@@ -46,7 +46,8 @@
   let initialLearningEntryHandled = false
   const initialLearningEntry = new Promise((resolve) => { resolveInitialLearningEntry = resolve })
 
-  function showLearningEntryChooser() {
+  async function showLearningEntryChooser() {
+    await global.KGWechatLogin?.waitForAccountFlow?.()
     if (!global.KGLearningEntryChooser || typeof global.KGLearningEntryChooser.init !== 'function') {
       return Promise.resolve({ shown: false })
     }
@@ -65,7 +66,8 @@
 
   global.addEventListener('kg:auth-session-changed', (event) => {
     if (event?.detail?.authenticated) {
-      requestCurrentUser({ force: true }).then(() => {
+      requestCurrentUser({ force: true }).then(async () => {
+        if (event.detail.authenticationAction === 'register') await global.KGWechatLogin?.promptBindingAfterRegister?.()
         showLearningEntryChooser()
       })
     } else {

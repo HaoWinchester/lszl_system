@@ -112,6 +112,13 @@
     panel.innerHTML=bound
       ?`<div class="uc-card-icon uc-card-icon-wechat">◉</div><div class="uc-card-content"><h3>微信已绑定</h3><p>已绑定微信账号：${escapeHTML(nickname)}。以后可直接使用微信扫码登录。</p></div><button type="button" class="uc-button uc-button-outline uc-button-compact" id="ucWechatUnbindBtn">解除绑定</button>`
       :`<div class="uc-card-icon uc-card-icon-wechat">◉</div><div class="uc-card-content"><h3>尚未绑定微信</h3><p>绑定后可使用微信扫码登录当前账号。</p></div><button type="button" class="uc-button uc-button-outline uc-button-compact" id="ucWechatBindBtn">绑定微信</button>`;
+    if(bound&&user.role==='student'){
+      const recover=document.createElement('button');
+      recover.type='button';recover.id='ucWechatRecoverBtn';recover.className='uc-button uc-button-outline uc-button-compact';
+      recover.textContent='找回原账号会员';
+      recover.onclick=()=>window.KGWechatLogin?.startOfficialLogin?.('recover');
+      panel.appendChild(recover);
+    }
     const bind=$("ucWechatBindBtn");
     const unbind=$("ucWechatUnbindBtn");
     if(bind)bind.addEventListener("click",()=>{

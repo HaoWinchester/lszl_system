@@ -3355,6 +3355,21 @@ g.is-batch-selected .edge-visible{
 #nodeModal .node-advanced-form input[type="color"]{justify-self:start}
 #nodeModal.node-editor-full .node-simple-form textarea{min-height:120px}
 
+/* Shared account choice after verified WeChat authorization. */
+.wechat-account-dialog{box-sizing:border-box;width:min(460px,calc(100vw - 32px));max-height:calc(100dvh - 40px);overflow:auto;border:1px solid #e2e8f0;border-radius:20px;padding:26px;color:#172033;background:#fff;box-shadow:0 24px 70px #0f172a33;font-family:inherit}
+.wechat-account-dialog::backdrop{background:#0f172a70}
+.wechat-account-dialog h2{margin:0 0 12px;font-size:21px}
+.wechat-account-dialog p{font-size:14px;line-height:1.65;color:#64748b}
+.wechat-account-dialog label{display:block;margin:14px 0;color:#334155;font-size:14px}
+.wechat-account-dialog input{box-sizing:border-box;display:block;width:100%;margin-top:7px;padding:11px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:16px}
+.wechat-account-dialog button{padding:11px 14px;border:1px solid #cbd5e1;border-radius:11px;background:#fff;color:#334155;font-weight:700;cursor:pointer}
+.wechat-account-dialog button[type=submit],.wechat-account-dialog [data-bind]{background:#168446;border-color:#168446;color:white}
+.wechat-account-dialog button:disabled{opacity:.6;cursor:wait}
+.wechat-account-dialog .wechat-account-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+.wechat-account-dialog .wechat-account-error{color:#b91c1c;min-height:20px;margin-bottom:0}
+.wechat-account-dialog .wechat-account-note{font-size:12px}
+.wechat-account-dialog :focus-visible{outline:3px solid #86cfa3;outline-offset:3px}
+
 /* kg:wechat-login-custom */
 .wechat-login-section{margin-top:14px;border-top:1px dashed #cbd5e1;padding-top:14px}
 .wechat-divider{display:flex;align-items:center;gap:10px;margin-bottom:12px;color:#94a3b8;font-size:12px;font-weight:900}.wechat-divider:before,.wechat-divider:after{content:"";height:1px;background:#e2e8f0;flex:1}.wechat-divider span{white-space:nowrap}

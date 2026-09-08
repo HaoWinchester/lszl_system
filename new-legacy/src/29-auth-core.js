@@ -164,9 +164,9 @@
     const value=payload?.loginSessionId||payload?.login_session_id||payload?.user?.loginSessionId||payload?.user?.login_session_id||"";
     return typeof value==="string"&&value.trim()?value.trim():"";
   }
-  function notifyRemoteSession(username,loginSessionId,previousLoginSessionId){
+  function notifyRemoteSession(username,loginSessionId,previousLoginSessionId,authenticationAction=''){
     if(loginSessionId!==previousLoginSessionId){
-      window.dispatchEvent(new CustomEvent("kg:auth-session-changed",{detail:{authenticated:!!username,username,loginSessionId}}));
+      window.dispatchEvent(new CustomEvent("kg:auth-session-changed",{detail:{authenticated:!!username,username,loginSessionId,authenticationAction}}));
     }
     window.dispatchEvent(new CustomEvent("kg-auth-session-change",{detail:{username,provider:"remote"}}));
   }
@@ -338,7 +338,7 @@
         const previousLoginSessionId=serverLoginSessionId(readRemoteSession()||{}),loginSessionId=serverLoginSessionId(payload);
         writeRemoteSession({user,token:payload.token||"",loginSessionId,issuedAt:Date.now()});
         try{if(Store.remove)Store.remove(AUTH_SESSION_KEY);else localStorage.removeItem(AUTH_SESSION_KEY)}catch(e){}
-        notifyRemoteSession(user.username,loginSessionId,previousLoginSessionId);
+        notifyRemoteSession(user.username,loginSessionId,previousLoginSessionId,'register');
         return {ok:true,user,message:String(payload.message||"注册成功")};
       }catch(error){return {ok:false,message:String(error?.message||error)}}
     }

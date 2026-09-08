@@ -1,5 +1,6 @@
 """ORM 模型汇总。新增模型在此 import，供 Alembic autogenerate 检测。"""
 
+from app.models.wechat_account import WechatAccountTicket
 from app.models.analytics import FeatureUsageEvent
 from app.models.content_prep import (
     ContentPrepDraft,
@@ -55,6 +56,7 @@ from app.models.training import (
 from app.models.user import User, UserAdminLog
 
 __all__ = [
+    "WechatAccountTicket",
     "User",
     "FeatureUsageEvent",
     "UserAdminLog",
