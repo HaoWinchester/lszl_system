@@ -1,11 +1,12 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.217",
-  "toVersion": "v9.0-p4.1.217",
+  "fromVersion": "v9.0-p4.1.218",
+  "toVersion": "v9.0-p4.1.219",
   "changes": {
     "added": [],
     "changed": [
-      "tests/practice-mark-show-answers-browser.py"
+      "VERSION",
+      "content-prep-studio/dist/content-prep.html"
     ],
     "removed": []
   },
