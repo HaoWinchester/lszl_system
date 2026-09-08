@@ -66,6 +66,36 @@ with sync_playwright() as playwright:
     page.locator('[data-report-review-all]').click()
     assert page.evaluate("window.reviewed") == "all"
 
+    # Batch review must show full content and filter without opening each question.
+    page.evaluate("""report=>KGPracticeResultReport.render(document.querySelector('#report'),report,{
+      questions:[
+        {id:'q7',stem:'错误题一 <script>bad</script>',options:[{id:'A',text:'选项一'},{id:'B',text:'选项二'}],correctAnswerIds:['B'],explanation:'第一题解析'},
+        {id:'q19',stem:'错误题二',options:[],correctAnswerIds:['A','C'],explanation:'第二题解析'},
+        {id:'q20',stem:'正确题',options:[],correctAnswerIds:['A']},
+        {id:'q21',stem:'未答题',options:[],correctAnswerIds:['A']}
+      ],
+      answers:{q7:{correct:false,selectedAnswer:'A'},q19:{correct:false,selectedAnswerIds:['A','B']},q20:{correct:true,selectedAnswer:'A'}}
+    })""", report)
+    assert page.locator('[data-review-card]').count() == 2
+    assert '第一题解析' in page.locator('[data-review-card="q7"]').inner_text()
+    assert '你的答案：A、B' in page.locator('[data-review-card="q19"]').inner_text()
+    assert '正确答案：A、C' in page.locator('[data-review-card="q19"]').inner_text()
+    assert page.locator('#report script').count() == 0
+    page.locator('[data-review-filter="correct"]').click()
+    assert page.locator('[data-review-card]').count() == 1
+    assert page.locator('[data-review-card="q20"]').count() == 1
+    page.locator('[data-review-filter="all"]').click()
+    assert page.locator('[data-review-card]').count() == 4
+    assert '未作答' in page.locator('[data-review-card="q21"]').inner_text()
+    page.locator('[data-review-filter="wrong"]').click()
+    assert page.locator('[data-review-card]').count() == 2
+    page.evaluate("""report=>KGPracticeResultReport.render(document.querySelector('#report'),{...report,wrongQuestionIds:[]},
+      {questions:[{id:'q20',stem:'正确题',options:[],correctAnswerIds:['A']}],answers:{q20:{correct:true,selectedAnswer:'A'}}})""", report)
+    assert page.locator('[data-review-card]').count() == 0
+    assert '没有答错的题目' in page.locator('[data-review-content]').inner_text()
+    page.locator('[data-review-filter="all"]').click()
+    assert page.locator('[data-review-card]').count() == 1
+
     incomplete = {**report, "domainDataComplete": False}
     page.evaluate(
         """report=>KGPracticeResultReport.render(document.querySelector('#report'),report)""",

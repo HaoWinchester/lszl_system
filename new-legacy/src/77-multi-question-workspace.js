@@ -475,6 +475,22 @@
       const index=catalog.findIndex(entry=>String(entry.paper?.releaseId||'')===releaseId);
       if(index>=0)catalog[index]=resolved;else catalog.unshift(resolved);
     }
+    // 画布只保存题目引用；恢复时还要加载画布实际引用的其他发布版本。
+    const workspace=store()?.ensure?.(workspaceOptions())||state.workspace;
+    const references=new Map();
+    Object.values(workspace?.nodes||{}).filter(node=>node.nodeType==='question-reference').forEach(node=>{
+      if(node.releaseId)references.set(String(node.releaseId),{paperId:String(node.paperId||''),releaseId:String(node.releaseId)});
+    });
+    for(const reference of references.values()){
+      if(catalog.some(entry=>String(entry.paper?.releaseId||'')===reference.releaseId&&(entry.items||[]).length))continue;
+      if(typeof resolver?.resolvePaper!=='function')continue;
+      try{
+        const resolved=repository?.peekResolved?.(reference.releaseId)||await resolver.resolvePaper({...reference,mode:'multi_question_canvas'},options);
+        if(!resolved?.ok)continue;
+        const index=catalog.findIndex(entry=>String(entry.paper?.releaseId||'')===reference.releaseId);
+        if(index>=0)catalog[index]=resolved;else catalog.push(resolved);
+      }catch(error){console.warn('画布引用试卷读取失败，可重新进入重试。',error)}
+    }
     return {
       catalog,
       paperId:String(selected?.paper?.id||''),
@@ -483,7 +499,7 @@
   }
   let questionSourcesLoading=false;
   async function rebuildQuestionSources(options={}){
-    // 目录仅取摘要，题目只解析当前 release；相同 release 的并发由 adapter 合并。
+    // 目录仅取摘要，按需解析当前试卷和画布引用的 release。
     if(questionSourcesLoading)return false;
     questionSourcesLoading=true;
     const previous={paperCatalog:state.paperCatalog,papers:state.papers,paperId:state.paperId,releaseId:state.releaseId,paperStats:state.paperStats,questions:state.questions};
@@ -498,6 +514,7 @@
       state.paperId=loaded.paperId;
       state.releaseId=loaded.releaseId;
       buildQuestionList();
+      if(state.initialized){renderCards();refreshAnalysisPanelContents()}
       if(byId('qwQuestionDrawer')?.classList.contains('open'))renderQuestionDock();
       return true;
     }catch(error){
@@ -684,8 +701,10 @@
     const identity=questionIdentity(question,bank);
     return [...state.cards.values()].map(record=>record.node).find(node=>nodeIdentity(node)===identity)||null;
   }
-  function findQuestion(questionId,bankId=''){
+  function findQuestion(questionId,bankId='',paperId='',releaseId=''){
     for(const entry of state.paperCatalog){
+      if(releaseId&&String(entry.paper?.releaseId||'')!==String(releaseId))continue;
+      if(paperId&&String(entry.paper?.id||'')!==String(paperId))continue;
       const item=(entry.items||[]).find(source=>
         String(source.question?.id||source.question?.sourceQuestionId||'')===String(questionId||'')&&
         (!bankId||String(source.bank?.id||'')===String(bankId))
@@ -1034,7 +1053,7 @@
     return html||'&nbsp;';
   }
   function resolvedQuestionForNode(node){
-    return findQuestion(node.questionId,node.bankId)?.question||null;
+    return findQuestion(node.questionId,node.bankId,node.paperId,node.releaseId)?.question||null;
   }
   function linkedSynthesisCount(nodeId){
     const workspace=state.workspace||store()?.read?.(workspaceOptions())||{};
@@ -3914,6 +3933,7 @@
     if(options.focusNodeId)setTimeout(()=>focusNode(options.focusNodeId),0);
     else recoverOffscreenWorkspaceViewport();
     global.KGMultiQuestionWorkspaceFilebar?.markSaved?.();
+    if(!questionSourcesLoading)void rebuildQuestionSources();
     return true;
   }
   function createWorkspace(){
@@ -4125,14 +4145,24 @@
     notify('已加入 '+created.length+' 道题'+(skipped?'，跳过 '+skipped+' 道已存在题目':'')+'。');
     return {created,skipped};
   }
-  function addQuestionByReference(reference={},position){
-    const item=state.questions.find(candidate=>
-      String(candidate.question?.id||candidate.question?.sourceQuestionId||'')===String(reference.questionId||'')
-      &&(!reference.bankId||String(candidate.bank?.id||candidate.question?.sourceBankId||'')===String(reference.bankId))
-      &&(!reference.releaseId||String(candidate.paper?.releaseId||candidate.question?.sourceReleaseId||'')===String(reference.releaseId))
-    );
-    if(!item){notify('这道错题不在当前已发布试卷中。');return {created:false,reason:'not-visible'}}
-    return addQuestionItem(item,position);
+  async function addQuestionByReference(reference={},position){
+    if(!canEdit())return {created:false,reason:'readonly',message:'登录后的桌面端才能编辑多题画布。'};
+    const questionId=String(reference.questionId||''),bankId=String(reference.bankId||''),paperId=String(reference.paperId||''),releaseId=String(reference.releaseId||'');
+    if(!questionId)return {created:false,reason:'missing-question',message:'这条错题记录缺少题目引用，无法放入画布。'};
+    const workspaceId=state.workspaceId,userId=store()?.currentUserId?.();
+    let item=findQuestion(questionId,bankId,paperId,releaseId);
+    if(!item){
+      const resolver=global.KGPublishedQuestionResolver;
+      if((!releaseId&&!paperId)||typeof resolver?.resolvePaper!=='function')return {created:false,reason:'missing-release',message:'这条错题记录缺少可用的试卷来源，无法放入画布。'};
+      const resolved=await resolver.resolvePaper({paperId,releaseId,mode:'multi_question_canvas'},{respectRole:true,mode:'multi_question_canvas'});
+      if(workspaceId!==state.workspaceId||userId!==store()?.currentUserId?.())return {created:false,reason:'workspace-changed',message:'当前画布或账号已切换，请在目标画布重新放入。'};
+      if(!resolved?.ok)return {created:false,reason:resolved?.code||'not-visible',message:resolver.message?.(resolved,'该试卷暂时不可用，请重试。')||resolved?.message||'该试卷暂时不可用，请重试。'};
+      const index=state.paperCatalog.findIndex(entry=>String(entry.paper?.releaseId||'')===String(resolved.paper?.releaseId||releaseId));
+      if(index>=0)state.paperCatalog[index]=resolved;else state.paperCatalog.push(resolved);
+      item=findQuestion(questionId,bankId,paperId,releaseId);
+    }
+    if(!item)return {created:false,reason:'not-visible',message:'这道题不在原发布版本中，无法放入画布。'};
+    return addQuestionItem({...item,question:{...item.question,sourcePaperId:String(item.paper?.id||item.question?.sourcePaperId||paperId),sourceReleaseId:String(item.paper?.releaseId||item.question?.sourceReleaseId||releaseId)}},position);
   }
   function addQuestionItem(item,position){
     if(!canEdit())return null;

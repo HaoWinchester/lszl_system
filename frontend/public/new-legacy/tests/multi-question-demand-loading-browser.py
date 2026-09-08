@@ -36,6 +36,8 @@ with sync_playwright() as playwright:
     browser = playwright.chromium.launch(headless=True, executable_path=executable, args=ARGS)
     page = browser.new_page(viewport={"width": 1366, "height": 860})
     page.set_default_timeout(10_000)
+    page.route("http://localhost/", lambda route: route.fulfill(body="<!doctype html><html></html>", content_type="text/html"))
+    page.goto("http://localhost/")
     attrs, body, scripts = page_parts()
     page.set_content(
         f'<!doctype html><html><head><base href="http://localhost/"></head><body{attrs}>{body}</body></html>'
@@ -102,6 +104,11 @@ with sync_playwright() as playwright:
           };
         }"""
     )
+    # A persisted reference exists before asynchronous question content arrives.
+    page.evaluate("""() => {
+      const item=__entry('release-1').items[0];
+      KGCanvasWorkspaceStore.addQuestionReference(item.question,item.bank.id,{x:50,y:50},{userId:'student'});
+    }""")
     page.add_script_tag(content=source("src/96-recall-question-source.js"))
     page.add_script_tag(content=source("src/77-multi-question-workspace.js"))
     page.evaluate("document.dispatchEvent(new Event('DOMContentLoaded'))")
@@ -119,6 +126,7 @@ with sync_playwright() as playwright:
     page.evaluate("window.__resolverPending.shift().resolve(window.__entry('release-1'))")
     page.wait_for_function("KGMultiQuestionWorkspace.getState().releaseId === 'release-1'")
     assert loading.is_hidden()
+    assert page.locator(".qw-card-options li").count() == 1
     assert page.locator("#qwPaperSelect").input_value() == "release-1"
     assert page.evaluate("KGMultiQuestionWorkspace.getState().questionCount") == 2
 
@@ -143,6 +151,52 @@ with sync_playwright() as playwright:
     assert page.evaluate("window.__resolverCalls") == ["release-1", "release-2", "release-2"]
     assert page.locator("#qwPaperSelect").input_value() == "release-2"
     assert page.evaluate("KGMultiQuestionWorkspace.getState().questionCount") == 2
+
+    # Insert a mistake from an unloaded release without changing the selected paper.
+    page.evaluate("""() => {
+      window.__paperRows.push({paperId:'paper-3',id:'paper-3',releaseId:'release-3',version:1,name:'错题来源试卷',title:'错题来源试卷',subject:'PMP',publishedAt:0,totalCount:2,enabledModes:['multi_question_canvas'],access:{allowed:true}});
+      window.__insertResult=null;
+      Promise.resolve(KGMultiQuestionWorkspace.addQuestionByReference({paperId:'paper-3',releaseId:'release-3',bankId:'bank-release-3',questionId:'question-release-3-2'})).then(result=>window.__insertResult=result);
+    }""")
+    page.wait_for_function("window.__resolverPending.some(item=>item.releaseId==='release-3')")
+    page.evaluate("window.__resolverPending.shift().resolve(window.__entry('release-3'))")
+    page.wait_for_function("window.__insertResult !== null")
+    assert page.evaluate("window.__insertResult.created") is True
+    assert page.locator('.qw-question-card').count() == 2
+    assert page.locator('.qw-card-options li').count() == 2
+    assert page.locator('#qwPaperSelect').input_value() == 'release-2'
+    # Existing references are focused rather than duplicated.
+    duplicate=page.evaluate("KGMultiQuestionWorkspace.addQuestionByReference({paperId:'paper-3',releaseId:'release-3',bankId:'bank-release-3',questionId:'question-release-3-2'})")
+    assert duplicate['reason'] == 'already-exists'
+    assert page.locator('.qw-question-card').count() == 2
+
+    # A withdrawn source must not fall back to another paper's question.
+    page.evaluate("""() => {
+      window.__insertResult=null;
+      KGMultiQuestionWorkspace.addQuestionByReference({paperId:'withdrawn-paper',releaseId:'withdrawn-release',bankId:'bank-release-2',questionId:'question-release-2-1'}).then(result=>window.__insertResult=result);
+    }""")
+    page.wait_for_function("window.__resolverPending.some(item=>item.releaseId==='withdrawn-release')")
+    page.evaluate("window.__resolverPending.shift().resolve({ok:false,code:'RELEASE_WITHDRAWN',message:'该发布版本已撤回'})")
+    page.wait_for_function("window.__insertResult !== null")
+    assert page.evaluate("window.__insertResult.created") is False
+    assert page.evaluate("window.__insertResult.reason") == 'RELEASE_WITHDRAWN'
+    assert page.locator('.qw-question-card').count() == 2
+
+    # A saved canvas may reference another release than the selected paper.
+    page.evaluate("""() => {
+      const item=__entry('release-2').items[0];
+      KGCanvasWorkspaceStore.addQuestionReference(item.question,item.bank.id,{x:500,y:50});
+      window.__resolvedEntries={};
+      window.dispatchEvent(new Event('focus'));
+    }""")
+    page.wait_for_function("window.__resolverPending.length === 1")
+    page.evaluate("window.__resolverPending.shift().resolve(window.__entry('release-2'))")
+    page.wait_for_function("window.__resolverPending.some(item=>item.releaseId==='release-1')")
+    page.evaluate("window.__resolverPending.shift().resolve(window.__entry('release-1'))")
+    page.wait_for_function("window.__resolverPending.some(item=>item.releaseId==='release-3')")
+    page.evaluate("window.__resolverPending.shift().resolve(window.__entry('release-3'))")
+    page.wait_for_function("document.querySelectorAll('.qw-card-options li').length === 3")
+    assert page.locator('#qwPaperSelect').input_value() == 'release-2'
 
     browser.close()
 
