@@ -1,5 +1,7 @@
 # UAT 独立部署设计
 
+> 历史设计：2026-09-08 用户要求共用 PostgreSQL 实例，现已改为共享实例、独立库及受限账号，UAT 也已启用 HTTPS。当前拓扑和回退方法见 [部署记录](../../verification/2026-09-08-uat-release-and-shared-postgres.md)。以下内容保留作为最初部署背景。
+
 ## 目标
 
 将提交 `a0730614dea9712f8d3e9e16153f5a3c9a956995` 部署到
