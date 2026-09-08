@@ -1,8 +1,9 @@
 """Transport-aware practice response projection.
 
 The website's signed-cookie client keeps its historical payload. Native mini-
-program Bearer clients receive a defensive copy with scoring facts removed
-until the mode's reveal point.
+program clients use the same authorized frozen session snapshots for local
+feedback and game rules. Standalone non-session responses retain their reveal
+policy. Final grading is always recomputed server-side.
 """
 
 from copy import deepcopy
@@ -97,6 +98,14 @@ def project_practice_payload(
     if status in COMPLETED_STATUSES:
         return deepcopy(payload)
     projected = _strip_hidden(payload)
+    # PC parity: local answer feedback, health and time need the frozen key.
+    # This function runs AFTER route authentication, ownership and access checks.
+    # Do not extend this to arbitrary catalog or standalone mistake payloads.
+    session = payload.get("session") if isinstance(payload, dict) else None
+    if isinstance(session, dict) and isinstance(session.get("questions"), list):
+        projected["session"] = deepcopy(session)
+        if isinstance(payload.get("questions"), list):
+            projected["questions"] = deepcopy(payload["questions"])
     if allow_current_reveal and mode in IMMEDIATE_REVEAL_MODES and isinstance(payload, dict):
         return _reveal_submitted_question(payload, projected)
     return projected

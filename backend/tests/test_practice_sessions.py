@@ -660,7 +660,7 @@ def test_short_paper_count_is_supported_by_the_session_api() -> None:
         asyncio.run(_cleanup_released_pmp_paper(ids))
 
 
-def test_mini_bearer_competitive_session_hides_answers_until_completion() -> None:
+def test_mini_bearer_competitive_session_supports_local_feedback_but_hides_explanation() -> None:
     ids = _practice_fixture_ids()
     asyncio.run(_seed_released_pmp_paper(ids))
 
@@ -687,19 +687,22 @@ def test_mini_bearer_competitive_session_hides_answers_until_completion() -> Non
             assert started_response.status_code == 200, started_response.text
             started = started_response.json()["session"]
             question = started["questions"][0]["question"]
-            assert "correctAnswer" not in question
-            assert "analysis" not in question
-            assert all("correct" not in option for option in question["options"])
+            assert question["correctAnswer"] == "A"
+            assert not question.get("analysis")
+            assert started["answers"] == {}
 
             completed_response = client.post(
                 f"/api/v1/learning/practice/sessions/{started['id']}/complete",
                 headers=headers,
-                json={"revision": started["revision"]},
+                json={"revision": started["revision"], "answers": {
+                    started["questions"][0]["questionId"]: {"selectedAnswer": "B", "selectionIndex": 1, "correct": True}
+                }},
             )
             assert completed_response.status_code == 200, completed_response.text
             completed_question = completed_response.json()["session"]["questions"][0]["question"]
             assert completed_question["correctAnswer"] == "A"
             assert completed_question["analysis"] == "第 1 题解析"
+            assert completed_response.json()["report"]["counts"]["correct"] == 0
     finally:
         asyncio.run(_cleanup_released_pmp_paper(ids))
 
@@ -1094,6 +1097,183 @@ def test_multiple_choice_session_scores_only_the_exact_option_set() -> None:
                 )
                 assert completed.status_code == 200, completed.text
                 assert completed.json()["session"]["stats"]["correct"] == expected
+    finally:
+        asyncio.run(_cleanup_released_pmp_paper(ids))
+
+
+def test_pending_multiple_selections_persist_without_grading_and_can_be_changed_or_cleared():
+    ids = _practice_fixture_ids()
+    asyncio.run(_seed_released_pmp_paper(ids, domains=["people"], multiple_choice=True))
+    try:
+        with TestClient(app) as client:
+            assert client.post('/api/v1/auth/login', json={
+                'username': ids['student'], 'password': PASSWORD,
+            }).status_code == 200
+            session = client.post('/api/v1/learning/practice/sessions/start', json={
+                'paperId': ids['paper'], 'releaseId': ids['release'],
+                'mode': 'challenge', 'count': 1, 'order': 'paper',
+            }).json()['session']
+            base = f"/api/v1/learning/practice/sessions/{session['id']}"
+            qid = session['questionOrder'][0]['questionId']
+            for pending in ({qid: ['A', 'C']}, {qid: ['A']}, {}):
+                payload = {'revision': session['revision'], 'answers': {},
+                           'runtimeState': {'pendingSelections': pending}}
+                for _ in range(2):
+                    response = client.post(base + '/pause', json=payload)
+                    assert response.status_code == 200, response.text
+                session = client.get(base).json()['session']
+                assert session['runtimeState']['pendingSelections'] == pending
+                assert session['answers'] == {}
+                assert session['stats']['answered'] == 0
+                assert session['stats']['experience'] == 0
+            for pending in ({'foreign-question': ['A']}, {qid: ['Z']}, {qid: 'A'}, {qid: []}):
+                rejected = client.post(base + '/pause', json={
+                    'revision': session['revision'], 'runtimeState': {'pendingSelections': pending},
+                })
+                assert rejected.status_code == 422, rejected.text
+                assert client.get(base).json()['session']['revision'] == session['revision']
+            locked = {qid: {'selectedAnswerIds': ['A', 'C'], 'selectionIndex': 1}}
+            response = client.post(base + '/pause', json={
+                'revision': session['revision'], 'answers': locked,
+                'runtimeState': {'pendingSelections': {}},
+            })
+            assert response.status_code == 200, response.text
+            session = response.json()['session']
+            assert session['stats']['experience'] == 10
+            # Pending data cannot replace a locked answer, remove it, or award more XP.
+            rejected = client.post(base + '/pause', json={
+                'revision': session['revision'], 'answers': {},
+                'runtimeState': {'pendingSelections': {qid: ['B']}},
+            })
+            assert rejected.status_code == 409
+            completed = client.post(base + '/complete', json={
+                'revision': session['revision'], 'answers': locked,
+                'runtimeState': {'pendingSelections': {}},
+            })
+            assert completed.status_code == 200, completed.text
+            assert completed.json()['session']['stats']['correct'] == 1
+            assert client.get('/api/v1/learning/practice/experience-summary').json()['totalExperience'] == 10
+    finally:
+        asyncio.run(_cleanup_released_pmp_paper(ids))
+
+
+def test_multiple_choice_session_answer_endpoint_accepts_option_ids() -> None:
+    ids = _practice_fixture_ids()
+    asyncio.run(_seed_released_pmp_paper(ids, domains=["people"], multiple_choice=True))
+    try:
+        with TestClient(app) as client:
+            assert client.post("/api/v1/auth/login", json={
+                "username": ids["student"], "password": PASSWORD,
+            }).status_code == 200
+            response = client.post("/api/v1/learning/practice/sessions/start", json={
+                "paperId": ids["paper"], "releaseId": ids["release"],
+                "mode": "challenge", "count": 1, "order": "paper",
+            })
+            assert response.status_code == 200, response.text
+            started = response.json()["session"]
+            question_id = started["questionOrder"][0]["questionId"]
+
+            answered = client.post(
+                f"/api/v1/learning/practice/sessions/{started['id']}/answers",
+                json={
+                    "revision": started["revision"],
+                    "questionId": question_id,
+                    "selectedAnswerIds": ["C", "A"],
+                },
+            )
+
+            assert answered.status_code == 200, answered.text
+            body = answered.json()
+            assert body["answer"]["selectedAnswerIds"] == ["A", "C"]
+            assert body["answer"]["correct"] is True
+            assert body["session"]["answers"][question_id]["selectedAnswerIds"] == ["A", "C"]
+
+            repeated = client.post(
+                f"/api/v1/learning/practice/sessions/{started['id']}/answers",
+                json={
+                    "revision": started["revision"],
+                    "questionId": question_id,
+                    "selectedAnswerIds": ["A", "C"],
+                },
+            )
+            assert repeated.status_code == 200, repeated.text
+            assert repeated.json()["idempotent"] is True
+
+            changed = client.post(
+                f"/api/v1/learning/practice/sessions/{started['id']}/answers",
+                json={
+                    "revision": body["session"]["revision"],
+                    "questionId": question_id,
+                    "selectedAnswerIds": ["A"],
+                },
+            )
+            assert changed.status_code == 409, changed.text
+            assert changed.json()["detail"]["code"] == "PRACTICE_ANSWER_LOCKED"
+    finally:
+        asyncio.run(_cleanup_released_pmp_paper(ids))
+
+
+def test_multiple_choice_timeout_answer_is_idempotent() -> None:
+    ids = _practice_fixture_ids()
+    asyncio.run(_seed_released_pmp_paper(ids, domains=["people"], multiple_choice=True))
+    try:
+        with TestClient(app) as client:
+            assert client.post("/api/v1/auth/login", json={
+                "username": ids["student"], "password": PASSWORD,
+            }).status_code == 200
+            started_response = client.post("/api/v1/learning/practice/sessions/start", json={
+                "paperId": ids["paper"], "releaseId": ids["release"],
+                "mode": "scholar", "count": 1, "order": "paper",
+            })
+            assert started_response.status_code == 200, started_response.text
+            started = started_response.json()["session"]
+            question_id = started["questionOrder"][0]["questionId"]
+            payload = {
+                "revision": started["revision"],
+                "questionId": question_id,
+                "timedOut": True,
+            }
+
+            first = client.post(
+                f"/api/v1/learning/practice/sessions/{started['id']}/answers",
+                json=payload,
+            )
+            assert first.status_code == 200, first.text
+            assert first.json()["answer"]["timedOut"] is True
+
+            repeated = client.post(
+                f"/api/v1/learning/practice/sessions/{started['id']}/answers",
+                json=payload,
+            )
+            assert repeated.status_code == 200, repeated.text
+            assert repeated.json()["idempotent"] is True
+    finally:
+        asyncio.run(_cleanup_released_pmp_paper(ids))
+
+
+def test_multiple_choice_timeout_whole_paper_save_and_complete() -> None:
+    ids = _practice_fixture_ids()
+    asyncio.run(_seed_released_pmp_paper(ids, domains=["people"], multiple_choice=True))
+    try:
+        with TestClient(app) as client:
+            assert client.post("/api/v1/auth/login", json={"username": ids["student"], "password": PASSWORD}).status_code == 200
+            session = client.post("/api/v1/learning/practice/sessions/start", json={
+                "paperId": ids["paper"], "releaseId": ids["release"], "mode": "scholar", "count": 1, "order": "paper",
+            }).json()["session"]
+            question_id = session["questionOrder"][0]["questionId"]
+            answers = {question_id: {"selectedAnswer": "__timeout__", "timedOut": True, "selectionIndex": 1}}
+            saved = client.post(f"/api/v1/learning/practice/sessions/{session['id']}/pause", json={
+                "revision": session["revision"], "answers": answers, "runtimeState": {"remainingMs": 40000, "health": 2},
+            })
+            assert saved.status_code == 200, saved.text
+            payload = {"revision": saved.json()["session"]["revision"], "answers": answers, "runtimeState": {"durationMs": 60000}}
+            completed = client.post(f"/api/v1/learning/practice/sessions/{session['id']}/complete", json=payload)
+            assert completed.status_code == 200, completed.text
+            assert completed.json()["report"]["counts"]["correct"] == 0
+            assert completed.json()["session"]["answers"][question_id]["timedOut"] is True
+            repeated = client.post(f"/api/v1/learning/practice/sessions/{session['id']}/complete", json=payload)
+            assert repeated.status_code == 200, repeated.text
+            assert repeated.json()["report"] == completed.json()["report"]
     finally:
         asyncio.run(_cleanup_released_pmp_paper(ids))
 
@@ -3600,6 +3780,21 @@ def test_experience_baseline_preserves_date_and_replays_once(client, active_sess
             assert session.stats['creditedExperience'] == 106
             await db.rollback()
     asyncio.run(verify())
+
+
+def test_background_state_save_keeps_locked_answers_and_enforces_the_same_lock(client, active_session):
+    base = f"/api/v1/learning/practice/sessions/{active_session['id']}"
+    qid = active_session['questions'][0]['questionId']
+    payload = {'revision': active_session['revision'],
+               'answers': {qid: {'selectedAnswer': 'A', 'selectionIndex': 1}},
+               'runtimeState': {'currentIndex': 1, 'pendingSelections': {}}}
+    saved = client.patch(base + '/state', json=payload)
+    assert saved.status_code == 200, saved.text
+    fetched = client.get(base).json()['session']
+    assert fetched['answers'] == payload['answers']
+    assert fetched['stats']['answered'] == 1
+    payload.update(revision=fetched['revision'], answers={})
+    assert client.patch(base + '/state', json=payload).status_code == 409
 
 
 def test_pause_credits_once_and_resumed_completion_only_credits_delta(client, active_session):

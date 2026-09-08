@@ -46,6 +46,7 @@ RUNTIME_FIELDS = RUNTIME_INTEGER_FIELDS | {
     "order",
     "showAnswers",
     "markedQuestionIds",
+    "pendingSelections",
 }
 RUNTIME_MARKED_QUESTION_IDS_MAX = 300
 RUNTIME_MARKED_QUESTION_ID_MAX_LENGTH = 128
@@ -303,7 +304,7 @@ async def _validated_draft_answers(
         ) if multiple else []
         selection_index = value.get("selectionIndex")
         if (
-            (not selected_ids if multiple else not selected)
+            (not selected_ids if multiple and value.get("timedOut") is not True else not selected)
             or isinstance(selection_index, bool)
             or not isinstance(selection_index, int)
             or selection_index < 1
@@ -470,8 +471,10 @@ async def _session_payload(db: AsyncSession, session: PracticeSession) -> dict:
             }
         )
     scoring = session.scoring_snapshot if isinstance(session.scoring_snapshot, dict) else {}
+    release = await db.get(PaperRelease, session.release_id) if session.release_id else None
     return {
         "id": session.id,
+        "paperName": release.name if release else "错题复仇",
         "paperId": session.paper_id,
         "releaseId": session.release_id,
         "mode": session.mode,
@@ -953,11 +956,15 @@ async def answer_session_question(
     question_id = str(data.get("questionId") or "").strip()
     timed_out = data.get("timedOut") is True
     selected_answer = str(data.get("selectedAnswer") or "").strip()
-    if not question_id or (not selected_answer and not timed_out):
+    raw_selected_ids = data.get("selectedAnswerIds")
+    has_selected_ids = isinstance(raw_selected_ids, (list, tuple)) and any(
+        str(value or "").strip() for value in raw_selected_ids
+    )
+    if not question_id or (not selected_answer and not has_selected_ids and not timed_out):
         raise _error(
             422,
             "PRACTICE_ANSWER_REQUIRED",
-            "questionId 和 selectedAnswer 不能为空",
+            "questionId 和答案不能为空",
         )
     if timed_out:
         selected_answer = "__timeout__"
@@ -979,10 +986,45 @@ async def answer_session_question(
     if ref is None:
         raise _error(422, "QUESTION_NOT_IN_SESSION", "题目不属于当前练习会话")
 
+    session_rows = await _session_question_rows(db, session)
+    row = session_rows.get(question_id)
+    if row is None:
+        raise _error(404, "PRACTICE_QUESTION_NOT_FOUND", "题目不存在于当前练习快照")
+    frozen_snapshot = row.snapshot if isinstance(row.snapshot, dict) else {}
+    multiple = str(frozen_snapshot.get("type") or "") == "multiple_choice"
+    if multiple and not timed_out:
+        selected_answer_ids = question_answer_service.normalize_option_ids(
+            raw_selected_ids,
+            [
+                str(option.get("id") or "").strip()
+                for option in frozen_snapshot.get("options") or []
+                if isinstance(option, dict) and str(option.get("id") or "").strip()
+            ],
+        )
+        if not selected_answer_ids:
+            raise _error(
+                422,
+                "PRACTICE_ANSWER_INVALID",
+                "selectedAnswerIds 不是冻结题目快照的有效选项集合",
+            )
+    else:
+        selected_answer_ids = []
+        if not selected_answer and not timed_out:
+            raise _error(422, "PRACTICE_ANSWER_REQUIRED", "questionId 和答案不能为空")
+
     answers = dict(session.answers or {})
     existing = answers.get(question_id)
     if isinstance(existing, dict) and existing.get("draft") is not True:
-        if str(existing.get("selectedAnswer") or "") != selected_answer:
+        existing_selection = (
+            existing.get("selectedAnswerIds") or []
+            if multiple
+            else str(existing.get("selectedAnswer") or "")
+        )
+        requested_selection = selected_answer_ids if multiple else selected_answer
+        if (
+            existing_selection != requested_selection
+            or (existing.get("timedOut") is True) != timed_out
+        ):
             raise _error(409, "PRACTICE_ANSWER_LOCKED", "已提交答案不能修改")
         return {
             "answer": _public_answer(existing),
@@ -999,11 +1041,6 @@ async def answer_session_question(
     if session.status == "paused":
         session.status = "active"
         session.paused_at = None
-
-    session_rows = await _session_question_rows(db, session)
-    row = session_rows.get(question_id)
-    if row is None:
-        raise _error(404, "PRACTICE_QUESTION_NOT_FOUND", "题目不存在于当前练习快照")
     # 旧逐题接口与整卷交卷共用同一个单题判题入口：不复制第二套错题逻辑。
     submission_index = len(
         [key for key, value in answers.items() if isinstance(value, dict)]
@@ -1016,7 +1053,11 @@ async def answer_session_question(
             session,
             ref,
             row,
-            {"selectedAnswer": selected_answer} | ({"timedOut": True} if timed_out else {}),
+            (
+                {"selectedAnswerIds": selected_answer_ids}
+                if multiple and not timed_out
+                else {"selectedAnswer": selected_answer}
+            ) | ({"timedOut": True} if timed_out else {}),
             submission_index,
         )
     except PracticeSessionError as error:
@@ -1161,6 +1202,16 @@ def _validated_runtime_state(data: dict, *, question_count: int) -> dict:
         state["markedQuestionIds"] = _validated_marked_question_ids(
             raw["markedQuestionIds"]
         )
+    if "pendingSelections" in raw:
+        pending = raw["pendingSelections"]
+        if not isinstance(pending, dict) or len(pending) > question_count or any(
+            not isinstance(qid, str) or not qid or len(qid) > RUNTIME_MARKED_QUESTION_ID_MAX_LENGTH
+            or not isinstance(ids, list) or not ids or len(ids) > 100
+            or any(not isinstance(option, str) or not option or len(option) > 128 for option in ids)
+            for qid, ids in pending.items()
+        ):
+            raise _error(422, "INVALID_RUNTIME_STATE_VALUE", "暂存选项无效", field="pendingSelections")
+        state["pendingSelections"] = {qid: list(dict.fromkeys(ids)) for qid, ids in pending.items()}
     if "revengeState" in raw:
         revenge_state = raw["revengeState"]
         if not isinstance(revenge_state, dict):
@@ -1246,7 +1297,10 @@ async def update_runtime_state(
             "练习进度已在其他页面更新，请加载最新进度",
             currentRevision=session.revision,
         )
-    _apply_runtime_patch(session, data)
+    if "answers" in data:
+        await _apply_saved_draft(db, session, data)
+    else:
+        await _apply_runtime_patch(db, session, data)
     if session.status == "paused":
         session.status = "active"
         session.paused_at = None
@@ -1355,11 +1409,17 @@ async def verify_revenge_session(
     return await _session_payload(db, session), mistake, verification, answer
 
 
-def _apply_runtime_patch(session: PracticeSession, data: dict) -> None:
+async def _apply_runtime_patch(db: AsyncSession, session: PracticeSession, data: dict) -> None:
     if "runtimeState" not in data:
         return
     refs = session.question_order if isinstance(session.question_order, list) else []
     patch = _validated_runtime_state(data, question_count=len(refs))
+    if "pendingSelections" in patch:
+        rows = await _session_question_rows(db, session)
+        for qid, ids in patch["pendingSelections"].items():
+            row = rows.get(qid)
+            if row is None or (row.snapshot or {}).get("type") != "multiple_choice" or not set(ids) <= _snapshot_option_ids(row.snapshot):
+                raise _error(422, "INVALID_RUNTIME_STATE_VALUE", "暂存选项不在本次练习题目内", field="pendingSelections")
     runtime_state = dict(session.runtime_state or {})
     runtime_state.update(patch)
     stats = dict(session.stats or {})
@@ -1424,7 +1484,7 @@ async def _apply_saved_draft(db: AsyncSession, session: PracticeSession, data: d
     draft = await _validated_draft_answers(db, session, data) if "answers" in data else None
     if draft is not None:
         _assert_existing_selections_unchanged(session.answers or {}, draft)
-    _apply_runtime_patch(session, data)
+    await _apply_runtime_patch(db, session, data)
     if draft is not None:
         session.answers = draft
     refs = session.question_order if isinstance(session.question_order, list) else []
@@ -1943,7 +2003,7 @@ async def complete_session(
         session.answers = answers
 
     runtime_state = dict(session.runtime_state or {})
-    _apply_runtime_patch(session, data)
+    await _apply_runtime_patch(db, session, data)
     runtime_state.update(session.runtime_state or {})
     current_answers = session.answers if isinstance(session.answers, dict) else {}
     previous_stats = session.stats if isinstance(session.stats, dict) else {}

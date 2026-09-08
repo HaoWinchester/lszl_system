@@ -44,7 +44,7 @@ def test_normal_answer_can_reveal_only_when_route_allows_it() -> None:
     assert revealed is not source
 
 
-def test_normal_answer_reveals_only_the_submitted_question() -> None:
+def test_session_snapshots_support_pc_equivalent_local_feedback() -> None:
     source = {
         "session": {
             "mode": "practice",
@@ -62,7 +62,17 @@ def test_normal_answer_reveals_only_the_submitted_question() -> None:
         "analysis": "第一题",
         "correctAnswer": "A",
     }
-    assert result["session"]["questions"][1]["question"] == {}
+    assert result["session"]["questions"][1]["question"] == source["session"]["questions"][1]["question"]
+
+
+def test_competitive_session_snapshot_matches_pc_for_local_game_rules() -> None:
+    source = {"session": {"id": "s1", "mode": "scholar", "status": "active", "questions": [
+        {"questionId": "q1", "question": {"correctOptionIds": ["A", "C"], "analysis": "冻结解析"}}
+    ]}}
+    result = project_practice_payload(source, transport="bearer")
+    assert result == source
+    result["session"]["questions"][0]["question"]["correctOptionIds"].append("B")
+    assert source["session"]["questions"][0]["question"]["correctOptionIds"] == ["A", "C"]
 
 
 def test_completed_session_can_reveal_for_every_mode() -> None:
