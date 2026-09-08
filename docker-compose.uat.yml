@@ -1,33 +1,16 @@
-# UAT deployment for uat.aihuanpu.com. Keep isolated from lszl-kg production.
+# UAT uses a separate database/account in the existing production PostgreSQL instance.
+# Provision kg_graph_uat and its restricted kg_uat role before starting this service.
 services:
-  db:
-    image: postgres:15-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: kg_graph_uat
-      POSTGRES_USER: kg_uat
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    volumes:
-      - uat_pg_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U kg_uat -d kg_graph_uat"]
-      interval: 5s
-      timeout: 5s
-      retries: 12
-
   backend:
     build:
       context: .
       dockerfile: backend/Dockerfile
     image: lszl-kg-backend:uat-27c39ab
     restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
     environment:
       ENV: uat
       SECRET_KEY: ${SECRET_KEY}
-      DATABASE_URL: postgresql+asyncpg://kg_uat:${POSTGRES_PASSWORD}@db:5432/kg_graph_uat
+      DATABASE_URL: postgresql+asyncpg://kg_uat:${POSTGRES_PASSWORD}@${POSTGRES_HOST:-lszl-kg-db-1}:5432/kg_graph_uat
       CORS_ORIGINS: '["http://uat.aihuanpu.com"]'
       QUESTION_CATALOG_CUTOVER_ENABLED: "true"
       GRAPH_FILES_API_CUTOVER_ENABLED: ${GRAPH_FILES_API_CUTOVER_ENABLED:-false}
@@ -49,6 +32,7 @@ services:
     ports:
       - "127.0.0.1:18087:8000"
 
-volumes:
-  uat_pg_data:
-    name: lszl-kg-uat_pg_data
+networks:
+  default:
+    external: true
+    name: ${POSTGRES_NETWORK:-lszl-kg_default}
