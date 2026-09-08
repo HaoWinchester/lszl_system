@@ -1,17 +1,10 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.219",
+  "fromVersion": "v9.0-p4.1.220",
   "toVersion": "v9.0-p4.1.220",
   "changes": {
     "added": [],
-    "changed": [
-      "VERSION",
-      "content-prep-studio/dist/content-prep.html",
-      "src/29-auth-core.js",
-      "src/32-wechat-login.js",
-      "src/33-user-center.js",
-      "styles/main.css"
-    ],
+    "changed": [],
     "removed": []
   },
   "incompatible": []
