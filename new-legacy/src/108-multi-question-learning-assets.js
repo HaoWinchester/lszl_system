@@ -3,7 +3,7 @@
 ;(function(global){
   const Personal=global.KGPersonalSynthesisCardApi||{};
   const Practice=global.KGPracticeLearningApi||{};
-  const state={personalFilter:'active',mistakeFilter:'active',personalQuery:'',mistakeQuery:'',personal:null,practice:null,editing:null,lastFocus:null};
+  const state={personalFilter:'active',mistakeFilter:'active',personalQuery:'',mistakeQuery:'',personal:null,practice:null,editing:null,lastFocus:null,insertingMistakeId:''};
   const byId=id=>document.getElementById(id);
   const clone=value=>{try{return JSON.parse(JSON.stringify(value))}catch(error){return value}};
   const escapeHTML=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
@@ -61,7 +61,7 @@
     const list=byId('qwMistakesList');if(!list)return;
     byId('qwMistakesError').hidden=true;
     const rows=mistakeRows(),mastered=state.mistakeFilter==='mastered';
-    list.innerHTML=rows.length?rows.map(row=>{const question=row.questionSnapshot||{};return '<article class="qw-learning-asset-card qw-mistake-card" data-mistake-id="'+escapeHTML(row.id)+'"><header><span>'+(mastered?'已掌握':'待掌握')+'</span><strong>'+escapeHTML(question.title||question.stem||'未命名错题')+'</strong></header><p>累计答错 '+Number(row.wrongCount||0)+' 次'+(row.paperName?' · '+escapeHTML(row.paperName):'')+'</p><footer><button type="button" data-mistake-action="insert">放入当前画布</button></footer></article>'}).join(''):'<div class="qw-learning-assets-empty">'+(mastered?'暂无已掌握错题':'太好了，当前没有待掌握错题。')+'</div>';
+    list.innerHTML=rows.length?rows.map(row=>{const question=row.questionSnapshot||{};return '<article class="qw-learning-asset-card qw-mistake-card" data-mistake-id="'+escapeHTML(row.id)+'"><header><span>'+(mastered?'已掌握':'待掌握')+'</span><strong>'+escapeHTML(question.title||question.stem||'未命名错题')+'</strong></header><p>累计答错 '+Number(row.wrongCount||0)+' 次'+(row.paperName?' · '+escapeHTML(row.paperName):'')+'</p><footer><button type="button" data-mistake-action="insert"'+(state.insertingMistakeId?' disabled':'')+' aria-busy="'+(String(row.id)===state.insertingMistakeId?'true':'false')+'">'+(String(row.id)===state.insertingMistakeId?'正在放入…':'放入当前画布')+'</button></footer></article>'}).join(''):'<div class="qw-learning-assets-empty">'+(mastered?'暂无已掌握错题':'太好了，当前没有待掌握错题。')+'</div>';
     updateCounts();
   }
   async function refreshPersonal(){
@@ -85,6 +85,22 @@
       showError('personal',error);
     }
   }
+  async function insertMistake(row){
+    if(state.insertingMistakeId)return;
+    state.insertingMistakeId=String(row.id);
+    renderMistakes();
+    let failure=null;
+    try{
+      const result=await global.KGMultiQuestionWorkspace?.addQuestionByReference?.({questionId:row.questionId,bankId:row.bankId,paperId:row.paperId,releaseId:row.releaseId});
+      if(result?.created||result?.reason==='already-exists')closeDrawers();
+      else failure=new Error(result?.message||'题目未能放入画布，请重试。');
+    }catch(error){failure=error}
+    finally{
+      state.insertingMistakeId='';
+      renderMistakes();
+      if(failure)showError('mistakes',failure);
+    }
+  }
   function bind(){
     // 409 冲突时保留本地编辑内容，由用户点击“重新加载最新版本”后再覆盖。
     byId('qwPersonalCardsBtn')?.addEventListener('click',()=>byId('qwPersonalCardsDrawer').hidden?openDrawer('personal'):closeDrawers());
@@ -94,7 +110,7 @@
     document.querySelectorAll('[data-personal-card-filter]').forEach(button=>button.addEventListener('click',()=>{state.personalFilter=String(button.dataset.personalCardFilter);document.querySelectorAll('[data-personal-card-filter]').forEach(item=>item.classList.toggle('active',item===button));renderPersonal()}));
     document.querySelectorAll('[data-mistake-filter]').forEach(button=>button.addEventListener('click',()=>{state.mistakeFilter=String(button.dataset.mistakeFilter);document.querySelectorAll('[data-mistake-filter]').forEach(item=>item.classList.toggle('active',item===button));renderMistakes()}));
     byId('qwPersonalCardsList')?.addEventListener('click',async event=>{const article=event.target.closest('[data-card-id]'),action=event.target.closest('[data-card-action]')?.dataset.cardAction,card=findCard(article?.dataset.cardId);if(!card||!action)return;if(action==='edit')openEditor(card);if(action==='insert'){const result=await global.KGMultiQuestionWorkspace?.insertPersonalCard?.(card);if(result?.created||result?.reason==='already-exists')closeDrawers()}if(action==='archive'){await Personal.archive?.(card.id);await refreshPersonal()}if(action==='restore'){await Personal.restore?.(card.id);await refreshPersonal()}});
-    byId('qwMistakesList')?.addEventListener('click',event=>{const article=event.target.closest('[data-mistake-id]'),action=event.target.closest('[data-mistake-action]')?.dataset.mistakeAction,row=(practiceSnapshot().mistakes||[]).find(item=>String(item.id)===String(article?.dataset.mistakeId));if(action==='insert'&&row){global.KGMultiQuestionWorkspace?.addQuestionByReference?.({questionId:row.questionId,bankId:row.bankId,releaseId:row.releaseId});closeDrawers()}});
+    byId('qwMistakesList')?.addEventListener('click',event=>{const article=event.target.closest('[data-mistake-id]'),action=event.target.closest('[data-mistake-action]')?.dataset.mistakeAction,row=(practiceSnapshot().mistakes||[]).find(item=>String(item.id)===String(article?.dataset.mistakeId));if(action==='insert'&&row)void insertMistake(row)});
     byId('qwPersonalCardsRetry')?.addEventListener('click',refreshPersonal);byId('qwMistakesRetry')?.addEventListener('click',refreshMistakes);
     byId('qwPersonalCardEditor')?.querySelector('form')?.addEventListener('submit',saveEditor);for(const id of ['qwPersonalCardEditorCancel','qwPersonalCardEditorDismiss'])byId(id)?.addEventListener('click',closeEditor);
     byId('qwPersonalCardConflictReload')?.addEventListener('click',async()=>{const fresh=await Personal.get?.(state.editing?.id);if(fresh)openEditor(fresh)});

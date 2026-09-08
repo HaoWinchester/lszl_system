@@ -408,3 +408,23 @@ body.practice-mode-page:not([data-practice-view="lobby"]) .practice-exp-fab{disp
 .practice-history-row.is-paper>.practice-history-actions{grid-column:2;grid-row:1 / span 2;flex-direction:column}
 
 .practice-paper-latest{display:inline-flex;align-items:center;margin-left:8px;padding:2px 7px;border-radius:5px;background:#e4f5eb;color:#17633d;font-size:11px;line-height:1.5;font-weight:700;vertical-align:middle;white-space:nowrap}
+
+/* 成绩与学习记录共用的批量题目回顾。 */
+.practice-report-review{padding:24px;border:1px solid var(--practice-border);border-radius:18px;background:#fff;min-width:0}
+.practice-report-review h2{margin:0 0 16px;font-size:22px}
+.practice-review-filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px}
+.practice-review-filters button{padding:10px 16px;border:1px solid var(--practice-border);border-radius:10px;background:#fff;color:#475467;font:inherit;cursor:pointer}
+.practice-review-filters button[aria-pressed="true"]{background:#ecfdf3;border-color:#15958f;color:#08786f;font-weight:700}
+.practice-review-filters button:focus-visible{outline:3px solid #74c3b8;outline-offset:2px}
+.practice-review-card{padding:24px 0;border-top:1px solid var(--practice-border);overflow-wrap:anywhere}
+.practice-review-card header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.practice-review-card h3{margin:0;font-size:16px}
+.practice-review-status{font-size:13px;color:#667085}.practice-review-status.is-correct{color:#08786f}.practice-review-status.is-wrong{color:#b42318}
+.practice-review-stem,.practice-review-explanation p{white-space:pre-wrap;line-height:1.8}
+.practice-review-options{list-style:none;padding:0;display:grid;gap:8px}
+.practice-review-options li{display:flex;align-items:baseline;gap:12px;padding:12px;border:1px solid var(--practice-border);border-radius:8px;white-space:pre-wrap;line-height:1.7}
+.practice-review-options .is-correct{background:#ecfdf3;border-color:#a6dccc}.practice-review-options .is-wrong{background:#fff1f3;border-color:#f3a3b3}
+.practice-review-answers{display:flex;flex-wrap:wrap;gap:12px 28px;margin:16px 0;font-size:14px}
+.practice-review-explanation{padding:16px;background:#f8fafc;border-radius:10px;font-size:14px}.practice-review-explanation p{margin:8px 0 0}
+.practice-review-empty{padding:24px 0;color:#667085}
+@media(max-width:600px){.practice-report-review{padding:18px 14px}.practice-review-filters button{padding:10px 12px}.practice-review-options li{padding:10px}}

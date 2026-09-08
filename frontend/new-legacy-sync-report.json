@@ -1,10 +1,21 @@
 {
   "schemaVersion": 1,
   "fromVersion": "v9.0-p4.1.216",
-  "toVersion": "v9.0-p4.1.216",
+  "toVersion": "v9.0-p4.1.217",
   "changes": {
     "added": [],
-    "changed": [],
+    "changed": [
+      "VERSION",
+      "content-prep-studio/dist/content-prep.html",
+      "src/100-practice-mode.js",
+      "src/108-multi-question-learning-assets.js",
+      "src/113-practice-result-report.js",
+      "src/77-multi-question-workspace.js",
+      "styles/practice-mode.css",
+      "tests/multi-question-demand-loading-browser.py",
+      "tests/multi-question-learning-assets-browser.py",
+      "tests/practice-result-report-browser.py"
+    ],
     "removed": []
   },
   "incompatible": []

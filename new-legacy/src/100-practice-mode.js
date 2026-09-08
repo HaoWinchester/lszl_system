@@ -243,6 +243,13 @@
     const questionNumbers=Object.fromEntries(state.questions.map((question,index)=>[question.id,index+1]));
     const rendered=global.KGPracticeResultReport.render(dom.result,state.report,{questionNumbers,
       experience:state.session?.stats?.experience,
+      questions:state.questions.map(question=>{
+        const view=questionLanguageView(question);
+        return {id:question.id,stem:view?languageText(view.stem):question.stem,
+          options:question.options.map(option=>({id:option.id,text:view?languageText(view.options?.find(item=>text(item.id)===text(option.id))?.display)||option.text:option.text})),
+          correctAnswerIds:questionCorrectIds(question),explanation:view?languageText(view.explanation):text(question.raw?.analysis||question.raw?.explanation)};
+      }),
+      answers:state.session?.answers||{},
       onReviewAll:state.mode==='practice'?()=>openQuestionReview(state.questions[state.index]?.id||state.questions[0]?.id):null,
       onReviewWrong:reviewWrongQuestion,onAgain:startAgain,onLobby:showLobby});
     renderModeOutcome();

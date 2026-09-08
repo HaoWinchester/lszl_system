@@ -88,6 +88,37 @@
     }).join('')
   }
 
+  function renderQuestionReview(root, report, options) {
+    const section = root.querySelector('[data-question-review]')
+    if (!section) return
+    const questions = options.questions || []
+    const answers = options.answers || {}
+    const wrongIds = new Set((report.wrongQuestionIds || []).map(text))
+    const status = question => answers[question.id]?.correct === true ? 'correct'
+      : wrongIds.has(text(question.id)) || answers[question.id]?.correct === false ? 'wrong' : 'unanswered'
+    const counts = { all: questions.length, correct: 0, wrong: 0 }
+    questions.forEach(question => { const key = status(question); if (key in counts) counts[key] += 1 })
+    const labels = { all: '全部', correct: '答对', wrong: '答错' }
+    section.innerHTML = `<h2>题目回顾</h2><div class="practice-review-filters" role="group" aria-label="按答题结果筛选">${Object.keys(labels).map(key => `<button type="button" data-review-filter="${key}" aria-pressed="false">${labels[key]}（${counts[key]}）</button>`).join('')}</div><div data-review-content aria-live="polite"></div>`
+    const select = filter => {
+      section.querySelectorAll('[data-review-filter]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.reviewFilter === filter)))
+      const rows = questions.map((question, index) => ({ question, index })).filter(({ question }) => filter === 'all' || status(question) === filter)
+      section.querySelector('[data-review-content]').innerHTML = rows.length ? rows.map(({ question, index }) => {
+        const answer = answers[question.id] || {}
+        const selected = Array.isArray(answer.selectedAnswerIds) ? answer.selectedAnswerIds.map(text) : [text(answer.selectedAnswer)].filter(Boolean)
+        const correct = (question.correctAnswerIds || []).map(text)
+        const outcome = status(question)
+        return `<article class="practice-review-card" data-review-card="${escapeHTML(question.id)}"><header><h3>第 ${index + 1} 题</h3><span class="practice-review-status is-${outcome}">${outcome === 'correct' ? '答对' : outcome === 'wrong' ? '答错' : '未作答'}</span></header><p class="practice-review-stem">${escapeHTML(question.stem)}</p><ol class="practice-review-options">${(question.options || []).map(option => `<li class="${correct.includes(text(option.id)) ? 'is-correct' : selected.includes(text(option.id)) ? 'is-wrong' : ''}"><strong>${escapeHTML(option.id)}</strong><span>${escapeHTML(option.text)}</span></li>`).join('')}</ol><div class="practice-review-answers"><span>你的答案：${escapeHTML(selected.join('、') || '未作答')}</span><span>正确答案：${escapeHTML(correct.join('、') || '暂无')}</span></div><div class="practice-review-explanation"><strong>题目解析</strong><p>${escapeHTML(question.explanation || '暂无解析')}</p></div></article>`
+      }).join('') : `<p class="practice-review-empty">${filter === 'wrong' ? '本次没有答错的题目。' : filter === 'correct' ? '本次没有答对的题目。' : '暂无可回顾的题目。'}</p>`
+    }
+    section.querySelectorAll('[data-review-filter]').forEach(button => button.addEventListener('click', () => select(button.dataset.reviewFilter)))
+    select(options.reviewFilter === 'all' ? 'all' : 'wrong')
+    root.querySelector('[data-report-review-all]')?.addEventListener('click', () => {
+      select('all')
+      section.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }
+
   function render(root, report, options = {}) {
     if (!root || !report || report.official !== false) return false
     root.classList.add('has-practice-report')
@@ -111,14 +142,16 @@
         ? `<section class="practice-report-breakdown"><header><span>EXAM BREAKDOWN</span><h2>考试领域分析</h2><p>扇区大小代表领域占比，颜色代表本领域的模拟表现等级。</p>${legendMarkup()}</header>${pieMarkup(report)}</section>
       <section class="practice-report-domains"><h2>各领域成绩</h2><div class="practice-report-table-scroll"><table class="practice-report-domain-table"><thead><tr><th>领域</th><th>占比</th><th>答对 / 总数</th><th>得分率</th><th>表现</th></tr></thead><tbody>${domainRows(report)}</tbody></table></div></section>`
         : '<section class="practice-report-domain-unavailable" role="status"><h2>领域分析暂不可用</h2><p>本试卷包含未标注 PMP 领域的历史题目；总体成绩仍按全部题目计算，为避免误导，本次不展示领域饼图与领域等级。</p></section>'}
-      <section class="practice-report-wrong"><div><h2>本次错题</h2><p>${wrongIds.length ? `共 ${wrongIds.length} 道，点击题号只读回看答案与解析。` : '本次作答没有错题。'}</p></div><div class="practice-report-wrong-list">${wrongButtons}</div></section>
+      <section class="practice-report-wrong"><div><h2>本次错题</h2><p>${wrongIds.length ? `共 ${wrongIds.length} 道，${Array.isArray(options.questions) ? '下方已统一展开错题与解析，也可筛选全部或答对的题目。' : '点击题号只读回看答案与解析。'}` : '本次作答没有错题。'}</p></div><div class="practice-report-wrong-list">${wrongButtons}</div></section>
+      ${Array.isArray(options.questions) ? '<section class="practice-report-review" data-question-review></section>' : ''}
       <section class="practice-report-next"><h2>下一步建议</h2><ul>${(Array.isArray(report.recommendations) ? report.recommendations : []).map(item => `<li>${escapeHTML(item)}</li>`).join('')}</ul></section>
       <p class="practice-report-disclaimer">${escapeHTML(report.disclaimer || '幻谱模拟判定，不代表 PMI 官方考试成绩')}</p>
-      <footer class="practice-report-actions">${options.onReviewAll ? '<button type="button" class="practice-secondary-btn" data-report-review-all="true">回看全部题目</button>' : ''}<button type="button" class="practice-primary-btn" data-report-again="true">再练一次</button><button type="button" class="practice-secondary-btn" data-report-lobby="true">返回大厅</button></footer>
+      <footer class="practice-report-actions">${options.onReviewAll || Array.isArray(options.questions) ? '<button type="button" class="practice-secondary-btn" data-report-review-all="true">回看全部题目</button>' : ''}<button type="button" class="practice-primary-btn" data-report-again="true">再练一次</button><button type="button" class="practice-secondary-btn" data-report-lobby="true">返回大厅</button></footer>
       <div class="practice-report-page">${escapeHTML(report.pageNumber || '1 / 1')}</div>
     </article>`
     root.querySelectorAll('[data-review-question]').forEach(button => button.addEventListener('click', () => options.onReviewWrong?.(button.dataset.reviewQuestion)))
-    root.querySelector('[data-report-review-all]')?.addEventListener('click', () => options.onReviewAll?.())
+    if (!Array.isArray(options.questions)) root.querySelector('[data-report-review-all]')?.addEventListener('click', () => options.onReviewAll?.())
+    renderQuestionReview(root, report, options)
     root.querySelector('[data-report-again]')?.addEventListener('click', () => options.onAgain?.())
     root.querySelector('[data-report-lobby]')?.addEventListener('click', () => options.onLobby?.())
     return true

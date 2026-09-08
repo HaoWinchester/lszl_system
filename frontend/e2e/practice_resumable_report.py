@@ -986,9 +986,14 @@ def run_matrix() -> None:
             page.locator(".practice-result-report").wait_for(state="visible", timeout=5000)
             check_matrix(14, "restoring fully answered draft automatically finishes", True)
             page.locator('[data-report-review-all]').click()
-            assert page.locator("#practiceExplanationPanel").is_visible()
-            assert page.locator('[data-option-id="A"]').is_disabled()
-            page.locator("#practiceReviewBackBtn").click()
+            assert page.locator('[data-review-card]').count() == PAPER_COUNT
+            assert page.locator('[data-review-filter="all"]').get_attribute('aria-pressed') == 'true'
+            assert page.locator('[data-review-card] .practice-review-explanation').count() == PAPER_COUNT
+            assert page.locator('[data-question-review] [data-option-id]').count() == 0
+            page.locator('[data-review-filter="wrong"]').click()
+            assert page.locator('[data-review-card]').count() == 0
+            page.locator('[data-review-filter="correct"]').click()
+            assert page.locator('[data-review-card]').count() == PAPER_COUNT
             page.locator(".practice-result-report").wait_for(state="visible")
 
             # ---- matrix 15: closing while complete response is pending never pauses ----
