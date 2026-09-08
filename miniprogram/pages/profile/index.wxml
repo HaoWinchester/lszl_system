@@ -1,7 +1,8 @@
-<view class="page-shell profile-page" style="padding-top: {{statusBarHeight}}px">
+<view class="page-shell profile-page" style="{{appearanceStyle}}padding-top: {{statusBarHeight}}px">
   <view class="nav-bar"><text class="nav-title">我的</text></view>
 
-  <view wx:if="{{loading}}" class="profile-loading"><view class="profile-loading-line is-lead"></view><view class="profile-loading-line"></view><view class="profile-loading-line"></view></view>
+  <empty-state wx:if="{{loggedOut}}" title="本机已退出登录" body="{{error || '正在打开登录页面。'}}" action-text="{{loggingOut ? '' : '前往登录'}}" bind:action="openLogin" />
+  <view wx:elif="{{loading}}" class="profile-loading"><view class="profile-loading-line is-lead"></view><view class="profile-loading-line"></view><view class="profile-loading-line"></view></view>
   <empty-state wx:elif="{{error}}" title="账号信息没有载入" body="{{error}}" action-text="重新加载" bind:action="loadProfile" />
 
   <block wx:else>
@@ -21,9 +22,13 @@
         <view class="info-row"><text class="info-label">登录账号</text><text class="info-value">{{user.username}}</text></view>
         <view class="info-row"><text class="info-label">账号身份</text><text class="info-value">{{roleLabel}}</text></view>
         <view class="info-row"><text class="info-label">学习权限</text><text class="info-value">{{accessTitle}}</text></view>
+        <view class="info-row"><text class="info-label">会员状态</text><text class="info-value">{{membership.statusLabel}}</text></view>
+        <view class="info-row"><text class="info-label">到期时间</text><text class="info-value expiry-value">{{membership.expiryLabel}}</text></view>
         <view class="info-row"><text class="info-label">数据同步</text><text class="info-value sync-value">{{syncLabel}}</text></view>
       </view>
       <text class="access-description">{{accessCopy}}</text>
+      <button class="account-row membership-entry" bindtap="onMembership"><text>查看会员信息</text><ui-icon name="chevron" size="32" color="muted" /></button>
+      <view wx:if="{{syncError}}" class="inline-notice"><text>{{syncError}}</text><button class="inline-retry" bindtap="onRefresh">重新同步</button></view>
     </view>
 
     <view class="profile-section">
@@ -36,10 +41,20 @@
     </view>
 
     <view class="profile-section account-section">
+      <text class="section-kicker">我的学习</text>
+      <button class="account-row" bindtap="onHistory"><text>练习记录与报告</text><ui-icon name="chevron" size="32" color="muted" /></button>
+      <button class="account-row" bindtap="onRevenge"><text>错题复习</text><ui-icon name="chevron" size="32" color="muted" /></button>
+    </view>
+    <view class="profile-section account-section">
+      <text class="section-kicker">偏好设置</text>
+      <button class="account-row" bindtap="onAppearance"><text>外观与阅读</text><ui-icon name="chevron" size="32" color="muted" /></button>
+    </view>
+    <view class="profile-section account-section">
       <text class="section-kicker">账号与安全</text>
-      <button class="account-row" data-document="privacy" bindtap="onOpenLegal"><text>隐私政策</text><view class="row-arrow"></view></button>
-      <button class="account-row" data-document="terms" bindtap="onOpenLegal"><text>用户协议</text><view class="row-arrow"></view></button>
+      <button class="account-row" data-document="privacy" bindtap="onOpenLegal"><text>隐私政策</text><ui-icon name="chevron" size="32" color="muted" /></button>
+      <button class="account-row" data-document="terms" bindtap="onOpenLegal"><text>用户协议</text><ui-icon name="chevron" size="32" color="muted" /></button>
       <button class="logout" loading="{{loggingOut}}" disabled="{{loggingOut}}" bindtap="onLogout">退出登录</button>
     </view>
   </block>
 </view>
+<app-dialog id="app-dialog" style="{{appearanceStyle}}" />

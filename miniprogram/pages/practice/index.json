@@ -5,6 +5,7 @@
     "answer-sheet": "/components/answer-sheet/index",
     "empty-state": "/components/empty-state/index",
     "question-view": "/components/question-view/index",
-    "save-status": "/components/save-status/index"
+    "save-status": "/components/save-status/index",
+    "ui-icon": "/components/ui-icon/index"
   }
 }

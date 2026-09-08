@@ -22,6 +22,24 @@ test('a retry keeps the original idempotency key', async () => {
   assert.deepEqual(seen, ['answer:q1:r3', 'answer:q1:r3']);
 });
 
+test('a server failure retries the failed write instead of saving unrelated state', async () => {
+  const seen = [];
+  const sync = createSyncCoordinator(async job => {
+    seen.push(`${job.action}:${job.key}`);
+    if (seen.length === 1) {
+      throw Object.assign(new Error('server rejected write'), { statusCode: 500 });
+    }
+    return { ok: true };
+  });
+  const job = { sessionId: 's1', key: 'answer:q1:r4', action: 'answer', payload: { selectedAnswer: 'A' } };
+
+  await assert.rejects(sync.enqueueWrite(job));
+  assert.equal(sync.pendingCount(), 1);
+  assert.deepEqual(await sync.retryPending(), [{ ok: true }]);
+  assert.equal(sync.pendingCount(), 0);
+  assert.deepEqual(seen, ['answer:answer:q1:r4', 'answer:answer:q1:r4']);
+});
+
 test('writes for a session are serialized in enqueue order', async () => {
   const order = [];
   let release;

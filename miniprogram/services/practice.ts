@@ -4,10 +4,12 @@ import {
   PracticeHistoryItem,
   PracticeReport,
   PracticeSession,
+  PracticeSessionSummary,
   SessionWriteInput,
   StartSessionInput,
 } from '../types/api';
 import { normalizeQuestion } from '../domain/question';
+import { invalidateLearningPages } from '../domain/page-freshness';
 
 const ROOT = '/api/v1/learning/practice';
 
@@ -20,6 +22,7 @@ function normalizeSession(rawValue: any): PracticeSession {
   const questions = Array.isArray(raw.questions) ? raw.questions : [];
   return {
     ...raw,
+    paperName: String(raw.paperName || raw.scoringSnapshot?.paperName || '未完成练习'),
     id: String(raw.id || ''),
     mode: String(raw.mode || 'practice'),
     status: String(raw.status || ''),
@@ -44,14 +47,27 @@ export function getRevengeSummary(): Promise<Record<string, any>> {
   return request({ path: `${ROOT}/revenge/summary` });
 }
 
-export async function getActiveSessions(): Promise<PracticeSession[]> {
-  const payload = await request<{ sessions?: unknown[] }>({ path: `${ROOT}/sessions/active` });
-  return (payload.sessions || []).map(normalizeSession);
+export async function getActiveSessions(): Promise<PracticeSessionSummary[]> {
+  const payload = await request<{ sessions?: PracticeSessionSummary[] }>({ path: `${ROOT}/sessions/active?summary=true` });
+  return payload.sessions || [];
 }
 
 export async function listSessions(): Promise<PracticeHistoryItem[]> {
-  const payload = await request<{ sessions?: unknown[] }>({ path: `${ROOT}/sessions` });
-  return (payload.sessions || []).map((value: any) => ({
+  const [payload, active] = await Promise.all([
+    request<{ sessions?: unknown[] }>({ path: `${ROOT}/sessions` }), getActiveSessions(),
+  ]);
+  const rows = new Map((payload.sessions || []).map((value: any) => [String(value.sessionId), value]));
+  for (const session of active) {
+    const previous: any = rows.get(session.id) || {};
+    rows.set(session.id, {
+      ...previous,
+      sessionId: session.id, mode: session.mode, paperId: session.paperId, paperName: session.paperName,
+      answered: session.stats?.answered, correct: session.stats?.correct, status: session.status,
+      durationMs: session.stats?.durationMs ?? previous.durationMs,
+      createdAt: session.lastSavedAt, reportAvailable: false,
+    });
+  }
+  return [...rows.values()].sort((a, b) => Date.parse(b.createdAt || '') - Date.parse(a.createdAt || '')).map((value: any) => ({
     sessionId: String(value?.sessionId || ''),
     mode: String(value?.mode || 'practice') as PracticeHistoryItem['mode'],
     paperId: value?.paperId ? String(value.paperId) : undefined,
@@ -72,6 +88,7 @@ export async function startSession(input: StartSessionInput): Promise<PracticeSe
     method: 'POST',
     data: { ...input, mode: backendMode(input.mode) },
   });
+  invalidateLearningPages();
   return normalizeSession(payload.session);
 }
 
@@ -104,6 +121,7 @@ export async function submitAnswer(sessionId: string, input: SessionWriteInput):
     data: input,
     idempotencyKey: input.requestId,
   });
+  invalidateLearningPages();
   return { ...payload, session: normalizeSession(payload.session) };
 }
 
@@ -124,6 +142,7 @@ export async function pauseSession(sessionId: string, input: SessionWriteInput):
     data: input,
     idempotencyKey: input.requestId,
   });
+  invalidateLearningPages();
   return normalizeSession(payload.session);
 }
 
@@ -134,6 +153,7 @@ export async function abandonSession(sessionId: string, input: SessionWriteInput
     data: input,
     idempotencyKey: input.requestId,
   });
+  invalidateLearningPages();
   return normalizeSession(payload.session);
 }
 
@@ -147,6 +167,7 @@ export async function completeSession(sessionId: string, input: SessionWriteInpu
     data: input,
     idempotencyKey: input.requestId,
   });
+  invalidateLearningPages();
   return { session: normalizeSession(payload.session), report: payload.report || {} };
 }
 
@@ -165,6 +186,12 @@ export async function submitRevengeAnswer(mistakeId: string, answer: Record<stri
     data: answer,
     idempotencyKey: key,
   });
+  invalidateLearningPages();
+  return payload.mistake;
+}
+
+export async function getRemediation(mistakeId: string): Promise<any> {
+  const payload = await request<{ mistake: any }>({ path: `${ROOT}/mistakes/${encodeURIComponent(mistakeId)}/remediation` });
   return payload.mistake;
 }
 
@@ -175,6 +202,7 @@ export async function markRemediationReviewed(mistakeId: string, requestId: stri
     data: {},
     idempotencyKey: requestId,
   });
+  invalidateLearningPages();
   return payload.mistake;
 }
 
@@ -186,10 +214,12 @@ export async function getVerificationCandidate(mistakeId: string): Promise<any> 
 }
 
 export async function submitVerification(mistakeId: string, answer: Record<string, unknown>): Promise<any> {
-  return request({
+  const result = await request({
     path: `${ROOT}/mistakes/${encodeURIComponent(mistakeId)}/verification`,
     method: 'POST',
     data: answer,
     idempotencyKey: String(answer.requestId || `verification:${mistakeId}`),
   });
+  invalidateLearningPages();
+  return result;
 }

@@ -2511,6 +2511,23 @@ def active_session(client, practice_ids):
     return started.json()["session"]
 
 
+def test_active_summary_is_small_owner_scoped_and_preserves_full_pc_detail(client, active_session, practice_ids):
+    response = client.get('/api/v1/learning/practice/sessions/active?summary=true')
+    assert response.status_code == 200
+    summary = response.json()['sessions'][0]
+    assert summary['id'] == active_session['id']
+    assert summary['stats']['total'] == 10
+    assert summary['paperName'] == active_session['paperName']
+    assert not {'questions', 'questionOrder', 'answers', 'runtimeState', 'scoringSnapshot'} & summary.keys()
+    assert len(response.content) < 2000
+    assert client.get('/api/v1/learning/practice/sessions/active?summary=true&mode=scholar').json()['sessions'] == []
+    full = client.get('/api/v1/learning/practice/sessions/active').json()['sessions'][0]
+    assert len(full['questions']) == 10
+    assert client.get(f"/api/v1/learning/practice/sessions/{summary['id']}").json()['session']['questions']
+    client.post('/api/v1/auth/login', json={'username': practice_ids['other_student'], 'password': PASSWORD})
+    assert client.get('/api/v1/learning/practice/sessions/active?summary=true').json()['sessions'] == []
+
+
 def test_active_session_keeps_answer_key_but_hides_explanation(
     client, active_session
 ):

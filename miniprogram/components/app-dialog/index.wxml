@@ -1,0 +1,12 @@
+<view wx:if="{{visible}}" class="dialog-mask" catchtap="noop" catchtouchmove="noop">
+  <view class="dialog-panel" aria-role="dialog" aria-modal="true" aria-label="{{title}}">
+    <text class="dialog-title">{{title}}</text>
+    <scroll-view wx:if="{{content}}" class="dialog-scroll" scroll-y show-scrollbar="{{false}}">
+      <text class="dialog-content">{{content}}</text>
+    </scroll-view>
+    <view class="dialog-actions">
+      <button wx:if="{{showCancel}}" class="dialog-button dialog-cancel" hover-class="dialog-pressed" data-id="{{id}}" bindtap="onCancel">{{cancelText}}</button>
+      <button class="dialog-button dialog-confirm" hover-class="dialog-pressed" data-id="{{id}}" bindtap="onConfirm">{{confirmText}}</button>
+    </view>
+  </view>
+</view>

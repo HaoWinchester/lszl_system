@@ -1,16 +1,20 @@
+import { navigation } from "../../domain/navigation";
+import { withAppearance } from '../../domain/appearance-page';
+import { showDialog } from '../../domain/dialog';
 import { validateSession } from '../../services/auth';
 import { MODE_POLICIES } from '../../domain/mode-policy';
 import { getCurrentUser } from '../../services/session';
 import { listPublishedPapers } from '../../services/papers';
 import {
-  enterSession,
+  getSession,
   getActiveSessions,
-  getExperienceSummary,
-  getOverview,
   getRevengeSummary,
 } from '../../services/practice';
-import { PaperSummary, PracticeMode, PracticeSession } from '../../types/api';
+import { PaperSummary, PracticeMode, PracticeSessionSummary } from '../../types/api';
 import { selectPrimaryTab } from '../../domain/primary-tabs';
+import { pageRefreshMode } from '../../domain/page-freshness';
+import { messageOf } from '../../services/http';
+import { openMembershipOffer } from '../../domain/membership-navigation';
 
 const modes = ['normal', 'challenge', 'scholar', 'revenge'].map(id => MODE_POLICIES[id as PracticeMode]);
 
@@ -20,22 +24,23 @@ function greetingFor(hour: number): string {
   return '晚上好';
 }
 
-Page({
+Page(withAppearance({
+  refreshing: false,
   data: {
     statusBarHeight: 24,
     loading: true,
+    error: '',
+    lastLoadedAt: 0,
+    continuing: false,
     displayName: '同学',
     greeting: '你好',
     todayLabel: '',
     modes,
     papers: [] as PaperSummary[],
-    activeSession: null as PracticeSession | null,
-    overview: {},
-    experience: {},
-    revenge: {},
+    activeSession: null as PracticeSessionSummary | null,
   },
 
-  async onLoad() {
+  onLoad() {
     const now = new Date();
     const cached = getCurrentUser();
     this.setData({
@@ -44,71 +49,86 @@ Page({
       greeting: greetingFor(now.getHours()),
       todayLabel: `${now.getMonth() + 1}月${now.getDate()}日`,
     });
-    const user = await validateSession();
-    if (!user) {
-      wx.reLaunch({ url: '/pages/login/index' });
-      return;
+  },
+
+  async loadHome() {
+    if (this.refreshing) return;
+    this.refreshing = true;
+    if (!this.data.lastLoadedAt) this.setData({ loading: true });
+    this.setData({ error: '' });
+    try {
+      const user = await validateSession();
+      if (!user) {
+        navigation.reLaunch({ url: '/pages/login/index' });
+        return;
+      }
+      this.setData({ displayName: user.display_name || user.username });
+      const results = await Promise.allSettled([
+        listPublishedPapers(1, 3),
+        getRevengeSummary(),
+        getActiveSessions(),
+      ]);
+      const paperResult: any = results[0];
+      const revengeResult: any = results[1];
+      const activeResult: any = results[2];
+      this.setData({
+        papers: paperResult.status === 'fulfilled' ? paperResult.value.items : this.data.papers,
+        modes: modes.map(item => item.id === 'revenge' && revengeResult.status === 'fulfilled' && Number(revengeResult.value?.stats?.active || 0) > 0
+          ? { ...item, copy: `待处理 ${Number(revengeResult.value.stats.active)} 道，重做后完成变式验证` }
+          : item),
+        activeSession: activeResult.status === 'fulfilled' ? activeResult.value[0] || null : this.data.activeSession,
+        loading: false,
+        lastLoadedAt: Date.now(),
+        error: results.some(item => item.status === 'rejected') ? '部分数据未更新，请重试。' : '',
+      });
+    } catch (error) {
+      this.setData({ loading: false, error: messageOf(error) });
+    } finally {
+      this.refreshing = false;
     }
-    this.setData({ displayName: user.display_name || user.username });
-    const results = await Promise.allSettled([
-      listPublishedPapers(1, 3),
-      getOverview(),
-      getExperienceSummary(),
-      getRevengeSummary(),
-      getActiveSessions(),
-    ]);
-    const paperResult: any = results[0];
-    const overviewResult: any = results[1];
-    const experienceResult: any = results[2];
-    const revengeResult: any = results[3];
-    const activeResult: any = results[4];
-    this.setData({
-      papers: paperResult.status === 'fulfilled' ? paperResult.value.items : [],
-      overview: overviewResult.status === 'fulfilled' ? overviewResult.value : {},
-      experience: experienceResult.status === 'fulfilled' ? experienceResult.value : {},
-      revenge: revengeResult.status === 'fulfilled' ? revengeResult.value : {},
-      modes: modes.map(item => item.id === 'revenge' && revengeResult.status === 'fulfilled' && Number(revengeResult.value?.stats?.active || 0) > 0
-        ? { ...item, copy: `待处理 ${Number(revengeResult.value.stats.active)} 道，重做后完成变式验证` }
-        : item),
-      activeSession: activeResult.status === 'fulfilled' ? activeResult.value[0] || null : null,
-      loading: false,
-    });
   },
 
   onShow() {
     selectPrimaryTab(this as any, 0);
+    if (pageRefreshMode(this.data.lastLoadedAt) !== 'skip') void this.loadHome();
   },
+
+  onPullDownRefresh() { this.loadHome().finally(() => wx.stopPullDownRefresh()); },
 
   async onContinue() {
     const current = this.data.activeSession;
-    if (!current) return;
+    if (!current || this.data.continuing) return;
+    this.setData({ continuing: true });
     try {
-      const entered = await enterSession({
-        paperId: current.paperId,
-        releaseId: current.releaseId,
-        mode: current.mode,
-      });
-      wx.navigateTo({ url: `/pages/practice/index?sessionId=${encodeURIComponent(entered.session.id)}` });
+      const session = await getSession(current.id);
+      if (session.status === 'abandoned') { await this.loadHome(); return; }
+      const page = session.status === 'completed' ? 'result' : 'practice';
+      navigation.navigateTo({ url: `/pages/${page}/index?sessionId=${encodeURIComponent(session.id)}` });
     } catch (error) {
-      wx.showModal({ title: '暂时无法继续', content: error instanceof Error ? error.message : '请稍后重试', showCancel: false });
+      showDialog({ title: '暂时无法继续', content: error instanceof Error ? error.message : '请稍后重试', showCancel: false });
+    } finally {
+      this.setData({ continuing: false });
     }
   },
 
-  onBrowsePapers() { wx.navigateTo({ url: '/pages/papers/index?mode=normal' }); },
+  onBrowsePapers() { navigation.navigateTo({ url: '/pages/papers/index?mode=normal' }); },
 
   onMode(event: any) {
     const mode = event.currentTarget.dataset.mode as PracticeMode;
     if (mode === 'revenge') {
-      wx.navigateTo({ url: '/pages/revenge/index' });
+      navigation.navigateTo({ url: '/pages/revenge/index' });
       return;
     }
-    wx.navigateTo({ url: `/pages/papers/index?mode=${mode}` });
+    navigation.navigateTo({ url: `/pages/papers/index?mode=${mode}` });
   },
 
-  onPaper(event: any) {
+  async onPaper(event: any) {
     const paper = this.data.papers.find((item: PaperSummary) => item.releaseId === event.currentTarget.dataset.releaseId);
     if (!paper) return;
+    if (paper.contentRestricted) {
+      return openMembershipOffer();
+    }
     const params = `paperId=${encodeURIComponent(paper.paperId)}&releaseId=${encodeURIComponent(paper.releaseId)}&title=${encodeURIComponent(paper.title)}&count=${paper.questionCount}&mode=normal`;
-    wx.navigateTo({ url: `/pages/practice-setup/index?${params}` });
+    navigation.navigateTo({ url: `/pages/practice-setup/index?${params}` });
   },
-});
+}));

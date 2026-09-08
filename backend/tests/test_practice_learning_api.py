@@ -687,9 +687,15 @@ def test_multiple_choice_revenge_verification_requires_same_type_and_exact_set()
     mistake = wrong.json()["mistake"]
     revenge_wrong = client.post(
         f"/api/v1/learning/practice/mistakes/{mistake['id']}/revenge-answer",
-        json={"selectedAnswerIds": ["A", "B", "C"]},
+        json={"selectedAnswerIds": ["A", "B", "C"], "requestId": "mini-revenge-retry"},
     )
     assert revenge_wrong.status_code == 200, revenge_wrong.text
+    revenge_replay = client.post(
+        f"/api/v1/learning/practice/mistakes/{mistake['id']}/revenge-answer",
+        json={"selectedAnswerIds": ["C", "B", "A"], "requestId": "mini-revenge-retry"},
+    )
+    assert revenge_replay.status_code == 200, revenge_replay.text
+    assert revenge_replay.json()['mistake']['revengeAttemptCount'] == revenge_wrong.json()['mistake']['revengeAttemptCount']
     reviewed = client.post(
         f"/api/v1/learning/practice/mistakes/{mistake['id']}/remediation-reviewed"
     )
@@ -708,14 +714,36 @@ def test_multiple_choice_revenge_verification_requires_same_type_and_exact_set()
     )
     assert under_selected.status_code == 200, under_selected.text
     assert under_selected.json()["verification"]["correct"] is False
+    assert under_selected.json()["mistake"]["remediationReviewedAt"] is None
+    blocked_retry = client.post(
+        f"/api/v1/learning/practice/mistakes/{mistake['id']}/verification",
+        json={"questionId": verification["question"]["id"], "selectedAnswerIds": ["C", "A"]},
+    )
+    assert blocked_retry.status_code == 422
+    resumed = client.get(f"/api/v1/learning/practice/mistakes/{mistake['id']}/remediation")
+    assert resumed.status_code == 200, resumed.text
+    assert resumed.json()["mistake"]["questionSnapshot"]["correctOptionIds"] == ["A", "C"]
+    assert client.post(f"/api/v1/learning/practice/mistakes/{mistake['id']}/remediation-reviewed").status_code == 200
 
     exact = client.post(
         f"/api/v1/learning/practice/mistakes/{mistake['id']}/verification",
-        json={"questionId": verification["question"]["id"], "selectedAnswerIds": ["C", "A"]},
+        json={"questionId": verification["question"]["id"], "selectedAnswerIds": ["C", "A"], "requestId": "mini-verification-retry"},
     )
     assert exact.status_code == 200, exact.text
     assert exact.json()["verification"]["correct"] is True
     assert exact.json()["verification"]["selectedAnswerIds"] == ["A", "C"]
+    replay = client.post(
+        f"/api/v1/learning/practice/mistakes/{mistake['id']}/verification",
+        json={"questionId": verification["question"]["id"], "selectedAnswerIds": ["A", "C"], "requestId": "mini-verification-retry"},
+    )
+    assert replay.status_code == 200, replay.text
+    assert replay.json()['verification']['id'] == exact.json()['verification']['id']
+    assert replay.json()['mistake']['verificationAttemptCount'] == exact.json()['mistake']['verificationAttemptCount']
+    changed = client.post(
+        f"/api/v1/learning/practice/mistakes/{mistake['id']}/verification",
+        json={"questionId": verification["question"]["id"], "selectedAnswerIds": ["B"], "requestId": "mini-verification-retry"},
+    )
+    assert changed.status_code == 422
 
 
 def test_practice_answer_validates_options_visibility_and_release_identity() -> None:

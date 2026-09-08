@@ -1,8 +1,10 @@
+import { navigation } from "../../domain/navigation";
+import { withAppearance } from '../../domain/appearance-page';
 import { bindExistingAccount, loginWithWechat, registerAccount } from '../../services/auth';
 import { messageOf } from '../../services/http';
 import { showLegalDocument } from '../../domain/legal-copy';
 
-Page({
+Page(withAppearance({
   data: {
     statusBarHeight: 24,
     stage: 'wechat',
@@ -13,6 +15,7 @@ Page({
     displayName: '',
     accepted: false,
     submitting: false,
+    authenticated: false,
     error: '',
   },
 
@@ -37,6 +40,8 @@ Page({
   },
 
   async onWechatLogin() {
+    if (this.data.submitting) return;
+    if (this.data.authenticated) { this.openHome(); return; }
     if (!this.data.accepted) {
       this.setData({ error: '请先阅读并同意隐私政策和用户协议' });
       return;
@@ -45,7 +50,7 @@ Page({
     try {
       const result = await loginWithWechat();
       if (result.status === 'authenticated') {
-        wx.reLaunch({ url: '/pages/home/index' });
+        this.openHome();
         return;
       }
       if (result.status === 'binding_required') {
@@ -61,6 +66,12 @@ Page({
   },
 
   async onSubmitAccount() {
+    if (this.data.submitting) return;
+    if (this.data.authenticated) { this.openHome(); return; }
+    if (!this.data.accepted) {
+      this.setData({ error: '请先阅读并同意隐私政策和用户协议' });
+      return;
+    }
     if (!this.data.username.trim() || !this.data.password) {
       this.setData({ error: '请填写用户名和密码' });
       return;
@@ -81,10 +92,17 @@ Page({
           this.data.displayName.trim(),
         );
       }
-      wx.reLaunch({ url: '/pages/home/index' });
+      this.openHome();
     } catch (error) {
       this.setData({ error: messageOf(error), submitting: false });
     }
+  },
+
+  openHome() {
+    this.setData({ authenticated: true, submitting: true, password: '', bindingTicket: '' });
+    navigation.reLaunch({ url: '/pages/home/index', fail: () => this.setData({
+      submitting: false, error: '登录已成功，但首页未打开，请重试。',
+    }) });
   },
 
   onRestart() {
@@ -98,4 +116,4 @@ Page({
       error: '',
     });
   },
-});
+}));

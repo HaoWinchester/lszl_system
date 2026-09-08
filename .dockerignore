@@ -19,5 +19,7 @@ backend/tests
 **/*.log
 **/.mypy_cache
 **/.ruff_cache
+**/.env
+**/.env.*
 /backups/
 /frontend/new-legacy-releases/

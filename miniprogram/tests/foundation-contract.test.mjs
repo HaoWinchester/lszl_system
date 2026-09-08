@@ -28,7 +28,8 @@ test('mini program declares native home and login pages', () => {
 
 test('client source contains no WeChat secret or provider session key', () => {
   assert.doesNotMatch(allSource(), /WECHAT_MINI_APP_SECRET|session_key|appSecret/);
-  assert.equal(JSON.parse(read('project.config.json')).appid, 'touristappid');
+  // AppID is a public identifier; a real local DevTools configuration is valid.
+  assert.match(JSON.parse(read('project.config.json')).appid, /^(touristappid|wx[a-f0-9]{16})$/i);
 });
 
 test('HTTP service attaches the opaque bearer token and handles expiry', () => {

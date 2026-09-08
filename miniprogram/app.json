@@ -8,10 +8,13 @@
     "pages/result/index",
     "pages/history/index",
     "pages/revenge/index",
-    "pages/profile/index"
+    "pages/profile/index",
+    "pages/membership/index",
+    "pages/appearance/index"
   ],
   "window": {
     "navigationStyle": "custom",
+    "navigationBarTextStyle": "black",
     "backgroundColor": "#f4f0e7",
     "backgroundTextStyle": "dark"
   },
@@ -35,6 +38,9 @@
         "text": "我的"
       }
     ]
+  },
+  "usingComponents": {
+    "app-dialog": "/components/app-dialog/index"
   },
   "style": "v2",
   "lazyCodeLoading": "requiredComponents",

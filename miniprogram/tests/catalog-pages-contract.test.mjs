@@ -24,20 +24,21 @@ test('setup includes count, order, all supported paper modes, and resume recover
   const source = read('pages/practice-setup/index.ts');
   assert.match(source, /RESUMABLE_SESSION_EXISTS/);
   assert.match(source, /confirmText:\s*'继续练习'/);
-  assert.match(source, /cancelText:\s*'重新开始'/);
+  assert.match(source, /cancelText:\s*'返回设置'/);
+  assert.match(source, /onRestartExisting/);
 });
 
 test('home loads authoritative summaries in parallel and every visible entry has a handler', () => {
   const source = read('pages/home/index.ts');
   assert.match(source, /Promise\.allSettled/);
-  for (const call of ['listPublishedPapers', 'getOverview', 'getExperienceSummary', 'getRevengeSummary', 'getActiveSessions']) {
+  for (const call of ['listPublishedPapers', 'getRevengeSummary', 'getActiveSessions']) {
     assert.match(source, new RegExp(call));
   }
   const page = read('pages/home/index.wxml');
   assert.match(page, /bindtap="onContinue"/);
   assert.match(page, /bindtap="onBrowsePapers"/);
   assert.match(page, /bindtap="onMode"/);
-  assert.match(source, /enterSession\(\{\s*paperId:\s*current\.paperId,\s*releaseId:\s*current\.releaseId,\s*mode:\s*current\.mode,?\s*\}\)/s);
+  assert.match(source, /getSession\(current\.id\)/);
 });
 
 test('new pages are declared and remain one-column mobile layouts', () => {

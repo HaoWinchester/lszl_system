@@ -15,16 +15,16 @@ export interface ModePolicy {
 
 export const MODE_POLICIES: Record<PracticeMode, ModePolicy> = {
   normal: {
-    id: 'normal', title: '普通练习', copy: '提交后即可查看答案与解析', showTimer: false, timerKind: 'none',
+    id: 'normal', title: '普通练习', copy: '作答即看反馈，答完自动交卷', showTimer: false, timerKind: 'none',
     revealAfterAnswer: true, revealAfterComplete: true, allowPause: true, accent: 'green',
   },
   challenge: {
-    id: 'challenge', title: '挑战模式', copy: '记录总用时，交卷后统一查看结果', showTimer: true, timerKind: 'elapsed',
-    revealAfterAnswer: false, revealAfterComplete: true, allowPause: false, accent: 'clay',
+    id: 'challenge', title: '挑战模式', copy: '答错扣生命，生命归零仍可继续', showTimer: false, timerKind: 'none',
+    revealAfterAnswer: false, revealAfterComplete: true, allowPause: true, accent: 'clay',
   },
   scholar: {
-    id: 'scholar', title: '学霸模式', copy: '每题 60 秒，超时自动记为未答', showTimer: true, timerKind: 'countdown', initialSeconds: 60,
-    revealAfterAnswer: false, revealAfterComplete: true, allowPause: false, accent: 'gold',
+    id: 'scholar', title: '学霸模式', copy: '答对加时、答错扣时，生命归零结束', showTimer: true, timerKind: 'countdown', initialSeconds: 60,
+    revealAfterAnswer: false, revealAfterComplete: true, allowPause: true, accent: 'gold',
   },
   revenge: {
     id: 'revenge', title: '错题复仇', copy: '重答原题，读完纠错后完成变式验证', showTimer: false, timerKind: 'none',

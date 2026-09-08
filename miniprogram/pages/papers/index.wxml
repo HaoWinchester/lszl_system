@@ -1,6 +1,6 @@
-<view class="page-shell papers-page" style="padding-top: {{statusBarHeight}}px">
+<view class="page-shell papers-page" style="{{appearanceStyle}}padding-top: {{statusBarHeight}}px">
   <view class="nav-bar">
-    <button class="back" bindtap="onBack" aria-label="返回"><view class="back-icon"></view></button>
+    <button class="nav-back" bindtap="onBack" aria-label="返回"><ui-icon name="back" /></button>
     <text class="nav-title">试卷库</text>
   </view>
 
@@ -17,8 +17,14 @@
     <view wx:for="{{skeletonRows}}" wx:key="*this" class="paper-skeleton"><view class="paper-skeleton-line is-short"></view><view class="paper-skeleton-line"></view><view class="paper-skeleton-line is-medium"></view></view>
   </view>
   <empty-state wx:elif="{{error}}" title="试卷没有载入" body="{{error}}" action-text="重新加载" bind:action="loadPapers" />
-  <empty-state wx:elif="{{filtered.length === 0}}" title="这里还没有试卷" body="换一个科目或访问范围看看。" />
+  <empty-state wx:elif="{{filtered.length === 0}}" title="{{hasMore ? '已载入的试卷中暂无匹配' : '这里还没有试卷'}}" body="{{hasMore ? '可以继续加载后面的试卷，或切换筛选。' : '换一个科目或访问范围看看。'}}" />
   <view wx:else class="paper-list">
     <paper-list-item wx:for="{{filtered}}" wx:key="releaseId" item="{{item}}" bind:select="onSelectPaper" />
   </view>
+  <view wx:if="{{!loading && !error && hasMore}}" class="catalog-more">
+    <text class="section-copy">已载入 {{papers.length}} / {{total}} 份，筛选当前已载入的试卷</text>
+    <text wx:if="{{moreError}}" class="error-copy">{{moreError}}</text>
+    <button class="quiet-button" loading="{{loadingMore}}" disabled="{{loadingMore}}" bindtap="loadMore">{{moreError ? '重新加载更多' : '加载更多试卷'}}</button>
+  </view>
 </view>
+<app-dialog id="app-dialog" style="{{appearanceStyle}}" />

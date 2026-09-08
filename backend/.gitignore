@@ -2,5 +2,6 @@
 __pycache__/
 *.pyc
 .env
+.env.wechat-mini.local
 .pytest_cache/
 .ruff_cache/

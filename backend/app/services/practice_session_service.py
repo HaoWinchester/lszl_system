@@ -116,8 +116,7 @@ def _release_scoring(release: PaperRelease) -> tuple[dict[str, int], dict]:
     if any(value < 0 for value in weights.values()) or sum(weights.values()) <= 0:
         weights = dict(DEFAULT_DOMAIN_WEIGHTS)
     else:
-        # Releases may freeze relative question counts, including zero-count
-        # domains. Reports expose percentages, without reverting to PMP quotas.
+        # Preserve the UAT release rule: relative domain counts normalize to percentages.
         percentages = paper_composition_service.allocate_counts(weights, 100)
         weights = {domain: percentages.get(domain, 0) for domain in DEFAULT_DOMAIN_WEIGHTS}
     raw_scoring = metadata.get("simulationScoring")
@@ -899,6 +898,7 @@ async def list_active_sessions(
     *,
     release_id: str | None = None,
     mode: str | None = None,
+    summary: bool = False,
 ) -> list[dict]:
     query = select(PracticeSession).where(
         PracticeSession.owner_id == owner,
@@ -908,6 +908,19 @@ async def list_active_sessions(
         query = query.where(PracticeSession.release_id == release_id)
     if mode:
         query = query.where(PracticeSession.mode == mode)
+    if summary:
+        # List pages need progress, not frozen question/answer JSON or per-session joins.
+        query = query.with_only_columns(
+            PracticeSession.id, PracticeSession.paper_id.label('paperId'),
+            PracticeSession.release_id.label('releaseId'), PaperRelease.name.label('paperName'),
+            PracticeSession.mode, PracticeSession.status, PracticeSession.revision,
+            PracticeSession.stats, PracticeSession.last_saved_at.label('lastSavedAt'),
+        ).outerjoin(PaperRelease, PaperRelease.id == PracticeSession.release_id)
+        rows = (await db.execute(query.order_by(PracticeSession.last_saved_at.desc()))).mappings().all()
+        return [{**row, 'paperName': row['paperName'] or '错题复仇',
+                 'stats': row['stats'] or {},
+                 'lastSavedAt': row['lastSavedAt'].isoformat() if row['lastSavedAt'] else None}
+                for row in rows]
     sessions = (
         await db.execute(query.order_by(PracticeSession.last_saved_at.desc()))
     ).scalars().all()

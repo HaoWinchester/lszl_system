@@ -336,7 +336,7 @@ async def _practice_mistake(
         PracticeMistake.owner_id == owner,
     )
     if for_update:
-        query = query.with_for_update()
+        query = query.with_for_update().execution_options(populate_existing=True)
     return (
         await db.execute(query)
     ).scalar_one_or_none()
@@ -375,6 +375,10 @@ async def _visible_learning_question(
     return None
 
 
+PRACTICE_REPLAY_EVENT_TYPES = {'PRACTICE_REVENGE_ANSWERED', 'PRACTICE_REMEDIATION_VERIFIED'}
+PRACTICE_RECEIPT_PREFIX = 'le_receipt_'
+
+
 async def _append_practice_event(
     db: AsyncSession,
     owner: str,
@@ -394,7 +398,8 @@ async def _append_practice_event(
         stored_question_id = None
     db.add(
         LearningEvent(
-            id=uid("le_"),
+            # Public append_event always generates le_<uuid>; it cannot mint receipts.
+            id=uid(PRACTICE_RECEIPT_PREFIX if event_type in PRACTICE_REPLAY_EVENT_TYPES else 'le_'),
             owner_id=owner,
             question_id=stored_question_id,
             event_type=event_type,
@@ -1204,6 +1209,29 @@ async def practice_overview(db: AsyncSession, owner: str) -> dict:
     }
 
 
+def _practice_request_selection(data: dict) -> list[str]:
+    values = data.get('selectedAnswerIds')
+    return sorted(set(map(str, values))) if isinstance(values, list) else [str(data.get('selectedAnswer') or '')]
+
+
+async def _practice_request_replay(db: AsyncSession, owner: str, mistake_id: str, event_type: str, data: dict):
+    request_id = str(data.get('requestId') or '').strip()
+    if not request_id:
+        return None
+    event = (await db.execute(select(LearningEvent).where(
+        LearningEvent.owner_id == owner,
+        LearningEvent.id.startswith(PRACTICE_RECEIPT_PREFIX, autoescape=True),
+        LearningEvent.event_type == event_type,
+        LearningEvent.payload['mistakeId'].astext == mistake_id,
+        LearningEvent.payload['requestId'].astext == request_id,
+    ).limit(1))).scalar_one_or_none()
+    if event is not None and event.payload.get('selection') != _practice_request_selection(data):
+        raise ValueError('同一次重试不能修改已提交的答案')
+    if event is not None and event_type == 'PRACTICE_REMEDIATION_VERIFIED' and event.payload.get('verificationQuestionId') != str(data.get('questionId') or ''):
+        raise ValueError('同一次重试不能更换验证题')
+    return event
+
+
 async def record_revenge_answer(
     db: AsyncSession,
     owner: str,
@@ -1228,6 +1256,8 @@ async def record_revenge_answer(
         return None
     if not record:
         # 只判定：升级链路对已记账的复仇答案不重放长期状态推进。
+        return mistake
+    if await _practice_request_replay(db, owner, mistake_id, 'PRACTICE_REVENGE_ANSWERED', data):
         return mistake
     selected_answer = str(data.get("selectedAnswer") or "").strip()
     snapshot = (
@@ -1273,18 +1303,29 @@ async def record_revenge_answer(
         mistake.status = "needs_remediation"
         mistake.next_review_at = None
         mistake.mastered_at = None
+        mistake.remediation_reviewed_at = None
         mistake.selected_answers = selected_answer_ids if multiple else _latest_actual_wrong_answers(selected_answer, snapshot)
     await _append_practice_event(
         db,
         owner,
         event_type="PRACTICE_REVENGE_ANSWERED",
         question_id=mistake.question_id,
-        payload={"mistakeId": mistake.id, "correct": correct, "status": mistake.status},
+        payload={"mistakeId": mistake.id, "correct": correct, "status": mistake.status,
+                 "requestId": str(data.get('requestId') or '').strip(), "selection": _practice_request_selection(data)},
     )
     if commit:
         await db.commit()
         await db.refresh(mistake)
     return mistake
+
+
+async def get_remediation(db: AsyncSession, owner: str, mistake_id: str) -> dict | None:
+    mistake = await _practice_mistake(db, owner, mistake_id)
+    if mistake is None:
+        return None
+    if mistake.status != 'needs_remediation':
+        raise ValueError('当前错题不处于待补救状态')
+    return _practice_mistake_to_dict(mistake, reveal_answer=True)
 
 
 async def mark_remediation_reviewed(
@@ -1338,7 +1379,7 @@ async def practice_verification_candidate(
     node_id = str(knowledge.get("nodeId") or "").strip()
     question_type = str((mistake.question_snapshot or {}).get("type") or "single_choice")
     if not taxonomy_id or not node_id:
-        raise ValueError("当前错题尚未配置可用于验证的主要知识点")
+        return {"available": False, "code": "MISSING_VERIFICATION_KNOWLEDGE", "message": "这道题尚未关联验证知识点，纠错记录已保留，补充题目后可继续验证。"}
     query = (
         select(Question)
         .join(QuestionBank, QuestionBank.id == Question.bank_id)
@@ -1388,6 +1429,15 @@ async def record_practice_verification(
     mistake = await _practice_mistake(db, owner, mistake_id, for_update=True)
     if mistake is None:
         return None
+    replay = await _practice_request_replay(db, owner, mistake_id, 'PRACTICE_REMEDIATION_VERIFIED', data)
+    if replay is not None:
+        verification = (await db.execute(select(PracticeVerification).where(
+            PracticeVerification.id == replay.payload.get('verificationId'),
+            PracticeVerification.owner_id == owner,
+            PracticeVerification.mistake_id == mistake_id,
+        ))).scalar_one_or_none()
+        if verification is not None:
+            return mistake, verification, deepcopy(replay.payload.get('answerSnapshot') or {})
     if mistake.status != "needs_remediation" or mistake.remediation_reviewed_at is None:
         raise ValueError("请先完成错题补救后再提交验证")
     candidate = await practice_verification_candidate(
@@ -1431,6 +1481,8 @@ async def record_practice_verification(
     mistake.verification_pass_count += int(correct)
     mistake.verification_fail_count += int(not correct)
     mistake.status = "verification_due" if correct else "needs_remediation"
+    if not correct:
+        mistake.remediation_reviewed_at = None
     mistake.next_review_at = now + PRACTICE_REVIEW_DELAY if correct else None
     mistake.mastered_at = None
     await _append_practice_event(
@@ -1442,6 +1494,9 @@ async def record_practice_verification(
             "mistakeId": mistake.id,
             "correct": correct,
             "sourceQuestionId": mistake.question_id,
+            **({"requestId": str(data['requestId']).strip(), "selection": _practice_request_selection(data),
+                "verificationId": verification.id, "verificationQuestionId": question_id,
+                "answerSnapshot": candidate_question} if data.get('requestId') else {}),
             **({"selectedAnswerIds": selected_answer_ids} if multiple else {"selectedAnswer": selected_answer}),
         },
     )
@@ -1460,7 +1515,7 @@ async def append_event(db: AsyncSession, owner: str, data: dict) -> LearningEven
     event_type = str(data.get("eventType") or "").strip()
     if not event_type:
         raise ValueError("eventType 不能为空")
-    if event_type == practice_experience_service.EXPERIENCE_EVENT_TYPE:
+    if event_type == practice_experience_service.EXPERIENCE_EVENT_TYPE or event_type in PRACTICE_REPLAY_EVENT_TYPES:
         raise ValueError("该学习事件只能由服务器结算生成")
     payload = data.get("payload") if isinstance(data.get("payload"), dict) else {}
     payload = dict(payload)

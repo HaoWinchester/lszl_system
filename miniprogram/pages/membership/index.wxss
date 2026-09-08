@@ -1,0 +1,10 @@
+.membership-page { padding-bottom: calc(var(--space-6) + env(safe-area-inset-bottom)); }
+.membership-summary { padding: var(--space-5) 0; border-bottom: 2rpx solid var(--line); }
+.summary-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-2); }
+.summary-title { color: var(--ink); font-size: var(--font-heading); font-weight: 650; }
+.status-label { color: var(--muted); font-size: var(--font-meta); }
+.expiry-row { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-3); margin-top: var(--space-3); }
+.expiry-label { min-width: 0; color: var(--ink); font-size: var(--font-body); text-align: right; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.summary-copy { display: block; margin-top: var(--space-2); color: var(--muted); font-size: var(--font-meta); line-height: 1.5; }
+.membership-loading { padding-top: var(--space-5); }
+.loading-line { height: 96rpx; margin-bottom: var(--space-3); border-radius: var(--radius-sm); background: var(--surface-quiet); }

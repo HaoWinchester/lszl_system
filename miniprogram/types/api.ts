@@ -56,10 +56,14 @@ export interface PracticeSession {
   markedQuestionIds?: string[];
   answers?: Record<string, Record<string, unknown>>;
   runtimeState?: Record<string, any>;
-  stats?: { total?: number; answered?: number; correct?: number; wrong?: number };
+  stats?: { total?: number; answered?: number; correct?: number; wrong?: number; durationMs?: number };
   remainingMs?: number;
   updatedAt?: number | string;
+  lastSavedAt?: string;
 }
+
+export type PracticeSessionSummary = Pick<PracticeSession,
+  'id' | 'paperId' | 'releaseId' | 'paperName' | 'mode' | 'status' | 'revision' | 'stats' | 'lastSavedAt'>;
 
 export interface StartSessionInput {
   paperId: string;

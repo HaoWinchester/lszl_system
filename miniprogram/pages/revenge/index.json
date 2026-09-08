@@ -3,6 +3,7 @@
   "usingComponents": {
     "empty-state": "/components/empty-state/index",
     "question-view": "/components/question-view/index",
-    "remediation-note": "/components/remediation-note/index"
+    "remediation-note": "/components/remediation-note/index",
+    "ui-icon": "/components/ui-icon/index"
   }
 }

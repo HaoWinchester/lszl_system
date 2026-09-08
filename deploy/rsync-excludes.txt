@@ -25,3 +25,4 @@ __pycache__
 /e2e
 .env.prod
 /backend/.env
+/backend/.env.wechat-mini.local

@@ -26,7 +26,7 @@ test('acceptance checklist covers the complete learning and recovery loop', () =
 test('configuration contains mini-app server keys but no real secrets', () => {
   const env = readRepo('backend/.env.example');
   for (const key of ['WECHAT_MINI_APP_ID=', 'WECHAT_MINI_APP_SECRET=', 'WECHAT_MINI_ENABLE_DEMO=']) assert.match(env, new RegExp(key));
-  assert.doesNotMatch(readRepo('miniprogram/project.config.json'), /wx[a-f0-9]{16}/i);
+  assert.doesNotMatch(readRepo('miniprogram/project.config.json'), /appSecret|session_key|WECHAT_MINI_APP_SECRET/i);
   assert.match(read('config/index.ts'), /uat\.aihuanpu\.com/);
   assert.match(read('config/index.ts'), /lszl\.aihuanpu\.com/);
 });

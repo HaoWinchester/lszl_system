@@ -1,0 +1,7 @@
+{
+  "navigationStyle": "custom",
+  "usingComponents": {
+    "ui-icon": "/components/ui-icon/index",
+    "question-view": "/components/question-view/index"
+  }
+}

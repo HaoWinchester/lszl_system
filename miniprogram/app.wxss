@@ -32,6 +32,8 @@ button::after {
 }
 
 .page-shell {
+  background: var(--paper);
+  color: var(--text);
   min-height: 100vh;
   padding: 0 var(--page-gutter) calc(var(--space-6) + env(safe-area-inset-bottom));
 }
@@ -39,16 +41,21 @@ button::after {
 .nav-bar {
   display: flex;
   align-items: center;
-  height: 88rpx;
+  gap: 0;
+  height: 44px;
   padding-right: 176rpx;
 }
 
 .nav-title {
   color: var(--ink);
   font-size: var(--font-nav);
-  font-weight: 650;
+  font-weight: 500;
   line-height: 1.35;
-  letter-spacing: 1rpx;
+  letter-spacing: 0;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .eyebrow {
@@ -70,7 +77,7 @@ button::after {
 
 .primary-button {
   background: var(--ink);
-  color: #fffdf7;
+  color: var(--on-accent);
 }
 
 .secondary-button {
@@ -127,3 +134,14 @@ button::after {
 .aligned-section {
   padding-top: var(--space-5);
 }
+
+/* Override button[class]'s reset: keep the touch target, not an extra visual gap. */
+button.nav-back { --button-width: 80rpx; display: flex; flex: 0 0 80rpx; align-items: center; justify-content: center; width: 80rpx; height: 44px; margin-left: -16rpx; background: transparent; }
+.inline-notice { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-3); padding: var(--space-2) var(--space-3); border-radius: 12rpx; background: var(--surface-quiet); color: var(--danger); font-size: var(--font-meta); line-height: 1.5; }
+.inline-retry { display: flex; flex-shrink: 0; align-items: center; justify-content: center; min-height: 80rpx; padding: 0 var(--space-1); background: transparent; color: var(--ink); font-size: var(--font-meta); }
+.mode-symbol { display: flex; flex: 0 0 44rpx; align-items: center; justify-content: center; }
+.section-kicker { color: var(--clay); font-size: var(--font-meta); font-weight: 600; line-height: 1.45; }
+button { font-family: inherit; font-weight: 400; }
+button[disabled] { opacity: .55; }
+button.payment-unavailable[disabled] { opacity: 1; background: var(--surface-quiet); color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { button, view { transition: none; animation: none; } }

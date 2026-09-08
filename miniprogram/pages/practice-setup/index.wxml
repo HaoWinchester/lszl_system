@@ -1,6 +1,6 @@
-<view class="page-shell setup-page" style="padding-top: {{statusBarHeight}}px">
+<view class="page-shell setup-page" style="{{appearanceStyle}}padding-top: {{statusBarHeight}}px">
   <view class="nav-bar">
-    <button class="back" bindtap="onBack" aria-label="返回"><view class="back-icon"></view></button>
+    <button class="nav-back" bindtap="onBack" aria-label="返回"><ui-icon name="back" /></button>
     <text class="nav-title">练习设置</text>
   </view>
 
@@ -33,7 +33,7 @@
     <text class="setting-label">练习方式</text>
     <view class="mode-list">
       <button wx:for="{{modes}}" wx:key="id" class="mode-option {{mode === item.id ? 'is-active' : ''}}" data-mode="{{item.id}}" bindtap="onMode">
-        <view class="mode-mark {{item.accent}}"></view>
+        <view class="mode-symbol"><ui-icon name="{{item.id}}" size="40" /></view>
         <view class="mode-text"><text class="line-title">{{item.title}}</text><text class="line-copy">{{item.copy}}</text></view>
         <view class="radio"><view wx:if="{{mode === item.id}}" class="radio-dot"></view></view>
       </button>
@@ -41,5 +41,7 @@
   </view>
 
   <text wx:if="{{error}}" class="error-copy">{{error}}</text>
-  <button class="primary-button start-button" loading="{{starting}}" disabled="{{starting}}" bindtap="start">开始练习</button>
+  <button class="primary-button start-button" loading="{{starting}}" disabled="{{starting}}" bindtap="start">{{existingSessionId ? '继续练习' : '开始练习'}}</button>
+  <button wx:if="{{existingSessionId}}" class="quiet-button start-button" disabled="{{starting}}" bindtap="onRestartExisting">放弃上次并重新开始</button>
 </view>
+<app-dialog id="app-dialog" style="{{appearanceStyle}}" />

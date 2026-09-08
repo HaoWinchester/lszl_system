@@ -46,7 +46,7 @@ test('native custom tab bar declares the three persistent primary pages', () => 
 test('custom tab bar switches without relaunching page instances', () => {
   assert.ok(existsSync(join(root, 'custom-tab-bar/index.ts')));
   const source = read('custom-tab-bar/index.ts');
-  assert.match(source, /wx\.switchTab/);
+  assert.match(source, /navigation\.switchTab/);
   assert.doesNotMatch(source, /wx\.reLaunch/);
 });
 

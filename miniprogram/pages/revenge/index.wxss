@@ -1,5 +1,4 @@
 .revenge-page { padding-bottom: calc(var(--space-6) + env(safe-area-inset-bottom)); }
-.revenge-nav { gap: var(--space-2); padding-right: 0; }
 .back { position: relative; display: flex; align-items: center; width: 62rpx; height: 72rpx; background: transparent; }
 .back-icon { width: 20rpx; height: 20rpx; border-bottom: 3rpx solid var(--ink); border-left: 3rpx solid var(--ink); transform: rotate(45deg); }
 .queue-count { margin-left: auto; color: var(--muted); font-size: var(--font-meta); }
@@ -7,7 +6,7 @@
 .stage-step { display: flex; align-items: center; gap: var(--space-1); color: var(--muted); font-size: var(--font-meta); }
 .stage-index { display: flex; align-items: center; justify-content: center; width: 40rpx; height: 40rpx; border: 2rpx solid var(--line); border-radius: 50%; font-size: var(--font-meta); }
 .stage-step.active { color: var(--ink); font-weight: 650; }
-.stage-step.active .stage-index { border-color: var(--clay); background: var(--clay); color: #fffdf7; }
+.stage-step.active .stage-index { border-color: var(--clay); background: var(--clay); color: var(--on-accent); }
 .revenge-intro { display: flex; flex-direction: column; padding: var(--space-5) 0 var(--space-2); }
 .revenge-title { margin-top: var(--space-2); color: var(--ink); font-size: var(--font-display); font-weight: 650; line-height: var(--line-tight); }
 .revenge-copy { margin-top: var(--space-2); color: var(--muted); font-size: var(--font-body); line-height: var(--line-body); }
@@ -18,3 +17,4 @@
 .revenge-loading { padding-top: var(--space-6); }
 .revenge-loading-line { height: 30rpx; margin-bottom: 28rpx; border-radius: 8rpx; background: var(--surface-quiet); }
 .revenge-loading-line.is-block { height: 124rpx; }
+.queue-count { margin: var(--space-2) 0 0; }

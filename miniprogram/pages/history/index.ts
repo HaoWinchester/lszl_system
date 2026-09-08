@@ -1,3 +1,5 @@
+import { navigation } from "../../domain/navigation";
+import { withAppearance } from '../../domain/appearance-page';
 import { messageOf } from '../../services/http';
 import { listSessions } from '../../services/practice';
 import { PracticeHistoryItem } from '../../types/api';
@@ -22,14 +24,14 @@ function viewItem(item: PracticeHistoryItem) {
     ...item,
     modeLabel: modeLabels[item.mode] || '练习',
     dateLabel: formatDate(item.createdAt),
-    statusLabel: completed ? '已交卷' : item.status === 'paused' ? '已暂停' : '已放弃',
+    statusLabel: completed ? '已交卷' : item.status === 'paused' ? '已暂停' : item.status === 'active' ? '进行中' : '已放弃',
     resultLabel: completed ? `正确率 ${accuracy}%` : `已答 ${item.answered} 题`,
     canReport: completed && item.reportAvailable,
-    canResume: item.status === 'paused',
+    canResume: ['active', 'paused'].includes(item.status),
   };
 }
 
-Page({
+Page(withAppearance({
   data: {
     statusBarHeight: 24,
     loading: true,
@@ -62,7 +64,7 @@ Page({
       const items = (await listSessions()).filter(item => item.sessionId).map(viewItem);
       const visibleItems = this.data.filter === 'all'
         ? items
-        : items.filter(item => item.status === this.data.filter);
+        : items.filter(item => this.data.filter === 'paused' ? item.canResume : item.status === this.data.filter);
       this.setData({
         items,
         visibleItems,
@@ -71,7 +73,7 @@ Page({
         lastLoadedAt: Date.now(),
       });
     } catch (error) {
-      if (silent) return;
+      if (silent) { this.setData({ error: messageOf(error) }); return; }
       this.setData({ loading: false, error: messageOf(error), items: [], visibleItems: [] });
     }
   },
@@ -79,7 +81,7 @@ Page({
   applyFilter() {
     const visibleItems = this.data.filter === 'all'
       ? this.data.items
-      : this.data.items.filter(item => item.status === this.data.filter);
+      : this.data.items.filter(item => this.data.filter === 'paused' ? item.canResume : item.status === this.data.filter);
     this.setData({ visibleItems });
   },
 
@@ -93,11 +95,12 @@ Page({
     const kind = String(event.currentTarget.dataset.kind || '');
     if (!sessionId) return;
     if (kind === 'report') {
-      wx.navigateTo({ url: `/pages/result/index?sessionId=${encodeURIComponent(sessionId)}` });
+      navigation.navigateTo({ url: `/pages/result/index?sessionId=${encodeURIComponent(sessionId)}` });
     } else if (kind === 'resume') {
-      wx.navigateTo({ url: `/pages/practice/index?sessionId=${encodeURIComponent(sessionId)}` });
+      navigation.navigateTo({ url: `/pages/practice/index?sessionId=${encodeURIComponent(sessionId)}` });
     }
   },
 
-  onBack() { wx.navigateBack(); },
-});
+  onBack() { navigation.navigateBack(); },
+  onBrowse() { navigation.navigateTo({ url: '/pages/papers/index?mode=normal' }); },
+}));

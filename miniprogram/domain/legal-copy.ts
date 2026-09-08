@@ -1,3 +1,4 @@
+import { showDialog } from './dialog';
 export type LegalDocumentKind = 'privacy' | 'terms';
 
 const DOCUMENTS = {
@@ -17,5 +18,5 @@ export function legalDocument(kind: LegalDocumentKind) {
 
 export function showLegalDocument(kind: LegalDocumentKind) {
   const document = legalDocument(kind);
-  return wx.showModal({ ...document, showCancel: false, confirmText: '知道了' });
+  return showDialog({ ...document, showCancel: false, confirmText: '知道了' });
 }

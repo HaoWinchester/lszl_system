@@ -1,0 +1,27 @@
+<view class="page-shell appearance-page" style="{{appearanceStyle}}padding-top: {{statusBarHeight}}px">
+  <view class="nav-bar"><button class="nav-back" aria-label="返回" bindtap="onBack"><ui-icon name="back" size="40" /></button><text class="nav-title">外观与阅读</text></view>
+  <view class="appearance-section">
+    <text class="section-title">选择主题</text>
+    <text class="appearance-description">换一种配色，熟悉的排版和操作保持不变。</text>
+    <view class="theme-options" role="radiogroup" aria-label="主题">
+      <button wx:for="{{themes}}" wx:key="id" class="theme-option {{appearanceTheme === item.id ? 'is-selected' : ''}}" role="radio" aria-checked="{{appearanceTheme === item.id}}" aria-label="{{item.name}}，{{item.description}}" data-id="{{item.id}}" bindtap="onSelectTheme" hover-class="choice-pressed">
+        <view class="theme-sample" style="{{item.style}}" aria-hidden="true"><view class="sample-title"></view><view class="sample-line"></view><view class="sample-answer"></view></view>
+        <view class="theme-copy"><text class="theme-name">{{item.name}}</text><text class="theme-description">{{item.description}}</text></view>
+        <view class="choice-radio {{appearanceTheme === item.id ? 'is-checked' : ''}}"><view wx:if="{{appearanceTheme === item.id}}" class="choice-dot"></view></view>
+      </button>
+    </view>
+  </view>
+  <view class="appearance-section reading-section">
+    <text class="section-title">阅读字号</text>
+    <text class="appearance-description">调整题干、选项和解析，菜单字号不变。</text>
+    <view class="size-options" role="radiogroup" aria-label="阅读字号">
+      <button wx:for="{{sizes}}" wx:key="id" class="size-option {{appearanceReadingSize === item.id ? 'is-selected' : ''}}" role="radio" aria-checked="{{appearanceReadingSize === item.id}}" data-id="{{item.id}}" bindtap="onSelectSize" hover-class="choice-pressed">{{item.name}}</button>
+    </view>
+    <text class="appearance-save {{saveError ? 'is-error' : ''}}" aria-role="status">{{saveError || saveMessage}}</text>
+  </view>
+  <view class="reading-preview">
+    <view class="preview-heading"><text class="section-title">阅读预览</text><text class="preview-note">排版示例 · 不计入记录</text></view>
+    <question-view question="{{previewQuestion}}" selected-ids="{{previewSelectedIds}}" submitted="{{true}}" show-analysis="{{true}}" show-result="{{true}}" />
+  </view>
+</view>
+<app-dialog id="app-dialog" style="{{appearanceStyle}}" />

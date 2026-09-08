@@ -32,9 +32,17 @@ export function createSyncCoordinator(execute: Executor) {
   const pending = new Map<string, SyncJob>();
   const blocked = new Map<string, unknown>();
 
+  function identityOf(job: SyncJob) {
+    return `${job.sessionId}\0${job.key}`;
+  }
+
   function remember(job: SyncJob) {
-    const identity = `${job.sessionId}\0${job.key}`;
+    const identity = identityOf(job);
     if (!pending.has(identity)) pending.set(identity, job);
+  }
+
+  function forget(job: SyncJob) {
+    pending.delete(identityOf(job));
   }
 
   function enqueueWrite<T = unknown>(job: SyncJob): Promise<T> {
@@ -45,10 +53,13 @@ export function createSyncCoordinator(execute: Executor) {
         throw blocked.get(job.sessionId);
       }
       try {
-        return await execute(job) as T;
+        const result = await execute(job) as T;
+        forget(job);
+        return result;
       } catch (error) {
-        if (classifyFailure(error) === 'offline') {
-          remember(job);
+        const failure = classifyFailure(error);
+        if (failure !== 'auth' && failure !== 'conflict') remember(job);
+        if (failure === 'offline') {
           blocked.set(job.sessionId, error);
         }
         throw error;
@@ -72,9 +83,12 @@ export function createSyncCoordinator(execute: Executor) {
       try {
         results.push(await execute(job));
       } catch (error) {
-        if (classifyFailure(error) === 'offline') {
-          blocked.set(job.sessionId, error);
+        const failure = classifyFailure(error);
+        if (failure !== 'auth' && failure !== 'conflict') {
           for (const remaining of jobs.slice(index)) remember(remaining);
+        }
+        if (failure === 'offline') {
+          blocked.set(job.sessionId, error);
         }
         throw error;
       }

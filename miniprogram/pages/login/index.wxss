@@ -91,7 +91,7 @@
   width: 40rpx;
   height: 40rpx;
   margin-top: 2rpx;
-  border: 2rpx solid #9ba49f;
+  border: 2rpx solid var(--border-strong);
   border-radius: 10rpx;
 }
 
@@ -103,8 +103,8 @@
 .check-mark {
   width: 14rpx;
   height: 8rpx;
-  border-bottom: 3rpx solid #fff;
-  border-left: 3rpx solid #fff;
+  border-bottom: 3rpx solid var(--on-accent);
+  border-left: 3rpx solid var(--on-accent);
   transform: rotate(-45deg) translateY(-2rpx);
 }
 

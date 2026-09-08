@@ -6,6 +6,8 @@ export interface PracticeDraft {
   answers: Record<string, string[]>;
   markedQuestionIds: string[];
   savedAt: number;
+  lockedAnswers?: Record<string, any>;
+  runtimeState?: Record<string, any>;
 }
 
 export function toggleAnswer(
@@ -39,9 +41,15 @@ export function mergeDraft(server: PracticeDraft, local?: PracticeDraft): {
   if (local.revision > server.revision) {
     return { state: local, conflict: false, pendingLocal: true };
   }
-  return local.savedAt > server.savedAt
-    ? { state: local, conflict: false, pendingLocal: true }
-    : { state: server, conflict: false, pendingLocal: false };
+  // The same revision means the local draft was based on this exact server state.
+  // Loading the server now must not make an older, unsent local selection disappear.
+  const locked = Object.fromEntries(Object.entries(server.answers)
+    .filter(([id]) => !server.lockedAnswers || server.lockedAnswers[id]?.draft !== true && !!server.lockedAnswers[id]));
+  const state = { ...local, answers: { ...server.answers, ...local.answers, ...locked } };
+  const pendingLocal = JSON.stringify(state.answers) !== JSON.stringify(server.answers)
+    || state.currentIndex !== server.currentIndex
+    || JSON.stringify(state.markedQuestionIds) !== JSON.stringify(server.markedQuestionIds);
+  return { state, conflict: false, pendingLocal };
 }
 
 export function toggleMarked(marked: string[], questionId: string): string[] {

@@ -9,12 +9,13 @@ import { getModePolicy } from '../domain/mode-policy.ts';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = path => readFileSync(join(root, path), 'utf8');
 
-test('competitive modes never reveal per-question answers', () => {
+test('competitive modes hide explanations, while only scholar displays a countdown', () => {
   for (const mode of ['challenge', 'scholar']) {
     const policy = getModePolicy(mode);
     assert.equal(policy.revealAfterAnswer, false);
     assert.equal(policy.revealAfterComplete, true);
-    assert.equal(policy.showTimer, true);
+    assert.equal(policy.showTimer, mode === 'scholar');
+    assert.equal(policy.allowPause, true);
   }
 });
 

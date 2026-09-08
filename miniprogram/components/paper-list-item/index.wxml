@@ -8,6 +8,6 @@
   <view class="paper-foot">
     <text>{{item.questionCount}} 题</text>
     <text wx:if="{{progressText}}">{{progressText}}</text>
-    <view class="arrow"><view class="arrow-line"></view></view>
+    <ui-icon name="chevron" size="32" />
   </view>
 </button>

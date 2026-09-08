@@ -1,0 +1,13 @@
+<view class="page-shell membership-page" style="{{appearanceStyle}}padding-top: {{statusBarHeight}}px">
+  <view class="nav-bar"><button class="nav-back" aria-label="返回" bindtap="onBack"><ui-icon name="back" size="40" /></button><text class="nav-title">会员信息</text></view>
+  <view wx:if="{{loading}}" class="membership-loading"><view class="loading-line"></view><view class="loading-line"></view><view class="loading-line"></view></view>
+  <empty-state wx:elif="{{error}}" title="会员信息没有载入" body="{{error}}" action-text="重新加载" bind:action="loadMembership" />
+  <block wx:else>
+    <view class="membership-summary">
+      <view class="summary-heading"><text class="summary-title">{{membership.title}}</text><text class="status-label">{{membership.statusLabel}}</text></view>
+      <view class="expiry-row"><text class="meta-copy">到期时间</text><text class="expiry-label">{{membership.expiryLabel}}</text></view>
+      <text class="summary-copy">{{membership.description}}</text>
+    </view>
+  </block>
+</view>
+<app-dialog id="app-dialog" style="{{appearanceStyle}}" />

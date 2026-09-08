@@ -1,9 +1,10 @@
 :host { display: block; width: 100%; }
-.question { padding: var(--space-5) 0 220rpx; }
+.question { padding: var(--space-4) 0 var(--space-5); }
+.question.is-compact { padding-bottom: var(--space-3); }
 .question-kind { display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: var(--font-meta); line-height: 1.45; }
 .question-kind-label { color: var(--clay); font-weight: 600; }
 .stem { display: block; margin-top: var(--space-3); color: var(--ink); font-size: var(--font-question); font-weight: 560; line-height: var(--line-question); }
-.stem-en { display: block; margin-top: var(--space-2); padding-left: var(--space-3); border-left: 4rpx solid var(--line); color: #64756e; font-size: var(--font-body); line-height: var(--line-body); }
+.stem-en { display: block; margin-top: var(--space-2); padding-left: var(--space-3); border-left: 4rpx solid var(--line); color: var(--muted); font-size: var(--font-reading-body); line-height: var(--line-body); }
 .question-images { margin-top: var(--space-3); overflow: hidden; border: 2rpx solid var(--line); border-radius: var(--radius-sm); }
 .question-image { display: block; width: 100%; }
 .options { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-5); }
@@ -11,10 +12,22 @@
 .option::after { border: 0; }
 .option.is-selected { border-color: var(--ink); background: var(--green-soft); }
 .option.is-locked { opacity: 1; }
-.option-key { display: flex; flex: 0 0 auto; align-items: center; justify-content: center; width: 52rpx; height: 52rpx; margin-right: var(--space-2); border: 2rpx solid #9ba49f; border-radius: 50%; color: var(--ink); font-size: var(--font-meta); font-weight: 650; }
-.option.is-selected .option-key { border-color: var(--ink); background: var(--ink); color: #fffdf7; }
+.option-key { display: flex; flex: 0 0 auto; align-items: center; justify-content: center; width: 52rpx; height: 52rpx; margin-right: var(--space-2); border: 2rpx solid var(--border-strong); border-radius: 50%; color: var(--ink); font-size: var(--font-reading-meta); font-weight: 650; }
+.option.is-selected .option-key { border-color: var(--ink); background: var(--ink); color: var(--on-accent); }
 .option-copy { display: flex; flex: 1; flex-direction: column; font-size: var(--font-option); line-height: var(--line-body); white-space: normal; }
-.option-en { margin-top: var(--space-1); color: var(--muted); font-size: var(--font-meta); line-height: var(--line-body); }
-.analysis { display: flex; flex-direction: column; margin-top: var(--space-5); padding: var(--space-3) 0 var(--space-1) var(--space-3); border-left: 4rpx solid #497465; }
-.analysis-label { color: #497465; font-size: var(--font-meta); font-weight: 650; }
-.analysis-copy { margin-top: var(--space-2); color: #354c45; font-size: var(--font-body); line-height: var(--line-question); }
+.option-en { margin-top: var(--space-1); color: var(--muted); font-size: var(--font-reading-meta); line-height: var(--line-body); }
+.analysis { display: flex; flex-direction: column; margin-top: var(--space-5); padding: var(--space-4) 0; border-top: 2rpx solid var(--line); }
+.analysis-label { color: var(--success); font-size: var(--font-meta); font-weight: 650; }
+.analysis-copy { margin-top: var(--space-2); color: var(--text); font-size: var(--font-reading-body); line-height: var(--line-question); }
+.option-copy { min-width: 0; overflow-wrap: break-word; }
+.options .option { align-items: flex-start; }
+.option-key { margin-top: 0; }
+.option.is-locked { opacity: 1; }
+.option.is-correct { border-color: var(--success); background: var(--success-soft); }
+.option.is-wrong { border-color: var(--danger); background: var(--danger-soft); }
+.option.is-wrong .option-key { background: var(--danger); border-color: var(--danger); color: var(--on-danger); }
+.option-verdict { margin-top: var(--space-1); font-size: var(--font-reading-meta); font-weight: 600; }
+.answer-outcome { color: var(--ink); font-size: var(--font-heading); font-weight: 600; }
+.answer-summary { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-2) 0 var(--space-4); color: var(--text); font-size: var(--font-reading-meta); }
+.option-pressed { opacity: .8; }
+.options .option { font-weight: 400; }

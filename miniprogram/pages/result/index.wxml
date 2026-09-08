@@ -1,5 +1,5 @@
-<view class="page-shell result-page" style="padding-top: {{statusBarHeight}}px">
-  <view class="nav-bar"><text class="nav-title">练习结果</text></view>
+<view class="page-shell result-page" style="{{appearanceStyle}}padding-top: {{statusBarHeight}}px">
+  <view class="nav-bar"><button class="nav-back" bindtap="onBack" aria-label="返回练习记录"><ui-icon name="back" /></button><text class="nav-title">练习结果</text></view>
 
   <view wx:if="{{loading}}" class="result-loading"><view class="result-loading-line is-lead"></view><view class="result-loading-line"></view><view class="result-loading-line"></view></view>
   <view wx:elif="{{error}}" class="result-error">
@@ -12,6 +12,8 @@
     <view class="result-heading">
       <text class="eyebrow">{{report.paperName || '本次练习'}}</text>
       <text class="result-conclusion">{{conclusion}}</text>
+      <text wx:if="{{gameOutcome}}" class="result-conclusion">{{gameOutcome}}</text>
+      <text wx:if="{{gameDetail}}" class="section-aside">{{gameDetail}}</text>
       <view class="accuracy-line"><text class="accuracy-number">{{accuracy}}</text><text class="accuracy-unit">%</text><text class="accuracy-label">正确率</text></view>
     </view>
 
@@ -31,35 +33,32 @@
     </view>
 
     <view class="result-section wrong-section">
-      <view class="section-title-row"><text class="section-kicker">错题 {{wrongQuestions.length}}</text><text class="section-aside">点开查看解析</text></view>
-      <button wx:for="{{wrongQuestions}}" wx:key="questionId" class="wrong-row" data-index="{{index}}" bindtap="onReview">
+      <view class="section-title-row"><text class="section-kicker">错题 {{wrongQuestions.length}} · 未答 {{unansweredCount}}</text><text class="section-aside">点开查看解析</text></view>
+      <view class="review-filters"><button class="review-filter {{reviewFilter === 'wrong' ? 'active' : ''}}" data-filter="wrong" bindtap="onReviewFilter">错题与未答</button><button class="review-filter {{reviewFilter === 'all' ? 'active' : ''}}" data-filter="all" bindtap="onReviewFilter">全部题目</button></view>
+      <button wx:for="{{reviewItems}}" wx:key="questionId" class="wrong-row" data-index="{{index}}" bindtap="onReview">
         <text class="wrong-number">{{item.number}}</text>
         <text class="wrong-stem">{{item.question.stem}}</text>
-        <text class="wrong-action">查看解析</text>
+        <view class="wrong-tail"><text class="wrong-status">{{item.status}}</text><ui-icon name="chevron" size="32" /></view>
       </button>
-      <text wx:if="{{!wrongQuestions.length}}" class="section-empty">没有错题，这次完成得很稳。</text>
+      <text wx:if="{{!reviewItems.length}}" class="section-empty">本次全部答对，也可以切换到全部题目回顾。</text>
     </view>
 
     <view class="next-actions">
-      <button wx:if="{{wrongQuestions.length}}" class="primary-button next-action" bindtap="onRevenge">开始错题复仇</button>
+      <button wx:if="{{wrongQuestions.length}}" class="primary-button next-action" bindtap="onRevenge">进入错题复习</button>
+      <text wx:if="{{wrongQuestions.length}}" class="section-aside">进入全部待复习错题，按学习进度安排重答与验证。</text>
       <button class="secondary-button next-action" bindtap="onRetry">再练一次</button>
       <button class="quiet-button next-action" bindtap="onHome">回到首页</button>
     </view>
   </block>
 </view>
 
-<view wx:if="{{reviewOpen}}" class="review-mask" bindtap="onCloseReview">
+<view wx:if="{{reviewOpen}}" class="review-mask" style="{{appearanceStyle}}" bindtap="onCloseReview">
   <view class="review-sheet" catchtap="noop">
     <view class="review-handle"></view>
     <view class="review-head"><text>第 {{reviewNumber}} 题</text><button class="review-close" bindtap="onCloseReview">关闭</button></view>
     <scroll-view scroll-y class="review-scroll">
-      <text class="review-stem">{{reviewQuestion.stem}}</text>
-      <text wx:if="{{reviewQuestion.stemEn}}" class="review-stem-en">{{reviewQuestion.stemEn}}</text>
-      <view class="review-divider"></view>
-      <text class="review-label">正确答案</text>
-      <text class="review-answer">{{reviewAnswer}}</text>
-      <text class="review-label">解析</text>
-      <text class="review-copy">{{reviewQuestion.analysis || reviewQuestion.explanation || '暂无解析'}}</text>
+      <question-view question="{{reviewQuestion}}" selected-ids="{{reviewSelectedIds}}" submitted="{{true}}" show-analysis="{{true}}" compact="{{true}}" />
     </scroll-view>
   </view>
 </view>
+<app-dialog id="app-dialog" style="{{appearanceStyle}}" />

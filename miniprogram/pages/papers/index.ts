@@ -1,6 +1,9 @@
+import { navigation } from "../../domain/navigation";
+import { withAppearance } from '../../domain/appearance-page';
 import { messageOf } from '../../services/http';
 import { listPublishedPapers } from '../../services/papers';
 import { PaperSummary, PracticeMode } from '../../types/api';
+import { openMembershipOffer } from '../../domain/membership-navigation';
 
 function filteredPapers(items: PaperSummary[], subject: string, access: string): PaperSummary[] {
   return items.filter(item =>
@@ -9,7 +12,8 @@ function filteredPapers(items: PaperSummary[], subject: string, access: string):
   );
 }
 
-Page({
+Page(withAppearance({
+  fetching: false,
   data: {
     statusBarHeight: 24,
     loading: true,
@@ -21,6 +25,11 @@ Page({
     access: 'all',
     mode: 'normal' as PracticeMode,
     skeletonRows: [0, 1, 2],
+    page: 0,
+    total: 0,
+    hasMore: false,
+    loadingMore: false,
+    moreError: '',
   },
 
   onLoad(query: Record<string, string>) {
@@ -36,16 +45,41 @@ Page({
   },
 
   async loadPapers() {
+    if (this.fetching) return;
+    this.fetching = true;
     this.setData({ loading: true, error: '' });
     try {
-      const { items } = await listPublishedPapers(1, 100);
+      const { items, total = items.length } = await listPublishedPapers(1, 100);
       const subjects = ['全部科目', ...Array.from(new Set(items.map(item => item.subject)))];
-      this.setData({ papers: items, subjects, loading: false });
+      this.setData({ papers: items, subjects, loading: false, page: 1, total, hasMore: items.length < total, moreError: '' });
       this.applyFilters();
     } catch (error) {
       this.setData({ loading: false, error: messageOf(error), filtered: [] });
+    } finally {
+      this.fetching = false;
     }
   },
+
+  async loadMore() {
+    if (this.fetching || !this.data.hasMore) return;
+    this.fetching = true;
+    this.setData({ loadingMore: true, moreError: '' });
+    try {
+      const next = this.data.page + 1;
+      const { items, total } = await listPublishedPapers(next, 100);
+      const papers = [...new Map([...this.data.papers, ...items].map(item => [item.releaseId, item])).values()];
+      this.setData({ papers, total, page: next, hasMore: items.length > 0 && next * 100 < total,
+        subjects: ['全部科目', ...Array.from(new Set(papers.map(item => item.subject)))] });
+      this.applyFilters();
+    } catch (error) {
+      this.setData({ moreError: messageOf(error) });
+    } finally {
+      this.fetching = false;
+      this.setData({ loadingMore: false });
+    }
+  },
+
+  onReachBottom() { this.loadMore(); },
 
   applyFilters() {
     this.setData({
@@ -63,16 +97,10 @@ Page({
     this.applyFilters();
   },
 
-  onSelectPaper(event: any) {
+  async onSelectPaper(event: any) {
     const item = event.detail.item as PaperSummary;
     if (item.contentRestricted) {
-      wx.showModal({
-        title: '当前账号暂不可练习',
-        content: '这份会员试卷需要先在网页端开通对应权限，已有权限会自动同步。',
-        showCancel: false,
-        confirmText: '知道了',
-      });
-      return;
+      return openMembershipOffer();
     }
     const params = [
       `paperId=${encodeURIComponent(item.paperId)}`,
@@ -81,8 +109,8 @@ Page({
       `count=${item.questionCount}`,
       `mode=${this.data.mode}`,
     ].join('&');
-    wx.navigateTo({ url: `/pages/practice-setup/index?${params}` });
+    navigation.navigateTo({ url: `/pages/practice-setup/index?${params}` });
   },
 
-  onBack() { wx.navigateBack(); },
-});
+  onBack() { navigation.navigateBack(); },
+}));

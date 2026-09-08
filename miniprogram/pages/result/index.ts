@@ -1,6 +1,10 @@
+import { navigation } from "../../domain/navigation";
+import { withAppearance } from '../../domain/appearance-page';
 import { messageOf } from '../../services/http';
 import { getReport, getSession } from '../../services/practice';
 import { PracticeQuestion, PracticeReport, PracticeSession } from '../../types/api';
+import { getModePolicy } from '../../domain/mode-policy';
+import { createPracticeRun } from '../../domain/pc-practice';
 
 const domainLabels: Record<string, string> = {
   people: '人员',
@@ -14,14 +18,23 @@ function percent(value: unknown): string {
 }
 
 function formatDuration(value: unknown): string {
-  const totalMinutes = Math.max(0, Math.round(Number(value || 0) / 60000));
+  const seconds = Math.max(0, Math.round(Number(value || 0) / 1000));
+  if (seconds < 60) return `${seconds} 秒`;
+  const totalMinutes = Math.floor(seconds / 60);
   if (totalMinutes < 60) return `${totalMinutes} 分钟`;
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
   return minutes ? `${hours} 小时 ${minutes} 分` : `${hours} 小时`;
 }
 
-Page({
+function reviewRows(session: PracticeSession, filter: string) {
+  return session.questions.map((entry, index) => {
+    const answer = session.answers?.[entry.questionId];
+    return { ...entry, number: index + 1, status: !answer || answer.timedOut ? '未作答' : answer.correct ? '正确' : '错误', needsReview: !answer || answer.correct !== true };
+  }).filter(item => filter === 'all' || item.needsReview);
+}
+
+Page(withAppearance({
   data: {
     statusBarHeight: 24,
     loading: true,
@@ -33,12 +46,18 @@ Page({
     score: '0',
     duration: '0 分钟',
     conclusion: '继续巩固',
+    gameOutcome: '',
+    gameDetail: '',
     domains: [] as Array<{ id: string; label: string; score: string; weak: boolean }>,
     wrongQuestions: [] as Array<{ questionId: string; number: number; question: PracticeQuestion }>,
+    reviewItems: [] as any[],
+    reviewFilter: 'wrong',
+    unansweredCount: 0,
     reviewOpen: false,
     reviewQuestion: {} as PracticeQuestion,
     reviewNumber: 0,
     reviewAnswer: '',
+    reviewSelectedIds: [] as string[],
   },
 
   onLoad(query: Record<string, string>) {
@@ -69,6 +88,9 @@ Page({
       const wrongQuestions = session.questions
         .map((entry, index) => ({ questionId: entry.questionId, number: index + 1, question: entry.question }))
         .filter(item => wrongIds.has(item.questionId));
+      const competitive = ['challenge', 'scholar'].includes(session.mode);
+      const run = competitive ? createPracticeRun(session) : null;
+      const runtime = run?.runtime();
       this.setData({
         report,
         session,
@@ -76,8 +98,12 @@ Page({
         score: percent(report.scorePercent),
         duration: formatDuration(report.durationMs),
         conclusion: report.passed ? '已达到本次目标' : '还有可以补强的地方',
+        gameOutcome: runtime ? `${session.mode === 'scholar' ? '学霸挑战' : '挑战'}${runtime.health > 0 ? '成功' : '失败'}` : '',
+        gameDetail: runtime ? `剩余生命 ${runtime.health} / ${run?.maxHealth}${session.mode === 'scholar' ? ` · 最高连对 ${runtime.maxStreak}` : ''}` : '',
         domains: domainRows,
         wrongQuestions,
+        reviewItems: reviewRows(session, this.data.reviewFilter),
+        unansweredCount: Number(report.counts?.unanswered || 0),
         loading: false,
       });
     } catch (error) {
@@ -87,7 +113,7 @@ Page({
 
   onReview(event: any) {
     const index = Number(event.currentTarget.dataset.index || 0);
-    const item = this.data.wrongQuestions[index];
+    const item = this.data.reviewItems[index];
     if (!item) return;
     const correctIds = item.question.correctOptionIds || [];
     this.setData({
@@ -95,11 +121,18 @@ Page({
       reviewQuestion: item.question,
       reviewNumber: item.number,
       reviewAnswer: correctIds.join('、') || item.question.correctAnswer || '请参考解析',
+      reviewSelectedIds: this.data.session.answers?.[item.questionId]?.timedOut ? [] : (this.data.session.answers?.[item.questionId]?.selectedAnswerIds as string[] || (this.data.session.answers?.[item.questionId]?.selectedAnswer ? [String(this.data.session.answers[item.questionId].selectedAnswer)] : [])),
     });
   },
 
   onCloseReview() { this.setData({ reviewOpen: false }); },
   noop() {},
+
+  onReviewFilter(event: any) {
+    const reviewFilter = event.currentTarget.dataset.filter;
+    const reviewItems = reviewRows(this.data.session, reviewFilter);
+    this.setData({ reviewFilter, reviewItems });
+  },
 
   onRetry() {
     const { session, report } = this.data;
@@ -108,14 +141,15 @@ Page({
       `releaseId=${encodeURIComponent(String(session.releaseId || report.releaseId || ''))}`,
       `title=${encodeURIComponent(String(report.paperName || session.paperName || '再练一次'))}`,
       `count=${session.questions.length}`,
-      'mode=normal',
+      `mode=${getModePolicy(session.mode).id}`,
     ].join('&');
-    wx.redirectTo({ url: `/pages/practice-setup/index?${query}` });
+    navigation.redirectTo({ url: `/pages/practice-setup/index?${query}` });
   },
 
   onRevenge() {
-    wx.navigateTo({ url: `/pages/revenge/index?sessionId=${encodeURIComponent(this.data.sessionId)}` });
+    navigation.navigateTo({ url: '/pages/revenge/index' });
   },
 
-  onHome() { wx.reLaunch({ url: '/pages/home/index' }); },
-});
+  onBack() { navigation.switchTab({ url: '/pages/history/index' }); },
+  onHome() { navigation.switchTab({ url: '/pages/home/index' }); },
+}));

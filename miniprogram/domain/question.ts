@@ -10,16 +10,26 @@ function httpsImages(value: unknown): string[] {
   return rows.map(text).filter(url => url.startsWith('https://'));
 }
 
+function optionText(value: unknown, id: string): string {
+  const original = text(value);
+  if (!/^[A-Za-z]$/.test(id)) return original;
+  // Only explicit labels for this option; keep API, H.264 and quoted other labels.
+  const prefix = new RegExp(`^(?:[（(]${id}[）)]\\s*|${id}(?:[.．]\\s+|[、:：)）]\\s*))`);
+  return original.replace(prefix, '').trim() || original;
+}
+
 export function normalizeQuestion(rawValue: unknown): PracticeQuestion {
   const raw = (rawValue && typeof rawValue === 'object' ? rawValue : {}) as Record<string, any>;
   const parts = Array.isArray(raw.stemParts ?? raw.stem_parts) ? (raw.stemParts ?? raw.stem_parts) : [];
-  const stem = text(raw.stem || raw.title || parts.map((part: any) => text(part?.text)).join('\n'));
+  const stem = text(raw.stem || parts.map((part: any) => String(part?.text || '')).join('') || raw.title);
   const stemEn = text(raw.stemEn || raw.stem_en || parts.map((part: any) => text(part?.textEn || part?.text_en)).filter(Boolean).join('\n'));
-  const options: QuestionOption[] = (Array.isArray(raw.options) ? raw.options : []).map((option: any, index: number) => ({
-    id: text(option?.id || option?.key || String.fromCharCode(65 + index)),
-    text: text(option?.text || option?.label),
-    ...(text(option?.textEn || option?.text_en) ? { textEn: text(option?.textEn || option?.text_en) } : {}),
-  }));
+  const options: QuestionOption[] = (Array.isArray(raw.options) ? raw.options : []).map((option: any, index: number) => {
+    const id = text(option?.id || option?.key || String.fromCharCode(65 + index));
+    return {
+      id, text: optionText(option?.text || option?.label, id),
+      ...(text(option?.textEn || option?.text_en) ? { textEn: optionText(option?.textEn || option?.text_en, id) } : {}),
+    };
+  });
   return {
     id: text(raw.id || raw.questionId || raw.question_id),
     type: raw.type === 'multiple_choice' ? 'multiple_choice' : 'single_choice',

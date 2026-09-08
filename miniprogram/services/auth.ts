@@ -1,5 +1,5 @@
 import { LEGAL_CONSENT_VERSION } from '../config/index';
-import { request } from './http';
+import { ApiError, request } from './http';
 import { clearSession, getSessionToken, MiniUser, setSession } from './session';
 
 export type AuthState =
@@ -28,8 +28,6 @@ function clientMetadata(): Record<string, string> {
 
 function remember(result: SessionResponse): AuthState {
   setSession(result.token, result.user);
-  const app = getApp<any>();
-  if (app?.globalData) app.globalData.authenticated = true;
   return result;
 }
 
@@ -91,8 +89,9 @@ export async function validateSession(): Promise<MiniUser | null> {
   try {
     const response = await request<{ user: MiniUser }>({ path: '/api/v1/auth/mini/session' });
     return response.user;
-  } catch (_error) {
-    return null;
+  } catch (error) {
+    if (error instanceof ApiError && error.statusCode === 401) return null;
+    throw error;
   }
 }
 
@@ -101,7 +100,5 @@ export async function logout(): Promise<void> {
     await request<{ ok: true }>({ path: '/api/v1/auth/mini/logout', method: 'POST' });
   } finally {
     clearSession();
-    const app = getApp<any>();
-    if (app?.globalData) app.globalData.authenticated = false;
   }
 }

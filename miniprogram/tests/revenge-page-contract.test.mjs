@@ -15,6 +15,14 @@ test('revenge flow requires remediation before verification', () => {
   assert.match(source, /submitVerification/);
 });
 
+test('reviewed remediation resumes verification and skips unavailable repeats', () => {
+  const source = read('pages/revenge/index.ts');
+  assert.match(source, /for \(const candidate of candidates\)/);
+  assert.match(source, /candidate\.remediationReviewedAt/);
+  assert.match(source, /verification\.available/);
+  assert.doesNotMatch(source, /const candidate = candidates\[0\]/);
+});
+
 test('revenge uses a quiet three-step learning sequence with real states', () => {
   const page = read('pages/revenge/index.wxml');
   for (const label of ['重答原题', '阅读纠错', '变式验证', '暂无待处理错题']) {

@@ -1,4 +1,4 @@
-<view class="tab-bar" role="tablist" aria-label="主导航">
+<view class="tab-bar" style="{{appearanceStyle}}" role="tablist" aria-label="主导航" aria-hidden="{{dialogOpen}}">
   <button
     wx:for="{{tabs}}"
     wx:key="key"
@@ -11,9 +11,8 @@
     aria-selected="{{selected === index}}"
     aria-label="{{item.label}}"
   >
-    <view class="tab-icon {{item.icon}}-icon">
-      <view wx:if="{{item.icon === 'home'}}" class="home-roof"></view>
-    </view>
+    <ui-icon name="{{item.icon}}" size="44" color="{{selected === index ? 'ink' : 'muted'}}" />
     <text class="tab-label">{{item.label}}</text>
   </button>
+  <view wx:if="{{dialogOpen}}" class="tab-dialog-mask" catchtap="noop" catchtouchmove="noop" />
 </view>

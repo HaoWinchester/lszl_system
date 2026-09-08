@@ -3,6 +3,7 @@
   "enablePullDownRefresh": true,
   "usingComponents": {
     "empty-state": "/components/empty-state/index",
-    "paper-list-item": "/components/paper-list-item/index"
+    "paper-list-item": "/components/paper-list-item/index",
+    "ui-icon": "/components/ui-icon/index"
   }
 }

@@ -1,9 +1,12 @@
+import { navigation } from "../../domain/navigation";
+import { withAppearance } from '../../domain/appearance-page';
+import { showDialog } from '../../domain/dialog';
 import { ApiError, messageOf } from '../../services/http';
 import { abandonSession, getSession, startSession } from '../../services/practice';
 import { PracticeMode, PracticeOrder } from '../../types/api';
 import { MODE_CHOICES } from '../../domain/mode-policy';
 
-Page({
+Page(withAppearance({
   data: {
     statusBarHeight: 24,
     paperId: '',
@@ -16,12 +19,13 @@ Page({
     mode: 'normal' as PracticeMode,
     modes: MODE_CHOICES,
     starting: false,
+    existingSessionId: '',
     error: '',
   },
 
   onLoad(query: Record<string, string>) {
     const total = Math.max(1, Number(query.count || 1));
-    const values = [10, 20, total].filter((value, index, rows) => value <= total && rows.indexOf(value) === index);
+    const values = total < 10 ? [total] : [10, 20, 60, 180].filter(value => value <= total);
     this.setData({
       statusBarHeight: wx.getWindowInfo?.().statusBarHeight || 24,
       paperId: decodeURIComponent(query.paperId || ''),
@@ -34,14 +38,20 @@ Page({
     });
   },
 
-  onCount(event: any) { this.setData({ count: Number(event.currentTarget.dataset.value) }); },
-  onOrder(event: any) { this.setData({ order: event.currentTarget.dataset.order }); },
-  onMode(event: any) { this.setData({ mode: event.currentTarget.dataset.mode }); },
-  onBack() { wx.navigateBack(); },
+  updateSetting(field: 'count' | 'order' | 'mode', value: number | string) {
+    if (this.data.starting || this.data[field] === value) return;
+    // A resumable session belongs to the settings that produced its lookup.
+    this.setData({ [field]: value, existingSessionId: '', error: '' });
+  },
+  onCount(event: any) { this.updateSetting('count', Number(event.currentTarget.dataset.value)); },
+  onOrder(event: any) { this.updateSetting('order', event.currentTarget.dataset.order); },
+  onMode(event: any) { this.updateSetting('mode', event.currentTarget.dataset.mode); },
+  onBack() { navigation.navigateBack(); },
 
   async start() {
     if (this.data.starting) return;
     this.setData({ starting: true, error: '' });
+    if (this.data.existingSessionId) { this.openPractice(this.data.existingSessionId); return; }
     try {
       const session = await startSession({
         paperId: this.data.paperId,
@@ -50,7 +60,7 @@ Page({
         count: this.data.count,
         order: this.data.order,
       });
-      wx.redirectTo({ url: `/pages/practice/index?sessionId=${encodeURIComponent(session.id)}` });
+      this.openPractice(session.id);
     } catch (error) {
       if (error instanceof ApiError && error.code === 'RESUMABLE_SESSION_EXISTS') {
         await this.resolveExistingSession(error);
@@ -66,26 +76,43 @@ Page({
       this.setData({ error: error.message, starting: false });
       return;
     }
-    const decision = await wx.showModal({
+    const decision = await showDialog({
       title: '已有未完成练习',
-      content: '可以继续上次进度，也可以放弃后重新开始。',
+      content: '继续上次进度，或返回设置。若要重新开始，可在设置页明确放弃上次练习。',
       confirmText: '继续练习',
-      cancelText: '重新开始',
+      cancelText: '返回设置',
     });
     if (decision.confirm) {
-      wx.redirectTo({ url: `/pages/practice/index?sessionId=${encodeURIComponent(sessionId)}` });
+      this.openPractice(sessionId);
       return;
     }
+    this.setData({ starting: false, existingSessionId: sessionId });
+  },
+
+  openPractice(sessionId: string) {
+    navigation.redirectTo({
+      url: `/pages/practice/index?sessionId=${encodeURIComponent(sessionId)}`,
+      fail: () => this.setData({ starting: false, existingSessionId: sessionId,
+        error: '练习已保留，但页面未打开。请点击继续练习重试。' }),
+    });
+  },
+
+  async onRestartExisting() {
+    const sessionId = this.data.existingSessionId;
+    if (!sessionId || this.data.starting) return;
+    const decision = await showDialog({ title: '放弃上次练习？', content: '上次练习将结束，不能再继续作答。随后按当前设置创建新练习。', confirmText: '重新开始', cancelText: '保留进度' });
+    if (!decision.confirm) return;
+    this.setData({ starting: true, error: '' });
     try {
       const existing = await getSession(sessionId);
       await abandonSession(sessionId, {
         revision: existing.revision,
         requestId: `abandon:${sessionId}:${existing.revision}`,
       });
-      this.setData({ starting: false });
+      this.setData({ starting: false, existingSessionId: '' });
       await this.start();
     } catch (retryError) {
       this.setData({ error: messageOf(retryError), starting: false });
     }
   },
-});
+}));

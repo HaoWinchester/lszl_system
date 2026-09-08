@@ -237,12 +237,14 @@ async def active_practice_sessions(
     user: CurrentUser,
     release_id: str | None = Query(None, alias="releaseId"),
     mode: str | None = Query(None),
+    summary: bool = Query(False),
 ):
-    return _practice_view(request, {
+    payload = {
         "sessions": await practice_session_service.list_active_sessions(
-            db, user.username, release_id=release_id, mode=mode
+            db, user.username, release_id=release_id, mode=mode, summary=summary
         )
-    })
+    }
+    return payload if summary else _practice_view(request, payload)
 
 
 @router.post("/learning/practice/sessions")
@@ -442,6 +444,17 @@ async def record_revenge_answer(mistake_id: str, body: dict, db: DB, user: Curre
     if mistake is None:
         raise HTTPException(status_code=404, detail="错题不存在或无权访问")
     return {"mistake": learning_service._practice_mistake_to_dict(mistake)}
+
+
+@router.get("/learning/practice/mistakes/{mistake_id}/remediation")
+async def get_remediation(mistake_id: str, db: DB, user: CurrentUser):
+    try:
+        mistake = await learning_service.get_remediation(db, user.username, mistake_id)
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    if mistake is None:
+        raise HTTPException(status_code=404, detail="错题不存在或无权访问")
+    return {"mistake": mistake}
 
 
 @router.post("/learning/practice/mistakes/{mistake_id}/remediation-reviewed")

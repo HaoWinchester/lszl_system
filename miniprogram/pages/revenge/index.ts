@@ -1,3 +1,6 @@
+import { navigation } from "../../domain/navigation";
+import { withAppearance } from '../../domain/appearance-page';
+import { showDialog } from '../../domain/dialog';
 import { normalizeQuestion } from '../../domain/question';
 import { toggleAnswer } from '../../domain/practice-state';
 import { classifyFailure, createSyncCoordinator } from '../../domain/sync-coordinator';
@@ -6,6 +9,7 @@ import { messageOf } from '../../services/http';
 import {
   getOverview,
   getRevengeSummary,
+  getRemediation,
   getVerificationCandidate,
   markRemediationReviewed,
   submitRevengeAnswer,
@@ -33,7 +37,7 @@ async function executeRevengeWrite(job: SyncJob) {
   throw new Error(`不支持的错题同步操作: ${job.action}`);
 }
 
-Page({
+Page(withAppearance({
   syncCoordinator: null as any,
   data: {
     statusBarHeight: 24,
@@ -42,9 +46,12 @@ Page({
     loadError: '',
     writeError: '',
     empty: false,
+    waitingCount: 0,
+    emptyTitle: '暂无待处理错题',
+    emptyCopy: '',
     stats: {} as Record<string, number>,
     queueCount: 0,
-    stage: 'answer' as 'answer' | 'remediation' | 'verification',
+    stage: 'answer' as 'answer' | 'remediation' | 'verification' | 'verification-result',
     candidate: {} as any,
     mistake: {} as any,
     question: {} as PracticeQuestion,
@@ -64,28 +71,60 @@ Page({
     try {
       const [overview, summary] = await Promise.all([getOverview(), getRevengeSummary()]);
       const candidates = Array.isArray(overview.revengeCandidates) ? overview.revengeCandidates : [];
-      const candidate = candidates[0];
-      if (!candidate) {
-        this.setData({ loading: false, empty: true, stats: summary.stats || {}, queueCount: 0 });
+      let skipped = 0;
+      for (const candidate of candidates) {
+        if (candidate.status === 'needs_remediation' && candidate.remediationReviewedAt) {
+          const mistakeId = String(candidate.mistakeId || candidate.id || '');
+          const verification = await getVerificationCandidate(mistakeId);
+          if (!verification.available || !verification.question) {
+            skipped += 1;
+            continue;
+          }
+          this.setData({
+            loading: false,
+            empty: false,
+            stats: summary.stats || {},
+            queueCount: candidates.length - skipped,
+            stage: 'verification',
+            candidate,
+            mistake: candidate,
+            question: normalizeQuestion(verification.question),
+            previousAnswer: previousAnswer(candidate),
+            feedback: '换一道同知识点题，确认自己是真正理解了。',
+          });
+          return;
+        }
+        if (candidate.status === 'needs_remediation') {
+          const mistake = await getRemediation(String(candidate.mistakeId || candidate.id || ''));
+          this.setData({ loading: false, empty: false, stats: summary.stats || {}, queueCount: candidates.length - skipped,
+            stage: 'remediation', candidate, mistake, question: normalizeQuestion(mistake.questionSnapshot || {}),
+            previousAnswer: (mistake.selectedAnswers || []).join('、') || previousAnswer(candidate), feedback: '继续上次未完成的纠错。' });
+          return;
+        }
+        this.setData({
+          loading: false,
+          empty: false,
+          stats: summary.stats || {},
+          queueCount: candidates.length - skipped,
+          stage: 'answer',
+          candidate,
+          mistake: candidate,
+          question: normalizeQuestion(candidate.questionSnapshot || {}),
+          previousAnswer: previousAnswer(candidate),
+        });
         return;
       }
-      this.setData({
-        loading: false,
-        empty: false,
-        stats: summary.stats || {},
-        queueCount: candidates.length,
-        stage: 'answer',
-        candidate,
-        mistake: candidate,
-        question: normalizeQuestion(candidate.questionSnapshot || {}),
-        previousAnswer: previousAnswer(candidate),
-      });
+      const waitingCount = skipped + Number(summary.stats?.verificationWaiting || 0);
+      this.setData({ loading: false, empty: true, stats: summary.stats || {}, queueCount: 0, waitingCount,
+        emptyTitle: waitingCount ? '本轮复习已完成' : '暂无待处理错题',
+        emptyCopy: waitingCount ? `还有 ${waitingCount} 道题等待复习时间或验证题，学习记录已保留。` : '继续练习后，需要重做的错题会出现在这里。' });
     } catch (error) {
       this.setData({ loading: false, loadError: messageOf(error) });
     }
   },
 
   onAnswerChange(event: any) {
+    if (this.data.busy || this.syncCoordinator.pendingCount()) return;
     const selectedIds = toggleAnswer(
       this.data.selectedIds,
       String(event.detail.optionId || ''),
@@ -106,7 +145,7 @@ Page({
         payload: answerPayload(this.data.question, this.data.selectedIds),
       });
       if (mistake.status !== 'needs_remediation') {
-        await wx.showModal({
+        await showDialog({
           title: '这次答对了',
           content: mistake.status === 'mastered' ? '这道错题已完成掌握验证。' : '已进入延时复习，稍后会再次验证。',
           showCancel: false,
@@ -119,6 +158,7 @@ Page({
         busy: false,
         stage: 'remediation',
         mistake,
+        previousAnswer: this.data.selectedIds.join('、'),
         question: normalizeQuestion(mistake.questionSnapshot || this.data.candidate.questionSnapshot || {}),
         feedback: '这次仍然答错了，先完成纠错。',
       });
@@ -134,13 +174,13 @@ Page({
     try {
       await this.syncCoordinator.enqueueWrite({
         sessionId: mistakeId,
-        key: `remediation:${mistakeId}`,
+        key: `remediation:${mistakeId}:${this.data.mistake.updatedAt || ''}`,
         action: 'remediation',
         payload: {},
       });
       const verification = await getVerificationCandidate(mistakeId);
       if (!verification.available || !verification.question) {
-        await wx.showModal({
+        await showDialog({
           title: '纠错已完成', content: verification.message || '暂无同知识点变式题，以后可继续验证。', showCancel: false,
         });
         await this.loadQueue();
@@ -165,17 +205,11 @@ Page({
     try {
       const result: any = await this.syncCoordinator.enqueueWrite({
         sessionId: mistakeId,
-        key: `verification:${mistakeId}:${this.data.question.id}`,
+        key: `verification:${mistakeId}:${this.data.question.id}:${this.data.mistake.verificationAttemptCount || 0}`,
         action: 'verification',
         payload: { questionId: this.data.question.id, ...answerPayload(this.data.question, this.data.selectedIds) },
       });
-      await wx.showModal({
-        title: result.verification?.correct ? '验证通过' : '再理一遍',
-        content: result.verification?.correct ? '这个知识点已经掌握。' : '变式题仍然出错，已重新放回纠错队列。',
-        showCancel: false,
-        confirmText: '继续',
-      });
-      await this.loadQueue();
+      this.showVerificationResult(result);
     } catch (error) {
       this.handleWriteError(error);
     }
@@ -183,10 +217,15 @@ Page({
 
   handleWriteError(error: unknown) {
     if (classifyFailure(error) === 'auth') {
-      wx.reLaunch({ url: '/pages/login/index' });
+      navigation.reLaunch({ url: '/pages/login/index' });
       return;
     }
     this.setData({ busy: false, writeError: messageOf(error) });
+  },
+
+  showVerificationResult(result: any) {
+    this.setData({ busy: false, stage: 'verification-result', question: normalizeQuestion(result.answer || this.data.question),
+      feedback: result.verification?.correct ? '本次验证通过，已安排延时复习。' : '本次验证有误，请对照选项和解析，再继续纠错。' });
   },
 
   async retryWrites() {
@@ -195,12 +234,7 @@ Page({
       const results = await this.syncCoordinator.retryPending();
       const last: any = results[results.length - 1];
       if (last?.verification) {
-        await wx.showModal({
-          title: last.verification.correct ? '验证通过' : '再理一遍',
-          content: last.verification.correct ? '这个知识点已经掌握。' : '变式题仍然出错，已重新放回纠错队列。',
-          showCancel: false,
-        });
-        await this.loadQueue();
+        this.showVerificationResult(last);
         return;
       }
       if (last?.status === 'needs_remediation' && last?.remediationReviewedAt) {
@@ -210,6 +244,8 @@ Page({
           this.setData({ busy: false, stage: 'verification', selectedIds: [], question: normalizeQuestion(verification.question) });
           return;
         }
+        await this.loadQueue();
+        return;
       }
       if (last?.status === 'needs_remediation') {
         this.setData({
@@ -227,6 +263,6 @@ Page({
     }
   },
 
-  onBack() { wx.navigateBack(); },
-  onHome() { wx.reLaunch({ url: '/pages/home/index' }); },
-});
+  onBack() { if (!this.data.busy) navigation.navigateBack({ fail: () => this.onHome() }); },
+  onHome() { navigation.switchTab({ url: '/pages/home/index' }); },
+}));

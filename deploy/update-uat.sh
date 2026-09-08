@@ -8,7 +8,7 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REMOTE="resume-prod"
 REMOTE_DIR="/home/ubuntu/lszl-kg-uat"
 PROJECT="lszl-kg-uat"
-COMPOSE_FILE="docker-compose.uat.yml"
+COMPOSE_ARGS="-f docker-compose.uat.yml -f docker-compose.mini-uat.yml"
 ENV_FILE=".env.uat"
 HEALTH_URL="http://127.0.0.1:18087/api/v1/health"
 PUBLIC_HEALTH_URL="https://uat.aihuanpu.com/api/v1/health"
@@ -17,11 +17,25 @@ MIN_FREE_GB=5   # 部署前服务器最低剩余磁盘（GB），不足则中止
 REMOTE_STATE_DIR="$REMOTE_DIR/.deploy-state"
 CURRENT_COMMIT="$(git -C "$REPO_DIR" rev-parse HEAD)"
 
+check_mini_config() {
+  # Quiet validation: never print expanded environment values or WeChat secrets.
+  ssh "$REMOTE" "cd $REMOTE_DIR && test -s backend/.env.wechat-mini.local && docker compose -p $PROJECT $COMPOSE_ARGS --env-file $ENV_FILE config --quiet"
+}
+
+case "${1:-}" in
+  --check-config) check_mini_config; exit 0 ;;
+  '') ;;
+  *) echo 'Usage: update-uat.sh [--check-config]' >&2; exit 2 ;;
+esac
+
 if [ -n "$(git -C "$REPO_DIR" status --porcelain)" ]; then
   echo "✗ UAT 部署前工作区有未提交修改，请先提交，避免远端差异基线失真" >&2
   git -C "$REPO_DIR" status --short >&2
   exit 1
 fi
+
+# Preserve the separate mini credential file; do not begin a deploy without it.
+ssh "$REMOTE" "cd $REMOTE_DIR && test -s backend/.env.wechat-mini.local"
 
 version_file="$REPO_DIR/new-legacy/VERSION"
 
@@ -128,7 +142,8 @@ rsync -az --delete \
   "$REPO_DIR/" "$REMOTE:$REMOTE_DIR/"
 
 echo "[4/9] 重建 UAT 后端镜像并重启（alembic 迁移自动执行）"
-ssh "$REMOTE" "cd $REMOTE_DIR && docker compose -p $PROJECT -f $COMPOSE_FILE --env-file $ENV_FILE up -d --build"
+check_mini_config
+ssh "$REMOTE" "cd $REMOTE_DIR && docker compose -p $PROJECT $COMPOSE_ARGS --env-file $ENV_FILE up -d --build"
 
 echo "[5/9] 等待健康检查（18087）"
 ssh "$REMOTE" "healthy=0; for attempt in \$(seq 1 40); do if curl -fsS $HEALTH_URL >/dev/null; then healthy=1; break; fi; sleep 1; done; test \"\$healthy\" -eq 1" \
@@ -153,11 +168,11 @@ echo "      HTTPS_HEALTH_OK"
 
 echo "[7/9] 核对历史已发布试卷回填状态（远端数据快照 + 回填代码）"
 PLAN_REPORT="/tmp/uat-paper-release-plan.json"
-ssh "$REMOTE" "cd $REMOTE_DIR && docker compose -p $PROJECT -f $COMPOSE_FILE --env-file $ENV_FILE exec -T backend python -m app.cli.runtime_domain_migration plan \
+ssh "$REMOTE" "cd $REMOTE_DIR && docker compose -p $PROJECT $COMPOSE_ARGS --env-file $ENV_FILE exec -T backend python -m app.cli.runtime_domain_migration plan \
   --source-key kg_exam_papers_published_v1 \
   --source-key kg_exam_paper_release_history_v1 \
   --report-json $PLAN_REPORT"
-SOURCE_SNAPSHOT_HASH="$(ssh "$REMOTE" "cd $REMOTE_DIR && docker compose -p $PROJECT -f $COMPOSE_FILE --env-file $ENV_FILE exec -T backend python -c \"import json; print(json.load(open('$PLAN_REPORT'))['source_snapshot_hash'])\"")"
+SOURCE_SNAPSHOT_HASH="$(ssh "$REMOTE" "cd $REMOTE_DIR && docker compose -p $PROJECT $COMPOSE_ARGS --env-file $ENV_FILE exec -T backend python -c \"import json; print(json.load(open('$PLAN_REPORT'))['source_snapshot_hash'])\"")"
 case "$SOURCE_SNAPSHOT_HASH" in
   *[!0-9a-f]*|'') echo "✗ 无法读取历史试卷数据快照指纹" >&2; exit 1 ;;
 esac
@@ -175,7 +190,7 @@ BACKFILL_FINGERPRINT="$(printf '%s\n%s\n' "$SOURCE_SNAPSHOT_HASH" "$BACKFILL_COD
 REMOTE_BACKFILL_FINGERPRINT="$(ssh "$REMOTE" "cat $REMOTE_STATE_DIR/paper-release-backfill-fingerprint 2>/dev/null || true")"
 BACKFILL_TARGET_VERIFIED="0"
 if [ "$BACKFILL_FINGERPRINT" = "$REMOTE_BACKFILL_FINGERPRINT" ]; then
-  if ssh "$REMOTE" "cd $REMOTE_DIR && docker compose -p $PROJECT -f $COMPOSE_FILE --env-file $ENV_FILE exec -T backend python -m app.cli.runtime_domain_migration verify \
+  if ssh "$REMOTE" "cd $REMOTE_DIR && docker compose -p $PROJECT $COMPOSE_ARGS --env-file $ENV_FILE exec -T backend python -m app.cli.runtime_domain_migration verify \
     --run-id uat-paper-release-backfill-v1 \
     --report-json /tmp/uat-paper-release-verify.json"; then
     BACKFILL_TARGET_VERIFIED="1"
@@ -184,7 +199,7 @@ if [ "$BACKFILL_FINGERPRINT" = "$REMOTE_BACKFILL_FINGERPRINT" ]; then
   fi
 fi
 if [ "$BACKFILL_FINGERPRINT" != "$REMOTE_BACKFILL_FINGERPRINT" ] || [ "$BACKFILL_TARGET_VERIFIED" != "1" ]; then
-  ssh "$REMOTE" "cd $REMOTE_DIR && docker compose -p $PROJECT -f $COMPOSE_FILE --env-file $ENV_FILE exec -T backend python -m app.cli.runtime_domain_migration backfill \
+  ssh "$REMOTE" "cd $REMOTE_DIR && docker compose -p $PROJECT $COMPOSE_ARGS --env-file $ENV_FILE exec -T backend python -m app.cli.runtime_domain_migration backfill \
     --run-id uat-paper-release-backfill-v1 \
     --source-key kg_exam_papers_published_v1 \
     --source-key kg_exam_paper_release_history_v1 \

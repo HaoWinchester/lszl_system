@@ -1,6 +1,7 @@
 .save-status { display: flex; align-items: center; gap: var(--space-1); color: var(--muted); font-size: var(--font-meta); line-height: 1.45; }
-.save-dot { width: 8rpx; height: 8rpx; border-radius: 50%; background: #9da59f; }
+.save-dot { width: 8rpx; height: 8rpx; border-radius: 50%; background: var(--border-strong); }
 .save-status.saving .save-dot { background: var(--gold); }
-.save-status.saved .save-dot { background: #497465; }
+.save-status.saved .save-dot { background: var(--success); }
 .save-status.offline .save-dot,
+.save-status.memory .save-dot,
 .save-status.conflict .save-dot { background: var(--clay); }

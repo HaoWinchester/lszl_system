@@ -12,14 +12,14 @@
   justify-content: center;
   width: 72rpx;
   height: 72rpx;
-  border: 2rpx solid #8e9a94;
+  border: 2rpx solid var(--border-strong);
   border-radius: 50%;
 }
 
 .empty-mark-line {
   width: 32rpx;
   height: 2rpx;
-  background: #8e9a94;
+  background: var(--border-strong);
 }
 
 .empty-title {
@@ -39,6 +39,9 @@
 }
 
 .empty-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   min-width: 224rpx;
   min-height: var(--touch-min);
   margin-top: var(--space-4);

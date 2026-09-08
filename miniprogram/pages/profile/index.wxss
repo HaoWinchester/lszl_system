@@ -15,7 +15,7 @@
 .learning-facts { display: flex; margin-top: var(--space-3); padding: var(--space-4) 0; border-top: 2rpx solid var(--line); border-bottom: 2rpx solid var(--line); }
 .learning-fact { display: flex; align-items: center; flex: 1; min-width: 0; flex-direction: column; text-align: center; }
 .learning-fact.with-divider { border-left: 2rpx solid var(--line); }
-.learning-value { color: var(--ink); font-size: var(--font-nav); font-variant-numeric: tabular-nums; font-weight: 650; }
+.learning-value { color: var(--ink); font-size: 34rpx; font-variant-numeric: tabular-nums; font-weight: 650; }
 .learning-label { margin-top: var(--space-1); color: var(--muted); font-size: var(--font-meta); }
 .account-row, .logout { --button-width: 100%; display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: var(--touch-min); border-bottom: 2rpx solid var(--line); border-radius: 0; background: transparent; color: var(--ink); font-size: var(--font-body); text-align: left; }
 .row-arrow { width: 15rpx; height: 15rpx; margin-right: 5rpx; border-top: 3rpx solid var(--muted); border-right: 3rpx solid var(--muted); transform: rotate(45deg); }
@@ -23,3 +23,6 @@
 .profile-loading { padding-top: var(--space-6); }
 .profile-loading-line { height: 32rpx; margin-bottom: var(--space-4); border-radius: 8rpx; background: var(--surface-quiet); }
 .profile-loading-line.is-lead { width: 42%; height: 76rpx; }
+.info-row, .account-row { gap: var(--space-2); }
+.expiry-value { white-space: normal; overflow-wrap: anywhere; padding: var(--space-2) 0; font-variant-numeric: tabular-nums; }
+.membership-entry { margin-top: var(--space-3); font-weight: 600; }

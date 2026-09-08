@@ -1,6 +1,8 @@
 {
   "navigationStyle": "custom",
   "usingComponents": {
-    "empty-state": "/components/empty-state/index"
-  }
+    "empty-state": "/components/empty-state/index",
+    "ui-icon": "/components/ui-icon/index"
+  },
+  "enablePullDownRefresh": true
 }

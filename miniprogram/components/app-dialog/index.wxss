@@ -1,0 +1,14 @@
+:host { display: block; }
+.dialog-mask { position: fixed; z-index: var(--z-dialog, 40); inset: 0; display: flex; align-items: center; justify-content: center; padding: 48rpx; box-sizing: border-box; background: var(--mask); }
+.dialog-panel { width: 100%; max-width: 640rpx; max-height: 80vh; box-sizing: border-box; padding: var(--space-4, 32rpx); border-radius: var(--radius-md, 28rpx); background: var(--surface); color: var(--text); animation: dialog-enter 160ms ease-out; }
+.dialog-title { display: block; color: var(--ink); font-size: var(--font-heading, 32rpx); font-weight: 600; line-height: var(--line-title, 1.4); text-align: left; }
+.dialog-scroll { max-height: 48vh; margin-top: var(--space-2, 16rpx); }
+.dialog-content { display: block; color: var(--muted); font-size: var(--font-body, 30rpx); font-weight: 400; line-height: var(--line-body, 1.58); text-align: left; white-space: pre-wrap; overflow-wrap: anywhere; }
+.dialog-actions { display: flex; gap: var(--space-2, 16rpx); margin-top: var(--space-4, 32rpx); }
+.dialog-button { --button-width: auto; display: flex; align-items: center; justify-content: center; flex: 1; width: auto; min-width: 0; min-height: var(--touch-min, 96rpx); margin: 0; padding: 16rpx; border: 0; border-radius: var(--radius-sm, 22rpx); font-size: var(--font-body, 30rpx); font-weight: 600; line-height: 1.4; }
+.dialog-button::after { border: 0; }
+.dialog-cancel { color: var(--ink); background: var(--surface-quiet); }
+.dialog-confirm { color: var(--on-accent); background: var(--ink); }
+.dialog-pressed { opacity: .72; }
+@keyframes dialog-enter { from { opacity: 0; transform: translateY(8rpx); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .dialog-panel { animation: none; } }
