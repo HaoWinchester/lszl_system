@@ -4,8 +4,7 @@
 1. 题目标记：标记按钮切换、答题卡 is-marked + legend、保存退出后恢复仍在。
 2. 显示答案开关：仅 practice 非 reviewing 显示；开启后未答题锁定并中性回放答案；
    关闭后恢复可作答；恢复会话后开关状态保留。
-3. 随机顺序恢复：有保存进度时选随机顺序，恢复后题目按 sessionId 确定性洗牌，
-   currentIndex 换算到同一道题，答题卡题号与显示顺序一致。
+3. 随机顺序恢复：沿用服务端冻结题序与 currentIndex，答题卡题号与显示顺序一致。
 """
 from pathlib import Path
 import re
@@ -38,6 +37,28 @@ def sheet_numbers(page):
     return page.evaluate(
         "()=>Array.from(document.querySelectorAll('#practiceAnswerSheet [data-question-id]')).map(b=>b.dataset.questionId)"
     )
+
+
+def assert_mark_layout(page):
+    stem = page.locator('#practiceQuestionStem')
+    original = stem.inner_html()
+    button = page.locator('#practiceMarkToggle')
+    for width in [320, 360, 390, 430, 768, 800, 801, 1440]:
+        page.set_viewport_size({"width": width, "height": 740})
+        for content in ['项目经理下一步应该怎么做？', '项目经理正在协调多个团队完成项目，面对需求变更与资源限制，需要结合沟通记录判断下一步行动。' * 8]:
+            stem.evaluate('(el, text) => el.textContent = text', content)
+            for _ in range(2):
+                mark_box = button.bounding_box()
+                stem_box = stem.bounding_box()
+                assert mark_box['y'] + mark_box['height'] <= stem_box['y'], (
+                    f'{width}px 标记按钮遮挡题干', mark_box, stem_box
+                )
+                assert mark_box['x'] >= 0 and mark_box['x'] + mark_box['width'] <= width
+                pressed = button.get_attribute('aria-pressed')
+                button.click()
+                assert button.get_attribute('aria-pressed') != pressed
+    stem.evaluate('(el, html) => el.innerHTML = html', original)
+    page.set_viewport_size({"width": 1440, "height": 960})
 
 
 with sync_playwright() as playwright:
@@ -113,6 +134,7 @@ with sync_playwright() as playwright:
     # 标记按钮可见；点击后按钮态切换
     assert page.locator('#practiceMarkToggle').is_visible()
     assert page.locator('#practiceMarkToggle').inner_text() == '标记本题'
+    assert_mark_layout(page)
     page.locator('#practiceMarkToggle').click()
     assert page.locator('#practiceMarkToggle').inner_text() == '取消标记'
     assert page.locator('#practiceMarkToggle').get_attribute('aria-pressed') == 'true'
@@ -189,7 +211,8 @@ with sync_playwright() as playwright:
           copy.runtimeState.currentIndex=2;
           copy.answers={};
           copy.stats={total:10,answered:0,correct:0,wrong:0,unanswered:10,experience:0,durationMs:0};
-          copy.questions=JSON.parse(JSON.stringify(source.questions));
+          copy.questions=JSON.parse(JSON.stringify(source.questions)).reverse();
+          copy.questionOrder=copy.questions.map(({question,...ref})=>ref);
           window.__pausedSnapshots['ps-random']=copy;
           window.__originalEnterSession=window.KGPracticeLearningApi.enterSession;
           window.KGPracticeLearningApi.enterSession=async()=>({resumed:true,session:JSON.parse(JSON.stringify(copy))});
@@ -201,15 +224,15 @@ with sync_playwright() as playwright:
     page.wait_for_timeout(300)
     random_snapshot = page.evaluate('KGPracticeMode.snapshot()')
     assert random_snapshot['sessionId'] == 'ps-random', random_snapshot
-    # 当前题仍是服务器序 currentIndex=2 对应的 q3（index 换算到新顺序）
-    assert '第 3 道题' in page.locator('#practiceQuestionStem').inner_text(), (
+    # 当前题仍是服务器冻结序 currentIndex=2 对应的 q8。
+    assert '第 8 道题' in page.locator('#practiceQuestionStem').inner_text(), (
         page.locator('#practiceQuestionStem').inner_text()
     )
-    # 显示顺序是确定性洗牌结果：集合一致且（10 题）几乎不可能与原序相同
+    # 完整题序和当前位置都必须与服务端保存的快照一致，不能再次洗牌。
     display_order = sheet_numbers(page)
     assert sorted(display_order) == sorted('q%d' % i for i in range(1, 11)), display_order
-    assert display_order != ['q%d' % i for i in range(1, 11)], display_order
-    assert random_snapshot['index'] == display_order.index('q3'), (
+    assert display_order == ['q%d' % i for i in range(10, 0, -1)], display_order
+    assert random_snapshot['index'] == display_order.index('q8') == 2, (
         random_snapshot['index'], display_order,
     )
 
@@ -238,6 +261,7 @@ with sync_playwright() as playwright:
     assert page.locator('#practiceShowAnswersToggle').is_hidden()
     assert page.locator('#practiceMarkToggle').is_visible()
 
+    assert_mark_layout(page)
     assert not errors, errors
     browser.close()
 

@@ -392,10 +392,12 @@ body.practice-mode-page:not([data-practice-view="lobby"]) .practice-exp-fab{disp
 .practice-explanation-toggle{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--practice-muted);cursor:pointer;white-space:nowrap}
 .practice-explanation-toggle[hidden]{display:none!important}
 .practice-explanation-toggle input{accent-color:var(--practice-accent,#6d28d9)}
-.practice-mark-toggle{position:absolute;top:14px;right:14px;padding:5px 12px;border:1px solid #d9e0ea;border-radius:999px;background:#fff;color:#667085;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap}
+/* 标记按钮参与题卡排版，避免长题干和双语题干进入按钮区域。 */
+.practice-mark-toggle{align-self:flex-end;flex-shrink:0;margin-bottom:12px;padding:5px 12px;border:1px solid #d9e0ea;border-radius:999px;background:#fff;color:#667085;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap}
 .practice-mark-toggle:hover{border-color:#f0b429;color:#b45309}
 .practice-mark-toggle.is-marked{border-color:#f0b429;background:#fffbeb;color:#b45309}
 .practice-mark-toggle[hidden]{display:none!important}
+@media(max-width:800px){.practice-mark-toggle{min-height:40px}}
 .practice-previous-wrong-answer{margin:-12px 0 18px;padding:10px 13px;border:1px solid #f0cbd2;border-radius:11px;background:#fff6f7;color:#8f2340;font-size:12px;font-weight:760;line-height:1.55}
 .practice-previous-wrong-toggle input{accent-color:#9f1239}
 .practice-history-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
