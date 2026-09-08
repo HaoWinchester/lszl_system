@@ -202,7 +202,7 @@ def delete_user(username: str) -> None:
     asyncio.run(scenario())
 
 
-def test_callback_creates_student_sets_session_and_redirects(monkeypatch) -> None:
+def test_callback_requires_choice_then_creates_student_sets_session(monkeypatch) -> None:
     openid = f"openid_login_{uuid4().hex[:12]}"
     username = wechat_service._wx_username(openid)
 
@@ -232,12 +232,16 @@ def test_callback_creates_student_sets_session_and_redirects(monkeypatch) -> Non
                 params={"code": "one-time-code", "state": state},
                 follow_redirects=False,
             )
+            assert "wechat=account-required" in callback.headers["location"]
+            assert client.get("/api/v1/auth/me").status_code == 401
+            created = client.post("/api/v1/auth/wechat/account", json={"action": "create"})
+            assert created.status_code == 200, created.text
             current = client.get("/api/v1/auth/me")
             repeated_current = client.get("/api/v1/auth/me")
             bootstrap = extract_bootstrap(client.get("/index.html"))
 
         assert callback.status_code == 303
-        assert callback.headers["location"].startswith("/training?wechat=login-success")
+        assert callback.headers["location"].startswith("/training?wechat=account-required")
         assert current.status_code == 200
         assert current.json()["user"]["username"] == username
         assert current.json()["user"]["role"] == "student"
@@ -314,7 +318,7 @@ def test_callback_rejects_an_external_return_path(monkeypatch) -> None:
             )
 
         assert callback.status_code == 303
-        assert callback.headers["location"].startswith("/?wechat=login-success")
+        assert callback.headers["location"].startswith("/?wechat=account-required")
         assert "malicious.example" not in callback.headers["location"]
     finally:
         delete_user(username)

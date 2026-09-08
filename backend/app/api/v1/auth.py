@@ -10,20 +10,22 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi import status
 from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import IntegrityError
 
 from app.core.auth import CurrentUser, establish_authenticated_session, get_login_session_id
 from app.core.config import settings
 from app.core.legal import LEGAL_CONSENT_VERSION, accepted_legal_consent
 from app.db.session import get_db
-from app.schemas.auth import AuthenticatedResponse, LoginRequest, RegisterRequest, SelfProfileUpdate
+from app.schemas.auth import AuthenticatedResponse, LoginRequest, RegisterRequest, SelfProfileUpdate, WechatAccountChoice
 from app.schemas.user import UserCreate
 from app.models.user import ACTIVE
-from app.services import system_service, user_service, wechat_service
+from app.services import system_service, user_service, wechat_service, wechat_account_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 DB = Annotated[AsyncSession, Depends(get_db)]
 
 SAFE_WECHAT_RETURN_PATHS = {
+    "/practice-mode.html",
     "/",
     "/graph",
     "/training",
@@ -140,6 +142,9 @@ async def login(req: LoginRequest, request: Request, db: DB):
 @router.post("/logout")
 async def logout(request: Request, db: DB):
     un = request.session.get("username")
+    pending = request.session.get("wechat_account") or {}
+    if pending.get("ticket"):
+        await wechat_account_service.cancel(db, str(pending["ticket"]))
     if un:
         ip, ua = _client_info(request)
         await user_service.log_action(db, "logout", un, un, "退出登录", ip, ua)
@@ -188,7 +193,7 @@ async def wechat_config(db: DB):
 async def wechat_auth_url(
     request: Request,
     db: DB,
-    intent: Literal["login", "bind"] = "login",
+    intent: Literal["login", "bind", "recover"] = "login",
     return_path: str = "/",
     accepted_terms_version: str | None = None,
 ):
@@ -201,7 +206,7 @@ async def wechat_auth_url(
     if wechat_service.compute_mode(cfg) != "official":
         raise HTTPException(status_code=400, detail="未配置正式微信登录（缺 AppID/AppSecret 或未启用）")
     username = str(request.session.get("username") or "")
-    if intent == "bind" and not username:
+    if intent in {"bind", "recover"} and not username:
         raise HTTPException(status_code=401, detail="请先登录后再绑定微信")
     url, state = wechat_service.build_auth_url(cfg)
     request.session["wechat_oauth"] = {
@@ -233,25 +238,40 @@ async def wechat_callback(code: str, state: str, request: Request, db: DB):
             "nickname": info.get("nickname", ""),
             "avatar": info.get("avatar", ""),
         }
-        if pending.get("intent") == "bind":
+        if pending.get("intent") in {"bind", "recover"}:
             username = str(pending.get("username") or "")
             if not username or request.session.get("username") != username:
                 return _wechat_redirect(return_path, "bind-failed")
             user = await user_service.get_by_username(db, username)
             if not user or user.status != ACTIVE:
                 return _wechat_redirect(return_path, "bind-failed")
+            if pending.get("intent") == "recover":
+                owner = await wechat_service.find_by_wechat_identity(db, profile["openid"], profile["unionid"])
+                if not owner or owner.username != username:
+                    return _wechat_redirect(return_path, "bind-failed")
+                raw = await wechat_account_service.issue(db, profile, username)
+                request.session["wechat_account"] = {"ticket": raw, "returnPath": return_path}
+                return _wechat_redirect(return_path, "account-required")
             user = await wechat_service.bind_user(db, user, profile, "wechat-bind")
             action, detail, result = "wechat_bind", "微信账号绑定成功", "bind-success"
         else:
             accepted_terms_version = _accepted_legal_consent(pending.get("acceptedTermsVersion"))
-            user = await wechat_service.find_or_create_user(db, profile, cfg, "wechat")
+            user = await wechat_service.find_or_create_user(db, profile, {**cfg, "autoCreateUser": False}, "wechat")
             if not user:
-                return _wechat_redirect(return_path, "login-failed")
+                raw = await wechat_account_service.issue(db, profile)
+                request.session.clear()
+                request.session["wechat_account"] = {
+                    "ticket": raw, "returnPath": return_path, "acceptedTermsVersion": accepted_terms_version,
+                }
+                return _wechat_redirect(return_path, "account-required")
             user_service.record_legal_consent(user, accepted_terms_version)
             establish_authenticated_session(request, user.username)
             action, detail, result = "wechat_login", "微信扫码登录", "login-success"
-    except (PermissionError, ValueError):
-        return _wechat_redirect(return_path, "bind-failed" if pending.get("intent") == "bind" else "login-failed")
+    except (PermissionError, ValueError) as exc:
+        await db.rollback()
+        result = "bind-conflict" if "已绑定其他账号" in str(exc) else (
+            "bind-failed" if pending.get("intent") in {"bind", "recover"} else "login-failed")
+        return _wechat_redirect(return_path, result)
     except Exception:  # noqa: BLE001
         return _wechat_redirect(return_path, "provider-failed")
     ip, ua = _client_info(request)
@@ -290,3 +310,51 @@ async def wechat_demo_login(
     await db.refresh(user)
     login_session_id = establish_authenticated_session(request, user.username)
     return {"user": user_service.to_dict(user), "loginSessionId": login_session_id}
+
+
+@router.get('/wechat/account')
+async def pending_wechat_account(request: Request, db: DB):
+    pending = request.session.get('wechat_account') or {}
+    try:
+        ticket = await wechat_account_service.pending(db, str(pending.get('ticket') or ''), request.session.get('username'))
+    except wechat_account_service.AccountLinkError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+    cfg = await system_service.get_wechat_config(db)
+    return {'mode': 'recover' if ticket.source_username else 'choose',
+            'canCreate': not ticket.source_username and bool(cfg.get('autoCreateUser', True))}
+
+
+@router.delete('/wechat/account')
+async def cancel_wechat_account(request: Request, db: DB):
+    pending = request.session.pop('wechat_account', {})
+    await wechat_account_service.cancel(db, str(pending.get('ticket') or ''))
+    return {'ok': True}
+
+
+@router.post('/wechat/account', response_model=AuthenticatedResponse)
+async def complete_wechat_account(req: WechatAccountChoice, request: Request, db: DB):
+    pending = request.session.get('wechat_account') or {}
+    try:
+        ticket = await wechat_account_service.pending(db, str(pending.get('ticket') or ''), request.session.get('username'))
+        source_username = ticket.source_username
+        accepted_version = None if source_username else _accepted_legal_consent(pending.get('acceptedTermsVersion'))
+        cfg = await system_service.get_wechat_config(db)
+        user = await wechat_account_service.complete(db, ticket, req.action, req.username, req.password, cfg)
+        user_service.record_legal_consent(user, accepted_version)
+        ip, ua = _client_info(request)
+        await user_service.log_action(db, 'wechat_account_recover' if source_username else 'wechat_account_link',
+            user.username, source_username or user.username,
+            '微信关联原账号：' + str(source_username or req.action), ip, ua)
+        await db.commit()
+        await db.refresh(user)
+    except wechat_account_service.AccountLinkError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail='微信绑定已变化，请重新扫码。') from exc
+    except PermissionError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    session_id = establish_authenticated_session(request, user.username)
+    return {'user': user_service.to_dict(user), 'loginSessionId': session_id}

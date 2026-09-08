@@ -73,7 +73,7 @@
     return payload;
   }
   async function createOfficialAuthRequest(intent='login',returnPath=currentReturnPath(),acceptedTermsVersion=''){
-    const params=new URLSearchParams({intent:String(intent)==='bind'?'bind':'login',return_path:returnPath||'/'});
+    const params=new URLSearchParams({intent:['bind','recover'].includes(String(intent))?String(intent):'login',return_path:returnPath||'/'});
     if(acceptedTermsVersion)params.set('accepted_terms_version',acceptedTermsVersion);
     const payload=await requestJson('/api/v1/auth/wechat/auth-url?'+params.toString());
     if(!payload.authUrl)throw new Error('服务器未返回微信授权地址。');
@@ -174,7 +174,7 @@
     modal.dataset.wechatLoginBound='1';
     const wrap=document.createElement('div');
     wrap.className='wechat-login-section';
-    wrap.innerHTML='<div class="wechat-divider"><span>或使用微信</span></div><p class="wechat-login-hint">点击后在下方打开微信授权二维码。首次登录将自动创建学生账号。</p><button class="wechat-login-entry" type="button">微信扫码登录</button><div class="wechat-login-panel" hidden></div>';
+    wrap.innerHTML='<div class="wechat-divider"><span>或使用微信</span></div><p class="wechat-login-hint">首次扫码可绑定已有账号，共用原会员；新用户可选择创建账号。</p><button class="wechat-login-entry" type="button">微信扫码登录</button><div class="wechat-login-panel" hidden></div>';
     actions.insertAdjacentElement('afterend',wrap);
     const entry=wrap.querySelector('.wechat-login-entry');
     const panel=wrap.querySelector('.wechat-login-panel');
@@ -184,6 +184,110 @@
     };
     modal.querySelector('.auth-close')?.addEventListener('click',()=>setWechatLoginMode(modal,false));
   }
+  let accountFlow=Promise.resolve();
+  let registrationPrompt=null;
+  function waitForAccountFlow(){return registrationPrompt||accountFlow}
+  function clearCallbackMarker(){
+    const params=new URLSearchParams(location.search||'');
+    params.delete('wechat');
+    const query=params.toString();
+    history.replaceState(null,document.title,location.pathname+(query?'?'+query:'')+location.hash);
+  }
+  function accountDialog(title,copy,body){
+    const dialog=document.createElement('dialog');
+    dialog.className='wechat-account-dialog';
+    dialog.setAttribute('aria-labelledby','wechatAccountTitle');
+    dialog.innerHTML=`<h2 id="wechatAccountTitle">${escapeHTML(title)}</h2><p>${escapeHTML(copy)}</p>${body}<p class="wechat-account-error" role="alert"></p>`;
+    document.body.appendChild(dialog);
+    dialog.showModal();
+    return dialog;
+  }
+  function promptBindingAfterRegister(){
+    if(registrationPrompt)return registrationPrompt;
+    registrationPrompt=(async()=>{
+      const username=window.KGAuthCore?.currentUsername?.();
+      if(!username||window.KGAuthCore?.currentUser?.()?.wechat?.bound)return;
+      const config=await loadPublicConfig();
+      if(window.KGAuthCore?.currentUsername?.()!==username)return;
+      return new Promise(resolve=>{
+        const dialog=accountDialog('注册成功，绑定微信更方便',
+          '绑定后，账号密码和微信登录都进入当前账号，共用会员和学习记录。',
+          '<div class="wechat-account-actions"><button type="button" data-bind>立即绑定微信</button><button type="button" data-later>稍后绑定</button></div><p>也可以稍后在用户中心绑定；绑定前请继续用账号密码登录。</p>');
+        const finish=()=>{dialog.close();dialog.remove();resolve()};
+        dialog.addEventListener('cancel',event=>{event.preventDefault();finish()});
+        dialog.querySelector('[data-later]').onclick=finish;
+        const bind=dialog.querySelector('[data-bind]');
+        if(!config.enableOfficial){
+          bind.disabled=true;
+          dialog.querySelector('[role="alert"]').textContent='微信绑定暂不可用，请先使用账号密码登录，稍后可在用户中心绑定。';
+        }
+        bind.onclick=async()=>{
+          if(bind.disabled)return;
+          bind.disabled=true;
+          try{
+            const payload=await createOfficialAuthRequest('bind');
+            location.assign(payload.authUrl);
+          }catch(error){
+            dialog.querySelector('[role="alert"]').textContent=String(error.message||'暂时无法绑定，请重试或稍后绑定。');
+            bind.disabled=false;
+          }
+        };
+      });
+    })().finally(()=>{registrationPrompt=null});
+    return registrationPrompt;
+  }
+  function resumeAccountChoice(){
+    accountFlow=(async()=>{
+      let state;
+      try{state=await requestJson('/api/v1/auth/wechat/account')}
+      catch(error){
+        clearCallbackMarker();
+        const dialog=accountDialog('微信授权已失效','请关闭此提示后重新扫码。','<button type="button" data-close>关闭</button>');
+        dialog.querySelector('[role="alert"]').textContent=String(error.message);
+        dialog.querySelector('[data-close]').onclick=()=>{dialog.close();dialog.remove()};
+        dialog.addEventListener('cancel',()=>dialog.remove());
+        return;
+      }
+      return new Promise(resolve=>{
+        const recover=state.mode==='recover';
+        const dialog=accountDialog(recover?'找回原账号会员':'已有账号，还是新用户？',
+          recover?'验证原注册账号后，微信将绑定到原账号，以后直接使用原账号会员。':'如果你已经注册或购买过会员，请绑定已有账号，继续使用原来的会员和学习记录。',
+          `<form><label>原账号用户名<input name="username" autocomplete="username" maxlength="64" required></label><label>原账号密码<input name="password" type="password" autocomplete="current-password" maxlength="128" required></label><button type="submit">${recover?'验证并关联原账号':'绑定已有账号'}</button></form>
+          ${recover?'<p class="wechat-account-note">本操作只关联微信登录方式。当前微信账号的学习记录保留，不自动合并；关联后如需找回这些记录，请联系管理员。已有会员或订单会转人工核对。</p>':''}
+          <div class="wechat-account-actions">${state.canCreate?'<button type="button" data-create>我是新用户，创建账号</button>':''}<button type="button" data-cancel>取消</button></div>`);
+        let busy=false;
+        const errorBox=dialog.querySelector('[role="alert"]');
+        function setBusy(value){busy=value;dialog.querySelectorAll('button,input').forEach(el=>{el.disabled=value})}
+        const finish=()=>{clearCallbackMarker();dialog.close();dialog.remove();resolve()};
+        const cancel=async()=>{
+          if(busy)return;
+          setBusy(true);
+          try{await requestJson('/api/v1/auth/wechat/account',{method:'DELETE'});finish()}
+          catch(error){errorBox.textContent=String(error.message);setBusy(false)}
+        };
+        dialog.addEventListener('cancel',event=>{event.preventDefault();cancel()});
+        dialog.querySelector('[data-cancel]').onclick=cancel;
+        async function submit(action){
+          if(busy)return;
+          const username=dialog.querySelector('[name="username"]').value.trim();
+          const password=dialog.querySelector('[name="password"]').value;
+          if(action==='bind'&&(!username||!password)){errorBox.textContent='请填写原账号用户名和密码。';return}
+          setBusy(true);errorBox.textContent='';
+          try{
+            await requestJson('/api/v1/auth/wechat/account',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,username,password})});
+            dialog.querySelector('[name="password"]').value='';
+            clearCallbackMarker();
+            location.reload();
+          }catch(error){errorBox.textContent=String(error.message);setBusy(false)}
+        }
+        dialog.querySelector('form').onsubmit=event=>{event.preventDefault();submit('bind')};
+        const create=dialog.querySelector('[data-create]');
+        if(create)create.onclick=()=>submit('create');
+      });
+    })();
+    return accountFlow;
+  }
+
   function handleOfficialCallback(){
     const params=new URLSearchParams(location.search||'');
     const result=params.get('wechat');
@@ -192,17 +296,21 @@
       'login-success':'微信登录成功。',
       'bind-success':'微信账号绑定成功。',
       'login-failed':'微信登录未完成，请重新扫码。',
-      'bind-failed':'微信账号绑定未完成，请重新扫码。',
+      'bind-failed':'微信账号绑定未完成，请确认扫码的是当前账号所绑定的微信后重试。',
+      'bind-conflict':'该微信已关联其他账号。请用微信登录，在用户中心选择“找回原账号会员”，验证原注册账号后关联。',
       'provider-failed':'微信授权服务暂时不可用，请稍后重试。',
       'state-invalid':'微信授权已失效或已被使用，请重新扫码。'
     };
-    showToast(messages[result]||'微信授权未完成。',result==='login-success'||result==='bind-success');
+    if(result==='account-required'){resumeAccountChoice();return}
+    else showToast(messages[result]||'微信授权未完成。',result==='login-success'||result==='bind-success');
     params.delete('wechat');
     const query=params.toString();
     try{history.replaceState(null,document.title,location.pathname+(query?'?'+query:'')+location.hash)}catch(error){}
   }
 
   window.KGWechatLogin={
+    promptBindingAfterRegister,
+    waitForAccountFlow,
     DEFAULT_CONFIG,
     getConfig,
     saveConfig,

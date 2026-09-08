@@ -1,6 +1,6 @@
 """认证请求与响应 schema。"""
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -35,3 +35,10 @@ class SelfProfileUpdate(BaseModel):
     note: str | None = Field(default=None, max_length=500)
     current_password: str | None = Field(default=None, max_length=128)
     new_password: str | None = Field(default=None, min_length=4, max_length=128)
+
+
+class WechatAccountChoice(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    action: Literal["bind", "create"]
+    username: str = Field(default="", max_length=64)
+    password: str = Field(default="", max_length=128)

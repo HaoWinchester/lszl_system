@@ -10,12 +10,18 @@ from datetime import datetime, timezone
 from urllib.parse import urlencode
 
 import httpx
-from sqlalchemy import or_, select
+from sqlalchemy import or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import now_utc, uid
 from app.models.user import ACTIVE, User
 from app.services import user_service
+
+
+async def lock_identity(db: AsyncSession, profile: dict) -> None:
+    keys = sorted('wechat:' + str(profile[key]) for key in ('openid', 'unionid') if profile.get(key))
+    for key in keys:
+        await db.execute(text('SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))'), {'key': key})
 
 
 def compute_mode(cfg: dict) -> str:
@@ -98,8 +104,9 @@ def profile_for_demo() -> dict:
 def _wechat_payload(profile: dict, existing: dict | None, source: str) -> dict:
     now = now_utc()
     return {
+        **(existing or {}),
         "openid": str(profile.get("openid") or ""),
-        "unionid": str(profile.get("unionid") or ""),
+        "unionid": str(profile.get("unionid") or (existing or {}).get("unionid") or ""),
         "nickname": str(profile.get("nickname") or "微信用户"),
         "avatar": str(profile.get("avatar") or ""),
         "boundAt": (existing or {}).get("boundAt", _iso(now)),
@@ -124,6 +131,7 @@ async def bind_user(db: AsyncSession, user: User, profile: dict, source: str) ->
     unionid = str(profile.get("unionid") or "")
     if not openid:
         raise ValueError("微信绑定失败：缺少 openid")
+    await lock_identity(db, profile)
     owner = await find_by_wechat_identity(db, openid, unionid)
     if owner and owner.username != user.username:
         raise ValueError("该微信已绑定其他账号，不能重复绑定")
@@ -142,7 +150,7 @@ async def unbind_user(db: AsyncSession, user: User) -> User:
 
 
 async def find_or_create_user(
-    db: AsyncSession, profile: dict, cfg: dict, source: str
+    db: AsyncSession, profile: dict, cfg: dict, source: str, *, commit: bool = True
 ) -> User | None:
     """按 openid/unionid 找用户；未命中且 autoCreateUser 则建微信用户（无密码）。"""
     openid = str(profile.get("openid") or "")
@@ -152,6 +160,7 @@ async def find_or_create_user(
     if not openid:
         raise ValueError("微信登录失败：缺少 openid")
 
+    await lock_identity(db, profile)
     found = await find_by_wechat_identity(db, openid, unionid)
 
     now = now_utc()
@@ -168,8 +177,9 @@ async def find_or_create_user(
         found.display_name = found.display_name or nickname
         found.last_login_at = now
         found.last_active_at = now
-        await db.commit()
-        await db.refresh(found)
+        if commit:
+            await db.commit()
+            await db.refresh(found)
         return found
 
     if not cfg.get("autoCreateUser", True):
@@ -192,6 +202,9 @@ async def find_or_create_user(
         last_active_at=now,
     )
     db.add(user)
-    await db.commit()
-    await db.refresh(user)
+    if commit:
+        await db.commit()
+        await db.refresh(user)
+    else:
+        await db.flush()
     return user
