@@ -36,6 +36,7 @@ const requiredRsyncExcludes = [
   '/e2e',
   '.env.prod',
   '/backend/.env',
+  '/backend/.env.wechat-mini.local',
 ]
 
 function assertRuntimePreparedBeforeRsync(script, label) {
