@@ -448,7 +448,7 @@ def _validate_question_content(
         for option in options
         if isinstance(option, dict) and option.get("id")
     }
-    if not options:
+    if not options and normalized.get("type") != "matching":
         issues.append(
             _question_issue(
                 question_id,
@@ -458,8 +458,8 @@ def _validate_question_content(
             )
         )
     question_type = str(normalized.get("type") or "single_choice").strip()
-    if question_type == "multiple_choice":
-        for issue in question_answer_service.validate_multiple_choice(normalized):
+    if question_type in {"multiple_choice", "matching"}:
+        for issue in question_answer_service.validate_question(normalized):
             issues.append(
                 _question_issue(
                     question_id,
@@ -1151,6 +1151,8 @@ async def _prepare_questions(
     for index, item in enumerate(request.questions):
         raw = item.question.model_dump(by_alias=True)
         normalized = normalize_question_payload(raw, subject=bank.subject)
+        from app.services.question_material_service import normalize_question_resources
+        await normalize_question_resources(db, actor, normalized)
         question_id = normalized["id"]
         existing = existing_by_id.get(question_id)
         if existing is not None and existing.bank_id != bank.id:
@@ -1586,6 +1588,8 @@ async def save_legacy_question_without_creator(
             request.question.model_dump(by_alias=True),
             subject=question.subject or "PMP",
         )
+        from app.services.question_material_service import normalize_question_resources
+        await normalize_question_resources(db, actor_context, normalized)
         reference_issues = await content_reference_service.validate_recall_references(
             db,
             question.subject or "PMP",

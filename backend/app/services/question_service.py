@@ -224,8 +224,10 @@ def _apply_normalized_question(target: Question, normalized: dict, actor_usernam
     target.updated_by = actor_username
 
 
-def _validate_normalized_question(normalized: dict) -> None:
-    issues = question_answer_service.validate_multiple_choice(normalized)
+async def _validate_normalized_question(db: AsyncSession, actor: User, normalized: dict) -> None:
+    from app.services.question_material_service import normalize_question_resources
+    await normalize_question_resources(db, actor, normalized)
+    issues = question_answer_service.validate_question(normalized)
     if issues:
         raise _import_validation_error(issues[0]["message"])
 
@@ -352,7 +354,7 @@ async def import_question_banks(
                         subject=str(bank_values["subject"]),
                     )
                     normalized["scope"] = "internal"
-                    _validate_normalized_question(normalized)
+                    await _validate_normalized_question(db, actor, normalized)
                     current = existing_by_question_source.get(source_question_id)
                     duplicate_signature = question_content_service.duplicate_question_signature(normalized)
                     candidates.append((imported_index, source_question_id, normalized, current, duplicate_signature))
@@ -847,7 +849,7 @@ async def create_question(db: AsyncSession, owner: User | str, bank_id: str, dat
         subject=b.subject,
     )
     normalized["scope"] = "internal"
-    _validate_normalized_question(normalized)
+    await _validate_normalized_question(db, actor, normalized)
     content_hash = question_content_service.canonical_question_hash(normalized)
     q = Question(
         id=question_id,
@@ -930,7 +932,7 @@ async def import_questions_into_bank(
             {**raw, "id": question_id, "title": raw.get("title") or f"导入题目 {index + 1}"},
             subject=bank.subject,
         )
-        _validate_normalized_question(normalized)
+        await _validate_normalized_question(db, actor, normalized)
         signature = question_content_service.duplicate_question_signature(normalized)
         source = "existing" if signature in known_signatures else "batch" if signature in batch_signatures else ""
         if source:
@@ -1062,7 +1064,7 @@ async def update_question(db: AsyncSession, owner: User | str, question_id: str,
         merged,
         subject=q.subject or "PMP",
     )
-    _validate_normalized_question(normalized)
+    await _validate_normalized_question(db, actor, normalized)
     q.title = normalized["title"]
     q.type = normalized["type"]
     q.subject = normalized["subject"]

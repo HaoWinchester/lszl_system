@@ -14,6 +14,7 @@ from app.api.v1 import (
     papers,
     paper_releases,
     question_catalog,
+    question_materials,
     questions,
     subscriptions,
     system,
@@ -33,6 +34,7 @@ api_router.include_router(questions.router)
 api_router.include_router(papers.router)
 api_router.include_router(paper_releases.router)
 api_router.include_router(question_catalog.router)
+api_router.include_router(question_materials.router)
 api_router.include_router(content_prep.router)
 api_router.include_router(course_management.router)
 api_router.include_router(training.router)

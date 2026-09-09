@@ -22,7 +22,7 @@ class PaperCreateRequest(BaseModel):
     name: str = Field(default="新试卷", min_length=1, max_length=200)
     subject: str = Field(default="PMP", min_length=1, max_length=32)
     description: str | None = None
-    paper_type: Literal["standard", "multiple_choice"] = Field(
+    paper_type: Literal["standard", "multiple_choice", "mixed"] = Field(
         default="standard",
         alias="paperType",
     )
@@ -57,7 +57,7 @@ class PaperUpdateRequest(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
     subject: str | None = Field(default=None, min_length=1, max_length=32)
     description: str | None = None
-    paper_type: Literal["standard", "multiple_choice"] | None = Field(
+    paper_type: Literal["standard", "multiple_choice", "mixed"] | None = Field(
         default=None,
         alias="paperType",
     )
@@ -157,7 +157,7 @@ class PaperCompositionPreflightRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     subject: str = Field(default="PMP", min_length=1, max_length=32)
-    paper_type: Literal["standard", "multiple_choice"] = Field(
+    paper_type: Literal["standard", "multiple_choice", "mixed"] = Field(
         default="standard",
         alias="paperType",
     )

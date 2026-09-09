@@ -162,6 +162,7 @@ class _PreparedCandidate:
     hard_value: str
     soft_value: str
     stable_key: str
+    case_group: Mapping[str, Any] | None = None
 
 
 def _prepare_candidates(
@@ -194,6 +195,7 @@ def _prepare_candidates(
                 hard_value=hard_value,
                 soft_value=facets.get(PERFORMANCE_DOMAIN, ""),
                 stable_key=stable_key,
+                case_group=(candidate.metadata.get("_mixedContent") or {}).get("caseGroup"),
             )
         )
     prepared.sort(key=lambda item: (item.stable_key, item.bank_id, item.question_id))
@@ -226,6 +228,8 @@ def _pick_variant(
     hard_weights: Mapping[str, float],
     soft_weights: Mapping[str, float],
 ) -> CompositionVariantPlan:
+    if any(item.case_group for item in available):
+        return _pick_grouped_variant(variant, available, hard_weights, soft_weights)
     hard_targets = allocate_counts(hard_weights, variant.total_count)
     soft_targets = (
         allocate_counts(soft_weights, variant.total_count) if soft_weights else {}
@@ -283,6 +287,50 @@ def _pick_variant(
         soft_targets=soft_targets,
         soft_actual=soft_actual,
         feasible=not hard_shortages and len(selected) == variant.total_count,
+    )
+
+
+def _pick_grouped_variant(variant, available, hard_weights, soft_weights):
+    """Solve hard quotas with indivisible case units, then fill with singles."""
+    targets = allocate_counts(hard_weights, variant.total_count)
+    domains = list(targets)
+    singles = [item for item in available if not item.case_group]
+    groups = {}
+    for item in available:
+        if item.case_group:
+            groups.setdefault(item.case_group.get("id"), []).append(item)
+    units = []
+    for group in groups.values():
+        group.sort(key=lambda item: item.case_group.get("order", 0))
+        total = group[0].case_group.get("total")
+        if len(group) != total or [item.case_group.get("order") for item in group] != list(range(1, total + 1)) or any(item.hard_value not in targets for item in group):
+            continue
+        units.append(group)
+    units.sort(key=lambda group: group[0].stable_key)
+    zero = tuple(0 for _ in domains)
+    reachable = {zero: []}
+    for index, unit in enumerate(units):
+        delta = tuple(sum(item.hard_value == domain for item in unit) for domain in domains)
+        for state, picked in list(reachable.items()):
+            next_state = tuple(a + b for a, b in zip(state, delta))
+            if all(next_state[i] <= targets[d] for i, d in enumerate(domains)) and next_state not in reachable:
+                reachable[next_state] = picked + [index]
+    inventory = {d: sum(item.hard_value == d for item in singles) for d in domains}
+    selected = []
+    feasible_states = [state for state in reachable if all(targets[d] - state[i] <= inventory[d] for i, d in enumerate(domains))]
+    if feasible_states:
+        state = max(feasible_states, key=lambda state: (sum(state), state))
+        selected = [item for index in reachable[state] for item in units[index]]
+        for index, domain in enumerate(domains):
+            selected.extend([item for item in singles if item.hard_value == domain][:targets[domain] - state[index]])
+    actual = {d: sum(item.hard_value == d for item in selected) for d in domains}
+    soft_targets = allocate_counts(soft_weights, variant.total_count) if soft_weights else {}
+    return CompositionVariantPlan(
+        code=str(variant.code), name=str(variant.name), total_count=variant.total_count,
+        question_ids=tuple(item.question_id for item in selected), hard_targets=targets,
+        hard_actual=actual, hard_shortages={d: targets[d] - actual[d] for d in domains if actual[d] < targets[d]},
+        soft_targets=soft_targets, soft_actual={d: sum(item.soft_value == d for item in selected) for d in soft_targets},
+        feasible=len(selected) == variant.total_count,
     )
 
 

@@ -257,6 +257,11 @@ def normalize_question_payload(payload: dict[str, Any], *, subject: str) -> dict
             if isinstance(option, dict) and option.get("id")
         },
     )
+    extensions = {key: deepcopy(payload[key]) for key in ("images", "material", "caseGroup", "matching") if payload.get(key) is not None}
+    # Existing persistence/import paths already round-trip metadata losslessly.
+    normalized["metadata"].pop("_mixedContent", None)
+    if extensions:
+        normalized["metadata"]["_mixedContent"] = extensions
     normalized["status"] = deepcopy(payload.get("status") or {})
     if (
         normalized["type"] == "multiple_choice"
@@ -323,6 +328,7 @@ def duplicate_question_signature(payload: dict[str, Any]) -> str:
             if isinstance(part, dict)
         )
     signature = {
+        "mixed": {key: normalized[key] for key in ("images", "material", "caseGroup", "matching") if key in normalized},
         "stem": _duplicate_text(stem),
         "options": [
             [_duplicate_text(option.get("id")), _duplicate_text(option.get("text"))]

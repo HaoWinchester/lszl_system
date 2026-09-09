@@ -276,6 +276,7 @@ class PracticeVerification(Base):
     bank_id: Mapped[str | None] = mapped_column(String(64), ForeignKey("question_banks.id", ondelete="SET NULL"), nullable=True)
     selected_answer: Mapped[str | None] = mapped_column(String(64), nullable=True)
     selected_answer_ids: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    selected_pairs: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     correct: Mapped[bool] = mapped_column(nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 

@@ -195,6 +195,7 @@ def _release_canonical(
     if declared_paper_type and declared_paper_type not in {
         "standard",
         "multiple_choice",
+        "mixed",
     }:
         raise ValueError("paper release type is invalid")
     question_types = [

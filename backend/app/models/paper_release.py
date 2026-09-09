@@ -14,7 +14,7 @@ class PaperRelease(Base):
     __table_args__ = (
         UniqueConstraint("paper_id", "version", name="uq_paper_releases_paper_version"),
         CheckConstraint(
-            "paper_type IN ('standard', 'multiple_choice')",
+            "paper_type IN ('standard', 'multiple_choice', 'mixed')",
             name="ck_paper_releases_paper_type",
         ),
         Index(

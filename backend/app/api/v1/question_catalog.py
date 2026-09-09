@@ -55,7 +55,7 @@ async def list_bank_questions(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
     search: str | None = Query(None, max_length=200),
-    question_type: Literal["standard", "multiple_choice"] | None = Query(None),
+    question_type: Literal["standard", "multiple_choice", "mixed"] | None = Query(None),
 ):
     questions, total = await question_catalog_service.list_bank_questions(
         db,

@@ -292,6 +292,7 @@ async def preflight_package(
 
     resolved_references: list[dict] = []
     resolved_question_types: list[str] = []
+    resolved_snapshots: list[dict] = []
     for reference in parsed_references:
         bank = resolved_banks.get(reference["sourceBankId"])
         if bank is None:
@@ -342,16 +343,25 @@ async def preflight_package(
             }
         )
         resolved_question_types.append(str(question.type or "single_choice"))
+        from app.services.question_catalog_service import question_to_payload
+        resolved_snapshots.append(question_to_payload(question))
 
+    from app.services.question_group_service import validate_case_groups
+    from app.services.question_material_service import hydrate_current_materials
+    try:
+        validate_case_groups(await hydrate_current_materials(db, resolved_snapshots))
+    except ValueError as error:
+        errors.append(_finding("error", "CASE_GROUP_INVALID", str(error)))
     declared_paper_type = str(paper.get("paperType") or "").strip()
     if declared_paper_type and declared_paper_type not in {
         "standard",
         "multiple_choice",
+        "mixed",
     }:
         errors.append(
             _finding("error", "PAPER_TYPE_INVALID", "试卷类型不受支持")
         )
-    if declared_paper_type in {"standard", "multiple_choice"}:
+    if declared_paper_type in {"standard", "multiple_choice", "mixed"}:
         paper_type = declared_paper_type
     elif resolved_question_types and all(
         value == "multiple_choice" for value in resolved_question_types

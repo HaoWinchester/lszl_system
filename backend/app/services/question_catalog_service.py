@@ -77,6 +77,9 @@ def question_to_payload(question: Question) -> dict:
         if question.type == "multiple_choice"
         else []
     )
+    extensions = payload["metadata"].get("_mixedContent") or {}
+    payload["metadata"] = {k: v for k, v in payload["metadata"].items() if k != "_mixedContent"}
+    payload.update({k: v for k, v in extensions.items() if k in {"images", "material", "caseGroup", "matching"}})
     return payload
 
 
@@ -170,14 +173,14 @@ async def list_bank_questions(
     page: int,
     page_size: int,
     search: str | None = None,
-    question_type: Literal["standard", "multiple_choice"] | None = None,
+    question_type: Literal["standard", "multiple_choice", "mixed"] | None = None,
 ) -> tuple[list[dict], int]:
     await question_access_service.require_bank_access(db, user, bank_id, edit=False)
     base = select(Question).where(Question.bank_id == bank_id)
     if question_type == "multiple_choice":
         base = base.where(Question.type == "multiple_choice")
     elif question_type == "standard":
-        base = base.where(Question.type != "multiple_choice")
+        base = base.where(Question.type.notin_(["multiple_choice", "matching"]))
     keyword = str(search or "").strip()
     if keyword:
         pattern = f"%{keyword}%"
@@ -199,7 +202,8 @@ async def list_bank_questions(
             .limit(page_size)
         )
     ).scalars().all()
-    return [question_to_payload(question) for question in rows], total
+    from app.services.question_material_service import hydrate_current_materials
+    return await hydrate_current_materials(db, [question_to_payload(question) for question in rows]), total
 
 
 async def get_catalog_question(
@@ -219,7 +223,8 @@ async def get_catalog_question(
         question.bank_id,
         edit=False,
     )
-    return question_to_payload(question)
+    from app.services.question_material_service import hydrate_current_materials
+    return (await hydrate_current_materials(db, [question_to_payload(question)]))[0]
 
 
 def _learning_visibility_clause():

@@ -120,3 +120,4 @@ __all__ = [
     "TeachingContentAudit",
     "TeachingContentRevision",
 ]
+from app.models.question_material import QuestionAsset, QuestionMaterial, QuestionMaterialRevision

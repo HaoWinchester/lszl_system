@@ -95,7 +95,7 @@ class ExamPaper(Base):
     __tablename__ = "exam_papers"
     __table_args__ = (
         CheckConstraint(
-            "paper_type IN ('standard', 'multiple_choice')",
+            "paper_type IN ('standard', 'multiple_choice', 'mixed')",
             name="ck_exam_papers_paper_type",
         ),
     )

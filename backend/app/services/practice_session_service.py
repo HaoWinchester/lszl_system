@@ -47,6 +47,7 @@ RUNTIME_FIELDS = RUNTIME_INTEGER_FIELDS | {
     "showAnswers",
     "markedQuestionIds",
     "pendingSelections",
+    "pendingMatches",
 }
 RUNTIME_MARKED_QUESTION_IDS_MAX = 300
 RUNTIME_MARKED_QUESTION_ID_MAX_LENGTH = 128
@@ -144,10 +145,10 @@ def _select_questions(
             available=len(rows),
             requested=count,
         )
-    if order == "random":
-        candidates = sorted(rows, key=lambda row: _stable_random_key(seed, row))
-    else:
-        candidates = sorted(rows, key=lambda row: row.order_index)
+    from app.services.question_group_service import select_grouped
+    candidates, available_counts = select_grouped(rows, count, random_key=(lambda row: _stable_random_key(seed, row)) if order == "random" else None)
+    if not candidates:
+        raise _error(422, "PRACTICE_GROUP_COUNT_UNSATISFIABLE", "无法保持案例完整并满足指定题数", availableCounts=available_counts, requested=count)
     selected = [
         {
             "questionId": row.question_id,
@@ -292,6 +293,20 @@ async def _validated_draft_answers(
             raise _error(422, "PRACTICE_DRAFT_ANSWER_INVALID", "草稿包含非法题目")
         row = rows.get(question_id)
         snapshot = row.snapshot if row is not None and isinstance(row.snapshot, dict) else {}
+        if snapshot.get("type") == "matching":
+            timed_out = value.get("timedOut") is True
+            selection_index = value.get("selectionIndex")
+            if isinstance(selection_index, bool) or not isinstance(selection_index, int) or not 1 <= selection_index <= len(refs) or selection_index in seen_indexes:
+                raise _error(422, "PRACTICE_DRAFT_ANSWER_INVALID", "草稿选择顺序无效")
+            if timed_out and session.mode != "scholar":
+                raise _error(422, "PRACTICE_TIMEOUT_MODE_INVALID", "只有学霸模式可以提交超时")
+            try:
+                pairs = {} if timed_out else question_answer_service.validate_selected_pairs(snapshot, value.get("selectedPairs"))
+            except ValueError as error:
+                raise _error(422, "PRACTICE_DRAFT_ANSWER_INVALID", str(error)) from error
+            seen_indexes.add(selection_index)
+            normalized[question_id] = {"selectedPairs": pairs, "selectionIndex": selection_index, **({"timedOut": True} if timed_out else {})}
+            continue
         multiple = str(snapshot.get("type") or "") == "multiple_choice"
         selected = str(value.get("selectedAnswer") or "").strip()
         selected_ids = question_answer_service.normalize_option_ids(
@@ -376,10 +391,11 @@ def _draft_stats(
         snapshot = row.snapshot if row is not None and isinstance(row.snapshot, dict) else {}
         selected = str(answer.get("selectedAnswer") or "")
         multiple = str(snapshot.get("type") or "") == "multiple_choice"
-        selected_ids = answer.get("selectedAnswerIds") if multiple else []
+        matching = snapshot.get("type") == "matching"
+        selected_ids = answer.get("selectedPairs") if matching else answer.get("selectedAnswerIds") if multiple else []
         grading = question_answer_service.grade_selection(
             snapshot,
-            selected_ids if multiple else [selected],
+            selected_ids if multiple or matching else [selected],
             timed_out=answer.get("timedOut") is True,
         )
         is_correct = bool(grading["correct"])
@@ -394,7 +410,7 @@ def _draft_stats(
             submission_index = position + 1
         scoring_answers[question_id] = {
             "questionId": question_id,
-            **({"selectedAnswerIds": grading["selectedOptionIds"]} if multiple else {"selectedAnswer": selected}),
+            **({"selectedPairs": grading["selectedPairs"]} if matching else {"selectedAnswerIds": grading["selectedOptionIds"]} if multiple else {"selectedAnswer": selected}),
             "correct": is_correct,
             "submissionIndex": submission_index,
             "submittedAt": str(answer.get("submittedAt") or ""),
@@ -713,27 +729,30 @@ async def start_session(
             str(item.get("domain") or "") in weights for item in question_order
         )
     else:
-        headers = await _release_question_headers(db, release_id)
-        if len(headers) < count:
-            raise _error(
-                422,
-                "PRACTICE_QUESTION_SHORTAGE",
-                "试卷题量不足，无法开始本次练习",
-                available=len(headers),
-                requested=count,
+        if release.paper_type == "mixed":
+            rows = list((await _release_question_rows(db, release_id)).values())
+        else:
+            headers = await _release_question_headers(db, release_id)
+            if len(headers) < count:
+                raise _error(
+                    422,
+                    "PRACTICE_QUESTION_SHORTAGE",
+                    "试卷题量不足，无法开始本次练习",
+                    available=len(headers),
+                    requested=count,
+                )
+            ordered_headers = (
+                sorted(headers, key=lambda row: _stable_random_key(selection_seed, row))
+                if order == "random"
+                else sorted(headers, key=lambda row: row.order_index)
             )
-        ordered_headers = (
-            sorted(headers, key=lambda row: _stable_random_key(selection_seed, row))
-            if order == "random"
-            else sorted(headers, key=lambda row: row.order_index)
-        )
-        selected_ids = [row.question_id for row in ordered_headers[:count]]
-        row_map = await _release_question_rows(
-            db,
-            release_id,
-            question_ids=selected_ids,
-        )
-        rows = [row_map[question_id] for question_id in selected_ids]
+            selected_ids = [row.question_id for row in ordered_headers[:count]]
+            row_map = await _release_question_rows(
+                db,
+                release_id,
+                question_ids=selected_ids,
+            )
+            rows = [row_map[question_id] for question_id in selected_ids]
         weights, scoring = _release_scoring(release)
         question_order, targets, domain_data_complete = _select_questions(
             rows,
@@ -973,7 +992,7 @@ async def answer_session_question(
     has_selected_ids = isinstance(raw_selected_ids, (list, tuple)) and any(
         str(value or "").strip() for value in raw_selected_ids
     )
-    if not question_id or (not selected_answer and not has_selected_ids and not timed_out):
+    if not question_id or (not selected_answer and not has_selected_ids and not data.get("selectedPairs") and not timed_out):
         raise _error(
             422,
             "PRACTICE_ANSWER_REQUIRED",
@@ -1005,7 +1024,15 @@ async def answer_session_question(
         raise _error(404, "PRACTICE_QUESTION_NOT_FOUND", "题目不存在于当前练习快照")
     frozen_snapshot = row.snapshot if isinstance(row.snapshot, dict) else {}
     multiple = str(frozen_snapshot.get("type") or "") == "multiple_choice"
-    if multiple and not timed_out:
+    matching = frozen_snapshot.get("type") == "matching"
+    selected_pairs = {}
+    if matching:
+        try:
+            selected_pairs = {} if timed_out else question_answer_service.validate_selected_pairs(frozen_snapshot, data.get("selectedPairs"))
+        except ValueError as error:
+            raise _error(422, "PRACTICE_ANSWER_INVALID", str(error)) from error
+        selected_answer_ids = []
+    elif multiple and not timed_out:
         selected_answer_ids = question_answer_service.normalize_option_ids(
             raw_selected_ids,
             [
@@ -1028,12 +1055,12 @@ async def answer_session_question(
     answers = dict(session.answers or {})
     existing = answers.get(question_id)
     if isinstance(existing, dict) and existing.get("draft") is not True:
-        existing_selection = (
+        existing_selection = existing.get("selectedPairs", {}) if matching else (
             existing.get("selectedAnswerIds") or []
             if multiple
             else str(existing.get("selectedAnswer") or "")
         )
-        requested_selection = selected_answer_ids if multiple else selected_answer
+        requested_selection = selected_pairs if matching else selected_answer_ids if multiple else selected_answer
         if (
             existing_selection != requested_selection
             or (existing.get("timedOut") is True) != timed_out
@@ -1067,6 +1094,7 @@ async def answer_session_question(
             ref,
             row,
             (
+                {"selectedPairs": selected_pairs} if matching else
                 {"selectedAnswerIds": selected_answer_ids}
                 if multiple and not timed_out
                 else {"selectedAnswer": selected_answer}
@@ -1215,6 +1243,15 @@ def _validated_runtime_state(data: dict, *, question_count: int) -> dict:
         state["markedQuestionIds"] = _validated_marked_question_ids(
             raw["markedQuestionIds"]
         )
+    if "pendingMatches" in raw:
+        pending = raw["pendingMatches"]
+        if not isinstance(pending, dict) or len(pending) > question_count or any(
+            not isinstance(qid, str) or not qid or len(qid) > 128 or not isinstance(pairs, dict) or len(pairs) > 12
+            or any(not isinstance(k, str) or not isinstance(v, str) or not k or not v or len(k) > 128 or len(v) > 128 for k, v in pairs.items())
+            for qid, pairs in pending.items()
+        ):
+            raise _error(422, "INVALID_RUNTIME_STATE_VALUE", "暂存配对无效", field="pendingMatches")
+        state["pendingMatches"] = deepcopy(pending)
     if "pendingSelections" in raw:
         pending = raw["pendingSelections"]
         if not isinstance(pending, dict) or len(pending) > question_count or any(
@@ -1427,6 +1464,16 @@ async def _apply_runtime_patch(db: AsyncSession, session: PracticeSession, data:
         return
     refs = session.question_order if isinstance(session.question_order, list) else []
     patch = _validated_runtime_state(data, question_count=len(refs))
+    if "pendingMatches" in patch:
+        rows = await _session_question_rows(db, session)
+        for qid, pairs in patch["pendingMatches"].items():
+            row = rows.get(qid)
+            if row is None or (row.snapshot or {}).get("type") != "matching":
+                raise _error(422, "INVALID_RUNTIME_STATE_VALUE", "暂存配对不在本次练习题目内", field="pendingMatches")
+            try:
+                patch["pendingMatches"][qid] = question_answer_service.validate_selected_pairs(row.snapshot, pairs, partial=True)
+            except ValueError as error:
+                raise _error(422, "INVALID_RUNTIME_STATE_VALUE", str(error), field="pendingMatches") from error
     if "pendingSelections" in patch:
         rows = await _session_question_rows(db, session)
         for qid, ids in patch["pendingSelections"].items():
@@ -1454,7 +1501,7 @@ def _revision_conflict(session: PracticeSession) -> PracticeSessionError:
     )
 
 
-_DRAFT_LOCK_FIELDS = ("selectedAnswer", "selectedAnswerIds", "timedOut", "selectionIndex")
+_DRAFT_LOCK_FIELDS = ("selectedAnswer", "selectedAnswerIds", "selectedPairs", "timedOut", "selectionIndex")
 
 
 def _assert_existing_selections_unchanged(existing: dict, draft: dict) -> None:
@@ -1758,6 +1805,7 @@ async def _build_report(db: AsyncSession, session: PracticeSession) -> dict:
         "domainDataComplete": domain_data_complete,
         "domains": domains,
         "wrongQuestionIds": wrong_question_ids,
+        "answers": {qid: _public_answer(answer) for qid, answer in answers.items() if isinstance(answer, dict)},
         "durationMs": max(0, int(stats.get("durationMs") or 0)),
         "learner": session.owner_id,
         "paperName": paper_name,
@@ -1798,7 +1846,8 @@ async def _grade_session_selection(
         selected = "__timeout__"
     frozen_snapshot = row.snapshot if isinstance(row.snapshot, dict) else {}
     multiple = str(frozen_snapshot.get("type") or "") == "multiple_choice"
-    selected_ids = draft.get("selectedAnswerIds") if multiple else [selected]
+    matching = frozen_snapshot.get("type") == "matching"
+    selected_ids = draft.get("selectedPairs") if matching else draft.get("selectedAnswerIds") if multiple else [selected]
     selection_grading = question_answer_service.grade_selection(
         frozen_snapshot, selected_ids, timed_out=timed_out
     )
@@ -1813,14 +1862,14 @@ async def _grade_session_selection(
     try:
         if session.mode == "revenge":
             option_ids = _snapshot_option_ids(frozen_snapshot)
-            if (multiple and len(correct_option_ids) < 2) or (not multiple and (not correct_answer or correct_answer not in option_ids)):
+            if (matching and question_answer_service.validate_matching(frozen_snapshot)) or (multiple and len(correct_option_ids) < 2) or (not matching and not multiple and (not correct_answer or correct_answer not in option_ids)):
                 raise _error(
                     409,
                     "PRACTICE_SNAPSHOT_INVALID",
                     "判题失败：冻结错题快照缺少有效正确答案",
                     questionId=str(ref.get("questionId") or ""),
                 )
-            if (multiple and not selected_option_ids) or (not multiple and selected not in option_ids):
+            if (multiple and not selected_option_ids) or (not matching and not multiple and selected not in option_ids):
                 raise _error(
                     422,
                     "PRACTICE_GRADE_FAILED",
@@ -1830,7 +1879,7 @@ async def _grade_session_selection(
                 db,
                 owner,
                 str(ref.get("mistakeId") or ""),
-                ({"selectedAnswerIds": selected_option_ids} if multiple else {"selectedAnswer": selected}),
+                ({"selectedPairs": selection_grading["selectedPairs"]} if matching else {"selectedAnswerIds": selected_option_ids} if multiple else {"selectedAnswer": selected}),
                 commit=False,
                 allow_concurrent=True,
                 record=record,
@@ -1851,7 +1900,7 @@ async def _grade_session_selection(
                     "paperId": session.paper_id,
                     "releaseId": session.release_id,
                     "sourceMode": session.mode,
-                    **({"selectedAnswerIds": selected_option_ids} if multiple else {"selectedAnswer": selected}),
+                    **({"selectedPairs": selection_grading["selectedPairs"]} if matching else {"selectedAnswerIds": selected_option_ids} if multiple else {"selectedAnswer": selected}),
                     "timedOut": timed_out,
                 },
                 current_user=user,
@@ -1876,7 +1925,7 @@ async def _grade_session_selection(
 
     answer = {
         "questionId": ref["questionId"],
-        **({"selectedAnswerIds": selected_option_ids, "correctOptionIds": correct_option_ids} if multiple else {"selectedAnswer": selected, "correctAnswer": correct_answer}),
+        **({"selectedPairs": selection_grading["selectedPairs"], "correctPairs": selection_grading["correctPairs"]} if matching else {"selectedAnswerIds": selected_option_ids, "correctOptionIds": correct_option_ids} if multiple else {"selectedAnswer": selected, "correctAnswer": correct_answer}),
         "correct": correct,
         "submittedAt": completion.get("completedAt") or now_utc().isoformat(),
         "submissionIndex": submission_index,

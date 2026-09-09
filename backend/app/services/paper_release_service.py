@@ -57,6 +57,8 @@ def _snapshot_is_learnable(snapshot: dict) -> bool:
         str(part.get("text") or "") for part in (snapshot.get("stemParts") or [])
         if isinstance(part, dict)
     ) or str(snapshot.get("stem") or "")
+    if snapshot.get("type") == "matching":
+        return bool(stem and not question_answer_service.validate_matching(snapshot))
     options = snapshot.get("options") or []
     has_answer = bool(snapshot.get("correctAnswer")) or bool(
         snapshot.get("correctOptionIds")
@@ -74,8 +76,13 @@ def _freeze_practice_domain_inventory(
     snapshots: list[dict],
     metadata: dict,
 ) -> None:
+    from app.services.question_group_service import validate_case_groups
+    try:
+        validate_case_groups(snapshots)
+    except ValueError as error:
+        raise _error(422, "CASE_GROUP_INVALID", str(error)) from error
     if (
-        paper_type == "multiple_choice"
+        paper_type in {"multiple_choice", "mixed"}
         or "practice_mode" not in modes
         or str(subject).strip().upper() != "PMP"
     ):
@@ -339,7 +346,9 @@ async def publish(
                 "试卷类型与所选题目类型不一致",
             )
         snapshot = question_catalog_service.question_to_payload(question)
-        issues = question_answer_service.validate_multiple_choice(
+        from app.services.question_material_service import freeze_question_resources
+        snapshot = await freeze_question_resources(db, actor, snapshot)
+        issues = question_answer_service.validate_question(
             snapshot,
             require_analysis=True,
         )
@@ -676,6 +685,8 @@ async def publish_from_payload(db: AsyncSession, actor: User, payload: dict) -> 
     await _repair_release_snapshots(db, canonical)
     for question in canonical["questions"]:
         snapshot = dict(question["question"])
+        from app.services.question_material_service import freeze_question_resources
+        snapshot = await freeze_question_resources(db, actor, snapshot)
         if not paper_service.question_matches_paper_type(
             canonical["paperType"],
             str(snapshot.get("type") or "single_choice"),
@@ -685,7 +696,7 @@ async def publish_from_payload(db: AsyncSession, actor: User, payload: dict) -> 
                 "PAPER_TYPE_QUESTION_MISMATCH",
                 "试卷类型与所选题目类型不一致",
             )
-        issues = question_answer_service.validate_multiple_choice(
+        issues = question_answer_service.validate_question(
             snapshot,
             require_analysis=True,
         )

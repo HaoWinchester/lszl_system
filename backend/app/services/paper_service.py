@@ -283,13 +283,23 @@ async def validate_references(
 def question_matches_paper_type(paper_type: str, question_type: str) -> bool:
     if paper_type == "multiple_choice":
         return question_type == "multiple_choice"
-    return question_type != "multiple_choice"
+    if paper_type == "mixed":
+        return question_type in {"single_choice", "multiple_choice", "matching"}
+    return question_type not in {"multiple_choice", "matching"}
 
 
-def validate_question_types(
+async def validate_question_types(
+    db: AsyncSession,
     paper_type: str,
     validated: list[tuple[PaperReference, Question]],
 ) -> None:
+    from app.services.question_group_service import validate_case_groups
+    from app.services.question_catalog_service import question_to_payload
+    try:
+        from app.services.question_material_service import hydrate_current_materials
+        validate_case_groups(await hydrate_current_materials(db, [question_to_payload(q) for ref, q in sorted(validated, key=lambda item: item[0].order)]))
+    except ValueError as error:
+        raise HTTPException(422, detail={"code": "CASE_GROUP_INVALID", "message": str(error)}) from error
     mismatches = [
         {
             "questionId": question.id,
@@ -345,7 +355,7 @@ async def create_paper(
 ) -> dict:
     await teaching_content_revision_service.acquire_lock(db)
     validated = await validate_references(db, request.questions)
-    validate_question_types(request.paper_type, validated)
+    await validate_question_types(db, request.paper_type, validated)
     paper = ExamPaper(
         id=uid("p_"),
         owner_id=actor.username,
@@ -517,7 +527,7 @@ async def replace_questions(
     if current is None:
         return None
     validated = await validate_references(db, request.questions)
-    validate_question_types(current.paper_type, validated)
+    await validate_question_types(db, current.paper_type, validated)
     updated_id = await cas_paper_mutation(
         db,
         actor,

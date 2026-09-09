@@ -71,6 +71,9 @@ def question_from_snapshot(snapshot: dict) -> Question:
     question.status = dict(snapshot.get("status") or {})
     question.translations = dict(snapshot.get("translations") or {})
     question.content_metadata = dict(snapshot.get("metadata") or {})
+    extensions = {k: snapshot[k] for k in ("images", "material", "caseGroup", "matching") if k in snapshot}
+    if extensions:
+        question.content_metadata["_mixedContent"] = extensions
     question.key_path = dict(snapshot.get("keyPath") or {})
     question.lifecycle = dict(snapshot.get("lifecycle") or {})
     return question

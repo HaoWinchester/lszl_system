@@ -15,6 +15,7 @@ HIDDEN_KEYS = {
     "isCorrect",
     "is_correct",
     "correctAnswer",
+    "correctPairs",
     "correct_answer",
     "correctAnswerIds",
     "correct_answer_ids",
