@@ -136,7 +136,7 @@ function templateState(kind='pmp'){
 }
 window.KGGraphDefaultFactory=()=>templateState('pmp');
 let state=templateState('pmp');
-let saveTimer=null,lastSavedSnapshot='',hoverDetailNodeId=null,hoverDetailTimer=null,detailDrag=null,detailPanelDragged=false;
+let previewContentSnapshot='',saveTimer=null,lastSavedSnapshot='',hoverDetailNodeId=null,hoverDetailTimer=null,detailDrag=null,detailPanelDragged=false;
 let selectedNodeIds=new Set(),selectedLinkIds=new Set(),selectedTextElementIds=new Set(),boxSelect=null;
 function safeString(v,fallback='',max=3000){const s=String(v??fallback).trim();return s.length>max?s.slice(0,max):s}
 function safeNumber(v,fallback=0,min=-50000,max=50000){const n=Number(v);return Number.isFinite(n)?clamp(n,min,max):fallback}
@@ -260,6 +260,7 @@ function load(){
     if(remote&&remote.active&&remote.active()){
       const remoteGraph=remote.getLoadedGraph&&remote.getLoadedGraph();
       if(remoteGraph){state=sanitizeState(remoteGraph);lastSavedSnapshot=JSON.stringify(saveableState());return true}
+      previewContentSnapshot=graphContentSnapshot(saveableState());
       return false;
     }
     const legacy=readLegacyState(),fileStore=window.KGGraphFileStore;
@@ -284,6 +285,10 @@ function saveableState(){
   // 日常自动保存走轻量路径，避免每次点击/滑动都全量 sanitize，降低长期使用卡顿。
   return {...state,selectedNodeId:null,selectedLinkId:null,selectedElementId:null,linkSourceId:null};
 }
+function graphContentSnapshot(snapshot){
+  const {viewport,...content}=snapshot;
+  return JSON.stringify(content);
+}
 function persistCurrentGraphNow(options={}){
   try{
     const snapshot=saveableState(),json=JSON.stringify(snapshot);
@@ -291,8 +296,9 @@ function persistCurrentGraphNow(options={}){
     const fileStore=window.KGGraphFileStore;
     const remote=window.KGGraphFileRemoteAdapter;
     if(remote&&remote.active&&remote.active()){
-      if(!remote.queueSave(snapshot,options))throw new Error('远端图谱文件尚未初始化');
-      return remote.flush().then(()=>{lastSavedSnapshot=json;return true}).catch(error=>{
+      // A preview has no server file: panning/zooming alone must not create one.
+      if(!remote.getCurrentFileMeta()&&previewContentSnapshot===graphContentSnapshot(snapshot))return true;
+      return remote.save(snapshot,options).then(()=>{lastSavedSnapshot=json;return true}).catch(error=>{
         console.warn('[KGGraphFileRemoteAdapter] save failed',error);
         if(!options.silent)showStatus('保存失败：请检查网络后重试。');
         return false;

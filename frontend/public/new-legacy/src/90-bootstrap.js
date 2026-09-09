@@ -56,7 +56,7 @@ window.KGHomepageGraphBootstrap=(async function bootstrapKnowledgeGraphApp(){
   window.addEventListener('kg-auth-session-change',event=>syncRemoteGraphSession({detail:{...event.detail,authenticated:!!(window.KGAuthCore&&window.KGAuthCore.currentUser&&window.KGAuthCore.currentUser())}}));
 
   requestAnimationFrame(() => {
-    if (!hadSavedState) fitView(true);
+    if (!hadSavedState) fitView(false);
     authRenderStatus();
   });
   return true;
