@@ -1,14 +1,10 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.223",
+  "fromVersion": "v9.0-p4.1.224",
   "toVersion": "v9.0-p4.1.224",
   "changes": {
     "added": [],
-    "changed": [
-      "VERSION",
-      "content-prep-studio/dist/content-prep.html",
-      "src/23-graph-file-remote-adapter.js"
-    ],
+    "changed": [],
     "removed": []
   },
   "incompatible": []
