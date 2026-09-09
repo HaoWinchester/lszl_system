@@ -6,13 +6,13 @@
  */
 (function(global){
   const INTERVAL_MS=3*60*1000;
-  let dirty=false,timer=null,saving=false,lastSavedAt=0,lastError='';
+  let dirty=false,timer=null,saving=false,lastSavedAt=0,lastError='',pending=null,changeVersion=0;
 
   function emit(reason='status'){
     global.dispatchEvent(new CustomEvent('kg-graph-autosave-status',{detail:{dirty,saving,lastSavedAt,lastError,reason}}));
   }
   function markDirty(reason='change'){
-    dirty=true;lastError='';emit(reason);return true;
+    changeVersion+=1;dirty=true;lastError='';emit(reason);return true;
   }
   function clearDirty(reason='saved'){
     dirty=false;lastError='';lastSavedAt=Date.now();emit(reason);return true;
@@ -25,18 +25,21 @@
   }
   function isDirty(){return dirty}
   function saveNow(options={}){
-    if(saving)return true;
+    if(pending)return pending;
+    if(saving)return false;
     if(!dirty&&!options.force)return true;
+    const version=changeVersion;
     saving=true;emit('saving');
     let result=false;
     try{
       if(typeof global.persistCurrentGraphNow==='function')result=global.persistCurrentGraphNow({...options,bypassAutosave:true});
       else if(typeof global.saveNow==='function')result=global.saveNow({...options,bypassAutosave:true});
       if(result&&typeof result.then==='function'){
-        return result.then(ok=>{
-          if(ok!==false){dirty=false;lastError='';lastSavedAt=Date.now()}else lastError='保存失败';
+        pending=result.then(ok=>{
+          if(ok!==false){dirty=changeVersion!==version;lastError='';lastSavedAt=Date.now()}else lastError='保存失败';
           saving=false;emit(ok!==false?'saved':'error');return ok!==false;
-        }).catch(err=>{console.warn('[KGGraphFileAutosave] save failed:',err);lastError=String(err&&err.message||err||'保存失败');saving=false;emit('error');return false});
+        }).catch(err=>{console.warn('[KGGraphFileAutosave] save failed:',err);lastError=String(err&&err.message||err||'保存失败');saving=false;emit('error');return false}).finally(()=>{pending=null});
+        return pending;
       }
       if(result!==false){dirty=false;lastError='';lastSavedAt=Date.now();result=true}
       else lastError='保存失败';

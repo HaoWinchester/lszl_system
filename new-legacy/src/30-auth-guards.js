@@ -188,7 +188,13 @@ function authLocalRegister(username,password){
   return true;
 }
 async function authLogout(){
-  if(authIsLoggedIn()&&saveNow({silent:true})===false){showStatus('当前图谱保存失败，已取消退出。请先导出学习包备份或清理浏览器存储空间。');return false}
+  if(authIsLoggedIn()){
+    const autosave=window.KGGraphFileAutosave;
+    let saved=await saveNow({silent:true});
+    // Edits made while a request was pending need their own confirmed save.
+    while(saved!==false&&autosave?.isDirty())saved=await saveNow({silent:true});
+    if(saved===false){showStatus('当前图谱未保存成功，已取消退出。请检查网络后点击保存重试。');return false}
+  }
   const old=authCurrentUser&&authCurrentUser.username;
   const remote=Boolean(AuthCore.providerStatus?.().remote);
   if(remote&&typeof AuthCore.logout==='function'){

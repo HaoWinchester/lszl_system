@@ -1,6 +1,6 @@
 'use strict';
 (function(global){
-  let current=null,loadedGraph=null,pendingSave=Promise.resolve(),sessionEpoch=0,initializedEpoch=-1,currentInitializer=null;
+  let creating=null,unselectedFileId=null,current=null,loadedGraph=null,pendingSave=Promise.resolve(),sessionEpoch=0,initializedEpoch=-1,currentInitializer=null;
   function clone(value){return value==null?value:JSON.parse(JSON.stringify(value))}
   function active(){return !!(global.KGGraphFileApi&&global.KGGraphFileApi.isRemote())}
   function normalize(file){return file&&typeof file==='object'?file:null}
@@ -17,7 +17,7 @@
     if(!next||!next.id||!next.graphData)return null;
     current=clone(next);loadedGraph=clone(next.graphData);return clone(current);
   }
-  function clearSession(){sessionEpoch+=1;initializedEpoch=-1;currentInitializer=null;current=null;loadedGraph=null;pendingSave=Promise.resolve()}
+  function clearSession(){sessionEpoch+=1;creating=null;unselectedFileId=null;initializedEpoch=-1;currentInitializer=null;current=null;loadedGraph=null;pendingSave=Promise.resolve()}
   function initializeCurrent(){
     if(!active())return Promise.resolve(null);
     const epoch=sessionEpoch;
@@ -52,14 +52,50 @@
     if(!active()||!current)return false;
     const epoch=sessionEpoch,id=current.id,snapshot=clone(graphData),onSuccess=options.onSuccess;
     loadedGraph=snapshot;
-    const expectedRevision=Number(current.revision)||1;
-    pendingSave=pendingSave.catch(()=>null).then(()=>global.KGGraphFileApi.save(id,{graphData:snapshot,learningState:options.learningState,expectedRevision})).then(payload=>{
+    pendingSave=pendingSave.catch(()=>null).then(()=>{
+      if(epoch!==sessionEpoch||!active()||current?.id!==id)throw new Error('当前图谱已切换，请重新保存。');
+      return global.KGGraphFileApi.save(id,{graphData:snapshot,learningState:options.learningState,expectedRevision:Number(current.revision)||1});
+    }).then(async payload=>{
       if(epoch!==sessionEpoch||!active())return null;
       current=normalize(payload.file)||current;
+      if(options.name!==undefined&&current.name!==options.name){
+        const renamed=await global.KGGraphFileApi.patchFile(id,{name:options.name});
+        if(epoch!==sessionEpoch||!active()||current?.id!==id)throw new Error('当前图谱已切换，请重新保存。');
+        current=normalize(renamed.file)||current;
+      }
       if(typeof onSuccess==='function')onSuccess();
       return current;
     }).catch(error=>{if(epoch===sessionEpoch)console.warn('[KGGraphFileRemoteAdapter] save failed',error);throw error});
     return true;
+  }
+  async function save(graphData,options={}){
+    const epoch=sessionEpoch;
+    function checkSession(){if(epoch!==sessionEpoch||!active())throw new Error('登录状态已变化，请重新登录后保存。')}
+    await initializeCurrent();checkSession();
+    if(!current){
+      if(!creating){
+        const task=(async()=>{
+          const payload=await global.KGGraphFileApi.create({name:graphData.meta?.title||'我的知识图谱',graphData,source:'created'});
+          checkSession();
+          if(!payload.file?.id)throw new Error('图谱文件创建失败，请重试。');
+          adoptFile({...payload.file,graphData});
+          unselectedFileId=current.id;
+          global.KGGraphFileRemoteStore?.seedCurrent?.(current);
+        })();
+        creating=task;
+        task.catch(()=>null).finally(()=>{if(creating===task)creating=null});
+      }
+      await creating;checkSession();
+    }
+    // Keep the created file after a selection failure so retry never duplicates it.
+    if(unselectedFileId){
+      await global.KGGraphFileApi.setCurrent(unselectedFileId);checkSession();unselectedFileId=null;
+      global.dispatchEvent(new CustomEvent('kg-graph-current-file-change',{detail:{id:current.id}}));
+    }
+    if(!queueSave(graphData,options))throw new Error('当前图谱不可保存，请重试。');
+    await flush();checkSession();
+    global.KGGraphFileRemoteStore?.seedCurrent?.({...current,graphData:loadedGraph});
+    return current;
   }
   function flush(){return pendingSave}
   async function handleSessionChange(event){
@@ -67,5 +103,5 @@
     if(!event?.detail?.authenticated||!active())return null;
     return initializeCurrent();
   }
-  global.KGGraphFileRemoteAdapter={active,initialize,initializeCurrent,adoptFile,getLoadedGraph,getCurrentFileMeta,queueSave,flush,clearSession,handleSessionChange};
+  global.KGGraphFileRemoteAdapter={active,initialize,initializeCurrent,adoptFile,getLoadedGraph,getCurrentFileMeta,queueSave,save,flush,clearSession,handleSessionChange};
 })(window);

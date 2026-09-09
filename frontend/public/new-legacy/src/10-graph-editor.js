@@ -4035,24 +4035,18 @@ function updateGraphInfoModal(){
   set('gNodeCount',`${state.nodes&&state.nodes.length||0} 个`);
   set('gWordCount',`${graphInfoWordCount()} 字`);
 }
-function saveGraphTitle(nextTitle,options={}){
+async function saveGraphTitle(nextTitle,options={}){
   nextTitle=String(nextTitle||'').trim().slice(0,40)||'知识点关系图谱';
-  const fileStore=window.KGGraphFileStore,currentFile=fileStore&&fileStore.getCurrentFileMeta?fileStore.getCurrentFileMeta():(fileStore&&fileStore.getCurrentFile?fileStore.getCurrentFile():null),oldTitle=state.meta&&state.meta.title;
   if(!state.meta)state.meta={};
   state.meta.title=nextTitle;
-  if(currentFile&&typeof persistCurrentGraphNow==='function'){
-    const saved=persistCurrentGraphNow({force:true,name:nextTitle,emit:true});
-    if(!saved){state.meta.title=oldTitle||currentFile.name||'知识点关系图谱';showStatus('图谱标题保存失败：浏览器本地存储空间可能已满。');return false}
-    if(window.KGGraphFileAutosave&&window.KGGraphFileAutosave.clearDirty)window.KGGraphFileAutosave.clearDirty('title-saved');
-  }else if(currentFile&&fileStore&&fileStore.renameFile){
-    const renamed=fileStore.renameFile(currentFile.id,nextTitle,{emit:true});
-    if(!renamed){state.meta.title=oldTitle||'知识点关系图谱';showStatus('文件名称保存失败：浏览器本地存储空间可能已满。');return false}
-  }else{
-    render({persist:true});
-  }
+  const autosave=window.KGGraphFileAutosave;
+  autosave?.markDirty('title-change');
+  let saved=await saveNow({force:true,name:state.meta.title,emit:true});
+  while(saved!==false&&autosave?.isDirty())saved=await saveNow({force:true,name:state.meta.title,emit:true});
+  if(saved===false){showStatus('图谱标题尚未保存，请检查网络后重试。');return false}
   renderHeader();
   render({persist:false});
-  if(window.KGGraphFileTabs&&window.KGGraphFileTabs.refresh)window.KGGraphFileTabs.refresh();
+  if(window.KGGraphFileTabs&&window.KGGraphFileTabs.refresh)await window.KGGraphFileTabs.refresh();
   if(options.message!==false)showStatus('图谱标题已保存，并已同步为文件名称。');
   return true;
 }
@@ -4063,8 +4057,8 @@ function openGraphModal(){
   setTimeout(()=>$('gTitle').focus(),80);
 }
 $('cancelGraphBtn').onclick=()=>$('graphModal').classList.remove('show');
-$('saveGraphBtn').onclick=()=>{
-  if(!saveGraphTitle($('gTitle').value))return;
+$('saveGraphBtn').onclick=async()=>{
+  if(!await saveGraphTitle($('gTitle').value))return;
   updateGraphInfoModal();
   $('graphModal').classList.remove('show');
 };

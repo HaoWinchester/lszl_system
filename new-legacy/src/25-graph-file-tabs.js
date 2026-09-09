@@ -96,7 +96,7 @@
     el.title=saving?'正在保存…':`${text}。点击立即保存（Ctrl+S / Command+S）`;
     const label=el.querySelector('.graph-save-state-text');if(label)label.textContent=text;
   }
-  function manualSave(){
+  async function manualSave(){
     const autosave=global.KGGraphFileAutosave;
     if(!autosave||typeof autosave.saveNow!=='function'){
       if(typeof global.showStatus==='function')global.showStatus('保存功能尚未就绪。');
@@ -105,7 +105,7 @@
     const status=typeof autosave.status==='function'?autosave.status():{};
     if(status.saving)return false;
     const hadChanges=typeof autosave.isDirty==='function'?autosave.isDirty():!!status.dirty;
-    const ok=autosave.saveNow({force:true,silent:false,reason:'manual-save'});
+    const ok=await autosave.saveNow({force:true,silent:false,reason:'manual-save'});
     if(typeof global.showStatus==='function'){
       if(ok)global.showStatus(hadChanges?'图谱已保存。':'当前内容已保存。');
       else global.showStatus((typeof autosave.status==='function'&&autosave.status().lastError)||'图谱保存失败。');
