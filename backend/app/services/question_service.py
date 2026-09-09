@@ -230,6 +230,8 @@ async def _validate_normalized_question(db: AsyncSession, actor: User, normalize
     issues = question_answer_service.validate_question(normalized)
     if issues:
         raise _import_validation_error(issues[0]["message"])
+    from app.services.question_material_service import apply_question_material_edit
+    await apply_question_material_edit(db, actor, normalized)
 
 
 async def import_question_banks(
@@ -1235,11 +1237,34 @@ async def compose_paper(
         q = q.where(Question.bank_id.in_(bank_ids))
     all_qs = (await db.execute(q)).scalars().all()
 
+    from app.services import paper_service, paper_composition_service
+    paper = await db.get(ExamPaper, paper_id)
+    if paper is None:
+        return -1
+    all_qs = [question for question in all_qs if paper_service.question_matches_paper_type(paper.paper_type, question.type)]
     picked: list[Question] = []
-    for domain, count in (quotas or {}).items():
-        pool = [x for x in all_qs if (x.domain or "其他") == domain]
-        random.shuffle(pool)
-        picked.extend(pool[: int(count)])
+    if paper.paper_type == "mixed" and quotas:
+        try:
+            total = sum(int(value) for value in quotas.values())
+            candidates = [paper_composition_service.CompositionCandidate(
+                question.id, question.bank_id,
+                {**(question.content_metadata or {}), "subjectFacets": [{"dimensionId": "exam-domain", "valueId": question.domain or "其他"}]},
+            ) for question in all_qs]
+            request = paper_composition_service.CompositionRequest(
+                (paper_composition_service.CompositionVariant("A", paper.name, total),), quotas, {}, uid("composition_"),
+            )
+            plan = paper_composition_service.build_plan(request, candidates).variants[0]
+        except (TypeError, ValueError) as error:
+            raise HTTPException(422, detail={"code": "COMPOSITION_REQUEST_INVALID", "message": str(error)}) from error
+        if not plan.feasible:
+            raise HTTPException(422, detail={"code": "CASE_GROUP_SELECTION_UNSATISFIABLE", "message": "无法保持案例完整并满足组卷配额", "requested": total, "available": len(all_qs), "hardShortages": plan.hard_shortages})
+        by_id = {question.id: question for question in all_qs}
+        picked = [by_id[question_id] for question_id in plan.question_ids]
+    else:
+        for domain, count in (quotas or {}).items():
+            pool = [x for x in all_qs if (x.domain or "其他") == domain]
+            random.shuffle(pool)
+            picked.extend(pool[: int(count)])
 
     updated_id = await _cas_paper_mutation(
         db,

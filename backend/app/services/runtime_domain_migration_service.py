@@ -206,6 +206,8 @@ def _release_canonical(
         paper_type = declared_paper_type
     elif all(value == "multiple_choice" for value in question_types):
         paper_type = "multiple_choice"
+    elif set(question_types) <= {"single_choice", "multiple_choice", "matching"} and ("matching" in question_types or len(set(question_types)) > 1):
+        paper_type = "mixed"
     else:
         paper_type = "standard"
     if any(

@@ -442,6 +442,11 @@ def _validate_question_content(
                 "题目标题不能为空",
             )
         )
+    from app.services.question_group_service import validate_case_reference
+    try:
+        validate_case_reference(normalized)
+    except ValueError as error:
+        issues.append(_question_issue(question_id, "caseGroup", "CASE_GROUP_INVALID", str(error)))
     options = normalized.get("options") or []
     option_ids = {
         str(option.get("id"))
@@ -1338,6 +1343,19 @@ async def _execute_upload(
                 batch_id=batch_id,
             ) from error
 
+    from app.services.question_material_service import apply_question_material_edit
+    material_edits = {}
+    for prepared_question in prepared:
+        command = prepared_question.normalized.get('_materialEdit')
+        if command:
+            material_id = command['snapshot']['id']
+            if material_id in material_edits:
+                if material_edits[material_id] != command['snapshot']:
+                    raise HTTPException(422, detail={'code': 'MATERIAL_EDIT_CONFLICT', 'message': '同批次材料修改内容不一致'})
+                continue
+            await apply_question_material_edit(db, actor, prepared_question.normalized)
+            material_edits[material_id] = command['snapshot']
+
     content_changes = await _upsert_principles(db, actor, request.principles)
     await db.flush()
     content_changes.extend(
@@ -1610,6 +1628,11 @@ async def save_legacy_question_without_creator(
                     issues=reference_issues,
                     record_failure=False,
                 )
+        issues = question_answer_service.validate_question(normalized)
+        if issues:
+            raise ContentPrepOperationError(issues[0]['code'], issues[0]['message'], status_code=422, record_failure=False)
+        from app.services.question_material_service import apply_question_material_edit
+        await apply_question_material_edit(db, actor_context, normalized)
         content_hash = canonical_question_hash(normalized)
         before_hash = question.content_hash
         before_revision = question.revision
@@ -1839,6 +1862,8 @@ async def upload_bundle(
     except ContentPrepOperationError as error:
         if error.record_failure:
             await record_failed_batch(db, actor_context, request, error)
+        raise
+    except HTTPException:
         raise
     except Exception as unexpected:
         error = ContentPrepOperationError(

@@ -1,3 +1,6 @@
+import pytest
+from mixed_question_support import mixed_data_cleanup
+pytestmark = pytest.mark.usefixtures("mixed_data_cleanup")
 import asyncio
 from fastapi.testclient import TestClient
 from app.main import app

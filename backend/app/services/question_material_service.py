@@ -74,21 +74,22 @@ async def canonical_images(db, user, images):
     return result
 
 
-async def save_material(db, user, data, material_id=None):
+async def save_material(db, user, data, material_id=None, *, commit=True, new_id=None):
     row = await owned_material(db, user, material_id, lock=True) if material_id else None
     if row is not None and data.revision != row.revision:
         fail('MATERIAL_REVISION_CONFLICT', '材料已更新，请刷新后重试', 409, currentRevision=row.revision)
     images = await canonical_images(db, user, data.images)
     if row is None:
-        row = QuestionMaterial(id=uid('qm_'), owner_id=user.username, revision=1)
+        row = QuestionMaterial(id=new_id or uid('qm_'), owner_id=user.username, revision=1)
         db.add(row)
     else:
         row.revision += 1
     row.title, row.text, row.images = data.title, data.text, images
     await db.flush()
     db.add(QuestionMaterialRevision(material_id=row.id, revision=row.revision, snapshot=material_payload(row)))
-    await db.commit()
-    await db.refresh(row)
+    if commit:
+        await db.commit()
+        await db.refresh(row)
     return material_payload(row)
 
 
@@ -154,8 +155,42 @@ async def hydrate_current_materials(db, snapshots):
 
 
 async def normalize_question_resources(db, user, normalized):
-    if not any(normalized.get(key) for key in ('images', 'material', 'caseGroup')):
+    """Prepare a canonical material edit without mutating either resource."""
+    command = normalized.pop('materialEdit', None)
+    if command is not None:
+        from pydantic import ValidationError
+        from app.schemas.question_material import MaterialEditInput
+        try:
+            edit = MaterialEditInput.model_validate(command)
+        except ValidationError as error:
+            fail('MATERIAL_INVALID', '材料编辑内容无效')
+        row = await owned_material(db, user, edit.id) if edit.id else None
+        if row is not None and edit.revision != row.revision:
+            fail('MATERIAL_REVISION_CONFLICT', '材料已更新，请刷新后重试', 409, currentRevision=row.revision)
+        images = await canonical_images(db, user, edit.images)
+        material = {'id': row.id if row else uid('qm_'), 'revision': row.revision + 1 if row else 1,
+                    'title': edit.title, 'text': edit.text, 'images': images}
+        normalized['material'] = material
+        if isinstance(normalized.get('caseGroup'), dict):
+            normalized['caseGroup'] = {**normalized['caseGroup'], 'id': material['id']}
+        normalized['_materialEdit'] = {'existingId': row.id if row else None, 'snapshot': material,
+                                       'revision': edit.revision}
+        if normalized.get('images'):
+            normalized['images'] = await canonical_images(db, user, normalized['images'])
+    elif any(normalized.get(key) for key in ('images', 'material', 'caseGroup')):
+        await freeze_question_resources(db, user, normalized)
+    else:
         return
-    await freeze_question_resources(db, user, normalized)
     extensions = normalized.setdefault('metadata', {}).setdefault('_mixedContent', {})
     extensions.update({key: deepcopy(normalized[key]) for key in ('images', 'material', 'caseGroup', 'matching') if normalized.get(key) is not None})
+
+
+async def apply_question_material_edit(db, user, normalized):
+    """Called after question validation/CAS; the caller owns the transaction."""
+    command = normalized.get('_materialEdit')
+    if not command:
+        return
+    from app.schemas.question_material import MaterialInput
+    snapshot = command['snapshot']
+    edit = MaterialInput(title=snapshot['title'], text=snapshot['text'], images=snapshot['images'], revision=command['revision'])
+    await save_material(db, user, edit, command['existingId'], commit=False, new_id=snapshot['id'])

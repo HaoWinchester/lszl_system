@@ -13,6 +13,8 @@ _INTERNAL_SCOPE_MARKERS = {"internal", "内部使用"}
 _PUBLIC_SCOPE_MARKERS = {"public", "可公开"}
 
 _HASH_EXCLUDED_FIELDS = {
+    "materialEdit",
+    "_materialEdit",
     "id",
     "questionId",
     "bankId",
@@ -192,6 +194,7 @@ def normalize_question_payload(payload: dict[str, Any], *, subject: str) -> dict
     """Normalize known fields without discarding Content Prep extension data."""
 
     normalized = deepcopy(payload)
+    normalized.pop("_materialEdit", None)
     normalized["id"] = str(payload.get("id") or payload.get("questionId") or "").strip()
     normalized["title"] = str(payload.get("title") or "").strip()
     normalized["type"] = str(payload.get("type") or "single_choice").strip()
@@ -204,7 +207,11 @@ def normalize_question_payload(payload: dict[str, Any], *, subject: str) -> dict
     normalized["options"] = deepcopy(payload.get("options") or [])
 
     correct_answer = payload.get("correctAnswer")
-    if normalized["type"] == "multiple_choice":
+    if normalized["type"] == "matching":
+        normalized["options"] = []
+        normalized["correctAnswer"] = None
+        normalized["correctOptionIds"] = []
+    elif normalized["type"] == "multiple_choice":
         correct_option_ids = payload.get("correctOptionIds")
         if correct_option_ids is None:
             correct_option_ids = payload.get("correctAnswers")

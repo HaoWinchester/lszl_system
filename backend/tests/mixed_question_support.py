@@ -8,7 +8,8 @@ from app.models.user import User
 from app.models.question import QuestionBank
 from app.core.security import hash_password
 from app.services import paper_release_service
-from test_mixed_question_types import MATCHING
+MATCHING = {'id': 'match-1', 'type': 'matching', 'title': '匹配', 'stemParts': [{'text': '配对'}], 'matching': {'left': [{'id': 'l1', 'text': '一'}, {'id': 'l2', 'text': '二'}], 'right': [{'id': 'r1', 'text': '甲'}, {'id': 'r2', 'text': '乙'}], 'correctPairs': {'l1': 'r2', 'l2': 'r1'}}}
+_FIXTURES = []
 PASSWORD = 'mixed-question-test'
 async def seed_users():
     suffix = uuid4().hex[:10]
@@ -19,6 +20,7 @@ async def seed_users():
         await db.flush()
         db.add(QuestionBank(id=ids["bank"], owner_id=ids["teacher"], name="混合题库", subject="PMP"))
         await db.commit()
+    _FIXTURES.append(ids)
     return ids
 
 def login(client, username):
@@ -53,3 +55,44 @@ async def publish(ids, qs):
         refs = [{'bankId':ids['bank'],'questionId':q['id'],'question':q} for q in qs]
         release = await paper_release_service.publish_from_payload(db, teacher, {'releaseId':'rel-'+uuid4().hex, 'publishedBy':ids['teacher'], 'paperId':ids['paper'],'name':'混合七题','subject':'PMP','paperType':'mixed','enabledModes':['practice_mode'],'allowedRoles':['student'], 'questions':refs, 'questionSnapshots':refs})
         return release.id
+
+
+async def cleanup_mixed_fixtures():
+    from sqlalchemy import delete, select, or_
+    from app.models.question import Question, ExamPaper, PaperQuestion
+    from app.models.paper_release import PaperRelease, PaperReleaseQuestion
+    from app.models.question_material import QuestionMaterial, QuestionAsset
+    from app.models.training import PracticeVerification, PracticeMistake, PracticeSession, TrainingProgress, LearningEvent
+    from app.models.content_prep import QuestionEditLock, QuestionAuditLog, QuestionUploadBatch, QuestionBankCollaborator
+    from app.models.user import UserAdminLog
+    for ids in _FIXTURES:
+        users = [ids[key] for key in ('teacher','student','other')]
+        async with AsyncSessionLocal() as db:
+            for model in (PracticeVerification, PracticeMistake, PracticeSession, TrainingProgress, LearningEvent):
+                await db.execute(delete(model).where(model.owner_id.in_(users)))
+            releases = select(PaperRelease.id).where(PaperRelease.publisher_id.in_(users))
+            await db.execute(delete(PaperReleaseQuestion).where(PaperReleaseQuestion.release_id.in_(releases)))
+            await db.execute(delete(PaperRelease).where(PaperRelease.publisher_id.in_(users)))
+            papers = select(ExamPaper.id).where(ExamPaper.owner_id.in_(users))
+            await db.execute(delete(PaperQuestion).where(PaperQuestion.paper_id.in_(papers)))
+            await db.execute(delete(ExamPaper).where(ExamPaper.owner_id.in_(users)))
+            question_ids = select(Question.id).where(Question.bank_id == ids['bank'])
+            await db.execute(delete(QuestionEditLock).where(QuestionEditLock.question_id.in_(question_ids)))
+            for model in (QuestionAuditLog, QuestionUploadBatch, QuestionBankCollaborator):
+                await db.execute(delete(model).where(model.bank_id == ids['bank']))
+            await db.execute(delete(Question).where(Question.bank_id == ids['bank']))
+            await db.execute(delete(QuestionBank).where(QuestionBank.id == ids['bank']))
+            await db.execute(delete(QuestionMaterial).where(QuestionMaterial.owner_id.in_(users)))
+            await db.execute(delete(QuestionAsset).where(QuestionAsset.owner_id.in_(users)))
+            await db.execute(delete(UserAdminLog).where(or_(UserAdminLog.actor.in_(users), UserAdminLog.target_username.in_(users))))
+            await db.execute(delete(User).where(User.username.in_(users)))
+            await db.commit()
+    _FIXTURES.clear()
+
+
+import pytest
+@pytest.fixture
+def mixed_data_cleanup():
+    import asyncio
+    yield
+    asyncio.run(cleanup_mixed_fixtures())

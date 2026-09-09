@@ -759,6 +759,9 @@ async def publish_from_payload(db: AsyncSession, actor: User, payload: dict) -> 
         "paperType": canonical["paperType"],
     })
 
+    frozen_payload["questionSnapshots"] = canonical["questions"]
+    frozen_payload["questions"] = [{key: value for key, value in question.items() if key != "question"} for question in canonical["questions"]]
+
     # 先 supersede 同试卷旧 active 版本，避免触发"每试卷仅一个 active"部分唯一索引
     await db.execute(
         update(PaperRelease)

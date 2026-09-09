@@ -1,34 +1,20 @@
 """Authenticated material editing and immutable image delivery."""
 import base64
-from typing import Annotated, Literal
+from typing import Annotated
 from fastapi import APIRouter, Depends, Query, Response
-from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth import get_current_user, require_role
 from app.db.session import get_db
 from app.models.user import User
 from app.models.question_material import QuestionMaterial
+from app.schemas.question_material import AssetInput, MaterialInput
 from app.services import question_material_service as service
 
 router = APIRouter(tags=['question-materials'])
 DB = Annotated[AsyncSession, Depends(get_db)]
 Editor = Annotated[User, Depends(require_role('teacher', 'admin'))]
 Reader = Annotated[User, Depends(get_current_user)]
-
-class MaterialInput(BaseModel):
-    model_config = ConfigDict(extra='forbid')
-    title: str = Field(min_length=1, max_length=200)
-    text: str = Field(default='', max_length=100000)
-    images: list[dict] = Field(default_factory=list, max_length=20)
-    revision: int | None = Field(default=None, ge=1)
-
-class AssetInput(BaseModel):
-    model_config = ConfigDict(extra='forbid', populate_by_name=True)
-    filename: str = Field(min_length=1, max_length=200)
-    mime_type: Literal['image/png','image/jpeg','image/webp'] = Field(alias='mimeType')
-    data_base64: str = Field(alias='dataBase64', max_length=6990508)
-    alt: str = Field(default='', max_length=1000)
 
 @router.post('/question-assets', status_code=201)
 async def upload(data: AssetInput, db: DB, user: Editor):

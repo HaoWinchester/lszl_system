@@ -667,6 +667,10 @@ async def record_practice_answer(
     snapshot = _question_snapshot(question)
     matching = snapshot.get("type") == "matching"
     selected_pairs = {} if timed_out or not matching else question_answer_service.validate_selected_pairs(snapshot, data.get("selectedPairs"))
+    if matching:
+        if question_answer_service.validate_matching(snapshot):
+            raise ValueError("题目尚未配置有效配对答案")
+        data = {**data, "selectedPairs": selected_pairs}
     multiple = str(question.type or "") == "multiple_choice"
     option_ids = {
         str(option.get("id") or "").strip()
@@ -1486,7 +1490,7 @@ async def record_practice_verification(
         owner_id=owner,
         question_id=question_id,
         bank_id=str(candidate_question.get("bankId") or "").strip() or None,
-        selected_answer=(",".join(selected_answer_ids) if multiple else selected_answer) or None,
+        selected_answer=None if matching else (",".join(selected_answer_ids) if multiple else selected_answer) or None,
         selected_answer_ids=selected_answer_ids if multiple else [],
         selected_pairs=selected_pairs,
         correct=correct,

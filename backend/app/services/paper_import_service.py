@@ -367,6 +367,8 @@ async def preflight_package(
         value == "multiple_choice" for value in resolved_question_types
     ):
         paper_type = "multiple_choice"
+    elif set(resolved_question_types) <= {"single_choice", "multiple_choice", "matching"} and ("matching" in resolved_question_types or len(set(resolved_question_types)) > 1):
+        paper_type = "mixed"
     else:
         paper_type = "standard"
     if any(

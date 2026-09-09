@@ -1,7 +1,8 @@
 from types import SimpleNamespace
 import pytest
 from app.services import question_answer_service as answers, paper_service, practice_session_service
-MATCHING = {'id': 'match-1', 'type': 'matching', 'title': '匹配', 'stemParts': [{'text': '配对'}], 'matching': {'left': [{'id': 'l1', 'text': '一'}, {'id': 'l2', 'text': '二'}], 'right': [{'id': 'r1', 'text': '甲'}, {'id': 'r2', 'text': '乙'}], 'correctPairs': {'l1': 'r2', 'l2': 'r1'}}}
+from mixed_question_support import MATCHING, mixed_data_cleanup
+pytestmark = pytest.mark.usefixtures('mixed_data_cleanup')
 def test_mixed_whitelist():
     assert paper_service.question_matches_paper_type('mixed', 'matching')
     assert paper_service.question_matches_paper_type('mixed', 'multiple_choice')
@@ -52,3 +53,19 @@ def test_matching_catalog_normalization_and_import_are_lossless():
             q = await question_service.update_question(db, user, q.id, {'title':'更新标题'})
             assert question_catalog_service.question_to_payload(q)['matching'] == MATCHING['matching']
     asyncio.run(scenario())
+
+
+def test_release_import_infers_mixed_without_losing_matching_content():
+    from app.services.runtime_domain_migration_service import normalize_release_payload
+    refs = [{'bankId':'bank','questionId':MATCHING['id'],'question':MATCHING}]
+    payload = {'releaseId':'rel-mixed-infer','paperId':'paper','publishedBy':'teacher','questions':refs,'questionSnapshots':refs,'enabledModes':['practice_mode']}
+    normalized = normalize_release_payload(payload)
+    assert normalized['paperType'] == 'mixed'
+    assert normalized['questions'][0]['question']['matching'] == MATCHING['matching']
+
+
+def test_matching_normalization_discards_stale_option_answers():
+    from app.services.question_content_service import normalize_question_payload
+    payload = normalize_question_payload({**MATCHING, 'options':[{'id':'A','correct':True}], 'correctAnswer':'A', 'correctOptionIds':['A']}, subject='PMP')
+    assert payload['options'] == [] and payload['correctAnswer'] is None and payload['correctOptionIds'] == []
+    assert payload['matching'] == MATCHING['matching']

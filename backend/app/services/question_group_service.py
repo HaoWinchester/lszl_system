@@ -2,6 +2,17 @@
 from __future__ import annotations
 
 
+def validate_case_reference(snapshot: dict) -> None:
+    group = snapshot.get('caseGroup')
+    if group is None:
+        return
+    material = snapshot.get('material')
+    if not isinstance(group, dict) or not isinstance(material, dict) or not group.get('id') or group['id'] != material.get('id'):
+        raise ValueError('案例题必须引用材料，caseGroup.id 必须等于 material.id')
+    if any(isinstance(group.get(key), bool) or not isinstance(group.get(key), int) or group[key] < 1 for key in ('order', 'total')) or group['order'] > group['total']:
+        raise ValueError('案例子题 order/total 必须为正整数，且 order 不大于 total')
+
+
 def validate_case_groups(snapshots: list[dict]) -> None:
     groups = {}
     for index, snapshot in enumerate(snapshots):

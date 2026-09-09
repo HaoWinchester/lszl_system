@@ -137,7 +137,7 @@ def validate_matching(question: dict) -> list[dict[str, str]]:
     for side in ('left', 'right'):
         items = matching.get(side)
         if not isinstance(items, list) or not 2 <= len(items) <= 12 or any(
-            not isinstance(item, dict) or not isinstance(item.get('id'), str) or not item['id'].strip()
+            not isinstance(item, dict) or not isinstance(item.get('id'), str) or not item['id'].strip() or len(item['id']) > 128
             or not isinstance(item.get('text'), str) or not item['text'].strip() for item in items
         ) or len({item['id'] for item in items}) != len(items):
             return [_issue('matching', 'MATCHING_ITEMS_INVALID', '配对两侧必须包含 2–12 个 ID 唯一且文本非空的项目')]
@@ -151,6 +151,11 @@ def validate_matching(question: dict) -> list[dict[str, str]]:
 
 
 def validate_question(question: dict, *, require_analysis: bool = False) -> list[dict[str, str]]:
+    from app.services.question_group_service import validate_case_reference
+    try:
+        validate_case_reference(question)
+    except ValueError as error:
+        return [_issue('caseGroup', 'CASE_GROUP_INVALID', str(error))]
     if question.get('type') == 'matching':
         return validate_matching(question)
     return validate_multiple_choice(question, require_analysis=require_analysis)

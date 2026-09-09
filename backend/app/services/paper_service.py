@@ -338,6 +338,8 @@ async def _reference_payloads(db: AsyncSession, paper_id: str) -> list[dict]:
             "score": _score(link.score),
             "summary": {
                 "title": question.title,
+                "type": question.type,
+                **({"caseGroup": (question.content_metadata.get("_mixedContent") or {})["caseGroup"]} if (question.content_metadata or {}).get("_mixedContent", {}).get("caseGroup") else {}),
                 "domain": question.domain,
                 "topic": question.topic,
                 "difficulty": question.difficulty,
