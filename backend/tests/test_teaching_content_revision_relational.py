@@ -116,6 +116,17 @@ async def _restore_protocol(
         await db.commit()
 
 
+def _restore_protocol_at_head(
+    relation_snapshot: dict | None,
+    legacy_snapshot: dict | None,
+) -> None:
+    """Restore the migration fixture and leave later tests at the current head."""
+
+    _run_alembic("upgrade", "b9d2e4f6a810")
+    asyncio.run(_restore_protocol(relation_snapshot, legacy_snapshot))
+    _run_alembic("upgrade", "head")
+
+
 async def _table_exists(table_name: str) -> bool:
     async with AsyncSessionLocal() as db:
         return (
@@ -265,8 +276,7 @@ def test_migration_backfills_parseable_legacy_payload_and_downgrade_keeps_it() -
 
         asyncio.run(assert_downgrade())
     finally:
-        _run_alembic("upgrade", "b9d2e4f6a810")
-        asyncio.run(_restore_protocol(relation_snapshot, legacy_snapshot))
+        _restore_protocol_at_head(relation_snapshot, legacy_snapshot)
 
 
 def test_migration_initializes_zero_when_legacy_payload_is_not_json() -> None:
@@ -288,8 +298,7 @@ def test_migration_initializes_zero_when_legacy_payload_is_not_json() -> None:
 
         asyncio.run(assert_default())
     finally:
-        _run_alembic("upgrade", "b9d2e4f6a810")
-        asyncio.run(_restore_protocol(relation_snapshot, legacy_snapshot))
+        _restore_protocol_at_head(relation_snapshot, legacy_snapshot)
 
 
 def test_migration_falls_back_when_payload_actor_exceeds_column_contract() -> None:
@@ -318,8 +327,7 @@ def test_migration_falls_back_when_payload_actor_exceeds_column_contract() -> No
 
         asyncio.run(assert_fallback())
     finally:
-        _run_alembic("upgrade", "b9d2e4f6a810")
-        asyncio.run(_restore_protocol(relation_snapshot, legacy_snapshot))
+        _restore_protocol_at_head(relation_snapshot, legacy_snapshot)
 
 
 def test_migration_initializes_zero_when_legacy_table_is_absent() -> None:
@@ -350,8 +358,7 @@ def test_migration_initializes_zero_when_legacy_table_is_absent() -> None:
             asyncio.run(
                 _rename_legacy_table(LEGACY_BACKUP_TABLE, "shared_runtime_states")
             )
-        _run_alembic("upgrade", "b9d2e4f6a810")
-        asyncio.run(_restore_protocol(relation_snapshot, legacy_snapshot))
+        _restore_protocol_at_head(relation_snapshot, legacy_snapshot)
 
 
 def test_migration_renders_offline_sql_without_reading_runtime_rows() -> None:
@@ -404,5 +411,4 @@ def test_migration_renders_offline_sql_without_reading_runtime_rows() -> None:
         asyncio.run(assert_backfill())
     finally:
         _run_alembic("downgrade", "c8e4f1a2b930")
-        _run_alembic("upgrade", "b9d2e4f6a810")
-        asyncio.run(_restore_protocol(relation_snapshot, legacy_snapshot))
+        _restore_protocol_at_head(relation_snapshot, legacy_snapshot)
