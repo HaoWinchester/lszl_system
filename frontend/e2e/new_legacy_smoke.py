@@ -44,6 +44,16 @@ with sync_playwright() as playwright:
     page_errors: list[str] = []
     http_errors: list[str] = []
     dialog_answers: list[str] = []
+    api_activity: dict = {}
+
+    def wait_for_api_settled(target) -> None:
+        # Auth change refreshes subscriptions after the visible login UI settles.
+        # Do not abort those requests with the next synthetic navigation.
+        activity = api_activity[target]
+        deadline = time.monotonic() + 15
+        while activity['pending'] or time.monotonic() - activity['changed'] < 0.25:
+            assert time.monotonic() < deadline, 'API requests did not settle before navigation'
+            target.wait_for_timeout(50)
 
     def handle_dialog(dialog: Dialog) -> None:
         if dialog.type == "prompt":
@@ -62,6 +72,20 @@ with sync_playwright() as playwright:
         http_errors.append(f"{response.status} {response.url} {detail}")
 
     def bind_page_observers(target) -> None:
+        activity = api_activity[target] = {'pending': set(), 'changed': time.monotonic()}
+
+        def track(request, finished=False):
+            if '/api/v1/' not in request.url:
+                return
+            if finished:
+                activity['pending'].discard(request)
+            else:
+                activity['pending'].add(request)
+            activity['changed'] = time.monotonic()
+
+        target.on('request', track)
+        target.on('requestfinished', lambda request: track(request, True))
+        target.on('requestfailed', lambda request: track(request, True))
         target.on("dialog", handle_dialog)
         target.on("console", lambda message: console_errors.append(message.text) if message.type == "error" else None)
         target.on("pageerror", lambda error: page_errors.append(error.stack or str(error)) if len(page_errors) < 12 else None)
@@ -106,6 +130,7 @@ with sync_playwright() as playwright:
         page.wait_for_function("window.__KG_DIRECT_BOOTSTRAP__?.authenticated === true")
         page.locator("#authModal").wait_for(state="hidden")
         assert "佩奇007" in page.locator("#authStatus").inner_text()
+        wait_for_api_settled(page)
 
         print("smoke: learner login survives reload without runtime state", flush=True)
         practice_runtime_requests: list[str] = []
@@ -181,6 +206,7 @@ with sync_playwright() as playwright:
                 arg=EXPECTED_RELEASE,
                 timeout=15_000,
             )
+            wait_for_api_settled(page)
 
         print("smoke: retired guided-learning aliases redirect to practice mode", flush=True)
         for route in ["/learning/placement-test", "/learning/node?node=awareness-keywords"]:
@@ -223,6 +249,7 @@ with sync_playwright() as playwright:
         screenshot = Path("/tmp/new-legacy-direct-settings.png")
         page.goto(BASE + "/settings", wait_until="domcontentloaded")
         page.locator(".ss-app").wait_for(state="visible", timeout=15_000)
+        wait_for_api_settled(page)
         page.screenshot(path=str(screenshot), full_page=False)
         assert screenshot.exists()
 
