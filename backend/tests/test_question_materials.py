@@ -139,3 +139,18 @@ def test_question_save_material_edit_is_atomic_and_command_is_transient():
         repeated = client.put('/api/v1/content-prep/questions/'+q['id'], json=payload)
         assert repeated.status_code == 200, repeated.text
         assert client.get('/api/v1/question-materials/'+mid).json()['material']['revision'] == 2
+
+
+def test_bank_question_create_rejects_invalid_payload_before_material_edit():
+    ids = asyncio.run(seed_users())
+    with TestClient(app) as client:
+        login(client, ids['teacher'])
+        # Validation failure on the question payload must leave no material row behind.
+        body = questions(ids)[0]
+        body.update(type='matching', options=[], correctAnswer=None, correctOptionIds=[],
+                    matching={'left': [], 'right': [], 'correctPairs': {}},
+                    materialEdit={'title':'不应存在','text':'x','images':[]})
+        rejected = client.post('/api/v1/banks/'+ids['bank']+'/questions', json=body)
+        assert rejected.status_code == 422, rejected.text
+        rows = client.get('/api/v1/question-materials').json()
+        assert all(row['title'] != '不应存在' for row in rows.get('materials', rows))

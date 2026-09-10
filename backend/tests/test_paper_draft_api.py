@@ -253,6 +253,7 @@ def test_create_paper_persists_ordered_references_and_denies_students() -> None:
                     "score": 1.0,
                     "summary": {
                         "title": "草稿题目 1",
+                        "type": "single_choice",
                         "domain": "人员",
                         "topic": "团队",
                         "difficulty": "medium",
@@ -266,6 +267,7 @@ def test_create_paper_persists_ordered_references_and_denies_students() -> None:
                     "score": 2.5,
                     "summary": {
                         "title": "草稿题目 2",
+                        "type": "single_choice",
                         "domain": "人员",
                         "topic": "团队",
                         "difficulty": "medium",
