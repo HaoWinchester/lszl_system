@@ -1,9 +1,29 @@
-import type { PracticeSession } from '../types/api';
+import type { PracticeSession, PracticeQuestion } from '../types/api';
 
-type Answer = { selectedAnswer?: string; selectedAnswerIds?: string[]; selectionIndex: number; timedOut?: boolean; correct?: boolean };
-const RUNTIME_FIELDS = ['currentIndex', 'health', 'streak', 'maxStreak', 'experience', 'remainingMs', 'durationMs', 'languageMode', 'autoExplain', 'order', 'showAnswers', 'markedQuestionIds'];
+type Answer = { selectedPairs?: Record<string,string>; selectedAnswer?: string; selectedAnswerIds?: string[]; selectionIndex: number; timedOut?: boolean; correct?: boolean };
+const RUNTIME_FIELDS = ['currentIndex', 'health', 'streak', 'maxStreak', 'experience', 'remainingMs', 'durationMs', 'languageMode', 'autoExplain', 'order', 'showAnswers', 'markedQuestionIds', 'pendingSelections', 'pendingMatches'];
 function writableRuntime(value: Record<string, any> = {}) {
   return Object.fromEntries(Object.entries(value).filter(([key]) => RUNTIME_FIELDS.includes(key)));
+}
+
+export function normalizePairs(question: PracticeQuestion, value: unknown, complete = false): Record<string,string> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const left = (question.matching?.left || []).map(item => item.id), right = (question.matching?.right || []).map(item => item.id);
+  const pairs = value as Record<string,string>, keys = Object.keys(pairs), values = Object.values(pairs);
+  if (!left.length || keys.some(id => !left.includes(id)) || values.some(id => !right.includes(id)) || new Set(values).size !== values.length) return null;
+  if (complete && (keys.length !== left.length || left.length !== right.length)) return null;
+  return Object.fromEntries(left.filter(id => Object.prototype.hasOwnProperty.call(pairs,id)).map(id => [id,pairs[id]]));
+}
+export function assignPair(question: PracticeQuestion, current: Record<string,string>, left: string, right: string): Record<string,string> {
+  const next = {...(normalizePairs(question,current) || {})};
+  if (!question.matching?.left.some(item => item.id === left)) return next;
+  if (!right) { delete next[left]; return next; }
+  if (!question.matching.right.some(item => item.id === right)) return next;
+  Object.keys(next).forEach(id => { if (next[id] === right) delete next[id]; });
+  next[left] = right; return next;
+}
+export function pairLabel(question: PracticeQuestion, selected: Record<string,string> = {}): string {
+  return (question.matching?.left || []).map((left,index) => `${index+1} → ${question.matching?.right.find(right=>right.id===selected[left.id])?.text || '未配对'}`).join('；');
 }
 
 // Kept in one pure module. Behavioral parity is tested against the PC draft engine.
@@ -17,6 +37,11 @@ export function createPracticeRun(session: PracticeSession, local?: { lockedAnsw
 
   function grade(id: string, value: any): Answer {
     const question = questions.get(id)!;
+    if (question.type === 'matching') {
+      const selectedPairs = value.timedOut ? {} : normalizePairs(question,value.selectedPairs) || {};
+      const expected = normalizePairs(question,question.matching?.correctPairs,true);
+      return {...value,selectedPairs,correct: !value.timedOut && !!expected && !!normalizePairs(question,selectedPairs,true) && Object.keys(expected).every(key=>expected[key]===selectedPairs[key])};
+    }
     const selected = question.type === 'multiple_choice'
       ? question.options.map(option => option.id).filter(id => (value.selectedAnswerIds || []).includes(id))
       : [String(value.selectedAnswer || '')];
@@ -30,14 +55,16 @@ export function createPracticeRun(session: PracticeSession, local?: { lockedAnsw
   }
   if (mode === 'challenge') runtime.health = Math.max(0, maxHealth - Object.values(answers).filter(answer => !answer.correct).length);
 
-  function select(id: string, ids: string[], timedOut = false): boolean {
+  function select(id: string, ids: string[] | Record<string,string>, timedOut = false): boolean {
     const question = questions.get(id);
-    if (!question || answers[id] || (timedOut && mode !== 'scholar')) return false;
-    const selected = [...new Set(ids)];
-    if (!timedOut && (!selected.length || selected.some(id => !question.options.some(option => option.id === id)))) return false;
-    if (!timedOut && question.type !== 'multiple_choice' && selected.length !== 1) return false;
+    if (!question || question.type === 'unknown' || !['single_choice','multiple_choice','matching'].includes(question.type) || answers[id] || (timedOut && mode !== 'scholar')) return false;
+    const matching = question.type === 'matching';
+    if (!timedOut && matching && !normalizePairs(question,ids,true)) return false;
+    const selected = Array.isArray(ids) ? [...new Set(ids)] : [];
+    if (!timedOut && !matching && (!selected.length || selected.some(id => !question.options.some(option => option.id === id)))) return false;
+    if (!timedOut && !matching && question.type !== 'multiple_choice' && selected.length !== 1) return false;
     const selectionIndex = Math.max(0, ...Object.values(answers).map(answer => answer.selectionIndex)) + 1;
-    const answer = grade(id, { selectionIndex, ...(timedOut ? { selectedAnswer: '__timeout__', timedOut: true }
+    const answer = grade(id, { selectionIndex, ...(matching ? {selectedPairs: timedOut ? {} : normalizePairs(question,ids,true)!, ...(timedOut?{timedOut:true}:{})} : timedOut ? { selectedAnswer: '__timeout__', timedOut: true }
       : question.type === 'multiple_choice' ? { selectedAnswerIds: selected } : { selectedAnswer: selected[0] }) });
     answers[id] = answer;
     if (answer.correct) {
@@ -60,7 +87,7 @@ export function createPracticeRun(session: PracticeSession, local?: { lockedAnsw
 
   function submission(): Record<string, Answer> {
     return Object.fromEntries(Object.entries(answers).map(([id, answer]) => [id, {
-      ...(answer.selectedAnswerIds ? { selectedAnswerIds: [...answer.selectedAnswerIds] } : { selectedAnswer: answer.selectedAnswer }),
+      ...(answer.selectedPairs ? {selectedPairs:{...answer.selectedPairs}} : answer.selectedAnswerIds ? { selectedAnswerIds: [...answer.selectedAnswerIds] } : { selectedAnswer: answer.selectedAnswer }),
       selectionIndex: answer.selectionIndex, ...(answer.timedOut ? { timedOut: true } : {}),
     }]));
   }

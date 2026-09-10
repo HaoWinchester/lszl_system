@@ -1,4 +1,4 @@
-import { PracticeQuestion, QuestionOption } from '../types/api';
+import type { PracticeQuestion, QuestionOption } from '../types/api';
 import { sanitizeRichText } from './rich-text';
 
 function text(value: unknown): string {
@@ -32,7 +32,11 @@ export function normalizeQuestion(rawValue: unknown): PracticeQuestion {
   });
   return {
     id: text(raw.id || raw.questionId || raw.question_id),
-    type: raw.type === 'multiple_choice' ? 'multiple_choice' : 'single_choice',
+    type: !raw.type || ['single_choice','scenario','case_analysis'].includes(raw.type) ? 'single_choice' : ['multiple_choice','matching'].includes(raw.type) ? raw.type : 'unknown',
+    matching: raw.matching || raw.metadata?.matching,
+    material: raw.material || raw.metadata?.material,
+    caseGroup: raw.caseGroup || raw.metadata?.caseGroup,
+    imageAssets: (Array.isArray(raw.images || raw.metadata?.images) ? (raw.images || raw.metadata.images) : []).filter((image: any) => image && typeof image === 'object' && /^\/api\/v1\/question-assets\/[\w-]+$/.test(String(image.url || ''))),
     stem,
     ...(stemEn ? { stemEn } : {}),
     stemNodes: sanitizeRichText(raw.stemNodes || raw.stem_nodes || stem),

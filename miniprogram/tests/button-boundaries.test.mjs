@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { loadPage } from './helpers/page-harness.mjs';
-import { createPracticeRun } from '../domain/pc-practice.ts';
+import { createPracticeRun, normalizePairs } from '../domain/pc-practice.ts';
 import { getModePolicy, formatTimer } from '../domain/mode-policy.ts';
 import { mergeDraft, moveQuestion, toggleAnswer, toggleMarked } from '../domain/practice-state.ts';
 import { createSyncCoordinator, classifyFailure, resolveConflict } from '../domain/sync-coordinator.ts';
@@ -14,7 +14,7 @@ async function pendingMultipleChoice({mode='practice',localDraft=null,confirm=tr
       options:[{id:'A',text:'甲'},{id:'B',text:'乙'},{id:'C',text:'丙'}]}}]};
   let pauseInput;
   const {page}=await loadPage('practice',{
-    createPracticeRun,getModePolicy,formatTimer,mergeDraft,moveQuestion,toggleAnswer,toggleMarked,
+    createPracticeRun, normalizePairs,getModePolicy,formatTimer,mergeDraft,moveQuestion,toggleAnswer,toggleMarked,
     createSyncCoordinator,classifyFailure,resolveConflict,ApiError:class extends Error {},
     getCurrentUser:()=>({username:'audit-student'}),getSession:async()=>structuredClone(session),
     loadLocalDraft:()=>localDraft,saveLocalDraft(){},clearLocalDraft(){},messageOf:error=>error.message,

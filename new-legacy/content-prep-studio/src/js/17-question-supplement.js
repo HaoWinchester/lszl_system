@@ -4,7 +4,7 @@
 'use strict';
 
 const SUPPLEMENT_PROTECTED_PREFIXES=Object.freeze([
-  'id','questionId','title','type','subject','stemParts','options','correctAnswer','contentHash','lifecycle','status',
+  'images','material','caseGroup','matching','correctOptionIds','id','questionId','title','type','subject','stemParts','options','correctAnswer','contentHash','lifecycle','status',
   'metadata.origin','metadata.idSystem','metadata.lastImport','metadata.lastSupplementImport','metadata.supplementHistory',
   'metadata.questionFamily.familyId','metadata.questionFamily.rootQuestionId','metadata.questionFamily.qualityConfirmed'
 ]);
@@ -173,7 +173,7 @@ async function mergeQuestionSupplement(payload,strategy='fill-empty',options={})
     const stat={changed:new Set(),conflicts:new Set(),protected:new Set()};
     let merged=mergeSupplementValue(local,raw,'',strategy,stat);
 
-    merged.id=local.id;merged.title=local.title;merged.type=local.type;merged.subject=local.subject;
+    for(const key of ['images','material','caseGroup','matching','correctOptionIds']){if(local[key]!=null)merged[key]=clone(local[key]);else delete merged[key];}merged.id=local.id;merged.title=local.title;merged.type=local.type;merged.subject=local.subject;
     merged.stemParts=clone(local.stemParts);merged.options=clone(local.options);merged.correctAnswer=clone(local.correctAnswer);
     merged.lifecycle=clone(local.lifecycle);merged.status=clone(local.status);
     merged.metadata=merged.metadata||{};

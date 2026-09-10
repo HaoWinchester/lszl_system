@@ -440,6 +440,9 @@ nav button.active{color:var(--brand)!important}
 .smalltxt.ok{color:#0f766e}
 .smalltxt.bad{color:#b91c1c}
 </style>
+<link rel="stylesheet" href="/styles/question-materials.css"/>
+<script src="/src/117-question-answer-set.js"></script>
+<script src="/src/118-question-materials.js"></script>
 </head>
 <body id="prepApp">
 <header>
@@ -1576,14 +1579,14 @@ function canonicalQuestionContent(q){
   return JSON.stringify({
     stem:normalizedContentText(questionStem(q)),
     options:(q.options||[]).slice(0,4).map(o=>({id:String(o.id||''),text:normalizedContentText(o.text)})),
-    correctAnswer:String(q.correctAnswer||'')
+    correctAnswer:String(q.correctAnswer||''),...globalThis.KGQuestionAnswerSet?.contentExtension(q)
   });
 }
 function computeQuestionContentHash(q){return 'sha256:'+sha256Hex(canonicalQuestionContent(q))}
 function canonicalDuplicateText(v){return String(v||'').normalize('NFKC').trim().replace(/\s+/g,' ').toLocaleLowerCase()}
 function canonicalQuestionDuplicateSignature(q={}){
   const primaryStem=questionStem(q)||String(q?.translations?.en?.stemParts?.map(part=>part?.text||'').join('')||'');
-  return JSON.stringify({stem:canonicalDuplicateText(primaryStem),options:(q.options||[]).map(option=>[canonicalDuplicateText(option?.id),canonicalDuplicateText(option?.text)]),correctAnswer:canonicalDuplicateText(q.correctAnswer)});
+  return JSON.stringify({stem:canonicalDuplicateText(primaryStem),options:(q.options||[]).map(option=>[canonicalDuplicateText(option?.id),canonicalDuplicateText(option?.text)]),correctAnswer:canonicalDuplicateText(q.correctAnswer),...globalThis.KGQuestionAnswerSet?.contentExtension(q)});
 }
 function preflightQuestionDuplicates(incoming,existing=[]){
   /* 与已有题内容相同(题干+选项+答案)的导入题不再丢弃,而是覆盖旧题(2026-08 录入需求):
@@ -1931,9 +1934,9 @@ function normalizeKeywordLevel(clue,q){
 function normalizeQuestion(q,i=0,subject='PMP'){
   q=q&&typeof q==='object'?clone(q):{};
   const options=(Array.isArray(q.options)?q.options:[]).map((o,idx)=>normalizeOption(o,idx,q.correctAnswer));
-  while(options.length<4)options.push(normalizeOption({id:String.fromCharCode(65+options.length),text:''},options.length,q.correctAnswer));
-  const correct=String(q.correctAnswer||options.find(o=>o.correct)?.id||'A');
-  options.forEach(o=>o.correct=o.id===correct);
+  while(q.type!=='matching'&&options.length<4)options.push(normalizeOption({id:String.fromCharCode(65+options.length),text:''},options.length,q.correctAnswer));
+  const correct=['matching','multiple_choice'].includes(q.type)?'':String(q.correctAnswer||options.find(o=>o.correct)?.id||'A');
+  options.forEach(o=>o.correct=q.type==='multiple_choice'?(q.correctOptionIds||[]).includes(o.id):o.id===correct);
   const clues=(Array.isArray(q.clues)?q.clues:[]).map((c,idx)=>{
     const level=normalizeKeywordLevel(c,q);
     const mirror=q?.metadata?.keywordSystemV2?.keywords?.find(x=>String(x.clueId||x.id)===String(c.id||''));
@@ -2806,7 +2809,7 @@ window.PMPRecallAcceptanceReady=raRestore();
 'use strict';
 
 const SUPPLEMENT_PROTECTED_PREFIXES=Object.freeze([
-  'id','questionId','title','type','subject','stemParts','options','correctAnswer','contentHash','lifecycle','status',
+  'images','material','caseGroup','matching','correctOptionIds','id','questionId','title','type','subject','stemParts','options','correctAnswer','contentHash','lifecycle','status',
   'metadata.origin','metadata.idSystem','metadata.lastImport','metadata.lastSupplementImport','metadata.supplementHistory',
   'metadata.questionFamily.familyId','metadata.questionFamily.rootQuestionId','metadata.questionFamily.qualityConfirmed'
 ]);
@@ -2975,7 +2978,7 @@ async function mergeQuestionSupplement(payload,strategy='fill-empty',options={})
     const stat={changed:new Set(),conflicts:new Set(),protected:new Set()};
     let merged=mergeSupplementValue(local,raw,'',strategy,stat);
 
-    merged.id=local.id;merged.title=local.title;merged.type=local.type;merged.subject=local.subject;
+    for(const key of ['images','material','caseGroup','matching','correctOptionIds']){if(local[key]!=null)merged[key]=clone(local[key]);else delete merged[key];}merged.id=local.id;merged.title=local.title;merged.type=local.type;merged.subject=local.subject;
     merged.stemParts=clone(local.stemParts);merged.options=clone(local.options);merged.correctAnswer=clone(local.correctAnswer);
     merged.lifecycle=clone(local.lifecycle);merged.status=clone(local.status);
     merged.metadata=merged.metadata||{};
@@ -3381,6 +3384,7 @@ function renderQuestionEditor(){
   const en=q.translations?.en||{};
   while(en.options.length<4)en.options.push({id:String.fromCharCode(65+en.options.length),text:''});
   ed.innerHTML=`
+  ${q.type==='matching'?'<p>本题为匹配题。配对内容与案例分组可在 <a href="/question-bank.html">题库管理</a> 中编辑；此处保留材料与匹配结构。</p>':''}
   <div class="form-grid">
     <div><label>题目 ID</label><input type="text" data-qfield="id" value="${esc(q.id)}"></div>
     <div><label>标题</label><input type="text" data-qfield="title" value="${esc(q.title)}"></div>
@@ -3676,12 +3680,13 @@ function renderPreview(){
   if(floatTitle)floatTitle.textContent=q?(q.title?`· ${q.title}`:`· ${q.id}`):'';
   if(!p)return;
   if(!q){p.innerHTML='<div class="no-data">请导入或新建题目。</div>';if(floatTarget)floatTarget.innerHTML=p.innerHTML;return}
-  let html=`<div class="stem-view" data-preview-source="stem" data-preview-option="">${markText(questionStem(q),q.clues,'stem')}</div>`;
+  let html=(globalThis.KGQuestionMaterials?.render(q,{readOnly:true,reveal:true,selectedPairs:q.matching?.correctPairs})||'')+`<div class="stem-view" data-preview-source="stem" data-preview-option="">${markText(questionStem(q),q.clues,'stem')}</div>`;
   q.options.forEach(o=>{
     html+=`<div class="option-view${q.correctAnswer===o.id?' correct':''}" data-preview-source="option" data-preview-option="${esc(o.id)}"><b>${esc(o.id)}.</b> ${markText(o.text,q.clues,'option',o.id)} ${q.correctAnswer===o.id?'<span class="pill">正确答案</span>':''}</div>`;
   });
   p.innerHTML=html;
   if(floatTarget)floatTarget.innerHTML=html;
+  globalThis.KGQuestionMaterials?.bindMedia(p);if(floatTarget)globalThis.KGQuestionMaterials?.bindMedia(floatTarget);
   bindInteractivePreview();
 }
 
@@ -3801,9 +3806,10 @@ function validateQuestion(q,deep=true){
   const push=(level,message,suggest='',field='')=>issues.push({level,object:id,questionId:q.id||'',field,message,suggest});
   if(!String(q.title||'').trim())push('error','缺少题目标题','填写 title。','title');
   if(!String(questionStem(q)||'').trim())push('error','缺少中文题干','填写题干。','stemParts');
-  if(!Array.isArray(q.options)||q.options.length<4||q.options.slice(0,4).some(o=>!String(o.text||'').trim()))push('error','A/B/C/D 选项不完整','补齐四个选项。','options');
-  if(!q.options.some(o=>o.id===q.correctAnswer))push('error','正确答案无效','从 A/B/C/D 选择正确答案。','correctAnswer');
+  if(q.type!=='matching'&&(!Array.isArray(q.options)||q.options.length<4||q.options.slice(0,4).some(o=>!String(o.text||'').trim())))push('error','A/B/C/D 选项不完整','补齐四个选项。','options');
+  if(!['matching','multiple_choice'].includes(q.type)&&!q.options.some(o=>o.id===q.correctAnswer))push('error','正确答案无效','从 A/B/C/D 选择正确答案。','correctAnswer');
   if(!String(q.analysis||'').trim())push('error','缺少中文解析','填写 analysis。','analysis');
+  if(q.type==='matching')(globalThis.KGQuestionAnswerSet?.validate(q)||['匹配模块未加载']).forEach(message=>push('error',message,'在题库管理修正匹配内容。','matching'));
   const en=q.translations?.en||{};
   if(!String(englishStem(q)||'').trim())push('warn','缺少英文题干','若要双语题库，请补齐 English Stem。','translations.en.stemParts');
   if((en.options||[]).length<4||(en.options||[]).slice(0,4).some(o=>!String(o.text||'').trim()))push('warn','英文选项不完整','补齐英文 A/B/C/D。','translations.en.options');
@@ -3946,10 +3952,10 @@ function exportableQuestion(q){
   out.keyPath.conceptIds=primary?[primary]:[];
   out.keyPath.primaryConceptId=primary;
   out.keyPath.ruleConceptId=primary;
-  out.keyPath.answerId=out.correctAnswer;
+  if(out.type==='matching')delete out.keyPath.answerId;else out.keyPath.answerId=out.correctAnswer;
   out.analysis=String(out.analysis||out.explanation||'');out.explanation=out.analysis;
   out.status=out.status||{};
-  out.status.contentReady=!!(questionStem(out)&&out.options.every(o=>o.text)&&out.analysis);
+  out.status.contentReady=!!(questionStem(out)&&(out.type==='matching'?!(globalThis.KGQuestionAnswerSet?.validate(out)||['匹配模块未加载']).length:out.options.every(o=>o.text))&&out.analysis);
   out.status.keywordsReady=out.clues.length>0&&out.clues.every(c=>String(c.text||'').trim());
   out.status.knowledgeReady=!!primary;
   out.status.reasoningReady=!!(out.reasoningSteps||[]).length;

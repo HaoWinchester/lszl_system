@@ -9,7 +9,7 @@ import { classifyFailure, createSyncCoordinator, resolveConflict } from '../../d
 import type { SyncJob } from '../../domain/sync-coordinator';
 import { ApiError, messageOf } from '../../services/http';
 import { abandonSession, completeSession, getSession, pauseSession, saveState } from '../../services/practice';
-import { createPracticeRun } from '../../domain/pc-practice';
+import { createPracticeRun, normalizePairs } from '../../domain/pc-practice';
 import { getCurrentUser } from '../../services/session';
 import { PracticeQuestion, PracticeSession } from '../../types/api';
 
@@ -61,6 +61,9 @@ Page(withAppearance({
     currentIndex: 0,
     currentQuestion: {} as PracticeQuestion,
     selectedIds: [] as string[],
+    selectedPairs: {} as Record<string,string>,
+    matches: {} as Record<string,Record<string,string>>,
+    matchingComplete:false,
     answers: {} as Record<string, string[]>,
     submittedById: {} as Record<string, boolean>,
     markedIds: [] as string[],
@@ -124,6 +127,7 @@ Page(withAppearance({
         session,
         currentIndex: Math.min(merged.state.currentIndex, Math.max(0, session.questions.length - 1)),
         answers: merged.state.answers,
+        matches: runtime.pendingMatches||{},
         markedIds: merged.state.markedQuestionIds,
         submittedById,
         saveState: merged.conflict ? 'conflict' : merged.pendingLocal ? 'local' : 'saved',
@@ -165,6 +169,8 @@ Page(withAppearance({
     this.setData({
       currentQuestion: entry.question,
       selectedIds,
+      selectedPairs:this.run?.answer(questionId)?.selectedPairs||this.data.matches[questionId]||{},
+      matchingComplete:!!normalizePairs(entry.question,this.data.matches[questionId]||{},true),
       submitted,
       nextActionLabel: this.run?.shouldComplete() ? '交卷'
         : lastQuestion ? (!submitted && selectedIds.length ? '完成本题' : '返回未答题') : '下一题',
@@ -186,6 +192,7 @@ Page(withAppearance({
       markedQuestionIds: this.data.markedIds,
       durationMs,
       showAnswers: this.data.showAnswers,
+      pendingMatches:Object.fromEntries(Object.entries(this.data.matches).filter(([id,pairs])=>Object.keys(pairs).length&&!this.run?.answer(id))),
       pendingSelections: Object.fromEntries(Object.entries(this.data.answers)
         .filter(([id, ids]) => ids.length && !this.run?.answer(id))),
     };
@@ -241,7 +248,7 @@ Page(withAppearance({
   buildSheetItems() {
     return this.data.session.questions.map((entry, index) => ({
       questionId: entry.questionId,
-      state: `${this.run?.answer(entry.questionId) ? (this.run.answer(entry.questionId)?.correct ? 'answered' : 'wrong') : this.data.answers[entry.questionId]?.length ? 'pending' : 'unanswered'}${index === this.data.currentIndex ? ' current' : ''}`,
+      state: `${this.run?.answer(entry.questionId) ? (this.run.answer(entry.questionId)?.correct ? 'answered' : 'wrong') : (this.data.answers[entry.questionId]?.length || Object.keys(this.data.matches[entry.questionId]||{}).length) ? 'pending' : 'unanswered'}${index === this.data.currentIndex ? ' current' : ''}`,
       marked: this.data.markedIds.includes(entry.questionId),
       label: this.run?.answer(entry.questionId)?.timedOut ? '超时' : this.run?.answer(entry.questionId) ? (this.run.answer(entry.questionId)?.correct ? '正确' : '错误') : this.data.answers[entry.questionId]?.length ? '已选，尚未提交' : '未答',
     }));
@@ -262,6 +269,11 @@ Page(withAppearance({
   onAnswerChange(event: any) {
     if (this.data.submitted || this.data.busy || this.data.showAnswers || this.syncCoordinator.pendingCount()) return;
     const questionId = this.data.session.questions[this.data.currentIndex].questionId;
+    if(this.data.currentQuestion.type==='matching'){
+      const pairs=normalizePairs(this.data.currentQuestion,event.detail.selectedPairs);if(!pairs)return;
+      this.setData({matches:{...this.data.matches,[questionId]:pairs},selectedPairs:pairs,writeError:''});this.refreshCurrent();this.saveDraft();return;
+    }
+    if(this.data.currentQuestion.type==='unknown')return;
     const selected = toggleAnswer(
       this.data.answers[questionId] || [],
       event.detail.optionId,
@@ -277,11 +289,15 @@ Page(withAppearance({
     }
   },
 
+  onConfirmMatching(){
+    if(this.data.showAnswers||this.data.busy||!this.data.matchingComplete||this.syncCoordinator.pendingCount())return;
+    if(this.recordCurrent()){if(this.run?.shouldComplete())void this.onComplete();else if(this.data.session.mode!=='practice')this.scheduleAdvance();}
+  },
   recordCurrent(timedOut = false) {
     if (this.data.busy || this.data.submitted || !this.run) return false;
     const entry = this.data.session.questions[this.data.currentIndex];
     this.run.patchRuntime(this.modeRuntimeState());
-    if (!this.run.select(entry.questionId, this.data.selectedIds, timedOut)) return false;
+    if (!this.run.select(entry.questionId, entry.question.type==='matching'?this.data.selectedPairs:this.data.selectedIds, timedOut)) return false;
     const runtime = this.run.runtime();
     this.setData({ submitted: true, submittedById: { ...this.data.submittedById, [entry.questionId]: true },
       answers: { ...this.data.answers, [entry.questionId]: timedOut ? [] : this.data.selectedIds },
@@ -363,6 +379,7 @@ Page(withAppearance({
             session: { ...latest, questions: latest.questions.length ? latest.questions : this.data.session.questions },
             currentIndex: reconciled.currentIndex,
             answers: mergeDraft(serverDraft, reconciled).state.answers,
+            matches:this.run.runtime().pendingMatches||{},
             submittedById: Object.fromEntries(Object.keys(this.run.submission()).map(id => [id, true])),
             markedIds: reconciled.markedQuestionIds,
             saveState: 'local',

@@ -28,6 +28,7 @@
 <link rel="stylesheet" href="styles/focus-vega-typography.css?v=v9.0-p4.1.224"/>
 <link rel="stylesheet" href="styles/focus-vega-teacher.css?v=v9.0-p4.1.224"/>
   <link rel="stylesheet" href="styles/close-button.css?v=v9.0-p4.1.224"/>
+<link rel="stylesheet" href="styles/question-materials.css?v=v9.0-p4.1.224"/>
 </head>
 <body class="teacher-admin-shell" data-admin-context="teacher" data-ui-skin="focus-vega" data-question-catalog-mode="managed">
 <nav class="admin-context-nav" aria-label="管理后台一级导航">
@@ -371,6 +372,7 @@
 <select id="questionTypeInput">
 <option value="single_choice">单选题</option>
 <option value="multiple_choice">多选题</option>
+<option value="matching">匹配题（拖拽／点击）</option>
 <option value="scenario">情景题</option>
 <option value="case_analysis">案例分析题</option>
 </select>
@@ -943,6 +945,8 @@
 <script defer src="src/teacher/teacher-domain-registry.js?v=v9.0-p4.1.224"></script>
 <script defer src="src/98-teacher-workflow-p2-services.js?v=v9.0-p4.1.224"></script>
 <script defer src="src/117-question-answer-set.js?v=v9.0-p4.1.224"></script>
+<script defer src="src/118-question-materials.js?v=v9.0-p4.1.224"></script>
+<script defer src="src/119-question-rich-editor.js?v=v9.0-p4.1.224"></script>
 <script defer src="./question-catalog-adapter.js?v=v9.0-p4.1.224"></script><!-- kg-question-catalog:generated -->
 <script defer src="./direct-question-adapter.js?v=v9.0-p4.1.224"></script><!-- kg-question-editor:generated -->
 <script defer src="./paper-draft-adapter.js?v=v9.0-p4.1.224"></script><!-- kg-paper-drafts:generated -->

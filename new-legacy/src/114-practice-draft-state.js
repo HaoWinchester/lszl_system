@@ -14,6 +14,8 @@
     return AnswerSet?.normalizeIds?.(value, optionIds) || []
   }
 
+  function isMatching(question) { return text(question?.type) === 'matching' }
+
   function isMultiple(question) { return text(question?.type) === 'multiple_choice' }
 
   function correctIds(question, optionIds) {
@@ -21,6 +23,10 @@
   }
 
   function gradeLocal(question, selectedAnswer, extra = {}) {
+    if (isMatching(question)) {
+      const selectedPairs = extra.timedOut ? {} : (AnswerSet.pairs(question, selectedAnswer) || {});
+      return clone({...extra, selectedPairs, correct: !extra.timedOut && AnswerSet.gradePairs(question, selectedPairs), correctPairs: question.matching?.correctPairs || {}}, {});
+    }
     const optionIds = (question?.options || []).map(option => text(option?.id)).filter(Boolean)
     if (isMultiple(question) && extra.timedOut !== true) {
       const selectedAnswerIds = normalizeIds(selectedAnswer, optionIds)
@@ -49,19 +55,19 @@
       const question = byId.get(text(questionId))
       const value = answers[questionId]
       if (!question || !value || typeof value !== 'object') return
-      const multi=isMultiple(question)
-      if (!Object.prototype.hasOwnProperty.call(value, multi?'selectedAnswerIds':'selectedAnswer')) return
+      const multi=isMultiple(question), matching=isMatching(question)
+      if (!Object.prototype.hasOwnProperty.call(value, matching?'selectedPairs':multi?'selectedAnswerIds':'selectedAnswer')) return
       const timedOut = value.timedOut === true
       const entry = {
         // 与后端 _judge 同构：timedOut 草稿一律按 '__timeout__' 判 false，
         // 即使旧数据保留真实选项值，也不产生 correct:true 的口径分裂。
-        ...(multi&&!timedOut?{selectedAnswerIds:normalizeIds(value.selectedAnswerIds,(question.options||[]).map(option=>text(option.id)))}:{selectedAnswer:timedOut ? TIMEOUT_PLACEHOLDER : text(value.selectedAnswer)}),
+        ...(matching?{selectedPairs:timedOut?{}:(AnswerSet.pairs(question,value.selectedPairs)||{})}:multi&&!timedOut?{selectedAnswerIds:normalizeIds(value.selectedAnswerIds,(question.options||[]).map(option=>text(option.id)))}:{selectedAnswer:timedOut ? TIMEOUT_PLACEHOLDER : text(value.selectedAnswer)}),
         selectionIndex: Number.isInteger(Number(value.selectionIndex)) && value.selectionIndex != null
           ? Number(value.selectionIndex)
           : Object.keys(draft).length + 1,
       }
       if (timedOut) entry.timedOut = true
-      draft[text(questionId)] = gradeLocal(question, multi?entry.selectedAnswerIds:entry.selectedAnswer, entry)
+      draft[text(questionId)] = gradeLocal(question, matching?entry.selectedPairs:multi?entry.selectedAnswerIds:entry.selectedAnswer, entry)
     })
     return draft
   }
@@ -73,10 +79,11 @@
 
     function select(questionId, selectedAnswer, { timedOut = false } = {}) {
       const id = text(questionId), question = byId.get(id)
-      if (!question || draft[id]) return { accepted: false, answer: draft[id] ? clone(draft[id]) : null }
+      if (!question || (AnswerSet?.supported && !AnswerSet.supported(question)) || draft[id]) return { accepted: false, answer: draft[id] ? clone(draft[id]) : null }
       const optionIds = new Set(((question && question.options) || []).map(item => text(item.id)))
       if (!timedOut && isMultiple(question) && (!Array.isArray(selectedAnswer) || !selectedAnswer.length || selectedAnswer.some(value=>!optionIds.has(text(value))))) return { accepted: false, answer: null }
-      if (!timedOut && !isMultiple(question) && !optionIds.has(text(selectedAnswer))) return { accepted: false, answer: null }
+      if (!timedOut && isMatching(question) && !AnswerSet.pairs(question,selectedAnswer,true)) return { accepted: false, answer: null }
+      if (!timedOut && !isMatching(question) && !isMultiple(question) && !optionIds.has(text(selectedAnswer))) return { accepted: false, answer: null }
       draft[id] = gradeLocal(question, timedOut ? TIMEOUT_PLACEHOLDER : selectedAnswer, {
         timedOut: timedOut ? true : undefined,
         selectionIndex: Object.keys(draft).length + 1,
@@ -98,7 +105,7 @@
       const payload = {}
       Object.keys(draft).forEach((questionId) => {
         const record = draft[questionId]
-        const entry = Array.isArray(record.selectedAnswerIds)
+        const entry = record.selectedPairs ? { selectedPairs: clone(record.selectedPairs,{}), selectionIndex: record.selectionIndex } : Array.isArray(record.selectedAnswerIds)
           ? { selectedAnswerIds: record.selectedAnswerIds, selectionIndex: record.selectionIndex }
           : { selectedAnswer: record.selectedAnswer, selectionIndex: record.selectionIndex }
         if (record.timedOut === true) entry.timedOut = true
@@ -124,6 +131,7 @@
       submission,
       stats,
       isDirty: () => dirty,
+      markDirty: () => { dirty = true },
       markSaved: () => { dirty = false },
     })
   }

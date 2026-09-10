@@ -18,6 +18,7 @@
 <link rel="stylesheet" href="styles/focus-vega-typography.css"/>
 <link rel="stylesheet" href="styles/focus-vega-teacher.css"/>
   <link rel="stylesheet" href="styles/close-button.css"/>
+<link rel="stylesheet" href="styles/question-materials.css"/>
 </head>
 <body class="teacher-admin-shell" data-admin-context="teacher" data-ui-skin="focus-vega" data-question-catalog-mode="managed">
 <nav class="admin-context-nav" aria-label="管理后台一级导航">
@@ -361,6 +362,7 @@
 <select id="questionTypeInput">
 <option value="single_choice">单选题</option>
 <option value="multiple_choice">多选题</option>
+<option value="matching">匹配题（拖拽／点击）</option>
 <option value="scenario">情景题</option>
 <option value="case_analysis">案例分析题</option>
 </select>
@@ -933,6 +935,8 @@
 <script defer src="src/teacher/teacher-domain-registry.js"></script>
 <script defer src="src/98-teacher-workflow-p2-services.js"></script>
 <script defer src="src/117-question-answer-set.js"></script>
+<script defer src="src/118-question-materials.js"></script>
+<script defer src="src/119-question-rich-editor.js"></script>
 <script defer src="src/65-question-bank-admin.js"></script>
 <script defer src="src/98-question-classification.js"></script>
 <script defer src="src/97-teacher-question-workflow.js"></script>

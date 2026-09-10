@@ -57,6 +57,7 @@ Page(withAppearance({
     reviewQuestion: {} as PracticeQuestion,
     reviewNumber: 0,
     reviewAnswer: '',
+    reviewSelectedPairs:{} as Record<string,string>,
     reviewSelectedIds: [] as string[],
   },
 
@@ -120,6 +121,7 @@ Page(withAppearance({
       reviewOpen: true,
       reviewQuestion: item.question,
       reviewNumber: item.number,
+      reviewSelectedPairs:this.data.session.answers?.[item.questionId]?.selectedPairs||{},
       reviewAnswer: correctIds.join('、') || item.question.correctAnswer || '请参考解析',
       reviewSelectedIds: this.data.session.answers?.[item.questionId]?.timedOut ? [] : (this.data.session.answers?.[item.questionId]?.selectedAnswerIds as string[] || (this.data.session.answers?.[item.questionId]?.selectedAnswer ? [String(this.data.session.answers[item.questionId].selectedAnswer)] : [])),
     });

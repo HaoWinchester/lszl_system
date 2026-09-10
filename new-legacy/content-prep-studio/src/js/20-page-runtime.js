@@ -306,6 +306,7 @@ function renderQuestionEditor(){
   const en=q.translations?.en||{};
   while(en.options.length<4)en.options.push({id:String.fromCharCode(65+en.options.length),text:''});
   ed.innerHTML=`
+  ${q.type==='matching'?'<p>本题为匹配题。配对内容与案例分组可在 <a href="/question-bank.html">题库管理</a> 中编辑；此处保留材料与匹配结构。</p>':''}
   <div class="form-grid">
     <div><label>题目 ID</label><input type="text" data-qfield="id" value="${esc(q.id)}"></div>
     <div><label>标题</label><input type="text" data-qfield="title" value="${esc(q.title)}"></div>
@@ -601,12 +602,13 @@ function renderPreview(){
   if(floatTitle)floatTitle.textContent=q?(q.title?`· ${q.title}`:`· ${q.id}`):'';
   if(!p)return;
   if(!q){p.innerHTML='<div class="no-data">请导入或新建题目。</div>';if(floatTarget)floatTarget.innerHTML=p.innerHTML;return}
-  let html=`<div class="stem-view" data-preview-source="stem" data-preview-option="">${markText(questionStem(q),q.clues,'stem')}</div>`;
+  let html=(globalThis.KGQuestionMaterials?.render(q,{readOnly:true,reveal:true,selectedPairs:q.matching?.correctPairs})||'')+`<div class="stem-view" data-preview-source="stem" data-preview-option="">${markText(questionStem(q),q.clues,'stem')}</div>`;
   q.options.forEach(o=>{
     html+=`<div class="option-view${q.correctAnswer===o.id?' correct':''}" data-preview-source="option" data-preview-option="${esc(o.id)}"><b>${esc(o.id)}.</b> ${markText(o.text,q.clues,'option',o.id)} ${q.correctAnswer===o.id?'<span class="pill">正确答案</span>':''}</div>`;
   });
   p.innerHTML=html;
   if(floatTarget)floatTarget.innerHTML=html;
+  globalThis.KGQuestionMaterials?.bindMedia(p);if(floatTarget)globalThis.KGQuestionMaterials?.bindMedia(floatTarget);
   bindInteractivePreview();
 }
 
@@ -726,9 +728,10 @@ function validateQuestion(q,deep=true){
   const push=(level,message,suggest='',field='')=>issues.push({level,object:id,questionId:q.id||'',field,message,suggest});
   if(!String(q.title||'').trim())push('error','缺少题目标题','填写 title。','title');
   if(!String(questionStem(q)||'').trim())push('error','缺少中文题干','填写题干。','stemParts');
-  if(!Array.isArray(q.options)||q.options.length<4||q.options.slice(0,4).some(o=>!String(o.text||'').trim()))push('error','A/B/C/D 选项不完整','补齐四个选项。','options');
-  if(!q.options.some(o=>o.id===q.correctAnswer))push('error','正确答案无效','从 A/B/C/D 选择正确答案。','correctAnswer');
+  if(q.type!=='matching'&&(!Array.isArray(q.options)||q.options.length<4||q.options.slice(0,4).some(o=>!String(o.text||'').trim())))push('error','A/B/C/D 选项不完整','补齐四个选项。','options');
+  if(!['matching','multiple_choice'].includes(q.type)&&!q.options.some(o=>o.id===q.correctAnswer))push('error','正确答案无效','从 A/B/C/D 选择正确答案。','correctAnswer');
   if(!String(q.analysis||'').trim())push('error','缺少中文解析','填写 analysis。','analysis');
+  if(q.type==='matching')(globalThis.KGQuestionAnswerSet?.validate(q)||['匹配模块未加载']).forEach(message=>push('error',message,'在题库管理修正匹配内容。','matching'));
   const en=q.translations?.en||{};
   if(!String(englishStem(q)||'').trim())push('warn','缺少英文题干','若要双语题库，请补齐 English Stem。','translations.en.stemParts');
   if((en.options||[]).length<4||(en.options||[]).slice(0,4).some(o=>!String(o.text||'').trim()))push('warn','英文选项不完整','补齐英文 A/B/C/D。','translations.en.options');
@@ -871,10 +874,10 @@ function exportableQuestion(q){
   out.keyPath.conceptIds=primary?[primary]:[];
   out.keyPath.primaryConceptId=primary;
   out.keyPath.ruleConceptId=primary;
-  out.keyPath.answerId=out.correctAnswer;
+  if(out.type==='matching')delete out.keyPath.answerId;else out.keyPath.answerId=out.correctAnswer;
   out.analysis=String(out.analysis||out.explanation||'');out.explanation=out.analysis;
   out.status=out.status||{};
-  out.status.contentReady=!!(questionStem(out)&&out.options.every(o=>o.text)&&out.analysis);
+  out.status.contentReady=!!(questionStem(out)&&(out.type==='matching'?!(globalThis.KGQuestionAnswerSet?.validate(out)||['匹配模块未加载']).length:out.options.every(o=>o.text))&&out.analysis);
   out.status.keywordsReady=out.clues.length>0&&out.clues.every(c=>String(c.text||'').trim());
   out.status.knowledgeReady=!!primary;
   out.status.reasoningReady=!!(out.reasoningSteps||[]).length;

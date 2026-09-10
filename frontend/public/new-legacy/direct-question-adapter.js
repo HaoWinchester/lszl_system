@@ -179,6 +179,7 @@
       reject(event, stem, '请先填写题干。')
       return
     }
+    if(document.getElementById('questionTypeInput')?.value === 'matching') return
     const options = Array.from(document.querySelectorAll('#qbOptionsEditor .option-text'))
     const completed = options.filter((input) => input.value.trim())
     if (completed.length < 2) {

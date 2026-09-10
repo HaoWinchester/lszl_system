@@ -1,3 +1,4 @@
+import { normalizePairs, pairLabel } from '../../domain/pc-practice';
 import { navigation } from "../../domain/navigation";
 import { withAppearance } from '../../domain/appearance-page';
 import { showDialog } from '../../domain/dialog';
@@ -17,16 +18,18 @@ import {
 } from '../../services/practice';
 import { PracticeQuestion } from '../../types/api';
 
-function answerPayload(question: PracticeQuestion, selectedIds: string[]) {
+function answerPayload(question: PracticeQuestion, selectedIds: string[], selectedPairs:Record<string,string> = {}) {
+  if(question.type==='matching')return {selectedPairs};
   return question.type === 'multiple_choice'
     ? { selectedAnswerIds: selectedIds }
     : { selectedAnswer: selectedIds[0] };
 }
 
 function previousAnswer(candidate: any): string {
+  if(candidate?.questionSnapshot?.type==='matching')return pairLabel(normalizeQuestion(candidate.questionSnapshot),candidate.selectedPairs || candidate.selectedAnswers?.at(-1)?.selectedPairs || {});
   const values = Array.isArray(candidate?.previousWrongAnswerIds)
     ? candidate.previousWrongAnswerIds.map(String)
-    : candidate?.previousWrongAnswer ? [String(candidate.previousWrongAnswer)] : [];
+    : Array.isArray(candidate?.selectedAnswers) ? candidate.selectedAnswers.filter((value:any)=>typeof value==='string') : candidate?.previousWrongAnswer ? [String(candidate.previousWrongAnswer)] : [];
   return values.join('、');
 }
 
@@ -56,6 +59,8 @@ Page(withAppearance({
     mistake: {} as any,
     question: {} as PracticeQuestion,
     selectedIds: [] as string[],
+    selectedPairs:{} as Record<string,string>,
+    matchingComplete:false,
     previousAnswer: '',
     feedback: '',
   },
@@ -67,7 +72,7 @@ Page(withAppearance({
   },
 
   async loadQueue() {
-    this.setData({ loading: true, busy: false, loadError: '', writeError: '', selectedIds: [], feedback: '' });
+    this.setData({ loading: true, busy: false, loadError: '', writeError: '', selectedIds: [], selectedPairs:{},matchingComplete:false, feedback: '' });
     try {
       const [overview, summary] = await Promise.all([getOverview(), getRevengeSummary()]);
       const candidates = Array.isArray(overview.revengeCandidates) ? overview.revengeCandidates : [];
@@ -98,7 +103,7 @@ Page(withAppearance({
           const mistake = await getRemediation(String(candidate.mistakeId || candidate.id || ''));
           this.setData({ loading: false, empty: false, stats: summary.stats || {}, queueCount: candidates.length - skipped,
             stage: 'remediation', candidate, mistake, question: normalizeQuestion(mistake.questionSnapshot || {}),
-            previousAnswer: (mistake.selectedAnswers || []).join('、') || previousAnswer(candidate), feedback: '继续上次未完成的纠错。' });
+            selectedPairs:mistake.selectedPairs||{}, previousAnswer: previousAnswer(mistake) || previousAnswer(candidate), feedback: '继续上次未完成的纠错。' });
           return;
         }
         this.setData({
@@ -125,6 +130,7 @@ Page(withAppearance({
 
   onAnswerChange(event: any) {
     if (this.data.busy || this.syncCoordinator.pendingCount()) return;
+    if(this.data.question.type==='matching'){const pairs=normalizePairs(this.data.question,event.detail.selectedPairs);if(pairs)this.setData({selectedPairs:pairs,matchingComplete:!!normalizePairs(this.data.question,pairs,true)});return;}
     const selectedIds = toggleAnswer(
       this.data.selectedIds,
       String(event.detail.optionId || ''),
@@ -134,7 +140,7 @@ Page(withAppearance({
   },
 
   async submitOriginal() {
-    if (this.data.busy || !this.data.selectedIds.length) return;
+    if (this.data.busy || (this.data.question.type==='matching'?!this.data.matchingComplete:!this.data.selectedIds.length)) return;
     const mistakeId = String(this.data.candidate.mistakeId || this.data.candidate.id || '');
     this.setData({ busy: true, writeError: '' });
     try {
@@ -142,7 +148,7 @@ Page(withAppearance({
         sessionId: mistakeId,
         key: `revenge:${mistakeId}:${this.data.candidate.updatedAt || this.data.candidate.revengeAttemptCount || 0}`,
         action: 'revenge-answer',
-        payload: answerPayload(this.data.question, this.data.selectedIds),
+        payload: answerPayload(this.data.question, this.data.selectedIds,this.data.selectedPairs),
       });
       if (mistake.status !== 'needs_remediation') {
         await showDialog({
@@ -158,7 +164,7 @@ Page(withAppearance({
         busy: false,
         stage: 'remediation',
         mistake,
-        previousAnswer: this.data.selectedIds.join('、'),
+        previousAnswer:this.data.question.type==='matching'?pairLabel(this.data.question,this.data.selectedPairs):this.data.selectedIds.join('、'),
         question: normalizeQuestion(mistake.questionSnapshot || this.data.candidate.questionSnapshot || {}),
         feedback: '这次仍然答错了，先完成纠错。',
       });
@@ -189,7 +195,7 @@ Page(withAppearance({
       this.setData({
         busy: false,
         stage: 'verification',
-        selectedIds: [],
+        selectedIds: [],selectedPairs:{},matchingComplete:false,
         question: normalizeQuestion(verification.question),
         feedback: '换一道同知识点题，确认自己是真正理解了。',
       });
@@ -199,7 +205,7 @@ Page(withAppearance({
   },
 
   async submitVerificationAnswer() {
-    if (this.data.busy || !this.data.selectedIds.length) return;
+    if (this.data.busy || (this.data.question.type==='matching'?!this.data.matchingComplete:!this.data.selectedIds.length)) return;
     const mistakeId = String(this.data.candidate.mistakeId || this.data.candidate.id || '');
     this.setData({ busy: true, writeError: '' });
     try {
@@ -207,7 +213,7 @@ Page(withAppearance({
         sessionId: mistakeId,
         key: `verification:${mistakeId}:${this.data.question.id}:${this.data.mistake.verificationAttemptCount || 0}`,
         action: 'verification',
-        payload: { questionId: this.data.question.id, ...answerPayload(this.data.question, this.data.selectedIds) },
+        payload: { questionId: this.data.question.id, ...answerPayload(this.data.question, this.data.selectedIds,this.data.selectedPairs) },
       });
       this.showVerificationResult(result);
     } catch (error) {

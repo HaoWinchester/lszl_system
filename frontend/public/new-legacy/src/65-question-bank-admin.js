@@ -43,7 +43,7 @@
     const bankList=TeacherDomains.QuestionBank?.BankListController?.create?.({getBanks:()=>state.banks,pageSize:BANK_PAGE_SIZE})||null;
     const questionList=TeacherDomains.QuestionBank?.QuestionListController?.create?.({getQuestions:()=>currentBank()?.questions||[],pageSize:QUESTION_PAGE_SIZE,lifecycleMatch:(question,filter)=>questionMatchesLifecycle(question,filter),searchText:questionSearchText})||null;
     const paperList=TeacherDomains.PaperManagement?.PaperListController?.create?.({getPapers:()=>state.papers,pageSize:PAPER_LIST_PAGE_SIZE,categoryName:paperCategoryName})||null;
-    const paperPicker=TeacherDomains.PaperManagement?.PaperQuestionPicker?.create?.()||null;
+    const paperPicker=TeacherDomains.PaperManagement?.PaperQuestionPicker?.create?.({lookup:paperQuestionLookup,groupMembers:(id,bankId)=>paperCandidates(currentPaper()?.subject||'PMP').filter(row=>row.bank.id===bankId&&(row.question.caseGroup||row.question.metadata?.caseGroup)?.id===id).sort((a,b)=>(a.question.caseGroup||a.question.metadata.caseGroup).order-(b.question.caseGroup||b.question.metadata.caseGroup).order).map(row=>({bankId:row.bank.id,questionId:row.question.id,score:1}))})||null;
     const training=TeacherDomains.TrainingConfig?.TrainingConfigService?.create?.({batch,transaction,audit})||null;
     const questionPreview=TeacherDomains.QuestionBank?.QuestionPreview||null;
     const paperPreview=TeacherDomains.PaperManagement?.PaperPreview||null;
@@ -567,18 +567,18 @@
     if(Difficulty.migrateQuestion)question=Difficulty.migrateQuestion(question);
     const stemParts = Array.isArray(question.stemParts) ? question.stemParts : [{text:String(question.stem || '')}];
     const type=String(question.type || 'single_choice');
-    const correct = type==='multiple_choice' ? '' : String(question.correctAnswer || '');
+    const correct = ['matching','multiple_choice'].includes(type) ? '' : String(question.correctAnswer || '');
     const options = Array.isArray(question.options) ? question.options.map((o,i) => normalizeOption(o,i,correct)) : [];
     const detectedCorrect = options.find(o => o.correct);
     const correctOptionIds=type==='multiple_choice'
       ? (AnswerSet.correctIds?.({...question,options}) || options.filter(option=>option.correct).map(option=>option.id))
       : [];
-    const correctAnswer = type==='multiple_choice' ? '' : String(question.correctAnswer || detectedCorrect?.id || options[0]?.id || '');
+    const correctAnswer = ['matching','multiple_choice'].includes(type) ? '' : String(question.correctAnswer || detectedCorrect?.id || options[0]?.id || '');
     options.forEach(o => { o.correct = type==='multiple_choice' ? correctOptionIds.includes(o.id) : (o.id === correctAnswer || o.correct && !correctAnswer); });
     const metadataSource={...(question.metadata&&typeof question.metadata==='object'?question.metadata:{}),principleIds:[...new Set([...(Array.isArray(question.principleIds)?question.principleIds:[]),...(Array.isArray(question.metadata?.principleIds)?question.metadata.principleIds:[])].map(String).filter(Boolean))]};
     const principleBindings=PrincipleBinding.normalize?.(metadataSource,options.map(option=>option.id))||{stemPrincipleIds:metadataSource.principleIds||[],optionPrincipleMap:metadataSource.optionPrincipleMap||{},principleIds:metadataSource.principleIds||[]};
     return {
-      ...question,
+      ...question,...Object.fromEntries(['images','material','matching','caseGroup'].filter(key=>question[key]!=null||question.metadata?.[key]!=null).map(key=>[key,question[key]??question.metadata[key]])),
       id:String(question.id || ('q-' + Date.now().toString(36) + '-' + index)),
       teacherNumber:String(question.teacherNumber || question.displayNumber || ''),
       title:String(question.title || '未命名题目'),
@@ -655,6 +655,7 @@
     return {quotas,errors};
   }
 
+  function paperAccepts(type,question){return TeacherDomains.PaperManagement.PaperQuestionPicker.accepts(type,question);}
   function normalizePaper(paper, index=0){
     paper = paper && typeof paper === 'object' ? paper : {};
     const subject = String(paper.subject || 'PMP');
@@ -692,7 +693,7 @@
       id:String(paper.id || ('paper-' + Date.now().toString(36) + '-' + index)),
       name:String(paper.name || subject + ' 综合训练试卷'),
       subject,
-      paperType:String(paper.paperType||paper.paper_type||'standard')==='multiple_choice'?'multiple_choice':'standard',
+      paperType:['standard','multiple_choice','mixed'].includes(paper.paperType||paper.paper_type)?(paper.paperType||paper.paper_type):'standard',
       description:String(paper.description || ''),
       accessPolicy:{accessLevel},
       totalCount:Number(paper.totalCount || paper.targetCount || 180),
@@ -946,8 +947,8 @@
   function supplementPaperDraft(value,candidateRows=paperCandidates(value?.subject),random=Math.random){
     if(typeof PaperQuotaService.supplement!=='function')throw new Error('试卷配额服务未加载，请刷新页面后重试。');
     const paper=normalizePaper(value),mode=paper.supplementMode==='principle'?'principle':'domain';
-    const wantedType=paper.paperType==='multiple_choice'?'multiple_choice':'standard';
-    const rows=(Array.isArray(candidateRows)?candidateRows:[]).filter(row=>wantedType==='multiple_choice'?row?.question?.type==='multiple_choice':row?.question?.type!=='multiple_choice'),candidateById=new Map();
+    const wantedType=paper.paperType||'standard';
+    const rows=(Array.isArray(candidateRows)?candidateRows:[]).filter(row=>paperAccepts(wantedType,row?.question)),candidateById=new Map();
     const candidates=rows.map(row=>{const candidate=paperQuotaCandidate(row);candidateById.set(candidate.id,row);return candidate});
     const response=PaperQuotaService.supplement({
       paperQuestionIds:(paper.questions||[]).map(paperRefKey),
@@ -1838,7 +1839,7 @@
       question.type=String(event.currentTarget.value||'single_choice');
       if(question.type==='multiple_choice'&&previous!=='multiple_choice')question.correctOptionIds=question.correctAnswer?[question.correctAnswer]:[];
       if(question.type!=='multiple_choice'&&previous==='multiple_choice')question.correctAnswer=question.correctOptionIds?.[0]||question.options?.[0]?.id||'';
-      renderOptions();
+      renderOptions();window.KGQuestionRichEditor?.setType(question.type);
     });
     $('qbAddSelectedKeywordBtn').addEventListener('click', addSelectedKeyword);
     $('qbAddClueBtn').addEventListener('click', addClue);
@@ -2231,7 +2232,7 @@
   function questionTypeLabel(type){
     return ({
       single_choice:'单选题',
-      multiple_choice:'多选题',
+      multiple_choice:'多选题',matching:'匹配题',
       scenario:'情景题',
       case_analysis:'案例分析题'
     })[type] || type || '未设置题型';
@@ -2509,6 +2510,8 @@
   }
   function fillQuestionForm(){
     const q = currentQuestion();
+    let richHost=$('questionRichEditor');if(!richHost&&$('qbOptionsEditor')){richHost=document.createElement('div');richHost.id='questionRichEditor';$('qbOptionsEditor').before(richHost);}
+    if(richHost)window.KGQuestionRichEditor?.mount(richHost,q,{onCreateChildren:createCaseChildren});
     const disabled = !q;
     ['questionTitleInput','questionTitleEnInput','questionTypeInput','questionDifficultyInput','questionDomainInput','questionTopicInput','questionTagsInput','questionPrincipleIdsInput','questionStemInput','questionStemEnInput','questionAnalysisInput','questionAnalysisEnInput'].forEach(id => {
       const el = $(id);
@@ -2573,6 +2576,8 @@
     const wrap = $('qbOptionsEditor');
     if(!q || !wrap) return;
     const bindings=PrincipleBinding.normalize?.(q.metadata||{},(q.options||[]).map(option=>option.id))||q.metadata||{};
+    wrap.hidden=q.type==='matching';if($('qbAddOptionBtn'))$('qbAddOptionBtn').hidden=q.type==='matching';
+    if(q.type==='matching'){wrap.innerHTML='';return;}
     const multiple=q.type==='multiple_choice';
     const correctIds=new Set(multiple?(q.correctOptionIds||[]):[q.correctAnswer]);
     wrap.innerHTML = (q.options || []).map((o, i) => `
@@ -2983,6 +2988,7 @@
     const preview=teacherDomainServices().questionPreview?.viewModel?.(question)||null;
     const stem=String(preview?.stem??stemText(question)).trim(),optionsList=preview?.options||(question.options||[]),correct=String(question.correctAnswer||optionsList.find(option=>option.correct)?.id||''),analysis=String(preview?.analysis??question.analysis??'').trim();
     $('qbLibraryQuestionPreviewContent').innerHTML=`<section class="qb-library-preview-block"><h3>题干</h3><div class="qb-library-preview-stem">${stem?escapeHTML(stem):'<span class="qb-library-preview-empty">暂无题干</span>'}</div></section>${optionsList.length?`<section class="qb-library-preview-block"><h3>选项</h3><div class="qb-library-preview-options">${optionsList.map(option=>`<div class="qb-library-preview-option ${option.correct?'correct':''}"><b>${escapeHTML(option.id)}</b><span>${escapeHTML(option.text||'')}</span></div>`).join('')}</div></section>`:''}<section class="qb-library-preview-block"><h3>正确答案</h3><div class="qb-library-preview-answer">${correct?escapeHTML(correct):'<span class="qb-library-preview-empty">未设置</span>'}</div></section><section class="qb-library-preview-block"><h3>解析</h3><div class="qb-library-preview-analysis">${analysis?escapeHTML(analysis):'<span class="qb-library-preview-empty">暂无解析</span>'}</div></section>`;
+    const mixedMarkup=window.KGQuestionMaterials?.render(question,{selectedPairs:question.matching?.correctPairs,readOnly:true,reveal:true})||'';$('qbLibraryQuestionPreviewContent').insertAdjacentHTML('afterbegin',mixedMarkup);window.KGQuestionMaterials?.bindMedia($('qbLibraryQuestionPreviewContent'));
     const editBtn=$('qbLibraryQuestionPreviewEditBtn');if(editBtn)editBtn.hidden=isQuestionDeleted(question);popover.hidden=false;markLibraryQuestionPreviewAnchor();requestAnimationFrame(positionLibraryQuestionPreview);
   }
   function closeLibraryQuestionPreview(){if(state.libraryPreviewClickTimer){clearTimeout(state.libraryPreviewClickTimer);state.libraryPreviewClickTimer=0}const popover=$('qbLibraryQuestionPreviewPopover');if(popover)popover.hidden=true;document.querySelectorAll('[data-library-question-preview].library-preview-active').forEach(row=>row.classList.remove('library-preview-active'));state.libraryPreviewAnchor=null;state.libraryPreviewRef=null}
@@ -3073,7 +3079,7 @@
     window.addEventListener('resize',applyPaperPaneRatio,{passive:true});setPaperWorkspaceMode('split');
   }
   function questionTypeLabel(type){
-    return ({single_choice:'单选题',multiple_choice:'多选题',true_false:'判断题',short_answer:'简答题'}[String(type||'')]||String(type||'题目'));
+    return ({single_choice:'单选题',multiple_choice:'多选题',matching:'匹配题',true_false:'判断题',short_answer:'简答题'}[String(type||'')]||String(type||'题目'));
   }
   function isPaperQuestionPreviewOpen(){
     const popover=$('qbQuestionPreviewPopover');return !!(popover&&!popover.hidden);
@@ -3126,6 +3132,7 @@
     const preview=teacherDomainServices().questionPreview?.viewModel?.(question)||null;
     const stem=String(preview?.stem??stemText(question)).trim(),optionsList=preview?.options||(question.options||[]),correct=String(question.correctAnswer||optionsList.find(option=>option.correct)?.id||''),analysis=String(preview?.analysis??question.analysis??'').trim();
     $('qbQuestionPreviewContent').innerHTML=`<section class="pm-preview-block"><h3>题干</h3><div class="pm-preview-stem">${stem?escapeHTML(stem):'<span class="pm-preview-empty">暂无题干</span>'}</div></section>${optionsList.length?`<section class="pm-preview-block"><h3>选项</h3><div class="pm-preview-options">${optionsList.map(option=>`<div class="pm-preview-option ${option.correct?'correct':''}"><b>${escapeHTML(option.id)}</b><span>${escapeHTML(option.text||'')}</span></div>`).join('')}</div></section>`:''}<section class="pm-preview-block"><h3>正确答案</h3><div class="pm-preview-answer">${correct?escapeHTML(correct):'<span class="pm-preview-empty">未设置</span>'}</div></section><section class="pm-preview-block"><h3>解析</h3><div class="pm-preview-analysis">${analysis?escapeHTML(analysis):'<span class="pm-preview-empty">暂无解析</span>'}</div></section>`;
+    $('qbQuestionPreviewContent').insertAdjacentHTML('afterbegin',window.KGQuestionMaterials?.render(question,{selectedPairs:question.matching?.correctPairs,readOnly:true,reveal:true})||'');window.KGQuestionMaterials?.bindMedia($('qbQuestionPreviewContent'));
     popover.hidden=false;markPaperPreviewAnchor();requestAnimationFrame(positionPaperQuestionPreview);
   }
   function closePaperQuestionPreview(){
@@ -3312,7 +3319,7 @@
     if(quotaDraft.errors.length){toast(quotaDraft.errors[0]);return null}
     paper.name = $('paperNameInput')?.value.trim() || paper.name || '未命名试卷';
     paper.subject = $('paperSubjectInput')?.value || paper.subject || 'PMP';
-    paper.paperType = $('paperTypeInput')?.value==='multiple_choice'?'multiple_choice':'standard';
+    paper.paperType = $('paperTypeInput')?.value||'mixed';
     paper.totalCount = Math.max(1, Number($('paperTotalInput')?.value || paper.totalCount || 180));
     paper.categoryId = $('paperCategoryInput')?.value || '';
     paper.description = $('paperDescriptionInput')?.value.trim() || '';
@@ -3343,7 +3350,7 @@
       id:safeId('paper'),
       name:`${meta.name} 综合训练试卷`,
       subject,
-      paperType:'standard',
+      paperType:'mixed',
       description:`从 ${meta.label} 多个题库/知识领域中抽题组成综合训练。`,
       accessPolicy:{accessLevel:'free'},
       totalCount:180,
@@ -3427,13 +3434,13 @@
 只移除试卷引用，不会删除题库原题。`))return;
     const draft=clone(paper),response=teacherDomainServices().paperPicker?.remove?.(draft,[...keys]);if(!response?.ok)return toast(response?.errors?.[0]||'移除题目失败。');const remainingIds=new Set((draft.questions||[]).map(ref=>String(ref.questionId||'')));draft.manualQuestionIds=(draft.manualQuestionIds||[]).filter(id=>remainingIds.has(String(id)));const saved=await persistPaperQuestions(draft,{silent:true});if(!saved)return;state.paperQuotaFeedback=null;state.selectedPaperQuestionKeys=new Set();renderPaperManager();toast(`已从试卷移除 ${response.value.removed} 道题。`);return response;
   }
-  async function movePaperQuestion(index,direction){const paper=currentPaper(),target=index+direction;if(!paper||index<0||target<0||target>=paper.questions.length)return;const draft=clone(paper);[draft.questions[index],draft.questions[target]]=[draft.questions[target],draft.questions[index]];draft.questions.forEach((ref,i)=>{ref.order=i+1});if(await persistPaperQuestions(draft,{silent:true}))renderPaperQuestionList()}
+  async function movePaperQuestion(index,direction){const paper=currentPaper(),target=index+direction;if(!paper||index<0||target<0||target>=paper.questions.length)return;const draft=clone(paper);const moved=teacherDomainServices().paperPicker.moveGroup(draft,paperRefKey(draft.questions[index]),direction);if(!moved.ok)return;if(await persistPaperQuestions(draft,{silent:true}))renderPaperQuestionList()}
 
   function renderFullCatalogPaperCandidates(){
     const wrap=$('qbPaperCandidateList');if(!wrap)return;const paper=currentPaper(),subject=$('paperSubjectInput')?.value||paper?.subject||'PMP',bankFilter=$('qbPaperCandidateBankFilter'),banks=state.banks.filter(bank=>bank.subject===subject);
     if(bankFilter){bankFilter.innerHTML='<option value="ALL">全部题库</option>'+banks.map(bank=>`<option value="${escapeHTML(bank.id)}">${escapeHTML(bank.name)}</option>`).join('');if(!banks.some(bank=>bank.id===state.paperCandidateBankId))state.paperCandidateBankId='ALL';bankFilter.value=state.paperCandidateBankId}
     if(!paper){wrap.innerHTML='<div class="qb-empty">请先新建或选择试卷。</div>';return}
-    const keyword=String(state.paperCandidateSearch||'').toLowerCase(),existing=new Set((paper.questions||[]).map(paperRefKey)),wantedType=paper.paperType==='multiple_choice'?'multiple_choice':'standard',rows=paperCandidates(subject).filter(row=>wantedType==='multiple_choice'?row.question.type==='multiple_choice':row.question.type!=='multiple_choice').filter(row=>state.paperCandidateBankId==='ALL'||row.bank.id===state.paperCandidateBankId).filter(row=>!keyword||[row.question.title,stemText(row.question),row.question.domain,row.question.topic,row.question.difficulty,...(row.question.tags||[])].join(' ').toLowerCase().includes(keyword));
+    const keyword=String(state.paperCandidateSearch||'').toLowerCase(),existing=new Set((paper.questions||[]).map(paperRefKey)),wantedType=paper.paperType||'standard',rows=paperCandidates(subject).filter(row=>paperAccepts(wantedType,row.question)).filter(row=>state.paperCandidateBankId==='ALL'||row.bank.id===state.paperCandidateBankId).filter(row=>!keyword||[row.question.title,stemText(row.question),row.question.domain,row.question.topic,row.question.difficulty,...(row.question.tags||[])].join(' ').toLowerCase().includes(keyword));
     const pages=Math.max(1,Math.ceil(rows.length/PAPER_CANDIDATE_PAGE_SIZE));state.paperCandidatePage=Math.min(Math.max(1,state.paperCandidatePage),pages);const start=(state.paperCandidatePage-1)*PAPER_CANDIDATE_PAGE_SIZE,pageRows=rows.slice(start,start+PAPER_CANDIDATE_PAGE_SIZE);state.currentPaperCandidateKeys=pageRows.map(row=>paperRefKey({bankId:row.bank.id,questionId:row.question.id}));
     const selectAll=$('qbSelectPaperCandidatesPage');if(selectAll){selectAll.checked=pageRows.length>0&&pageRows.every(row=>state.selectedPaperCandidateKeys.has(paperRefKey({bankId:row.bank.id,questionId:row.question.id})));selectAll.indeterminate=pageRows.some(row=>state.selectedPaperCandidateKeys.has(paperRefKey({bankId:row.bank.id,questionId:row.question.id})))&&!selectAll.checked}
     const count=$('qbPaperCandidateSelectionCount');if(count)count.textContent=`已选择 ${state.selectedPaperCandidateKeys.size} 道题`;
@@ -3456,7 +3463,7 @@
     const search=$('qbPaperCandidateSearch');if(search&&search.value!==state.paperCandidateSearch)search.value=state.paperCandidateSearch;
     if(!paper){wrap.innerHTML='<div class="qb-empty">请先新建或选择试卷。</div>';return}
     if(!state.paperCandidateBankId){wrap.innerHTML='<div class="qb-empty">当前科目暂无题库，请先导入题库数据包。</div>';return}
-    const wantedType=paper.paperType==='multiple_choice'?'multiple_choice':'standard',rows=state.paperCandidateRows.filter(row=>row.bank?.id===state.paperCandidateBankId&&!isQuestionDeleted(row.question)).filter(row=>wantedType==='multiple_choice'?row.question.type==='multiple_choice':row.question.type!=='multiple_choice'),existing=new Set((paper.questions||[]).map(paperRefKey));
+    const wantedType=paper.paperType||'standard',rows=state.paperCandidateRows.filter(row=>row.bank?.id===state.paperCandidateBankId&&!isQuestionDeleted(row.question)).filter(row=>paperAccepts(wantedType,row.question)),existing=new Set((paper.questions||[]).map(paperRefKey));
     const total=state.paperCandidateTotal,pages=Math.max(1,Math.ceil(total/PAPER_CANDIDATE_PAGE_SIZE)),start=(state.paperCandidatePage-1)*PAPER_CANDIDATE_PAGE_SIZE,pageRows=rows;state.currentPaperCandidateKeys=pageRows.map(row=>paperRefKey({bankId:row.bank.id,questionId:row.question.id}));
     const selectAll=$('qbSelectPaperCandidatesPage');if(selectAll){selectAll.checked=pageRows.length>0&&pageRows.every(row=>state.selectedPaperCandidateKeys.has(paperRefKey({bankId:row.bank.id,questionId:row.question.id})));selectAll.indeterminate=pageRows.some(row=>state.selectedPaperCandidateKeys.has(paperRefKey({bankId:row.bank.id,questionId:row.question.id})))&&!selectAll.checked;selectAll.disabled=state.paperCandidateLoading||!pageRows.length}
     const count=$('qbPaperCandidateSelectionCount');if(count)count.textContent=`已选择 ${state.selectedPaperCandidateKeys.size} 道题`;
@@ -3471,7 +3478,7 @@
   }
   function toggleSelectPaperCandidatePage(event){const checked=!!event.currentTarget.checked;state.selectedPaperCandidateKeys=checked?new Set(state.currentPaperCandidateKeys.filter(key=>{const paper=currentPaper();return !(paper?.questions||[]).some(ref=>paperRefKey(ref)===key)})):new Set();renderPaperCandidateList()}
   async function addSelectedCandidatesToPaper(){
-    const paper=currentPaper();if(!paper)return toast('请先新建试卷。');const selected=state.selectedPaperCandidateKeys;if(!selected.size)return toast('请先选择当前页题目。');const refs=[...selected].map(key=>{const [bankId,questionId]=key.split('::');return {bankId,questionId,score:1}}).filter(ref=>ref.bankId&&ref.questionId),draft=clone(paper);const response=teacherDomainServices().paperPicker?.add?.(draft,refs);if(!response?.ok)return toast(response?.errors?.[0]||'加入题目失败。');draft.manualQuestionIds=[...new Set([...(draft.manualQuestionIds||[]),...response.value.added.map(ref=>String(ref.questionId||'')).filter(Boolean)])];draft.totalCount=Math.max(Number(draft.totalCount||0),draft.questions.length);const saved=await persistPaperQuestions(draft,{silent:true});if(!saved)return;state.paperQuotaFeedback=null;state.selectedPaperCandidateKeys=new Set();renderPaperManager();toast(`已加入 ${response.value.added.length} 道题${response.value.duplicates.length?`，跳过 ${response.value.duplicates.length} 道重复题`:''}。`);return response;
+    const paper=currentPaper();if(!paper)return toast('请先新建试卷。');const selected=state.selectedPaperCandidateKeys;if(!selected.size)return toast('请先选择当前页题目。');await loadPaperQuotaCandidates(paper.subject);const refs=[...selected].map(key=>{const [bankId,questionId]=key.split('::');return {bankId,questionId,score:1}}).filter(ref=>ref.bankId&&ref.questionId),draft=clone(paper);const response=teacherDomainServices().paperPicker?.add?.(draft,refs);if(!response?.ok)return toast(response?.errors?.[0]||'加入题目失败。');draft.manualQuestionIds=[...new Set([...(draft.manualQuestionIds||[]),...response.value.added.map(ref=>String(ref.questionId||'')).filter(Boolean)])];draft.totalCount=Math.max(Number(draft.totalCount||0),draft.questions.length);const saved=await persistPaperQuestions(draft,{silent:true});if(!saved)return;state.paperQuotaFeedback=null;state.selectedPaperCandidateKeys=new Set();renderPaperManager();toast(`已加入 ${response.value.added.length} 道题${response.value.duplicates.length?`，跳过 ${response.value.duplicates.length} 道重复题`:''}。`);return response;
   }
 
   async function autoDistributeQuota(){
@@ -3479,8 +3486,8 @@
     if(!paper){paper=await addPaper();}
     paper=readPaperFormInto(clone(paper));if(!paper)return;
     try{await loadPaperQuotaCandidates(paper.subject)}catch(error){return toast(`题库题目加载失败：${error.message||error}`)}
-    const mode=paper.supplementMode==='principle'?'principle':'domain',wantedType=paper.paperType==='multiple_choice'?'multiple_choice':'standard';
-    const candidates=paperCandidates(paper.subject).filter(row=>wantedType==='multiple_choice'?row.question.type==='multiple_choice':row.question.type!=='multiple_choice');
+    const mode=paper.supplementMode==='principle'?'principle':'domain',wantedType=paper.paperType||'standard';
+    const candidates=paperCandidates(paper.subject).filter(row=>paperAccepts(wantedType,row.question));
     const stats=(mode==='principle'?paperPrincipleStats(paper.subject,candidates).map(item=>({bucketId:item.id,count:item.count})):paperDomainStats(paper.subject,candidates).map(item=>({bucketId:item.domain,count:item.count}))).filter(item => item.count > 0);
     if(!stats.length) return toast('该科目暂无可组卷题目。');
     const total = Math.min(paper.totalCount || 180, stats.reduce((sum,item) => sum + item.count, 0));
@@ -3563,8 +3570,8 @@
     const paper = clone(currentPaper());
     if(!paper) return;
     const removed=paper.questions[index];
-    paper.questions.splice(index, 1);
-    if(removed)paper.manualQuestionIds=(paper.manualQuestionIds||[]).filter(id=>String(id)!==String(removed.questionId||''));
+    teacherDomainServices().paperPicker.remove(paper,[paperRefKey(removed)]);
+    const remainingIds=new Set(paper.questions.map(ref=>String(ref.questionId)));paper.manualQuestionIds=(paper.manualQuestionIds||[]).filter(id=>remainingIds.has(String(id)));
     state.paperQuotaFeedback=null;
     if(removed){state.selectedPaperQuestionKeys.delete(paperRefKey(removed));if(paperPreviewKey()===paperRefKey(removed))closePaperQuestionPreview()}
     paper.questions.forEach((ref, i) => { ref.order = i + 1; });
@@ -3762,13 +3769,14 @@
     writeQuestionPrincipleBindings(principleBindings,draft.options.map(option=>option.id));
     draft.metadata={...(draft.metadata||{}),...principleBindings,translationStatus:hasEnglish?'bilingual':'zh_only'};
     if(options.includePendingSubforms)applyPendingCognitiveSubforms(draft,options.pendingSubforms||{});
-    return {draft,rawStem,reasoningSteps};
+    return {draft:window.KGQuestionRichEditor?.collect(draft)||draft,rawStem,reasoningSteps};
   }
   async function saveQuestionForm(options={}){
     const bank = currentBank();
     const q = currentQuestion();
     if(!bank || !q) return false;
     if(state.serverCatalogNewerRevision&&!options.allowServerMerge){if(!options.silent)toast('服务器有新版本，请先选择重新载入或合并。');return false}
+    try{await window.KGQuestionRichEditor?.flush(q);}catch(error){if(!options.silent)alert(error.message);return false;}
     const collected=collectQuestionDraftFromDom(q,bank);
     if(!collected)return false;
     const {draft,rawStem,reasoningSteps}=collected;
@@ -3777,11 +3785,12 @@
     const published=!!draft.status?.published;
     const trainingResponse=teacherDomainServices().training?.update?.(draft,{clues:draft.clues||[],concepts:draft.concepts||[],reasoningSteps,metadata:draft.metadata});
     if(trainingResponse?.ok===false)return false;
-    const hasAnswer=draft.type==='multiple_choice'?draft.correctOptionIds.length>=2:!!draft.correctAnswer;
-    draft.status={...(draft.status||{}),contentReady:!!(rawStem.trim()&&draft.options.length>=2&&hasAnswer),published};
+    const hasAnswer=draft.type==='matching'?!!AnswerSet.pairs(draft,draft.matching?.correctPairs,true):draft.type==='multiple_choice'?draft.correctOptionIds.length>=2:!!draft.correctAnswer;
+    draft.status={...(draft.status||{}),contentReady:!!(rawStem.trim()&&(draft.type==='matching'||draft.options.length>=2)&&hasAnswer),published};
     const previousBanks=clone(state.banks);
     try{
       const saved=await CatalogEditor.save({...draft,id:q.id,bankId:bank.id,revision:q.revision,creatorId:q.creatorId},{bankId:bank.id,baseRevision:q.revision,creatorId:q.creatorId});
+      if(draft.materialEdit)await Catalog.reload({includeQuestions:true});
       reloadBanksFromCatalog(bank.id,saved?.id||q.id);
       if(!options.silent){
       const track=(globalThis.KGFeatureAnalytics&&globalThis.KGFeatureAnalytics.track)||function(){};
@@ -3976,6 +3985,14 @@
       toast('已创建题库。');
       return created;
     }catch(error){alert('题库创建失败：'+(error.message||error));return null}
+  }
+  async function createCaseChildren(){
+    if(!await saveQuestionForm({silent:true}))throw new Error('请先补全并保存当前小题。');
+    const bank=currentBank(),q=currentQuestion(),group=q.caseGroup;if(!group)throw new Error('请先关联案例材料。');
+    const existing=new Set(bank.questions.filter(item=>item.caseGroup?.id===group.id).map(item=>item.caseGroup.order));
+    try{for(let order=1;order<=group.total;order++){if(existing.has(order))continue;const child=emptyQuestion(bank.subject);child.title=q.material.title+' · 小题 '+order;child.material=clone(q.material);child.caseGroup={...group,order};child.status={...child.status,contentReady:false};await Catalog.saveQuestion(child,{bankId:bank.id});}
+      reloadBanksFromCatalog(bank.id,q.id);render();toast('案例小题已补齐，请逐题填写题干、答案和解析。');
+    }catch(error){reloadBanksFromCatalog(bank.id,q.id);throw error;}
   }
   async function addQuestion(){
     const bank = currentBank();
@@ -4680,7 +4697,7 @@
   function canonicalQuestionDuplicateSignature(question={}){
     const primaryStem=stemText(question)||englishStemText(question);
     const options=(question.options||[]).map(option=>[canonicalDuplicateText(option?.id),canonicalDuplicateText(option?.text)]);
-    return JSON.stringify({stem:canonicalDuplicateText(primaryStem),options,correctAnswer:canonicalDuplicateText(question.correctAnswer)});
+    return JSON.stringify({stem:canonicalDuplicateText(primaryStem),options,correctAnswer:canonicalDuplicateText(question.correctAnswer),...AnswerSet.contentExtension(question)});
   }
   function preflightQuestionDuplicates(incoming,existing=[]){
     const known=new Set((existing||[]).map(canonicalQuestionDuplicateSignature).filter(Boolean)),batch=new Set(),unique=[],duplicates=[];

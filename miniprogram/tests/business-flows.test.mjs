@@ -6,7 +6,7 @@ import { mergeDraft, moveQuestion, toggleAnswer, toggleMarked } from '../domain/
 import { getModePolicy, MODE_POLICIES, formatTimer } from '../domain/mode-policy.ts';
 import { createSyncCoordinator, classifyFailure } from '../domain/sync-coordinator.ts';
 import { pageRefreshMode, invalidateLearningPages } from '../domain/page-freshness.ts';
-import { createPracticeRun } from '../domain/pc-practice.ts';
+import { createPracticeRun, normalizePairs } from '../domain/pc-practice.ts';
 import { subscriptionView } from '../domain/subscription-view.ts';
 
 const session = (mode = 'practice') => ({ id: 's1', mode, status: 'active', revision: 3, paperId: 'p1', releaseId: 'r1',
@@ -37,7 +37,7 @@ test('network failures validating a session propagate instead of logging the use
 
 async function practice(overrides = {}, wxOverrides = {}) {
   const savedDrafts = [];
-  const result = await loadPage('practice', { ApiError: class extends Error {}, createPracticeRun, getModePolicy, formatTimer, mergeDraft, moveQuestion, toggleAnswer, toggleMarked, createSyncCoordinator, classifyFailure,
+  const result = await loadPage('practice', { ApiError: class extends Error {}, createPracticeRun, normalizePairs, getModePolicy, formatTimer, mergeDraft, moveQuestion, toggleAnswer, toggleMarked, createSyncCoordinator, classifyFailure,
     getCurrentUser: () => ({ username: 'u' }), loadLocalDraft: () => undefined,
     saveLocalDraft: draft => savedDrafts.push(draft), clearLocalDraft() {}, messageOf: e => e.message,
     getSession: async () => session(), ...overrides }, wxOverrides);
@@ -333,7 +333,7 @@ test('profile failed summaries preserve values and do not claim synced', async (
 
 test('report includes unanswered questions and reuses the original practice mode', async () => {
   const s = session('challenge'); s.answers.q1 = { selectedAnswerIds: ['B'], correct: false }; s.questions[0].question.correctOptionIds = ['A'];
-  const { page, navigation } = await loadPage('result', { createPracticeRun, getModePolicy, getReport: async () => ({ wrongQuestionIds: ['q1'], counts: { unanswered: 1 }, durationMs: 35000 }),
+  const { page, navigation } = await loadPage('result', { createPracticeRun, normalizePairs, getModePolicy, getReport: async () => ({ wrongQuestionIds: ['q1'], counts: { unanswered: 1 }, durationMs: 35000 }),
     getSession: async () => s, messageOf: e => e.message });
   page.data.sessionId = s.id; await page.loadResult();
   assert.equal(page.data.reviewItems.length, 2); assert.equal(page.data.reviewItems[1].status, '未作答');
@@ -345,7 +345,7 @@ test('report includes unanswered questions and reuses the original practice mode
 
 test('scholar result uses remaining life rather than exam pass percentage', async () => {
   const s = session('scholar'); s.status = 'completed'; s.runtimeState = { health: 0, maxStreak: 4 };
-  const { page } = await loadPage('result', { createPracticeRun, getModePolicy, messageOf: e => e.message,
+  const { page } = await loadPage('result', { createPracticeRun, normalizePairs, getModePolicy, messageOf: e => e.message,
     getSession: async () => s, getReport: async () => ({ passed: true, counts: { total: 2, correct: 1 } }) });
   await page.loadResult(); assert.equal(page.data.gameOutcome, '学霸挑战失败');
   assert.match(page.data.gameDetail, /剩余生命 0 \/ 3/);
@@ -363,4 +363,17 @@ test('revenge waiting for verification is not presented as no mistakes', async (
     getRevengeSummary: async () => ({ stats: { verificationWaiting: 2 } }), getVerificationCandidate: async () => ({ available: false }), messageOf: e => e.message });
   await page.loadQueue(); assert.equal(page.data.empty, true); assert.equal(page.data.waitingCount, 3);
   assert.equal(page.data.emptyTitle, '本轮复习已完成');
+});
+
+test('matching partial pair saves as pending, resumes, and confirms only when complete', async()=>{
+ const s=session();s.questions[0].question={id:'q1',type:'matching',options:[],matching:{left:[{id:'l1',text:'一'},{id:'l2',text:'二'}],right:[{id:'r1',text:'甲'},{id:'r2',text:'乙'}],correctPairs:{l1:'r2',l2:'r1'}}};
+ s.runtimeState={pendingMatches:{q1:{l1:'r2'}}};
+ const {page,savedDrafts}=await practice({getSession:async()=>s});await page.loadSession();
+ assert.deepEqual(page.data.selectedPairs,{l1:'r2'});assert.equal(page.data.matchingComplete,false);assert.equal(page.run.answer('q1'),null);
+ page.onAnswerChange({detail:{selectedPairs:{l1:'r2',l2:'r1'}}});
+ assert.equal(page.data.matchingComplete,true);assert.equal(page.run.answer('q1'),null);
+ assert.deepEqual(savedDrafts.at(-1).runtimeState.pendingMatches.q1,{l1:'r2',l2:'r1'});
+ page.onConfirmMatching();assert.equal(page.run.answer('q1').correct,true);assert.equal(page.data.submitted,true);
+ assert.deepEqual(page.run.submission().q1.selectedPairs,{l1:'r2',l2:'r1'});
+ assert.deepEqual(page.modeRuntimeState().pendingMatches,{});page.stopModeTimer();
 });

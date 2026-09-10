@@ -177,14 +177,14 @@ function canonicalQuestionContent(q){
   return JSON.stringify({
     stem:normalizedContentText(questionStem(q)),
     options:(q.options||[]).slice(0,4).map(o=>({id:String(o.id||''),text:normalizedContentText(o.text)})),
-    correctAnswer:String(q.correctAnswer||'')
+    correctAnswer:String(q.correctAnswer||''),...globalThis.KGQuestionAnswerSet?.contentExtension(q)
   });
 }
 function computeQuestionContentHash(q){return 'sha256:'+sha256Hex(canonicalQuestionContent(q))}
 function canonicalDuplicateText(v){return String(v||'').normalize('NFKC').trim().replace(/\s+/g,' ').toLocaleLowerCase()}
 function canonicalQuestionDuplicateSignature(q={}){
   const primaryStem=questionStem(q)||String(q?.translations?.en?.stemParts?.map(part=>part?.text||'').join('')||'');
-  return JSON.stringify({stem:canonicalDuplicateText(primaryStem),options:(q.options||[]).map(option=>[canonicalDuplicateText(option?.id),canonicalDuplicateText(option?.text)]),correctAnswer:canonicalDuplicateText(q.correctAnswer)});
+  return JSON.stringify({stem:canonicalDuplicateText(primaryStem),options:(q.options||[]).map(option=>[canonicalDuplicateText(option?.id),canonicalDuplicateText(option?.text)]),correctAnswer:canonicalDuplicateText(q.correctAnswer),...globalThis.KGQuestionAnswerSet?.contentExtension(q)});
 }
 function preflightQuestionDuplicates(incoming,existing=[]){
   /* 与已有题内容相同(题干+选项+答案)的导入题不再丢弃,而是覆盖旧题(2026-08 录入需求):
@@ -532,9 +532,9 @@ function normalizeKeywordLevel(clue,q){
 function normalizeQuestion(q,i=0,subject='PMP'){
   q=q&&typeof q==='object'?clone(q):{};
   const options=(Array.isArray(q.options)?q.options:[]).map((o,idx)=>normalizeOption(o,idx,q.correctAnswer));
-  while(options.length<4)options.push(normalizeOption({id:String.fromCharCode(65+options.length),text:''},options.length,q.correctAnswer));
-  const correct=String(q.correctAnswer||options.find(o=>o.correct)?.id||'A');
-  options.forEach(o=>o.correct=o.id===correct);
+  while(q.type!=='matching'&&options.length<4)options.push(normalizeOption({id:String.fromCharCode(65+options.length),text:''},options.length,q.correctAnswer));
+  const correct=['matching','multiple_choice'].includes(q.type)?'':String(q.correctAnswer||options.find(o=>o.correct)?.id||'A');
+  options.forEach(o=>o.correct=q.type==='multiple_choice'?(q.correctOptionIds||[]).includes(o.id):o.id===correct);
   const clues=(Array.isArray(q.clues)?q.clues:[]).map((c,idx)=>{
     const level=normalizeKeywordLevel(c,q);
     const mirror=q?.metadata?.keywordSystemV2?.keywords?.find(x=>String(x.clueId||x.id)===String(c.id||''));

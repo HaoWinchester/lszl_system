@@ -4,7 +4,7 @@
   const RUNTIME_FIELDS = Object.freeze([
     'currentIndex', 'health', 'streak', 'maxStreak', 'experience',
     'remainingMs', 'durationMs', 'languageMode', 'autoExplain',
-    'order', 'showAnswers', 'markedQuestionIds',
+    'order', 'showAnswers', 'markedQuestionIds', 'pendingSelections', 'pendingMatches',
   ])
 
   function clone(value, fallback) {

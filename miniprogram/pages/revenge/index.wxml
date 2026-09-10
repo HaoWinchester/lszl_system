@@ -19,13 +19,13 @@
       <text wx:if="{{feedback}}" class="revenge-copy">{{feedback}}</text>
     </view>
 
-    <question-view wx:if="{{stage !== 'remediation'}}" question="{{question}}" selected-ids="{{selectedIds}}" submitted="{{busy || stage === 'verification-result'}}" show-analysis="{{stage === 'verification-result'}}" compact="{{true}}" bind:change="onAnswerChange" />
-    <remediation-note wx:else mistake="{{mistake}}" question="{{question}}" previous-answer="{{previousAnswer}}" />
+    <question-view question="{{question}}" selected-ids="{{selectedIds}}" selected-pairs="{{selectedPairs}}" submitted="{{busy || stage === 'verification-result' || stage === 'remediation'}}" show-analysis="{{stage === 'verification-result' || stage === 'remediation'}}" compact="{{true}}" bind:change="onAnswerChange" />
+    <remediation-note wx:if="{{stage === 'remediation'}}" mistake="{{mistake}}" question="{{question}}" previous-answer="{{previousAnswer}}" />
 
     <view wx:if="{{writeError}}" class="write-error"><text class="write-error-copy">{{writeError}}</text><button class="write-error-action quiet-button" bindtap="retryWrites">重试同步</button></view>
-    <button wx:if="{{stage === 'answer'}}" class="primary-button stage-action" loading="{{busy}}" disabled="{{busy || !selectedIds.length}}" bindtap="submitOriginal">提交重答</button>
+    <button wx:if="{{stage === 'answer'}}" class="primary-button stage-action" loading="{{busy}}" disabled="{{busy || (question.type === 'matching' ? !matchingComplete : !selectedIds.length)}}" bindtap="submitOriginal">提交重答</button>
     <button wx:elif="{{stage === 'remediation'}}" class="primary-button stage-action" loading="{{busy}}" disabled="{{busy}}" bindtap="confirmRemediation">我已理解，进入验证</button>
-    <button wx:elif="{{stage === 'verification'}}" class="primary-button stage-action" loading="{{busy}}" disabled="{{busy || !selectedIds.length}}" bindtap="submitVerificationAnswer">提交验证</button>
+    <button wx:elif="{{stage === 'verification'}}" class="primary-button stage-action" loading="{{busy}}" disabled="{{busy || (question.type === 'matching' ? !matchingComplete : !selectedIds.length)}}" bindtap="submitVerificationAnswer">提交验证</button>
     <button wx:else class="primary-button stage-action" bindtap="loadQueue">继续复习</button>
   </block>
 </view>

@@ -22,9 +22,16 @@ export interface QuestionOption {
   textEn?: string;
 }
 
+export interface ImageAsset { id: string; url: string; alt: string; }
+export interface CaseMaterial { id: string; revision: number; title: string; text: string; images: ImageAsset[]; }
+export interface MatchingQuestion { left: QuestionOption[]; right: QuestionOption[]; correctPairs: Record<string,string>; }
 export interface PracticeQuestion {
   id: string;
-  type: 'single_choice' | 'multiple_choice';
+  type: 'single_choice' | 'multiple_choice' | 'matching' | 'unknown';
+  matching?: MatchingQuestion;
+  material?: CaseMaterial;
+  caseGroup?: {id:string;order:number;total:number};
+  imageAssets?: ImageAsset[];
   stem: string;
   stemEn?: string;
   stemNodes: unknown[];

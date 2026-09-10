@@ -10,12 +10,12 @@
   ];
   function create(options={}){
     const api=options.api||global.KGPaperDraftApi;
-    let state={mode:'quick',subject:'PMP',paperType:'standard',bankIds:[],filters:{},variants:defaultVariants(),hardWeights:{people:42,process:50,'business-environment':8},softWeights:{governance:1,scope:1,schedule:1,finance:1,stakeholder:1,resource:1,risk:1},randomSeed:'',preflight:null,busy:false,error:'',success:null};
+    let state={mode:'quick',subject:'PMP',paperType:'mixed',bankIds:[],filters:{},variants:defaultVariants(),hardWeights:{people:42,process:50,'business-environment':8},softWeights:{governance:1,scope:1,schedule:1,finance:1,stakeholder:1,resource:1,risk:1},randomSeed:'',preflight:null,busy:false,error:'',success:null};
     let submitPromise=null;
     const emit=()=>{const value=clone(state);options.onChange?.(value);return value};
     const fail=message=>{state={...state,busy:false,error:String(message||'组卷失败。'),success:null};emit();return {ok:false,error:state.error}};
     function setMode(mode){state={...state,mode:mode==='custom'?'custom':'quick',preflight:null,error:''};emit();return clone(state)}
-    function setPaperType(value){state={...state,paperType:value==='multiple_choice'?'multiple_choice':'standard',preflight:null,error:''};emit();return clone(state)}
+    function setPaperType(value){state={...state,paperType:['standard','multiple_choice','mixed'].includes(value)?value:'mixed',preflight:null,error:''};emit();return clone(state)}
     function setBankIds(bankIds){state={...state,bankIds:[...new Set((bankIds||[]).map(String).filter(Boolean))],preflight:null,error:''};emit();return clone(state)}
     function setVariant(code,patch={}){state={...state,variants:state.variants.map(item=>item.code===String(code)?{...item,...clone(patch),code:item.code}:item),preflight:null,error:''};emit();return clone(state)}
     function setHardWeights(weights){state={...state,hardWeights:{...state.hardWeights,...clone(weights)},preflight:null,error:''};emit();return clone(state)}

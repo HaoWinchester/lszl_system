@@ -18,8 +18,9 @@
   <empty-state wx:if="{{navigationError}}" title="页面未打开" body="{{navigationError}}" action-text="重试跳转" bind:action="retryNavigation" />
   <view wx:elif="{{loading}}" class="question-loading"><view class="question-loading-line is-short"></view><view class="question-loading-line"></view><view class="question-loading-line is-block"></view><view class="question-loading-line is-block"></view></view>
   <empty-state wx:elif="{{loadError}}" title="题目没有载入" body="{{loadError}}" action-text="重新加载" bind:action="loadSession" />
-  <question-view wx:else question="{{currentQuestion}}" selected-ids="{{selectedIds}}" submitted="{{submitted || busy || showAnswers || writeError !== ''}}" show-result="{{showResult}}" show-analysis="{{showAnalysis}}" bind:change="onAnswerChange" />
+  <question-view wx:else question="{{currentQuestion}}" selected-ids="{{selectedIds}}" selected-pairs="{{selectedPairs}}" submitted="{{submitted || busy || showAnswers || writeError !== ''}}" show-result="{{showResult}}" show-analysis="{{showAnalysis}}" bind:change="onAnswerChange" />
 
+  <button wx:if="{{!loading && !loadError && currentQuestion.type === 'matching' && !submitted && !showAnswers}}" class="primary-button" disabled="{{busy || !matchingComplete}}" bindtap="onConfirmMatching">确认配对答案</button>
   <view wx:if="{{writeError && !loading && !loadError}}" class="write-error"><text class="write-error-copy">{{writeError}}</text><button class="write-error-action" bindtap="retryWrites">重试同步</button></view>
   <view wx:if="{{!loading && !loadError && !navigationTarget}}" class="answer-actions">
     <button class="sheet-entry {{busy ? 'is-disabled' : ''}}" bindtap="onOpenSheet" disabled="{{busy}}" aria-label="打开答题卡"><ui-icon name="sheet" size="28" /><text>答题卡</text></button>
