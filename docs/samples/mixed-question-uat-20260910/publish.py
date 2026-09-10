@@ -17,10 +17,11 @@ from app.core.config import settings
 from app.db.session import AsyncSessionLocal
 from app.models.question import ExamPaper, Question, QuestionBank
 from app.models.question_material import QuestionMaterial
+from app.models.paper_release import PaperRelease
 from app.models.user import User
 from app.schemas.paper import PaperCreateRequest
 from app.schemas.question_material import AssetInput, MaterialInput
-from app.services import question_service, question_material_service, paper_service
+from app.services import question_service, question_material_service, paper_service, paper_release_service
 
 
 async def main(actor_name):
@@ -76,8 +77,15 @@ async def main(actor_name):
                 description=content['description'], totalCount=5,
                 enabledModes=['practice_mode'], questions=refs))
             paper = await db.get(ExamPaper, created['id'])
-        if not paper.published_release_id:
-            paper = await question_service.set_published(db, actor, paper.id, True, paper.revision)
+        release = await db.get(PaperRelease, paper.published_release_id) if paper.published_release_id else None
+        # This UAT demo must also remain visible after an administrator or teacher logs in.
+        allowed_roles = ['admin', 'teacher', 'student', 'viewer']
+        if release is None or release.status != 'published' or set(release.allowed_roles or []) != set(allowed_roles):
+            await paper_release_service.publish(
+                db, actor, paper.id, expected_revision=paper.revision,
+                access_level='free', enabled_modes=['practice_mode'], allowed_roles=allowed_roles,
+                metadata=deepcopy(release.release_metadata or {}) if release else {})
+            await db.refresh(paper)
         result = await paper_service.get_paper(db, actor, paper.id)
         assert result['questionCount'] == 5, result['questionCount']
         print(json.dumps({
