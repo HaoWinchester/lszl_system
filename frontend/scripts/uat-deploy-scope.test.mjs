@@ -127,3 +127,17 @@ test('the full profile retains backend and cross-domain release gates', () => {
     'visual-regression',
   ]) assert.equal(groups.has(group), true, group)
 })
+
+test('operational Markdown records do not force a practice-only deployment to full validation', () => {
+  assert.equal(classify([
+    'new-legacy/practice-mode.html',
+    'docs/verification/uat.md',
+    'docs/superpowers/specs/practice.md',
+  ]).validationProfile, 'uat-fast')
+  for (const path of ['docs/verification/uat.md', 'docs/verification/check.py', 'docs/功能基线-重构参考.md']) {
+    assert.equal(classify([path]).validationProfile, 'full')
+  }
+  for (const path of ['docs/verification/check.py', 'backend/app/main.py']) {
+    assert.equal(classify(['new-legacy/practice-mode.html', path]).validationProfile, 'full')
+  }
+})

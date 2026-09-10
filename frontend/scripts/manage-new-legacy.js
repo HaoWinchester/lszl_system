@@ -10,6 +10,7 @@ import {
   openSync,
   readlinkSync,
   readFileSync,
+  readSync,
   readdirSync,
   renameSync,
   rmSync,
@@ -21,6 +22,7 @@ import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 
 import { CRITICAL_SITE_FILES } from './new-legacy-release-storage.js'
+import { isOperationalRecord } from '../../deploy/release-input-policy.mjs'
 
 const scriptsDir = dirname(fileURLToPath(import.meta.url))
 const frontendDir = resolve(scriptsDir, '..')
@@ -35,7 +37,6 @@ const uatScopeScript = resolve(repoDir, 'deploy', 'uat-change-scope.mjs')
 const validationScript = process.env.KG_RELEASE_VALIDATION_SCRIPT
   ? resolve(process.env.KG_RELEASE_VALIDATION_SCRIPT)
   : resolve(scriptsDir, 'validate-new-legacy-release.sh')
-const validationMaxBuffer = 64 * 1024 * 1024
 const uatRemote = 'resume-prod'
 const uatRemoteStatePath = '/home/ubuntu/lszl-kg-uat/.deploy-state/git-commit'
 
@@ -185,10 +186,31 @@ function validationContextHash() {
     throw new Error(listed.stderr.trim() || '无法计算 release 验收上下文')
   }
   const hash = createHash('sha256')
-  for (const path of listed.stdout.split('\0').filter(Boolean).sort()) {
+  hash.update(JSON.stringify({ node: process.version, platform: process.platform, arch: process.arch }))
+  for (const [label, executable] of [
+    ['python3', 'python3'],
+    ['backend-python', resolve(repoDir, 'backend/.venv/bin/python')],
+  ]) {
+    const runtime = spawnSync(executable, ['--version'], { cwd: repoDir, encoding: 'utf8' })
+    // An absent virtualenv cannot share evidence with a configured environment.
+    // Other probe failures are ambiguous and must never authorize a cache hit.
+    if (runtime.error?.code === 'ENOENT' && label === 'backend-python') {
+      hash.update(`${label}\0<unavailable>\0`)
+    } else if (runtime.status !== 0 || !(runtime.stdout || runtime.stderr).trim()) {
+      throw new Error(`无法确认 release 验收运行环境：${label}`)
+    } else {
+      hash.update(`${label}\0${(runtime.stdout || runtime.stderr).trim()}\0`)
+    }
+  }
+  for (const path of [...new Set(listed.stdout.split('\0').filter(Boolean))].sort()) {
+    if (isOperationalRecord(path)) continue
     hashFilesystemEntry(hash, path, resolve(repoDir, path))
   }
-  hashFilesystemEntry(hash, validationScript, validationScript)
+  // The validator identity is its contents and permissions, not its checkout.
+  hashFilesystemEntry(hash, '<validation-script>', validationScript)
+  if (existsSync(validationScript) && lstatSync(validationScript).isSymbolicLink()) {
+    hash.update(readFileSync(validationScript))
+  }
   return hash.digest('hex')
 }
 
@@ -339,18 +361,36 @@ function writeValidationReport(root, version, report) {
   return report
 }
 
+function readValidationLogTail(path) {
+  const size = statSync(path).size
+  const buffer = Buffer.alloc(Math.min(size, 160_000))
+  const descriptor = openSync(path, 'r')
+  try {
+    const bytes = readSync(descriptor, buffer, 0, buffer.length, size - buffer.length)
+    return buffer.subarray(0, bytes).toString('utf8').slice(-40_000)
+  } finally {
+    closeSync(descriptor)
+  }
+}
+
 function validateCandidate(activeRoot, candidateRoot, version, skipValidation, validationProfile) {
   const startedAt = new Date().toISOString()
   const release = releaseManifest(candidateRoot, version)
   if (!release) throw new Error(`找不到候选版本：${version}`)
   const validatorHash = skipValidation ? null : validationContextHash()
   let gate
+  let siteHash
   try {
     gate = candidateSiteGate(activeRoot, candidateRoot, version)
+    const candidateSourceHash = sourceHash(resolve(candidateRoot, version, 'source'))
+    if (candidateSourceHash !== release.sourceHash) {
+      throw new Error('候选 source 内容与 release manifest 不一致')
+    }
+    siteHash = sourceHash(resolve(candidateRoot, version, 'site'))
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     writeValidationReport(candidateRoot, version, {
-      schemaVersion: 1,
+      schemaVersion: 2,
       version,
       passed: false,
       startedAt,
@@ -368,7 +408,7 @@ function validateCandidate(activeRoot, candidateRoot, version, skipValidation, v
   }
   if (skipValidation) {
     return writeValidationReport(candidateRoot, version, {
-      schemaVersion: 1,
+      schemaVersion: 2,
       version,
       passed: true,
       skipped: true,
@@ -377,6 +417,7 @@ function validateCandidate(activeRoot, candidateRoot, version, skipValidation, v
       command: ['candidate-site-gate'],
       profile: validationProfile,
       sourceHash: release.sourceHash,
+      siteHash,
       adapterHash: release.adapterHash,
       validatorHash,
       gate,
@@ -389,40 +430,69 @@ function validateCandidate(activeRoot, candidateRoot, version, skipValidation, v
   const compatibleProfile = previous?.profile === 'full' || previous?.profile === validationProfile
   if (
     previous?.passed === true
+    && previous.schemaVersion === 2
     && previous?.skipped !== true
     && compatibleProfile
     && previous.sourceHash === release.sourceHash
+    && previous.siteHash === siteHash
     && previous.adapterHash === release.adapterHash
     && previous.validatorHash === validatorHash
   ) return previous
 
-  const result = spawnSync(validationScript, [candidateRoot, version, validationProfile], {
-    cwd: repoDir,
-    encoding: 'utf8',
-    maxBuffer: validationMaxBuffer,
-  })
-  const error = result.status === 0
+  // Adapter candidates are deleted after failure. Keep their logs outside the
+  // staging tree without replacing the active release or its validation report.
+  const logFile = activeRoot === candidateRoot
+    ? 'validation-run.log'
+    : `../.validation-logs/${version}-${Date.now()}-${process.pid}.log`
+  const logPath = resolve(activeRoot, version, logFile)
+  mkdirSync(dirname(logPath), { recursive: true })
+  process.stderr.write(`[manage-new-legacy] 验收进度日志：${logPath}\n`)
+  const log = openSync(logPath, 'w', 0o600)
+  let result
+  try {
+    result = spawnSync(validationScript, [candidateRoot, version, validationProfile], {
+      cwd: repoDir,
+      stdio: ['ignore', log, log],
+    })
+  } finally {
+    closeSync(log)
+  }
+  const output = readValidationLogTail(logPath)
+  let error = result.status === 0
     ? ''
-    : String(result.stderr || result.error?.message || result.stdout || `退出码 ${result.status}`).trim()
+    : String(result.error?.message || output || `退出码 ${result.status}`).trim()
+  if (result.status === 0) {
+    try {
+      if (
+        sourceHash(resolve(candidateRoot, version, 'source')) !== release.sourceHash
+        || sourceHash(resolve(candidateRoot, version, 'site')) !== siteHash
+        || validationContextHash() !== validatorHash
+      ) error = '验收过程中 source、site 或运行上下文发生变更，请重新验收'
+    } catch (verificationError) {
+      error = verificationError instanceof Error ? verificationError.message : String(verificationError)
+    }
+  }
   const report = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     version,
-    passed: result.status === 0,
+    passed: result.status === 0 && !error,
     startedAt,
     completedAt: new Date().toISOString(),
     command: [validationScript, candidateRoot, version],
     profile: validationProfile,
     sourceHash: release.sourceHash,
+    siteHash,
     adapterHash: release.adapterHash,
     validatorHash,
     gate,
     error,
-    stdout: String(result.stdout || '').slice(-40_000),
-    stderr: String(result.stderr || result.error?.message || '').slice(-40_000),
+    logFile,
+    stdout: output,
+    stderr: error,
   }
   writeValidationReport(candidateRoot, version, report)
-  if (result.status !== 0) {
-    const detail = report.stderr.trim() || report.stdout.trim() || `退出码 ${result.status}`
+  if (!report.passed) {
+    const detail = error || report.stderr.trim() || report.stdout.trim() || `退出码 ${result.status}`
     throw new Error(`候选版本 ${version} 自动验收失败，正式版本未切换：\n${detail}`)
   }
   return report

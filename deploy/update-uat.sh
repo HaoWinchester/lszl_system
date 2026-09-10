@@ -16,6 +16,21 @@ NGINX_CONFIG="$REPO_DIR/deploy/nginx-uat.aihuanpu.com.conf"
 MIN_FREE_GB=5   # 部署前服务器最低剩余磁盘（GB），不足则中止
 REMOTE_STATE_DIR="$REMOTE_DIR/.deploy-state"
 CURRENT_COMMIT="$(git -C "$REPO_DIR" rev-parse HEAD)"
+source "$REPO_DIR/deploy/timing.sh"
+deployment_timing_start uat
+changed_paths=""
+finish_deployment() {
+  local status="$?"
+  if [ -n "$changed_paths" ]; then
+    rm -f "$changed_paths" || { if [ "$status" -eq 0 ]; then status=1; fi; }
+  fi
+  deployment_timing_finish "$status"
+  return "$status"
+}
+trap finish_deployment EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+deployment_timing_stage preflight
 
 check_mini_config() {
   # Quiet validation: never print expanded environment values or WeChat secrets.
@@ -70,7 +85,6 @@ VALIDATION_PROFILE="full"
 BUILD_CONTENT_PREP="1"
 if [ -n "$DEPLOYED_COMMIT" ] && git -C "$REPO_DIR" cat-file -e "$DEPLOYED_COMMIT^{commit}" 2>/dev/null; then
   changed_paths="$(mktemp "${TMPDIR:-/tmp}/kg-uat-changes.XXXXXX")"
-  trap 'rm -f "$changed_paths"' EXIT INT TERM
   {
     git -C "$REPO_DIR" diff --name-only "$DEPLOYED_COMMIT" --
     git -C "$REPO_DIR" ls-files --others --exclude-standard
@@ -81,6 +95,7 @@ if [ -n "$DEPLOYED_COMMIT" ] && git -C "$REPO_DIR" cat-file -e "$DEPLOYED_COMMIT
 fi
 echo "      验收级别：$VALIDATION_PROFILE"
 
+deployment_timing_stage frontend-build
 echo "[1/9] 本地构建 new-legacy 前端产物"
 if [ "$BUILD_CONTENT_PREP" -eq 1 ]; then
   build_content_prep
@@ -91,7 +106,9 @@ cd "$REPO_DIR/frontend"
 node scripts/sync-new-legacy.js
 cd "$REPO_DIR"
 
+deployment_timing_stage release-validation
 echo "[2/9] 打包并发布 new-legacy release"
+echo "      验证日志：/tmp/kg-uat-release.log"
 cd "$REPO_DIR/frontend"
 # 若本地已有同版本号但内容不同的 release（开发分支忘记递增 VERSION），自动递增末段重打包。
 # 只有 update 真正成功才允许继续，防止把旧包当新版本发布出去。
@@ -134,22 +151,26 @@ node scripts/prepare-new-legacy-runtime.js
 cd "$REPO_DIR"
 echo "      当前发布版本：$VERSION"
 
+deployment_timing_stage transfer
 echo "[3/9] rsync 代码与 release 到 $REMOTE:$REMOTE_DIR"
-rsync -az --delete \
+rsync -az --delete --stats \
   --exclude-from "$REPO_DIR/deploy/rsync-excludes.txt" \
   --exclude '.env.uat' \
   --exclude '/deploy' \
   "$REPO_DIR/" "$REMOTE:$REMOTE_DIR/"
 
+deployment_timing_stage image-restart
 echo "[4/9] 重建 UAT 后端镜像并重启（alembic 迁移自动执行）"
 check_mini_config
 ssh "$REMOTE" "cd $REMOTE_DIR && docker compose -p $PROJECT $COMPOSE_ARGS --env-file $ENV_FILE up -d --build"
 
+deployment_timing_stage health
 echo "[5/9] 等待健康检查（18087）"
 ssh "$REMOTE" "healthy=0; for attempt in \$(seq 1 40); do if curl -fsS $HEALTH_URL >/dev/null; then healthy=1; break; fi; sleep 1; done; test \"\$healthy\" -eq 1" \
   || { echo "✗ 健康检查失败，查看日志：ssh $REMOTE 'cd $REMOTE_DIR && docker compose -p $PROJECT logs backend --tail 50'" >&2; exit 1; }
 echo "      HEALTH_OK"
 
+deployment_timing_stage nginx
 echo "[6/9] 安装 Git 管理的 UAT HTTPS/HTTP2/gzip 配置"
 LOCAL_NGINX_HASH="$(shasum -a 256 "$NGINX_CONFIG" | awk '{print $1}')"
 REMOTE_NGINX_HASH="$(ssh "$REMOTE" "sudo sha256sum /etc/nginx/conf.d/uat.aihuanpu.com.conf 2>/dev/null | awk '{print \$1}'" || true)"
@@ -166,6 +187,7 @@ fi
 curl -fsS "$PUBLIC_HEALTH_URL" >/dev/null
 echo "      HTTPS_HEALTH_OK"
 
+deployment_timing_stage historical-backfill
 echo "[7/9] 核对历史已发布试卷回填状态（远端数据快照 + 回填代码）"
 PLAN_REPORT="/tmp/uat-paper-release-plan.json"
 ssh "$REMOTE" "cd $REMOTE_DIR && docker compose -p $PROJECT $COMPOSE_ARGS --env-file $ENV_FILE exec -T backend python -m app.cli.runtime_domain_migration plan \
@@ -212,9 +234,11 @@ else
   echo "      数据快照、回填代码和目标完整性均未变更，跳过 backfill"
 fi
 
+deployment_timing_stage maintenance
 echo "[8/9] 清理构建缓存与悬空镜像（仅清理 dangling 资源，不动运行中容器）"
 ssh "$REMOTE" 'docker image prune -f >/dev/null; docker builder prune -f --filter until=168h >/dev/null; true'
 
+deployment_timing_stage public-version
 echo "[9/9] 磁盘水位与 UAT 版本核对"
 ssh "$REMOTE" 'df -h / | tail -1'
 PUBLIC_VERSION="$(curl -fsS "https://uat.aihuanpu.com/" | sed -n 's/.*data-release="\([^"]*\)".*/\1/p' | head -1)"

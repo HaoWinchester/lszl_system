@@ -17,6 +17,7 @@ mkdir -p \
   "$TEST_REPO/backend/app/cli" \
   "$TEST_REPO/backend/app/services"
 cp "$SOURCE_REPO/deploy/update-uat.sh" "$TEST_REPO/deploy/update-uat.sh"
+cp "$SOURCE_REPO/deploy/timing.sh" "$SOURCE_REPO/deploy/release-input-policy.mjs" "$TEST_REPO/deploy/"
 cp "$SOURCE_REPO/deploy/uat-change-scope.mjs" "$TEST_REPO/deploy/uat-change-scope.mjs"
 cp "$SOURCE_REPO/deploy/nginx-uat.aihuanpu.com.conf" "$TEST_REPO/deploy/nginx-uat.aihuanpu.com.conf"
 cp "$SOURCE_REPO/deploy/rsync-excludes.txt" "$TEST_REPO/deploy/rsync-excludes.txt"

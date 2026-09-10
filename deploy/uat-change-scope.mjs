@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { isOperationalRecord } from './release-input-policy.mjs'
 
 const paths = readFileSync(0, 'utf8')
   .split(/\r?\n/)
@@ -26,7 +27,8 @@ const practiceCompanionPaths = new Set([
 ])
 
 function isFrontendOnly(path) {
-  return authoritativePracticePaths.has(path)
+  return isOperationalRecord(path)
+    || authoritativePracticePaths.has(path)
     || practiceCompanionPaths.has(path)
     || path.startsWith('frontend/public/new-legacy/')
 }

@@ -7,6 +7,8 @@ VALIDATION_PROFILE="${3:-full}"
 RELEASE_ROOT="$(cd "$RELEASE_ROOT_INPUT" && pwd)"
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 source "$REPO_DIR/frontend/scripts/new-legacy-validation-profile.sh"
+source "$REPO_DIR/deploy/timing.sh"
+deployment_timing_start validation
 new_legacy_validation_groups "$VALIDATION_PROFILE" >/dev/null
 VALIDATION_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/kg-release-validation.XXXXXX")"
 INTEGRATED_LOG="$VALIDATION_ROOT/integrated.log"
@@ -77,12 +79,17 @@ PY
 }
 
 cleanup() {
+  local status="$?"
   if [[ -n "$INTEGRATED_PID" ]]; then kill "$INTEGRATED_PID" 2>/dev/null || true; fi
   if [[ -n "$RAW_PID" ]]; then kill "$RAW_PID" 2>/dev/null || true; fi
   if [[ "$VALIDATION_DATABASE_CREATED" == "1" ]]; then postgres_database_command dropdb "$VALIDATION_DATABASE_NAME" || true; fi
-  rm -rf "$VALIDATION_ROOT"
+  rm -rf "$VALIDATION_ROOT" || { if [[ "$status" -eq 0 ]]; then status=1; fi; }
+  deployment_timing_finish "$status"
+  return "$status"
 }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 free_port() {
   python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1]); s.close()'
@@ -100,18 +107,22 @@ wait_for_health() {
 }
 
 if new_legacy_validation_group_enabled "$VALIDATION_PROFILE" backend-tests; then
+  deployment_timing_stage backend-tests
   cd "$REPO_DIR/backend"
   .venv/bin/python -m pytest tests/ -q
 fi
 
+deployment_timing_stage frontend-contracts
 cd "$REPO_DIR/frontend"
 pnpm test
 
 cd "$REPO_DIR"
+deployment_timing_stage landing-contracts-browser
 node new-legacy/tests/landing-page-contract.test.js
 node new-legacy/tests/shared-auth-dialog.test.js
 python3 new-legacy/tests/landing-page-browser.py
 if new_legacy_validation_group_enabled "$VALIDATION_PROFILE" extended-contracts; then
+  deployment_timing_stage extended-contracts
   node --test \
     new-legacy/tests/graph-file-api-cutover.test.js \
     new-legacy/tests/graph-file-browser-storage-cutover.test.js \
@@ -133,6 +144,7 @@ if new_legacy_validation_group_enabled "$VALIDATION_PROFILE" extended-contracts;
   node new-legacy/content-prep-studio/tests/test_recall_acceptance_api.js
 fi
 
+deployment_timing_stage isolated-runtime
 mkdir -p "$VALIDATION_ROOT/releases/$RELEASE_VERSION"
 cp -R "$RELEASE_ROOT/$RELEASE_VERSION/." "$VALIDATION_ROOT/releases/$RELEASE_VERSION/"
 python3 - "$VALIDATION_ROOT/releases/current.json" "$RELEASE_VERSION" <<'PY'
@@ -185,6 +197,7 @@ done
 curl -fsS "http://127.0.0.1:$RAW_PORT/learning-path.html" >/dev/null
 
 cd "$REPO_DIR"
+deployment_timing_stage core-practice-browser
 E2E_BASE_URL="http://127.0.0.1:$INTEGRATED_PORT" \
 E2E_RELEASE_VERSION="$RELEASE_VERSION" \
   python3 frontend/e2e/new_legacy_smoke.py
@@ -195,6 +208,7 @@ E2E_BASE_URL="http://127.0.0.1:$INTEGRATED_PORT" \
 python3 new-legacy/tests/practice-answer-sheet-browser.py
 python3 new-legacy/tests/practice-result-report-browser.py
 if new_legacy_validation_group_enabled "$VALIDATION_PROFILE" cross-domain-e2e; then
+  deployment_timing_stage cross-domain-browser
   E2E_BASE_URL="http://127.0.0.1:$INTEGRATED_PORT" \
     python3 frontend/e2e/content_prep_question_bank.py
   E2E_BASE_URL="http://127.0.0.1:$INTEGRATED_PORT" \
@@ -213,6 +227,7 @@ fi
 # 而是 v9 有意改了布局。该 e2e 待后续按 v9 布局专项重写，暂移出自动验收。
 # E2E_BASE_URL="http://127.0.0.1:$INTEGRATED_PORT" \
 #   python3 frontend/e2e/full_role_regression.py
+deployment_timing_stage visual-regression
 python3 frontend/e2e/direct_new_legacy_visual.py \
   --integrated "http://127.0.0.1:$INTEGRATED_PORT" \
   --raw "http://127.0.0.1:$RAW_PORT" \

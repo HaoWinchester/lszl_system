@@ -16,6 +16,7 @@ mkdir -p \
   "$TEST_REPO/backend/app/cli" \
   "$TEST_REPO/backend/app/services"
 cp "$REPO_DIR/deploy/update-uat.sh" "$TEST_REPO/deploy/update-uat.sh"
+cp "$REPO_DIR/deploy/timing.sh" "$REPO_DIR/deploy/release-input-policy.mjs" "$TEST_REPO/deploy/"
 cp "$REPO_DIR/deploy/nginx-uat.aihuanpu.com.conf" "$TEST_REPO/deploy/nginx-uat.aihuanpu.com.conf"
 cp "$REPO_DIR/deploy/rsync-excludes.txt" "$TEST_REPO/deploy/rsync-excludes.txt"
 printf '%s\n' 'v9.0-validation-test' > "$TEST_REPO/new-legacy/VERSION"
@@ -50,6 +51,16 @@ fi
 if ! grep -q '自动验收失败' "$OUTPUT_LOG"; then
   echo "expected the release validator failure to be the deployment blocker" >&2
   sed -n '1,160p' "$OUTPUT_LOG" >&2
+  exit 1
+fi
+
+if ! grep -q 'TIMING scope=uat stage=release-validation seconds=.* status=1' "$OUTPUT_LOG"; then
+  echo "failed release validation must report its phase and nonzero status" >&2
+  cat "$OUTPUT_LOG" >&2
+  exit 1
+fi
+if ! grep -q 'TIMING scope=uat stage=total seconds=.* status=1' "$OUTPUT_LOG"; then
+  echo "failed deployment must report total duration" >&2
   exit 1
 fi
 

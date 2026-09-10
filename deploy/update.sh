@@ -12,6 +12,11 @@ PROJECT="lszl-kg"
 REMOTE_BACKUP_ROOT="/home/ubuntu/lszl-backups"
 BACKUP_TS="$(date +'%Y%m%d_%H%M%S')"
 REMOTE_BACKUP_DIR="${REMOTE_BACKUP_ROOT}/${BACKUP_TS}"
+source "$REPO_DIR/deploy/timing.sh"
+deployment_timing_start production
+trap 'deployment_timing_finish "$?"' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 backup_remote_release() {
   ssh "$REMOTE" "install -d -m 700 '${REMOTE_BACKUP_DIR}'"
@@ -35,9 +40,11 @@ db_backup=${REMOTE_BACKUP_DIR}/db_${BACKUP_TS}.dump
 EOF"
 }
 
+deployment_timing_stage backup
 echo "[0/5] 发布前备份远端当前代码与数据库"
 backup_remote_release
 
+deployment_timing_stage frontend-build
 echo "[1/5] 本地构建 new-legacy 产物（前端页面 + 引导课程 seed）"
 cd "$REPO_DIR/frontend"
 node scripts/sync-new-legacy.js
@@ -45,14 +52,17 @@ node scripts/export-guided-course.mjs
 node scripts/prepare-new-legacy-runtime.js
 cd "$REPO_DIR"
 
+deployment_timing_stage transfer
 echo "[2/5] rsync 代码到 $REMOTE:$REMOTE_DIR"
-rsync -az --delete \
+rsync -az --delete --stats \
   --exclude-from "$REPO_DIR/deploy/rsync-excludes.txt" \
   "$REPO_DIR/" "$REMOTE:$REMOTE_DIR/"
 
+deployment_timing_stage image-restart
 echo "[3/5] 重建后端镜像并重启"
 ssh "$REMOTE" "cd $REMOTE_DIR && docker compose -p ${PROJECT} -f ${COMPOSE_FILE} --env-file ${ENV_FILE} up -d --build"
 
+deployment_timing_stage health-maintenance
 echo "[4/5] 等待健康检查并执行非阻断空间维护"
 ssh "$REMOTE" 'healthy=0; for attempt in $(seq 1 30); do if curl -fsS http://127.0.0.1:18086/api/v1/health >/dev/null; then healthy=1; break; fi; sleep 1; done; test "$healthy" -eq 1'
 ssh "$REMOTE" 'docker image prune -f >/dev/null || true; docker builder prune -f --filter until=168h >/dev/null || true; sudo -n journalctl --vacuum-size=512M >/dev/null || true; df -h /'

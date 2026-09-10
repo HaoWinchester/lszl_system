@@ -223,6 +223,8 @@ test('same source version is atomically rebuilt when a bundle build input change
   const releases = resolve(root, 'releases')
   mkdirSync(harness, { recursive: true })
   cpSync(resolve(frontendDir, 'scripts'), resolve(harness, 'scripts'), { recursive: true })
+  mkdirSync(resolve(harness, '../deploy'), { recursive: true })
+  cpSync(resolve(repoDir, 'deploy/release-input-policy.mjs'), resolve(harness, '../deploy/release-input-policy.mjs'))
   const harnessCommand = resolve(harness, 'scripts', 'manage-new-legacy.js')
   const runHarness = () => spawnSync(
     process.execPath,
@@ -485,6 +487,8 @@ test('candidate missing the public landing page is rejected before promotion', (
   const harness = resolve(root, 'landing-gate-harness', 'frontend')
   mkdirSync(harness, { recursive: true })
   cpSync(resolve(frontendDir, 'scripts'), resolve(harness, 'scripts'), { recursive: true })
+  mkdirSync(resolve(harness, '../deploy'), { recursive: true })
+  cpSync(resolve(repoDir, 'deploy/release-input-policy.mjs'), resolve(harness, '../deploy/release-input-policy.mjs'))
   const harnessSync = resolve(harness, 'scripts', 'sync-new-legacy.js')
   const copyBlock = [
     '  cpSync(source, out, {',

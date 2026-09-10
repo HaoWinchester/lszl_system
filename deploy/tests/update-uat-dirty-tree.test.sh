@@ -11,6 +11,7 @@ trap 'rm -rf "$TEST_ROOT"' EXIT
 
 mkdir -p "$TEST_REPO/deploy" "$TEST_REPO/backend"
 cp "$SOURCE_REPO/deploy/update-uat.sh" "$TEST_REPO/deploy/update-uat.sh"
+cp "$SOURCE_REPO/deploy/timing.sh" "$SOURCE_REPO/deploy/release-input-policy.mjs" "$TEST_REPO/deploy/"
 printf '%s\n' 'before' > "$TEST_REPO/backend/app.py"
 git -C "$TEST_REPO" init -q
 git -C "$TEST_REPO" config user.email uat-test@example.com
