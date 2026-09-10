@@ -1,0 +1,39 @@
+# 答题页参考图改版
+
+用户提供的截图为设计依据，网页端复用既有 `practice-mode.html` 答题流程，开发分支 `codex/answer-page-design` 基于 `uat` 创建。原工作区的小程序、后端及其他未提交修改未纳入本次提交。
+
+## 页面与行为
+
+- 浅蓝底色、蓝色进度条、在线考试品牌、左侧答题导航。
+- 有材料的题目采用材料与题卡双栏，900px 及以下改为上下排列；无材料使用单栏题卡。
+- 保留案例材料折叠和滚动位置、题目图表放大、单选/多选/配对、原有判分、保存恢复、交卷和模式策略。
+- 标记使用现有会话标记集合；侧栏和答题卡增加“已标记”筛选，不创建新的永久收藏数据。切换筛选保持标记样式，空集合提供明确空态。
+- 阅读设置调整题干、材料、选项字号，仅影响本次页面展示。
+- 桌面退出入口位于左侧底部，小屏位于进度栏左侧；答题卡仍在进度栏最右侧。
+- 公共图标沿用学习页面 SVG sprite；新增展示样式和控件模块各一份，不新增依赖。
+
+## 开发自检
+
+已完成以下定向验证：
+
+- `python3 frontend/e2e/answer_page_design.py`：隔离 PostgreSQL + 真实 API + 不可变 release，案例/普通/多选/配对、材料滚动与折叠保留、标记筛选与保存刷新恢复、首尾题边界、阅读字号、320/390/768/900/1024/1360px 无横向溢出。
+- `python3 new-legacy/tests/practice-mark-show-answers-browser.py`：标记/取消、筛选正反向、空态恢复、显示答案锁定与恢复、字号开关、长题干布局。
+- `node --test new-legacy/tests/mixed-practice.test.js new-legacy/tests/practice-marked-answer-sheet.test.js`：8/8 通过。
+- `node new-legacy/tests/learning-focus-vega-icons.test.js`：通过。
+- 原有 `practice_resumable_report.py` 15 组真实 API/浏览器矩阵：保存退出、断点恢复、学霸超时、复仇计数、账号隔离、页面关闭/刷新/BFCache、经验增量、防重复结算和答题卡布局通过。
+
+浏览器截图与日志位于本功能工作树 `artifacts/answer-page-design/`。示例案例文字只写入测试创建并清理的隔离数据库，产品题目继续来自业务 API。
+
+## 发布核对
+
+UAT 运行容器实际 active release 为 v9.0-p4.1.226、990 个文件；宿主机历史 release 指针并非容器实际使用版本。候选新增 `src/practice/practice-answer-page.js`、`styles/answer-page.css` 共 2 个文件，无文件删除，`admin-console.html` 完整保留。通过发布管理工具构建与校验，不手工改 release site。新工作树的浏览器校验需要已有 active baseline，因此从既有发布工作树初始化了已通过完整校验的 v9.0-p4.1.226 不可变基线，并逐文件核对 SHA-256；未覆盖任何现有 release。
+
+`node frontend/scripts/manage-new-legacy.js update new-legacy` 完整发布校验通过，候选版本 v9.0-p4.1.228：
+
+- 后端 `pytest tests/ -q`：707 通过，1 项已有依赖弃用提示。
+- 前端 `pnpm test`：273 项 Node 测试、9 项 Python 契约和 4 项 UAT 部署脚本测试通过；包含 5 项设计契约。
+- 扩展契约、登录与权限、答题 15 组会话矩阵、答题卡、成绩单、题库加载和并发、会员购买、流程指示器、学习资产回归通过。
+- 发布原始页与适配页的桌面/手机视觉比对均为 0.000% 差异；这是集成前后的一致性检查，参考图还原另由本次定向截图检查。
+- 全套校验耗时 690 秒，退出码 0。候选源码和 site 校验完成，当前版本由管理工具 promote。
+
+UAT 部署结果将在部署完成后补充。用户尚未进行业务 UAT 验收，不合入 main。

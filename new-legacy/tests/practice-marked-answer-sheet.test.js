@@ -25,7 +25,7 @@ assert(Sheet, 'answer sheet should load');
 
 const rootElement = {
   innerHTML: '',
-  addEventListener() {},
+  addEventListener(type, handler) { this.onClick = handler; },
 };
 
 const sheet = Sheet.mount(rootElement, {});
@@ -60,11 +60,21 @@ assert(
 
 // 不传标记集合：legend 不出现「已标记」
 sheet.render(session, 'q2');
-assert(!rootElement.innerHTML.includes('已标记'), 'legend must omit marked entry without marks');
+assert(!rootElement.innerHTML.match(/class="practice-answer-sheet-legend"[\s\S]*已标记/), 'legend must omit marked entry without marks');
 
 // 筛选切换（闭包重渲染）仍保留标记：通过源码契约验证闭包保存
 const componentSource = fs.readFileSync(path.join(root, 'src/112-practice-answer-sheet.js'), 'utf8');
 assert(/let markedIds = null/.test(componentSource), 'markedIds must be kept in closure for filter re-render');
 assert(/markedIds\.has\(id\)/.test(componentSource), 'render must consult markedIds per question');
 
+sheet.render(session, 'q2', 'all', new Set(['q2']));
+rootElement.onClick({target: {closest: selector => selector === '[data-answer-filter]' ? {dataset: {answerFilter: 'marked'}} : null}});
+assert(rootElement.innerHTML.includes('data-question-id="q2"'));
+assert(!rootElement.innerHTML.includes('data-question-id="q1"'));
+assert(!rootElement.innerHTML.includes('data-question-id="q3"'));
+rootElement.onClick({target: {closest: selector => selector === '[data-answer-filter]' ? {dataset: {answerFilter: 'all'}} : null}});
+assert(/is-marked[^>]*data-question-id="q2"/.test(rootElement.innerHTML), 'filter changes preserve marks');
+sheet.render(session, 'q2', 'marked', new Set());
+assert(rootElement.innerHTML.includes('该筛选下暂无题目'));
+assert(!rootElement.innerHTML.includes('data-question-id='));
 console.log('practice-marked-answer-sheet-ok');

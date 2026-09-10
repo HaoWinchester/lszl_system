@@ -23,7 +23,9 @@ SCRIPTS = [
     "src/117-question-answer-set.js",
     "src/114-practice-draft-state.js",
     "src/118-revenge-entry-policy.js",
+    "src/118-question-materials.js",
     "src/100-practice-mode.js",
+    "src/practice/practice-answer-page.js",
 ]
 
 
@@ -113,7 +115,7 @@ with sync_playwright() as playwright:
           window.KGFreeModeLanguage={};
         }"""
     )
-    for stylesheet in ["styles/main.css", "styles/practice-mode.css"]:
+    for stylesheet in ["styles/main.css", "styles/practice-mode.css", "styles/focus-vega-typography.css", "styles/learning-skin.css", "styles/question-materials.css", "styles/answer-page.css"]:
         page.add_style_tag(content=(ROOT / stylesheet).read_text(encoding="utf-8"))
     for script in SCRIPTS:
         page.add_script_tag(content=(ROOT / script).read_text(encoding="utf-8"))
@@ -157,7 +159,7 @@ with sync_playwright() as playwright:
         "el=>el.querySelectorAll('.practice-option.is-correct').length"
     ) >= 1
     assert page.locator('#practiceExplanationPanel').is_visible()
-    assert '正确答案 · A' in page.locator('#practiceExplanationHead').inner_text()
+    assert '正确答案：A' in page.locator('#practiceExplanationHead').inner_text()
     assert '回答正确' not in page.locator('#practiceExplanationHead').inner_text()
     assert page.locator('#practiceOptions button[disabled]').count() == 2
     # 显示答案下作答不产生草稿
@@ -262,6 +264,31 @@ with sync_playwright() as playwright:
     assert page.locator('#practiceMarkToggle').is_visible()
 
     assert_mark_layout(page)
+    # Reference design controls use the real question navigation and marked set.
+    page.locator('[data-practice-action="marked"]').click()
+    assert page.locator('.practice-answer-filter-empty').is_visible()
+    page.locator('#practiceAnswerSheetDrawerClose').click()
+    page.locator('#practiceMarkToggle').click()
+    page.locator('[data-practice-action="marked"]').click()
+    assert page.locator('#practiceAnswerSheet [data-question-id]').count() == 1
+    assert 'is-marked' in page.locator('#practiceAnswerSheet [data-question-id]').get_attribute('class')
+    page.locator('[data-answer-filter="all"]').click()
+    assert page.locator('#practiceAnswerSheet [data-question-id]').count() == 10
+    assert page.locator('#practiceAnswerSheet .is-marked[data-question-id]').count() == 1
+    page.locator('#practiceAnswerSheetDrawerClose').click()
+    before = page.locator('#practiceQuestionStem').evaluate('(el)=>parseFloat(getComputedStyle(el).fontSize)')
+    page.locator('[data-practice-action="settings"]').click()
+    page.locator('#practiceReadingSize').select_option('large')
+    assert page.locator('#practiceQuestionStem').evaluate('(el)=>parseFloat(getComputedStyle(el).fontSize)') > before
+    page.keyboard.press('Escape')
+    assert page.locator('#practiceReadingSettings').is_hidden()
+    page.locator('[data-practice-action="settings"]').click()
+    page.locator('#practiceReadingSize').select_option('standard')
+    page.locator('[data-practice-action="close-settings"]').click()
+    for width in [320, 390, 768, 1024, 1360]:
+        page.set_viewport_size({'width': width, 'height': 1000})
+        assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), width
+        assert page.locator('#practiceMarkToggle').bounding_box()['y'] < page.locator('#practiceQuestionStem').bounding_box()['y']
     assert not errors, errors
     browser.close()
 

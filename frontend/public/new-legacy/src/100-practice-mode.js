@@ -651,15 +651,20 @@
       dom.questionStem.textContent=question.stem;
       dom.options.innerHTML=question.options.map(option=>'<button type="button" class="practice-option" data-option-id="'+escapeHTML(option.id)+'"><span class="practice-option-key">'+escapeHTML(option.id)+'</span><span>'+escapeHTML(option.text)+'</span></button>').join('');
     }
-    let materialHost=dom.questionCard.querySelector('.qm-question-materials');
-    if(!materialHost){materialHost=document.createElement('div');materialHost.className='qm-question-materials';dom.questionCard.prepend(materialHost);}
-    const prior=materialHost.querySelector('[data-case-id]');
-    if(prior)state.casePositions[prior.dataset.caseId]={scroll:prior.querySelector('.qm-case-body')?.scrollTop||0,open:prior.open};
-    materialHost.innerHTML=global.KGQuestionMaterials?.renderMaterials(question)||'';
-    global.KGQuestionMaterials?.bindMedia(materialHost);
-    const current=materialHost.querySelector('[data-case-id]'),position=current&&state.casePositions[current.dataset.caseId];
-    if(position){current.open=position.open;current.querySelector('.qm-case-body').scrollTop=position.scroll;}
-    dom.questionCard.classList.toggle('qm-case-layout',!!question.caseGroup);
+    const materialPanel=dom.questionCard.querySelector('.qm-question-materials');
+    const materialHost=materialPanel?.querySelector('.practice-material-content');
+    if(materialHost){
+      const prior=materialHost.querySelector('[data-case-id]');
+      if(prior)state.casePositions[prior.dataset.caseId]={scroll:prior.querySelector('.qm-case-body')?.scrollTop||0,open:prior.open};
+      materialHost.innerHTML=global.KGQuestionMaterials?.renderMaterials(question)||'';
+      materialPanel.hidden=!materialHost.innerHTML;
+      global.KGQuestionMaterials?.bindMedia(materialHost);
+      const current=materialHost.querySelector('[data-case-id]'),position=current&&state.casePositions[current.dataset.caseId];
+      if(position){current.open=position.open;current.querySelector('.qm-case-body').scrollTop=position.scroll;}
+      dom.questionCard.classList.toggle('qm-case-layout',!materialPanel.hidden);
+    }
+    const typeLabel=$('practiceQuestionType');
+    if(typeLabel)typeLabel.textContent=question.type==='matching'?'配对题':question.type==='multiple_choice'?'多选题':'单选题';
     if(question.type==='matching')renderMatchingAnswer(question,savedAnswer,!!savedAnswer||(state.mode==='practice'&&showAnswersEnabled()));
     if(AnswerSet.supported&&!AnswerSet.supported(question)){dom.options.innerHTML='<p role="alert">当前客户端不支持此题型，请更新后重试。</p>';state.locked=true;}
     renderPreviousWrongAnswer(question);

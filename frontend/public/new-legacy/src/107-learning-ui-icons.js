@@ -1,6 +1,6 @@
 'use strict';
 (function(global){
-  const names=Object.freeze(['arrow-left','chevron-down','circle-help','circle-user-round','diamond','heart','library','log-in','log-out','palette','plus','sparkles','timer','x','zap']);
+  const names=Object.freeze(['arrow-left','chevron-down','circle-help','circle-user-round','diamond','heart','library','log-in','log-out','palette','plus','sparkles','timer','x','zap','chevron-left','chevron-right','file-text','layout-grid','star','settings']);
   const allowed=new Set(names);
   const fallback='circle-help';
   const warned=new Set();

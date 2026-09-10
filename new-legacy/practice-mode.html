@@ -16,15 +16,17 @@
   <link rel="stylesheet" href="styles/learning-loading.css"/>
   <link rel="stylesheet" href="styles/learning-weekly-open-gate.css"/>
   <link rel="stylesheet" href="styles/close-button.css"/>
+  <link rel="stylesheet" href="styles/answer-page.css"/>
 <link rel="stylesheet" href="styles/question-materials.css"/>
 </head>
 <body class="practice-mode-page" data-learning-skin="focus-vega">
   <div class="practice-app">
     <header class="practice-header">
       <a class="practice-brand" href="practice-mode.html" aria-label="返回做题模式大厅">
-        <span class="practice-brand-mark" aria-hidden="true">P</span>
-        <span><strong>做题模式</strong><small>轻量练习</small></span>
+        <span class="practice-brand-mark" aria-hidden="true"><svg viewBox="0 0 56 56" fill="none"><defs><linearGradient id="practiceCap" x1="8" y1="5" x2="46" y2="52" gradientUnits="userSpaceOnUse"><stop stop-color="#65b9ff"/><stop offset="1" stop-color="#4941ff"/></linearGradient></defs><path d="M12 25v15c0 7 32 7 32 0V25" fill="url(#practiceCap)"/><path d="m5 18 20-10a7 7 0 0 1 6 0l20 10a3 3 0 0 1 0 5L31 33a7 7 0 0 1-6 0L5 23a3 3 0 0 1 0-5Z" fill="url(#practiceCap)"/><path d="m15 25 10 5a7 7 0 0 0 6 0l10-5M27 17l10 5" stroke="white" stroke-width="2.5" stroke-linecap="round"/></svg></span>
+        <span><strong>在线考试</strong><small>专注 · 高效 · 成长</small></span>
       </a>
+      <p class="practice-brand-motto">把知识，变成更大的可能</p>
       <div class="practice-header-actions">
         <nav class="practice-mode-switch" aria-label="模式切换" title="切换做题或自由模式">
           <a class="is-active" href="practice-mode.html" aria-current="page">做题</a>
@@ -149,6 +151,19 @@
       </section>
 
       <section class="practice-game" id="practiceGame" hidden aria-live="polite">
+        <nav class="practice-side-nav" aria-label="答题导航">
+          <button type="button" class="practice-side-item is-active" data-practice-action="question" aria-label="回到当前题目"><span data-kg-icon="file-text" data-kg-icon-size="28" aria-hidden="true"></span><span>答题</span></button>
+          <button type="button" class="practice-side-item" data-practice-action="sheet" aria-controls="practiceAnswerSheetDrawer"><span data-kg-icon="layout-grid" data-kg-icon-size="28" aria-hidden="true"></span><span>答题卡</span></button>
+          <button type="button" class="practice-side-item" data-practice-action="marked" aria-controls="practiceAnswerSheetDrawer" title="查看本次练习标记的题目"><span data-kg-icon="star" data-kg-icon-size="28" aria-hidden="true"></span><span>标记</span></button>
+          <button type="button" class="practice-side-item" data-practice-action="settings" aria-controls="practiceReadingSettings" aria-expanded="false"><span data-kg-icon="settings" data-kg-icon-size="28" aria-hidden="true"></span><span>设置</span></button>
+          <p class="practice-side-note">坚持<br/>是通往优秀<br/>最短的路</p>
+        </nav>
+        <section class="practice-reading-settings" id="practiceReadingSettings" aria-label="阅读设置" hidden>
+          <div><strong>阅读设置</strong><button type="button" data-practice-action="close-settings" aria-label="关闭阅读设置">×</button></div>
+          <label for="practiceReadingSize">阅读字号</label>
+          <select id="practiceReadingSize"><option value="standard">标准</option><option value="large">大字</option></select>
+          <p>调整题干、案例材料和选项的字号。</p>
+        </section>
         <header class="practice-game-topbar">
           <button type="button" class="practice-exit-btn" id="practiceExitBtn" aria-label="退出本次练习" title="退出"><span data-kg-icon="x" data-kg-icon-size="18" aria-hidden="true"></span></button>
           <button type="button" class="practice-review-back" id="practiceReviewBackBtn" hidden>← 返回成绩单</button>
@@ -182,7 +197,13 @@
         </div>
 
         <article class="practice-question-card" id="practiceQuestionCard">
-          <button type="button" class="practice-mark-toggle" id="practiceMarkToggle" aria-pressed="false" hidden>标记本题</button>
+          <aside class="qm-question-materials" aria-labelledby="practiceMaterialTitle" hidden>
+            <header class="practice-material-heading"><span data-kg-icon="file-text" data-kg-icon-size="28" aria-hidden="true"></span><div><h2 id="practiceMaterialTitle">案例材料</h2><p>阅读以下材料，结合所给信息完成题目</p></div></header>
+            <div class="practice-material-content"></div>
+          </aside>
+          <div class="practice-answer-panel">
+          <div class="practice-question-meta"><span class="practice-question-type" id="practiceQuestionType">单选题</span>
+          <button type="button" class="practice-mark-toggle" id="practiceMarkToggle" aria-pressed="false" hidden>标记本题</button></div>
           <div class="practice-question-stem" id="practiceQuestionStem"></div>
           <div class="practice-previous-wrong-answer" id="practicePreviousWrongAnswer" hidden></div>
           <div class="practice-options" id="practiceOptions"></div>
@@ -200,6 +221,7 @@
             <label id="practicePreviousWrongToggle" class="practice-explanation-toggle practice-previous-wrong-toggle" hidden><input type="checkbox" id="practiceShowPreviousWrong" checked/><span>显示上次错选</span></label>
             <span class="practice-question-pos" id="practiceQuestionPos">1 / 10</span>
             <button type="button" class="practice-nav-btn" id="practiceNextBtn" aria-label="下一题">下一题<span data-kg-icon="chevron-right" data-kg-icon-size="16" aria-hidden="true"></span></button>
+          </div>
           </div>
           <p class="practice-study-tip"><strong>刷题提示</strong>备考重在掌握思路，不必被少量争议题打乱节奏。遇到答案存疑题目，先看题干条件与解析依据，暂时想不通的可以标记反馈。把更多精力放在核心考点和错题复盘上，稳步提高解题能力。</p>
         </article>
@@ -352,5 +374,6 @@
   <script defer src="src/118-revenge-entry-policy.js"></script>
   <script defer src="src/paper-presentation.js"></script>
   <script defer src="src/100-practice-mode.js"></script>
+  <script defer src="src/practice/practice-answer-page.js"></script>
 </body>
 </html>

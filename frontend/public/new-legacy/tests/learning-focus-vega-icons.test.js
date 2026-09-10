@@ -4,7 +4,7 @@ const fs=require('node:fs');
 const path=require('node:path');
 const vm=require('node:vm');
 const root=path.resolve(__dirname,'..');
-const allowed=['arrow-left','chevron-down','circle-help','circle-user-round','diamond','heart','library','log-in','log-out','palette','plus','sparkles','timer','x','zap'];
+const allowed=['arrow-left','chevron-down','circle-help','circle-user-round','diamond','heart','library','log-in','log-out','palette','plus','sparkles','timer','x','zap','chevron-left','chevron-right','file-text','layout-grid','star','settings'];
 const sprite=fs.readFileSync(path.join(root,'assets/icons/lucide-learning.svg'),'utf8');
 for(const name of allowed)assert.match(sprite,new RegExp(`<symbol id="${name}"(?=\\s|>)`),`missing ${name}`);
 assert.deepEqual([...sprite.matchAll(/<symbol id="([^"]+)"/g)].map(match=>match[1]),allowed);

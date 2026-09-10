@@ -26,6 +26,7 @@
       const core = global.KGPracticeSessionCore
       const questions = Array.isArray(snapshot?.questions) ? snapshot.questions : []
       if (activeFilter === 'all') return questions
+      if (activeFilter === 'marked') return questions.filter(question => markedIds?.has(text(question.questionId)))
       return questions.filter(question => core?.questionStatus?.(snapshot, question.questionId) === activeFilter)
     }
 
@@ -34,7 +35,7 @@
       currentId = text(currentQuestionId)
       markedIds = markedQuestionIds && typeof markedQuestionIds.has === 'function' ? markedQuestionIds : null
       if (snapshot.reviewOnly) activeFilter = 'wrong'
-      else if (['all', 'unanswered', 'wrong'].includes(filter)) activeFilter = filter
+      else if (['all', 'unanswered', 'wrong', 'marked'].includes(filter)) activeFilter = filter
       const core = global.KGPracticeSessionCore
       const stats = core?.answerSheetStats?.(snapshot) || { total: 0, answered: 0, correct: 0, wrong: 0, unanswered: 0 }
       const questions = visibleQuestions()
@@ -53,6 +54,7 @@
           <button type="button" data-answer-filter="all" class="${activeFilter === 'all' ? 'is-active' : ''}">全部</button>
           <button type="button" data-answer-filter="unanswered" class="${activeFilter === 'unanswered' ? 'is-active' : ''}">未答</button>
           <button type="button" data-answer-filter="wrong" class="${activeFilter === 'wrong' ? 'is-active' : ''}">错题</button>
+          <button type="button" data-answer-filter="marked" class="${activeFilter === 'marked' ? 'is-active' : ''}">已标记</button>
         </div>`}
         <div class="practice-answer-number-grid">${numbers || '<p class="practice-answer-filter-empty">该筛选下暂无题目</p>'}</div>
         <div class="practice-answer-sheet-legend"><span><i class="is-correct"></i>正确</span><span><i class="is-wrong"></i>错误</span><span><i class="is-unanswered"></i>未答</span>${markedIds && markedIds.size ? '<span><i class="is-marked"></i>已标记</span>' : ''}</div>
@@ -64,7 +66,7 @@
       const filterButton = event.target.closest?.('[data-answer-filter]')
       if (filterButton) {
         activeFilter = filterButton.dataset.answerFilter || 'all'
-        render(snapshot, currentId, activeFilter)
+        render(snapshot, currentId, activeFilter, markedIds)
         return
       }
       const numberButton = event.target.closest?.('[data-question-id]')
