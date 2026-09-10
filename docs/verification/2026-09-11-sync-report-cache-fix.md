@@ -20,4 +20,14 @@
 - `pnpm -C frontend test`：276 项 Node 测试、9 项 Python 契约、4 组 UAT shell 夹具全部通过。
 - 独立只读审查通过。
 
-真实完整发布验证及 UAT 部署结果在完成后追加。未合入 main，未部署正式环境；用户 UAT 业务验收仍待确认。
+## 真实发布路径验证
+
+修复提交 `976f764`。真实管理器完整验证成功，用时 677 秒：707 项后端测试通过（1 个已有 warning）、276 项 Node 测试、9 项 Python 契约、4 组部署脚本测试，以及内置浏览器/视觉校验通过。
+
+验证完成后提交修复，再执行真实同步脚本，报告确实从 v227→v228 的非空差异变为 v228→v228 的空差异。再次执行管理器 `update new-legacy` 仅耗时 **0.450 秒**；`validation.json` 与 `validation-run.log` 的 SHA-256 和纳秒修改时间均未改变，证明确实复用了刚通过的验证。
+
+成功报告 SHA-256：`dd32b899dfc8ef15ff31782f57278817e37b631bc8b26525b759ef85f56641be`。原始证据保存在功能工作树 `.superpowers/sync-report-reuse-proof.json`、`.superpowers/sync-report-full-validation.log` 和 v228 的 `validation-run.log`。
+
+本次候选与另一个任务刚发布的 v228 均为 992 个 site 文件，逐文件内容相同，sourceHash 均为 `d4b321aa77dfd03146582fcd5c3cae17464b3b310ac88825dc08b8359f80a92a`。
+
+UAT 部署结果在完成后追加。未合入 main，未部署正式环境；用户 UAT 业务验收仍待确认。
