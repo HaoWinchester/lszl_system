@@ -1,6 +1,6 @@
 """Publish this reviewed sample through application services, only in UAT.
 
-Run inside the UAT backend: PYTHONPATH=/app python publish.py --actor admin
+Run inside the UAT backend: PYTHONPATH=/app/backend python publish.py --actor admin
 The JSON and PNG must be next to this script. No production connection allowed.
 """
 import argparse

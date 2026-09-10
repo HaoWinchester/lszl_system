@@ -24,6 +24,6 @@
 ## 空间恢复后的步骤
 
 1. 在干净的功能工作区检查 `uat` 和远端基线，执行 `bash deploy/update-uat.sh`；现有 full 验证结果在源、适配层和验证器指纹一致时可复用。
-2. 将 `docs/samples/mixed-question-uat-20260910/` 中的 JSON、PNG 和 `publish.py` 复制到 UAT 容器的 `/tmp/mixed-question-demo/`，执行 `PYTHONPATH=/app python /tmp/mixed-question-demo/publish.py --actor admin`，保存返回的题库、试卷、发布版本 ID。
+2. 将 `docs/samples/mixed-question-uat-20260910/` 中的 JSON、PNG 和 `publish.py` 复制到 UAT 容器的 `/tmp/mixed-question-demo/`，执行 `PYTHONPATH=/app/backend python /tmp/mixed-question-demo/publish.py --actor admin`，保存返回的题库、试卷、发布版本 ID。
 3. 以独立的临时学生账号验证：题库大厅可见 5 题、图片加载与放大、案例桌面/手机布局、四对拖拽/键盘配对、部分配对保存续作、最终 5/5 判分。自动检查脚本准备在当前工作区 `.superpowers/uat-mixed-demo/verify_browser.py`；需新建临时账号及保存发布 ID。
 4. 向用户提供 `https://uat.aihuanpu.com/practice-mode.html` 和试卷名称，等待用户本人业务验收；不要合入 `main`。

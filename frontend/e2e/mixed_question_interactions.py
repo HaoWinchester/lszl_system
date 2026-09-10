@@ -32,9 +32,24 @@ def main():
         }''')
         if page.evaluate('control.value().l1')!='r2':
             failures.append('Dropping unrelated content clears a previously selected match')
+        for name in ['main.css', 'question-materials.css']:
+            page.add_style_tag(path=str(ROOT/'new-legacy/styles'/name))
+        page.evaluate('''() => {
+          document.querySelector('#editor').remove();
+          document.querySelector('#matching').style.maxWidth='760px';
+          match.matching.left[0].text='销售团队了解项目，但反对当前交付安排，与交付团队目标不一致。'.repeat(3);
+          match.matching.right[0].text='EngagementLevelWithAnUnbrokenIdentifier'.repeat(4);
+          document.querySelector('#matching').innerHTML=KGQuestionMaterials.renderMatching(match);
+        }''')
+        for width in [1440, 390]:
+            page.set_viewport_size({'width':width, 'height':1000})
+            overflow = page.locator('.qm-target b,.qm-target span,.qm-candidate').evaluate_all(
+                '(nodes) => nodes.filter(el => el.scrollWidth > el.clientWidth + 1).length')
+            if overflow:
+                failures.append(f'Long matching text overlaps its answer slot or overflows at {width}px')
         browser.close()
     assert not failures, '\n'.join(failures)
-    print('PASS case editor draft survives redraw; unrelated drag cannot clear matching answer')
+    print('PASS case editor draft, unrelated drag, and long matching text on desktop/mobile')
 
 if __name__=='__main__':
     main()

@@ -16,5 +16,5 @@
 UAT 后端容器内运行（将本目录复制到容器后）：
 
 ```sh
-PYTHONPATH=/app python /tmp/mixed-question-demo/publish.py --actor admin
+PYTHONPATH=/app/backend python /tmp/mixed-question-demo/publish.py --actor admin
 ```
