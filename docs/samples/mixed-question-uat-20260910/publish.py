@@ -83,7 +83,7 @@ async def main(actor_name):
         print(json.dumps({
             'paperId': paper.id, 'bankId': bank_id, 'releaseId': paper.published_release_id,
             'name': paper.name, 'questionCount': 5, 'questions': refs,
-            'url': 'https://uat.aihuanpu.com/practice-mode.html?paperId=' + paper.id,
+            'url': 'https://uat.aihuanpu.com/practice-mode.html',
         }, ensure_ascii=False))
 
 
