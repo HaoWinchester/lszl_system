@@ -54,6 +54,28 @@ def main():
         assert edit.locator('[data-rich-left="0"]').input_value()=='更新后的左侧条目'
         edit.screenshot(path=str(OUT/'teacher-matching.png'))
         print('PASS teacher matching editor save/reload',flush=True)
+        edit.goto(base+'/question-bank.html?bankId='+ids['bank']+'&questionId='+qs[0]['id']+'&view=content&entry=manual',wait_until='networkidle')
+        edit.locator('[data-rich-case]').check()
+        edit.locator('[data-rich-title]').fill('教师新建的三小题案例')
+        edit.locator('[data-rich-text]').fill('此材料由教师表单创建，三个小题共同引用。')
+        edit.locator('[data-rich-order]').fill('2')
+        edit.locator('[data-rich-total]').fill('3')
+        edit.locator('[data-rich-children]').click()
+        edit.wait_for_function('''() => {
+          const rows=KGQuestionBankAdminAPI.getCurrentBank().questions;
+          return rows.filter(q=>q.material?.title==='教师新建的三小题案例').length===3;
+        }''')
+        group=edit.evaluate("KGQuestionBankAdminAPI.getCurrentBank().questions.filter(q=>q.material?.title==='教师新建的三小题案例')")
+        assert sorted(q['caseGroup']['order'] for q in group)==[1,2,3]
+        assert len({q['material']['id'] for q in group})==1
+        edit.locator('[data-rich-text]').fill('教师更新后的共享案例材料。')
+        with edit.expect_response(lambda r:'/content-prep/questions/' in r.url and r.request.method=='PUT') as saving:
+            edit.locator('#qbSaveQuestionBtn').click()
+        assert saving.value.ok,saving.value.text()
+        edit.reload(wait_until='networkidle')
+        assert edit.locator('[data-rich-text]').input_value()=='教师更新后的共享案例材料。'
+        assert edit.locator('[data-rich-order]').input_value()=='2'
+        print('PASS teacher case creation, complete sibling generation and atomic shared material edit',flush=True)
         release=harness.run_async(publish(ids,qs))
         context=browser.new_context(viewport={'width':1280,'height':900})
         harness.login(context.request,base,ids['student'],PASSWORD)
@@ -114,6 +136,21 @@ def main():
         assert not errors,errors
         page.screenshot(path=str(OUT/'mixed-report.png'))
         print('PASS seven mixed questions, partial pairing save/resume, keyboard, image zoom, case desktop/mobile, exact 7/7 report',flush=True)
+        path=base+'/api/v1/learning/practice/sessions'
+        attempt=context.request.post(path+'/start',data={'paperId':ids['paper'],'releaseId':release,'mode':'challenge','count':7}).json()['session']
+        answers={q['id']:{'selectedAnswer':'A','selectionIndex':i+1} for i,q in enumerate(qs)}
+        answers[qs[1]['id']]={'selectedAnswerIds':['A','C'],'selectionIndex':2}
+        answers[qs[2]['id']]={'selectedPairs':{'l1':'r1','l2':'r2'},'selectionIndex':3}
+        response=context.request.post(path+'/'+attempt['id']+'/complete',data={'revision':attempt['revision'],'answers':answers})
+        assert response.ok,response.text()
+        page.reload(wait_until='networkidle')
+        page.locator('[data-practice-start="revenge"]').click()
+        page.locator('#practiceGame').wait_for(state='visible')
+        page.locator('#practiceShowPreviousWrong').check()
+        assert '1 → 甲' in page.locator('#practicePreviousWrongAnswer').inner_text()
+        assert '2 → 乙' in page.locator('#practicePreviousWrongAnswer').inner_text()
+        assert not errors,errors
+        print('PASS revenge shows persisted previous matching pairs',flush=True)
         browser.close()
     server.close()
 

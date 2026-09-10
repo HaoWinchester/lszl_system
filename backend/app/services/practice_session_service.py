@@ -696,6 +696,7 @@ async def start_session(
                         candidate.get("previousWrongAnswer") or ""
                     ),
                     "previousWrongAnswerIds": list(candidate.get("previousWrongAnswerIds") or []),
+                    **({"previousWrongPairs": deepcopy(candidate.get("selectedPairs") or {})} if snapshot.get("type") == "matching" else {}),
                     "sourcePaperId": str(candidate.get("paperId") or ""),
                     "sourcePaperName": str(candidate.get("paperName") or ""),
                     "sourceReleaseId": str(candidate.get("releaseId") or ""),

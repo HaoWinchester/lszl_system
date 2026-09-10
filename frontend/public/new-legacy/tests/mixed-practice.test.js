@@ -35,3 +35,24 @@ test('unknown types cannot submit as single choice',()=>{
  const d=D.create({questions:[{questionId:'u',question:{type:'unknown',options:[{id:'A'}],correctAnswer:'A'}}]});
  assert.equal(d.select('u','A').accepted,false);
 });
+
+const modeSource=fs.readFileSync(path.join(__dirname,'../src/100-practice-mode.js'),'utf8');
+test('revenge can choose an unanswered matching verification question',async()=>{
+ const source={...question,id:'source',mistakeId:'m',stem:'原题',options:[],knowledge:{nodeId:'k'}};
+ const candidate={...source,id:'candidate',raw:{...question,id:'candidate'}};
+ const env={state:{active:true,mode:'revenge',remediationPending:true,index:0,questions:[source,candidate]},text:String,clone:plain,
+  usableQuestion:q=>!!q.stem&&(q.type==='matching'?!!q.matching?.left?.length:q.options.length>=2),
+  hideRemediation(){},showToast(){},advanceAfterAnswer(){},renderQuestion(){},document:{body:{dataset:{}}}};
+ vm.createContext(env);
+ vm.runInContext(modeSource.slice(modeSource.indexOf('  async function startRemediationVerification('),modeSource.indexOf('  function finishRemediationVerification(')),env);
+ await env.startRemediationVerification();
+ assert.equal(env.state.verification?.question.id,'candidate');
+});
+test('revenge shows the previous matching attempt using candidate labels',()=>{
+ const env={state:{mode:'revenge',showPreviousWrong:true},dom:{previousWrongToggle:{},showPreviousWrong:{},previousWrongAnswer:{}},text:String,AnswerSet:A};
+ vm.createContext(env);
+ vm.runInContext(modeSource.slice(modeSource.indexOf('  function renderPreviousWrongAnswer('),modeSource.indexOf('  function renderQuestion(')),env);
+ env.renderPreviousWrongAnswer({...question,previousWrongPairs:{l1:'r1',l2:'r2'}});
+ assert.equal(env.dom.previousWrongAnswer.hidden,false);
+ assert.ok(env.dom.previousWrongAnswer.textContent.includes('甲'));
+});

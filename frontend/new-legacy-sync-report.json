@@ -5,16 +5,8 @@
   "changes": {
     "added": [],
     "changed": [
-      "content-prep-studio/dist/content-prep.html",
-      "content-prep-studio/src/js/20-page-runtime.js",
       "src/100-practice-mode.js",
-      "src/114-practice-draft-state.js",
-      "src/118-question-materials.js",
-      "src/119-question-rich-editor.js",
-      "src/65-question-bank-admin.js",
-      "src/teacher/paper-management/paper-question-picker.js",
-      "styles/question-materials.css",
-      "tests/mixed-question-editor.test.js"
+      "tests/mixed-practice.test.js"
     ],
     "removed": []
   },

@@ -69,7 +69,7 @@
     return {
       id:text(q.id||ref?.questionId||('q-'+index)),bankId:text(ref?.bankId||q.sourceBankId),mistakeId:text(ref?.mistakeId),previousWrongAnswer:text(ref?.previousWrongAnswer),previousWrongAnswerIds:Array.isArray(ref?.previousWrongAnswerIds)?ref.previousWrongAnswerIds.map(text):[],
       title:text(q.title||'未命名题目'),stem:stemText(q),options,correctAnswer:type==='multiple_choice'?'':resolvedCorrect,correctOptionIds,
-      type,raw:q,matching:q.matching||q.metadata?.matching,material:q.material||q.metadata?.material,images:q.images||q.metadata?.images,caseGroup:q.caseGroup||q.metadata?.caseGroup,
+      type,raw:q,matching:q.matching||q.metadata?.matching,material:q.material||q.metadata?.material,images:q.images||q.metadata?.images,caseGroup:q.caseGroup||q.metadata?.caseGroup,previousWrongPairs:clone(ref?.previousWrongPairs||ref?.selectedPairs||{}),
       knowledge:{taxonomyId:text(knowledge.taxonomyId),nodeId:text(knowledge.primaryNodeId||knowledge.nodeId),title:text(path[path.length-1]||knowledge.title||q.topic),path}
     };
   }
@@ -448,7 +448,7 @@
     if(!state.active||state.mode!=='revenge'||!state.remediationPending)return false;
     const sourceQuestion=state.questions[state.index];
     if(!sourceQuestion?.mistakeId)return false;
-    const nodeId=text(sourceQuestion.knowledge?.nodeId),fallback=(state.questions.find(question=>question.id!==sourceQuestion.id&&question.type===sourceQuestion.type&&(!nodeId||text(question.knowledge?.nodeId)===nodeId)&&question.stem&&question.options.length>=2))||null;
+    const nodeId=text(sourceQuestion.knowledge?.nodeId),fallback=(state.questions.find(question=>question.id!==sourceQuestion.id&&question.type===sourceQuestion.type&&(!nodeId||text(question.knowledge?.nodeId)===nodeId)&&usableQuestion(question)&&!state.draft?.answer?.(question.id)))||null;
     if(!fallback){state.remediationPending=false;state.revengeState={phase:'verification_due',mistakeId:sourceQuestion.mistakeId,questionId:sourceQuestion.id};hideRemediation();showToast('暂无同题型验证题，已安排后续用原题延迟验证。');advanceAfterAnswer();return true}
     state.verification={active:true,sourceQuestion,question:fallback};
     state.revengeState={phase:'verification',mistakeId:sourceQuestion.mistakeId,questionId:sourceQuestion.id,verificationQuestion:clone(fallback.raw)};
@@ -618,13 +618,14 @@
     const revengeQuestion=state.mode==='revenge'&&!state.verification?.active;
     const answerIds=question?.previousWrongAnswerIds?.length?question.previousWrongAnswerIds:[text(question?.previousWrongAnswer)].filter(Boolean);
     const options=answerIds.map(id=>question?.options?.find(item=>text(item.id)===id)).filter(Boolean);
-    const visible=revengeQuestion&&state.showPreviousWrong&&!!options.length;
+    const previousPairs=question?.type==='matching'?AnswerSet.pairs(question,question.previousWrongPairs):null;
+    const visible=revengeQuestion&&state.showPreviousWrong&&(!!options.length||!!Object.keys(previousPairs||{}).length);
     if(dom.previousWrongToggle)dom.previousWrongToggle.hidden=!revengeQuestion;
     if(dom.showPreviousWrong)dom.showPreviousWrong.checked=state.showPreviousWrong;
     if(!dom.previousWrongAnswer)return;
     dom.previousWrongAnswer.hidden=!visible;
     if(!visible){dom.previousWrongAnswer.textContent='';return}
-    dom.previousWrongAnswer.textContent='上次选错：'+options.map(option=>text(option.id)).join('、');
+    dom.previousWrongAnswer.textContent='上次选错：'+(previousPairs?AnswerSet.answerText(question,previousPairs):options.map(option=>text(option.id)).join('、'));
   }
   function renderQuestion(){
     if(state.mode==='revenge'&&!state.verification?.active&&state.revengeState?.phase==='verification'&&state.revengeState?.verificationQuestion){

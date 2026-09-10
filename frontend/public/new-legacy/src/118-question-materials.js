@@ -46,7 +46,7 @@
     };
     container.ondragstart=event=>{const right=event.target.closest('[data-qm-right]');if(right){event.dataTransfer.setData('text/plain',right.dataset.qmRight);event.dataTransfer.effectAllowed='move';}};
     container.ondragover=event=>{if(!readOnly&&event.target.closest('[data-qm-left]'))event.preventDefault();};
-    container.ondrop=event=>{const left=event.target.closest('[data-qm-left]');if(left&&!readOnly){event.preventDefault();assign(left.dataset.qmLeft,event.dataTransfer.getData('text/plain'));}};
+    container.ondrop=event=>{const left=event.target.closest('[data-qm-left]');if(left&&!readOnly){event.preventDefault();const right=event.dataTransfer?.getData('text/plain');if(q.matching.right.some(item=>item.id===right))assign(left.dataset.qmLeft,right);}};
     return {value:()=>({...selected})};
   }
   function render(question,options={}){return renderMaterials(question)+(question?.type==='matching'?renderMatching(question,options):'');}

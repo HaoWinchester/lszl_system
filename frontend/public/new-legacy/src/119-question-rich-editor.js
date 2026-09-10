@@ -28,6 +28,8 @@
  }
  function showError(error){const node=host?.querySelector('.qm-editor-error');if(node)node.textContent=error.message||String(error);}
  function capture(){if(!state||!host)return;
+  const order=host.querySelector('[data-rich-order]'),total=host.querySelector('[data-rich-total]');
+  if(order&&total)state.caseGroup={id:state.material.id,order:order.value,total:total.value};
   host.querySelectorAll('[data-rich-left]').forEach(el=>{state.matching.left[Number(el.dataset.richLeft)].text=el.value;});
   host.querySelectorAll('[data-rich-right]').forEach(el=>{state.matching.right[Number(el.dataset.richRight)].text=el.value;});
   host.querySelectorAll('[data-rich-answer]').forEach(el=>{if(el.value)state.matching.correctPairs[el.dataset.richAnswer]=el.value;else delete state.matching.correctPairs[el.dataset.richAnswer];});

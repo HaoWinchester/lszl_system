@@ -35,6 +35,12 @@ def test_matching_partial_resume_submit_report_and_mistake():
         mistakes = client.get('/api/v1/learning/practice/overview')
         assert mistakes.status_code == 200, mistakes.text
         assert 'selectedPairs' in mistakes.text and 'matching' in mistakes.text
+        revenge = client.post(PATH+'/start', json={'mode':'revenge','count':1})
+        assert revenge.status_code == 200, revenge.text
+        previous = revenge.json()['session']['questions'][0]
+        assert previous['previousWrongPairs'] == {'l1':'r1','l2':'r2'}
+        resumed = client.get(PATH+'/'+revenge.json()['session']['id']).json()['session']
+        assert resumed['questions'][0]['previousWrongPairs'] == previous['previousWrongPairs']
 
 
 def test_matching_submission_lock_revision_timeout_and_revenge():
