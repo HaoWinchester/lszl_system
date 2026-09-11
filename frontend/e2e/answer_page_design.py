@@ -54,6 +54,11 @@ def main():
             errors=[];page.on('pageerror',lambda error:errors.append(str(error)))
             page.goto(base+'/practice-mode.html',wait_until='networkidle')
             page.locator(f'[data-paper-id="{ids["paper"]}"]').first.click()
+            list_type = page.evaluate('''() => {
+                const size = selector => getComputedStyle(document.querySelector(selector)).fontSize;
+                return {title:size('.practice-mode-card h2'), body:size('.practice-mode-card p'),
+                        control:size('.practice-start-btn'), brand:size('.practice-brand strong')};
+            }''')
             page.locator('[data-practice-start="challenge"]').click()
             page.locator('#practiceGame').wait_for(state='visible')
             def jump(index):
@@ -91,12 +96,18 @@ def main():
                 assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), width
                 if width<=900:
                     assert page.locator('.qm-question-materials').bounding_box()['y']<page.locator('.practice-answer-panel').bounding_box()['y']
+                for selector, role in [('.practice-question-stem','title'),('.qm-text','body'),
+                                       ('.practice-option','body'),('.practice-nav-btn','control'),
+                                       ('.practice-brand strong','brand')]:
+                    assert page.locator(selector).first.evaluate('(el)=>getComputedStyle(el).fontSize') == list_type[role], (width, selector, list_type)
+                standard_size = page.locator('.practice-option').first.evaluate('(el)=>parseFloat(getComputedStyle(el).fontSize)')
                 page.locator('[data-practice-action="settings"]').click()
                 page.locator('#practiceReadingSize').select_option('large')
-                assert page.locator('.practice-option').first.evaluate('(el)=>parseFloat(getComputedStyle(el).fontSize)') >= (20 if width<=600 else 24)
+                assert page.locator('.practice-option').first.evaluate('(el)=>parseFloat(getComputedStyle(el).fontSize)') > standard_size
                 assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), ('large',width)
                 page.locator('#practiceReadingSize').select_option('standard')
                 page.keyboard.press('Escape')
+                assert page.locator('.practice-option').first.evaluate('(el)=>parseFloat(getComputedStyle(el).fontSize)') == standard_size
                 if width==390: page.screenshot(path=str(OUT/'mobile-case.png'),full_page=True)
             jump(0)
             assert page.locator('.qm-question-materials').is_hidden()
