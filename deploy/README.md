@@ -16,6 +16,6 @@ rsync 输出文件总量、实际发送字节和传输统计；Docker 输出各�
 
 保留 release 目录中的 `source/`、`site/`、`release.json` 和 `validation.json`，继续使用管理器的 `update` 入口；无需增加跳过检查的参数。相同输入的成功完整验证可以在相同运行环境的不同工作树间复用。管理器每次仍检查关键页面、文件数、源和 site 内容及验证上下文。
 
-旧版证据、新代码/依赖/测试/配置、未知文件、运行环境变化、发布包损坏，都会拒绝复用或重新验证。仅 `docs/superpowers/`、`docs/verification/` 下的 Markdown 运维记录不使缓存失效；其他文档及这些目录中的脚本仍计入。快速验证结果不能代替完整验证。
+旧版证据、新代码/依赖/测试/配置、未知文件、运行环境变化、发布包损坏，都会拒绝复用或重新验证。`docs/superpowers/`、`docs/verification/` 下的 Markdown 运维记录，以及 `frontend/new-legacy-sync-report.json` 同步差异报告不使缓存失效。该报告在重复同步时会从“上次变更”变成“无变更”，不代表发布内容变化；源、site 和 manifest 仍按实际内容校验。其他文档、脚本和未知报告仍计入。快速验证结果不能代替完整验证。
 
 不要手工复制覆盖远端 active site，也不要使用 `--skip-browser` 来制造缓存命中。验证通过只代表开发自检，不代表用户已完成 UAT 业务验收。

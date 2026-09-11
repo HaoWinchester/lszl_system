@@ -100,7 +100,27 @@ test('only operational Markdown records may change without rerunning validation'
   assert.equal(f.count(), 1, 'operational records must not invalidate the evidence')
 })
 
-for (const path of ['backend/app.py', '.unknown-runtime-config', 'docs/runtime-contract.md', 'docs/superpowers/check.js', 'frontend/package.json']) {
+test('committing a validated release then refreshing the sync diff report reuses evidence', (t) => {
+  const f = fixture(t)
+  const report = resolve(f.checkout, 'frontend/new-legacy-sync-report.json')
+  put(report, JSON.stringify({ schemaVersion: 1, fromVersion: 'old', toVersion: version,
+    changes: { added: [], changed: ['VERSION', 'styles/answer-page.css'], removed: [] }, incompatible: [] }))
+  f.pass()
+  const before = readFileSync(f.reportPath, 'utf8')
+  for (const args of [['add', '.'], ['-c', 'user.name=Cache Test', '-c', 'user.email=cache@example.invalid', 'commit', '-qm', 'release']]) {
+    const result = spawnSync('git', args, { cwd: f.checkout, encoding: 'utf8' })
+    assert.equal(result.status, 0, result.stderr)
+  }
+  // update-uat syncs once more before asking the release manager to update.
+  // The previous diff becomes empty although all actual release inputs match.
+  put(report, JSON.stringify({ schemaVersion: 1, fromVersion: version, toVersion: version,
+    changes: { added: [], changed: [], removed: [] }, incompatible: [] }))
+  f.pass()
+  assert.equal(f.count(), 1, 'refreshing a diagnostic diff must not repeat full validation')
+  assert.equal(readFileSync(f.reportPath, 'utf8'), before)
+})
+
+for (const path of ['backend/app.py', '.unknown-runtime-config', 'docs/runtime-contract.md', 'docs/superpowers/check.js', 'frontend/package.json', 'frontend/new-legacy-manifest.json', 'frontend/another-sync-report.json']) {
   test(`runtime input ${path} invalidates successful evidence`, (t) => {
     const f = fixture(t)
     f.pass()
