@@ -74,7 +74,14 @@ def main():
             assert abs(material_box['y']-panel['y']) < 2
             assert page.locator('#practiceQuestionType').inner_text()=='单选题'
             assert 'linear-gradient' in page.locator('#practiceNextBtn').evaluate('(el)=>getComputedStyle(el).backgroundImage')
-            assert page.locator('[data-kg-icon="settings"]').get_attribute('data-kg-icon-hydrated')=='settings'
+            assert page.locator('.practice-brand strong').inner_text()=='知识练习'
+            assert page.locator('[data-practice-action="settings"], #practiceReadingSettings').count()==0
+            note=page.locator('.practice-side-note').bounding_box()
+            exit_box=page.locator('.practice-side-nav #practiceExitBtn').bounding_box()
+            assert page.locator('#practiceExitBtn').inner_text()=='退出'
+            assert 0 < note['y']-(exit_box['y']+exit_box['height']) < 60
+            page.locator('[data-practice-action="question"]').click()
+            assert page.locator('#practiceQuestionStem').evaluate('(el)=>el===document.activeElement')
             page.locator('.qm-case-body').evaluate('(el)=>el.scrollTop=100')
             prior=page.locator('.qm-case-body').evaluate('(el)=>el.scrollTop')
             page.locator('#practiceNextBtn').click()
@@ -100,14 +107,6 @@ def main():
                                        ('.practice-option','body'),('.practice-nav-btn','control'),
                                        ('.practice-brand strong','brand')]:
                     assert page.locator(selector).first.evaluate('(el)=>getComputedStyle(el).fontSize') == list_type[role], (width, selector, list_type)
-                standard_size = page.locator('.practice-option').first.evaluate('(el)=>parseFloat(getComputedStyle(el).fontSize)')
-                page.locator('[data-practice-action="settings"]').click()
-                page.locator('#practiceReadingSize').select_option('large')
-                assert page.locator('.practice-option').first.evaluate('(el)=>parseFloat(getComputedStyle(el).fontSize)') > standard_size
-                assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), ('large',width)
-                page.locator('#practiceReadingSize').select_option('standard')
-                page.keyboard.press('Escape')
-                assert page.locator('.practice-option').first.evaluate('(el)=>parseFloat(getComputedStyle(el).fontSize)') == standard_size
                 if width==390: page.screenshot(path=str(OUT/'mobile-case.png'),full_page=True)
             jump(0)
             assert page.locator('.qm-question-materials').is_hidden()
@@ -136,7 +135,7 @@ def main():
             assert page.locator('#practiceAnswerSheet [data-question-id]').count()==1
             assert not errors, errors
             browser.close()
-            print('PASS design: cases, single/multiple/matching, scroll/collapse retention, marked filter/save/reload, navigation boundaries, reading settings, six viewport widths')
+            print('PASS design: cases, single/multiple/matching, scroll/collapse retention, marked filter/save/reload, navigation boundaries, simplified sidebar, list typography, six viewport widths')
     finally:
         server.close()
 

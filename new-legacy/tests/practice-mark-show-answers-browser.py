@@ -276,15 +276,7 @@ with sync_playwright() as playwright:
     assert page.locator('#practiceAnswerSheet [data-question-id]').count() == 10
     assert page.locator('#practiceAnswerSheet .is-marked[data-question-id]').count() == 1
     page.locator('#practiceAnswerSheetDrawerClose').click()
-    before = page.locator('#practiceQuestionStem').evaluate('(el)=>parseFloat(getComputedStyle(el).fontSize)')
-    page.locator('[data-practice-action="settings"]').click()
-    page.locator('#practiceReadingSize').select_option('large')
-    assert page.locator('#practiceQuestionStem').evaluate('(el)=>parseFloat(getComputedStyle(el).fontSize)') > before
-    page.keyboard.press('Escape')
-    assert page.locator('#practiceReadingSettings').is_hidden()
-    page.locator('[data-practice-action="settings"]').click()
-    page.locator('#practiceReadingSize').select_option('standard')
-    page.locator('[data-practice-action="close-settings"]').click()
+    assert page.locator('[data-practice-action="settings"], #practiceReadingSettings').count() == 0
     for width in [320, 390, 768, 1024, 1360]:
         page.set_viewport_size({'width': width, 'height': 1000})
         assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), width

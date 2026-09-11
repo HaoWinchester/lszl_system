@@ -1,7 +1,7 @@
 /* Reference-led answer workspace. Lobby, reports and shared dialogs keep their own skin. */
 .practice-brand-mark svg{display:block;width:56px;height:56px}
 .practice-brand-motto{display:none}
-.practice-side-nav,.practice-reading-settings{display:none}
+.practice-side-nav{display:none}
 body.practice-mode-page[data-practice-view="game"]{
   --learn-radius-control:14px;--practice-accent:#3865ff;--practice-accent-soft:#eaf0ff;
   background:radial-gradient(ellipse at 100% 0,#e8eeff 0,transparent 32%),linear-gradient(135deg,#f6faff,#f8fbff 65%);
@@ -20,14 +20,13 @@ body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice
 body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-side-item:hover{background:#f0f4ff;color:#2761ff}
 body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-side-item.is-active{background:#eaf0ff;color:#2761ff;font-weight:650}
 .practice-side-item svg{width:28px;height:28px}
-.practice-side-note{margin:auto auto 0 8px;padding-top:80px;font-size:var(--ui-text-meta);line-height:1.6;color:#8190ac}
+.practice-side-note{margin:32px auto 0 8px;padding-top:0;font-size:var(--ui-text-meta);line-height:1.6;color:#8190ac}
 .practice-side-note::before{content:"";display:block;width:20px;border-top:2px solid #cbd5e8;margin-bottom:12px}
 body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-game-topbar{display:flex;gap:26px;min-height:44px;margin:0 10px 22px;align-items:center}
 body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-progress{flex:1;display:flex;gap:24px;align-items:center;min-width:70px}
 body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-progress-shell{flex:1;height:14px;background:#e5edff}
 body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-progress-shell span{background:linear-gradient(90deg,#4879ff,#5850ff)}
 body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-question-progress{font-size:var(--ui-text-control);line-height:1.4;color:#4c5a7b;font-weight:550}
-body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-exit-btn{position:absolute;left:49px;bottom:150px;order:-1;width:32px;height:32px;border:0;background:transparent;color:#8492ad;flex-shrink:0}
 body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-health{gap:10px}
 body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-heart svg{width:24px;height:24px;fill:none;stroke-width:2}
 body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-language-cycle{height:42px;min-width:44px;border:1px solid #d9e1f0;border-radius:11px;background:#fff;color:#43516d;font-size:var(--ui-text-control)}
@@ -75,14 +74,6 @@ body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice
 body.practice-mode-page[data-learning-skin][data-practice-view="game"] .qm-case-layout>.practice-study-tip{grid-column:2;grid-row:2}
 body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-study-tip strong{display:block;color:#3767ff;font-size:var(--ui-text-control);margin-bottom:2px}
 body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-study-tip::before{content:"";position:absolute;left:16px;top:15px;width:24px;height:26px;background:#3767ff;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round'%3E%3Cpath d='M9 18h6m-5 3h4M8 15a7 7 0 1 1 8 0l-1 3H9ZM12 0v1M1 10h1m20 0h1M3 3l1 1m16 0 1-1'/%3E%3C/g%3E%3C/svg%3E") center/contain no-repeat}
-body.practice-mode-page[data-practice-view="game"] .practice-reading-settings:not([hidden]){display:block;position:absolute;left:138px;top:310px;z-index:35;width:270px;padding:22px;border:1px solid #dce5f5;border-radius:14px;background:#fff;box-shadow:0 12px 40px #24437020;color:#334766}
-.practice-reading-settings>div{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
-.practice-reading-settings button{font-size:var(--ui-text-card-title);border:0;background:none;color:#72809b}
-.practice-reading-settings label{display:block;margin-bottom:10px;font-size:var(--ui-text-control)}
-.practice-reading-settings select{width:100%;padding:10px;border:1px solid #dce5f5;border-radius:7px;background:#fff;color:#334766}
-.practice-reading-settings p{font-size:var(--ui-text-meta);line-height:1.7;color:#7485a6}
-body.practice-mode-page[data-learning-skin][data-practice-view="game"] [data-reading-size="large"] .practice-question-stem{font-size:var(--ui-text-section-title)}
-body.practice-mode-page[data-learning-skin][data-practice-view="game"] [data-reading-size="large"] :is(.qm-text,.practice-option){font-size:var(--ui-text-card-title)}
 body.practice-mode-page[data-practice-view="game"] :is(button,a,select,summary):focus-visible{outline:3px solid #80a4ff;outline-offset:4px}
 @media(max-width:1150px){
   body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-game{padding-left:104px}
@@ -95,8 +86,6 @@ body.practice-mode-page[data-practice-view="game"] :is(button,a,select,summary):
   body.practice-mode-page[data-learning-skin][data-practice-view="game"] .qm-text{font-size:var(--ui-text-body)}
   .practice-material-heading{gap:10px;margin-inline:0}.practice-material-heading>span{width:44px;height:50px}.practice-material-heading h2{font-size:var(--ui-text-body)}.practice-material-heading p{font-size:var(--ui-text-meta)}
   body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-brand-motto{display:none}
-  body.practice-mode-page[data-practice-view="game"] .practice-reading-settings:not([hidden]){left:94px}
-  body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-exit-btn{left:28px}
 }
 @media(max-width:900px){
   body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-question-card.qm-case-layout{grid-template-columns:minmax(0,1fr)}
@@ -124,7 +113,6 @@ body.practice-mode-page[data-practice-view="game"] :is(button,a,select,summary):
   body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-answer-sheet-mobile-btn{height:36px;font-size:var(--ui-text-meta);padding:0 8px;gap:3px}
   body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-answer-sheet-mobile-btn::before{display:none}
   body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-language-cycle{height:32px;min-width:30px;font-size:var(--ui-text-control);padding:0 5px}
-  body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-exit-btn{position:static;width:24px;height:28px}
   body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-answer-panel{padding:20px 16px;border-radius:12px}
   body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-question-card{gap:14px}
   body.practice-mode-page[data-learning-skin][data-practice-view="game"] .qm-question-materials{padding:16px 12px;border-radius:12px}
@@ -140,8 +128,5 @@ body.practice-mode-page[data-practice-view="game"] :is(button,a,select,summary):
   body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-nav-btn{height:46px;font-size:var(--ui-text-control);min-width:86px;gap:6px}
   body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-question-pos{font-size:var(--ui-text-meta)}
   body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-explanation-toggle{font-size:var(--ui-text-meta)}
-  body.practice-mode-page[data-practice-view="game"] .practice-reading-settings:not([hidden]){left:auto;right:12px;top:58px;max-width:calc(100% - 24px)}
-  body.practice-mode-page[data-learning-skin][data-practice-view="game"] [data-reading-size="large"] .practice-question-stem{font-size:var(--ui-text-section-title)}
-  body.practice-mode-page[data-learning-skin][data-practice-view="game"] [data-reading-size="large"] :is(.qm-text,.practice-option){font-size:var(--ui-text-card-title)}
 }
 @media(prefers-reduced-motion:reduce){body.practice-mode-page[data-practice-view="game"] *{scroll-behavior:auto!important;animation:none!important;transition:none!important}}

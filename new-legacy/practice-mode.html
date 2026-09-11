@@ -24,7 +24,7 @@
     <header class="practice-header">
       <a class="practice-brand" href="practice-mode.html" aria-label="返回做题模式大厅">
         <span class="practice-brand-mark" aria-hidden="true"><svg viewBox="0 0 56 56" fill="none"><defs><linearGradient id="practiceCap" x1="8" y1="5" x2="46" y2="52" gradientUnits="userSpaceOnUse"><stop stop-color="#65b9ff"/><stop offset="1" stop-color="#4941ff"/></linearGradient></defs><path d="M12 25v15c0 7 32 7 32 0V25" fill="url(#practiceCap)"/><path d="m5 18 20-10a7 7 0 0 1 6 0l20 10a3 3 0 0 1 0 5L31 33a7 7 0 0 1-6 0L5 23a3 3 0 0 1 0-5Z" fill="url(#practiceCap)"/><path d="m15 25 10 5a7 7 0 0 0 6 0l10-5M27 17l10 5" stroke="white" stroke-width="2.5" stroke-linecap="round"/></svg></span>
-        <span><strong>在线考试</strong><small>专注 · 高效 · 成长</small></span>
+        <span><strong>知识练习</strong><small>专注 · 高效 · 成长</small></span>
       </a>
       <p class="practice-brand-motto">把知识，变成更大的可能</p>
       <div class="practice-header-actions">
@@ -155,17 +155,10 @@
           <button type="button" class="practice-side-item is-active" data-practice-action="question" aria-label="回到当前题目"><span data-kg-icon="file-text" data-kg-icon-size="28" aria-hidden="true"></span><span>答题</span></button>
           <button type="button" class="practice-side-item" data-practice-action="sheet" aria-controls="practiceAnswerSheetDrawer"><span data-kg-icon="layout-grid" data-kg-icon-size="28" aria-hidden="true"></span><span>答题卡</span></button>
           <button type="button" class="practice-side-item" data-practice-action="marked" aria-controls="practiceAnswerSheetDrawer" title="查看本次练习标记的题目"><span data-kg-icon="star" data-kg-icon-size="28" aria-hidden="true"></span><span>标记</span></button>
-          <button type="button" class="practice-side-item" data-practice-action="settings" aria-controls="practiceReadingSettings" aria-expanded="false"><span data-kg-icon="settings" data-kg-icon-size="28" aria-hidden="true"></span><span>设置</span></button>
+          <button type="button" class="practice-side-item practice-exit-btn" id="practiceExitBtn" aria-label="退出本次练习" title="退出本次练习"><span data-kg-icon="log-out" data-kg-icon-size="28" aria-hidden="true"></span><span>退出</span></button>
           <p class="practice-side-note">坚持<br/>是通往优秀<br/>最短的路</p>
         </nav>
-        <section class="practice-reading-settings" id="practiceReadingSettings" aria-label="阅读设置" hidden>
-          <div><strong>阅读设置</strong><button type="button" data-practice-action="close-settings" aria-label="关闭阅读设置">×</button></div>
-          <label for="practiceReadingSize">阅读字号</label>
-          <select id="practiceReadingSize"><option value="standard">标准</option><option value="large">大字</option></select>
-          <p>调整题干、案例材料和选项的字号。</p>
-        </section>
         <header class="practice-game-topbar">
-          <button type="button" class="practice-exit-btn" id="practiceExitBtn" aria-label="退出本次练习" title="退出"><span data-kg-icon="x" data-kg-icon-size="18" aria-hidden="true"></span></button>
           <button type="button" class="practice-review-back" id="practiceReviewBackBtn" hidden>← 返回成绩单</button>
           <div class="practice-progress">
             <div class="practice-progress-shell" id="practiceProgressShell" role="progressbar" aria-label="做题进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="第 0 / 0 题"><span id="practiceProgressBar"></span></div>
