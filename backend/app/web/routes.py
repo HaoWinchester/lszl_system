@@ -14,7 +14,7 @@ from app.core.auth import CurrentUser
 from app.core.permissions import can
 from app.db.session import get_db
 from app.web.bootstrap import build_bootstrap, optional_user
-from app.web.html import html_response
+from app.web.html import has_bootstrap_anchor, html_response
 from app.web.releases import (
     ReleaseNotFoundError,
     WebRelease,
@@ -274,6 +274,10 @@ async def preview_asset(version: str, asset_path: str, request: Request, db: DB)
     if path.suffix.lower() == ".html":
         if await _page_access_denied(request, db, path.name):
             return _forbidden_page()
+        page_html = path.read_text(encoding="utf-8")
+        if not has_bootstrap_anchor(page_html):
+            # 搜索引擎站长平台验证文件等无锚点静态 html，字节级原样直出。
+            return FileResponse(path, headers=_static_headers(request, release))
         bootstrap = await build_bootstrap(
             request, db, page=path.name, release_version=release.version, read_only=True
         )
@@ -290,6 +294,10 @@ async def active_asset(asset_path: str, request: Request, db: DB) -> Response:
     if path.suffix.lower() == ".html":
         if await _page_access_denied(request, db, path.name):
             return _forbidden_page()
+        page_html = path.read_text(encoding="utf-8")
+        if not has_bootstrap_anchor(page_html):
+            # 搜索引擎站长平台验证文件等无锚点静态 html，字节级原样直出。
+            return FileResponse(path, headers=_static_headers(request, release))
         bootstrap = await build_bootstrap(
             request, db, page=path.name, release_version=release.version
         )
