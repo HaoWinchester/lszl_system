@@ -4,7 +4,9 @@
   "toVersion": "v9.0-p4.1.224",
   "changes": {
     "added": [],
-    "changed": [],
+    "changed": [
+      "landing.html"
+    ],
     "removed": []
   },
   "incompatible": []
