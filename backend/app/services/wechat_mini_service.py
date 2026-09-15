@@ -297,6 +297,9 @@ async def exchange_login_code(
     user.last_login_at = now
     user.last_active_at = now
     existing = dict(user.wechat or {})
+    existing["miniOpenid"] = openid
+    existing["unionid"] = unionid or existing.get("unionid", "")
+    existing["miniBoundAt"] = existing.get("miniBoundAt") or _iso(now)
     existing["miniLastLoginAt"] = _iso(now)
     user.wechat = existing
     record, issued = _new_session(user, client_metadata)
