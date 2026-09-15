@@ -153,13 +153,34 @@ def test_actual_session_save_counts_wrong_once_and_rejects_replays_events_and_ot
         assert another_save.status_code == 200
         assert client.get("/api/v1/learning/practice/growth").json()["today"]["answered"] == 1
 
+        another_complete = client.post(
+            f"/api/v1/learning/practice/sessions/{another['id']}/complete",
+            json={
+                "revision": another_save.json()["session"]["revision"],
+                "answers": {question_id: {"selectedAnswer": "A", "selectionIndex": 1}},
+            },
+        )
+        assert another_complete.status_code == 200, another_complete.text
+        same_day_session = client.post("/api/v1/learning/practice/sessions/start", json={
+            "paperId": ids["paper"], "releaseId": ids["release"],
+            "mode": "challenge", "count": 1, "order": "paper",
+        }).json()["session"]
+        same_day_save = client.patch(
+            f"/api/v1/learning/practice/sessions/{same_day_session['id']}/state",
+            json={"revision": 1, "answers": {
+                question_id: {"selectedAnswer": "A", "selectionIndex": 1}
+            }},
+        )
+        assert same_day_save.status_code == 200
+        assert client.get("/api/v1/learning/practice/growth").json()["today"]["answered"] == 1
+
         third_day = datetime(2026, 9, 15, 16, 0, tzinfo=timezone.utc)
         monkeypatch.setattr(practice_growth_service, "now_utc", lambda: third_day)
         monkeypatch.setattr(practice_session_service, "now_utc", lambda: third_day)
         upgraded = client.post(
-            f"/api/v1/learning/practice/sessions/{another['id']}/answers",
+            f"/api/v1/learning/practice/sessions/{same_day_session['id']}/answers",
             json={
-                "revision": another_save.json()["session"]["revision"],
+                "revision": same_day_save.json()["session"]["revision"],
                 "questionId": question_id,
                 "selectedAnswer": "A",
             },
@@ -317,6 +338,101 @@ def test_whole_paper_and_pc_answer_do_not_invert_growth_and_question_locks(monke
         whole, pc = await asyncio.wait_for(asyncio.gather(complete_whole(), answer_pc()), timeout=8)
         assert whole[0]["status"] == "completed"
         assert pc["correct"] is True
+      asyncio.run(scenario())
+    finally:
+      asyncio.run(_cleanup_released_pmp_paper(ids))
+
+
+def test_session_verification_request_replay_does_not_credit_later_day(monkeypatch):
+    username = f"growth-session-verify-{__import__('uuid').uuid4().hex[:8]}"
+    _create_student(username)
+    source = _create_public_question(title="session verify source", taxonomy_id="session-growth-tax", node_id="session-growth-node")
+    variant = _create_public_question(title="session verify variant", taxonomy_id="session-growth-tax", node_id="session-growth-node")
+    day_one = datetime(2026, 10, 1, 4, tzinfo=timezone.utc)
+    monkeypatch.setattr(practice_growth_service, "now_utc", lambda: day_one)
+    monkeypatch.setattr(practice_session_service, "now_utc", lambda: day_one)
+    monkeypatch.setattr(learning_service, "now_utc", lambda: day_one)
+    with TestClient(app) as client:
+      _login(client, username, "test1234")
+      wrong = client.post("/api/v1/learning/practice/answers", json={
+          "questionId": source["question"]["id"], "bankId": source["bankId"], "selectedAnswer": "B"
+      }).json()
+      started = client.post("/api/v1/learning/practice/sessions/start", json={
+          "mode": "revenge", "count": 1, "order": "paper"
+      }).json()["session"]
+      answered = client.post(f"/api/v1/learning/practice/sessions/{started['id']}/answers", json={
+          "revision": started["revision"], "questionId": source["question"]["id"], "selectedAnswer": "B"
+      })
+      assert answered.status_code == 200, answered.text
+      mistake_id = wrong["mistake"]["id"]
+      reviewed = client.post(
+          f"/api/v1/learning/practice/sessions/{started['id']}/mistakes/{mistake_id}/remediation",
+          json={"revision": answered.json()["session"]["revision"]},
+      )
+      assert reviewed.status_code == 200, reviewed.text
+      verify_path = f"/api/v1/learning/practice/sessions/{started['id']}/mistakes/{mistake_id}/verification"
+      verify_body = {
+          "revision": reviewed.json()["session"]["revision"],
+          "questionId": variant["question"]["id"], "selectedAnswer": "A", "requestId": "session-growth-replay",
+      }
+      first = client.post(verify_path, json=verify_body)
+      assert first.status_code == 200, first.text
+      assert client.get("/api/v1/learning/practice/growth").json()["today"]["answered"] == 2
+      day_two = datetime(2026, 10, 2, 4, tzinfo=timezone.utc)
+      monkeypatch.setattr(practice_growth_service, "now_utc", lambda: day_two)
+      monkeypatch.setattr(practice_session_service, "now_utc", lambda: day_two)
+      monkeypatch.setattr(learning_service, "now_utc", lambda: day_two)
+      replay = client.post(verify_path, json={**verify_body, "revision": first.json()["session"]["revision"]})
+      assert replay.status_code == 200, replay.text
+      assert replay.json()["verification"]["id"] == first.json()["verification"]["id"]
+      assert client.get("/api/v1/learning/practice/growth").json()["today"]["answered"] == 0
+
+
+def test_abandon_and_pc_answer_do_not_invert_growth_and_question_locks(monkeypatch):
+    ids = _practice_fixture_ids()
+    asyncio.run(_seed_released_pmp_paper(ids, domains=["people", "people"]))
+    try:
+      with TestClient(app) as client:
+        _login(client, ids["student"], SESSION_PASSWORD)
+        started = client.post("/api/v1/learning/practice/sessions/start", json={
+            "paperId": ids["paper"], "releaseId": ids["release"],
+            "mode": "challenge", "count": 2, "order": "paper",
+        }).json()["session"]
+      q1, q2 = [item["questionId"] for item in started["questions"]]
+      original = learning_service.record_practice_answer
+      q1_finished = asyncio.Event()
+      pc_finished = asyncio.Event()
+      async def controlled(*args, **kwargs):
+        result = await original(*args, **kwargs)
+        if kwargs.get("account_growth") is False and args[2].get("questionId") == q1:
+          q1_finished.set()
+          await asyncio.wait_for(pc_finished.wait(), timeout=3)
+        return result
+      monkeypatch.setattr(learning_service, "record_practice_answer", controlled)
+      async def scenario():
+        async def abandon():
+          async with AsyncSessionLocal() as db:
+            user = await db.get(User, ids["student"])
+            return await practice_session_service.abandon_session(db, ids["student"], started["id"], {
+                "revision": started["revision"],
+                "answers": {
+                    q1: {"selectedAnswer": "A", "selectionIndex": 1},
+                    q2: {"selectedAnswer": "A", "selectionIndex": 2},
+                },
+            }, user=user)
+        async def pc():
+          await asyncio.wait_for(q1_finished.wait(), timeout=3)
+          try:
+            async with AsyncSessionLocal() as db:
+              user = await db.get(User, ids["student"])
+              return await learning_service.record_practice_answer(db, ids["student"], {
+                  "questionId": q2, "bankId": ids["bank"], "releaseId": ids["release"], "selectedAnswer": "A"
+              }, current_user=user)
+          finally:
+            pc_finished.set()
+        abandoned, pc_result = await asyncio.wait_for(asyncio.gather(abandon(), pc()), timeout=8)
+        assert abandoned["status"] == "abandoned"
+        assert pc_result["correct"] is True
       asyncio.run(scenario())
     finally:
       asyncio.run(_cleanup_released_pmp_paper(ids))

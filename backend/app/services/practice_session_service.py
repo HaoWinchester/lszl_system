@@ -1443,7 +1443,7 @@ async def verify_revenge_session(
     if session.revision != requested_revision:
         raise _revision_conflict(session)
     result = await learning_service.record_practice_verification(
-        db, owner, mistake_id, data, commit=False, account_growth=False
+        db, owner, mistake_id, data, commit=False
     )
     if result is None:
         raise _error(404, "PRACTICE_MISTAKE_NOT_FOUND", "错题不存在或无权访问")
@@ -1458,11 +1458,7 @@ async def verify_revenge_session(
     session.status = "active"
     session.paused_at = None
     session.revision += 1
-    accepted_at = now_utc()
-    session.last_saved_at = accepted_at
-    await practice_growth_service.record_answers(
-        db, owner, [verification.question_id], accepted_at
-    )
+    session.last_saved_at = now_utc()
     await db.commit()
     await db.refresh(session)
     await db.refresh(mistake)
@@ -1551,7 +1547,14 @@ def _assert_existing_selections_unchanged(existing: dict, draft: dict) -> None:
             )
 
 
-async def _apply_saved_draft(db: AsyncSession, session: PracticeSession, data: dict, accepted_at) -> None:
+async def _apply_saved_draft(
+    db: AsyncSession,
+    session: PracticeSession,
+    data: dict,
+    accepted_at,
+    *,
+    account_growth: bool = True,
+) -> set[str]:
     previous_ids = set((session.answers or {}).keys())
     draft = await _validated_draft_answers(db, session, data) if "answers" in data else None
     if draft is not None:
@@ -1559,13 +1562,18 @@ async def _apply_saved_draft(db: AsyncSession, session: PracticeSession, data: d
     await _apply_runtime_patch(db, session, data)
     if draft is not None:
         session.answers = draft
-        await practice_growth_service.record_answers(
-            db, session.owner_id, set(draft.keys()) - previous_ids, accepted_at
-        )
+        newly_answered = set(draft.keys()) - previous_ids
+        if account_growth:
+            await practice_growth_service.record_answers(
+                db, session.owner_id, newly_answered, accepted_at
+            )
+    else:
+        newly_answered = set()
     refs = session.question_order if isinstance(session.question_order, list) else []
     rows = await _session_question_rows(db, session)
     session.stats = _draft_stats(refs, rows, session.answers or {}, dict(session.stats or {}))
     session.runtime_state = {**(session.runtime_state or {}), "experience": session.stats["experience"]}
+    return newly_answered
 
 
 async def _same_saved_payload(db: AsyncSession, session: PracticeSession, data: dict) -> bool:
@@ -1641,7 +1649,9 @@ async def abandon_session(
     if session.revision != requested_revision:
         raise _revision_conflict(session)
     saved_at = now_utc()
-    await _apply_saved_draft(db, session, data, saved_at)
+    newly_answered = await _apply_saved_draft(
+        db, session, data, saved_at, account_growth=False
+    )
     await _settle_saved_experience(db, session, saved_at)
     # 结束练习时对已作答题目权威判分并记录错题：与交卷同一判分入口，
     # 中途退出同样是真实作答，错题应进入复仇模式。只记错题副作用，
@@ -1679,6 +1689,7 @@ async def abandon_session(
             session.answers = answers
             for question_id in newly_graded:
                 _record_runtime_ledger(session, question_id)
+    await practice_growth_service.record_answers(db, owner, newly_answered, saved_at)
     session.status = "abandoned"
     session.abandoned_at = saved_at
     session.last_saved_at = saved_at

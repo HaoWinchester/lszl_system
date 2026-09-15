@@ -68,3 +68,21 @@ Fix RED/GREEN evidence:
 - Reviewer RED for concurrency: the review's two-transaction reproduction raised `asyncpg.exceptions.DeadlockDetectedError` for whole-paper q1→q2 versus concurrent PC q2. The permanent controlled regression was added after the structural fix, so a separate local pre-fix failing run was not captured; this sequencing gap is recorded rather than relabeled.
 - GREEN: `.venv/bin/python -m pytest tests/test_practice_growth.py tests/test_alembic_single_head.py -q` -> `9 passed`.
 - GREEN adjacent: `.venv/bin/python -m pytest tests/test_practice_sessions.py tests/test_practice_learning_api.py tests/test_learning_workspace.py -q` -> `92 passed`.
+
+## Review round 2 fixes
+
+The three open items in `task-1-rereview-1.md` are covered and fixed:
+
+- `abandon_session` now validates the draft and captures `newly_answered` without taking the growth lock, performs every authoritative question grading, then records one batch with the original `saved_at`. This matches completion's lock order and keeps rollback atomic.
+- Session verification again leaves growth accounting inside the shared verifier's existing request replay guard. A replay returns before accounting, while a new variant uses the verifier's single authoritative timestamp. The session wrapper no longer unconditionally credits the returned verification.
+- The real session test now starts another session for the same source question on the same Shanghai day and asserts the daily count remains one. The next-day draft-upgrade guard remains covered.
+
+Test-first evidence for this round:
+
+- Before production changes: `.venv/bin/python -m pytest tests/test_practice_growth.py::test_actual_session_save_counts_wrong_once_and_rejects_replays_events_and_other_owner tests/test_practice_growth.py::test_session_verification_request_replay_does_not_credit_later_day tests/test_practice_growth.py::test_abandon_and_pc_answer_do_not_invert_growth_and_question_locks -q` -> `2 failed, 1 passed`.
+  - Verification request replay returned the same verification ID but D+1 `today.answered == 1`, expected `0`.
+  - Controlled abandon/PC concurrency timed out at the q1 barrier because abandon held growth while PC held q2.
+  - Same-day same-source/new-session dedup passed before the fix, confirming the ledger constraint already handled this missing coverage rather than exposing a product defect.
+- After production changes, the identical three-test command -> `3 passed`.
+- Full growth plus migration head: `.venv/bin/python -m pytest tests/test_practice_growth.py tests/test_alembic_single_head.py -q` -> `11 passed`.
+- Affected adjacent suites: `.venv/bin/python -m pytest tests/test_practice_sessions.py tests/test_practice_learning_api.py tests/test_learning_workspace.py -q` -> `92 passed`.
