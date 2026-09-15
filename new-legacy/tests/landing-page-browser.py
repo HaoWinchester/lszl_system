@@ -154,7 +154,7 @@ def main() -> None:
         page.goto(PAGE_URL, wait_until="load")
         page.wait_for_timeout(120)
 
-        assert page.title() == "幻谱｜知识图谱学习平台"
+        assert page.title() == "知识图谱备考平台｜刷题 · 错题归纳 · 主动回忆"
         assert page.locator('a[href="/graph"]').count() >= 3
         assert_header_cta_visible_without_hover(page)
         assert_product_tabs(page)
