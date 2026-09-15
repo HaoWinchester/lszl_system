@@ -11,7 +11,7 @@ import { getMySubscription } from '../../services/subscription';
 import { pageRefreshMode } from '../../domain/page-freshness';
 import { selectPrimaryTab } from '../../domain/primary-tabs';
 import { avatarLetterOf } from '../../domain/profile-view';
-import { subscriptionView } from '../../domain/subscription-view';
+import { subscriptionView, subscriptionSummary } from '../../domain/subscription-view';
 
 const roleLabels: Record<string, string> = {
   admin: '管理员', teacher: '教师', student: '学员', viewer: '访客',
@@ -31,6 +31,7 @@ Page(withAppearance({
     weekExperience: '—' as number | string,
     completedCount: '—' as number | string,
     accessTitle: '基础权限',
+    membershipSummary: '待确认',
     accessCopy: '会员信息尚未获取',
     membership: { title: '会员信息', statusLabel: '待确认', expiryLabel: '待确认', description: '会员信息尚未获取' },
     syncLabel: '等待更新',
@@ -79,6 +80,7 @@ Page(withAppearance({
         completedCount: historyResult.status === 'fulfilled' ? history.filter(item => item.status === 'completed').length : this.data.completedCount,
         accessTitle: membership.title,
         membership,
+        membershipSummary: subscriptionSummary(membership),
         syncLabel: partialFailure ? '部分数据未更新' : '已与网页端同步',
         syncError: partialFailure ? '未更新的项目保留上次数据，可以重新同步。' : '',
         accessCopy: membership.description,

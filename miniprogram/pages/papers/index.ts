@@ -1,3 +1,4 @@
+import { pageRefreshMode } from '../../domain/page-freshness';
 import { selectPrimaryTab } from '../../domain/primary-tabs';
 import { MODE_POLICIES } from '../../domain/mode-policy';
 import { navigation, consumePaperMode } from "../../domain/navigation";
@@ -21,6 +22,8 @@ Page(withAppearance({
     statusBarHeight: 24,
     loading: true,
     error: '',
+    refreshError: '',
+    lastLoadedAt: 0,
     papers: [] as PaperSummary[],
     filtered: [] as PaperSummary[],
     subjects: ['全部科目'],
@@ -49,6 +52,7 @@ Page(withAppearance({
     selectPrimaryTab(this as any, 1);
     const mode = consumePaperMode();
     if (mode) this.setData({ mode: mode as PracticeMode });
+    if (pageRefreshMode(this.data.lastLoadedAt) !== 'skip') return this.loadPapers();
   },
 
   onSearch(event: any) { this.setData({ search: String(event.detail.value || '') }); this.applyFilters(); },
@@ -65,21 +69,22 @@ Page(withAppearance({
   async loadPapers() {
     if (this.fetching) return;
     this.fetching = true;
-    this.setData({ loading: true, error: '' });
+    this.setData({ loading: this.data.lastLoadedAt === 0, error: '', refreshError: '' });
     try {
       const { items, total = items.length } = await listPublishedPapers(1, 100);
       const subjects = ['全部科目', ...Array.from(new Set(items.map(item => item.subject)))];
-      this.setData({ papers: items, subjects, loading: false, page: 1, total, hasMore: items.length < total, moreError: '' });
+      this.setData({ papers: items, subjects, loading: false, lastLoadedAt: Date.now(), refreshError: '', page: 1, total, hasMore: items.length < total, moreError: '' });
       this.applyFilters();
     } catch (error) {
-      this.setData({ loading: false, error: messageOf(error), filtered: [] });
+      if (this.data.lastLoadedAt) this.setData({ loading: false, refreshError: messageOf(error) });
+      else this.setData({ loading: false, error: messageOf(error), filtered: [] });
     } finally {
       this.fetching = false;
     }
   },
 
   async loadMore() {
-    if (this.fetching || !this.data.hasMore) return;
+    if (this.fetching || this.data.refreshError || !this.data.hasMore) return;
     this.fetching = true;
     this.setData({ loadingMore: true, moreError: '' });
     try {
@@ -116,6 +121,10 @@ Page(withAppearance({
   },
 
   async onSelectPaper(event: any) {
+    if (this.fetching || this.data.refreshError) {
+      wx.showToast({ title: this.fetching ? '试卷权限更新中，请稍候' : '请先重试更新试卷权限', icon: 'none' });
+      return;
+    }
     const item = event.detail.item as PaperSummary;
     if (item.contentRestricted) {
       return openMembershipOffer();

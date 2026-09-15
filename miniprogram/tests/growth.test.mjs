@@ -53,6 +53,7 @@ test('paper mode transient intent is consumed once after switchTab, failure clea
 test('catalog onShow consumes mode and search filters real paper data without changing access', async () => {
   let intent = 'challenge';
   const { page, navigation } = await loadPage('papers', { MODE_POLICIES, selectPrimaryTab() {}, consumePaperMode: () => { const value = intent; intent = null; return value; }, messageOf: e => e.message });
+  page.setData({ lastLoadedAt: Date.now() });
   page.onShow(); assert.equal(page.data.mode, 'challenge'); page.onShow(); assert.equal(page.data.mode, 'challenge');
   page.setData({ papers: [{ title: '项目管理', subject: 'PMP', accessLevel: 'free' }, { title: '敏捷实践', subject: 'ACP', accessLevel: 'member' }] });
   page.onSearch({ detail: { value: '敏捷' } }); assert.equal(page.data.filtered.length, 1); assert.equal(page.data.filtered[0].accessLevel, 'member');

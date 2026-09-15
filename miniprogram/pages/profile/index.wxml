@@ -15,7 +15,7 @@
       </view>
     </view>
 
-    <view class="membership-summary"><view class="membership-summary-copy"><text class="membership-title">{{accessTitle}}</text><text class="membership-copy">{{membership.statusLabel}} · {{membership.expiryLabel}}</text></view><button class="membership-link" bindtap="onMembership">会员信息 <ui-icon name="chevron" size="28" /></button></view>
+    <view class="membership-summary"><view class="membership-summary-copy"><text class="membership-title">{{accessTitle}}</text><text class="membership-copy">{{membershipSummary}}</text></view><button class="membership-link" bindtap="onMembership">会员信息 <ui-icon name="chevron" size="28" /></button></view>
     <view wx:if="{{syncError}}" class="inline-notice"><text>{{syncError}}</text><button class="inline-retry" bindtap="onRefresh">重新同步</button></view>
     <view class="profile-section">
       <view class="profile-heading"><text class="section-kicker">学习数据</text><text class="sync-label">{{syncLabel}}</text></view>

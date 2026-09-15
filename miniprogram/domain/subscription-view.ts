@@ -34,3 +34,8 @@ export function subscriptionView(role: string, state?: SubscriptionState) {
       : statusLabel === '已停用' ? '会员权限已停用，请联系管理员核实。' : '会员权限待确认，请重新同步。',
   };
 }
+
+// Compact surfaces retain expiry information without repeating identical labels.
+export function subscriptionSummary(view: { statusLabel: string; expiryLabel: string }): string {
+  return view.statusLabel === view.expiryLabel ? view.statusLabel : `${view.statusLabel} · ${view.expiryLabel}`;
+}

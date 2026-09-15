@@ -12,6 +12,7 @@
     <button class="access-filter {{access === 'member' ? 'is-active' : ''}}" data-access="member" bindtap="onAccess">会员试卷</button>
   </view>
 
+  <view wx:if="{{refreshError}}" class="inline-notice" role="alert"><text>更新失败，当前为上次试卷：{{refreshError}}</text><button class="inline-retry" bindtap="loadPapers">重试更新</button></view>
   <view wx:if="{{loading}}" class="paper-loading">
     <view wx:for="{{skeletonRows}}" wx:key="*this" class="paper-skeleton"><view class="paper-skeleton-line is-short"></view><view class="paper-skeleton-line"></view><view class="paper-skeleton-line is-medium"></view></view>
   </view>
@@ -23,7 +24,7 @@
   <view wx:if="{{!loading && !error && hasMore}}" class="catalog-more">
     <text class="section-copy">已载入 {{papers.length}} / {{total}} 份，筛选当前已载入的试卷</text>
     <text wx:if="{{moreError}}" class="error-copy">{{moreError}}</text>
-    <button class="quiet-button" loading="{{loadingMore}}" disabled="{{loadingMore}}" bindtap="loadMore">{{moreError ? '重新加载更多' : '加载更多试卷'}}</button>
+    <button class="quiet-button" loading="{{loadingMore}}" disabled="{{loadingMore || refreshError}}" bindtap="loadMore">{{moreError ? '重新加载更多' : '加载更多试卷'}}</button>
   </view>
 </view>
 <app-dialog id="app-dialog" style="{{appearanceStyle}}" />

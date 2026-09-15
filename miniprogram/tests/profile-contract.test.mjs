@@ -81,7 +81,7 @@ test('profile identity and rows share the approved scale', () => {
 
 test('profile presents real account information without invented fields', () => {
   const page = read('pages/profile/index.wxml');
-  for (const label of ['displayName', 'user.username', 'roleLabel', 'accessTitle', 'syncLabel', 'membership.statusLabel', 'membership.expiryLabel']) {
+  for (const label of ['displayName', 'user.username', 'roleLabel', 'accessTitle', 'syncLabel', 'membershipSummary']) {
     assert.match(page, new RegExp(label));
   }
   assert.match(page, /avatarLetter/);

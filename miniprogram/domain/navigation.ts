@@ -20,9 +20,9 @@ export const navigation = {
   redirectTo: (options: NavigationOptions) => move('redirectTo', options),
   switchTab: (options: NavigationOptions) => move('switchTab', options),
   reLaunch: (options: NavigationOptions) => move('reLaunch', options),
-  navigateBack(options: { fail?: () => void; fallback?: string } = {}) {
+  navigateBack(options: { fail?: () => void; fallback?: string; delta?: number } = {}) {
     const fail = () => options.fail ? options.fail() : navigation.switchTab({ url: options.fallback || '/pages/home/index' });
-    try { wx.navigateBack({ fail }); } catch { fail(); }
+    try { wx.navigateBack({ delta: options.delta || 1, fail }); } catch { fail(); }
   },
 };
 
@@ -40,4 +40,18 @@ export function consumePaperMode(): string | null {
   const mode = pendingPaperMode;
   pendingPaperMode = null;
   return mode;
+}
+
+// Reuse an existing secondary page instead of multiplying its stack frames.
+export function returnToPage(path: string) {
+  const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : [];
+  const route = path.replace(/^\//, '');
+  const fallback = () => navigation.redirectTo({ url: path });
+  for (let index = pages.length - 2; index >= 0; index--) {
+    if (pages[index].route === route) {
+      navigation.navigateBack({ delta: pages.length - 1 - index, fail: fallback });
+      return;
+    }
+  }
+  fallback();
 }

@@ -1,4 +1,4 @@
-import { navigation } from "../../domain/navigation";
+import { navigation, returnToPage } from "../../domain/navigation";
 import { withAppearance } from '../../domain/appearance-page';
 import { messageOf } from '../../services/http';
 import { getReport, getSession } from '../../services/practice';
@@ -152,6 +152,6 @@ Page(withAppearance({
     navigation.navigateTo({ url: '/pages/revenge/index' });
   },
 
-  onBack() { navigation.redirectTo({ url: '/pages/history/index' }); },
+  onBack() { returnToPage('/pages/history/index'); },
   onHome() { navigation.switchTab({ url: '/pages/home/index' }); },
 }));
