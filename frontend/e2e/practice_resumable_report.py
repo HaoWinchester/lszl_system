@@ -43,7 +43,9 @@ from sqlalchemy import delete, select
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 BACKEND_ROOT = REPO_ROOT / "backend"
-ACTIVE_RELEASE_ROOT = REPO_ROOT / "frontend" / "new-legacy-releases"
+ACTIVE_RELEASE_ROOT = Path(os.environ.get(
+    "KG_E2E_ACTIVE_RELEASE_ROOT", str(REPO_ROOT / "frontend" / "new-legacy-releases")
+))
 SOURCE_ROOT = REPO_ROOT / "new-legacy"
 
 PASSWORD = "Practice-E2E-111111"
