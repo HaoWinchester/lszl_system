@@ -1669,6 +1669,8 @@
     const node=record?.node||{},question=resolvedQuestionForNode(node)||{};
     const paper=state.papers.find(item=>String(item.id||'')===String(node.paperId||question.sourcePaperId||'')&&(!node.releaseId||String(item.releaseId||'')===String(node.releaseId)))||selectedPaper()||{};
     return {
+      // Mint once for this selection; queued/network/manual retries reuse the payload.
+      requestId:'canvas-answer-'+(global.crypto?.randomUUID?.()||Date.now().toString(36)+Math.random().toString(36).slice(2)),
       questionId:String(node.questionId||question.id||question.sourceQuestionId||''),
       bankId:String(node.bankId||question.sourceBankId||''),
       paperId:String(node.paperId||question.sourcePaperId||paper.id||state.paperId||''),
