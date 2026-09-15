@@ -7,7 +7,7 @@ import { PRIMARY_TABS } from '../domain/primary-tabs.ts';
 test('home navigation failure gives feedback and allows another attempt', async () => {
   const notices = []; let attempts = 0;
   const { page } = await loadPage('home', { MODE_POLICIES }, {
-    switchTab: options => { attempts++; options.fail?.({ errMsg: 'navigateTo:fail webview count limit exceed' }); },
+    reLaunch: options => { attempts++; options.fail?.({ errMsg: 'navigateTo:fail webview count limit exceed' }); },
     showToast: value => notices.push(value.title),
   });
   page.onBrowsePapers(); page.onBrowsePapers();
@@ -16,7 +16,7 @@ test('home navigation failure gives feedback and allows another attempt', async 
   assert.ok(notices.every(title => /返回|重试/.test(title)));
 });
 
-for (const [name, destination] of [['papers', '/pages/home/index'], ['practice-setup', '/pages/home/index'], ['membership', '/pages/profile/index']]) {
+for (const [name, destination] of [['papers', '/pages/tabs/index?tab=home'], ['practice-setup', '/pages/tabs/index?tab=home'], ['membership', '/pages/tabs/index?tab=profile']]) {
   test(`${name}: a directly opened page can return even without a previous page`, async () => {
     const { page, navigation } = await loadPage(name, { MODE_CHOICES: [] }, {
       navigateBack: options => options?.fail?.({ errMsg: 'navigateBack:fail cannot navigate back at first page' }),
@@ -79,24 +79,20 @@ test('retrying a created practice opens its retained ID without creating a dupli
   assert.ok(opens.every(url => url.endsWith('sessionId=retained')));
 });
 
-test('failed tab switching restores selection, provides feedback and can be retried', async () => {
-  let definition, attempts = 0; const notices = [];
-  const wx = { showToast: value => notices.push(value.title), switchTab: options => {
-    attempts++;
-    if (attempts === 1) options.fail?.({ errMsg: 'switchTab:fail' });
-    else options.success?.();
-    options.complete?.();
-  } };
-  const routing = await loadModule('domain/navigation.ts', { wx }, ['navigation']);
-  await loadModule('custom-tab-bar/index.ts', { ...routing, wx, PRIMARY_TABS,
+test('bottom tabs update the host once and ignore selected or dialog-covered taps', async () => {
+  let definition; const events = [];
+  await loadModule('components/primary-tab-bar/index.ts', { PRIMARY_TABS,
     appearanceData: () => ({}), Component: value => { definition = value; },
   }, []);
-  const tab = { ...definition.methods, data: { ...definition.data }, setData: function(value) { Object.assign(this.data, value); } };
-  const event = { currentTarget: { dataset: { index: 1 } } };
-  tab.switchTab(event);
-  assert.equal(tab.data.selected, 0); assert.equal(tab.data.switching, false); assert.equal(notices.length, 1);
-  tab.switchTab(event);
-  assert.equal(tab.data.selected, 1); assert.equal(tab.data.switching, false); assert.equal(attempts, 2);
+  const tab = { ...definition.methods, data: { ...definition.data },
+    setData(value) { Object.assign(this.data, value); }, triggerEvent(name, detail) { events.push([name, detail.index]); } };
+  const tap = index => tab.switchTab({ currentTarget: { dataset: { index } } });
+  tap(1); tap(1); tap(99);
+  tab.data.dialogOpen = true; tap(2);
+  assert.deepEqual(events, [['select', 1]]);
+  assert.equal(tab.data.selected, 1);
+  tab.data.dialogOpen = false; tap(2);
+  assert.deepEqual(events, [['select', 1], ['select', 2]]);
 });
 
 test('logout navigation failure can reopen login without another logout or draft deletion', async () => {

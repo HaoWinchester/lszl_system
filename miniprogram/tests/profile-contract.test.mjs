@@ -33,22 +33,21 @@ test('profile preserves rendered content during background refreshes', () => {
   assert.match(source, /mode === 'skip'/);
 });
 
-test('native custom tab bar declares the four persistent primary pages', () => {
+test('one persistent host declares all four primary panels', () => {
   const app = JSON.parse(read('app.json'));
-  assert.equal(app.tabBar?.custom, true);
-  assert.deepEqual(app.tabBar.list.map(item => item.pagePath), [
-    'pages/home/index',
-    'pages/papers/index',
-    'pages/growth/index',
-    'pages/profile/index',
+  assert.equal(app.pages[0], 'pages/tabs/index');
+  assert.equal(app.tabBar, undefined);
+  const host = JSON.parse(read('pages/tabs/index.json'));
+  assert.deepEqual(['home', 'papers', 'growth', 'profile'].map(key => host.usingComponents[`${key}-panel`]), [
+    '/pages/home/index', '/pages/papers/index', '/pages/growth/index', '/pages/profile/index',
   ]);
+  for (let index = 0; index < 4; index++) assert.ok(read('pages/tabs/index.wxml').includes(`activeTab === ${index}`));
 });
 
-test('custom tab bar switches without relaunching page instances', () => {
-  assert.ok(existsSync(join(root, 'custom-tab-bar/index.ts')));
-  const source = read('custom-tab-bar/index.ts');
-  assert.match(source, /navigation\.switchTab/);
-  assert.doesNotMatch(source, /wx\.reLaunch/);
+test('custom tab bar changes host selection without relaunching page instances', () => {
+  const source = read('components/primary-tab-bar/index.ts');
+  assert.match(source, /triggerEvent\('select'/);
+  assert.doesNotMatch(source, /wx\.reLaunch|navigation\.switchTab/);
 });
 
 test('primary pages delegate navigation to the native tab bar', () => {
@@ -59,15 +58,15 @@ test('primary pages delegate navigation to the native tab bar', () => {
 });
 
 test('custom tab bar styles use component-safe class selectors', () => {
-  assert.ok(existsSync(join(root, 'custom-tab-bar/index.wxss')));
-  const styles = read('custom-tab-bar/index.wxss');
+  assert.ok(existsSync(join(root, 'components/primary-tab-bar/index.wxss')));
+  const styles = read('components/primary-tab-bar/index.wxss');
   assert.doesNotMatch(styles, /\.tab-bar button/);
   assert.doesNotMatch(styles, /\.home-icon view/);
 });
 
 test('custom tab bar keeps readable metadata and touch sizing', () => {
-  assert.ok(existsSync(join(root, 'custom-tab-bar/index.wxss')));
-  const styles = read('custom-tab-bar/index.wxss');
+  assert.ok(existsSync(join(root, 'components/primary-tab-bar/index.wxss')));
+  const styles = read('components/primary-tab-bar/index.wxss');
   assert.match(styles, /font-size:\s*var\(--font-meta\)/);
   assert.match(styles, /min-height:\s*var\(--touch-min\)/);
 });

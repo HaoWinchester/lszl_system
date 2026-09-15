@@ -6,8 +6,9 @@ export function withAppearance(options: any) {
     const data = appearanceData(value);
     // Native custom headers share one safe-area inset on every mounted page.
     data.appearanceStyle += `--status-bar-height:${page.data.statusBarHeight ?? 24}px;`;
-    page.setData(data);
-    page.getTabBar?.()?.setData(data);
+    if (page.data.appearanceStyle !== data.appearanceStyle) page.setData(data);
+    const tab = page.getTabBar?.();
+    if (tab && tab.data?.appearanceStyle !== data.appearanceStyle) tab.setData(data);
   };
   return {
     ...options,
@@ -19,7 +20,11 @@ export function withAppearance(options: any) {
     },
     onShow(this: any) {
       apply(this, readAppearance());
-      updateAppearanceChrome();
+      const theme = readAppearance().theme;
+      if (this.appliedChromeTheme !== theme) {
+        updateAppearanceChrome();
+        this.appliedChromeTheme = theme;
+      }
       return options.onShow?.call(this);
     },
     onUnload(this: any) {

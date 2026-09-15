@@ -1,0 +1,11 @@
+{
+  "navigationStyle": "custom",
+  "enablePullDownRefresh": true,
+  "usingComponents": {
+    "home-panel": "/pages/home/index",
+    "papers-panel": "/pages/papers/index",
+    "growth-panel": "/pages/growth/index",
+    "profile-panel": "/pages/profile/index",
+    "primary-tab-bar": "/components/primary-tab-bar/index"
+  }
+}

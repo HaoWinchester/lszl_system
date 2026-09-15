@@ -2,13 +2,14 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { join } from 'node:path';
 import { pageRefreshMode } from '../../domain/page-freshness.ts';
+import { PRIMARY_TABS } from '../../domain/primary-tabs.ts';
 import { MODE_POLICIES } from '../../domain/mode-policy.ts';
 
 export async function loadModule(file, dependencies, exports) {
   const source = readFileSync(new URL(`../../${file}`, import.meta.url), 'utf8')
     .replace(/^import[\s\S]*?from\s+['"][^'"]+['"];\s*/gm, '')
     .replace(/^export /gm, '');
-  return runSource(`${source}\nreturn { ${exports.join(', ')} };`, dependencies);
+  return runSource(`${source}\nreturn { ${exports.join(', ')} };`, { PRIMARY_TABS, ...dependencies });
 }
 
 async function runSource(source, host) {
@@ -43,8 +44,9 @@ export async function loadPage(name, dependencies = {}, wxOverrides = {}) {
   const host = {
     Date, Promise, Set, Map, Object, String, Number, Error, JSON, Math,
     setInterval: () => 1, clearInterval() {}, setTimeout: () => 1,
-    MODE_POLICIES, pageRefreshMode, wx, showDialog: options => wx.showModal(options), ...dependencies,
-    Page(options) { page = options; page.setData = values => Object.assign(page.data, values); },
+    PRIMARY_TABS, MODE_POLICIES, pageRefreshMode, wx, withPrimaryPanel: (_key, options) => options, showDialog: options => wx.showModal(options), ...dependencies,
+    Page(options) { page = options; page.setData = (values, done) => { Object.assign(page.data, values); done?.(); }; },
+    Component(options) { page = options; page.setData = (values, done) => { Object.assign(page.data, values); done?.(); }; },
   };
   const appearance = await loadModule('domain/appearance.ts', { wx }, ['appearanceData', 'readAppearance', 'subscribeAppearance', 'updateAppearanceChrome']);
   const { withAppearance } = await loadModule('domain/appearance-page.ts', { ...appearance, ...dependencies }, ['withAppearance']);

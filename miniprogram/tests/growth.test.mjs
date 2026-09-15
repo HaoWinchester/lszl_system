@@ -42,12 +42,12 @@ test('home keeps saved practice visible when growth fails and resumes exact sess
   const { page, navigation } = await loadPage('home', await dependencies({ MODE_POLICIES, listPublishedPapers: async () => ({ items: [] }), getRevengeSummary: async () => ({ stats: { active: 1 } }), getActiveSessions: async () => [active], getGrowthSummary: async () => { throw Error('成长暂不可用'); }, getSession: async () => ({ id: active.id, status: 'paused' }) }));
   await page.loadHome(); assert.equal(page.data.activeSession.id, active.id); assert.equal(page.data.loading, false); assert.equal(page.data.growthError, '成长暂不可用');
   await page.onContinue(); assert.equal(navigation.at(-1).url, '/pages/practice/index?sessionId=saved-session');
-  page.setData({ activeSession: null }); page.onBrowsePapers(); assert.equal(navigation.at(-1).url, '/pages/papers/index');
+  page.setData({ activeSession: null }); page.onBrowsePapers(); assert.equal(navigation.at(-1).url, '/pages/tabs/index?tab=papers');
 });
 test('paper mode transient intent is consumed once after switchTab, failure clears intent', async () => {
   let failed = false, moves = [];
-  const mod = await loadModule('domain/navigation.ts', { wx: { switchTab: o => { moves.push(o); if (failed) o.fail(Error('fail')); }, showToast() {} } }, ['navigation', 'openPaperCatalog', 'consumePaperMode']);
-  mod.openPaperCatalog('scholar'); assert.equal(moves[0].url, '/pages/papers/index'); assert.equal(mod.consumePaperMode(), 'scholar'); assert.equal(mod.consumePaperMode(), null);
+  const mod = await loadModule('domain/navigation.ts', { wx: { reLaunch: o => { moves.push(o); if (failed) o.fail(Error('fail')); }, showToast() {} } }, ['navigation', 'openPaperCatalog', 'consumePaperMode']);
+  mod.openPaperCatalog('scholar'); assert.equal(moves[0].url, '/pages/tabs/index?tab=papers'); assert.equal(mod.consumePaperMode(), 'scholar'); assert.equal(mod.consumePaperMode(), null);
   failed = true; mod.openPaperCatalog('challenge'); assert.equal(mod.consumePaperMode(), null);
 });
 test('catalog onShow consumes mode and search filters real paper data without changing access', async () => {
@@ -104,7 +104,7 @@ test('secondary history opens via navigateTo/redirectTo and back has a home fall
     if (name === 'result') page.onBack(); else page.onHistory();
   }
   assert.deepEqual(calls, [['push','/pages/history/index'],['push','/pages/history/index'],['replace','/pages/history/index']]);
-  const { page, navigation } = await loadPage('history', {}, { navigateBack: o => o.fail() }); page.onBack(); assert.equal(navigation.at(-1).url, '/pages/home/index'); page.onBrowse(); assert.equal(navigation.at(-1).url, '/pages/papers/index');
+  const { page, navigation } = await loadPage('history', {}, { navigateBack: o => o.fail() }); page.onBack(); assert.equal(navigation.at(-1).url, '/pages/tabs/index?tab=home'); page.onBrowse(); assert.equal(navigation.at(-1).url, '/pages/tabs/index?tab=papers');
 });
 
 test('new learning controls bind real page handlers and expose recovery and accessible states', async () => {

@@ -78,6 +78,9 @@
 - 使用官方构建和同步脚本生成 v9.0-p4.1.233，包含后端配套的新 canvas 请求标识逻辑。
 - 对照先前UAT快照998个文件，候选999个文件，无路径缺失；仅新增 tests/practice-answer-attempt.test.js。部署前仍须读取远端当前实际active再核对。
 - 完整发布验证于2026-09-15 22:36（上海时间）通过，profile=full、退出码0、总耗时595秒。后端733通过（1条依赖弃用警告）；前端276通过与9项Python检查；扩展契约10通过；落地页、核心做题和跨业务浏览器流程全部通过；4项桌面/移动网页视觉回归差异均0%。此前两次主动中止的部分运行不计为通过。
-- 当前尚未合入或部署UAT，未合入main，未发布正式小程序。用户要求先完成本地后再处理远端。
+- 本地完整验证后，74e325d 已合入并推送 uat，UAT 部署 v9.0-p4.1.233 成功（999 文件、迁移 c8d7e6f5a401）；健康检查 200/数据库正常，成长接口未登录 401，demo=false，新 canvas requestId 已核对。
+- 本次 UAT 备份目录：`/home/ubuntu/lszl-uat-backups/mini-spekra-growth-20260915_223858`，包含已校验非空的代码归档、数据库 dump 和回滚镜像。
+- 小程序开发版本 1.0.1 已通过开发工具上传成功；尚未在管理后台设置为体验版，未正式发布。main 仍为 ebb1827，等待用户 UAT 验收。
+- 随后的底栏响应及协议全文一致性修复，见 `2026-09-15-mini-tab-response-and-legal.md`。
 
 完整证据：`frontend/new-legacy-releases/v9.0-p4.1.233/validation.json` 与 `validation-run.log`，小程序与设计日志位于 `artifacts/spekra-growth/mini-final.log` / `design-final.log`。本地current.json已由官方管理工具指向233；完整验证指纹核对通过。

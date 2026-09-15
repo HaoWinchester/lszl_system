@@ -22,7 +22,9 @@ function allSource() {
 
 test('mini program declares native home and login pages', () => {
   const app = JSON.parse(read('app.json'));
-  assert.deepEqual(app.pages.slice(0, 2), ['pages/home/index', 'pages/login/index']);
+  assert.equal(app.pages[0], 'pages/tabs/index');
+  assert.ok(app.pages.includes('pages/login/index'));
+  assert.ok(app.pages.includes('pages/home/index'));
   assert.equal(app.window.navigationStyle, 'custom');
 });
 

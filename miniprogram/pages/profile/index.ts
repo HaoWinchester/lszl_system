@@ -1,3 +1,4 @@
+import { withPrimaryPanel } from '../../domain/primary-panel';
 import { navigation } from "../../domain/navigation";
 import { withAppearance } from '../../domain/appearance-page';
 import { showDialog } from '../../domain/dialog';
@@ -17,7 +18,7 @@ const roleLabels: Record<string, string> = {
   admin: '管理员', teacher: '教师', student: '学员', viewer: '访客',
 };
 
-Page(withAppearance({
+Component(withPrimaryPanel('profile', withAppearance({
   data: {
     statusBarHeight: 24,
     loading: true,
@@ -131,4 +132,4 @@ Page(withAppearance({
       loggingOut: false, error: '本机已退出，登录页面未打开，请重试。',
     }) });
   },
-}));
+})));

@@ -1,0 +1,8 @@
+<view class="tab-host" style="{{appearanceStyle}}">
+  <view hidden="{{activeTab !== 0}}"><home-panel id="panel-0" active="{{activeTab === 0}}" /></view>
+  <view hidden="{{activeTab !== 1}}"><papers-panel id="panel-1" active="{{activeTab === 1}}" /></view>
+  <view hidden="{{activeTab !== 2}}"><growth-panel id="panel-2" active="{{activeTab === 2}}" /></view>
+  <view hidden="{{activeTab !== 3}}"><profile-panel id="panel-3" active="{{activeTab === 3}}" /></view>
+  <app-dialog id="app-dialog" style="{{appearanceStyle}}" />
+  <primary-tab-bar id="primary-tab-bar" bindselect="onSelectTab" />
+</view>

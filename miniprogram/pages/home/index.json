@@ -3,5 +3,6 @@
   "usingComponents": {
     "ui-icon": "/components/ui-icon/index"
   },
-  "enablePullDownRefresh": true
+  "enablePullDownRefresh": true,
+  "component": true
 }

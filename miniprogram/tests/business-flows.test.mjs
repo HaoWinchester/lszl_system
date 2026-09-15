@@ -139,7 +139,7 @@ test('completed report navigation can be retried without another completion writ
 
 test('saved exit navigation failure offers a retry without repeating the pause write', async () => {
   let opens = 0, writes = 0;
-  const { page } = await practice({}, { switchTab: options => {
+  const { page } = await practice({}, { reLaunch: options => {
     opens++; if (opens === 1) options.fail?.({ errMsg: 'switchTab:fail' }); else options.success?.();
   } });
   await page.loadSession();
@@ -174,7 +174,7 @@ test('retrying a failed save-exit removes its stale draft and resumes without a 
   assert.equal(navigation.length, 0);
   assert.deepEqual(drafts.loadLocalDraft('u', 's1').answers.q1, ['B']);
   unavailable = false; await page.retryWrites();
-  assert.equal(navigation.at(-1)?.url, '/pages/home/index');
+  assert.equal(navigation.at(-1)?.url, '/pages/tabs/index?tab=home');
   let conflicts = 0;
   const resumed = await practice(dependencies, { showModal: async () => { conflicts++; return { dismissed: true }; } });
   await resumed.page.loadSession();

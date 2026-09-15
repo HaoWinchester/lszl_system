@@ -1,3 +1,5 @@
+import { PRIMARY_TABS } from './primary-tabs';
+
 type NavigationOptions = {
   url: string;
   success?: (result?: any) => void;
@@ -11,6 +13,28 @@ function move(method: 'navigateTo' | 'redirectTo' | 'switchTab' | 'reLaunch', op
     if (options.fail) options.fail(error);
     else wx.showToast({ title: '页面未打开，请返回后重试', icon: 'none' });
   };
+  const tabIndex = PRIMARY_TABS.findIndex(tab => tab.path === options.url.split('?')[0]);
+  if (tabIndex >= 0) {
+    const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : [];
+    const hostIndex = pages.findIndex(page => page.route === 'pages/tabs/index');
+    if (hostIndex >= 0 && method !== 'reLaunch') {
+      const host = pages[hostIndex] as any;
+      const previous = host.data?.activeTab;
+      host.switchPrimaryTab(tabIndex);
+      if (hostIndex === pages.length - 1) {
+        options.success?.({ errMsg: 'switchTab:ok' });
+        options.complete?.({ errMsg: 'switchTab:ok' });
+      } else {
+        try { wx.navigateBack({ delta: pages.length - 1 - hostIndex, success: options.success,
+          fail: error => { if (previous !== undefined) host.switchPrimaryTab(previous); fail(error); }, complete: options.complete }); }
+        catch (error) { if (previous !== undefined) host.switchPrimaryTab(previous); fail(error); options.complete?.(error); }
+      }
+      return;
+    }
+    try { wx.reLaunch({ ...options, url: `/pages/tabs/index?tab=${PRIMARY_TABS[tabIndex].key}`, fail }); }
+    catch (error) { fail(error); options.complete?.(error); }
+    return;
+  }
   try { wx[method]({ ...options, fail }); }
   catch (error) { fail(error); options.complete?.(error); }
 }

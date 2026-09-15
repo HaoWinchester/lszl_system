@@ -6,6 +6,8 @@
     "node": ">=22.6.0"
   },
   "scripts": {
-    "test": "node --experimental-strip-types --test tests/*.test.mjs"
+    "test": "node --experimental-strip-types --test tests/*.test.mjs",
+    "sync:legal": "node scripts/sync-legal-documents.mjs",
+    "pretest": "node scripts/sync-legal-documents.mjs --check"
   }
 }

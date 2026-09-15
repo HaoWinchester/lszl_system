@@ -181,5 +181,5 @@ for(const formMode of ['bind','register']) test(`${formMode}: consent withdrawal
   assert.equal(submitted,0); assert.ok(page.data.error); assert.equal(page.data.password,'audit-pass');
   assert.equal(navigation.length,0);
   page.onToggleAccepted(); await page.onSubmitAccount();
-  assert.equal(submitted,1); assert.equal(navigation.at(-1).url,'/pages/home/index');
+  assert.equal(submitted,1); assert.equal(navigation.at(-1).url,'/pages/tabs/index?tab=home');
 });

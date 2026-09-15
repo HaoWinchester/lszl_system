@@ -1,3 +1,4 @@
+import { withPrimaryPanel } from '../../domain/primary-panel';
 import { navigation, openPaperCatalog } from '../../domain/navigation';
 import { withAppearance } from '../../domain/appearance-page';
 import { selectPrimaryTab } from '../../domain/primary-tabs';
@@ -6,7 +7,7 @@ import { validateSession } from '../../services/auth';
 import { messageOf } from '../../services/http';
 import { getGrowthSummary, updateGrowthGoal, GrowthSummary } from '../../services/growth';
 
-Page(withAppearance({
+Component(withPrimaryPanel('growth', withAppearance({
   fetching: false,
   data: {
     statusBarHeight: 24, loading: true, error: '', goalError: '', saving: false,
@@ -44,4 +45,4 @@ Page(withAppearance({
   },
   onPractice() { openPaperCatalog('normal'); },
   onHistory() { navigation.navigateTo({ url: '/pages/history/index' }); },
-}));
+})));

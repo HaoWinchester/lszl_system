@@ -1,5 +1,6 @@
 {
   "pages": [
+    "pages/tabs/index",
     "pages/home/index",
     "pages/login/index",
     "pages/papers/index",
@@ -18,31 +19,6 @@
     "navigationBarTextStyle": "black",
     "backgroundColor": "#f8f7f2",
     "backgroundTextStyle": "dark"
-  },
-  "tabBar": {
-    "custom": true,
-    "color": "#718079",
-    "selectedColor": "#174d3b",
-    "backgroundColor": "#f8f7f2",
-    "borderStyle": "white",
-    "list": [
-      {
-        "pagePath": "pages/home/index",
-        "text": "首页"
-      },
-      {
-        "pagePath": "pages/papers/index",
-        "text": "练习"
-      },
-      {
-        "pagePath": "pages/growth/index",
-        "text": "成长"
-      },
-      {
-        "pagePath": "pages/profile/index",
-        "text": "我的"
-      }
-    ]
   },
   "usingComponents": {
     "app-dialog": "/components/app-dialog/index"

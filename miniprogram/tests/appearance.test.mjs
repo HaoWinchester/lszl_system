@@ -114,9 +114,9 @@ test('every page and its dialog bind the shared palette, including cached primar
     const markup = readFileSync(new URL(`../${page}.wxml`, import.meta.url), 'utf8');
     assert.match(markup.split('\n')[0], /style="\{\{appearanceStyle\}\}/, page);
     assert.match(markup, /<app-dialog[^>]+style="\{\{appearanceStyle\}\}"/, page);
-    assert.match(readFileSync(new URL(`../${page}.ts`, import.meta.url), 'utf8'), /Page\(withAppearance\(/, page);
+    assert.match(readFileSync(new URL(`../${page}.ts`, import.meta.url), 'utf8'), /(?:Page\(withAppearance\(|Component\(withPrimaryPanel\([^,]+, withAppearance\()/, page);
   }
-  assert.match(readFileSync(new URL('../custom-tab-bar/index.wxml', import.meta.url), 'utf8'), /style="\{\{appearanceStyle\}\}"/);
+  assert.match(readFileSync(new URL('../components/primary-tab-bar/index.wxml', import.meta.url), 'utf8'), /style="\{\{appearanceStyle\}\}"/);
 });
 
 for (const theme of ['paper', 'white', 'night']) {
@@ -174,7 +174,7 @@ test('directly opened appearance preview has a working return path', async () =>
   const { wx: platform, ...api } = await appearance();
   const { page, navigation } = await loadPage('appearance', api, { navigateBack: options => options?.fail?.() });
   page.onBack();
-  assert.equal(navigation[0]?.url, '/pages/profile/index');
+  assert.equal(navigation[0]?.url, '/pages/tabs/index?tab=profile');
 });
 
 test('shared appearance exposes actual status-bar height for scroll-safe native navigation', async () => {
@@ -189,4 +189,25 @@ test('shared appearance exposes actual status-bar height for scroll-safe native 
   const styles = readFileSync(new URL('../app.wxss', import.meta.url), 'utf8');
   assert.match(styles, /\.nav-bar\s*\{[^}]*position:\s*sticky;[^}]*top:\s*var\(--status-bar-height,\s*24px\)/s);
   assert.match(styles, /\.nav-bar::before\s*\{[^}]*top:\s*calc\(-1 \* var\(--status-bar-height,\s*24px\)\);[^}]*background:\s*var\(--paper\)/s);
+});
+
+test('returning to an unchanged tab does not resend palette or native chrome updates', async () => {
+  const api = await appearance();
+  const { withAppearance } = await loadModule('domain/appearance-page.ts', api, ['withAppearance']);
+  let pageWrites = 0, tabWrites = 0, shows = 0;
+  const tab = { data: {}, setData(value) { tabWrites++; Object.assign(this.data, value); } };
+  const page = withAppearance({ data: { statusBarHeight: 44 }, onShow() { shows++; } });
+  page.setData = value => { pageWrites++; Object.assign(page.data, value); };
+  page.getTabBar = () => tab;
+  page.onLoad(); page.onShow();
+  const initial = [pageWrites, tabWrites, api.chrome.length];
+  for (let i = 0; i < 4; i++) page.onShow();
+  assert.deepEqual([pageWrites, tabWrites, api.chrome.length], initial);
+  assert.equal(shows, 5, 'business freshness checks must still run on every return');
+  api.saveAppearance({ theme: 'night', readingSize: 'large' });
+  page.onShow();
+  assert.equal(page.data.appearanceTheme, 'night');
+  assert.equal(tab.data.appearanceTheme, 'night');
+  assert.ok(api.chrome.length > initial[2]);
+  page.onUnload();
 });

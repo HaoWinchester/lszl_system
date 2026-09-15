@@ -101,7 +101,7 @@ test('navigation keeps a compact back-title group without losing the touch targe
 
 test('all standard page headers inherit the common navigation geometry', () => {
   const { pages } = JSON.parse(read('app.json'));
-  for (const page of pages.filter(page => page !== 'pages/practice/index')) {
+  for (const page of pages.filter(page => !['pages/practice/index', 'pages/tabs/index'].includes(page))) {
     assert.match(read(`${page}.wxml`), /class="nav-bar(?:\s[^"]*)?"/, page);
     assert.doesNotMatch(read(`${page}.wxss`), /\.(?:nav-bar|nav-title|nav-back|history-nav|revenge-nav)\s*\{/, page);
   }

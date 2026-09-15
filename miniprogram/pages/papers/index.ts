@@ -1,3 +1,4 @@
+import { withPrimaryPanel } from '../../domain/primary-panel';
 import { pageRefreshMode } from '../../domain/page-freshness';
 import { selectPrimaryTab } from '../../domain/primary-tabs';
 import { MODE_POLICIES } from '../../domain/mode-policy';
@@ -16,7 +17,7 @@ function filteredPapers(items: PaperSummary[], subject: string, access: string, 
   );
 }
 
-Page(withAppearance({
+Component(withPrimaryPanel('papers', withAppearance({
   fetching: false,
   data: {
     statusBarHeight: 24,
@@ -140,4 +141,4 @@ Page(withAppearance({
   },
 
   onBack() { navigation.navigateBack(); },
-}));
+})));

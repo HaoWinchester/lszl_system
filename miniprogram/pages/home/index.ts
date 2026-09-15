@@ -1,3 +1,4 @@
+import { withPrimaryPanel } from '../../domain/primary-panel';
 import { getGrowthSummary, GrowthSummary } from '../../services/growth';
 import { growthView } from '../../domain/growth-view';
 import { navigation, openPaperCatalog } from "../../domain/navigation";
@@ -23,7 +24,7 @@ function greetingFor(hour: number): string {
   return '晚上好';
 }
 
-Page(withAppearance({
+Component(withPrimaryPanel('home', withAppearance({
   refreshing: false,
   data: {
     statusBarHeight: 24,
@@ -138,4 +139,4 @@ Page(withAppearance({
     const params = `paperId=${encodeURIComponent(paper.paperId)}&releaseId=${encodeURIComponent(paper.releaseId)}&title=${encodeURIComponent(paper.title)}&count=${paper.questionCount}&mode=normal`;
     navigation.navigateTo({ url: `/pages/practice-setup/index?${params}` });
   },
-}));
+})));
