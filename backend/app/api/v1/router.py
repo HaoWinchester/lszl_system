@@ -13,6 +13,7 @@ from app.api.v1 import (
     learning,
     papers,
     paper_releases,
+    practice_growth,
     question_catalog,
     question_comments,
     question_materials,
@@ -42,6 +43,7 @@ api_router.include_router(content_prep.router)
 api_router.include_router(course_management.router)
 api_router.include_router(training.router)
 api_router.include_router(learning.router)
+api_router.include_router(practice_growth.router)
 api_router.include_router(subscriptions.router)
 api_router.include_router(analytics.router)
 api_router.include_router(engagement.router)

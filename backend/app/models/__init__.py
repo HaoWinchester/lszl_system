@@ -18,6 +18,7 @@ from app.models.engagement import Announcement, AnnouncementAudience, Feedback, 
 from app.models.guided_learning import GuidedActivity, GuidedCourse, GuidedCourseActivity, GuidedLearningProgress
 from app.models.paper import PaperCategory, PaperGenerationBatch, PaperImportOperation
 from app.models.paper_release import PaperRelease, PaperReleaseQuestion
+from app.models.practice_growth import PracticeGrowthAnswer, PracticeGrowthDay, PracticeGrowthSetting
 from app.models.question import (
     ExamPaper,
     PaperQuestion,
@@ -94,6 +95,9 @@ __all__ = [
     "PaperImportOperation",
     "PaperRelease",
     "PaperReleaseQuestion",
+    "PracticeGrowthAnswer",
+    "PracticeGrowthDay",
+    "PracticeGrowthSetting",
     "QuestionCleanupAudit",
     "ContentPrepRecallAcceptance",
     "TrainingProgress",

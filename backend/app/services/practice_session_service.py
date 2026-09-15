@@ -16,7 +16,7 @@ from app.core.security import now_utc, uid
 from app.models.paper_release import PaperRelease, PaperReleaseQuestion
 from app.models.training import LearningEvent, PracticeMistake, PracticeSession
 from app.models.user import User
-from app.services import learning_service, practice_experience_service, paper_composition_service, paper_release_service, question_answer_service
+from app.services import learning_service, practice_experience_service, practice_growth_service, paper_composition_service, paper_release_service, question_answer_service
 from app.services.practice_scoring_service import (
     DEFAULT_DOMAIN_WEIGHTS,
     DEFAULT_SIMULATION_SCORING,
@@ -1139,6 +1139,7 @@ async def answer_session_question(
         }
     session.runtime_state = runtime_state
     session.revision += 1
+    await practice_growth_service.record_answers(db, owner, [question_id])
     await db.commit()
     await db.refresh(session)
     return {
@@ -1542,12 +1543,16 @@ def _assert_existing_selections_unchanged(existing: dict, draft: dict) -> None:
 
 
 async def _apply_saved_draft(db: AsyncSession, session: PracticeSession, data: dict) -> None:
+    previous_ids = set((session.answers or {}).keys())
     draft = await _validated_draft_answers(db, session, data) if "answers" in data else None
     if draft is not None:
         _assert_existing_selections_unchanged(session.answers or {}, draft)
     await _apply_runtime_patch(db, session, data)
     if draft is not None:
         session.answers = draft
+        await practice_growth_service.record_answers(
+            db, session.owner_id, set(draft.keys()) - previous_ids
+        )
     refs = session.question_order if isinstance(session.question_order, list) else []
     rows = await _session_question_rows(db, session)
     session.stats = _draft_stats(refs, rows, session.answers or {}, dict(session.stats or {}))
@@ -2063,7 +2068,9 @@ async def complete_session(
                 "PRACTICE_MISTAKE_ALREADY_RECORDED",
                 "该题错题已记录，请刷新进度后重试",
             )
+        newly_answered = set(answers.keys()) - set((session.answers or {}).keys())
         session.answers = answers
+        await practice_growth_service.record_answers(db, owner, newly_answered)
 
     runtime_state = dict(session.runtime_state or {})
     await _apply_runtime_patch(db, session, data)

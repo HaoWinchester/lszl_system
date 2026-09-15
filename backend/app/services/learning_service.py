@@ -18,7 +18,7 @@ from app.models.training import (
     PracticeVerification,
     TrainingProgress,
 )
-from app.services import question_catalog_service, question_service, practice_experience_service, question_answer_service
+from app.services import question_catalog_service, question_service, practice_experience_service, practice_growth_service, question_answer_service
 
 SESSION_SCHEMA_VERSIONS = {1, 2}
 WORKSPACE_SCHEMA_VERSIONS = set(range(1, 11))
@@ -768,6 +768,7 @@ async def record_practice_answer(
         db, owner, event_type="PRACTICE_ANSWER_COMPLETED", question_id=question.id,
         payload={**completion, "mistakeId": mistake.id if mistake else None},
     )
+    await practice_growth_service.record_answers(db, owner, [question.id])
     if commit:
         await db.commit()
         if mistake is not None:
@@ -1330,6 +1331,7 @@ async def record_revenge_answer(
         payload={"mistakeId": mistake.id, "correct": correct, "status": mistake.status,
                  "requestId": str(data.get('requestId') or '').strip(), "selection": _practice_request_selection(data)},
     )
+    await practice_growth_service.record_answers(db, owner, [mistake.question_id])
     if commit:
         await db.commit()
         await db.refresh(mistake)
@@ -1520,6 +1522,7 @@ async def record_practice_verification(
             **({"selectedPairs": selected_pairs} if matching else {"selectedAnswerIds": selected_answer_ids} if multiple else {"selectedAnswer": selected_answer}),
         },
     )
+    await practice_growth_service.record_answers(db, owner, [question_id])
     if commit:
         await db.commit()
         await db.refresh(mistake)
