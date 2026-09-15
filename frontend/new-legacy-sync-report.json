@@ -3,8 +3,15 @@
   "fromVersion": "v9.0-p4.1.230",
   "toVersion": "v9.0-p4.1.230",
   "changes": {
-    "added": [],
-    "changed": [],
+    "added": [
+      "baidu_verify_codeva-1EsQLxjfxR.html",
+      "robots.txt",
+      "sitemap.xml"
+    ],
+    "changed": [
+      "VERSION",
+      "landing.html"
+    ],
     "removed": []
   },
   "incompatible": []

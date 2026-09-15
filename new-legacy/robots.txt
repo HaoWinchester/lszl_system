@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /api/
+Disallow: /__preview/
+
+Sitemap: https://lszl.aihuanpu.com/sitemap.xml

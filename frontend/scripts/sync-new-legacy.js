@@ -1150,7 +1150,8 @@ function sync({ source, out }) {
   }
 
 
-  for (const page of walk(out).filter((path) => !path.includes('/') && path.endsWith('.html'))) {
+  // 搜索引擎站长平台验证文件（baidu_verify_*.html 等）必须字节级原样输出，禁止注入任何脚本。
+  for (const page of walk(out).filter((path) => !path.includes('/') && path.endsWith('.html') && !path.startsWith('baidu_verify_'))) {
     const path = resolve(out, page)
     let pageHtml = patchArchitectureCopy(page, readFileSync(path, 'utf8'))
     if (page === 'system-settings.html') pageHtml = patchSystemSettingsAnalyticsHtml(pageHtml)

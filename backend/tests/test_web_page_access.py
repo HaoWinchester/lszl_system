@@ -57,3 +57,17 @@ def test_admin_can_download_privileged_page_html() -> None:
 
 def test_content_prep_html_is_registered_as_a_teaching_page() -> None:
     assert "content-prep.html" in TEACHING_PAGES
+
+
+def test_verify_html_without_bootstrap_anchor_is_served_verbatim(monkeypatch, tmp_path) -> None:
+    site = tmp_path / "site"
+    site.mkdir()
+    verify_code = "475d460b1663fdb0a2696381fc76193c"
+    (site / "baidu_verify_test.html").write_text(verify_code, encoding="utf-8")
+    release = WebRelease(version="verify-test", site=site, source_hash="test-hash")
+    monkeypatch.setattr(routes, "active_release", lambda: release)
+
+    with TestClient(app) as client:
+        response = client.get("/baidu_verify_test.html")
+    assert response.status_code == 200
+    assert response.text == verify_code
