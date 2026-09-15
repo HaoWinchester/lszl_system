@@ -1,0 +1,169 @@
+/* 单题留言 + 弹幕（119-question-comments.js）。配色跟随练习页现有蓝灰体系。 */
+
+.q-comments {
+  margin: 10px 0 2px;
+  padding: 10px 12px 12px;
+  background: #f7f9fc;
+  border: 1px solid #e3e8f0;
+  border-radius: 10px;
+  font-size: 13px;
+  color: #3d4757;
+}
+.q-comments-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-weight: 600;
+  color: #33415c;
+}
+.q-comments-count { font-size: 12px; font-weight: 400; color: #8a94a6; }
+
+/* 弹幕条：解析区内嵌横向滚动层 */
+.q-danmaku {
+  position: relative;
+  height: 40px;
+  margin-bottom: 8px;
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(138, 180, 248, 0.14), rgba(138, 180, 248, 0.03));
+  border-radius: 8px;
+}
+.q-danmaku-track { position: relative; height: 100%; }
+.q-danmaku-item {
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  white-space: nowrap;
+  padding: 3px 10px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid #e3e7ee;
+  border-radius: 999px;
+  font-size: 12px;
+  color: #44506a;
+  animation: q-danmaku-scroll 18s linear infinite;
+  animation-delay: var(--q-danmaku-delay, 0s);
+  will-change: transform;
+}
+/* 多条弹幕分行，避免同屏重叠 */
+.q-danmaku-item:nth-child(2n) { margin-top: -22px; }
+@keyframes q-danmaku-scroll {
+  from { transform: translate(0, -50%); }
+  to { transform: translate(calc(-100% - 100vw), -50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .q-danmaku-item { animation: none; position: static; display: inline-block; margin: 6px 6px 0 0; }
+  .q-danmaku { height: auto; padding: 6px 8px; }
+  .q-danmaku-track { display: flex; flex-wrap: wrap; overflow-x: auto; }
+}
+
+/* 留言列表 */
+.q-comment-list { list-style: none; margin: 0; padding: 0; }
+.q-comment {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 0;
+  border-top: 1px dashed #e8ecf3;
+}
+.q-comment:first-child { border-top: 0; }
+.q-comment-main { min-width: 0; flex: 1; }
+.q-comment-author { font-weight: 600; color: #4a5b83; margin-right: 6px; }
+.q-comment-time { font-size: 11px; color: #9aa3b2; }
+.q-comment-content { margin: 3px 0 0; word-break: break-word; white-space: pre-wrap; }
+.q-comment-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.q-comment-like,
+.q-comment-delete {
+  border: 1px solid #e0e6ef;
+  background: #fff;
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 12px;
+  color: #6b7688;
+  cursor: pointer;
+}
+.q-comment-like.is-liked { background: #eaf2ff; border-color: #b9d2fb; color: #2f6bd8; }
+.q-comment-delete:hover { color: #c0392b; border-color: #eab7b0; }
+.q-comments-empty { margin: 4px 0; font-size: 12px; color: #9aa3b2; }
+.q-comments-error { margin: 4px 0; font-size: 12px; color: #b3541e; }
+.q-comments-error button { border: 0; background: none; color: #2f6bd8; cursor: pointer; text-decoration: underline; }
+
+/* 发送框 */
+.q-composer { margin-top: 8px; }
+.q-composer-input {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid #dfe5ee;
+  border-radius: 8px;
+  font: inherit;
+  color: #333;
+  background: #fff;
+}
+.q-composer-input:focus { outline: 2px solid #b9d2fb; border-color: #8ab4f8; }
+.q-composer-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; }
+.q-composer-count { font-size: 11px; color: #9aa3b2; }
+.q-composer-send {
+  border: 0;
+  background: #3f7ad6;
+  color: #fff;
+  border-radius: 999px;
+  padding: 4px 16px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.q-composer-send:disabled { background: #c6d2e4; cursor: not-allowed; }
+.q-composer-login {
+  width: 100%;
+  border: 1px dashed #b9c4d6;
+  background: #fff;
+  color: #4a5b83;
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.q-comments-toast {
+  margin-top: 8px;
+  padding: 5px 10px;
+  background: #fdf1e3;
+  border: 1px solid #f2d3ac;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #9a5b13;
+}
+.q-comments-toast[hidden] { display: none; }
+
+/* 报告页折叠条：默认只显示入口，展开才拉取留言 */
+.q-comments.is-collapsed { padding: 0; background: transparent; border: 0; }
+.q-comments-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px dashed #c9d4e5;
+  background: #f7f9fc;
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 12px;
+  color: #4a5b83;
+  cursor: pointer;
+  text-align: left;
+}
+.q-comments-toggle:hover { background: #eef3fb; border-color: #8ab4f8; }
+.q-comments-collapse {
+  border: 0;
+  background: none;
+  font-size: 11px;
+  color: #8a94a6;
+  cursor: pointer;
+}
+.q-comments-collapse:hover { color: #2f6bd8; }
+
+/* 报告页题卡内嵌时收窄外边距 */
+.practice-review-card .q-comments { margin: 10px 0 0; }
+

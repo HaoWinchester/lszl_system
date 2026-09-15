@@ -32,7 +32,7 @@
       return clone(await DomainApi.request({ method, path: `${API_ROOT}${path}`, body }));
     } catch (error) {
       if (error?.status === 401) {
-        try { global.dispatchEvent(new CustomEvent('kg:auth-required')); } catch (error) {}
+        try { (global.document || global).dispatchEvent(new CustomEvent('kg:auth-required', { bubbles: true })); } catch (error) {}
       }
       throw error;
     }

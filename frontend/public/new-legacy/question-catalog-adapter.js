@@ -23,7 +23,7 @@
   }
 
   function emit(type, detail) {
-    try { global.dispatchEvent(new CustomEvent(type, { detail })) } catch (error) {}
+    try { (global.document || global).dispatchEvent(new CustomEvent(type, { detail, bubbles: true })) } catch (error) {}
   }
 
   async function request(path, options = {}) {

@@ -15,7 +15,9 @@ const screenshotSources = read('assets/landing/SOURCES.md');
 const contract = JSON.parse(fs.readFileSync(CONTRACT, 'utf8'));
 
 assert.match(html, /<html[^>]*lang="zh-CN"[^>]*class="landing-page"/);
-assert.match(html, /<title>幻谱｜知识图谱学习平台<\/title>/);
+assert.match(html, /<title>知识图谱备考平台｜刷题 · 错题归纳 · 主动回忆<\/title>/);
+assert.match(html, /<meta property="og:title" content="知识图谱备考平台｜刷题 · 错题归纳 · 主动回忆"/);
+assert.match(html, /<link rel="canonical" href="https:\/\/lszl\.aihuanpu\.com\/"/);
 assert.match(html, /<link rel="icon" href="data:image\/svg\+xml,/);
 assert.match(html, /<h1[^>]*>[\s\S]*把零散知识点[\s\S]*会生长的图谱[\s\S]*<\/h1>/);
 assert.match(html, /知识难的不是内容多，[\s\S]*知识始终[\s\S]*没有连起来/);
@@ -53,8 +55,11 @@ assert.match(html, /我的学习内容会自动保存吗/);
 assert.match(html, /styles\/landing\.css/);
 assert.match(html, /src\/landing\.js/);
 assert.match(css, /\.landing-page/);
-const htmlWithoutDataUrls = html.replace(/href="data:[^"]+"/g, 'href=""');
-assert.doesNotMatch(htmlWithoutDataUrls, /https?:\/\//, '官网不能依赖外部运行资源');
+const runtimeHtml = html
+  .replace(/href="data:[^"]+"/g, 'href=""')
+  .replace(/<meta\b[^>]*>/g, '')
+  .replace(/<link rel="canonical"[^>]*>/g, '');
+assert.doesNotMatch(runtimeHtml, /https?:\/\//, '官网不能依赖外部运行资源；SEO 元数据不发起资源请求');
 assert.doesNotMatch(html, /价格|套餐|通过率|1000万|客户评价|合作机构/);
 assert.doesNotMatch(script, /localStorage|sessionStorage|indexedDB/);
 for (const name of ['graph.png', 'practice.png', 'workspace.png', 'recall.png']) {

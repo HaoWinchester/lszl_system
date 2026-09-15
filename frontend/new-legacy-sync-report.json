@@ -1,16 +1,14 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.230",
-  "toVersion": "v9.0-p4.1.230",
+  "fromVersion": "v9.0-p4.1.231",
+  "toVersion": "v9.0-p4.1.232",
   "changes": {
-    "added": [
-      "baidu_verify_codeva-1EsQLxjfxR.html",
-      "robots.txt",
-      "sitemap.xml"
-    ],
+    "added": [],
     "changed": [
       "VERSION",
-      "landing.html"
+      "content-prep-studio/dist/content-prep.html",
+      "tests/landing-page-browser.py",
+      "tests/landing-page-contract.test.js"
     ],
     "removed": []
   },
