@@ -23,7 +23,7 @@
   function authenticated() { return Boolean(currentUser()) }
   function isPracticeEntryPage() { return /(?:^|\/)practice-mode\.html$/.test(text(global.location?.pathname)) }
   function emit(type, detail) {
-    try { global.dispatchEvent(new CustomEvent(type, { detail: clone(detail) })) } catch (error) {}
+    try { (global.document || global).dispatchEvent(new CustomEvent(type, { detail: clone(detail), bubbles: true })) } catch (error) {}
   }
   async function request(path, options = {}) {
     const response = await global.fetch(`${API_ROOT}${path}`, {

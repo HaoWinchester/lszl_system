@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     # legal-consent version. Tests disable it only for pre-existing fixtures.
     LEGAL_CONSENT_REQUIRED: bool = True
 
+    # 题目类接口限流；应急关停可设置 RATE_LIMIT_ENABLED=false 后重启。
+    RATE_LIMIT_ENABLED: bool = True
+    RATE_LIMIT_QUESTIONS_PER_MINUTE: int = 60
+    RATE_LIMIT_QUESTIONS_IP_PER_MINUTE: int = 120
+
     # itsdangerous 签名密钥（生产必改）
     SECRET_KEY: str = "change-me-in-prod"
 

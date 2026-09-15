@@ -189,6 +189,15 @@
   };
   global.KGStandaloneAuthDialog=Object.freeze({bind,open,close,login,register,logout,renderStatus,isLoggedIn,currentUsername,hasLegalConsent,requireLegalConsent,legalConsentVersion:LEGAL_CONSENT_VERSION});
 
+  let lastAuthRequiredAt=0;
+  document.addEventListener('kg:auth-required',()=>{
+    const now=Date.now();
+    if(now-lastAuthRequiredAt<3000)return;
+    lastAuthRequiredAt=now;
+    if(isLoggedIn())return;
+    open('题库与练习内容需要登录后查看，请先登录。');
+  });
+
   document.addEventListener('DOMContentLoaded',bind);
   global.addEventListener('load',()=>setTimeout(bind,0));
 })(window);

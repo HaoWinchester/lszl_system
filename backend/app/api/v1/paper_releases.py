@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import get_current_user, optional_current_user, require_permissions
+from app.core.rate_limit import QuestionRateLimited
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.paper_release import PaperReleasePublishRequest, PaperReleaseWithdrawRequest
@@ -119,6 +120,7 @@ async def release_questions(
     release_id: str,
     db: DB,
     user: CurrentUser,
+    _: QuestionRateLimited = None,
     limit: int = Query(default=20, ge=1, le=50),
     offset: int = Query(default=0, ge=0),
     seed: str | None = Query(default=None, max_length=128),

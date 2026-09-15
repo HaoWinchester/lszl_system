@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import CurrentUser
+from app.core.rate_limit import QuestionRateLimited
 from app.db.session import get_db
 from app.schemas.deep_recall import RecallProgressResetRequest, RecallProgressSaveRequest
 from app.services import deep_recall_service, training_service
@@ -47,7 +48,9 @@ async def save_progress(
 
 
 @router.get("/recall/question/{question_id}")
-async def recall_question(question_id: str, db: DB, user: CurrentUser):
+async def recall_question(
+    question_id: str, db: DB, user: CurrentUser, _: QuestionRateLimited = None
+):
     q = await training_service.get_question_for_recall(db, user.username, question_id)
     if not q:
         raise HTTPException(status_code=404, detail="题目不存在或无权访问")
@@ -96,6 +99,7 @@ async def recall_session(
     question_id: str,
     db: DB,
     user: CurrentUser,
+    _: QuestionRateLimited = None,
     release_id: str = Query("", alias="releaseId", max_length=64),
 ):
     return await deep_recall_service.get_session(db, user, question_id, release_id=release_id)

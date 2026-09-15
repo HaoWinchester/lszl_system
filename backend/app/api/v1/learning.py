@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import CurrentUser
+from app.core.rate_limit import QuestionRateLimited
 from app.db.session import get_db
 from app.schemas.personal_card import PersonalCardCreate, PersonalCardUpdate
 from app.services import learning_service, personal_card_service, practice_session_service
@@ -205,7 +206,9 @@ async def record_practice_answer(body: dict, db: DB, user: CurrentUser):
 
 
 @router.post("/learning/practice/sessions/start")
-async def start_practice_session(body: dict, request: Request, db: DB, user: CurrentUser):
+async def start_practice_session(
+    body: dict, request: Request, db: DB, user: CurrentUser, _: QuestionRateLimited = None
+):
     try:
         session = await practice_session_service.start_session(
             db, user.username, user, body
@@ -218,7 +221,9 @@ async def start_practice_session(body: dict, request: Request, db: DB, user: Cur
 
 
 @router.post("/learning/practice/sessions/enter")
-async def enter_practice_session(body: dict, request: Request, db: DB, user: CurrentUser):
+async def enter_practice_session(
+    body: dict, request: Request, db: DB, user: CurrentUser, _: QuestionRateLimited = None
+):
     try:
         payload = await practice_session_service.enter_session(
             db, user.username, user, body

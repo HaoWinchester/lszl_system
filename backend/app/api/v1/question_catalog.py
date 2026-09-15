@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import optional_current_user, require_permissions
 from app.core.permissions import can
+from app.core.rate_limit import QuestionRateLimited
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.question_catalog import (
@@ -52,6 +53,7 @@ async def list_bank_questions(
     bank_id: str,
     db: DB,
     user: CatalogManager,
+    _: QuestionRateLimited = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
     search: str | None = Query(None, max_length=200),
@@ -75,7 +77,9 @@ async def list_bank_questions(
 
 
 @router.get("/questions/{question_id}", response_model=CatalogQuestionResponse)
-async def get_question(question_id: str, db: DB, user: CatalogManager):
+async def get_question(
+    question_id: str, db: DB, user: CatalogManager, _: QuestionRateLimited = None
+):
     return {
         "question": await question_catalog_service.get_catalog_question(
             db,
@@ -89,6 +93,7 @@ async def get_question(question_id: str, db: DB, user: CatalogManager):
 async def list_learning_questions(
     request: Request,
     db: DB,
+    _: QuestionRateLimited = None,
     subject: str | None = Query(None),
     bank_id: str | None = Query(None),
     paper_id: str | None = Query(None),
@@ -118,6 +123,7 @@ async def list_learning_questions(
 async def bootstrap(
     request: Request,
     db: DB,
+    _: QuestionRateLimited = None,
     mode: Literal["managed", "learning"] = Query("learning"),
     subject: str | None = Query(None),
     include_questions: bool = Query(False),

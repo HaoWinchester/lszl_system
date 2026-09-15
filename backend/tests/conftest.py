@@ -18,6 +18,7 @@ from urllib.parse import urlencode
 from uuid import uuid4
 
 from dotenv import dotenv_values
+import pytest
 from sqlalchemy.engine import URL, make_url
 
 
@@ -126,6 +127,7 @@ atexit.register(_drop_test_database)
 # These imports must remain below the database creation, environment override,
 # and Alembic migration above.
 from app.core.config import settings  # noqa: E402
+from app.core.rate_limit import reset_all as reset_rate_limit  # noqa: E402
 from app.db.session import engine  # noqa: E402
 from app.main import (  # noqa: E402
     _seed_admin,
@@ -135,6 +137,13 @@ from app.main import (  # noqa: E402
 # 本地 .env 可能临时开启 CONTENT_PREP_VALIDATION_DISABLED(dev 提速),但测试永远跑默认校验路径;
 # 需要开关行为的测试(test_content_prep_validation_switch)自行显式设置。
 settings.CONTENT_PREP_VALIDATION_DISABLED = False
+
+
+@pytest.fixture(autouse=True)
+def _isolate_rate_limit_state():
+    reset_rate_limit()
+    yield
+    reset_rate_limit()
 
 asyncio.run(_seed_admin())
 asyncio.run(_seed_builtin_teaching_content())

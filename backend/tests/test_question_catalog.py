@@ -1062,6 +1062,11 @@ def test_catalog_access_pagination_round_trip_and_learning_visibility() -> None:
             assert set(bank_ids.values()) <= admin_ids
             client.post("/api/v1/auth/logout")
 
+            # Public learning discovery remains available while its question
+            # endpoints are protected by the shared IP rate-limit bucket.
+            assert client.get(
+                "/api/v1/question-catalog/bootstrap", params={"mode": "learning"}
+            ).status_code == 200
             learning = client.get(
                 "/api/v1/question-catalog/learning/questions",
                 params={"subject": "PMP", "bank_id": bank_ids["published"]},

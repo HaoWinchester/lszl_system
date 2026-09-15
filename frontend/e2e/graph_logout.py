@@ -18,7 +18,13 @@ def main():
  subprocess.run(['createdb','-h','/tmp',database],check=True)
  process=None
  def login(page):
-  ab('open',base+'/'+page);wait("typeof authOpen==='function'");js('authOpen()')
+  ab('open',base+'/'+page);wait("typeof authOpen==='function'")
+  assert js("!!document.querySelector('#authModal')"),page
+  js("document.dispatchEvent(new CustomEvent('kg:auth-required',{bubbles:true}))")
+  wait("!!document.querySelector('#authModal.show')")
+  click('#authCloseBtn')
+  click('[data-account-menu-trigger]');ab('snapshot','-i');click('#accountMenuSessionBtn')
+  wait("!!document.querySelector('#authModal.show')")
   fill('#authUsername',username);fill('#authPassword',PASSWORD);ab('check','#authLegalConsent');click('#authDoLoginBtn')
   wait('!!KGAuthCore.currentUser()')
   if js("!!document.querySelector('#learningEntryModal.show')"):click('#learningEntryDismissBtn')

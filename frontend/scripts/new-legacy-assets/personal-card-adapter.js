@@ -36,7 +36,7 @@
       error.status = response.status
       error.detail = payload?.detail ?? payload
       if (response.status === 401) {
-        try { global.dispatchEvent(new CustomEvent('kg:auth-required', { detail: { source: 'personal-cards' } })) } catch (eventError) {}
+        try { (global.document || global).dispatchEvent(new CustomEvent('kg:auth-required', { detail: { source: 'personal-cards' }, bubbles: true })) } catch (eventError) {}
       }
       throw error
     }
