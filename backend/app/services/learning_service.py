@@ -638,6 +638,7 @@ async def record_practice_answer(
     commit: bool = True,
     allow_concurrent: bool = False,
     record: bool = True,
+    account_growth: bool = True,
 ) -> dict:
     """Grade a canvas answer from server-owned question content and update its mistake.
 
@@ -768,7 +769,8 @@ async def record_practice_answer(
         db, owner, event_type="PRACTICE_ANSWER_COMPLETED", question_id=question.id,
         payload={**completion, "mistakeId": mistake.id if mistake else None},
     )
-    await practice_growth_service.record_answers(db, owner, [question.id])
+    if account_growth:
+        await practice_growth_service.record_answers(db, owner, [question.id], now)
     if commit:
         await db.commit()
         if mistake is not None:
@@ -1257,6 +1259,7 @@ async def record_revenge_answer(
     commit: bool = True,
     allow_concurrent: bool = False,
     record: bool = True,
+    account_growth: bool = True,
     authoritative_snapshot: dict | None = None,
 ) -> PracticeMistake | None:
     mistake = await _practice_mistake(db, owner, mistake_id)
@@ -1331,7 +1334,8 @@ async def record_revenge_answer(
         payload={"mistakeId": mistake.id, "correct": correct, "status": mistake.status,
                  "requestId": str(data.get('requestId') or '').strip(), "selection": _practice_request_selection(data)},
     )
-    await practice_growth_service.record_answers(db, owner, [mistake.question_id])
+    if account_growth:
+        await practice_growth_service.record_answers(db, owner, [mistake.question_id], now)
     if commit:
         await db.commit()
         await db.refresh(mistake)
@@ -1438,6 +1442,7 @@ async def record_practice_verification(
     data: dict,
     *,
     commit: bool = True,
+    account_growth: bool = True,
 ) -> tuple[PracticeMistake, PracticeVerification, dict] | None:
     mistake = await _practice_mistake(db, owner, mistake_id)
     if mistake is None:
@@ -1522,7 +1527,8 @@ async def record_practice_verification(
             **({"selectedPairs": selected_pairs} if matching else {"selectedAnswerIds": selected_answer_ids} if multiple else {"selectedAnswer": selected_answer}),
         },
     )
-    await practice_growth_service.record_answers(db, owner, [question_id])
+    if account_growth:
+        await practice_growth_service.record_answers(db, owner, [question_id], now)
     if commit:
         await db.commit()
         await db.refresh(mistake)

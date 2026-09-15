@@ -45,3 +45,26 @@ Tests cover empty defaults, auth denial, invalid/selectable and repeated goal ch
 - Migration head `c8d7e6f5a401` is stable and must be applied before starting code that writes growth rows.
 - No production deployment, push, `uat`, or `main` operation was performed.
 - The controller still needs the planned full backend suite and UAT real-interface verification. No task-owned functional concern remains from targeted and adjacent tests.
+
+### Post-review regression RED
+
+The reviewer identified a cross-day draft-completion path not covered by the initial test. A real API regression now saves a validated draft on D, replays it after Asia/Shanghai midnight, then completes the session on D+1. Command:
+
+`backend/.venv/bin/python -m pytest backend/tests/test_practice_growth.py::test_actual_session_save_counts_wrong_once_and_rejects_replays_events_and_other_owner -q`
+
+Actual RED: `1 failed`; after completion the D+1 `today.answered` was `1`, expected `0`. This confirmed that completion grading reached the standalone answer growth hook before the outer session's `newly_answered` filter.
+
+## Review round 1 fixes
+
+All three Important findings in `task-1-review.md` were addressed:
+
+1. Session-owned grading now calls shared answer/revenge/verification functions with `account_growth=False`. The outer session boundary computes the newly accepted source-question set and records it once. Draft-to-single upgrade excludes an already saved question. Save-state, pause, abandon, completion and session verification pass one captured server timestamp into growth accounting.
+2. Whole-paper grading no longer acquires the owner growth lock inside its question loop. It grades all questions first and performs one post-grading batch. A controlled concurrency regression pauses whole-paper completion after q1 while a PC q2 transaction runs to completion; both finish without a PostgreSQL deadlock. This enforces the question-lock-then-growth order used by both flows.
+3. Growth-specific real-handler assertions now cover mini state save, cross-day completion replay, draft-to-single upgrade, the same source in a new session, PC wrong-answer submission, revenge deduplication, a distinct verification variant, forged learning events, and owner isolation. Deterministic rows cover streak gaps and actual 7/30/100 unlocks.
+
+Fix RED/GREEN evidence:
+
+- RED before production fix: `.venv/bin/python -m pytest tests/test_practice_growth.py::test_actual_session_save_counts_wrong_once_and_rejects_replays_events_and_other_owner -q` -> `1 failed`; D+1 completion returned `today.answered == 1`, expected `0`.
+- Reviewer RED for concurrency: the review's two-transaction reproduction raised `asyncpg.exceptions.DeadlockDetectedError` for whole-paper q1→q2 versus concurrent PC q2. The permanent controlled regression was added after the structural fix, so a separate local pre-fix failing run was not captured; this sequencing gap is recorded rather than relabeled.
+- GREEN: `.venv/bin/python -m pytest tests/test_practice_growth.py tests/test_alembic_single_head.py -q` -> `9 passed`.
+- GREEN adjacent: `.venv/bin/python -m pytest tests/test_practice_sessions.py tests/test_practice_learning_api.py tests/test_learning_workspace.py -q` -> `92 passed`.

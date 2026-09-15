@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import asyncio
 
 import pytest
@@ -8,13 +8,15 @@ from sqlalchemy import delete
 from app.db.session import AsyncSessionLocal
 from app.main import app
 from app.models.practice_growth import PracticeGrowthAnswer, PracticeGrowthDay, PracticeGrowthSetting
-from app.services import practice_growth_service
+from app.models.user import User
+from app.services import learning_service, practice_growth_service, practice_session_service
 from test_practice_sessions import (
     PASSWORD as SESSION_PASSWORD,
     _cleanup_released_pmp_paper,
     _practice_fixture_ids,
     _seed_released_pmp_paper,
 )
+from test_practice_learning_api import _create_public_question, _create_student
 
 
 def _login(client: TestClient, username="学生", password="111111"):
@@ -86,6 +88,7 @@ def test_actual_session_save_counts_wrong_once_and_rejects_replays_events_and_ot
     asyncio.run(_seed_released_pmp_paper(ids, domains=["people"]))
     first_day = datetime(2026, 9, 14, 15, 59, tzinfo=timezone.utc)
     monkeypatch.setattr(practice_growth_service, "now_utc", lambda: first_day)
+    monkeypatch.setattr(practice_session_service, "now_utc", lambda: first_day)
     try:
       with TestClient(app) as client:
         _login(client, ids["student"], SESSION_PASSWORD)
@@ -116,10 +119,52 @@ def test_actual_session_save_counts_wrong_once_and_rejects_replays_events_and_ot
 
         second_day = datetime(2026, 9, 14, 16, 0, tzinfo=timezone.utc)
         monkeypatch.setattr(practice_growth_service, "now_utc", lambda: second_day)
+        monkeypatch.setattr(practice_session_service, "now_utc", lambda: second_day)
         replay = client.patch(path, json={"revision": saved.json()["session"]["revision"], "answers": {
             question_id: {"selectedAnswer": "B", "selectionIndex": 1}
         }})
         assert replay.status_code == 200
+        assert client.get("/api/v1/learning/practice/growth").json()["today"]["answered"] == 0
+
+        completed = client.post(
+            f"/api/v1/learning/practice/sessions/{started['id']}/complete",
+            json={
+                "revision": replay.json()["session"]["revision"],
+                "answers": {
+                    question_id: {"selectedAnswer": "B", "selectionIndex": 1}
+                },
+            },
+        )
+        assert completed.status_code == 200, completed.text
+        # The accepted answer was already credited when its draft was saved on D.
+        # Grading that immutable draft during completion on D+1 must not credit D+1.
+        assert client.get("/api/v1/learning/practice/growth").json()["today"]["answered"] == 0
+
+        another = client.post("/api/v1/learning/practice/sessions/start", json={
+            "paperId": ids["paper"], "releaseId": ids["release"],
+            "mode": "challenge", "count": 1, "order": "paper",
+        }).json()["session"]
+        another_save = client.patch(
+            f"/api/v1/learning/practice/sessions/{another['id']}/state",
+            json={"revision": 1, "answers": {
+                question_id: {"selectedAnswer": "A", "selectionIndex": 1}
+            }},
+        )
+        assert another_save.status_code == 200
+        assert client.get("/api/v1/learning/practice/growth").json()["today"]["answered"] == 1
+
+        third_day = datetime(2026, 9, 15, 16, 0, tzinfo=timezone.utc)
+        monkeypatch.setattr(practice_growth_service, "now_utc", lambda: third_day)
+        monkeypatch.setattr(practice_session_service, "now_utc", lambda: third_day)
+        upgraded = client.post(
+            f"/api/v1/learning/practice/sessions/{another['id']}/answers",
+            json={
+                "revision": another_save.json()["session"]["revision"],
+                "questionId": question_id,
+                "selectedAnswer": "A",
+            },
+        )
+        assert upgraded.status_code == 200, upgraded.text
         assert client.get("/api/v1/learning/practice/growth").json()["today"]["answered"] == 0
 
       with TestClient(app) as other:
@@ -156,3 +201,122 @@ def test_streak_can_end_yesterday_and_handles_year_boundary():
         assert result["longestStreak"] == 2
         assert result["totalCompletedDays"] == 2
     asyncio.run(scenario())
+
+
+def test_pc_revenge_and_verification_variant_handlers_account_stable_sources():
+    username = f"growth-handler-{__import__('uuid').uuid4().hex[:8]}"
+    _create_student(username)
+    source = _create_public_question(title="growth source", taxonomy_id="growth-tax", node_id="growth-node")
+    variant = _create_public_question(title="growth variant", taxonomy_id="growth-tax", node_id="growth-node")
+    with TestClient(app) as client:
+      _login(client, username, "test1234")
+      wrong = client.post("/api/v1/learning/practice/answers", json={
+          "questionId": source["question"]["id"], "bankId": source["bankId"],
+          "selectedAnswer": "B", "sourceMode": "workspace",
+      })
+      assert wrong.status_code == 200, wrong.text
+      mistake = wrong.json()["mistake"]
+      assert client.get("/api/v1/learning/practice/growth").json()["today"]["answered"] == 1
+      revenge = client.post(
+          f"/api/v1/learning/practice/mistakes/{mistake['id']}/revenge-answer",
+          json={"selectedAnswer": "B", "requestId": "growth-revenge"},
+      )
+      assert revenge.status_code == 200, revenge.text
+      # Same stable source question remains one credit today.
+      assert client.get("/api/v1/learning/practice/growth").json()["today"]["answered"] == 1
+      reviewed = client.post(f"/api/v1/learning/practice/mistakes/{mistake['id']}/remediation-reviewed")
+      assert reviewed.status_code == 200, reviewed.text
+      candidate = client.get(f"/api/v1/learning/practice/mistakes/{mistake['id']}/verification-candidate")
+      assert candidate.status_code == 200, candidate.text
+      assert candidate.json()["candidate"]["question"]["id"] == variant["question"]["id"]
+      verified = client.post(
+          f"/api/v1/learning/practice/mistakes/{mistake['id']}/verification",
+          json={"questionId": variant["question"]["id"], "selectedAnswer": "A", "requestId": "growth-variant"},
+      )
+      assert verified.status_code == 200, verified.text
+      assert client.get("/api/v1/learning/practice/growth").json()["today"]["answered"] == 2
+
+
+def test_streak_gaps_and_all_milestone_thresholds():
+    async def scenario():
+      owner = "admin"
+      today = datetime(2026, 8, 31, 4, tzinfo=timezone.utc)
+      end = practice_growth_service._local_day(today)
+      async with AsyncSessionLocal() as db:
+        await db.execute(delete(PracticeGrowthAnswer).where(PracticeGrowthAnswer.owner_id == owner))
+        await db.execute(delete(PracticeGrowthDay).where(PracticeGrowthDay.owner_id == owner))
+        # Three runs separated by gaps: 7, 30, then 100 days ending today.
+        starts_and_lengths = ((end - timedelta(days=140), 7), (end - timedelta(days=130), 30), (end - timedelta(days=99), 100))
+        for start, length in starts_and_lengths:
+          db.add_all([
+              PracticeGrowthDay(owner_id=owner, local_date=start + timedelta(days=i), goal=10, answered=10)
+              for i in range(length)
+          ])
+        await db.commit()
+        summary = await practice_growth_service.growth_summary(db, owner, today)
+        assert summary["currentStreak"] == 100
+        assert summary["longestStreak"] == 100
+        assert summary["totalCompletedDays"] == 137
+        assert summary["milestones"] == [
+            {"days": 7, "unlocked": True},
+            {"days": 30, "unlocked": True},
+            {"days": 100, "unlocked": True},
+        ]
+    asyncio.run(scenario())
+
+
+def test_whole_paper_and_pc_answer_do_not_invert_growth_and_question_locks(monkeypatch):
+    ids = _practice_fixture_ids()
+    asyncio.run(_seed_released_pmp_paper(ids, domains=["people", "people"]))
+    try:
+      with TestClient(app) as client:
+        _login(client, ids["student"], SESSION_PASSWORD)
+        started = client.post("/api/v1/learning/practice/sessions/start", json={
+            "paperId": ids["paper"], "releaseId": ids["release"],
+            "mode": "challenge", "count": 2, "order": "paper",
+        }).json()["session"]
+      q1, q2 = [item["questionId"] for item in started["questions"]]
+      original = learning_service.record_practice_answer
+      q1_finished = asyncio.Event()
+      pc_finished = asyncio.Event()
+
+      async def controlled(*args, **kwargs):
+        result = await original(*args, **kwargs)
+        data = args[2]
+        if kwargs.get("account_growth") is False and data.get("questionId") == q1:
+          q1_finished.set()
+          await asyncio.wait_for(pc_finished.wait(), timeout=3)
+        return result
+
+      monkeypatch.setattr(learning_service, "record_practice_answer", controlled)
+
+      async def scenario():
+        async def complete_whole():
+          async with AsyncSessionLocal() as db:
+            user = await db.get(User, ids["student"])
+            assert user is not None
+            return await practice_session_service.complete_session(db, ids["student"], user, started["id"], {
+                "revision": started["revision"],
+                "answers": {
+                    q1: {"selectedAnswer": "A", "selectionIndex": 1},
+                    q2: {"selectedAnswer": "A", "selectionIndex": 2},
+                },
+            })
+        async def answer_pc():
+          await asyncio.wait_for(q1_finished.wait(), timeout=3)
+          try:
+            async with AsyncSessionLocal() as db:
+              user = await db.get(User, ids["student"])
+              assert user is not None
+              return await learning_service.record_practice_answer(db, ids["student"], {
+                  "questionId": q2, "bankId": ids["bank"], "releaseId": ids["release"],
+                  "selectedAnswer": "A", "sourceMode": "practice_mode",
+              }, current_user=user)
+          finally:
+            pc_finished.set()
+        whole, pc = await asyncio.wait_for(asyncio.gather(complete_whole(), answer_pc()), timeout=8)
+        assert whole[0]["status"] == "completed"
+        assert pc["correct"] is True
+      asyncio.run(scenario())
+    finally:
+      asyncio.run(_cleanup_released_pmp_paper(ids))
