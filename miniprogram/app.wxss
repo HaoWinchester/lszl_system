@@ -39,6 +39,10 @@ button::after {
 }
 
 .nav-bar {
+  position: sticky;
+  top: var(--status-bar-height, 24px);
+  z-index: 20;
+  background: var(--paper);
   display: flex;
   align-items: center;
   gap: 0;
@@ -151,3 +155,6 @@ button.payment-unavailable[disabled] { opacity: 1; background: var(--surface-qui
 .growth-track { height: 12rpx; overflow: hidden; border-radius: 12rpx; background: var(--surface-quiet); }
 .growth-fill { height: 100%; border-radius: 12rpx; background: var(--ink); }
 .tab-page { padding-bottom: calc(160rpx + env(safe-area-inset-bottom)); }
+
+/* Opaque shared header extends over the status bar while content scrolls. */
+.nav-bar::before { content: ""; position: absolute; z-index: -1; top: calc(-1 * var(--status-bar-height, 24px)); right: calc(-1 * var(--page-gutter)); bottom: 0; left: calc(-1 * var(--page-gutter)); background: var(--paper); pointer-events: none; }

@@ -176,3 +176,17 @@ test('directly opened appearance preview has a working return path', async () =>
   page.onBack();
   assert.equal(navigation[0]?.url, '/pages/profile/index');
 });
+
+test('shared appearance exposes actual status-bar height for scroll-safe native navigation', async () => {
+  const api = await appearance();
+  const { withAppearance } = await loadModule('domain/appearance-page.ts', api, ['withAppearance']);
+  const page = withAppearance({ data: { statusBarHeight: 44 } });
+  page.setData = values => Object.assign(page.data, values);
+  page.onShow();
+  assert.match(page.data.appearanceStyle, /--status-bar-height:44px/);
+  page.data.statusBarHeight = 20; page.onShow();
+  assert.match(page.data.appearanceStyle, /--status-bar-height:20px/);
+  const styles = readFileSync(new URL('../app.wxss', import.meta.url), 'utf8');
+  assert.match(styles, /\.nav-bar\s*\{[^}]*position:\s*sticky;[^}]*top:\s*var\(--status-bar-height,\s*24px\)/s);
+  assert.match(styles, /\.nav-bar::before\s*\{[^}]*top:\s*calc\(-1 \* var\(--status-bar-height,\s*24px\)\);[^}]*background:\s*var\(--paper\)/s);
+});

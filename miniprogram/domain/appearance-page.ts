@@ -4,6 +4,8 @@ import { Appearance, appearanceData, readAppearance, subscribeAppearance, update
 export function withAppearance(options: any) {
   const apply = (page: any, value: Appearance) => {
     const data = appearanceData(value);
+    // Native custom headers share one safe-area inset on every mounted page.
+    data.appearanceStyle += `--status-bar-height:${page.data.statusBarHeight ?? 24}px;`;
     page.setData(data);
     page.getTabBar?.()?.setData(data);
   };
