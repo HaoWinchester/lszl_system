@@ -1,6 +1,7 @@
 export const PRIMARY_TABS = [
   { key: 'home', label: '首页', path: '/pages/home/index', icon: 'home' },
-  { key: 'history', label: '记录', path: '/pages/history/index', icon: 'history' },
+  { key: 'papers', label: '练习', path: '/pages/papers/index', icon: 'normal' },
+  { key: 'growth', label: '成长', path: '/pages/growth/index', icon: 'growth' },
   { key: 'profile', label: '我的', path: '/pages/profile/index', icon: 'profile' },
 ] as const;
 

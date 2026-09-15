@@ -1,8 +1,9 @@
-import { navigation } from "../../domain/navigation";
+import { getGrowthSummary, GrowthSummary } from '../../services/growth';
+import { growthView } from '../../domain/growth-view';
+import { navigation, openPaperCatalog } from "../../domain/navigation";
 import { withAppearance } from '../../domain/appearance-page';
 import { showDialog } from '../../domain/dialog';
 import { validateSession } from '../../services/auth';
-import { MODE_POLICIES } from '../../domain/mode-policy';
 import { getCurrentUser } from '../../services/session';
 import { listPublishedPapers } from '../../services/papers';
 import {
@@ -15,8 +16,6 @@ import { selectPrimaryTab } from '../../domain/primary-tabs';
 import { pageRefreshMode } from '../../domain/page-freshness';
 import { messageOf } from '../../services/http';
 import { openMembershipOffer } from '../../domain/membership-navigation';
-
-const modes = ['normal', 'challenge', 'scholar', 'revenge'].map(id => MODE_POLICIES[id as PracticeMode]);
 
 function greetingFor(hour: number): string {
   if (hour < 11) return '早上好';
@@ -32,10 +31,13 @@ Page(withAppearance({
     error: '',
     lastLoadedAt: 0,
     continuing: false,
+    summary: null as GrowthSummary | null,
+    growth: null as ReturnType<typeof growthView> | null,
+    growthError: '',
+    revengeCount: '—' as number | string,
     displayName: '同学',
     greeting: '你好',
     todayLabel: '',
-    modes,
     papers: [] as PaperSummary[],
     activeSession: null as PracticeSessionSummary | null,
   },
@@ -67,19 +69,22 @@ Page(withAppearance({
         listPublishedPapers(1, 3),
         getRevengeSummary(),
         getActiveSessions(),
+        getGrowthSummary(),
       ]);
       const paperResult: any = results[0];
       const revengeResult: any = results[1];
       const activeResult: any = results[2];
+      const growthResult: any = results[3];
       this.setData({
+        summary: growthResult.status === 'fulfilled' ? growthResult.value : this.data.summary,
+        growth: growthResult.status === 'fulfilled' ? growthView(growthResult.value) : this.data.growth,
+        growthError: growthResult.status === 'rejected' ? messageOf(growthResult.reason) : '',
+        revengeCount: revengeResult.status === 'fulfilled' ? Number(revengeResult.value?.stats?.active || 0) : this.data.revengeCount,
         papers: paperResult.status === 'fulfilled' ? paperResult.value.items : this.data.papers,
-        modes: modes.map(item => item.id === 'revenge' && revengeResult.status === 'fulfilled' && Number(revengeResult.value?.stats?.active || 0) > 0
-          ? { ...item, copy: `待处理 ${Number(revengeResult.value.stats.active)} 道，重做后完成变式验证` }
-          : item),
         activeSession: activeResult.status === 'fulfilled' ? activeResult.value[0] || null : this.data.activeSession,
         loading: false,
         lastLoadedAt: Date.now(),
-        error: results.some(item => item.status === 'rejected') ? '部分数据未更新，请重试。' : '',
+        error: results.slice(0, 3).some(item => item.status === 'rejected') ? '部分数据未更新，请重试。' : '',
       });
     } catch (error) {
       this.setData({ loading: false, error: messageOf(error) });
@@ -111,7 +116,7 @@ Page(withAppearance({
     }
   },
 
-  onBrowsePapers() { navigation.navigateTo({ url: '/pages/papers/index?mode=normal' }); },
+  onBrowsePapers() { openPaperCatalog('normal'); },
 
   onMode(event: any) {
     const mode = event.currentTarget.dataset.mode as PracticeMode;
@@ -119,8 +124,10 @@ Page(withAppearance({
       navigation.navigateTo({ url: '/pages/revenge/index' });
       return;
     }
-    navigation.navigateTo({ url: `/pages/papers/index?mode=${mode}` });
+    openPaperCatalog(mode);
   },
+
+  onGrowth() { navigation.switchTab({ url: '/pages/growth/index' }); },
 
   async onPaper(event: any) {
     const paper = this.data.papers.find((item: PaperSummary) => item.releaseId === event.currentTarget.dataset.releaseId);

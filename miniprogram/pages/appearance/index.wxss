@@ -23,3 +23,5 @@
 .preview-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
 .preview-note { color: var(--muted); font-size: var(--font-meta); }
 .choice-pressed { opacity: .75; }
+
+.appearance-section { margin-top: 24rpx; padding: 28rpx; border-radius: 32rpx; background: var(--surface); }.reading-preview { padding: 24rpx; border: 0; border-radius: 28rpx; background: var(--surface); }

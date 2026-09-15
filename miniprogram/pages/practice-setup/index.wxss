@@ -24,3 +24,5 @@
 .start-button { --button-width: 100%; width: 100%; margin-top: var(--space-6); }
 .mode-option { gap: var(--space-3); }
 .mode-text { min-width: 0; }
+
+.setting-section { margin-top: 24rpx; padding: 28rpx; border-radius: 32rpx; background: var(--surface); }.option-list, .mode-list { border-top: 0; }.line-option:last-child, .mode-option:last-child { border-bottom: 0; }

@@ -76,13 +76,14 @@ test('home loads only visible data and does not depend on unused statistics', as
     listPublishedPapers: async () => ({ items: [{ releaseId: 'r1', title: '试卷' }] }),
     getOverview: unexpected, getExperienceSummary: unexpected,
     getRevengeSummary: async () => ({ stats: { active: 2 } }),
+    getGrowthSummary: async () => ({ date: '2026-09-15', today: { answered: 0, goal: 10 }, week: [], milestones: [] }),
     getActiveSessions: async () => [{ id: 's1' }], messageOf: e => e.message,
   });
   await page.loadHome();
   assert.equal(page.data.error, '');
   assert.equal(page.data.papers[0].title, '试卷');
   assert.equal(page.data.activeSession.id, 's1');
-  assert.match(page.data.modes.find(mode => mode.id === 'revenge').copy, /2/);
+  assert.equal(page.data.revengeCount, 2);
 });
 
 test('same-revision local choice survives a later server fetch', () => {

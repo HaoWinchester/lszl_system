@@ -76,8 +76,8 @@ button::after {
 }
 
 .primary-button {
-  background: var(--ink);
-  color: var(--on-accent);
+  background: var(--orange);
+  color: var(--on-orange);
 }
 
 .secondary-button {
@@ -145,3 +145,9 @@ button { font-family: inherit; font-weight: 400; }
 button[disabled] { opacity: .55; }
 button.payment-unavailable[disabled] { opacity: 1; background: var(--surface-quiet); color: var(--muted); }
 @media (prefers-reduced-motion: reduce) { button, view { transition: none; animation: none; } }
+
+/* Shared learning surfaces preserve all appearance variants. */
+.learning-card { padding: var(--space-4); border-radius: var(--radius-md); background: var(--surface); }
+.growth-track { height: 12rpx; overflow: hidden; border-radius: 12rpx; background: var(--surface-quiet); }
+.growth-fill { height: 100%; border-radius: 12rpx; background: var(--ink); }
+.tab-page { padding-bottom: calc(160rpx + env(safe-area-inset-bottom)); }

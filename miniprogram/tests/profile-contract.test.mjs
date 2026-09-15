@@ -33,12 +33,13 @@ test('profile preserves rendered content during background refreshes', () => {
   assert.match(source, /mode === 'skip'/);
 });
 
-test('native custom tab bar declares the three persistent primary pages', () => {
+test('native custom tab bar declares the four persistent primary pages', () => {
   const app = JSON.parse(read('app.json'));
   assert.equal(app.tabBar?.custom, true);
   assert.deepEqual(app.tabBar.list.map(item => item.pagePath), [
     'pages/home/index',
-    'pages/history/index',
+    'pages/papers/index',
+    'pages/growth/index',
     'pages/profile/index',
   ]);
 });
@@ -51,7 +52,7 @@ test('custom tab bar switches without relaunching page instances', () => {
 });
 
 test('primary pages delegate navigation to the native tab bar', () => {
-  for (const page of ['home', 'history', 'profile']) {
+  for (const page of ['home', 'papers', 'growth', 'profile']) {
     assert.doesNotMatch(read(`pages/${page}/index.wxml`), /bottom-nav/);
     assert.match(read(`pages/${page}/index.ts`), /selectPrimaryTab/);
   }
@@ -80,16 +81,17 @@ test('profile identity and rows share the approved scale', () => {
 
 test('profile presents real account information without invented fields', () => {
   const page = read('pages/profile/index.wxml');
-  for (const label of ['个人信息', '显示名称', '登录账号', '账号身份', '学习权限', '数据同步']) {
+  for (const label of ['displayName', 'user.username', 'roleLabel', 'accessTitle', 'syncLabel', 'membership.statusLabel', 'membership.expiryLabel']) {
     assert.match(page, new RegExp(label));
   }
   assert.match(page, /avatarLetter/);
   assert.doesNotMatch(page, /手机号|学校|地区|注册时间|编辑资料/);
 });
 
-test('profile information rows share a fixed mobile alignment column', () => {
+test('profile groups real identity and membership into compact readable surfaces', () => {
   const styles = read('pages/profile/index.wxss');
-  assert.match(styles, /\.info-row\s*\{[^}]*min-height:\s*var\(--touch-min\)/s);
-  assert.match(styles, /\.info-label\s*\{[^}]*flex:\s*0 0 144rpx/s);
-  assert.match(styles, /\.info-value\s*\{[^}]*text-align:\s*right/s);
+  assert.match(styles, /\.identity\s*\{[^}]*background:\s*var\(--forest\)/s);
+  assert.match(styles, /\.membership-summary\s*\{[^}]*background:\s*var\(--mint\)/s);
+  assert.match(styles, /\.account-row, \.logout\s*\{[^}]*min-height:\s*var\(--touch-min\)/s);
+  assert.match(read('pages/profile/index.wxml'), /bindtap="onGrowth"/);
 });

@@ -1,46 +1,37 @@
 <view class="page-shell home-page" style="{{appearanceStyle}}padding-top: {{statusBarHeight}}px">
-  <view class="nav-bar"><text class="nav-title">练习</text></view>
-  <view wx:if="{{loading}}" class="loading-state">
-    <view class="loading-line short"></view>
-    <view class="loading-line"></view>
-    <view class="loading-line"></view>
-  </view>
+  <view class="nav-bar"><text class="nav-title">首页</text></view>
+  <view wx:if="{{loading}}" class="loading-state" aria-label="正在加载学习进度"><view class="loading-line short"></view><view class="loading-line"></view><view class="loading-line"></view></view>
   <view wx:else>
     <view class="welcome">
-      <text class="eyebrow">{{todayLabel}}</text>
-      <text class="home-title">{{greeting}}，{{displayName}}</text>
-    <text class="home-copy">{{error ? '当前数据尚未全部更新。' : loading ? '正在获取你的学习进度…' : '从上次停下的地方，继续练习。'}}</text>
+      <view class="greeting-row"><view class="greeting-copy"><text class="eyebrow">{{todayLabel}} · {{greeting}}</text><text class="greeting-name">{{displayName}}</text></view><button class="goal-chip" bindtap="onGrowth"><ui-icon name="target" size="32" /><text>{{summary ? '今日目标 ' + summary.today.goal + ' 题' : '我的成长'}}</text></button></view>
+      <text class="home-title">每天一小步，<text class="headline-second">让知识更扎实。</text></text>
     </view>
-    <view wx:if="{{error}}" class="inline-notice"><text>{{error}}</text><button class="inline-retry" bindtap="loadHome">重新同步</button></view>
-    <view class="rule"></view>
-    <view wx:if="{{activeSession}}" class="continue-block">
-      <text class="section-kicker">继续上次</text>
-      <text class="section-title">{{activeSession.paperName || '未完成练习'}}</text>
-      <text class="section-copy">已完成 {{activeSession.stats.answered || 0}} / {{activeSession.stats.total || 0}} 题</text>
-      <button class="secondary-button continue-button" loading="{{continuing}}" disabled="{{continuing}}" bindtap="onContinue">继续作答</button>
+    <view wx:if="{{error}}" class="inline-notice" role="alert"><text>{{error}}</text><button class="inline-retry" bindtap="loadHome">重新同步</button></view>
+    <view class="learning-pair">
+      <view class="continue-block">
+        <text class="hero-kicker">{{activeSession ? '接着上次，继续向前' : '今天，从一道题开始'}}</text>
+        <view class="path-art" aria-hidden="true"><view class="path-orbit"></view><view class="path-step step-one"></view><view class="path-step step-two"></view><view class="path-step step-three"></view><view class="path-sun"></view><view class="path-flag"></view></view>
+        <text class="hero-title">{{activeSession ? (activeSession.paperName || '未完成练习') : '开始练习'}}</text>
+        <text class="hero-copy">{{activeSession ? '已答 ' + (activeSession.stats.answered || 0) + ' / ' + (activeSession.stats.total || 0) + ' 题' : '选一份试卷，积累新收获'}}</text>
+        <button wx:if="{{activeSession}}" class="primary-button continue-button" loading="{{continuing}}" disabled="{{continuing}}" bindtap="onContinue">继续作答</button>
+        <button wx:else class="primary-button continue-button" bindtap="onBrowsePapers">开始练习</button>
+      </view>
+      <view class="revenge-card">
+        <text class="hero-kicker">把薄弱点，变成掌握</text>
+        <view class="review-art" aria-hidden="true"><view class="review-paper"><view class="review-clip"></view><view class="review-line"></view><view class="review-line short"></view><view class="review-check"></view></view><view class="review-dot"></view></view>
+        <text class="hero-title">错题再练</text><text class="hero-copy">待巩固 {{revengeCount}} 道</text>
+        <button class="review-button" data-mode="revenge" bindtap="onMode">去巩固</button>
+      </view>
     </view>
-    <view class="mode-section">
-      <text class="section-kicker">选择练习方式</text>
-      <button wx:for="{{modes}}" wx:key="id" class="mode-row" data-mode="{{item.id}}" bindtap="onMode">
-        <view class="mode-symbol"><ui-icon name="{{item.id}}" size="44" /></view>
-        <view class="mode-body"><text class="mode-title">{{item.title}}</text><text class="mode-copy">{{item.copy}}</text></view>
-        <ui-icon name="chevron" size="32" color="muted" />
-      </button>
+    <view class="learning-card today-card">
+      <view class="section-heading"><text class="section-title">今日目标</text><button class="text-action" bindtap="onGrowth">查看成长 <ui-icon name="chevron" size="26" /></button></view>
+      <block wx:if="{{summary}}"><view class="today-numbers"><text class="today-value">{{summary.today.answered}}<text class="today-total"> / {{summary.today.goal}} 题</text></text><text class="meta-copy">{{summary.today.completed ? '今天已达标' : '再答 ' + growth.remaining + ' 题达标'}}</text></view><view class="growth-track"><view class="growth-fill" style="width: {{growth.percent}}%"></view></view><view class="home-stats"><view class="home-stat"><text class="stat-value">{{summary.currentStreak}}</text><text>连续达标天数</text></view><view class="home-stat"><text class="stat-value">{{summary.totalCompletedDays}}</text><text>累计达标天数</text></view></view></block>
+      <text wx:else class="section-copy">答题成功保存后，成长进度会自动更新。</text>
+      <view wx:if="{{growthError}}" class="inline-notice" role="alert"><text>{{growthError}}</text><button class="inline-retry" bindtap="loadHome">重试</button></view>
     </view>
-    <view class="paper-heading-row">
-      <text class="section-kicker">最近试卷</text>
-      <button class="all-papers" bindtap="onBrowsePapers">查看全部</button>
-    </view>
-    <view wx:if="{{papers.length}}" class="home-papers">
-      <button wx:for="{{papers}}" wx:key="releaseId" class="home-paper" data-release-id="{{item.releaseId}}" bindtap="onPaper">
-        <view class="home-paper-body"><text class="home-paper-subject">{{item.subject}}</text><text class="home-paper-title">{{item.title}}</text></view>
-        <text class="home-paper-count">{{item.questionCount}}题</text>
-      </button>
-    </view>
-    <view wx:else class="first-state">
-      <text class="section-title">暂时没有可练习试卷</text>
-      <text class="section-copy">教师发布后会自动出现在这里。</text>
-    </view>
+    <view class="paper-heading-row"><text class="section-title">最近试卷</text><button class="all-papers" bindtap="onBrowsePapers">查看全部 <ui-icon name="chevron" size="26" /></button></view>
+    <view wx:if="{{papers.length}}" class="home-papers learning-card"><button wx:for="{{papers}}" wx:key="releaseId" class="home-paper" data-release-id="{{item.releaseId}}" bindtap="onPaper"><view class="paper-symbol"><ui-icon name="normal" size="38" /></view><view class="home-paper-body"><text class="home-paper-subject">{{item.subject}}{{item.contentRestricted ? ' · 会员试卷' : ''}}</text><text class="home-paper-title">{{item.title}}</text></view><text class="home-paper-count">{{item.questionCount}}题</text></button></view>
+    <view wx:else class="first-state learning-card"><text class="section-title">暂时没有可练习试卷</text><text class="section-copy">教师发布后会自动出现在这里。</text></view>
   </view>
 </view>
 <app-dialog id="app-dialog" style="{{appearanceStyle}}" />

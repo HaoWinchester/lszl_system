@@ -40,3 +40,5 @@
 .review-filter.active { color: var(--ink); border-bottom: 3rpx solid var(--ink); }
 .wrong-tail { display: flex; flex: none; align-items: center; gap: var(--space-1); }
 .wrong-status { color: var(--muted); font-size: var(--font-meta); }
+
+.result-facts { margin-top: 24rpx; padding: 28rpx 12rpx; border: 0; border-radius: 28rpx; background: var(--mint); }.result-section { margin-top: 24rpx; padding: 28rpx; border-radius: 32rpx; background: var(--surface); }

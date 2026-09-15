@@ -25,3 +25,19 @@ export const navigation = {
     try { wx.navigateBack({ fail }); } catch { fail(); }
   },
 };
+
+// switchTab cannot carry query strings. Keep only a one-shot UI route intent;
+// never store account or practice records here. Consume on catalog onShow.
+let pendingPaperMode: string | null = null;
+export function openPaperCatalog(mode = 'normal') {
+  pendingPaperMode = ['normal', 'challenge', 'scholar'].includes(mode) ? mode : 'normal';
+  navigation.switchTab({ url: '/pages/papers/index', fail: () => {
+    pendingPaperMode = null;
+    wx.showToast({ title: '练习页未打开，请重试', icon: 'none' });
+  } });
+}
+export function consumePaperMode(): string | null {
+  const mode = pendingPaperMode;
+  pendingPaperMode = null;
+  return mode;
+}

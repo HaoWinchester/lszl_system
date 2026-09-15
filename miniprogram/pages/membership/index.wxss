@@ -8,3 +8,5 @@
 .summary-copy { display: block; margin-top: var(--space-2); color: var(--muted); font-size: var(--font-meta); line-height: 1.5; }
 .membership-loading { padding-top: var(--space-5); }
 .loading-line { height: 96rpx; margin-bottom: var(--space-3); border-radius: var(--radius-sm); background: var(--surface-quiet); }
+
+.membership-summary { margin-top: 24rpx; padding: 32rpx; border: 0; border-radius: 32rpx; background: var(--surface); }

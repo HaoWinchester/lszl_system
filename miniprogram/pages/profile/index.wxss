@@ -6,12 +6,6 @@
 .profile-name { overflow: hidden; margin-top: var(--space-1); color: var(--ink); font-size: var(--font-display); font-weight: 650; line-height: var(--line-tight); text-overflow: ellipsis; white-space: nowrap; }
 .profile-username { overflow: hidden; margin-top: var(--space-1); color: var(--muted); font-size: var(--font-meta); line-height: 1.45; text-overflow: ellipsis; white-space: nowrap; }
 .profile-section { padding-top: var(--space-5); }
-.info-list { margin-top: var(--space-3); border-top: 2rpx solid var(--line); }
-.info-row { display: flex; align-items: center; width: 100%; min-height: var(--touch-min); border-bottom: 2rpx solid var(--line); }
-.info-label { flex: 0 0 144rpx; color: var(--muted); font-size: var(--font-meta); line-height: 1.45; }
-.info-value { overflow: hidden; flex: 1; min-width: 0; color: var(--ink); font-size: var(--font-body); line-height: var(--line-body); text-align: right; text-overflow: ellipsis; white-space: nowrap; }
-.sync-value { color: var(--ink); }
-.access-description { display: block; margin-top: var(--space-2); color: var(--muted); font-size: var(--font-meta); line-height: 1.45; }
 .learning-facts { display: flex; margin-top: var(--space-3); padding: var(--space-4) 0; border-top: 2rpx solid var(--line); border-bottom: 2rpx solid var(--line); }
 .learning-fact { display: flex; align-items: center; flex: 1; min-width: 0; flex-direction: column; text-align: center; }
 .learning-fact.with-divider { border-left: 2rpx solid var(--line); }
@@ -26,3 +20,5 @@
 .info-row, .account-row { gap: var(--space-2); }
 .expiry-value { white-space: normal; overflow-wrap: anywhere; padding: var(--space-2) 0; font-variant-numeric: tabular-nums; }
 .membership-entry { margin-top: var(--space-3); font-weight: 600; }
+
+.identity { margin-top: 24rpx; padding: 32rpx; border-radius: 32rpx 32rpx 0 0; border-bottom: 0; background: var(--forest); color: var(--forest-text); }.identity .eyebrow, .profile-username { color: #c9ddcf; }.profile-name { color: var(--forest-text); }.avatar-mark { flex-basis: 88rpx; width: 88rpx; height: 88rpx; border-radius: 28rpx; background: var(--mint); color: var(--on-mint); border-color: transparent; }.identity-copy { margin-left: 24rpx; }.membership-summary { display: flex; justify-content: space-between; align-items: center; gap: 16rpx; padding: 20rpx 28rpx; border-radius: 0 0 32rpx 32rpx; background: var(--mint); color: var(--on-mint); }.membership-summary-copy { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 8rpx; }.membership-title { font-size: var(--font-body); font-weight: 600; }.membership-copy { font-size: var(--font-meta); line-height: 1.5; }.membership-link { display: flex; align-items: center; flex-shrink: 0; min-height: var(--touch-min); background: transparent; color: var(--on-mint); font-size: var(--font-meta); }.profile-section { margin-top: 24rpx; padding: 28rpx; border-radius: 32rpx; background: var(--surface); }.learning-facts { margin-top: 18rpx; padding: 18rpx 0 0; border: 0; }.profile-heading { display: flex; justify-content: space-between; align-items: center; gap: 12rpx; }.sync-label { color: var(--muted); font-size: var(--font-meta); }.account-row:last-child { border-bottom: 0; }.account-section .section-kicker { display: block; padding-bottom: 8rpx; color: var(--muted); }.row-label { display: flex; align-items: center; gap: 18rpx; }

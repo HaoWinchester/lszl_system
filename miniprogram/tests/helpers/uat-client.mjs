@@ -47,10 +47,12 @@ export async function createUatClient(account) {
     ['startSession', 'getSession', 'getActiveSessions', 'pauseSession', 'saveState', 'completeSession', 'abandonSession', 'getReport', 'listSessions',
       'getExperienceSummary', 'getOverview', 'getRevengeSummary', 'getRemediation', 'getVerificationCandidate', 'markRemediationReviewed', 'submitRevengeAnswer', 'submitVerification']);
   const papers = await loadModule('services/papers.ts', http, ['listPublishedPapers']);
+  const growth = await loadModule('services/growth.ts', { ...http, invalidateLearningPages }, ['getGrowthSummary', 'updateGrowthGoal']);
+  const growthFormatting = await loadModule('domain/growth-view.ts', {}, ['growthView', 'GROWTH_GOALS']);
   const subscription = await loadModule('services/subscription.ts', http, ['getMySubscription']);
   const drafts = await loadModule('domain/draft-store.ts', { wx }, ['loadLocalDraft', 'saveLocalDraft', 'clearLocalDraft', 'clearUserDrafts']);
   return { account, base, wx, storage, requests, faults, activate,
-    deps: { ...identity, ...http, ...auth, ...practice, ...papers, ...subscription, ...drafts,
+    deps: { ...identity, ...http, ...auth, ...practice, ...papers, ...subscription, ...drafts, ...growth, ...growthFormatting,
       normalizeQuestion, createPracticeRun, getModePolicy, MODE_POLICIES, MODE_CHOICES, formatTimer, mergeDraft, moveQuestion, toggleAnswer, toggleMarked,
       createSyncCoordinator, classifyFailure, resolveConflict, pageRefreshMode, subscriptionView, avatarLetterOf, selectPrimaryTab() {} } };
 }

@@ -7,7 +7,7 @@ import { PRIMARY_TABS } from '../domain/primary-tabs.ts';
 test('home navigation failure gives feedback and allows another attempt', async () => {
   const notices = []; let attempts = 0;
   const { page } = await loadPage('home', { MODE_POLICIES }, {
-    navigateTo: options => { attempts++; options.fail?.({ errMsg: 'navigateTo:fail webview count limit exceed' }); },
+    switchTab: options => { attempts++; options.fail?.({ errMsg: 'navigateTo:fail webview count limit exceed' }); },
     showToast: value => notices.push(value.title),
   });
   page.onBrowsePapers(); page.onBrowsePapers();

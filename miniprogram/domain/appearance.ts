@@ -3,18 +3,21 @@ export interface Theme { id: string; name: string; description: string; colors: 
 
 export const THEMES: Theme[] = [
   { id: 'paper', name: '纸感绿', description: '米白纸感，沉静深绿', colors: {
-    paper: '#f4f0e7', surface: '#fbf9f3', 'surface-quiet': '#ece8dc', ink: '#173b32', text: '#243b35', muted: '#58685f',
-    line: '#d8d7cc', 'green-soft': '#dfe9df', clay: '#a55842', gold: '#a78037', danger: '#a3473c',
+    forest: '#174d3b', 'forest-text': '#f8f7f2', orange: '#ffad66', 'on-orange': '#243b2c', mint: '#e2efdf', 'on-mint': '#174d3b',
+    paper: '#f8f7f2', surface: '#ffffff', 'surface-quiet': '#eeefe8', ink: '#174d3b', text: '#243b35', muted: '#58685f',
+    line: '#d8d7cc', 'green-soft': '#e2efdf', clay: '#a55842', gold: '#a78037', danger: '#a3473c',
     success: '#3f6859', 'success-soft': '#dfe9df', 'danger-soft': '#f4e8e2', 'on-accent': '#fffdf7', 'on-danger': '#ffffff',
     'border-strong': '#9ba49f', disabled: '#758078', 'disabled-surface': '#d9ded9', 'disabled-text': '#526159', mask: 'rgba(20, 39, 34, .38)',
   } },
   { id: 'white', name: '清爽白', description: '清晰白底，柔和蓝色', colors: {
+    forest: '#174d3b', 'forest-text': '#f8f7f2', orange: '#ffad66', 'on-orange': '#243b2c', mint: '#e2efdf', 'on-mint': '#174d3b',
     paper: '#f5f7fa', surface: '#ffffff', 'surface-quiet': '#e9edf2', ink: '#2d5275', text: '#28333e', muted: '#586776',
     line: '#d3dbe3', 'green-soft': '#e2ebf5', clay: '#a2513b', gold: '#8c6b24', danger: '#aa4037',
     success: '#376c51', 'success-soft': '#e3eee7', 'danger-soft': '#f8e8e5', 'on-accent': '#ffffff', 'on-danger': '#ffffff',
     'border-strong': '#8999a8', disabled: '#708090', 'disabled-surface': '#dbe2ea', 'disabled-text': '#526172', mask: 'rgba(24, 34, 45, .38)',
   } },
   { id: 'night', name: '夜读灰', description: '深灰底色，柔白正文', colors: {
+    forest: '#173c2e', 'forest-text': '#f0f5ef', orange: '#f5b57d', 'on-orange': '#243b2c', mint: '#344d40', 'on-mint': '#d3eadb',
     paper: '#202724', surface: '#29332e', 'surface-quiet': '#35423b', ink: '#a6d8be', text: '#e4e9e6', muted: '#adb9b1',
     line: '#53635a', 'green-soft': '#364d43', clay: '#e1ab8f', gold: '#d3b57c', danger: '#f0a49a',
     success: '#9bccb1', 'success-soft': '#31463b', 'danger-soft': '#523935', 'on-accent': '#10251c', 'on-danger': '#2c1516',

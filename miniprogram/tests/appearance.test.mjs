@@ -57,7 +57,7 @@ test('all theme body, action and answer-state text meets 4.5:1 contrast', async 
   const { THEMES } = await appearance();
   assert.equal(THEMES.length, 3);
   for (const theme of THEMES) {
-    for (const [fg, bg] of [['ink','paper'], ['text','surface'], ['muted','paper'], ['muted','surface'], ['muted','green-soft'], ['muted','surface-quiet'], ['ink','surface-quiet'], ['clay','paper'], ['on-accent','ink'], ['on-danger','danger'], ['text','danger-soft'], ['danger','danger-soft'], ['success','success-soft']]) {
+    for (const [fg, bg] of [['forest-text','forest'], ['on-orange','orange'], ['on-mint','mint'], ['ink','paper'], ['text','surface'], ['muted','paper'], ['muted','surface'], ['muted','green-soft'], ['muted','surface-quiet'], ['ink','surface-quiet'], ['clay','paper'], ['on-accent','ink'], ['on-danger','danger'], ['text','danger-soft'], ['danger','danger-soft'], ['success','success-soft']]) {
       const a = luminance(theme.colors[fg]), b = luminance(theme.colors[bg]);
       assert.ok((Math.max(a,b)+.05)/(Math.min(a,b)+.05) >= 4.5, `${theme.id} ${fg}/${bg}`);
     }

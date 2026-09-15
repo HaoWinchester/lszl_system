@@ -11,28 +11,14 @@
       <view class="identity-copy">
         <text class="eyebrow">{{roleLabel}}</text>
         <text class="profile-name">{{displayName}}</text>
-        <text class="profile-username">{{user.username}}</text>
+        <text class="profile-username">账号 · {{user.username}}</text>
       </view>
     </view>
 
-    <view class="profile-section info-section">
-      <text class="section-kicker">个人信息</text>
-      <view class="info-list">
-        <view class="info-row"><text class="info-label">显示名称</text><text class="info-value">{{displayName}}</text></view>
-        <view class="info-row"><text class="info-label">登录账号</text><text class="info-value">{{user.username}}</text></view>
-        <view class="info-row"><text class="info-label">账号身份</text><text class="info-value">{{roleLabel}}</text></view>
-        <view class="info-row"><text class="info-label">学习权限</text><text class="info-value">{{accessTitle}}</text></view>
-        <view class="info-row"><text class="info-label">会员状态</text><text class="info-value">{{membership.statusLabel}}</text></view>
-        <view class="info-row"><text class="info-label">到期时间</text><text class="info-value expiry-value">{{membership.expiryLabel}}</text></view>
-        <view class="info-row"><text class="info-label">数据同步</text><text class="info-value sync-value">{{syncLabel}}</text></view>
-      </view>
-      <text class="access-description">{{accessCopy}}</text>
-      <button class="account-row membership-entry" bindtap="onMembership"><text>查看会员信息</text><ui-icon name="chevron" size="32" color="muted" /></button>
-      <view wx:if="{{syncError}}" class="inline-notice"><text>{{syncError}}</text><button class="inline-retry" bindtap="onRefresh">重新同步</button></view>
-    </view>
-
+    <view class="membership-summary"><view class="membership-summary-copy"><text class="membership-title">{{accessTitle}}</text><text class="membership-copy">{{membership.statusLabel}} · {{membership.expiryLabel}}</text></view><button class="membership-link" bindtap="onMembership">会员信息 <ui-icon name="chevron" size="28" /></button></view>
+    <view wx:if="{{syncError}}" class="inline-notice"><text>{{syncError}}</text><button class="inline-retry" bindtap="onRefresh">重新同步</button></view>
     <view class="profile-section">
-      <text class="section-kicker">学习数据</text>
+      <view class="profile-heading"><text class="section-kicker">学习数据</text><text class="sync-label">{{syncLabel}}</text></view>
       <view class="learning-facts">
         <view class="learning-fact"><text class="learning-value">{{totalExperience}}</text><text class="learning-label">累计经验</text></view>
         <view class="learning-fact with-divider"><text class="learning-value">{{weekExperience}}</text><text class="learning-label">本周经验</text></view>
@@ -42,8 +28,9 @@
 
     <view class="profile-section account-section">
       <text class="section-kicker">我的学习</text>
-      <button class="account-row" bindtap="onHistory"><text>练习记录与报告</text><ui-icon name="chevron" size="32" color="muted" /></button>
-      <button class="account-row" bindtap="onRevenge"><text>错题复习</text><ui-icon name="chevron" size="32" color="muted" /></button>
+      <button class="account-row" bindtap="onGrowth"><view class="row-label"><ui-icon name="growth" size="36" /><text>目标与成长</text></view><ui-icon name="chevron" size="32" color="muted" /></button>
+      <button class="account-row" bindtap="onHistory"><view class="row-label"><ui-icon name="history" size="36" /><text>练习记录与报告</text></view><ui-icon name="chevron" size="32" color="muted" /></button>
+      <button class="account-row" bindtap="onRevenge"><view class="row-label"><ui-icon name="revenge" size="36" /><text>错题复习</text></view><ui-icon name="chevron" size="32" color="muted" /></button>
     </view>
     <view class="profile-section account-section">
       <text class="section-kicker">偏好设置</text>

@@ -18,3 +18,5 @@
 .history-action { flex: 0 0 auto; min-width: 128rpx; min-height: var(--touch-min); padding: 0 var(--space-1); border-bottom: 2rpx solid var(--ink); border-radius: 0; background: transparent; color: var(--ink); font-size: var(--font-meta); }
 .history-action { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-1); border-bottom: 0; }
 .history-result { align-items: center; }
+
+.history-page { padding-bottom: calc(56rpx + env(safe-area-inset-bottom)); }.history-row { margin-top: 20rpx; padding: 28rpx; border: 0; border-radius: 30rpx; background: var(--surface); }.history-action { padding: 0 22rpx; border-radius: 24rpx; background: var(--green-soft); }

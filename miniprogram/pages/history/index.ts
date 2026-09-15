@@ -1,10 +1,9 @@
-import { navigation } from "../../domain/navigation";
+import { navigation, openPaperCatalog } from "../../domain/navigation";
 import { withAppearance } from '../../domain/appearance-page';
 import { messageOf } from '../../services/http';
 import { listSessions } from '../../services/practice';
 import { PracticeHistoryItem } from '../../types/api';
 import { pageRefreshMode } from '../../domain/page-freshness';
-import { selectPrimaryTab } from '../../domain/primary-tabs';
 
 const modeLabels: Record<string, string> = {
   practice: '普通练习', challenge: '挑战模式', scholar: '学霸模式', revenge: '错题复仇',
@@ -47,7 +46,6 @@ Page(withAppearance({
   },
 
   onShow() {
-    selectPrimaryTab(this as any, 1);
     const mode = pageRefreshMode(this.data.lastLoadedAt);
     if (mode === 'skip') return;
     this.loadHistory({ silent: mode === 'silent' });
@@ -102,5 +100,5 @@ Page(withAppearance({
   },
 
   onBack() { navigation.navigateBack(); },
-  onBrowse() { navigation.navigateTo({ url: '/pages/papers/index?mode=normal' }); },
+  onBrowse() { openPaperCatalog('normal'); },
 }));

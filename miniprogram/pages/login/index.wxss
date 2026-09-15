@@ -119,3 +119,5 @@
   text-decoration: underline;
   text-underline-offset: 5rpx;
 }
+
+.intro { margin-top: 26rpx; padding: 32rpx; border-radius: 32rpx; background: var(--mint); }.intro .eyebrow, .intro-copy { color: var(--on-mint); }.binding-panel { padding: 28rpx; border-radius: 32rpx; background: var(--surface); }

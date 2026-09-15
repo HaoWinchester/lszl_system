@@ -1,6 +1,7 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { join } from 'node:path';
+import { MODE_POLICIES } from '../../domain/mode-policy.ts';
 
 export async function loadModule(file, dependencies, exports) {
   const source = readFileSync(new URL(`../../${file}`, import.meta.url), 'utf8')
@@ -41,13 +42,16 @@ export async function loadPage(name, dependencies = {}, wxOverrides = {}) {
   const host = {
     Date, Promise, Set, Map, Object, String, Number, Error, JSON, Math,
     setInterval: () => 1, clearInterval() {}, setTimeout: () => 1,
-    wx, showDialog: options => wx.showModal(options), ...dependencies,
+    MODE_POLICIES, wx, showDialog: options => wx.showModal(options), ...dependencies,
     Page(options) { page = options; page.setData = values => Object.assign(page.data, values); },
   };
   const appearance = await loadModule('domain/appearance.ts', { wx }, ['appearanceData', 'readAppearance', 'subscribeAppearance', 'updateAppearanceChrome']);
   const { withAppearance } = await loadModule('domain/appearance-page.ts', { ...appearance, ...dependencies }, ['withAppearance']);
   host.withAppearance = withAppearance;
-  host.navigation = (await loadModule('domain/navigation.ts', { wx }, ['navigation'])).navigation;
+  const routing = await loadModule('domain/navigation.ts', { wx }, ['navigation', 'openPaperCatalog', 'consumePaperMode']);
+  const growth = await loadModule('domain/growth-view.ts', {}, ['growthView', 'GROWTH_GOALS']);
+  Object.assign(host, growth, routing, dependencies);
+  host.navigation = routing.navigation;
   await runSource(source, host);
   return { page, navigation, wx };
 }

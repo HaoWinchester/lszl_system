@@ -1,13 +1,16 @@
-import { navigation } from "../../domain/navigation";
+import { selectPrimaryTab } from '../../domain/primary-tabs';
+import { MODE_POLICIES } from '../../domain/mode-policy';
+import { navigation, consumePaperMode } from "../../domain/navigation";
 import { withAppearance } from '../../domain/appearance-page';
 import { messageOf } from '../../services/http';
 import { listPublishedPapers } from '../../services/papers';
 import { PaperSummary, PracticeMode } from '../../types/api';
 import { openMembershipOffer } from '../../domain/membership-navigation';
 
-function filteredPapers(items: PaperSummary[], subject: string, access: string): PaperSummary[] {
+function filteredPapers(items: PaperSummary[], subject: string, access: string, search: string): PaperSummary[] {
   return items.filter(item =>
-    (subject === '全部科目' || item.subject === subject)
+    (!search.trim() || `${item.title} ${item.subject} ${item.description || ''}`.toLowerCase().includes(search.trim().toLowerCase()))
+    && (subject === '全部科目' || item.subject === subject)
     && (access === 'all' || item.accessLevel === access),
   );
 }
@@ -24,6 +27,8 @@ Page(withAppearance({
     subject: '全部科目',
     access: 'all',
     mode: 'normal' as PracticeMode,
+    search: '',
+    modes: ['normal', 'challenge', 'scholar', 'revenge'].map(id => MODE_POLICIES[id as PracticeMode]),
     skeletonRows: [0, 1, 2],
     page: 0,
     total: 0,
@@ -32,12 +37,25 @@ Page(withAppearance({
     moreError: '',
   },
 
-  onLoad(query: Record<string, string>) {
+  onLoad(query: Record<string, string> = {}) {
     this.setData({
       statusBarHeight: wx.getWindowInfo?.().statusBarHeight || 24,
-      mode: (query.mode || 'normal') as PracticeMode,
+      mode: (['normal', 'challenge', 'scholar'].includes(query.mode) ? query.mode : 'normal') as PracticeMode,
     });
     this.loadPapers();
+  },
+
+  onShow() {
+    selectPrimaryTab(this as any, 1);
+    const mode = consumePaperMode();
+    if (mode) this.setData({ mode: mode as PracticeMode });
+  },
+
+  onSearch(event: any) { this.setData({ search: String(event.detail.value || '') }); this.applyFilters(); },
+  onMode(event: any) {
+    const mode = event.currentTarget.dataset.mode;
+    if (mode === 'revenge') { navigation.navigateTo({ url: '/pages/revenge/index' }); return; }
+    if (['normal', 'challenge', 'scholar'].includes(mode)) this.setData({ mode });
   },
 
   onPullDownRefresh() {
@@ -83,7 +101,7 @@ Page(withAppearance({
 
   applyFilters() {
     this.setData({
-      filtered: filteredPapers(this.data.papers, this.data.subject, this.data.access),
+      filtered: filteredPapers(this.data.papers, this.data.subject, this.data.access, this.data.search),
     });
   },
 

@@ -18,3 +18,5 @@
 .revenge-loading-line { height: 30rpx; margin-bottom: 28rpx; border-radius: 8rpx; background: var(--surface-quiet); }
 .revenge-loading-line.is-block { height: 124rpx; }
 .queue-count { margin: var(--space-2) 0 0; }
+
+.stage-line { margin-top: 20rpx; padding: 24rpx 16rpx; border: 0; border-radius: 28rpx; background: var(--surface); }.stage-step.active .stage-index { background: var(--forest); border-color: var(--forest); color: var(--forest-text); }

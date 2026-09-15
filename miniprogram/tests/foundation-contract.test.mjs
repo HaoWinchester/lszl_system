@@ -61,7 +61,7 @@ test('visual foundation avoids AI-like effects and keeps mobile touch sizing', (
   assert.doesNotMatch(styles, /linear-gradient|radial-gradient|filter:\s*blur|text-shadow/);
   assert.match(styles, /--touch-min:\s*96rpx/);
   assert.match(styles, /--option-min:\s*104rpx/);
-  assert.match(styles, /--ink:\s*#173b32/);
+  assert.match(styles, /--ink:\s*#174d3b/);
 });
 
 test('entry pages share the approved title and spacing system', () => {
@@ -96,7 +96,7 @@ test('classed buttons opt out of the native fixed width and declare intentional 
   assert.match(appStyles, /button\[class\]\s*\{[^}]*width:\s*var\(--button-width,\s*auto\);[^}]*margin-left:\s*0;[^}]*margin-right:\s*0;/s);
 
   const fullWidthRules = [
-    ['pages/home/index.wxss', '.mode-row'],
+    ['pages/home/index.wxss', '.continue-button, .review-button'],
     ['pages/home/index.wxss', '.home-paper'],
     ['pages/practice-setup/index.wxss', '.line-option, .mode-option'],
     ['pages/practice-setup/index.wxss', '.start-button'],

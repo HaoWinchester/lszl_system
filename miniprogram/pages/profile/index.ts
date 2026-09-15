@@ -44,7 +44,7 @@ Page(withAppearance({
   },
 
   onShow() {
-    selectPrimaryTab(this as any, 2);
+    selectPrimaryTab(this as any, 3);
     const mode = pageRefreshMode(this.data.lastLoadedAt);
     if (mode === 'skip') return;
     this.loadProfile({ silent: mode === 'silent' });
@@ -98,7 +98,8 @@ Page(withAppearance({
 
   onPullDownRefresh() { this.loadProfile({ silent: true }).finally(() => wx.stopPullDownRefresh()); },
   onRefresh() { return this.loadProfile({ silent: true }); },
-  onHistory() { navigation.switchTab({ url: '/pages/history/index' }); },
+  onHistory() { navigation.navigateTo({ url: '/pages/history/index' }); },
+  onGrowth() { navigation.switchTab({ url: '/pages/growth/index' }); },
   onMembership() { navigation.navigateTo({ url: '/pages/membership/index' }); },
   onAppearance() { navigation.navigateTo({ url: '/pages/appearance/index' }); },
   onRevenge() { navigation.navigateTo({ url: '/pages/revenge/index' }); },

@@ -56,9 +56,10 @@ async function clientFor(account) {
   const practice=await loadModule('services/practice.ts',{...http,normalizeQuestion,invalidateLearningPages},
     ['startSession','getSession','enterSession','saveState','pauseSession','abandonSession','completeSession','getReport','listSessions','getOverview','getExperienceSummary','getRevengeSummary','submitRevengeAnswer','getRemediation','markRemediationReviewed','getVerificationCandidate','submitVerification']);
   const subscription=await loadModule('services/subscription.ts',http,['getMySubscription']);
+  const growth=await loadModule('services/growth.ts',{...http,invalidateLearningPages},['getGrowthSummary','updateGrowthGoal']);
   const papers=await loadModule('services/papers.ts',http,['listPublishedPapers']);
   const drafts=await loadModule('domain/draft-store.ts',{wx},['loadLocalDraft','saveLocalDraft','clearLocalDraft','clearUserDrafts']);
-  const deps={...session,...http,...auth,...practice,...subscription,...papers,...drafts,
+  const deps={...session,...http,...auth,...practice,...subscription,...papers,...growth,...drafts,
     normalizeQuestion,createPracticeRun,getModePolicy,formatTimer,mergeDraft,moveQuestion,toggleAnswer,toggleMarked,
     createSyncCoordinator,classifyFailure,resolveConflict,pageRefreshMode,subscriptionView,avatarLetterOf,selectPrimaryTab(){}};
   return {deps,activate,faults};

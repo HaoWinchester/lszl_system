@@ -10,19 +10,20 @@
     "pages/revenge/index",
     "pages/profile/index",
     "pages/membership/index",
-    "pages/appearance/index"
+    "pages/appearance/index",
+    "pages/growth/index"
   ],
   "window": {
     "navigationStyle": "custom",
     "navigationBarTextStyle": "black",
-    "backgroundColor": "#f4f0e7",
+    "backgroundColor": "#f8f7f2",
     "backgroundTextStyle": "dark"
   },
   "tabBar": {
     "custom": true,
     "color": "#718079",
-    "selectedColor": "#173b32",
-    "backgroundColor": "#f4f0e7",
+    "selectedColor": "#174d3b",
+    "backgroundColor": "#f8f7f2",
     "borderStyle": "white",
     "list": [
       {
@@ -30,8 +31,12 @@
         "text": "首页"
       },
       {
-        "pagePath": "pages/history/index",
-        "text": "记录"
+        "pagePath": "pages/papers/index",
+        "text": "练习"
+      },
+      {
+        "pagePath": "pages/growth/index",
+        "text": "成长"
       },
       {
         "pagePath": "pages/profile/index",

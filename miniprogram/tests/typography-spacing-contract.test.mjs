@@ -28,7 +28,7 @@ test('typography uses one global family and the approved scale', () => {
     .filter(path => /font-family\s*:/.test(readFileSync(path, 'utf8')));
   assert.deepEqual(localFamilyFiles, []);
 
-  const allowed = new Set([26, 30, 31, 32, 34, 36, 44, 104]);
+  const allowed = new Set([26, 30, 31, 32, 34, 36, 44, 48, 104]);
   const hardCodedSizes = [...source.matchAll(/font-size\s*:\s*(\d+)rpx/g)]
     .map(match => Number(match[1]));
   assert.deepEqual([...new Set(hardCodedSizes.filter(size => !allowed.has(size)))], []);
@@ -80,7 +80,7 @@ test('answer sheet keeps a scrollable grid and centered controls', () => {
 test('secondary-page navigation shares the back-to-title spacing instead of page-specific overrides', () => {
   const global = read('app.wxss');
   assert.match(global, /\.nav-bar\s*\{[^}]*gap:\s*0;/s);
-  for (const page of ['papers', 'practice-setup', 'result', 'membership', 'appearance', 'revenge']) {
+  for (const page of ['history', 'practice-setup', 'result', 'membership', 'appearance', 'revenge']) {
     const markup = read(`pages/${page}/index.wxml`);
     assert.match(markup, /class="nav-bar(?:\s[^"]*)?"/);
     assert.match(markup, /class="nav-back"/);

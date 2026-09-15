@@ -152,6 +152,6 @@ Page(withAppearance({
     navigation.navigateTo({ url: '/pages/revenge/index' });
   },
 
-  onBack() { navigation.switchTab({ url: '/pages/history/index' }); },
+  onBack() { navigation.redirectTo({ url: '/pages/history/index' }); },
   onHome() { navigation.switchTab({ url: '/pages/home/index' }); },
 }));

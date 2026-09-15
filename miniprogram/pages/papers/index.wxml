@@ -1,9 +1,8 @@
 <view class="page-shell papers-page" style="{{appearanceStyle}}padding-top: {{statusBarHeight}}px">
-  <view class="nav-bar">
-    <button class="nav-back" bindtap="onBack" aria-label="返回"><ui-icon name="back" /></button>
-    <text class="nav-title">试卷库</text>
-  </view>
-
+  <view class="nav-bar"><text class="nav-title">练习</text></view>
+  <view class="catalog-heading"><text class="page-title">找到今天的练习</text><text class="catalog-copy">循序积累，练出自己的节奏。</text></view>
+  <input class="field catalog-search" value="{{search}}" bindinput="onSearch" placeholder="搜索试卷名称或科目" aria-label="搜索试卷名称或科目" confirm-type="search" />
+  <scroll-view class="mode-selector" scroll-x enhanced show-scrollbar="false"><button wx:for="{{modes}}" wx:key="id" class="catalog-mode {{mode === item.id ? 'active' : ''}}" data-mode="{{item.id}}" bindtap="onMode" role="tab" aria-selected="{{mode === item.id}}">{{item.title}}</button></scroll-view>
   <scroll-view class="filters" scroll-x enhanced show-scrollbar="false">
     <button wx:for="{{subjects}}" wx:key="*this" class="filter {{subject === item ? 'is-active' : ''}}" data-subject="{{item}}" bindtap="onSubject">{{item}}</button>
   </scroll-view>
