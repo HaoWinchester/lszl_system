@@ -611,6 +611,7 @@
     if(body)body.innerHTML='<p class="practice-answer-line">'+escapeHTML(correctText)+'</p>'+explanationMarkup;
     const actions=$('practiceExplanationActions');
     if(actions)actions.innerHTML='';
+    global.KGQuestionComments?.mountPanel({panel,questionId:text(question.id)});
     panel.hidden=false;
     panel.scrollIntoView({behavior:'smooth',block:'nearest'});
   }

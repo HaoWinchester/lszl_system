@@ -14,6 +14,7 @@ from app.api.v1 import (
     papers,
     paper_releases,
     question_catalog,
+    question_comments,
     question_materials,
     questions,
     subscriptions,
@@ -31,6 +32,8 @@ api_router.include_router(users.router)
 api_router.include_router(system.router)
 api_router.include_router(files.router)
 api_router.include_router(questions.router)
+api_router.include_router(question_comments.router)
+api_router.include_router(question_comments.counts_router)
 api_router.include_router(papers.router)
 api_router.include_router(paper_releases.router)
 api_router.include_router(question_catalog.router)

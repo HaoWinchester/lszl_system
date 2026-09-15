@@ -25,6 +25,7 @@ from app.models.question import (
     QuestionBank,
     QuestionCleanupAudit,
 )
+from app.models.question_comment import QuestionComment, QuestionCommentLike
 from app.models.recall_acceptance import ContentPrepRecallAcceptance
 from app.models.runtime_migration import RuntimeMigrationItem, RuntimeMigrationRun
 from app.models.runtime_state import RuntimeState
@@ -75,6 +76,8 @@ __all__ = [
     "QuestionBankCollaborator",
     "ContentPrepDraft",
     "Question",
+    "QuestionComment",
+    "QuestionCommentLike",
     "Principle",
     "SynthesisPreset",
     "QuestionTagConfig",

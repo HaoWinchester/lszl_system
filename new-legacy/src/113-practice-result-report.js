@@ -111,10 +111,16 @@
         return `<article class="practice-review-card" data-review-card="${escapeHTML(question.id)}"><header><h3>第 ${index + 1} 题</h3><span class="practice-review-status is-${outcome}">${outcome === 'correct' ? '答对' : outcome === 'wrong' ? '答错' : '未作答'}</span></header><p class="practice-review-stem">${escapeHTML(question.stem)}</p>${global.KGQuestionMaterials?.render(question,{selectedPairs:answer.selectedPairs||{},readOnly:true,reveal:true})||''}<ol class="practice-review-options">${(question.options || []).map(option => `<li class="${correct.includes(text(option.id)) ? 'is-correct' : selected.includes(text(option.id)) ? 'is-wrong' : ''}"><strong>${escapeHTML(option.id)}</strong><span>${escapeHTML(option.text)}</span></li>`).join('')}</ol><div class="practice-review-answers"><span>你的答案：${escapeHTML(question.type==='matching'?global.KGQuestionAnswerSet?.answerText(question,answer.selectedPairs):selected.join('、') || '未作答')}</span><span>正确答案：${escapeHTML(question.type==='matching'?global.KGQuestionAnswerSet?.answerText(question,question.matching?.correctPairs):correct.join('、') || '暂无')}</span></div><div class="practice-review-explanation"><strong>题目解析</strong><p>${escapeHTML(question.explanation || '暂无解析')}</p></div></article>`
       }).join('') : `<p class="practice-review-empty">${filter === 'wrong' ? '本次没有答错的题目。' : filter === 'correct' ? '本次没有答对的题目。' : '暂无可回顾的题目。'}</p>`
     }
-    section.querySelectorAll('[data-review-filter]').forEach(button => button.addEventListener('click', () => select(button.dataset.reviewFilter)))
-    select(options.reviewFilter === 'all' ? 'all' : 'wrong')
+    const mountComments = () => {
+      if (!global.KGQuestionComments?.mountCards) return
+      const cards = Array.from(section.querySelectorAll('[data-review-card]')).map(card => ({ card, questionId: card.dataset.reviewCard }))
+      global.KGQuestionComments.mountCards({ cards })
+    }
+    const selectWithComments = filter => { select(filter); mountComments() }
+    section.querySelectorAll('[data-review-filter]').forEach(button => button.addEventListener('click', () => selectWithComments(button.dataset.reviewFilter)))
+    selectWithComments(options.reviewFilter === 'all' ? 'all' : 'wrong')
     root.querySelector('[data-report-review-all]')?.addEventListener('click', () => {
-      select('all')
+      selectWithComments('all')
       section.scrollIntoView({ behavior: 'smooth', block: 'start' })
     })
   }
