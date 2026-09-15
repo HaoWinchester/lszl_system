@@ -20,14 +20,19 @@ function optionText(value: unknown, id: string): string {
 
 export function normalizeQuestion(rawValue: unknown): PracticeQuestion {
   const raw = (rawValue && typeof rawValue === 'object' ? rawValue : {}) as Record<string, any>;
+  const english = raw.translations?.en || {};
+  const englishParts = Array.isArray(english.stemParts ?? english.stem_parts) ? (english.stemParts ?? english.stem_parts) : [];
+  const englishOptions = Array.isArray(english.options) ? english.options : [];
   const parts = Array.isArray(raw.stemParts ?? raw.stem_parts) ? (raw.stemParts ?? raw.stem_parts) : [];
   const stem = text(raw.stem || parts.map((part: any) => String(part?.text || '')).join('') || raw.title);
-  const stemEn = text(raw.stemEn || raw.stem_en || parts.map((part: any) => text(part?.textEn || part?.text_en)).filter(Boolean).join('\n'));
+  const stemEn = text(raw.stemEn || raw.stem_en || parts.map((part: any) => text(part?.textEn || part?.text_en)).filter(Boolean).join('\n') || english.stem || englishParts.map((part: any) => text(part?.text)).filter(Boolean).join('\n'));
   const options: QuestionOption[] = (Array.isArray(raw.options) ? raw.options : []).map((option: any, index: number) => {
     const id = text(option?.id || option?.key || String.fromCharCode(65 + index));
+    const translated = englishOptions.find((item: any) => text(item?.id || item?.key) === id);
+    const textEn = text(option?.textEn || option?.text_en || translated?.text || translated?.label);
     return {
       id, text: optionText(option?.text || option?.label, id),
-      ...(text(option?.textEn || option?.text_en) ? { textEn: optionText(option?.textEn || option?.text_en, id) } : {}),
+      ...(textEn ? { textEn: optionText(textEn, id) } : {}),
     };
   });
   return {

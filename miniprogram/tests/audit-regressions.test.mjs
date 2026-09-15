@@ -69,3 +69,17 @@ test('lightweight active progress does not erase persisted history duration or e
   const [row] = await listSessions();
   assert.equal(row.durationMs, 123000); assert.equal(row.experience, 15); assert.equal(row.answered, 3);
 });
+
+test('published translations supply English stems and match options by ID without replacing Chinese', async () => {
+  const { normalizeQuestion } = await loadModule('domain/question.ts', { sanitizeRichText }, ['normalizeQuestion']);
+  const raw = { stemParts: [{ text: '项目经理下一步应该做什么？' }], options: [{ id: 'A', text: '先沟通' }, { id: 'B', text: '更新计划' }],
+    translations: { en: { stemParts: [{ text: 'What should the project manager do next?' }], options: [{ id: 'B', text: 'B. Update the plan' }, { id: 'A', text: 'A. Communicate first' }] } } };
+  const result = normalizeQuestion(raw);
+  assert.equal(result.stem, '项目经理下一步应该做什么？');
+  assert.equal(result.stemEn, 'What should the project manager do next?');
+  assert.deepEqual(result.options.map(o => o.textEn), ['Communicate first', 'Update the plan']);
+  assert.deepEqual(normalizeQuestion(result), result);
+  const flat = normalizeQuestion({ ...raw, stemEn: 'Explicit English', options: [{ id: 'A', text: '先沟通', textEn: 'Explicit option' }] });
+  assert.equal(flat.stemEn, 'Explicit English'); assert.equal(flat.options[0].textEn, 'Explicit option');
+  assert.equal(normalizeQuestion({ stem: '只有中文', options: [{ id: 'A', text: '选项' }], translations: { en: { options: {} } } }).stemEn, undefined);
+});

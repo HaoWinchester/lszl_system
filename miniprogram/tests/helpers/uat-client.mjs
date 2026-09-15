@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { loadModule } from './page-harness.mjs';
 import { sanitizeRichText } from '../../domain/rich-text.ts';
-import { createPracticeRun } from '../../domain/pc-practice.ts';
+import { createPracticeRun, normalizePairs } from '../../domain/pc-practice.ts';
 import { getModePolicy, MODE_POLICIES, MODE_CHOICES, formatTimer } from '../../domain/mode-policy.ts';
 import { mergeDraft, moveQuestion, toggleAnswer, toggleMarked } from '../../domain/practice-state.ts';
 import { createSyncCoordinator, classifyFailure, resolveConflict } from '../../domain/sync-coordinator.ts';
@@ -10,9 +10,11 @@ import { subscriptionView } from '../../domain/subscription-view.ts';
 import { avatarLetterOf } from '../../domain/profile-view.ts';
 
 // Test-only host: real Page and service modules, external HTTP boundary only.
-export async function createUatClient(account) {
-  assert.match(account.username, /^mini_uat_save_[a-f0-9]{12}_[012]$/);
-  const base = 'https://uat.aihuanpu.com', storage = new Map(), requests = [];
+export async function createUatClient(account, options = {}) {
+  const base = options.base || 'https://uat.aihuanpu.com';
+  assert.ok(['https://uat.aihuanpu.com', 'http://127.0.0.1:5183'].includes(base));
+  assert.match(account.username, base.startsWith('http://127.') ? /^mini_bilingual_0[123]$/ : /^mini_uat_save_[a-f0-9]{12}_[012]$/);
+  const storage = options.storage || new Map(), requests = [];
   const faults = { offline: false, delayMs: 0, dropResponse: '' };
   const wx = {
     getStorageSync: k => storage.get(k), setStorageSync: (k, v) => storage.set(k, structuredClone(v)),
@@ -53,6 +55,6 @@ export async function createUatClient(account) {
   const drafts = await loadModule('domain/draft-store.ts', { wx }, ['loadLocalDraft', 'saveLocalDraft', 'clearLocalDraft', 'clearUserDrafts']);
   return { account, base, wx, storage, requests, faults, activate,
     deps: { ...identity, ...http, ...auth, ...practice, ...papers, ...subscription, ...drafts, ...growth, ...growthFormatting,
-      normalizeQuestion, createPracticeRun, getModePolicy, MODE_POLICIES, MODE_CHOICES, formatTimer, mergeDraft, moveQuestion, toggleAnswer, toggleMarked,
+      normalizeQuestion, createPracticeRun, normalizePairs, getModePolicy, MODE_POLICIES, MODE_CHOICES, formatTimer, mergeDraft, moveQuestion, toggleAnswer, toggleMarked,
       createSyncCoordinator, classifyFailure, resolveConflict, pageRefreshMode, subscriptionView, avatarLetterOf, selectPrimaryTab() {} } };
 }
