@@ -436,3 +436,70 @@ def test_abandon_and_pc_answer_do_not_invert_growth_and_question_locks(monkeypat
       asyncio.run(scenario())
     finally:
       asyncio.run(_cleanup_released_pmp_paper(ids))
+
+
+@pytest.mark.parametrize('with_request_id', [True, False])
+def test_pc_attempt_replay_across_midnight_and_new_attempt(monkeypatch, with_request_id):
+    username = f"growth-pc-replay-{__import__('uuid').uuid4().hex[:8]}"
+    _create_student(username)
+    source = _create_public_question(title="PC attempt", taxonomy_id="pc-growth", node_id="pc-growth")
+    now = datetime(2026, 9, 14, 15, 59, 59, tzinfo=timezone.utc)
+    monkeypatch.setattr(learning_service, "now_utc", lambda: now)
+    monkeypatch.setattr(practice_growth_service, "now_utc", lambda: now)
+    body = {"questionId": source["question"]["id"], "bankId": source["bankId"], "selectedAnswer": "B"}
+    if with_request_id:
+        body["requestId"] = "canvas-attempt-one"
+    with TestClient(app) as client:
+        _login(client, username, "test1234")
+        first = client.post('/api/v1/learning/practice/answers', json=body)
+        assert first.status_code == 200, first.text
+        assert client.get('/api/v1/learning/practice/growth').json()['today']['answered'] == 1
+        now = datetime(2026, 9, 14, 16, 0, 0, tzinfo=timezone.utc)
+        replay = client.post('/api/v1/learning/practice/answers', json=body)
+        assert replay.status_code == 200, replay.text
+        assert client.get('/api/v1/learning/practice/growth').json()['today']['answered'] == 0
+        if with_request_id:
+            assert replay.json() == first.json()
+            conflict = client.post('/api/v1/learning/practice/answers', json={**body, 'selectedAnswer': 'A'})
+            assert conflict.status_code == 422
+            other_question = _create_public_question(title="different PC question", taxonomy_id="pc-other", node_id="pc-other")
+            switched = client.post('/api/v1/learning/practice/answers', json={
+                **body, 'questionId': other_question['question']['id'], 'bankId': other_question['bankId'],
+            })
+            assert switched.status_code == 422
+            forged = client.post('/api/v1/learning/events', json={
+                'eventType': 'PRACTICE_ANSWER_COMPLETED', 'questionId': body['questionId'],
+                'payload': {'requestId': 'canvas-attempt-two', 'response': {}},
+            })
+            assert forged.status_code == 400
+        new = client.post('/api/v1/learning/practice/answers', json={**body, 'requestId': 'canvas-attempt-two'})
+        assert new.status_code == 200, new.text
+        assert client.get('/api/v1/learning/practice/growth').json()['today']['answered'] == 1
+        if with_request_id:
+            assert client.post('/api/v1/learning/practice/answers', json=body).json() == first.json()
+
+
+def test_pc_attempt_receipt_is_atomic_and_serializes_duplicates(monkeypatch):
+    username = f"growth-pc-atomic-{__import__('uuid').uuid4().hex[:8]}"
+    _create_student(username)
+    source = _create_public_question(title="PC atomic", taxonomy_id="pc-atomic", node_id="pc-atomic")
+    body = {'questionId': source['question']['id'], 'selectedAnswer': 'B', 'requestId': 'atomic-attempt'}
+    original = practice_growth_service.record_answers
+    async def fail_after_growth(*args, **kwargs):
+        await original(*args, **kwargs)
+        raise ValueError('forced transaction rollback')
+    with TestClient(app) as client:
+        _login(client, username, 'test1234')
+        monkeypatch.setattr(practice_growth_service, 'record_answers', fail_after_growth)
+        assert client.post('/api/v1/learning/practice/answers', json=body).status_code == 422
+        monkeypatch.setattr(practice_growth_service, 'record_answers', original)
+        assert client.get('/api/v1/learning/practice/growth').json()['today']['answered'] == 0
+    async def scenario():
+        async def submit():
+            async with AsyncSessionLocal() as db:
+                user = await db.get(User, username)
+                return await learning_service.record_practice_answer(db, username, body, current_user=user)
+        first, second = await asyncio.gather(submit(), submit())
+        assert first == second
+        assert first['mistake']['wrongCount'] == 1
+    asyncio.run(scenario())

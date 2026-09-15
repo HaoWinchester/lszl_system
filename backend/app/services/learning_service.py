@@ -378,7 +378,7 @@ async def _visible_learning_question(
     return None
 
 
-PRACTICE_REPLAY_EVENT_TYPES = {'PRACTICE_REVENGE_ANSWERED', 'PRACTICE_REMEDIATION_VERIFIED'}
+PRACTICE_REPLAY_EVENT_TYPES = {'PRACTICE_REVENGE_ANSWERED', 'PRACTICE_REMEDIATION_VERIFIED', 'PRACTICE_ANSWER_COMPLETED'}
 PRACTICE_RECEIPT_PREFIX = 'le_receipt_'
 
 
@@ -699,9 +699,37 @@ async def record_practice_answer(
         raise ValueError("题目尚未配置可判定的正确答案")
     correct = bool(grading["correct"])
     stored_selection = [{"selectedPairs": selected_pairs}] if matching else selected_answer_ids if multiple else [selected_answer]
+    # Standalone callers mint one ID per logical answer, retaining it on retry.
+    # Request lock precedes the existing question -> growth order. Session-owned
+    # grading has its own replay boundary and never takes this extra lock.
+    request_id = str(data.get("requestId") or "").strip() if record and account_growth else ""
+    request_identity = {
+        "questionId": question.id, "releaseId": release_id,
+        "selection": _practice_request_selection(data), "timedOut": timed_out,
+    }
+    if request_id:
+        await _practice_write_lock(db, owner, f"request:{request_id}")
     await _practice_write_lock(
         db, owner, f"{release_id}:{question.id}", allow_concurrent=allow_concurrent
     )
+    if request_id:
+        receipt = (await db.execute(select(LearningEvent).where(
+            LearningEvent.owner_id == owner,
+            LearningEvent.id.startswith(PRACTICE_RECEIPT_PREFIX, autoescape=True),
+            LearningEvent.event_type == "PRACTICE_ANSWER_COMPLETED",
+            LearningEvent.payload['requestId'].astext == request_id,
+        ).limit(1))).scalar_one_or_none()
+        if receipt is not None:
+            if receipt.payload.get("requestIdentity") != request_identity:
+                raise ValueError("同一次重试不能更换题目或修改已提交的答案")
+            return deepcopy(receipt.payload["response"])
+    # Legacy no-ID requests retain their existing grading/mistake semantics.
+    # Only their first completion can earn growth: an old completion is neither
+    # proof of a new attempt nor eligible for historical backfill.
+    previous_progress = await _progress(db, owner, question.id, release_id) if account_growth else None
+    previously_completed = bool(previous_progress and (previous_progress.submitted or (
+        isinstance(previous_progress.session_data, dict) and previous_progress.session_data.get("completedAt")
+    )))
     mistake = (
         await db.execute(
             select(PracticeMistake).where(
@@ -765,14 +793,25 @@ async def record_practice_answer(
     completion = await _record_answer_completion(
         db, owner, question, data, selected_answer="" if matching else ",".join(stored_selection), selected_answer_ids=selected_answer_ids if multiple else None, correct=correct
     )
+    response = None
+    if request_id:
+        await db.flush()
+        if mistake is not None:
+            await db.refresh(mistake)
+        response = {"correct": correct, "mistake": _practice_mistake_to_dict(mistake) if mistake else None,
+                    "completion": completion}
     await _append_practice_event(
         db, owner, event_type="PRACTICE_ANSWER_COMPLETED", question_id=question.id,
-        payload={**completion, "mistakeId": mistake.id if mistake else None},
+        payload={**completion, "mistakeId": mistake.id if mistake else None,
+                 **({"requestId": request_id, "requestIdentity": request_identity, "response": response}
+                    if request_id else {})},
     )
-    if account_growth:
+    if account_growth and (request_id or not previously_completed):
         await practice_growth_service.record_answers(db, owner, [question.id], now)
     if commit:
         await db.commit()
+        if response is not None:
+            return response
         if mistake is not None:
             await db.refresh(mistake)
         return {
