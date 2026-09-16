@@ -10,6 +10,7 @@ function fixture(t) {
  const dir = mkdtempSync(join(root, 'artifacts/mini-readiness/prod-config-'));
  t.after(() => rmSync(dir,{recursive:true,force:true}));
  mkdirSync(join(dir,'backend')); mkdirSync(join(dir,'deploy')); mkdirSync(join(dir,'bin'));
+ copyFileSync(join(root,'docker-compose.mini-uat.yml'),join(dir,'docker-compose.mini-uat.yml'));
  for (const file of ['update.sh','timing.sh']) copyFileSync(join(root,'deploy',file),join(dir,'deploy',file));
  writeFileSync(join(dir,'bin/ssh'), '#!/bin/sh\nprintf "%s\\n" "$*" >> "$CHECK_LOG"\ncase "$*" in *"test -s backend/.env.wechat-mini.local"*) exit 7;; *) exit 0;; esac\n', {mode:0o755});
  return dir;
@@ -20,6 +21,7 @@ test('production configuration preflight checks isolated mini credentials and ne
  assert.notEqual(result.status,0);
  const calls = readFileSync(log,'utf8');
  assert.match(calls,/test -s backend\/\.env\.wechat-mini\.local/);
+ assert.match(calls,/-f docker-compose\.prod\.yml -f - --env-file/);
  assert.doesNotMatch(calls,/tar -czf|pg_dump|docker tag|up -d|rsync/);
 });
 test('production mini overlay preserves PC credentials, payment mount, database and ports', t => {
@@ -29,7 +31,7 @@ test('production mini overlay preserves PC credentials, payment mount, database 
  writeFileSync(join(dir,'.env.prod'),'POSTGRES_PASSWORD=test-db\nSECRET_KEY=test-key\nWECHAT_APP_ID=pc-app\n');
  writeFileSync(join(dir,'payment.env'),'WECHAT_PAY_MCH_ID=test-merchant\n');
  writeFileSync(join(dir,'backend/.env.wechat-mini.local'),'WECHAT_MINI_APP_ID=wx-mini-test\nWECHAT_MINI_APP_SECRET=mini-test-secret\nWECHAT_MINI_ENABLE_DEMO=true\n');
- const run = overlay => spawnSync('docker',['compose','--env-file','.env.prod','-f','docker-compose.prod.yml',...(overlay?['-f','docker-compose.mini-uat.yml']:[]),'config','--format','json'],{cwd:dir,encoding:'utf8'});
+ const run = overlay => spawnSync('docker',['compose','--env-file','.env.prod','-f','docker-compose.prod.yml',...(overlay?['-f','-']:[]),'config','--format','json'],{cwd:dir,encoding:'utf8',input:overlay?readFileSync(join(dir,'docker-compose.mini-uat.yml'),'utf8'):undefined});
  const before=run(false),after=run(true); assert.equal(before.status,0,before.stderr);assert.equal(after.status,0,after.stderr);
  const a=JSON.parse(before.stdout),b=JSON.parse(after.stdout);assert.deepEqual(a.services.db,b.services.db);assert.deepEqual(a.volumes,b.volumes);
  for(const key of ['ports','volumes','image']) assert.deepEqual(a.services.backend[key],b.services.backend[key]);

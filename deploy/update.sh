@@ -6,7 +6,8 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REMOTE="resume-prod"
 REMOTE_DIR="/home/ubuntu/lszl-kg"
-COMPOSE_ARGS="-f docker-compose.prod.yml -f docker-compose.mini-uat.yml"
+COMPOSE_BASE_ARGS="-f docker-compose.prod.yml"
+COMPOSE_ARGS="$COMPOSE_BASE_ARGS -f docker-compose.mini-uat.yml"
 ENV_FILE=".env.prod"
 PROJECT="lszl-kg"
 REMOTE_BACKUP_ROOT="/home/ubuntu/lszl-backups"
@@ -27,7 +28,7 @@ backup_remote_release() {
     --exclude='node_modules' --exclude='*.pyc' --exclude='.DS_Store' --exclude='._*' ."
 
   # \${...} 必须转义为字面量传到容器内展开（本地无该变量，set -u 下会 unbound）
-  ssh "$REMOTE" "umask 077; cd '${REMOTE_DIR}' && docker compose -p ${PROJECT} ${COMPOSE_ARGS} --env-file ${ENV_FILE} exec -T db sh -lc '
+  ssh "$REMOTE" "umask 077; cd '${REMOTE_DIR}' && docker compose -p ${PROJECT} ${COMPOSE_BASE_ARGS} --env-file ${ENV_FILE} exec -T db sh -lc '
     PGPASSWORD=\"\${POSTGRES_PASSWORD}\"
     pg_dump --format=custom --no-owner --no-acl -U \"\${POSTGRES_USER:-kg}\" -d \"\${POSTGRES_DB:-kg_graph}\"' \
     > '${REMOTE_BACKUP_DIR}/db_${BACKUP_TS}.dump'"
@@ -37,7 +38,7 @@ backup_remote_release() {
     && tar -tzf '${REMOTE_BACKUP_DIR}/repo_${BACKUP_TS}.tar.gz' >/dev/null \
     && test -s '${REMOTE_BACKUP_DIR}/db_${BACKUP_TS}.dump' \
     && cd '${REMOTE_DIR}' \
-    && docker compose -p ${PROJECT} ${COMPOSE_ARGS} --env-file ${ENV_FILE} exec -T db pg_restore --list \
+    && docker compose -p ${PROJECT} ${COMPOSE_BASE_ARGS} --env-file ${ENV_FILE} exec -T db pg_restore --list \
       < '${REMOTE_BACKUP_DIR}/db_${BACKUP_TS}.dump' >/dev/null"
 
   # 给当前运行镜像保留明确标签，防止部署后的 dangling 清理移除回滚镜像。
@@ -58,7 +59,7 @@ EOF"
 # The same isolated mini overlay is used in UAT and production. Its filename is
 # retained for compatibility; the base compose still owns PC/payment/DB settings.
 check_mini_config() {
-  ssh "$REMOTE" "cd $REMOTE_DIR && test -s backend/.env.wechat-mini.local && docker compose -p $PROJECT $COMPOSE_ARGS --env-file $ENV_FILE config --quiet"
+  ssh "$REMOTE" "cd $REMOTE_DIR && test -s backend/.env.wechat-mini.local && docker compose -p $PROJECT $COMPOSE_BASE_ARGS -f - --env-file $ENV_FILE config --quiet" < "$REPO_DIR/docker-compose.mini-uat.yml"
 }
 case "${1:-}" in
   --check-config) check_mini_config; exit 0 ;;
