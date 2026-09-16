@@ -1,6 +1,6 @@
 <view class="question {{compact ? 'is-compact' : ''}}">
   <view class="question-kind"><text class="question-kind-label">{{displayQuestion.type === 'matching' ? '匹配题' : displayQuestion.type === 'unknown' ? '未支持题型' : displayQuestion.type === 'multiple_choice' ? '多选题' : '单选题'}}</text><text wx:if="{{displayQuestion.type === 'multiple_choice'}}">请选择所有正确选项</text></view>
-  <view wx:if="{{displayQuestion.material}}" class="case-material"><button bindtap="toggleCase" aria-expanded="{{caseOpen}}">{{displayQuestion.material.title}} · {{caseOpen ? '收起材料' : '展开材料'}}</button><view wx:if="{{caseOpen}}"><text class="case-text">{{displayQuestion.material.text}}</text><image wx:for="{{materialImages}}" wx:key="id" src="{{item.src}}" mode="widthFix" class="question-image" data-src="{{item.src}}" bindtap="previewImage"/><text wx:if="{{displayQuestion.caseGroup}}">第 {{displayQuestion.caseGroup.order}} / {{displayQuestion.caseGroup.total}} 小题</text></view></view>
+  <view wx:if="{{displayQuestion.material}}" class="case-material"><button class="case-toggle" bindtap="toggleCase" aria-expanded="{{caseOpen}}">{{displayQuestion.material.title}} · {{caseOpen ? '收起材料' : '展开材料'}}</button><view wx:if="{{caseOpen}}"><text class="case-text">{{displayQuestion.material.text}}</text><image wx:for="{{materialImages}}" wx:key="id" src="{{item.src}}" mode="widthFix" class="question-image" data-src="{{item.src}}" bindtap="previewImage"/><text wx:if="{{displayQuestion.caseGroup}}">第 {{displayQuestion.caseGroup.order}} / {{displayQuestion.caseGroup.total}} 小题</text></view></view>
   <rich-text class="stem" nodes="{{displayQuestion.stemNodes}}"></rich-text>
   <text wx:if="{{displayQuestion.stemEn}}" class="stem-en">{{displayQuestion.stemEn}}</text>
   <view wx:if="{{displayQuestion.images.length}}" class="question-images">
@@ -10,10 +10,10 @@
   <view wx:if="{{displayQuestion.type === 'matching'}}" class="matching">
     <text wx:if="{{!submitted}}" class="matching-hint">依次点选条目，再选择展开的候选答案。每个答案只能配对一次。</text>
     <view wx:for="{{pairRows}}" wx:key="id" class="matching-pair {{item.verdict}}">
-      <button data-id="{{item.id}}" bindtap="chooseLeft" disabled="{{submitted}}" class="matching-target {{activeLeft === item.id ? 'active' : ''}}" aria-expanded="{{activeLeft === item.id}}"><text>{{item.number}}. {{item.text}}</text><text class="matching-selection">{{item.selectedText}}</text></button>
+      <button data-id="{{item.id}}" bindtap="chooseLeft" disabled="{{submitted}}" class="matching-target {{submitted ? 'is-locked' : ''}} {{activeLeft === item.id ? 'active' : ''}}" aria-expanded="{{activeLeft === item.id}}"><text>{{item.number}}. {{item.text}}</text><text class="matching-selection">{{item.selectedText}}</text></button>
       <view wx:if="{{!submitted && activeLeft === item.id}}" class="matching-candidates">
         <text class="matching-hint">为第 {{item.number}} 项选择答案</text>
-        <button wx:for="{{displayQuestion.matching.right}}" wx:for-item="candidate" wx:key="id" data-id="{{candidate.id}}" bindtap="chooseRight">{{candidate.text}}</button>
+        <button class="matching-candidate" wx:for="{{displayQuestion.matching.right}}" wx:for-item="candidate" wx:key="id" data-id="{{candidate.id}}" bindtap="chooseRight">{{candidate.text}}</button>
       </view>
       <button wx:if="{{item.selectedId && !submitted}}" data-id="{{item.id}}" bindtap="clearPair" class="matching-clear">取消配对</button>
       <text wx:if="{{item.verdict}}">正确配对：{{item.correctText}}</text>
