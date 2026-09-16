@@ -1,4 +1,5 @@
-# UAT mini-program integration only. Layer on docker-compose.uat.yml.
+# Shared mini-program overlay for docker-compose.uat.yml or docker-compose.prod.yml.
+# The historical filename is retained for existing deployment commands.
 # PC login/payment settings, ports and database remain in the base file.
 services:
   backend:

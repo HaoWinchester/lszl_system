@@ -26,3 +26,7 @@ __pycache__
 .env.prod
 /backend/.env
 /backend/.env.wechat-mini.local
+
+/artifacts
+/.worktrees
+/.mini-test-runtime-*

@@ -6,7 +6,7 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REMOTE="resume-prod"
 REMOTE_DIR="/home/ubuntu/lszl-kg"
-COMPOSE_FILE="docker-compose.prod.yml"
+COMPOSE_ARGS="-f docker-compose.prod.yml -f docker-compose.mini-uat.yml"
 ENV_FILE=".env.prod"
 PROJECT="lszl-kg"
 REMOTE_BACKUP_ROOT="/home/ubuntu/lszl-backups"
@@ -27,7 +27,7 @@ backup_remote_release() {
     --exclude='node_modules' --exclude='*.pyc' --exclude='.DS_Store' --exclude='._*' ."
 
   # \${...} 必须转义为字面量传到容器内展开（本地无该变量，set -u 下会 unbound）
-  ssh "$REMOTE" "umask 077; cd '${REMOTE_DIR}' && docker compose -p ${PROJECT} -f ${COMPOSE_FILE} --env-file ${ENV_FILE} exec -T db sh -lc '
+  ssh "$REMOTE" "umask 077; cd '${REMOTE_DIR}' && docker compose -p ${PROJECT} ${COMPOSE_ARGS} --env-file ${ENV_FILE} exec -T db sh -lc '
     PGPASSWORD=\"\${POSTGRES_PASSWORD}\"
     pg_dump --format=custom --no-owner --no-acl -U \"\${POSTGRES_USER:-kg}\" -d \"\${POSTGRES_DB:-kg_graph}\"' \
     > '${REMOTE_BACKUP_DIR}/db_${BACKUP_TS}.dump'"
@@ -37,7 +37,7 @@ backup_remote_release() {
     && tar -tzf '${REMOTE_BACKUP_DIR}/repo_${BACKUP_TS}.tar.gz' >/dev/null \
     && test -s '${REMOTE_BACKUP_DIR}/db_${BACKUP_TS}.dump' \
     && cd '${REMOTE_DIR}' \
-    && docker compose -p ${PROJECT} -f ${COMPOSE_FILE} --env-file ${ENV_FILE} exec -T db pg_restore --list \
+    && docker compose -p ${PROJECT} ${COMPOSE_ARGS} --env-file ${ENV_FILE} exec -T db pg_restore --list \
       < '${REMOTE_BACKUP_DIR}/db_${BACKUP_TS}.dump' >/dev/null"
 
   # 给当前运行镜像保留明确标签，防止部署后的 dangling 清理移除回滚镜像。
@@ -55,6 +55,24 @@ EOF"
   echo "      BACKUP_VERIFIED=${REMOTE_BACKUP_DIR}"
 }
 
+# The same isolated mini overlay is used in UAT and production. Its filename is
+# retained for compatibility; the base compose still owns PC/payment/DB settings.
+check_mini_config() {
+  ssh "$REMOTE" "cd $REMOTE_DIR && test -s backend/.env.wechat-mini.local && docker compose -p $PROJECT $COMPOSE_ARGS --env-file $ENV_FILE config --quiet"
+}
+case "${1:-}" in
+  --check-config) check_mini_config; exit 0 ;;
+  '') ;;
+  *) echo 'Usage: update.sh [--check-config]' >&2; exit 2 ;;
+esac
+if [ "$(git -C "$REPO_DIR" branch --show-current)" != main ]; then
+  echo '正式部署必须从已验收并合入的 main 分支执行' >&2; exit 1
+fi
+if [ -n "$(git -C "$REPO_DIR" status --porcelain)" ]; then
+  echo '正式部署前工作区必须干净' >&2; exit 1
+fi
+check_mini_config
+
 deployment_timing_stage backup
 echo "[0/5] 发布前备份远端当前代码与数据库"
 backup_remote_release
@@ -62,7 +80,7 @@ backup_remote_release
 deployment_timing_stage frontend-build
 echo "[1/5] 本地构建 new-legacy 产物（前端页面 + 引导课程 seed）"
 cd "$REPO_DIR/frontend"
-node scripts/sync-new-legacy.js
+node scripts/manage-new-legacy.js update ../new-legacy
 node scripts/export-guided-course.mjs
 node scripts/prepare-new-legacy-runtime.js
 cd "$REPO_DIR"
@@ -75,11 +93,12 @@ rsync -az --delete --stats \
 
 deployment_timing_stage image-restart
 echo "[3/5] 重建后端镜像并重启"
-ssh "$REMOTE" "cd $REMOTE_DIR && docker compose -p ${PROJECT} -f ${COMPOSE_FILE} --env-file ${ENV_FILE} up -d --build"
+ssh "$REMOTE" "cd $REMOTE_DIR && docker compose -p ${PROJECT} ${COMPOSE_ARGS} --env-file ${ENV_FILE} up -d --build"
 
 deployment_timing_stage health-maintenance
 echo "[4/5] 等待健康检查并执行非阻断空间维护"
 ssh "$REMOTE" 'healthy=0; for attempt in $(seq 1 30); do if curl -fsS http://127.0.0.1:18086/api/v1/health >/dev/null; then healthy=1; break; fi; sleep 1; done; test "$healthy" -eq 1'
+ssh "$REMOTE" "cd $REMOTE_DIR && docker compose -p $PROJECT $COMPOSE_ARGS --env-file $ENV_FILE exec -T backend python -m app.cli.check_mini_readiness"
 ssh "$REMOTE" 'docker image prune -f >/dev/null || true; docker builder prune -f --filter until=168h >/dev/null || true; sudo -n journalctl --vacuum-size=512M >/dev/null || true; df -h /'
 
 echo

@@ -169,9 +169,11 @@ echo "[5/9] 等待健康检查（18087）"
 ssh "$REMOTE" "healthy=0; for attempt in \$(seq 1 40); do if curl -fsS $HEALTH_URL >/dev/null; then healthy=1; break; fi; sleep 1; done; test \"\$healthy\" -eq 1" \
   || { echo "✗ 健康检查失败，查看日志：ssh $REMOTE 'cd $REMOTE_DIR && docker compose -p $PROJECT logs backend --tail 50'" >&2; exit 1; }
 echo "      HEALTH_OK"
+ssh "$REMOTE" "cd $REMOTE_DIR && docker compose -p $PROJECT $COMPOSE_ARGS --env-file $ENV_FILE exec -T backend python -m app.cli.check_mini_readiness"
 
 deployment_timing_stage nginx
 echo "[6/9] 安装 Git 管理的 UAT HTTPS/HTTP2/gzip 配置"
+
 LOCAL_NGINX_HASH="$(shasum -a 256 "$NGINX_CONFIG" | awk '{print $1}')"
 REMOTE_NGINX_HASH="$(ssh "$REMOTE" "sudo sha256sum /etc/nginx/conf.d/uat.aihuanpu.com.conf 2>/dev/null | awk '{print \$1}'" || true)"
 if [ "$LOCAL_NGINX_HASH" != "$REMOTE_NGINX_HASH" ]; then
