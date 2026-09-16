@@ -28,7 +28,13 @@ Page(withAppearance({
   onFreePapers() { openPaperCatalog('normal', { access: 'free' }); },
   onHelp() { this.setData({ helpOpen: !this.data.helpOpen }); },
   onCopyUsername() { wx.setClipboardData({ data: this.data.username, fail: () => wx.showToast({ title: '复制失败，请重试', icon: 'none' }) }); },
-  onPreviewSupport() { wx.previewImage({ current: '/assets/support-qr.jpg', urls: ['/assets/support-qr.jpg'] }); },
+  onPreviewSupport() {
+    // Native preview needs a filesystem URL, not a bundled image component path.
+    const path = `${wx.env.USER_DATA_PATH}/support-qr.jpg`;
+    const fail = () => wx.showToast({ title: '图片未打开，请重试', icon: 'none' });
+    wx.getFileSystemManager().copyFile({ srcPath: '/assets/support-qr.jpg', destPath: path,
+      success: () => wx.previewImage({ current: path, urls: [path], fail }), fail });
+  },
   onBack() { navigation.navigateBack({ fallback: '/pages/profile/index' }); },
   onPullDownRefresh() { this.loadMembership().finally(() => wx.stopPullDownRefresh()); },
 }));

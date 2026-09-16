@@ -53,3 +53,10 @@ test('six to nine question papers retain full-paper practice alongside the quick
   page.onLoad({count:String(total),quick:'1'});assert.equal(page.data.count,5);
  }
 });
+test('support preview uses a local file and reports copy failures without opening a broken preview',async()=>{
+ let copy;const previews=[],notices=[];
+ const {page}=await loadPage('membership',{}, {env:{USER_DATA_PATH:'wxfile://usr'},getFileSystemManager:()=>({copyFile:o=>{copy=o;}}),previewImage:o=>previews.push(o),showToast:o=>notices.push(o.title)});
+ page.onPreviewSupport();assert.equal(previews.length,0);assert.equal(copy.srcPath,'/assets/support-qr.jpg');
+ copy.success();assert.equal(previews[0].current,'wxfile://usr/support-qr.jpg');assert.deepEqual(previews[0].urls,['wxfile://usr/support-qr.jpg']);
+ page.onPreviewSupport();copy.fail();assert.equal(previews.length,1);assert.equal(notices.length,1);
+});
