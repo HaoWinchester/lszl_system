@@ -43,3 +43,14 @@
 已同步234版本的public产物、manifest、sync report与课程seed元数据。部署脚本将对最终同步产物执行其自身验收。
 
 额外执行 `python3 frontend/e2e/graph_logout.py`：首页、练习页、知识回忆、多题工作区四页的登录/退出及 `kg:auth-required` 登录弹窗均通过；保存失败阻止退出、恢复后保存退出、重开持久化也通过（隔离数据库，未改真实账号）。
+
+### UAT更新完成
+
+- 业务提交：`3e1a5b96c95d4653fb7d7ba149f7318236ae4e59`，已合入并推送uat。
+- `bash deploy/update-uat.sh` 完整成功，635秒，exit 0；最终同步产物再次通过完整校验（598秒），737后端、279前端、浏览器流程、四组视觉差异0%。
+- 实际UAT公开版本 `v9.0-p4.1.234`，健康检查通过，历史已发布试卷回填核查通过。
+- 部署后直接HTTP核验7个资源：退款6项关键条文、评论脚本/样式、练习与成绩单挂载点、两类登录模块监听全部通过。在线隐私政策和使用条款article与源原文完全一致。
+- 小程序后端就绪检查通过（29条必需路由、13张必需表）。
+- `artifacts/refund-uat-deploy.log`、`artifacts/refund-uat-live-verification.json`保存部署与线上证据。
+- 远端备份目录：`/home/ubuntu/lszl-uat-backups/regression-recovery-20260916_161528`。
+- 正式PC仍保持原版本；此次没有合入main、部署正式或提审小程序。请用户在UAT及小程序1.0.5体验版验收后，再进入正式发布。
