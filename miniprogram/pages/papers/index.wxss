@@ -77,4 +77,10 @@
 .paper-skeleton-line.is-short { width: 30%; height: 18rpx; }
 .paper-skeleton-line.is-medium { width: 55%; margin-bottom: 0; }
 
-.catalog-heading { display: flex; flex-direction: column; gap: 12rpx; margin: 26rpx 0; color: var(--ink); }.catalog-copy { color: var(--muted); font-size: var(--font-meta); }.catalog-search { border-color: transparent; border-radius: 28rpx; }.mode-selector { margin-top: 24rpx; padding: 8rpx; border-radius: 28rpx; background: var(--surface-quiet); white-space: nowrap; }.catalog-mode { display: inline-flex; align-items: center; justify-content: center; min-height: var(--touch-min); padding: 0 24rpx; border-radius: 22rpx; background: transparent; color: var(--muted); font-size: var(--font-meta); }.catalog-mode.active { background: var(--forest); color: var(--forest-text); font-weight: 600; }.paper-list { margin-top: 24rpx; padding: 0 24rpx; border-radius: 32rpx; background: var(--surface); }.filters { margin-top: 24rpx; }
+.catalog-heading { display: flex; flex-direction: column; gap: 12rpx; margin: 26rpx 0; color: var(--ink); }.catalog-copy { color: var(--muted); font-size: var(--font-meta); }.catalog-search { border-color: transparent; border-radius: 28rpx; }.mode-selector { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8rpx; margin-top: 24rpx; padding: 8rpx; border-radius: 28rpx; background: var(--surface-quiet); white-space: nowrap; }.catalog-mode { display: inline-flex; align-items: center; justify-content: center; min-height: var(--touch-min); padding: 0 24rpx; border-radius: 22rpx; background: transparent; color: var(--muted); font-size: var(--font-meta); }.catalog-mode.active { background: var(--forest); color: var(--forest-text); font-weight: 600; }.paper-list { margin-top: 24rpx; padding: 0 24rpx; border-radius: 32rpx; background: var(--surface); }.filters { margin-top: 24rpx; }
+
+.catalog-mode { width:100%; margin:0; white-space:normal; }
+.quick-notice { display:flex;flex-direction:column;gap:12rpx;margin-top:24rpx;padding:24rpx;border-radius:24rpx;background:var(--green-soft);font-size:var(--font-meta);line-height:1.6;color:var(--ink); }
+.quick-title { font-size:var(--font-heading);font-weight:650; }
+
+.quick-notice .text-action { min-height:var(--touch-min);padding:12rpx;background:transparent;color:var(--ink);font-size:var(--font-meta);text-align:left;line-height:1.5; }

@@ -8,9 +8,10 @@ Component({
     submitted: { type: Boolean, value: false },
     showAnalysis: { type: Boolean, value: false },
     showResult: { type: Boolean, value: false },
+    allowAnalysis: { type: Boolean, value: false },
     compact: { type: Boolean, value: false },
   },
-  data: { caseOpen:true, activeLeft:'', pairRows:[], matchingStatus:'', assetImages:[], assetErrors:[], materialImages:[], displayQuestion: { images: [], options: [] }, displayOptions: [], answerLabel: '', selectedLabel: '', outcome: '' },
+  data: { analysisExpanded:false, questionKey:'', caseOpen:true, activeLeft:'', pairRows:[], matchingStatus:'', assetImages:[], assetErrors:[], materialImages:[], displayQuestion: { images: [], options: [] }, displayOptions: [], answerLabel: '', selectedLabel: '', outcome: '' },
   observers: {
     'question, selectedIds, showAnalysis, showResult, selectedPairs'(question: any, selectedIds: string[], showAnalysis: boolean, showResult: boolean, selectedPairs:Record<string,string>) {
       const selected = new Set((selectedIds || []).map(String));
@@ -19,7 +20,9 @@ Component({
       const correctIds = reveal ? (safeQuestion.correctOptionIds?.length ? safeQuestion.correctOptionIds : safeQuestion.correctAnswer ? [safeQuestion.correctAnswer] : []).map(String) : [];
       const correct = new Set(correctIds);
       const pairs=selectedPairs||{}, matching=safeQuestion.type==='matching';
+      const changed = this.data.questionKey !== String(safeQuestion.id || '');
       this.setData({
+        ...(changed ? { questionKey: String(safeQuestion.id || ''), activeLeft: '', matchingStatus: '', analysisExpanded: false } : {}),
         pairRows:(safeQuestion.matching?.left||[]).map((left:any,index:number)=>({id:left.id,text:left.text,number:index+1,selectedId:pairs[left.id]||'',selectedText:safeQuestion.matching.right.find((r:any)=>r.id===pairs[left.id])?.text||'选择候选答案',correctText:reveal?safeQuestion.matching.right.find((r:any)=>r.id===safeQuestion.matching.correctPairs?.[left.id])?.text:'',verdict:reveal?(pairs[left.id]===safeQuestion.matching.correctPairs?.[left.id]?'correct':'wrong'):''})),
         displayQuestion: { ...safeQuestion, images: safeQuestion.images || [], options: safeQuestion.options || [] },
         displayOptions: (safeQuestion.options || []).map((option: any) => ({
@@ -46,9 +49,10 @@ Component({
       (this as any)._assetFiles=results.filter((item:any)=>item.src).map((item:any)=>item.src);
       this.setData({assetImages:results.filter((item:any)=>!item.material&&!item.error),materialImages:results.filter((item:any)=>item.material&&!item.error),assetErrors:results.filter((item:any)=>item.error)});
     },
+    toggleAnalysis(){ if(this.properties.allowAnalysis && this.properties.showResult) this.setData({analysisExpanded:!this.data.analysisExpanded}); },
     retryAssets(){this.loadAssets(this.properties.question,true);},
     toggleCase(){this.setData({caseOpen:!this.data.caseOpen});},
-    chooseLeft(event:any){if(this.properties.submitted)return;this.setData({activeLeft:String(event.currentTarget.dataset.id),matchingStatus:'请选择下方候选答案'});},
+    chooseLeft(event:any){if(this.properties.submitted)return;const id=String(event.currentTarget.dataset.id);const activeLeft=this.data.activeLeft===id?'':id;this.setData({activeLeft,matchingStatus:activeLeft?'请选择此条目下的候选答案':''});},
     chooseRight(event:any){if(this.properties.submitted)return;if(!this.data.activeLeft){this.setData({matchingStatus:'请先选择上方条目'});return;}const pairs=assignPair(this.properties.question,this.properties.selectedPairs,this.data.activeLeft,String(event.currentTarget.dataset.id));this.setData({activeLeft:'',matchingStatus:`已配对 ${Object.keys(pairs).length} 项`});this.triggerEvent('change',{selectedPairs:pairs});},
     clearPair(event:any){if(this.properties.submitted)return;this.triggerEvent('change',{selectedPairs:assignPair(this.properties.question,this.properties.selectedPairs,String(event.currentTarget.dataset.id),'')});},
     onChoose(event: any) {

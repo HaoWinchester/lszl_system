@@ -10,3 +10,8 @@
 .loading-line { height: 96rpx; margin-bottom: var(--space-3); border-radius: var(--radius-sm); background: var(--surface-quiet); }
 
 .membership-summary { margin-top: 24rpx; padding: 32rpx; border: 0; border-radius: 32rpx; background: var(--surface); }
+
+.membership-actions { display:flex;flex-direction:column;gap:20rpx;margin-top:32rpx; }
+.membership-help { margin-top:32rpx;padding:32rpx;background:var(--surface);border-radius:24rpx; }
+.support-qr { display:block;width:320rpx;margin:24rpx auto; }
+.account-name { display:block;margin:20rpx 0;overflow-wrap:anywhere;font-size:var(--font-body); }

@@ -20,6 +20,7 @@ import { openMembershipOffer } from '../../domain/membership-navigation';
 
 function greetingFor(hour: number): string {
   if (hour < 11) return '早上好';
+  if (hour < 13) return '中午好';
   if (hour < 18) return '下午好';
   return '晚上好';
 }
@@ -116,6 +117,8 @@ Component(withPrimaryPanel('home', withAppearance({
       this.setData({ continuing: false });
     }
   },
+
+  onQuickPractice() { openPaperCatalog('normal', { access: 'free', quick: true }); },
 
   onBrowsePapers() { openPaperCatalog('normal'); },
 

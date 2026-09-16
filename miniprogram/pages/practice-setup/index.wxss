@@ -8,7 +8,7 @@
 .setting-section { padding-top: var(--space-6); }
 .setting-label { color: var(--ink); font-size: var(--font-heading); font-weight: 650; line-height: var(--line-title); }
 .choice-row { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
-.choice { flex: 1; min-width: 0; min-height: var(--touch-min); margin: 0; padding: 0 var(--space-2); border: 2rpx solid var(--line); background: var(--surface); color: var(--muted); font-size: var(--font-body); }
+.choice { flex: 1 1 calc(33.333% - var(--space-2)); min-width: 0; min-height: var(--touch-min); margin: 0; padding: 0 var(--space-2); border: 2rpx solid var(--line); background: var(--surface); color: var(--muted); font-size: var(--font-body); }
 .choice.is-active { border-color: var(--ink); background: var(--green-soft); color: var(--ink); }
 .choice { display: flex; align-items: center; justify-content: center; }
 .option-list, .mode-list { margin-top: var(--space-2); border-top: 2rpx solid var(--line); }

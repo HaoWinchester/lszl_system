@@ -500,7 +500,7 @@ Page(withAppearance({
       return;
     }
     this.confirming = true;
-    const decision = await showDialog({ title: '退出练习', content: '保存已答题和当前进度，下次继续；也可以结束本次练习，已答错题仍会计入错题记录。', confirmText: '保存退出', cancelText: '结束练习' });
+    const decision = await showDialog({ title: '退出练习', content: '保存退出会保留进度，下次继续；完成或结束本次练习后，错题才会加入复习。', confirmText: '保存退出', cancelText: '结束练习' });
     this.confirming = false;
     if (decision.dismissed) return;
     if (!decision.confirm) {

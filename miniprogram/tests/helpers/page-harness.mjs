@@ -51,7 +51,7 @@ export async function loadPage(name, dependencies = {}, wxOverrides = {}) {
   const appearance = await loadModule('domain/appearance.ts', { wx }, ['appearanceData', 'readAppearance', 'subscribeAppearance', 'updateAppearanceChrome']);
   const { withAppearance } = await loadModule('domain/appearance-page.ts', { ...appearance, ...dependencies }, ['withAppearance']);
   host.withAppearance = withAppearance;
-  const routing = await loadModule('domain/navigation.ts', { wx, getCurrentPages: dependencies.getCurrentPages || (() => []) }, ['navigation', 'openPaperCatalog', 'consumePaperMode', 'returnToPage']);
+  const routing = await loadModule('domain/navigation.ts', { wx, getCurrentPages: dependencies.getCurrentPages || (() => []) }, ['navigation', 'openPaperCatalog', 'consumePaperMode', 'consumePaperOptions', 'returnToPage']);
   const growth = await loadModule('domain/growth-view.ts', {}, ['growthView', 'GROWTH_GOALS']);
   const subscription = await loadModule('domain/subscription-view.ts', {}, ['subscriptionSummary']);
   Object.assign(host, growth, routing, subscription, dependencies);

@@ -8,6 +8,19 @@
       <view class="expiry-row"><text class="meta-copy">到期时间</text><text class="expiry-label">{{membership.expiryLabel}}</text></view>
       <text class="summary-copy">{{membership.description}}</text>
     </view>
+    <view class="membership-actions">
+      <button class="primary-button" bindtap="onFreePapers">先练免费试卷</button>
+      <button class="quiet-button" bindtap="loadMembership">重新同步权益</button>
+      <button class="quiet-button" bindtap="onHelp">{{helpOpen ? '收起账号帮助' : '权限有疑问？查看账号帮助'}}</button>
+    </view>
+    <view wx:if="{{helpOpen}}" class="membership-help">
+      <text class="summary-title">账号帮助</text>
+      <text class="summary-copy">与网页端使用同一账号，权益会自动同步。如访问范围不符合预期，请联系账号管理员，或通过下方客服核实账号权限。</text>
+      <image class="support-qr" src="/assets/support-qr.jpg" mode="widthFix" show-menu-by-longpress bindtap="onPreviewSupport" aria-label="与网页端一致的客服二维码" />
+      <text class="summary-copy">可保存二维码后在微信中识别，联系时请备注用户名。</text>
+      <text class="account-name" user-select>{{username}}</text>
+      <button class="quiet-button" bindtap="onCopyUsername">复制用户名</button>
+    </view>
   </block>
 </view>
 <app-dialog id="app-dialog" style="{{appearanceStyle}}" />

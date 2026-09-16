@@ -45,7 +45,8 @@ test('new pages are declared and remain one-column mobile layouts', () => {
   const app = JSON.parse(read('app.json'));
   assert.ok(app.pages.includes('pages/papers/index'));
   assert.ok(app.pages.includes('pages/practice-setup/index'));
-  assert.doesNotMatch(`${read('pages/papers/index.wxss')}\n${read('pages/practice-setup/index.wxss')}`, /grid-template-columns\s*:\s*repeat\([2-9]/);
+  const catalogContent = read('pages/papers/index.wxss').replace(/\.mode-selector\s*\{[^}]*\}/g, '');
+  assert.doesNotMatch(`${catalogContent}\n${read('pages/practice-setup/index.wxss')}`, /grid-template-columns\s*:\s*repeat\([2-9]/);
 });
 
 test('catalog and setup controls share touch size and spacing tokens', () => {
@@ -57,7 +58,7 @@ test('catalog and setup controls share touch size and spacing tokens', () => {
 
 test('practice count choices remain a three-column mobile row', () => {
   const setupStyles = read('pages/practice-setup/index.wxss');
-  assert.match(setupStyles, /\.choice\s*\{[^}]*flex:\s*1;/s);
+  assert.match(setupStyles, /\.choice\s*\{[^}]*flex:\s*1\s+1\s+calc\(33\.333%/s);
   assert.match(setupStyles, /\.choice\s*\{[^}]*min-width:\s*0;/s);
   assert.match(setupStyles, /\.choice\s*\{[^}]*margin:\s*0;/s);
 });

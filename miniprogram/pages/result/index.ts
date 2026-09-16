@@ -98,7 +98,7 @@ Page(withAppearance({
         accuracy: percent(report.accuracyPercent),
         score: percent(report.scorePercent),
         duration: formatDuration(report.durationMs),
-        conclusion: report.passed ? '已达到本次目标' : '还有可以补强的地方',
+        conclusion: report.passed ? '本次练习达标' : '还有可以补强的地方',
         gameOutcome: runtime ? `${session.mode === 'scholar' ? '学霸挑战' : '挑战'}${runtime.health > 0 ? '成功' : '失败'}` : '',
         gameDetail: runtime ? `剩余生命 ${runtime.health} / ${run?.maxHealth}${session.mode === 'scholar' ? ` · 最高连对 ${runtime.maxStreak}` : ''}` : '',
         domains: domainRows,

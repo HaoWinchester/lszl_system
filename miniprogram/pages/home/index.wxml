@@ -12,9 +12,9 @@
         <text class="hero-kicker">{{activeSession ? '接着上次，继续向前' : '今天，从一道题开始'}}</text>
         <view class="path-art" aria-hidden="true"><view class="path-orbit"></view><view class="path-step step-one"></view><view class="path-step step-two"></view><view class="path-step step-three"></view><view class="path-sun"></view><view class="path-flag"></view></view>
         <text class="hero-title">{{activeSession ? (activeSession.paperName || '未完成练习') : '开始练习'}}</text>
-        <text class="hero-copy">{{activeSession ? '已答 ' + (activeSession.stats.answered || 0) + ' / ' + (activeSession.stats.total || 0) + ' 题' : '选一份试卷，积累新收获'}}</text>
+        <text class="hero-copy">{{activeSession ? '已答 ' + (activeSession.stats.answered || 0) + ' / ' + (activeSession.stats.total || 0) + ' 题' : '选一份免费试卷，轻松开始'}}</text>
         <button wx:if="{{activeSession}}" class="primary-button continue-button" loading="{{continuing}}" disabled="{{continuing}}" bindtap="onContinue">继续作答</button>
-        <button wx:else class="primary-button continue-button" bindtap="onBrowsePapers">开始练习</button>
+        <button wx:else class="primary-button continue-button" bindtap="onQuickPractice">先练 5 题</button>
       </view>
       <view class="revenge-card">
         <text class="hero-kicker">把薄弱点，变成掌握</text>
@@ -23,6 +23,7 @@
         <button class="review-button" data-mode="revenge" bindtap="onMode">去巩固</button>
       </view>
     </view>
+    <text wx:if="{{activeSession}}" class="section-copy review-timing">完成或结束练习后，错题会加入复习；保存退出可保留进度。</text>
     <view class="learning-card today-card">
       <view class="section-heading"><text class="section-title">今日目标</text><button class="text-action" bindtap="onGrowth">查看成长 <ui-icon name="chevron" size="26" /></button></view>
       <block wx:if="{{summary}}"><view class="today-numbers"><text class="today-value">{{summary.today.answered}}<text class="today-total"> / {{summary.today.goal}} 题</text></text><text class="meta-copy">{{summary.today.completed ? '今天已达标' : '再答 ' + growth.remaining + ' 题达标'}}</text></view><view class="growth-track"><view class="growth-fill" style="width: {{growth.percent}}%"></view></view><view class="home-stats"><view class="home-stat"><text class="stat-value">{{summary.currentStreak}}</text><text>连续达标天数</text></view><view class="home-stat"><text class="stat-value">{{summary.totalCompletedDays}}</text><text>累计达标天数</text></view></view></block>

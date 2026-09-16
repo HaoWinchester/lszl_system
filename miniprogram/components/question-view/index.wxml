@@ -7,7 +7,19 @@
     <image wx:for="{{displayQuestion.images}}" wx:key="*this" class="question-image" src="{{item}}" mode="widthFix" data-src="{{item}}" bindtap="previewImage" />
   </view>
   <view class="question-images"><view wx:for="{{assetImages}}" wx:key="id"><image class="question-image" src="{{item.src}}" mode="widthFix" data-src="{{item.src}}" bindtap="previewImage"/><text>{{item.alt}}</text></view><button wx:if="{{assetErrors.length}}" bindtap="retryAssets">图表加载失败，点击重试</button></view>
-  <view wx:if="{{displayQuestion.type === 'matching'}}" class="matching"><text>先点条目，再点候选；候选可以重新分配。</text><view wx:for="{{pairRows}}" wx:key="id" class="matching-pair {{item.verdict}}"><button data-id="{{item.id}}" bindtap="chooseLeft" disabled="{{submitted}}" class="matching-target {{activeLeft === item.id ? 'active' : ''}}"><text>{{item.number}}. {{item.text}}</text><text class="matching-selection">{{item.selectedText}}</text></button><button wx:if="{{item.selectedId && !submitted}}" data-id="{{item.id}}" bindtap="clearPair" class="matching-clear">取消配对</button><text wx:if="{{item.verdict}}">正确配对：{{item.correctText}}</text></view><view wx:if="{{!submitted}}" class="matching-candidates"><button wx:for="{{displayQuestion.matching.right}}" wx:key="id" data-id="{{item.id}}" bindtap="chooseRight">{{item.text}}</button></view><text aria-live="polite">{{matchingStatus}}</text></view>
+  <view wx:if="{{displayQuestion.type === 'matching'}}" class="matching">
+    <text wx:if="{{!submitted}}" class="matching-hint">依次点选条目，再选择展开的候选答案。每个答案只能配对一次。</text>
+    <view wx:for="{{pairRows}}" wx:key="id" class="matching-pair {{item.verdict}}">
+      <button data-id="{{item.id}}" bindtap="chooseLeft" disabled="{{submitted}}" class="matching-target {{activeLeft === item.id ? 'active' : ''}}" aria-expanded="{{activeLeft === item.id}}"><text>{{item.number}}. {{item.text}}</text><text class="matching-selection">{{item.selectedText}}</text></button>
+      <view wx:if="{{!submitted && activeLeft === item.id}}" class="matching-candidates">
+        <text class="matching-hint">为第 {{item.number}} 项选择答案</text>
+        <button wx:for="{{displayQuestion.matching.right}}" wx:for-item="candidate" wx:key="id" data-id="{{candidate.id}}" bindtap="chooseRight">{{candidate.text}}</button>
+      </view>
+      <button wx:if="{{item.selectedId && !submitted}}" data-id="{{item.id}}" bindtap="clearPair" class="matching-clear">取消配对</button>
+      <text wx:if="{{item.verdict}}">正确配对：{{item.correctText}}</text>
+    </view>
+    <text aria-live="polite">{{matchingStatus}}</text>
+  </view>
   <view wx:if="{{displayQuestion.type === 'unknown'}}" role="alert">当前客户端不支持此题型，请更新后重试。</view>
   <view wx:if="{{displayQuestion.type !== 'matching' && displayQuestion.type !== 'unknown'}}" class="options">
     <button wx:for="{{displayOptions}}" wx:key="id" class="option {{item.selected ? 'is-selected' : ''}} {{submitted ? 'is-locked' : ''}} {{item.verdict ? 'is-' + item.verdict : ''}}" data-id="{{item.id}}" hover-class="{{submitted ? 'none' : 'option-pressed'}}" bindtap="onChoose" aria-disabled="{{submitted}}" aria-label="选项 {{item.id}} {{item.text}}" aria-checked="{{item.selected}}" role="{{displayQuestion.type === 'multiple_choice' ? 'checkbox' : 'radio'}}">
@@ -15,7 +27,8 @@
       <view class="option-copy"><text>{{item.text}}</text><text wx:if="{{item.textEn}}" class="option-en">{{item.textEn}}</text><text wx:if="{{item.verdict}}" class="option-verdict">{{item.verdict === 'correct' ? '正确选项' : '你的选择'}}</text></view>
     </button>
   </view>
-  <view wx:if="{{showAnalysis}}" class="analysis">
+  <button wx:if="{{allowAnalysis && showResult && !showAnalysis}}" class="analysis-toggle" bindtap="toggleAnalysis" aria-expanded="{{analysisExpanded}}">{{analysisExpanded ? '收起解析' : '查看解析'}}</button>
+  <view wx:if="{{showAnalysis || (allowAnalysis && showResult && analysisExpanded)}}" class="analysis">
     <text class="answer-outcome">{{outcome}}</text>
     <view class="answer-summary"><text>你的答案：{{selectedLabel}}</text><text>正确答案：{{answerLabel}}</text></view>
     <text class="analysis-label">解析</text>

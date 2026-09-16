@@ -2,7 +2,8 @@
   <view class="nav-bar"><text class="nav-title">练习</text></view>
   <view class="catalog-heading"><text class="page-title">找到今天的练习</text><text class="catalog-copy">循序积累，练出自己的节奏。</text></view>
   <input class="field catalog-search" value="{{search}}" bindinput="onSearch" placeholder="搜索试卷名称或科目" aria-label="搜索试卷名称或科目" confirm-type="search" />
-  <scroll-view class="mode-selector" scroll-x enhanced show-scrollbar="false"><button wx:for="{{modes}}" wx:key="id" class="catalog-mode {{mode === item.id ? 'active' : ''}}" data-mode="{{item.id}}" bindtap="onMode" role="tab" aria-selected="{{mode === item.id}}">{{item.title}}</button></scroll-view>
+  <view wx:if="{{quick}}" class="quick-notice"><text class="quick-title">先练 5 题</text><text>选一份试卷，即可按普通模式顺序开始；不足 5 题则练全卷。</text><button class="text-action" bindtap="onFullPractice">自行设置题量和模式</button></view>
+  <view class="mode-selector" role="tablist"><button wx:for="{{modes}}" wx:key="id" class="catalog-mode {{mode === item.id ? 'active' : ''}}" data-mode="{{item.id}}" bindtap="onMode" role="tab" aria-selected="{{mode === item.id}}">{{item.title}}</button></view>
   <scroll-view class="filters" scroll-x enhanced show-scrollbar="false">
     <button wx:for="{{subjects}}" wx:key="*this" class="filter {{subject === item ? 'is-active' : ''}}" data-subject="{{item}}" bindtap="onSubject">{{item}}</button>
   </scroll-view>

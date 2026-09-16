@@ -10,6 +10,8 @@
     <text class="setup-meta">全卷 {{totalCount}} 题</text>
   </view>
 
+  <text wx:if="{{error}}" class="error-copy" role="alert">{{error}}</text>
+  <button class="primary-button start-button" loading="{{starting}}" disabled="{{starting}}" bindtap="start">{{existingSessionId ? '继续练习' : '开始练习'}}</button>
   <view class="setting-section">
     <text class="setting-label">题量</text>
     <view class="choice-row">
@@ -40,8 +42,7 @@
     </view>
   </view>
 
-  <text wx:if="{{error}}" class="error-copy">{{error}}</text>
-  <button class="primary-button start-button" loading="{{starting}}" disabled="{{starting}}" bindtap="start">{{existingSessionId ? '继续练习' : '开始练习'}}</button>
+
   <button wx:if="{{existingSessionId}}" class="quiet-button start-button" disabled="{{starting}}" bindtap="onRestartExisting">放弃上次并重新开始</button>
 </view>
 <app-dialog id="app-dialog" style="{{appearanceStyle}}" />

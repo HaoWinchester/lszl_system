@@ -2,7 +2,7 @@ import { withPrimaryPanel } from '../../domain/primary-panel';
 import { pageRefreshMode } from '../../domain/page-freshness';
 import { selectPrimaryTab } from '../../domain/primary-tabs';
 import { MODE_POLICIES } from '../../domain/mode-policy';
-import { navigation, consumePaperMode } from "../../domain/navigation";
+import { navigation, consumePaperMode, consumePaperOptions } from "../../domain/navigation";
 import { withAppearance } from '../../domain/appearance-page';
 import { messageOf } from '../../services/http';
 import { listPublishedPapers } from '../../services/papers';
@@ -32,6 +32,7 @@ Component(withPrimaryPanel('papers', withAppearance({
     access: 'all',
     mode: 'normal' as PracticeMode,
     search: '',
+    quick: false,
     modes: ['normal', 'challenge', 'scholar', 'revenge'].map(id => MODE_POLICIES[id as PracticeMode]),
     skeletonRows: [0, 1, 2],
     page: 0,
@@ -53,6 +54,11 @@ Component(withPrimaryPanel('papers', withAppearance({
     selectPrimaryTab(this as any, 1);
     const mode = consumePaperMode();
     if (mode) this.setData({ mode: mode as PracticeMode });
+    const options = consumePaperOptions();
+    if (options) {
+      this.setData({ quick: options.quick === true, ...(options.access ? { access: options.access, search: '', subject: '全部科目' } : {}) });
+      this.applyFilters();
+    }
     if (pageRefreshMode(this.data.lastLoadedAt) !== 'skip') return this.loadPapers();
   },
 
@@ -60,7 +66,7 @@ Component(withPrimaryPanel('papers', withAppearance({
   onMode(event: any) {
     const mode = event.currentTarget.dataset.mode;
     if (mode === 'revenge') { navigation.navigateTo({ url: '/pages/revenge/index' }); return; }
-    if (['normal', 'challenge', 'scholar'].includes(mode)) this.setData({ mode });
+    if (['normal', 'challenge', 'scholar'].includes(mode)) this.setData({ mode, quick: false });
   },
 
   onPullDownRefresh() {
@@ -135,10 +141,13 @@ Component(withPrimaryPanel('papers', withAppearance({
       `releaseId=${encodeURIComponent(item.releaseId)}`,
       `title=${encodeURIComponent(item.title)}`,
       `count=${item.questionCount}`,
+      ...(this.data.quick ? ['quick=1'] : []),
       `mode=${this.data.mode}`,
     ].join('&');
     navigation.navigateTo({ url: `/pages/practice-setup/index?${params}` });
   },
+
+  onFullPractice() { this.setData({ quick: false }); },
 
   onBack() { navigation.navigateBack(); },
 })));

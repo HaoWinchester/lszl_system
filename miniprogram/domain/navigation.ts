@@ -53,10 +53,14 @@ export const navigation = {
 // switchTab cannot carry query strings. Keep only a one-shot UI route intent;
 // never store account or practice records here. Consume on catalog onShow.
 let pendingPaperMode: string | null = null;
-export function openPaperCatalog(mode = 'normal') {
+type PaperOptions = { access?: 'all' | 'free' | 'member'; quick?: boolean };
+let pendingPaperOptions: PaperOptions | null = null;
+export function openPaperCatalog(mode = 'normal', options?: PaperOptions) {
+  pendingPaperOptions = options ? { access: options.access || 'all', quick: options.quick === true } : { quick: false };
   pendingPaperMode = ['normal', 'challenge', 'scholar'].includes(mode) ? mode : 'normal';
   navigation.switchTab({ url: '/pages/papers/index', fail: () => {
     pendingPaperMode = null;
+    pendingPaperOptions = null;
     wx.showToast({ title: '练习页未打开，请重试', icon: 'none' });
   } });
 }
@@ -64,6 +68,12 @@ export function consumePaperMode(): string | null {
   const mode = pendingPaperMode;
   pendingPaperMode = null;
   return mode;
+}
+
+export function consumePaperOptions(): PaperOptions | null {
+  const options = pendingPaperOptions;
+  pendingPaperOptions = null;
+  return options;
 }
 
 // Reuse an existing secondary page instead of multiplying its stack frames.

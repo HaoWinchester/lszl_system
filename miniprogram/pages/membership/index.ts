@@ -1,4 +1,4 @@
-import { navigation } from "../../domain/navigation";
+import { navigation, openPaperCatalog } from "../../domain/navigation";
 import { withAppearance } from '../../domain/appearance-page';
 import { getCurrentUser } from '../../services/session';
 import { getMySubscription } from '../../services/subscription';
@@ -7,7 +7,7 @@ import { messageOf } from '../../services/http';
 
 Page(withAppearance({
   data: {
-    statusBarHeight: 24, loading: true, error: '',
+    statusBarHeight: 24, loading: true, error: '', helpOpen: false, username: '',
     membership: { title: '会员信息', statusLabel: '待确认', expiryLabel: '待确认', description: '' },
   },
   onLoad() { this.setData({ statusBarHeight: wx.getWindowInfo?.().statusBarHeight || 24 }); },
@@ -17,7 +17,7 @@ Page(withAppearance({
     if (!user) { navigation.reLaunch({ url: '/pages/login/index' }); return; }
     if (this.fetching) return;
     this.fetching = true;
-    this.setData({ loading: true, error: '' });
+    this.setData({ loading: true, error: '', username: user.username });
     try {
       const access = await getMySubscription();
       this.setData({ membership: subscriptionView(user.role, access), loading: false });
@@ -25,6 +25,10 @@ Page(withAppearance({
       this.setData({ error: messageOf(error), loading: false });
     } finally { this.fetching = false; }
   },
+  onFreePapers() { openPaperCatalog('normal', { access: 'free' }); },
+  onHelp() { this.setData({ helpOpen: !this.data.helpOpen }); },
+  onCopyUsername() { wx.setClipboardData({ data: this.data.username, fail: () => wx.showToast({ title: '复制失败，请重试', icon: 'none' }) }); },
+  onPreviewSupport() { wx.previewImage({ current: '/assets/support-qr.jpg', urls: ['/assets/support-qr.jpg'] }); },
   onBack() { navigation.navigateBack({ fallback: '/pages/profile/index' }); },
   onPullDownRefresh() { this.loadMembership().finally(() => wx.stopPullDownRefresh()); },
 }));
