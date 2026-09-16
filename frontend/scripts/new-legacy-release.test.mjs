@@ -569,3 +569,27 @@ test('release validation runs smoke and visual regression against the candidate'
   const contract = readJson(resolve(scriptsDir, 'new-legacy-contract.json'))
   assert.ok(contract.releaseValidation?.commands?.includes('python3 frontend/e2e/multi_question_learning_assets.py'))
 })
+
+for (const mutation of ['older-version', 'same-version-missing-refund']) {
+  test(`candidate legal regression is rejected before promotion: ${mutation}`, () => {
+    const root = makeRoot();
+    const baseline = resolve(root, 'baseline-source');
+    cpSync(source, baseline, { recursive: true });
+    const terms = resolve(baseline, 'terms-of-service.html');
+    const old = readFileSync(terms, 'utf8');
+    const approved = old.replace(/版本 [\d.]+｜/, '版本 1.1｜');
+    writeFileSync(terms, approved);
+    assert.equal(run(root, 'update', baseline).status, 0);
+    const before = readFileSync(resolve(root, 'current.json'), 'utf8');
+    const next = resolve(root, 'regressed-source');
+    cpSync(baseline, next, { recursive: true });
+    writeFileSync(resolve(next, 'VERSION'), `${sourceVersion}-legal-regressed\n`);
+    writeFileSync(resolve(next, 'terms-of-service.html'), mutation === 'older-version'
+      ? approved.replace('版本 1.1｜', '版本 1.0｜')
+      : approved.replace(/<p>退款说明：[\s\S]*?<\/p>/, ''));
+    const result = run(root, 'update', next);
+    assert.notEqual(result.status, 0, 'Same file count must not hide legal rollback');
+    assert.match(result.stderr, /协议版本回退|协议正文变化但版本未更新/);
+    assert.equal(readFileSync(resolve(root, 'current.json'), 'utf8'), before);
+  });
+}

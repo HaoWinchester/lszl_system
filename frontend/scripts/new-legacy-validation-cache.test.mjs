@@ -42,6 +42,9 @@ function fixture(t) {
   }
   put(resolve(checkout, 'new-legacy/VERSION'), version)
   for (const file of CRITICAL_SITE_FILES) put(resolve(checkout, 'new-legacy', file), `fixture ${file}\n`)
+  for (const file of ['terms-of-service.html', 'privacy-policy.html']) {
+    put(resolve(checkout, 'new-legacy', file), '<article><p>版本 1.1｜</p><p>Legal fixture</p></article>\n')
+  }
   put(resolve(checkout, 'backend/app.py'), 'print("backend")\n')
   put(resolve(checkout, 'docs/superpowers/plan.md'), 'Plan\n')
   put(resolve(checkout, 'docs/verification/result.md'), 'Result\n')

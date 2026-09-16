@@ -333,6 +333,27 @@ function inspect(source) {
   }
 }
 
+// File counts cannot detect an older legal document replacing a newer one.
+function legalDocument(site, file) {
+  const path = resolve(site, file)
+  if (!existsSync(path)) throw new Error(`候选 site 缺少协议：${file}`)
+  const html = readFileSync(path, 'utf8')
+  const article = html.match(/<article\b[^>]*>([\s\S]*?)<\/article>/)?.[1]
+  const version = article?.match(/版本\s+(\d+(?:\.\d+)+)/)?.[1]
+  if (!article || !version) throw new Error(`协议正文或版本缺失：${file}`)
+  return { version, text: article.replace(/<[^>]*>/g, '').replace(/\s+/g, '') }
+}
+
+function legalVersionCompare(left, right) {
+  const a = left.split('.').map(Number)
+  const b = right.split('.').map(Number)
+  for (let index = 0; index < Math.max(a.length, b.length); index += 1) {
+    const delta = (a[index] || 0) - (b[index] || 0)
+    if (delta) return delta
+  }
+  return 0
+}
+
 function candidateSiteGate(activeRoot, candidateRoot, version) {
   const candidateSite = resolve(candidateRoot, version, 'site')
   if (!existsSync(candidateSite) || !statSync(candidateSite).isDirectory()) {
@@ -351,6 +372,16 @@ function candidateSiteGate(activeRoot, candidateRoot, version) {
     activeFiles = walk(activeSite).length
     if (candidateFiles < activeFiles) {
       throw new Error(`候选 site 文件数 ${candidateFiles} 少于当前 active site ${activeFiles}`)
+    }
+  }
+  for (const file of ['terms-of-service.html', 'privacy-policy.html']) {
+    const candidate = legalDocument(candidateSite, file)
+    if (!current?.site) continue
+    const active = legalDocument(resolve(activeRoot, current.site), file)
+    const order = legalVersionCompare(candidate.version, active.version)
+    if (order < 0) throw new Error(`协议版本回退：${file} ${active.version} → ${candidate.version}`)
+    if (order === 0 && candidate.text !== active.text) {
+      throw new Error(`协议正文变化但版本未更新：${file} ${candidate.version}`)
     }
   }
   return { candidateFiles, activeFiles, requiredFiles: CRITICAL_SITE_FILES }
