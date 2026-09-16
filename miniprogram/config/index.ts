@@ -1,14 +1,16 @@
 const API_BASE_URLS: Record<string, string> = {
   develop: 'http://127.0.0.1:5173',
-  trial: 'https://uat.aihuanpu.com',
+  // The uploaded review/experience package must use the same backend as release.
+  // UAT is selected explicitly via kg_api_base_url in development only.
+  trial: 'https://lszl.aihuanpu.com',
   release: 'https://lszl.aihuanpu.com',
 };
 
 function environmentVersion(): string {
   try {
-    return String(wx.getAccountInfoSync?.().miniProgram?.envVersion || 'develop');
+    return String(wx.getAccountInfoSync?.().miniProgram?.envVersion || 'release');
   } catch (_error) {
-    return 'develop';
+    return 'release';
   }
 }
 
