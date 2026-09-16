@@ -90,7 +90,7 @@ export async function validateSession(): Promise<MiniUser | null> {
     const response = await request<{ user: MiniUser }>({ path: '/api/v1/auth/mini/session' });
     return response.user;
   } catch (error) {
-    if (error instanceof ApiError && error.statusCode === 401) return null;
+    if (error instanceof ApiError && error.statusCode === 401 && error.code !== 'SESSION_CHANGED') return null;
     throw error;
   }
 }

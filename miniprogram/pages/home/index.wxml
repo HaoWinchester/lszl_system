@@ -1,7 +1,7 @@
 <view class="page-shell home-page" style="{{appearanceStyle}}padding-top: {{statusBarHeight}}px">
   <view class="nav-bar"><text class="nav-title">首页</text></view>
-  <view wx:if="{{loading}}" class="loading-state" aria-label="正在加载学习进度"><view class="loading-line short"></view><view class="loading-line"></view><view class="loading-line"></view></view>
-  <view wx:else>
+  <view wx:if="{{loading}}" class="inline-notice" role="status"><text>正在同步学习数据，已有内容可继续查看。</text></view>
+  <view>
     <view class="welcome">
       <view class="greeting-row"><view class="greeting-copy"><text class="eyebrow">{{todayLabel}} · {{greeting}}</text><text class="greeting-name">{{displayName}}</text></view><button class="goal-chip" bindtap="onGrowth"><ui-icon name="target" size="32" /><text>{{summary ? '今日目标 ' + summary.today.goal + ' 题' : '我的成长'}}</text></button></view>
       <text class="home-title">每天一小步，<text class="headline-second">让知识更扎实。</text></text>
@@ -32,7 +32,7 @@
     </view>
     <view class="paper-heading-row"><text class="section-title">最近试卷</text><button class="all-papers" bindtap="onBrowsePapers">查看全部 <ui-icon name="chevron" size="26" /></button></view>
     <view wx:if="{{papers.length}}" class="home-papers learning-card"><button wx:for="{{papers}}" wx:key="releaseId" class="home-paper" data-release-id="{{item.releaseId}}" bindtap="onPaper"><view class="paper-symbol"><ui-icon name="normal" size="38" /></view><view class="home-paper-body"><text class="home-paper-subject">{{item.subject}}{{item.contentRestricted ? ' · 会员试卷' : ''}}</text><text class="home-paper-title">{{item.title}}</text></view><text class="home-paper-count">{{item.questionCount}}题</text></button></view>
-    <view wx:else class="first-state learning-card"><text class="section-title">暂时没有可练习试卷</text><text class="section-copy">教师发布后会自动出现在这里。</text></view>
+    <view wx:elif="{{!loading}}" class="first-state learning-card"><text class="section-title">暂时没有可练习试卷</text><text class="section-copy">教师发布后会自动出现在这里。</text></view>
   </view>
 </view>
 <app-dialog id="app-dialog" style="{{appearanceStyle}}" />

@@ -1,3 +1,4 @@
+import { loadSections } from '../../domain/load-sections';
 import { withPrimaryPanel } from '../../domain/primary-panel';
 import { navigation } from "../../domain/navigation";
 import { withAppearance } from '../../domain/appearance-page';
@@ -19,6 +20,7 @@ const roleLabels: Record<string, string> = {
 };
 
 Component(withPrimaryPanel('profile', withAppearance({
+  refreshing: false,
   data: {
     statusBarHeight: 24,
     loading: true,
@@ -27,7 +29,7 @@ Component(withPrimaryPanel('profile', withAppearance({
     user: {} as any,
     displayName: '同学',
     avatarLetter: '学',
-    roleLabel: '学员',
+    roleLabel: '账号',
     totalExperience: '—' as number | string,
     weekExperience: '—' as number | string,
     completedCount: '—' as number | string,
@@ -43,6 +45,8 @@ Component(withPrimaryPanel('profile', withAppearance({
 
   onLoad() {
     this.setData({ statusBarHeight: wx.getWindowInfo?.().statusBarHeight || 24 });
+    const user = getCurrentUser();
+    if (user) this.applyIdentity(user);
   },
 
   onShow() {
@@ -52,8 +56,15 @@ Component(withPrimaryPanel('profile', withAppearance({
     this.loadProfile({ silent: mode === 'silent' });
   },
 
+  applyIdentity(user: any) {
+    const displayName = user.display_name || user.username;
+    this.setData({ user, displayName, avatarLetter: avatarLetterOf(displayName, user.username), roleLabel: roleLabels[user.role] || user.role });
+  },
+
   async loadProfile(options: { silent?: boolean } = {}) {
     if (this.data.loggedOut) { this.openLogin(); return; }
+    if (this.refreshing) return;
+    this.refreshing = true;
     const silent = options.silent === true && this.data.lastLoadedAt > 0;
     if (!silent) this.setData({ loading: true, error: '' });
     try {
@@ -62,37 +73,28 @@ Component(withPrimaryPanel('profile', withAppearance({
         this.openLogin();
         return;
       }
-      const [experienceResult, historyResult, accessResult] = await Promise.allSettled([
-        getExperienceSummary(), listSessions(), getMySubscription(),
+      this.applyIdentity(user);
+      const results = await loadSections([
+        { load: getExperienceSummary, apply: experience => this.setData({
+          totalExperience: Number(experience.totalExperience || 0), weekExperience: Number(experience.weekExperience || 0),
+        }) },
+        { load: listSessions, apply: (history: any[]) => this.setData({ completedCount: history.filter(item => item.status === 'completed').length }) },
+        { load: getMySubscription, apply: access => {
+          const membership = subscriptionView(user.role, access);
+          this.setData({ membership, accessTitle: membership.title, membershipSummary: subscriptionSummary(membership), accessCopy: membership.description });
+        } },
       ]);
-      const experience: any = experienceResult.status === 'fulfilled' ? experienceResult.value : {};
-      const history: any[] = historyResult.status === 'fulfilled' ? historyResult.value : [];
-      const access: any = accessResult.status === 'fulfilled' ? accessResult.value : {};
-      const membership = accessResult.status === 'fulfilled' ? subscriptionView(user.role, access) : this.data.membership;
-      const partialFailure = [experienceResult, historyResult, accessResult].some(item => item.status === 'rejected');
-      const displayName = user.display_name || user.username;
+      const partialFailure = results.some(item => item.status === 'rejected');
       this.setData({
-        user,
-        displayName,
-        avatarLetter: avatarLetterOf(displayName, user.username),
-        roleLabel: roleLabels[user.role] || user.role,
-        totalExperience: experienceResult.status === 'fulfilled' ? Number(experience.totalExperience || 0) : this.data.totalExperience,
-        weekExperience: experienceResult.status === 'fulfilled' ? Number(experience.weekExperience || 0) : this.data.weekExperience,
-        completedCount: historyResult.status === 'fulfilled' ? history.filter(item => item.status === 'completed').length : this.data.completedCount,
-        accessTitle: membership.title,
-        membership,
-        membershipSummary: subscriptionSummary(membership),
         syncLabel: partialFailure ? '部分数据未更新' : '已与网页端同步',
         syncError: partialFailure ? '未更新的项目保留上次数据，可以重新同步。' : '',
-        accessCopy: membership.description,
-        loading: false,
-        error: '',
-        lastLoadedAt: Date.now(),
+        accessCopy: this.data.membership.description,
+        loading: false, error: '', lastLoadedAt: Date.now(),
       });
     } catch (error) {
       if (silent) { this.setData({ syncError: messageOf(error), syncLabel: '更新失败' }); return; }
       this.setData({ loading: false, error: messageOf(error) });
-    }
+    } finally { this.refreshing = false; this.setData({ loading: false }); }
   },
 
   onOpenLegal(event: any) {
