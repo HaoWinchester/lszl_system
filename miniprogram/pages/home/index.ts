@@ -1,3 +1,4 @@
+import { withAppShare } from '../../domain/app-share';
 import { loadSections } from '../../domain/load-sections';
 import { withPrimaryPanel } from '../../domain/primary-panel';
 import { getGrowthSummary, GrowthSummary } from '../../services/growth';
@@ -26,7 +27,7 @@ function greetingFor(hour: number): string {
   return '晚上好';
 }
 
-Component(withPrimaryPanel('home', withAppearance({
+Component(withPrimaryPanel('home', withAppearance(withAppShare({
   refreshing: false,
   data: {
     statusBarHeight: 24,
@@ -134,4 +135,4 @@ Component(withPrimaryPanel('home', withAppearance({
     const params = `paperId=${encodeURIComponent(paper.paperId)}&releaseId=${encodeURIComponent(paper.releaseId)}&title=${encodeURIComponent(paper.title)}&count=${paper.questionCount}&mode=normal`;
     navigation.navigateTo({ url: `/pages/practice-setup/index?${params}` });
   },
-})));
+}))));

@@ -1,3 +1,4 @@
+import { withAppShare } from '../../domain/app-share';
 import { pageRefreshMode } from '../../domain/page-freshness';
 import { withPrimaryPanel } from '../../domain/primary-panel';
 import { navigation, openPaperCatalog } from '../../domain/navigation';
@@ -8,7 +9,7 @@ import { validateSession } from '../../services/auth';
 import { messageOf } from '../../services/http';
 import { getGrowthSummary, updateGrowthGoal, GrowthSummary } from '../../services/growth';
 
-Component(withPrimaryPanel('growth', withAppearance({
+Component(withPrimaryPanel('growth', withAppearance(withAppShare({
   fetching: false,
   data: {
     statusBarHeight: 24, lastLoadedAt: 0, loading: true, error: '', goalError: '', saving: false,
@@ -46,4 +47,4 @@ Component(withPrimaryPanel('growth', withAppearance({
   },
   onPractice() { openPaperCatalog('normal'); },
   onHistory() { navigation.navigateTo({ url: '/pages/history/index' }); },
-})));
+}))));

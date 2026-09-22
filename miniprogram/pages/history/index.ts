@@ -1,3 +1,4 @@
+import { withAppShare } from '../../domain/app-share';
 import { navigation, openPaperCatalog } from "../../domain/navigation";
 import { withAppearance } from '../../domain/appearance-page';
 import { messageOf } from '../../services/http';
@@ -30,7 +31,7 @@ function viewItem(item: PracticeHistoryItem) {
   };
 }
 
-Page(withAppearance({
+Page(withAppearance(withAppShare({
   data: {
     statusBarHeight: 24,
     loading: true,
@@ -101,4 +102,4 @@ Page(withAppearance({
 
   onBack() { navigation.navigateBack(); },
   onBrowse() { openPaperCatalog('normal'); },
-}));
+})));

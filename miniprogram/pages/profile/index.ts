@@ -1,3 +1,4 @@
+import { withAppShare } from '../../domain/app-share';
 import { loadSections } from '../../domain/load-sections';
 import { withPrimaryPanel } from '../../domain/primary-panel';
 import { navigation } from "../../domain/navigation";
@@ -19,7 +20,7 @@ const roleLabels: Record<string, string> = {
   admin: '管理员', teacher: '教师', student: '学员', viewer: '访客',
 };
 
-Component(withPrimaryPanel('profile', withAppearance({
+Component(withPrimaryPanel('profile', withAppearance(withAppShare({
   refreshing: false,
   data: {
     statusBarHeight: 24,
@@ -134,4 +135,4 @@ Component(withPrimaryPanel('profile', withAppearance({
       loggingOut: false, error: '本机已退出，登录页面未打开，请重试。',
     }) });
   },
-})));
+}))));

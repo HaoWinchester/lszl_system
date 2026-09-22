@@ -1,3 +1,4 @@
+import { withAppShare } from '../../domain/app-share';
 import { navigation } from "../../domain/navigation";
 import { withAppearance } from '../../domain/appearance-page';
 import { showDialog } from '../../domain/dialog';
@@ -6,7 +7,7 @@ import { abandonSession, getSession, startSession } from '../../services/practic
 import { PracticeMode, PracticeOrder } from '../../types/api';
 import { MODE_CHOICES } from '../../domain/mode-policy';
 
-Page(withAppearance({
+Page(withAppearance(withAppShare({
   data: {
     statusBarHeight: 24,
     paperId: '',
@@ -120,4 +121,4 @@ Page(withAppearance({
       this.setData({ error: messageOf(retryError), starting: false });
     }
   },
-}));
+})));

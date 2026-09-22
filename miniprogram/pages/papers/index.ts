@@ -1,3 +1,4 @@
+import { withAppShare } from '../../domain/app-share';
 import { withPrimaryPanel } from '../../domain/primary-panel';
 import { pageRefreshMode } from '../../domain/page-freshness';
 import { selectPrimaryTab } from '../../domain/primary-tabs';
@@ -19,7 +20,7 @@ function filteredPapers(items: PaperSummary[], subject: string, access: string, 
   );
 }
 
-Component(withPrimaryPanel('papers', withAppearance({
+Component(withPrimaryPanel('papers', withAppearance(withAppShare({
   fetching: false,
   data: {
     statusBarHeight: 24,
@@ -152,4 +153,4 @@ Component(withPrimaryPanel('papers', withAppearance({
   onFullPractice() { this.setData({ quick: false }); },
 
   onBack() { navigation.navigateBack(); },
-})));
+}))));

@@ -1,3 +1,4 @@
+import { withAppShare } from '../../domain/app-share';
 import { navigation, openPaperCatalog } from "../../domain/navigation";
 import { withAppearance } from '../../domain/appearance-page';
 import { getCurrentUser } from '../../services/session';
@@ -5,7 +6,7 @@ import { getMySubscription } from '../../services/subscription';
 import { subscriptionView } from '../../domain/subscription-view';
 import { messageOf } from '../../services/http';
 
-Page(withAppearance({
+Page(withAppearance(withAppShare({
   data: {
     statusBarHeight: 24, loading: true, error: '', helpOpen: false, username: '',
     membership: { title: '会员信息', statusLabel: '待确认', expiryLabel: '待确认', description: '' },
@@ -37,4 +38,4 @@ Page(withAppearance({
   },
   onBack() { navigation.navigateBack({ fallback: '/pages/profile/index' }); },
   onPullDownRefresh() { this.loadMembership().finally(() => wx.stopPullDownRefresh()); },
-}));
+})));

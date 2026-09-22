@@ -1,10 +1,11 @@
+import { withAppShare } from '../../domain/app-share';
 import { navigation } from "../../domain/navigation";
 import { withAppearance } from '../../domain/appearance-page';
 import { bindExistingAccount, loginWithWechat, registerAccount } from '../../services/auth';
 import { messageOf } from '../../services/http';
 import { showLegalDocument } from '../../domain/legal-copy';
 
-Page(withAppearance({
+Page(withAppearance(withAppShare({
   data: {
     statusBarHeight: 24,
     stage: 'wechat',
@@ -116,4 +117,4 @@ Page(withAppearance({
       error: '',
     });
   },
-}));
+})));
