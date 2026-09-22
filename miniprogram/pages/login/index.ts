@@ -95,7 +95,11 @@ Page(withAppearance(withAppShare({
       }
       this.openHome();
     } catch (error) {
-      this.setData({ error: messageOf(error), submitting: false });
+      const code = (error as { code?: string })?.code;
+      const restart = code === 'BINDING_TICKET_INVALID' || code === 'SESSION_STORAGE_FAILED';
+      this.setData({ error: messageOf(error), submitting: false,
+        ...(restart ? { stage: 'wechat', bindingTicket: '' } : {}),
+      });
     }
   },
 
