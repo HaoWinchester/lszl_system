@@ -1,14 +1,12 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.237",
-  "toVersion": "v9.0-p4.1.238",
+  "fromVersion": "v9.0-p4.1.238",
+  "toVersion": "v9.0-p4.1.239",
   "changes": {
     "added": [],
     "changed": [
       "VERSION",
-      "src/canvas/94-canvas-ink.js",
-      "tests/canvas-ink-controller-browser.py",
-      "tests/helpers/canvas_ink_server.py"
+      "content-prep-studio/dist/content-prep.html"
     ],
     "removed": []
   },
