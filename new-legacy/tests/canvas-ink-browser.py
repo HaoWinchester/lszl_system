@@ -330,8 +330,9 @@ def check_switch_save_barriers(context,base,kind):
     flush(page,kind)
 
     held=[]
+    release_pending=False
     def delay(route):
-        if route.request.method=='PUT': held.append(route)
+        if route.request.method=='PUT' and not release_pending: held.append(route)
         else: route.continue_()
     page.route(pattern,delay)
     tool.locator('[data-ink-tool=pen]').click();draw(page,card,15)
@@ -346,8 +347,9 @@ def check_switch_save_barriers(context,base,kind):
     draw(page,card,20)
     stroke_count(page,initial+2)
     # Resume the genuine server write after verifying the frozen UI.
+    release_pending=True
+    for route in list(held): route.continue_()
     page.unroute(pattern,delay)
-    for route in held: route.continue_()
     if kind=='recall':
         page.wait_for_url('**questionId=ink-question-2*')
     else:
