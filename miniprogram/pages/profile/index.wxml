@@ -2,10 +2,9 @@
   <view class="nav-bar"><text class="nav-title">我的</text></view>
 
   <empty-state wx:if="{{loggedOut}}" title="本机已退出登录" body="{{error || '正在打开登录页面。'}}" action-text="{{loggingOut ? '' : '前往登录'}}" bind:action="openLogin" />
-  <view wx:elif="{{loading}}" class="profile-loading"><view class="profile-loading-line is-lead"></view><view class="profile-loading-line"></view><view class="profile-loading-line"></view></view>
-  <empty-state wx:elif="{{error}}" title="账号信息没有载入" body="{{error}}" action-text="重新加载" bind:action="loadProfile" />
-
   <block wx:else>
+    <view wx:if="{{loading}}" class="inline-notice" role="status"><text>正在同步账号信息，菜单可正常使用。</text></view>
+    <view wx:if="{{error}}" class="inline-notice" role="alert"><text>{{error}}</text><button class="inline-retry" bindtap="loadProfile">重新同步</button></view>
     <view class="identity">
       <view class="avatar-mark" aria-hidden="true"><text class="avatar-letter">{{avatarLetter}}</text></view>
       <view class="identity-copy">

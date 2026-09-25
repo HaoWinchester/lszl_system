@@ -1,8 +1,9 @@
+import { withAppShare } from '../../domain/app-share';
 import { navigation } from "../../domain/navigation";
 import { withAppearance } from '../../domain/appearance-page';
 import { THEMES, READING_SIZES, appearanceData, readAppearance, saveAppearance, updateAppearanceChrome, Appearance } from '../../domain/appearance';
 
-Page(withAppearance({
+Page(withAppearance(withAppShare({
   data: {
     statusBarHeight: 24,
     themes: THEMES.map(theme => ({ ...theme, style: appearanceData({ theme: theme.id, readingSize: 'standard' }).appearanceStyle })),
@@ -37,4 +38,4 @@ Page(withAppearance({
       this.setData({ saveError: '设置未能保存，已保留原样。请再次选择重试。' });
     }
   },
-}));
+})));

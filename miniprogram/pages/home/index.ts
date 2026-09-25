@@ -1,3 +1,5 @@
+import { withAppShare } from '../../domain/app-share';
+import { loadSections } from '../../domain/load-sections';
 import { withPrimaryPanel } from '../../domain/primary-panel';
 import { getGrowthSummary, GrowthSummary } from '../../services/growth';
 import { growthView } from '../../domain/growth-view';
@@ -25,7 +27,7 @@ function greetingFor(hour: number): string {
   return '晚上好';
 }
 
-Component(withPrimaryPanel('home', withAppearance({
+Component(withPrimaryPanel('home', withAppearance(withAppShare({
   refreshing: false,
   data: {
     statusBarHeight: 24,
@@ -67,23 +69,14 @@ Component(withPrimaryPanel('home', withAppearance({
         return;
       }
       this.setData({ displayName: user.display_name || user.username });
-      const results = await Promise.allSettled([
-        listPublishedPapers(1, 3),
-        getRevengeSummary(),
-        getActiveSessions(),
-        getGrowthSummary(),
+      const results = await loadSections([
+        { load: () => listPublishedPapers(1, 3), apply: result => this.setData({ papers: result.items }) },
+        { load: getRevengeSummary, apply: result => this.setData({ revengeCount: Number(result?.stats?.active || 0) }) },
+        { load: getActiveSessions, apply: result => this.setData({ activeSession: result[0] || null }) },
+        { load: getGrowthSummary, apply: summary => this.setData({ summary, growth: growthView(summary), growthError: '' }),
+          failed: error => this.setData({ growthError: messageOf(error) }) },
       ]);
-      const paperResult: any = results[0];
-      const revengeResult: any = results[1];
-      const activeResult: any = results[2];
-      const growthResult: any = results[3];
       this.setData({
-        summary: growthResult.status === 'fulfilled' ? growthResult.value : this.data.summary,
-        growth: growthResult.status === 'fulfilled' ? growthView(growthResult.value) : this.data.growth,
-        growthError: growthResult.status === 'rejected' ? messageOf(growthResult.reason) : '',
-        revengeCount: revengeResult.status === 'fulfilled' ? Number(revengeResult.value?.stats?.active || 0) : this.data.revengeCount,
-        papers: paperResult.status === 'fulfilled' ? paperResult.value.items : this.data.papers,
-        activeSession: activeResult.status === 'fulfilled' ? activeResult.value[0] || null : this.data.activeSession,
         loading: false,
         lastLoadedAt: Date.now(),
         error: results.slice(0, 3).some(item => item.status === 'rejected') ? '部分数据未更新，请重试。' : '',
@@ -142,4 +135,4 @@ Component(withPrimaryPanel('home', withAppearance({
     const params = `paperId=${encodeURIComponent(paper.paperId)}&releaseId=${encodeURIComponent(paper.releaseId)}&title=${encodeURIComponent(paper.title)}&count=${paper.questionCount}&mode=normal`;
     navigation.navigateTo({ url: `/pages/practice-setup/index?${params}` });
   },
-})));
+}))));

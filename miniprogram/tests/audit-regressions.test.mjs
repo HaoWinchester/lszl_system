@@ -38,26 +38,28 @@ test('active list consumers request lightweight summaries but details still load
 
 test('catalog can load beyond 100, retain data on failure, retry the same page and filter new rows', async () => {
   let fail = true; const calls = [];
-  const first = Array.from({ length: 100 }, (_, i) => ({ releaseId: 'r' + i, subject: 'PMP', accessLevel: 'free' }));
+  const rows = [...Array.from({ length: 100 }, (_, i) => ({ releaseId: 'r' + i, subject: 'PMP', accessLevel: 'free' })),
+    { releaseId: 'r100', subject: 'ACP', accessLevel: 'member' }];
   const { page } = await loadPage('papers', { messageOf: e => e.message,
     listPublishedPapers: async (number, size) => {
       calls.push([number, size]);
-      if (number === 1) return { items: first, total: 101 };
-      if (fail) throw new Error('network unavailable');
-      return { items: [{ releaseId: 'r100', subject: 'ACP', accessLevel: 'member' }], total: 101 };
+      if (number === 2 && fail) throw new Error('network unavailable');
+      return { items: rows.slice((number - 1) * size, number * size), total: 101 };
     },
   });
   await page.loadPapers(); assert.equal(page.data.hasMore, true);
   page.onAccess({ currentTarget: { dataset: { access: 'member' } } });
   assert.equal(page.data.filtered.length, 0);
-  await page.loadMore(); assert.equal(page.data.papers.length, 100); assert.ok(page.data.moreError);
+  await page.loadMore(); assert.equal(page.data.papers.length, 20); assert.ok(page.data.moreError);
   fail = false;
   await page.loadMore();
-  assert.deepEqual(calls, [[1,100],[2,100],[2,100]]);
+  for (let i = 0; i < 4; i++) await page.loadMore();
+  assert.deepEqual(calls, [[1,20],[2,20],[2,20],[3,20],[4,20],[5,20],[6,20]]);
+  assert.equal(page.data.papers.length, 101);
   assert.equal(page.data.filtered[0].releaseId, 'r100');
   assert.ok(page.data.subjects.includes('ACP')); assert.equal(page.data.hasMore, false);
   assert.equal(page.data.moreError, '');
-  await page.loadMore(); assert.equal(calls.length, 3);
+  await page.loadMore(); assert.equal(calls.length, 7);
 });
 
 test('lightweight active progress does not erase persisted history duration or experience', async () => {

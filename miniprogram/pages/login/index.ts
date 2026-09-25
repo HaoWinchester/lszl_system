@@ -1,10 +1,11 @@
+import { withAppShare } from '../../domain/app-share';
 import { navigation } from "../../domain/navigation";
 import { withAppearance } from '../../domain/appearance-page';
 import { bindExistingAccount, loginWithWechat, registerAccount } from '../../services/auth';
 import { messageOf } from '../../services/http';
 import { showLegalDocument } from '../../domain/legal-copy';
 
-Page(withAppearance({
+Page(withAppearance(withAppShare({
   data: {
     statusBarHeight: 24,
     stage: 'wechat',
@@ -94,7 +95,11 @@ Page(withAppearance({
       }
       this.openHome();
     } catch (error) {
-      this.setData({ error: messageOf(error), submitting: false });
+      const code = (error as { code?: string })?.code;
+      const restart = code === 'BINDING_TICKET_INVALID' || code === 'SESSION_STORAGE_FAILED';
+      this.setData({ error: messageOf(error), submitting: false,
+        ...(restart ? { stage: 'wechat', bindingTicket: '' } : {}),
+      });
     }
   },
 
@@ -116,4 +121,4 @@ Page(withAppearance({
       error: '',
     });
   },
-}));
+})));

@@ -30,7 +30,8 @@ test('setup includes count, order, all supported paper modes, and resume recover
 
 test('home loads authoritative summaries in parallel and every visible entry has a handler', () => {
   const source = read('pages/home/index.ts');
-  assert.match(source, /Promise\.allSettled/);
+  assert.match(source, /loadSections/);
+  assert.match(read('domain/load-sections.ts'), /Promise\.allSettled/);
   for (const call of ['listPublishedPapers', 'getRevengeSummary', 'getActiveSessions']) {
     assert.match(source, new RegExp(call));
   }

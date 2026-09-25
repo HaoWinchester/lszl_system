@@ -1,3 +1,4 @@
+import { withAppShare } from '../../domain/app-share';
 import { withPrimaryPanel } from '../../domain/primary-panel';
 import { pageRefreshMode } from '../../domain/page-freshness';
 import { selectPrimaryTab } from '../../domain/primary-tabs';
@@ -9,6 +10,8 @@ import { listPublishedPapers } from '../../services/papers';
 import { PaperSummary, PracticeMode } from '../../types/api';
 import { openMembershipOffer } from '../../domain/membership-navigation';
 
+const CATALOG_PAGE_SIZE = 20;
+
 function filteredPapers(items: PaperSummary[], subject: string, access: string, search: string): PaperSummary[] {
   return items.filter(item =>
     (!search.trim() || `${item.title} ${item.subject} ${item.description || ''}`.toLowerCase().includes(search.trim().toLowerCase()))
@@ -17,7 +20,7 @@ function filteredPapers(items: PaperSummary[], subject: string, access: string, 
   );
 }
 
-Component(withPrimaryPanel('papers', withAppearance({
+Component(withPrimaryPanel('papers', withAppearance(withAppShare({
   fetching: false,
   data: {
     statusBarHeight: 24,
@@ -78,7 +81,7 @@ Component(withPrimaryPanel('papers', withAppearance({
     this.fetching = true;
     this.setData({ loading: this.data.lastLoadedAt === 0, error: '', refreshError: '' });
     try {
-      const { items, total = items.length } = await listPublishedPapers(1, 100);
+      const { items, total = items.length } = await listPublishedPapers(1, CATALOG_PAGE_SIZE);
       const subjects = ['全部科目', ...Array.from(new Set(items.map(item => item.subject)))];
       this.setData({ papers: items, subjects, loading: false, lastLoadedAt: Date.now(), refreshError: '', page: 1, total, hasMore: items.length < total, moreError: '' });
       this.applyFilters();
@@ -96,9 +99,9 @@ Component(withPrimaryPanel('papers', withAppearance({
     this.setData({ loadingMore: true, moreError: '' });
     try {
       const next = this.data.page + 1;
-      const { items, total } = await listPublishedPapers(next, 100);
+      const { items, total } = await listPublishedPapers(next, CATALOG_PAGE_SIZE);
       const papers = [...new Map([...this.data.papers, ...items].map(item => [item.releaseId, item])).values()];
-      this.setData({ papers, total, page: next, hasMore: items.length > 0 && next * 100 < total,
+      this.setData({ papers, total, page: next, hasMore: items.length > 0 && next * CATALOG_PAGE_SIZE < total,
         subjects: ['全部科目', ...Array.from(new Set(papers.map(item => item.subject)))] });
       this.applyFilters();
     } catch (error) {
@@ -150,4 +153,4 @@ Component(withPrimaryPanel('papers', withAppearance({
   onFullPractice() { this.setData({ quick: false }); },
 
   onBack() { navigation.navigateBack(); },
-})));
+}))));

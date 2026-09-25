@@ -1,3 +1,4 @@
+import { withAppShare } from '../../domain/app-share';
 import { normalizePairs, pairLabel } from '../../domain/pc-practice';
 import { navigation } from "../../domain/navigation";
 import { withAppearance } from '../../domain/appearance-page';
@@ -40,7 +41,7 @@ async function executeRevengeWrite(job: SyncJob) {
   throw new Error(`不支持的错题同步操作: ${job.action}`);
 }
 
-Page(withAppearance({
+Page(withAppearance(withAppShare({
   syncCoordinator: null as any,
   data: {
     statusBarHeight: 24,
@@ -271,4 +272,4 @@ Page(withAppearance({
 
   onBack() { if (!this.data.busy) navigation.navigateBack({ fail: () => this.onHome() }); },
   onHome() { navigation.switchTab({ url: '/pages/home/index' }); },
-}));
+})));

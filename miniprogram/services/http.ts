@@ -2,13 +2,19 @@ import { getApiBaseUrl } from '../config/index';
 import { clearSession, getSessionToken } from './session';
 
 export class ApiError extends Error {
+  readonly statusCode: number;
+  readonly code: string;
+  readonly detail?: unknown;
   constructor(
     message: string,
-    public readonly statusCode: number,
-    public readonly code = 'REQUEST_FAILED',
-    public readonly detail?: unknown,
+    statusCode: number,
+    code = 'REQUEST_FAILED',
+    detail?: unknown,
   ) {
     super(message);
+    this.statusCode = statusCode;
+    this.code = code;
+    this.detail = detail;
   }
 }
 
@@ -31,20 +37,30 @@ function errorParts(payload: any): { code: string; message: string } {
   return { code: 'REQUEST_FAILED', message: String(detail || '请求失败，请重试') };
 }
 
+const pendingReads = new Map<string, Promise<any>>();
+
 export function request<T>(options: RequestOptions): Promise<T> {
   const token = getSessionToken();
   const headers: Record<string, string> = { 'content-type': 'application/json' };
   if (options.auth !== false && token) headers.Authorization = `Bearer ${token}`;
   if (options.idempotencyKey) headers['Idempotency-Key'] = options.idempotencyKey;
 
-  return new Promise((resolve, reject) => {
+  const url = `${getApiBaseUrl()}${options.path}`;
+  const readKey = (options.method || 'GET') === 'GET' && options.data === undefined && !options.idempotencyKey
+    ? JSON.stringify([url, options.auth === false ? 'public' : token]) : '';
+  if (readKey && pendingReads.has(readKey)) return pendingReads.get(readKey)!;
+  const pending = new Promise<T>((resolve, reject) => {
     wx.request({
-      url: `${getApiBaseUrl()}${options.path}`,
+      url,
       method: options.method || 'GET',
       data: options.data,
       header: headers,
       timeout: 12000,
       success: (response: { statusCode: number; data: any }) => {
+        if (options.auth !== false && token !== getSessionToken()) {
+          reject(new ApiError('登录状态已变更，请重新加载', 401, 'SESSION_CHANGED'));
+          return;
+        }
         if (response.statusCode >= 200 && response.statusCode < 300) {
           resolve(response.data as T);
           return;
@@ -65,6 +81,12 @@ export function request<T>(options: RequestOptions): Promise<T> {
       },
     });
   });
+  if (readKey) {
+    pendingReads.set(readKey, pending);
+    const clear = () => { if (pendingReads.get(readKey) === pending) pendingReads.delete(readKey); };
+    pending.then(clear, clear);
+  }
+  return pending;
 }
 
 export function messageOf(error: unknown): string {

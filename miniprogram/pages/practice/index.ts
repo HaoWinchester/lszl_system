@@ -1,3 +1,4 @@
+import { withAppShare } from '../../domain/app-share';
 import { navigation } from "../../domain/navigation";
 import { withAppearance } from '../../domain/appearance-page';
 import { showDialog } from '../../domain/dialog';
@@ -36,7 +37,7 @@ function draftFor(session: PracticeSession, username: string, currentIndex: numb
   return { sessionId: session.id, username, revision: session.revision, currentIndex, answers, markedQuestionIds: marked, savedAt: Date.now() };
 }
 
-Page(withAppearance({
+Page(withAppearance(withAppShare({
   timerId: 0 as any,
   timerStartedAt: 0,
   timerDeadline: 0,
@@ -582,4 +583,4 @@ Page(withAppearance({
     this.timerStartedAt = 0;
   },
   onUnload() { this.unloaded = true; this.stopModeTimer(); clearTimeout(this.feedbackTimer); },
-}));
+})));

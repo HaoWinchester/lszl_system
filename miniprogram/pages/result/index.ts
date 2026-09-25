@@ -1,3 +1,4 @@
+import { withAppShare } from '../../domain/app-share';
 import { navigation, returnToPage } from "../../domain/navigation";
 import { withAppearance } from '../../domain/appearance-page';
 import { messageOf } from '../../services/http';
@@ -34,7 +35,7 @@ function reviewRows(session: PracticeSession, filter: string) {
   }).filter(item => filter === 'all' || item.needsReview);
 }
 
-Page(withAppearance({
+Page(withAppearance(withAppShare({
   data: {
     statusBarHeight: 24,
     loading: true,
@@ -154,4 +155,4 @@ Page(withAppearance({
 
   onBack() { returnToPage('/pages/history/index'); },
   onHome() { navigation.switchTab({ url: '/pages/home/index' }); },
-}));
+})));

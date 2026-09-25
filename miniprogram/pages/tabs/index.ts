@@ -1,7 +1,8 @@
+import { withAppShare } from '../../domain/app-share';
 import { withAppearance } from '../../domain/appearance-page';
 import { PRIMARY_TABS } from '../../domain/primary-tabs';
 
-Page(withAppearance({
+Page(withAppearance(withAppShare({
   data: { activeTab: 0 },
   scrollPositions: {} as Record<number, number>,
   onLoad(query: Record<string, string> = {}) {
@@ -49,4 +50,4 @@ Page(withAppearance({
     else wx.stopPullDownRefresh();
   },
   onReachBottom() { this.selectComponent(`#panel-${this.data.activeTab}`)?.onReachBottom?.(); },
-}));
+})));

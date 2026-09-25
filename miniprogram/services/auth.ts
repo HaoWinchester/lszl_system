@@ -16,30 +16,44 @@ interface SessionResponse {
 }
 
 function clientMetadata(): Record<string, string> {
-  const device = wx.getDeviceInfo();
-  const appInfo = wx.getAppBaseInfo();
+  // Optional diagnostics must not prevent authentication on restricted devices.
+  let device: any = {}, appInfo: any = {};
+  try { device = wx.getDeviceInfo?.() || {}; } catch {}
+  try { appInfo = wx.getAppBaseInfo?.() || {}; } catch {}
   return {
-    platform: String(device.platform || ''),
-    model: String(device.model || ''),
-    system: String(device.system || ''),
-    version: String(appInfo.version || ''),
+    platform: String(device.platform || '').slice(0, 32),
+    model: String(device.model || '').slice(0, 80),
+    system: String(device.system || '').slice(0, 80),
+    version: String(appInfo.version || '').slice(0, 32),
   };
 }
 
 function remember(result: SessionResponse): AuthState {
+  if (result?.status !== 'authenticated' || typeof result.token !== 'string' || !result.token.trim()
+    || typeof result.user?.username !== 'string' || !result.user.username.trim()) {
+    throw new ApiError('登录服务返回信息不完整，请重试', 0, 'INVALID_AUTH_RESPONSE');
+  }
   setSession(result.token, result.user);
   return result;
 }
 
 export async function loginWithWechat(): Promise<AuthState> {
-  const { code } = await wx.login();
+  let login: { code?: string };
+  try { login = await wx.login({ timeout: 12000 }); }
+  catch { throw new ApiError('微信登录未完成，请检查网络后重试', 0, 'WECHAT_LOGIN_FAILED'); }
+  const code = login?.code;
+  if (typeof code !== 'string' || !code.trim()) {
+    throw new ApiError('未获取到微信登录凭证，请重试', 0, 'WECHAT_CODE_MISSING');
+  }
   const result = await request<AuthState>({
     path: '/api/v1/auth/mini/wechat/login',
     method: 'POST',
     auth: false,
     data: { code, client: clientMetadata() },
   });
-  return result.status === 'authenticated' ? remember(result as SessionResponse) : result;
+  if (result?.status === 'authenticated') return remember(result as SessionResponse);
+  if (result?.status === 'binding_required' && typeof result.bindingTicket === 'string' && result.bindingTicket.trim()) return result;
+  throw new ApiError('登录服务返回信息不完整，请重试', 0, 'INVALID_AUTH_RESPONSE');
 }
 
 export async function bindExistingAccount(
@@ -90,7 +104,7 @@ export async function validateSession(): Promise<MiniUser | null> {
     const response = await request<{ user: MiniUser }>({ path: '/api/v1/auth/mini/session' });
     return response.user;
   } catch (error) {
-    if (error instanceof ApiError && error.statusCode === 401) return null;
+    if (error instanceof ApiError && error.statusCode === 401 && error.code !== 'SESSION_CHANGED') return null;
     throw error;
   }
 }

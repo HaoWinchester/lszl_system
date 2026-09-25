@@ -3,6 +3,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { join } from 'node:path';
 import { pageRefreshMode } from '../../domain/page-freshness.ts';
 import { PRIMARY_TABS } from '../../domain/primary-tabs.ts';
+import { withAppShare } from '../../domain/app-share.ts';
+import { loadSections } from '../../domain/load-sections.ts';
 import { MODE_POLICIES } from '../../domain/mode-policy.ts';
 
 export async function loadModule(file, dependencies, exports) {
@@ -44,7 +46,7 @@ export async function loadPage(name, dependencies = {}, wxOverrides = {}) {
   const host = {
     Date, Promise, Set, Map, Object, String, Number, Error, JSON, Math,
     setInterval: () => 1, clearInterval() {}, setTimeout: () => 1,
-    PRIMARY_TABS, MODE_POLICIES, pageRefreshMode, wx, withPrimaryPanel: (_key, options) => options, showDialog: options => wx.showModal(options), ...dependencies,
+    PRIMARY_TABS, MODE_POLICIES, pageRefreshMode, loadSections, withAppShare, wx, withPrimaryPanel: (_key, options) => options, showDialog: options => wx.showModal(options), ...dependencies,
     Page(options) { page = options; page.setData = (values, done) => { Object.assign(page.data, values); done?.(); }; },
     Component(options) { page = options; page.setData = (values, done) => { Object.assign(page.data, values); done?.(); }; },
   };
