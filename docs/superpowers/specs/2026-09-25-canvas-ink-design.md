@@ -14,7 +14,7 @@
 - 多题画布使用 `65-canvas-workspace-store.js`、`77-multi-question-workspace.js` 和同步层 `canvas-workspace-adapter.js`，已有画布历史操作及数据库 JSONB payload。
 - 正式环境为 https://lszl.aihuanpu.com 。通过显式服务器地址解析的 HTTPS 健康检查成功；管理员反馈接口要求登录。SSH 连接超时，现有浏览器会话未取得管理员登录状态，文档默认账号登录返回用户名或密码错误。
 - 本地 `kg_graph_dev.feedback` 只读查询结果为 0 条，不能据此认定线上没有反馈。
-- 未读取到真实反馈内容，因此现在不能按用户反馈作优先级判断。尚未修改反馈状态或回复用户。
+- 后续使用用户授权账号已读取正式反馈 6 条；评审见 `docs/verification/2026-09-25-user-feedback-review.md`。未修改反馈状态或回复用户。
 - 参考：[博思白板官方画板说明](https://boardmix.cn/online-board/)：提供画笔类型、颜色、粗细等设置。本次仅采纳用户指定的两类笔和颜色、粗细设置。
 
 ## 方案比较

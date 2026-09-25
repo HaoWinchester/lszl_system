@@ -147,6 +147,7 @@
     sessionHighlights:new Map(),
     fontScale:'large',
     pointerMode:'edit',
+    ink:null,
     temporaryPanMode:false,
     temporaryPanReasons:new Set(),
     rightPanPointerId:null,
@@ -253,10 +254,14 @@
       return !!global.KGAuthCore?.currentUsername?.();
     }catch(e){return false}
   }
+  function hasWorkspaceWriteAccess(){
+    const role=global.KGRolePermissions?.currentRole?.()||global.KGAuthCore?.currentUser?.()?.role;
+    return loggedIn()&&role!=='viewer';
+  }
   function resolvedPolicy(){
     const base=global.KGCanvasPolicy?.presets?.synthesis?.()||{};
     if(state.mobile)return global.KGCanvasPolicy?.presets?.mobileReadonly?.(base)||base;
-    if(!loggedIn()){
+    if(!hasWorkspaceWriteAccess()){
       return global.KGCanvasPolicy?.merge?.(base,{
         readonly:true,
         editable:false,
@@ -354,7 +359,7 @@
 
   function updateReadonly(){
     state.mobile=isMobile();
-    state.readonly=state.mobile||!loggedIn();
+    state.readonly=state.mobile||!hasWorkspaceWriteAccess();
     state.kernel?.replacePolicy?.(resolvedPolicy());
     state.kernel?.setMobile?.(state.mobile);
     document.body.dataset.qwMobile=state.mobile?'1':'0';
@@ -372,12 +377,13 @@
       state.viewport?.classList.remove('is-panning');
     }
     updateLayoutToolbar();
+    state.ink?.render();
     return state.readonly;
   }
   function canEdit(message='登录后的桌面端才能编辑多题画布。'){
     updateReadonly();
     if(!state.readonly)return true;
-    if(!loggedIn()){
+    if(!hasWorkspaceWriteAccess()){
       try{if(typeof authOpen==='function')authOpen(message)}catch(e){}
     }else notify('移动端仅支持查看多题画布。');
     return false;
@@ -3856,6 +3862,7 @@
     renderQuestionDock();
     renderMinimap();
     scheduleLayoutDiagnosis(40);
+    state.ink?.render();
     return nodes.length;
   }
   function refreshProgress(){
@@ -3901,6 +3908,7 @@
   }
   function loadWorkspace(workspaceId,options={}){
     workspaceId=String(workspaceId||'');
+    state.ink?.cancel();state.ink?.setTool('select');
     state.sessionHighlights.clear();
     closeAnalysisPanel();
     clearOptionTransientState();
@@ -3984,12 +3992,12 @@
     }catch(e){}
     return renameWorkspaceTo(workspaceId,title);
   }
-  function manualSaveWorkspace(){
+  async function manualSaveWorkspace(){
     if(!state.workspaceId)return false;
     const latest=store()?.ensure?.(workspaceOptions())||state.workspace;
     if(!latest)return false;
     const saved=store()?.write?.(latest,{reason:'manual-save'});
-    if(saved){state.workspace=saved;return saved}
+    if(saved){state.workspace=saved;await global.KGCanvasWorkspaceAdapter?.flush?.({throwOnError:true});return saved}
     return false;
   }
 
@@ -4488,6 +4496,7 @@
     updatePointerModeUI();
   }
   function setPointerMode(mode,announce=false){
+    if(mode==='pan')state.ink?.setTool('select');
     state.pointerMode=mode==='pan'?'pan':'edit';
     state.temporaryPanReasons.clear();
     state.temporaryPanMode=false;
@@ -4968,7 +4977,7 @@
     if(state.mobile)return;
     // P4.5.36：解析面板内滚轮留给面板内容原生滚动（qw-analysis-content overflow:auto），
     // 不再触发画布缩放。
-    if(event.target.closest?.('.qw-question-drawer,.qw-analysis-panel'))return;
+    if(event.target.closest?.('.qw-question-drawer,.qw-analysis-panel,.canvas-ink-toolbar'))return;
     const preserveSelectionLock=hasLockedSelectionBounds();
     event.preventDefault();
     beginViewportMotion('zoom');
@@ -5084,11 +5093,11 @@
     state.contextMenu=factory.create({
       stage:state.viewport,
       actions:['refresh'],
-      onAction:detail=>{
+      onAction:async detail=>{
         if(detail?.action!=='refresh')return;
         clearOptionTransientState();
         saveViewport();
-        manualSaveWorkspace();
+        try{await manualSaveWorkspace()}catch(error){notify(error.message);return}
         global.KGLearningProgress?.flush?.('multi_question_canvas');
         global.location.reload();
       }
@@ -5101,7 +5110,7 @@
     menu.show({clientX:event.clientX,clientY:event.clientY,context:{type:'canvas',canPaste:false}});return true;
   }
   function isSelectionLockControlTarget(target){
-    return !!target?.closest?.('#qwSelectionToolbar,.uc-selection-filter-wrap,.uc-selection-filter,.qw-edge-quick-menu,.qw-edge-inline-editor,.qw-overlay,.lp-canvas-zoom-dock,.qw-bottom-right-dock,.qw-help-popover,.qw-question-drawer,.qw-diagnostics-panel,.qw-analysis-panel,[data-canvas-ui],[data-stage-ui]');
+    return !!target?.closest?.('#qwSelectionToolbar,.uc-selection-filter-wrap,.uc-selection-filter,.qw-edge-quick-menu,.qw-edge-inline-editor,.qw-overlay,.lp-canvas-zoom-dock,.qw-bottom-right-dock,.qw-help-popover,.qw-question-drawer,.qw-diagnostics-panel,.qw-analysis-panel,.canvas-ink-toolbar,[data-canvas-ui],[data-stage-ui]');
   }
   function beginLockedSelectionPointer(event){
     if(!hasLockedSelectionBounds()||isSelectionLockControlTarget(event.target))return false;
@@ -5631,7 +5640,7 @@
     state.analysisLayer=byId('qwAnalysisLayer');
     if(!state.viewport||!state.world||!state.nodeLayer){state.initializing=false;return}
     state.mobile=isMobile();
-    state.readonly=state.mobile||!loggedIn();
+    state.readonly=state.mobile||!hasWorkspaceWriteAccess();
     createKernel();
     state.initialized=true;
     state.initializing=false;
@@ -5661,6 +5670,19 @@
     const workspace=store()?.ensure?.({workspaceId:requested,activate:true});
     state.workspaceId=workspace?.id||requested;
     initUnifiedCanvasRuntime();
+    state.ink=global.KGCanvasInk?.create?.({
+      viewport:state.viewport,world:state.world,history:state.kernel.history,
+      getViewport:()=>({x:state.panX,y:state.panY,scale:state.zoom}),
+      getStrokes:()=>state.workspace?.strokes||[],isReadonly:()=>state.readonly||!state.workspace,
+      setStrokes:strokes=>{
+        if(!state.workspace||state.readonly)throw new Error('当前画布不能编辑');
+        state.suppressStoreEvent=true;
+        try{state.workspace=store().write({...state.workspace,strokes},{reason:'canvas-ink'})}finally{state.suppressStoreEvent=false}
+        global.KGMultiQuestionWorkspaceFilebar?.render?.(state.workspace);
+      },
+      onError:notify,onDrawMode:()=>{setPointerMode('edit');clearCardSelection();clearEdgeSelection();setActiveGroup('')}
+    });
+    global.KGWorkspaceInk=state.ink;
     bind();
     loadWorkspace(state.workspaceId,{focusNodeId});
   }
