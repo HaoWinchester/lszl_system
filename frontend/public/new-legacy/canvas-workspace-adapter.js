@@ -9,6 +9,13 @@
   const inFlight = new Map()
   const pending = new Map()
   const timers = new Map()
+  const states = new Map()
+  const sequences = new Map()
+  function getState(id) { return { ...(states.get(String(id || '')) || { status: 'idle', error: '' }) } }
+  function setState(id, status, error = '') {
+    states.set(id, { status, error: String(error?.message || error || '') })
+    global.dispatchEvent?.(new CustomEvent('kg-workspace-save-state', { detail: { workspaceId: id, ...getState(id) } }))
+  }
   let hydrating = true
   let leaving = false
 
@@ -84,13 +91,20 @@
     const workspace = pending.get(id)
     pending.delete(id)
     if (!workspace) return null
+    const sequence = sequences.get(id)
+    setState(id, 'saving')
     const previous = inFlight.get(id) || Promise.resolve()
     const operation = previous.catch(() => null).then(() => persistWorkspace(workspace, options))
     inFlight.set(id, operation)
     try {
-      return await operation
+      const result = await operation
+      if (sequences.get(id) === sequence) setState(id, 'saved')
+      return result
     } catch (error) {
-      pending.set(id, workspace)
+      if (sequences.get(id) === sequence) {
+        pending.set(id, workspace)
+        setState(id, 'failed', error)
+      }
       if (!options.silent && !leaving) console.error('[CanvasWorkspaceAdapter] save failed:', error)
       return null
     } finally {
@@ -101,7 +115,9 @@
   function enqueue(workspace, immediate = false) {
     const id = String(workspace?.id || '')
     if (!id) return
+    sequences.set(id, (sequences.get(id) || 0) + 1)
     pending.set(id, JSON.parse(JSON.stringify(workspace)))
+    setState(id, 'pending')
     clearTimeout(timers.get(id))
     if (immediate) void flushOne(id)
     else timers.set(id, setTimeout(() => void flushOne(id), 350))
@@ -113,6 +129,8 @@
     clearTimeout(timers.get(id))
     timers.delete(id)
     pending.delete(id)
+    sequences.set(id, (sequences.get(id) || 0) + 1)
+    states.delete(id)
     const activeWrite = inFlight.get(id)
     if (activeWrite) await activeWrite.catch(() => null)
     const remoteId = remoteIds.get(id)
@@ -161,16 +179,17 @@
   async function flush(options = {}) {
     const queuedWrites = [...pending.keys()].map(id => flushOne(id, options))
     await Promise.all(queuedWrites)
-    return Promise.all([...inFlight.values()].map(write => write.catch(() => null)))
+    const results = await Promise.all([...inFlight.values()].map(write => write.catch(() => null)))
+    if (options.throwOnError && [...states.values()].some(state => state.status === 'failed')) throw new Error('画布尚未保存到服务器，请检查网络后点击保存重试。')
+    return results
   }
   // Browsers may cancel a keepalive write while the document is being discarded.
-  // The canonical store has already retained the pending workspace locally, so an
-  // unload cancellation is expected recovery state rather than a console error.
+  // Failed writes remain pending in this page; never report them as saved.
   global.addEventListener?.('pagehide', () => {
     leaving = true
     void flush({ keepalive: true, silent: true })
     unsubscribe?.()
   })
   global.addEventListener?.('pageshow', () => { leaving = false })
-  global.KGCanvasWorkspaceAdapter = Object.freeze({ ready, flush, refresh: hydrate })
+  global.KGCanvasWorkspaceAdapter = Object.freeze({ ready, flush, getState, refresh: hydrate })
 })(window)

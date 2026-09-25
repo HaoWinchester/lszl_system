@@ -4,7 +4,11 @@
   "toVersion": "v9.0-p4.1.234",
   "changes": {
     "added": [],
-    "changed": [],
+    "changed": [
+      "src/86-knowledge-recall.js",
+      "tests/canvas-ink-browser.py",
+      "tests/helpers/canvas_ink_server.py"
+    ],
     "removed": []
   },
   "incompatible": []

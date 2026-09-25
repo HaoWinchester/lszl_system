@@ -77,6 +77,7 @@
       viewport:{x:0,y:0,zoom:1},
       nodes:{},
       edges:[],
+      strokes:[],
       groups:[],
       createdAt,
       updatedAt:createdAt
@@ -241,6 +242,7 @@
       },
       nodes,
       edges,
+      strokes:global.KGCanvasInk?global.KGCanvasInk.normalize(value.strokes):clone(value.strokes||[]),
       groups:(Array.isArray(value.groups)?value.groups:[]).map(normalizeGroup).map(group=>({...group,nodeIds:group.nodeIds.filter(id=>nodes[id])})).filter(group=>group.nodeIds.length),
       createdAt:Number(value.createdAt||base.createdAt),
       updatedAt:Number(value.updatedAt||base.updatedAt)

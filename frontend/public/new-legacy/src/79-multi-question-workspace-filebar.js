@@ -65,6 +65,9 @@
   }
   function renderSaveState(next){
     if(next)status={...status,...next};
+    const remote=global.KGCanvasWorkspaceAdapter?.getState?.(workspace()?.id);
+    if(remote?.status==='failed')status={dirty:true,saving:false,lastError:remote.error||'服务器保存失败'};
+    else if(remote?.status==='pending'||remote?.status==='saving')status={dirty:true,saving:remote.status==='saving',lastError:''};
     const el=byId('qwWorkspaceSaveState');if(!el)return status;
     const saving=!!status.saving,dirty=!!status.dirty,error=!!status.lastError;
     el.classList.toggle('is-dirty',dirty&&!saving&&!error);
@@ -89,6 +92,7 @@
     chip.title=title+' · 双击修改画布名称';
     chip.setAttribute('aria-label',`当前画布：${title}。双击修改名称`);
     if(!byId('qwWorkspaceGlobalSearchPanel')?.hidden)renderSearchResults(byId('qwWorkspaceGlobalSearchInput')?.value||'');
+    renderSaveState();
     return current;
   }
   function finishTitleEdit(commit=true){
@@ -144,6 +148,10 @@
   }
   function bind(){
     if(bound)return;bound=true;
+    global.addEventListener?.('kg-workspace-save-state',event=>{
+      if(String(event.detail?.workspaceId)!==String(workspace()?.id))return;
+      if(event.detail.status==='saved')markSaved();else renderSaveState();
+    });
     const chip=byId('qwWorkspaceChip');
     chip?.addEventListener('dblclick',event=>{event.preventDefault();event.stopPropagation();openTitleEdit()});
     chip?.addEventListener('keydown',event=>{

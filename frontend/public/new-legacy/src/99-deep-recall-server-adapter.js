@@ -35,6 +35,7 @@
     const progress=session?.progress&&typeof session.progress==='object'?session.progress:{};
     return {
       nodes:Array.isArray(progress.nodes)?clone(progress.nodes):[],
+      strokes:Array.isArray(progress.strokes)?clone(progress.strokes):[],
       edges:Array.isArray(progress.edges)?clone(progress.edges):[],
       customNodes:progress.customNodes&&typeof progress.customNodes==='object'?clone(progress.customNodes):{},
       activeKeywords:Array.isArray(progress.activeKeywords)?clone(progress.activeKeywords):[],
@@ -49,6 +50,7 @@
     const value=graph&&typeof graph==='object'?graph:{};
     return {
       nodes:Array.isArray(value.nodes)?clone(value.nodes):[],
+      strokes:Array.isArray(value.strokes)?clone(value.strokes):[],
       edges:Array.isArray(value.edges)?clone(value.edges):[],
       customNodes:value.customNodes&&typeof value.customNodes==='object'?clone(value.customNodes):{},
       activeKeywords:Array.isArray(value.activeKeywords)?clone(value.activeKeywords):[],
@@ -125,6 +127,7 @@
         libraryHash,
         graphSchemaVersion:pending.graphSchemaVersion,
         nodes:pending.nodes,
+        strokes:pending.strokes,
         edges:pending.edges,
         customNodes:pending.customNodes,
         activeKeywords:pending.activeKeywords,
@@ -185,7 +188,7 @@
         targetQuestionRevision:Number(state.session.currentQuestion?.revision)||1
       };
       try{
-        const saved=await send(`/api/v1/recall/progress/${questionPath(id)}${releaseQuery}/reset`,{
+        const saved=await send(`/api/v1/recall/progress/${questionPath(id)}/reset${releaseQuery}`,{
           method:'POST',
           body:JSON.stringify(body)
         });
