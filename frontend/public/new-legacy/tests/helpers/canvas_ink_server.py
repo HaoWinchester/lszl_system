@@ -2,6 +2,8 @@
 from __future__ import annotations
 import argparse
 import asyncio
+from contextlib import contextmanager
+import signal
 import importlib.util
 import os
 from pathlib import Path
@@ -50,9 +52,26 @@ async def seed():
         db.add(CanvasWorkspace(id='viewer-workspace',owner_id='ink-viewer',title='只读笔迹',schema_version=10,payload={'id':'viewer-workspace','title':'只读笔迹','schemaVersion':10,'nodes':{},'edges':[],'groups':[],'strokes':[stroke]}))
         await db.commit()
 
+class DisposableServer(uvicorn.Server):
+    @contextmanager
+    def capture_signals(self):
+        # Uvicorn normally re-raises SIGTERM after graceful shutdown, bypassing
+        # Python atexit. Keep its graceful handler but return to our cleanup.
+        signals=(signal.SIGINT,signal.SIGTERM)
+        previous={sig:signal.signal(sig,self.handle_exit) for sig in signals}
+        try:
+            yield
+        finally:
+            for sig,handler in previous.items():
+                signal.signal(sig,handler)
+
 if __name__ == '__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--port',type=int,default=5189)
     args=parser.parse_args()
     asyncio.run(seed())
-    uvicorn.run(app,host='127.0.0.1',port=args.port,log_level='warning')
+    try:
+        DisposableServer(uvicorn.Config(app,host='127.0.0.1',port=args.port,log_level='warning')).run()
+    finally:
+        asyncio.run(fixture.engine.dispose())
+        fixture._drop_test_database()

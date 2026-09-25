@@ -1,15 +1,14 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.236",
-  "toVersion": "v9.0-p4.1.237",
+  "fromVersion": "v9.0-p4.1.237",
+  "toVersion": "v9.0-p4.1.238",
   "changes": {
     "added": [],
     "changed": [
       "VERSION",
-      "src/77-multi-question-workspace.js",
-      "src/86-knowledge-recall.js",
-      "tests/canvas-ink-browser.py",
-      "tests/canvas-ink-navigation.test.js"
+      "src/canvas/94-canvas-ink.js",
+      "tests/canvas-ink-controller-browser.py",
+      "tests/helpers/canvas_ink_server.py"
     ],
     "removed": []
   },
