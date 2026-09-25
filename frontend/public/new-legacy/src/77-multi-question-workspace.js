@@ -166,6 +166,8 @@
     dragLeaveTimer:null,
     mobile:false,
     readonly:false,
+    workspaceTransition:false,
+    workspaceSession:0,
     suppressStoreEvent:false,
     worldWidth:WORLD_WIDTH,
     worldHeight:WORLD_HEIGHT
@@ -261,7 +263,7 @@
   function resolvedPolicy(){
     const base=global.KGCanvasPolicy?.presets?.synthesis?.()||{};
     if(state.mobile)return global.KGCanvasPolicy?.presets?.mobileReadonly?.(base)||base;
-    if(!hasWorkspaceWriteAccess()){
+    if(state.workspaceTransition||!hasWorkspaceWriteAccess()){
       return global.KGCanvasPolicy?.merge?.(base,{
         readonly:true,
         editable:false,
@@ -309,7 +311,7 @@
         if(!state.selectionToolbarSuppressed)scheduleSelectionToolbarPosition();
       },
       onViewportPersist(next){
-        if(state.mobile||!state.workspaceId)return;
+        if(state.workspaceTransition||state.mobile||!state.workspaceId)return;
         state.suppressStoreEvent=true;
         global.KGMultiQuestionWorkspaceFilebar?.markSaving?.();
         try{
@@ -359,7 +361,7 @@
 
   function updateReadonly(){
     state.mobile=isMobile();
-    state.readonly=state.mobile||!hasWorkspaceWriteAccess();
+    state.readonly=state.workspaceTransition||state.mobile||!hasWorkspaceWriteAccess();
     state.kernel?.replacePolicy?.(resolvedPolicy());
     state.kernel?.setMobile?.(state.mobile);
     document.body.dataset.qwMobile=state.mobile?'1':'0';
@@ -381,6 +383,7 @@
     return state.readonly;
   }
   function canEdit(message='登录后的桌面端才能编辑多题画布。'){
+    if(state.workspaceTransition)return false;
     updateReadonly();
     if(!state.readonly)return true;
     if(!hasWorkspaceWriteAccess()){
@@ -3907,6 +3910,33 @@
     return workspaces;
   }
   function loadWorkspace(workspaceId,options={}){
+    if(state.workspaceTransition)return false;
+    workspaceId=String(workspaceId||'');
+    // Initialization stays synchronous; changing an existing canvas waits for its server writes.
+    if(!state.workspace||!state.workspaceId||state.workspaceId===workspaceId)return activateWorkspace(workspaceId,options);
+    const previousId=state.workspaceId,session=state.workspaceSession,shouldSave=!state.readonly;
+    if(state.inlineEdit?.finish)state.inlineEdit.finish(true);
+    state.workspaceTransition=true;
+    state.ink?.cancel();state.ink?.setTool('select');
+    state.gesture=null;state.kernel?.cards?.cancelDrag?.();state.kernel?.selection?.cancel?.();
+    updateReadonly();
+    return (async()=>{
+      try{
+        if(shouldSave)saveViewport();
+        await global.KGCanvasWorkspaceAdapter?.flush?.({throwOnError:true});
+        // An authentication change may already have replaced the active user's canvas.
+        if(state.workspaceId!==previousId||state.workspaceSession!==session)return false;
+        state.workspaceTransition=false;updateReadonly();
+        return activateWorkspace(workspaceId,options);
+      }catch(error){
+        // Closing the active tab marks it closed before invoking this navigation callback.
+        if(state.workspaceId===previousId){global.KGMultiQuestionWorkspaceTabs?.reopen?.(previousId);renderWorkspaceSelector()}
+        notify(error?.message||'当前画布尚未保存，请重试后再切换。');return false;
+      }
+      finally{state.workspaceTransition=false;updateReadonly()}
+    })();
+  }
+  function activateWorkspace(workspaceId,options={}){
     workspaceId=String(workspaceId||'');
     state.ink?.cancel();state.ink?.setTool('select');
     state.sessionHighlights.clear();
@@ -3917,11 +3947,7 @@
     state.answerSync.clear();
     clearCardSelection();
     state.kernel?.history?.clear?.();
-    if(state.workspace&&state.workspaceId&&state.workspaceId!==workspaceId){
-      saveViewport();
-    }else{
-      state.kernel?.viewport?.cancelPersist?.();
-    }
+    state.kernel?.viewport?.cancelPersist?.();
     const workspace=store()?.setActiveWorkspace?.(workspaceId)||store()?.ensure?.({workspaceId});
     if(!workspace)return false;
     state.workspaceId=workspace.id;
@@ -3958,7 +3984,7 @@
       if(entered===null)return null;
       title=String(entered||title).trim()||title;
     }catch(e){}
-    const workspace=store()?.createWorkspace?.(title,{activate:true});
+    const workspace=store()?.createWorkspace?.(title,{activate:false});
     if(workspace){
       global.KGMultiQuestionWorkspaceTabs?.reopen?.(workspace.id);
       loadWorkspace(workspace.id);
@@ -4010,7 +4036,8 @@
     const result=store()?.deleteWorkspace?.(workspaceId);
     if(result){
       global.KGMultiQuestionWorkspaceTabs?.forget?.(workspaceId);
-      if(result.activeWorkspace)loadWorkspace(result.activeWorkspace.id);
+      // The removed workspace must never be saved again while opening its replacement.
+      if(result.activeWorkspace)activateWorkspace(result.activeWorkspace.id);
       else renderWorkspaceSelector();
     }
     return result;
@@ -5558,6 +5585,7 @@
       setTemporaryPanMode(false);
     });
     global.addEventListener('kg-auth-session-change',()=>{
+      state.workspaceSession++;
       updateReadonly();
       invalidateQuestionSources();
       setDefaultHighlightColor(readHighlightColor(),false);
@@ -5569,7 +5597,7 @@
       state.kernel?.history?.clear?.();
       clearCardSelection();
       const workspace=store()?.ensure?.({activate:true});
-      if(workspace)loadWorkspace(workspace.id);
+      if(workspace)activateWorkspace(workspace.id);
       void rebuildQuestionSources();
       refreshPersonalCardReferences();
       if(byId('qwQuestionDrawer')?.classList.contains('open'))renderQuestionDock();

@@ -8,11 +8,9 @@ The optional --base-url must point at helpers/canvas_ink_server.py, never produc
 from __future__ import annotations
 import argparse
 import json
-import os
 from pathlib import Path
 import socket
 import subprocess
-import sys
 import time
 from urllib.parse import urlparse
 from urllib.request import urlopen
@@ -29,9 +27,15 @@ def record(name):
     print('PASS '+name,flush=True)
 
 def stroke_count(page,n):
-    expect(page.locator('.canvas-ink-layer path')).to_have_count(n)
+    try:
+        expect(page.locator('.canvas-ink-layer path')).to_have_count(n)
+    except AssertionError:
+        page.screenshot(path=str(ARTIFACTS/'failure.png'))
+        print(page.evaluate('({url:location.href,tool:document.querySelector("[data-ink-tool][aria-pressed=true]")?.dataset.inkTool})'),flush=True)
+        raise
 
 def draw(page,card,dy=0):
+    page.wait_for_timeout(500)  # Card entry/focus transitions must settle before coordinates are sampled.
     box=page.locator(card).bounding_box()
     assert box,card
     x=box['x']+min(55,box['width']/5)
@@ -65,6 +69,9 @@ def check_page(context,base,kind):
     page.goto(base+(RECALL if kind=='recall' else WORKSPACE),wait_until='networkidle')
     page.wait_for_function('!!window.'+('KGRecallInk' if kind=='recall' else 'KGWorkspaceInk'))
     if kind=='workspace':
+        for name in ('pen','highlighter','select'):
+            page.locator('.canvas-ink-toolbar [data-ink-tool='+name+']').click(timeout=5000)
+        record('workspace: empty-state ink controls are unobstructed')
         page.locator('#qwQuestionDockBtn').click()
         page.locator('[data-add-index]').first.click()
         page.keyboard.press('Escape')
@@ -159,12 +166,16 @@ def check_page(context,base,kind):
     record(kind+': API reads persisted strokes; reload restores exact world paths')
 
     if kind=='recall':
-        page.locator('#krNextQuestionBtn').click()
+        with page.expect_response(lambda response:'/api/v1/recall/session/ink-question-2' in response.url):
+            page.locator('#krNextQuestionBtn').click()
         page.wait_for_url('**questionId=ink-question-2*')
+        page.wait_for_load_state('networkidle')
         stroke_count(page,0)
         expect(tool.locator('[data-ink-action=undo]')).to_be_disabled()
-        page.locator('#krPrevQuestionBtn').click()
+        with page.expect_response(lambda response:'/api/v1/recall/session/ink-question-1' in response.url):
+            page.locator('#krPrevQuestionBtn').click()
         page.wait_for_url('**questionId=ink-question-1*')
+        page.wait_for_load_state('networkidle')
         stroke_count(page,3)
     else:
         old_id=page.evaluate('KGMultiQuestionWorkspace.activeWorkspaceId()')
@@ -222,7 +233,15 @@ def check_viewer(browser,base):
     assert context.request.post(base+'/api/v1/auth/login',data={'username':'ink-viewer','password':'ink-browser-test'}).ok
     for kind,url in [('workspace',WORKSPACE+'&workspace=viewer-workspace'),('recall',RECALL)]:
         page=context.new_page()
+        errors=[]
+        page.on('pageerror',lambda error:errors.append(str(error)))
         page.goto(base+url,wait_until='networkidle')
+        if kind=='recall':
+            expect(page.get_by_text('暂无访问权限')).to_be_visible()
+            assert not errors,errors
+            record('recall: existing viewer restriction denies non-demo question')
+            page.close()
+            continue
         stroke_count(page,1)
         tool=page.locator('.canvas-ink-toolbar')
         for selector in ('[data-ink-tool=pen]','[data-ink-tool=highlighter]','[data-ink-action=clear]'):
@@ -233,9 +252,36 @@ def check_viewer(browser,base):
         if kind=='workspace':
             response=context.request.put(base+'/api/v1/workspaces/viewer-workspace',data={'payload':{'strokes':[]}})
             assert response.status==403,response.text()
+        assert not errors,errors
         record(kind+': actual viewer sees saved stroke but cannot draw/clear')
         page.close()
     context.close()
+
+def check_recall_readonly(context,base):
+    # The existing viewer policy permits only a built-in demo. Exercise the
+    # page's readonly-session branch while keeping real DB ink/read requests.
+    page=context.new_page()
+    errors=[]
+    writes=[]
+    page.on('pageerror',lambda error:errors.append(str(error)))
+    page.on('request',lambda request:writes.append(request.url) if request.method=='PUT' and '/recall/progress/' in request.url else None)
+    def readonly_session(route):
+        response=route.fetch()
+        payload=response.json()
+        payload['permissions'].update(canWrite=False,canReset=False,readOnly=True)
+        route.fulfill(response=response,json=payload)
+    page.route('**/api/v1/recall/session/**',readonly_session)
+    page.goto(base+RECALL,wait_until='networkidle')
+    stroke_count(page,4)
+    for selector in ('[data-ink-tool=pen]','[data-ink-tool=highlighter]','[data-ink-action=clear]'):
+        expect(page.locator('.canvas-ink-toolbar '+selector)).to_be_disabled()
+    draw(page,'#krQuestionCard')
+    stroke_count(page,4)
+    assert not writes,writes
+    assert not errors,errors
+    page.screenshot(path=str(ARTIFACTS/'recall-readonly.png'))
+    record('recall: readonly session preserves saved ink, disables editing, sends no writes')
+    page.close()
 
 def check_recall_reset(context,base):
     page=context.new_page()
@@ -250,9 +296,75 @@ def check_recall_reset(context,base):
     record('recall: reset cancel/confirm clears persisted ink for current release')
     page.close()
 
+def check_switch_save_barriers(context,base,kind):
+    page=context.new_page()
+    errors=[]
+    page.on('pageerror',lambda error:errors.append(str(error)))
+    if kind=='workspace':
+        payload={'id':'ink-switch-target','title':'切换保存测试','schemaVersion':10,'nodes':{},'edges':[],'groups':[],'strokes':[]}
+        response=context.request.post(base+'/api/v1/workspaces',data={'id':'ink-switch-target','title':payload['title'],'schemaVersion':10,'payload':payload})
+        assert response.ok,response.text()
+    page.goto(base+(RECALL if kind=='recall' else WORKSPACE+'&workspace=pmp-pattern-workspace'),wait_until='networkidle')
+    card='#krQuestionCard' if kind=='recall' else '.qw-question-card'
+    tool=page.locator('.canvas-ink-toolbar')
+    old_id='ink-question-1' if kind=='recall' else page.evaluate('KGMultiQuestionWorkspace.activeWorkspaceId()')
+    initial=page.locator('.canvas-ink-layer path').count()
+    pattern='**/api/v1/recall/progress/**' if kind=='recall' else '**/api/v1/workspaces**'
+    def fail(route):
+        if route.request.method=='PUT': route.fulfill(status=503,json={'detail':'Failed switch save'})
+        else: route.continue_()
+    page.route(pattern,fail)
+    tool.locator('[data-ink-tool=pen]').click();draw(page,card)
+    stroke_count(page,initial+1)
+    if kind=='recall':
+        page.locator('#krNextQuestionBtn').click()
+        expect(page.locator('#krSaveRetryBtn')).to_be_visible(timeout=15000)
+        assert 'questionId='+old_id in page.url
+    else:
+        result=page.evaluate("KGMultiQuestionWorkspace.loadWorkspace('ink-switch-target')")
+        assert result is False,result
+        assert page.evaluate('KGMultiQuestionWorkspace.activeWorkspaceId()')==old_id
+    stroke_count(page,initial+1)
+    expect(tool.locator('[data-ink-tool=pen]')).to_be_enabled()
+    page.unroute(pattern,fail)
+    flush(page,kind)
+
+    held=[]
+    release_pending=False
+    def delay(route):
+        if route.request.method=='PUT' and not release_pending: held.append(route)
+        else: route.continue_()
+    page.route(pattern,delay)
+    tool.locator('[data-ink-tool=pen]').click();draw(page,card,15)
+    stroke_count(page,initial+2)
+    if kind=='recall': page.locator('#krNextQuestionBtn').click()
+    else: page.evaluate("void KGMultiQuestionWorkspace.loadWorkspace('ink-switch-target')")
+    for _ in range(100):
+        if held: break
+        page.wait_for_timeout(50)
+    assert held,'Switch did not await a PUT'
+    expect(tool.locator('[data-ink-tool=pen]')).to_be_disabled()
+    draw(page,card,20)
+    stroke_count(page,initial+2)
+    # Resume the genuine server write after verifying the frozen UI.
+    release_pending=True
+    for route in list(held): route.continue_()
+    page.unroute(pattern,delay)
+    if kind=='recall':
+        page.wait_for_url('**questionId=ink-question-2*')
+    else:
+        page.wait_for_function("KGMultiQuestionWorkspace.activeWorkspaceId()==='ink-switch-target'")
+    page.wait_for_load_state('networkidle')
+    stroke_count(page,0)
+    assert len(persisted(context,base,kind))==initial+2
+    assert not errors,errors
+    record(kind+': failed save blocks switching; pending save freezes drawing until durable switch')
+    page.close()
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--base-url')
+    parser.add_argument('--kind',choices=['workspace','recall','all'],default='all')
     parser.add_argument('--backend-python',default=str(ROOT/'backend/.venv/bin/python'))
     parser.add_argument('--chrome',default='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
     args=parser.parse_args()
@@ -279,9 +391,13 @@ def main():
             context=browser.new_context(viewport={'width':1440,'height':1000},has_touch=True)
             login=context.request.post(base+'/api/v1/auth/login',data={'username':'ink-browser','password':'ink-browser-test'})
             assert login.ok,login.text()
-            for kind in ('workspace','recall'): check_page(context,base,kind)
+            for kind in (('workspace','recall') if args.kind=='all' else (args.kind,)): check_page(context,base,kind)
             check_viewer(browser,base)
-            check_recall_reset(context,base)
+            if args.kind in ('all','recall'):
+                check_recall_readonly(context,base)
+                check_recall_reset(context,base)
+            for kind in (('workspace','recall') if args.kind=='all' else (args.kind,)):
+                check_switch_save_barriers(context,base,kind)
             browser.close()
         (ARTIFACTS/'results.json').write_text(json.dumps({'passed':RESULTS},ensure_ascii=False,indent=2))
         print(f'{len(RESULTS)} browser checks passed; screenshots: {ARTIFACTS}',flush=True)

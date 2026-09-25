@@ -17,7 +17,7 @@
   let keywordMatchers=buildKeywordMatchers(rootMap);
   let state={nodes:[],edges:[],strokes:[],lastNewEdgeId:'',lastNewNodeId:'',activeNodeId:null,activeKeywords:[],transform:{x:0,y:0,scale:1},customNodes:{},choiceOffsets:{},metrics:{keywordClicks:0,choiceClicks:0,nodeOpens:0,sessionStartedAt:Date.now()}};
   let isDragging=false,dragStart=null,worldStart=null,panPointerId=null,panButton=0,rightPanStart=null,contextMenuSuppressUntil=0,contextMenu=null,customOpen=false,lastViewportSize=null;
-  let canvasRuntime=null,inkController=null,recallViewportRestored=false;
+  let canvasRuntime=null,inkController=null,recallViewportRestored=false,recallTransitionBusy=false;
   let progressSaveTimer=0,questionSessionToken=0,cardClickTimer=0,searchTimer=0,nodeSearchTimer=0;
   let associationRuntime={subject:'',library:null,nodeCache:new Map(),resolveCache:new Map()};
   let nodeDrag=null,suppressNodeClickUntil=0;
@@ -50,7 +50,22 @@
   ];
 
   function recallQuestionBankId(){return String(question?.sourceCollectionId||question?.sourceReleaseId||question?.sourceBankId||question?.bankId||'')}
-  function isRecallReadonly(){return document.body.classList.contains('kr-readonly')||recallSession?.permissions?.canWrite===false}
+  function isRecallSessionReadonly(){return document.body.classList.contains('kr-readonly')||recallSession?.permissions?.canWrite===false}
+  function isRecallReadonly(){return recallTransitionBusy||isRecallSessionReadonly()}
+  function setRecallTransitionBusy(enabled){
+    recallTransitionBusy=enabled;
+    if(enabled){
+      inkController?.cancel();
+      if(nodeDrag){
+        nodeDrag.button?.classList.remove('is-pressed');nodeDrag.wrap?.classList.remove('is-dragging');
+        try{nodeDrag.button?.releasePointerCapture?.(nodeDrag.pointerId)}catch(_){}
+        nodeDrag=null;
+      }
+      finishCanvasPan(null,true);
+    }
+    setRecallReadonly(document.body.classList.contains('kr-readonly'));
+    updateQuestionNavigator();
+  }
   function isTeacherDraftPreview(){return document.body?.dataset?.recallPreview==='teacher-draft'}
   function notifyRecallReadonly(){
     notifyRecallLimit(recallSession?.versionState==='mismatch'?'当前显示的是旧版本回忆图，只能查看；可重置后按新题继续。':'当前账号只能查看深度回忆。');
@@ -65,7 +80,7 @@
       if(label)label.textContent='访客只读';else status.textContent='访客只读';
       status.setAttribute('aria-label','访客只读模式');
     }
-    ['krResetBtn','krRevealKeywordsBtn'].forEach(id=>{const el=$(id);if(el){const allowVersionReset=id==='krResetBtn'&&recallSession?.versionState==='mismatch'&&recallSession?.permissions?.canReset;const disabled=!!enabled&&!allowVersionReset;el.classList.toggle('kr-readonly-control',disabled);el.setAttribute('aria-disabled',String(disabled));el.disabled=disabled}});
+    ['krResetBtn','krRevealKeywordsBtn'].forEach(id=>{const el=$(id);if(el){const allowVersionReset=id==='krResetBtn'&&recallSession?.versionState==='mismatch'&&recallSession?.permissions?.canReset;const disabled=recallTransitionBusy||(!!enabled&&!allowVersionReset);el.classList.toggle('kr-readonly-control',disabled);el.setAttribute('aria-disabled',String(disabled));el.disabled=disabled}});
   }
   function installRecallReadonlyGuard(){
     if(document.body.dataset.krReadonlyGuardBound)return;
@@ -337,8 +352,8 @@
   function progressPayload(){
     return {nodes:state.nodes,edges:state.edges,strokes:state.strokes,customNodes:state.customNodes,activeKeywords:state.activeKeywords,choiceOffsets:state.choiceOffsets,metrics:state.metrics,graphSchemaVersion:3,transform:{x:Number(state.transform.x)||0,y:Number(state.transform.y)||0,scale:Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,Number(state.transform.scale)||1))},optionState:{selected:String(krOptionState.selected||''),persistent:String(krOptionState.persistent||'')}};
   }
-  async function writeProgressNow(){
-    if(isRecallReadonly()||isTeacherDraftPreview()||!recallAdapter)return false;
+  async function writeProgressNow({allowTransition=false}={}){
+    if(isRecallSessionReadonly()||(recallTransitionBusy&&!allowTransition)||isTeacherDraftPreview()||!recallAdapter)return false;
     if(progressSaveTimer){clearTimeout(progressSaveTimer);progressSaveTimer=0}
     try{
       const saved=Boolean(await recallAdapter.saveGraph(progressPayload()));
@@ -379,15 +394,18 @@
     return false;
   }
   async function resetProgress(){
+    if(recallTransitionBusy)return false;
     const versionReset=recallSession?.versionState==='mismatch'&&recallSession?.permissions?.canReset;
     if(isRecallReadonly()&&!versionReset){notifyRecallReadonly();return}
     if(!confirm('确定清除这道题已回忆的全部知识点和笔迹吗？'))return;
     cancelProgressSave();if(!recallAdapter)return;
+    setRecallTransitionBusy(true);
     try{
       await recallAdapter.resetToCurrent();
       applyServerSession(recallAdapter.getState().session||recallSession,{history:false});
       destroyingNodeIds.clear();state.activeNodeId=null;state.lastNewEdgeId='';state.lastNewNodeId='';hideGuide();renderAll();centerOn(0,0,true);
     }catch(error){notifyRecallLimit(error?.message||'重置失败，请稍后重试。')}
+    finally{setRecallTransitionBusy(false)}
   }
   function isTextEditingTarget(target){
     return Boolean(target?.closest?.('input,textarea,select,[contenteditable="true"],[contenteditable=""]'));
@@ -1345,7 +1363,7 @@
     if(count)count.textContent=context.total?`${position}/${context.total}`:'0/0';
     if(positionEl)positionEl.textContent=context.total?`题目 ${position} / ${context.total}`:'暂无题目';
     const prev=$('krPrevQuestionBtn'),next=$('krNextQuestionBtn');
-    if(prev)prev.disabled=context.total<2;if(next)next.disabled=context.total<2;
+    if(prev)prev.disabled=recallTransitionBusy||context.total<2;if(next)next.disabled=recallTransitionBusy||context.total<2;
   }
   function moveQuestion(delta){
     const context=questionContext();if(!context.bank||!context.total)return false;
@@ -1399,17 +1417,22 @@
     }
   }
   async function switchQuestion(bankId,questionId){
-    inkController?.cancel();
-    if(!isRecallReadonly()&&recallAdapter&&!await flushProgress()){notifyRecallLimit('当前题目尚未保存，请重试保存后再切换。');return false}
-    questionSessionToken+=1;cancelProgressSave();
-    const result=await window.KGRecallQuestionSource?.activate?.(bankId,questionId);if(!result?.valid){notifyRecallLimit((result?.errors||['题目切换失败。']).join('；'));return false}
-    const selected=result.question;questionBrowser.bankId=String(result.collection?.id||result.bank?.id||bankId||selected.sourceCollectionId||'');
-    const routeContext=window.KGLearningRouteContext?.normalize?.({paperId:selected.sourcePaperId,releaseId:selected.sourceReleaseId,bankId:selected.sourceBankId,questionId:selected.id,mode:'deep_recall',returnUrl:window.KGLearningRouteContext?.parse?.({mode:'deep_recall'})?.returnUrl||'index.html'})||{};
-    window.KGLearningRouteContext?.replace?.(routeContext,{target:'knowledge-recall.html'});
-    destroyingNodeIds.clear();inkController?.reset();setRecallReadonly(true);
-    state={nodes:[],edges:[],strokes:[],lastNewEdgeId:'',lastNewNodeId:'',activeNodeId:null,activeKeywords:[],transform:{x:0,y:0,scale:1},customNodes:{},choiceOffsets:{},metrics:{keywordClicks:0,choiceClicks:0,nodeOpens:0,sessionStartedAt:Date.now()}};
-    try{await loadDatabaseSession(selected.id)}catch(error){notifyRecallLimit(error?.message||'题目载入失败。');return false}
-    closeGuide();closeNodeSearch();closeQuestionDrawer();renderAll();setTimeout(()=>{centerOn(0,0,true);playQuestionCardEntry()},30);enforceRecallPermission();return true;
+    if(recallTransitionBusy)return false;
+    const shouldSave=!isRecallReadonly()&&recallAdapter;
+    setRecallTransitionBusy(true);
+    try{
+      if(shouldSave&&!await writeProgressNow({allowTransition:true})){notifyRecallLimit('当前题目尚未保存，请重试保存后再切换。');return false}
+      questionSessionToken+=1;cancelProgressSave();
+      const result=await window.KGRecallQuestionSource?.activate?.(bankId,questionId);if(!result?.valid){notifyRecallLimit((result?.errors||['题目切换失败。']).join('；'));return false}
+      const selected=result.question;questionBrowser.bankId=String(result.collection?.id||result.bank?.id||bankId||selected.sourceCollectionId||'');
+      const routeContext=window.KGLearningRouteContext?.normalize?.({paperId:selected.sourcePaperId,releaseId:selected.sourceReleaseId,bankId:selected.sourceBankId,questionId:selected.id,mode:'deep_recall',returnUrl:window.KGLearningRouteContext?.parse?.({mode:'deep_recall'})?.returnUrl||'index.html'})||{};
+      window.KGLearningRouteContext?.replace?.(routeContext,{target:'knowledge-recall.html'});
+      destroyingNodeIds.clear();inkController?.reset();setRecallReadonly(true);
+      state={nodes:[],edges:[],strokes:[],lastNewEdgeId:'',lastNewNodeId:'',activeNodeId:null,activeKeywords:[],transform:{x:0,y:0,scale:1},customNodes:{},choiceOffsets:{},metrics:{keywordClicks:0,choiceClicks:0,nodeOpens:0,sessionStartedAt:Date.now()}};
+      try{await loadDatabaseSession(selected.id)}catch(error){notifyRecallLimit(error?.message||'题目载入失败。');return false}
+      closeGuide();closeNodeSearch();closeQuestionDrawer();renderAll();setTimeout(()=>{centerOn(0,0,true);playQuestionCardEntry()},30);enforceRecallPermission();return true;
+    }catch(error){notifyRecallLimit(error?.message||'题目切换失败。');return false}
+    finally{setRecallTransitionBusy(false)}
   }
   function bindQuestionDrawer(){
     $('krQuestionListBtn')?.addEventListener('click',openQuestionDrawer);
