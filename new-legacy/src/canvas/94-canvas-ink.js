@@ -50,7 +50,7 @@
     const history=options.history||global.KGCanvasHistoryController?.create({onChange:refreshControls});
     const ownHistory=!options.history;
     const getStrokes=()=>options.getStrokes?.()||[];
-    const inside=target=>target===viewport||world.contains(target);
+    const inside=target=>!target?.closest?.('.qw-analysis-panel,[data-canvas-ui],[data-stage-ui]')&&(target===viewport||world.contains(target));
     const stop=event=>{event.preventDefault();event.stopImmediatePropagation()};
     function listen(target,type,callback,config){target.addEventListener(type,callback,config);listeners.push(()=>target.removeEventListener(type,callback,config))}
     function makePath(stroke){

@@ -20,6 +20,21 @@ with sync_playwright() as pw:
     }''')
     pen=page.get_by_role('button',name='画笔',exact=True)
     pen.click()
+    page.evaluate('''() => {
+      window.overlayClicks=0;
+      for(const [index,attribute] of ['class="qw-analysis-panel"','data-canvas-ui','data-stage-ui'].entries()){
+        const overlay=document.createElement('aside');
+        overlay.innerHTML=`<div ${attribute}><button id="overlay-${index}">关闭面板</button></div>`;
+        Object.assign(overlay.style,{position:'absolute',left:'220px',top:(index*50)+'px'});
+        overlay.querySelector('button').onclick=()=>window.overlayClicks++;
+        document.querySelector('#world').append(overlay);
+      }
+    }''')
+    for index in range(3):
+        page.locator(f'#overlay-{index}').click()
+    assert page.evaluate('overlayClicks')==3
+    assert page.evaluate('strokes.length')==0
+    page.evaluate('panStarts=0')
     page.mouse.move(148,158);page.mouse.down();page.mouse.move(220,190,steps=10);page.mouse.up()
     assert page.evaluate('strokes.length')==1
     assert page.evaluate('strokes[0].points[0]')==[20,25]
