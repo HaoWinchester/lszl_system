@@ -42,6 +42,6 @@ Files: knowledge-recall.html, question-workspace.html; src/86-knowledge-recall.j
 - [x] Run frontend pnpm test and pnpm test:design; backend full tests; inspect screenshots and real persistence in both pages.
 - [x] Review whole feature diff, fix actionable findings, rerun relevant checks; record test results and unresolved limitations.
 - [x] Build and validate v239 using manage-new-legacy update full; compare active/candidate file counts and verify key pages.
-- [ ] Merge feature into uat preserving existing changes; push through proxy and verify remote ref.
-- [ ] Deploy using update-uat.sh and verify remote health/assets (SSH connectivity currently blocked).
-- [ ] Stop at UAT awaiting user business acceptance. Preserve main/uat branches.
+- [x] Merge feature into uat preserving existing changes; push through proxy and verify remote ref.
+- [ ] Deploy using update-uat.sh and verify remote health/assets. BLOCKED: official preflight SSH timed out after 75s, exit255; HTTPS health ok, online stillv236.
+- [x] Stop at UAT boundary; preserve main/uat and feature worktree. Deployment must succeed before user business acceptance; main remains unchanged.
