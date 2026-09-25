@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth import CurrentUser
+from app.core.auth import CanvasWriter, CurrentUser
 from app.core.rate_limit import QuestionRateLimited
 from app.db.session import get_db
 from app.schemas.deep_recall import RecallProgressResetRequest, RecallProgressSaveRequest
@@ -127,7 +127,7 @@ async def recall_library(subject: str, db: DB, user: CurrentUser):
 async def delete_recall(
     question_id: str,
     db: DB,
-    user: CurrentUser,
+    user: CanvasWriter,
     release_id: str = Query("", alias="releaseId", max_length=64),
 ):
     """Compatibility endpoint for older clients; new clients use explicit reset."""

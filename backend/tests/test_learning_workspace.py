@@ -1,5 +1,7 @@
 from uuid import uuid4
 
+import pytest
+
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -110,6 +112,7 @@ def test_workspace_crud_is_owner_isolated() -> None:
 
     assert client_b.get(f"/api/v1/workspaces/{created['id']}").status_code == 404
     assert client_b.put(f"/api/v1/workspaces/{created['id']}", json={"title": "越权"}).status_code == 404
+    assert client_b.delete(f"/api/v1/workspaces/{created['id']}").status_code == 404
 
     listed = client_a.get("/api/v1/workspaces")
     assert listed.status_code == 200
@@ -153,3 +156,44 @@ def test_learning_persistence_requires_authentication() -> None:
     assert client.get("/api/v1/workspaces").status_code == 401
     assert client.get("/api/v1/learning/events").status_code == 401
     assert client.get("/api/v1/training/session/missing").status_code == 401
+
+
+@pytest.mark.parametrize("method", ["POST", "PUT", "DELETE"])
+def test_viewer_cannot_mutate_owned_workspace_via_api(method: str) -> None:
+    username = _name("workspace_readonly")
+    _create_student(username)
+    client = TestClient(app)
+    _login(client, username)
+    payload = {"strokes": [{"id": "ink", "tool": "pen", "color": "#123456", "width": 3, "points": [[1, 2]]}]}
+    created = client.post("/api/v1/workspaces", json={"title": "saved ink", "payload": payload})
+    assert created.status_code == 200, created.text
+    workspace_id = created.json()["workspace"]["id"]
+
+    admin = TestClient(app)
+    _login(admin, "admin", "jbgsnmm~123")
+    changed = admin.put(f"/api/v1/users/{username}", json={"role": "viewer"})
+    assert changed.status_code == 200, changed.text
+    path = "/api/v1/workspaces" if method == "POST" else f"/api/v1/workspaces/{workspace_id}"
+    response = client.request(method, path, json={"title": "changed", "payload": {"strokes": []}})
+    assert response.status_code == 403, response.text
+    loaded = client.get(f"/api/v1/workspaces/{workspace_id}")
+    assert loaded.status_code == 200, loaded.text
+    assert loaded.json()["workspace"]["payload"] == payload
+    assert len(client.get("/api/v1/workspaces").json()["workspaces"]) == 1
+
+
+@pytest.mark.parametrize("role", ["admin", "teacher"])
+def test_privileged_canvas_writers_keep_workspace_crud(role: str) -> None:
+    username = _name("workspace_writer")
+    _create_student(username)
+    admin = TestClient(app)
+    _login(admin, "admin", "jbgsnmm~123")
+    changed = admin.put(f"/api/v1/users/{username}", json={"role": role})
+    assert changed.status_code == 200, changed.text
+    client = TestClient(app)
+    _login(client, username)
+    created = client.post("/api/v1/workspaces", json={"title": "writer", "payload": {"strokes": []}})
+    assert created.status_code == 200, created.text
+    path = f"/api/v1/workspaces/{created.json()['workspace']['id']}"
+    assert client.put(path, json={"title": "updated"}).status_code == 200
+    assert client.delete(path).status_code == 200

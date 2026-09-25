@@ -133,3 +133,6 @@ def require_permissions(*permission_names: str) -> Callable:
 
 # 便捷类型别名
 CurrentUser = Annotated[User, Depends(get_current_user)]
+
+# Shared mutation guard for owned learning canvases.
+CanvasWriter = Annotated[User, Depends(require_role("admin", "teacher", "student"))]

@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth import CurrentUser
+from app.core.auth import CanvasWriter, CurrentUser
 from app.core.rate_limit import QuestionRateLimited
 from app.db.session import get_db
 from app.schemas.personal_card import PersonalCardCreate, PersonalCardUpdate
@@ -506,7 +506,7 @@ async def list_workspaces(db: DB, user: CurrentUser):
 
 
 @router.post("/workspaces")
-async def create_workspace(body: dict, db: DB, user: CurrentUser):
+async def create_workspace(body: dict, db: DB, user: CanvasWriter):
     try:
         workspace = await learning_service.create_workspace(db, user.username, body)
     except ValueError as error:
@@ -523,7 +523,7 @@ async def get_workspace(workspace_id: str, db: DB, user: CurrentUser):
 
 
 @router.put("/workspaces/{workspace_id}")
-async def update_workspace(workspace_id: str, body: dict, db: DB, user: CurrentUser):
+async def update_workspace(workspace_id: str, body: dict, db: DB, user: CanvasWriter):
     try:
         workspace = await learning_service.update_workspace(db, user.username, workspace_id, body)
     except ValueError as error:
@@ -534,7 +534,7 @@ async def update_workspace(workspace_id: str, body: dict, db: DB, user: CurrentU
 
 
 @router.delete("/workspaces/{workspace_id}")
-async def delete_workspace(workspace_id: str, db: DB, user: CurrentUser):
+async def delete_workspace(workspace_id: str, db: DB, user: CanvasWriter):
     if not await learning_service.delete_workspace(db, user.username, workspace_id):
         raise HTTPException(status_code=404, detail="工作区不存在或无权访问")
     return {"ok": True}

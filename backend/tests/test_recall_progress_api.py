@@ -140,3 +140,38 @@ def test_recall_progress_rejects_a_missing_question_without_a_database_error() -
 
     assert response.status_code == 404, response.text
     assert response.json()["detail"]["code"] == "recall_question_not_found"
+
+
+def test_viewer_cannot_delete_saved_recall_through_legacy_api() -> None:
+    username, other = _name("recall_readonly"), _name("recall_nonowner")
+    _create_student(username)
+    _create_student(other)
+    _, question_id = _create_published_question()
+    client = TestClient(app)
+    _login(client, username)
+    session = client.get(f"/api/v1/recall/session/{question_id}").json()
+    strokes = [{"id": "ink", "tool": "pen", "color": "#123456", "width": 3, "points": [[1, 2]]}]
+    saved = client.put(f"/api/v1/recall/progress/{question_id}", json={
+        "expectedRevision": 0,
+        "questionRevision": session["currentQuestion"]["revision"],
+        "libraryHash": session["library"]["contentHash"],
+        "graphSchemaVersion": 3, "nodes": [], "edges": [], "strokes": strokes,
+    })
+    assert saved.status_code == 200, saved.text
+    nonowner = TestClient(app)
+    _login(nonowner, other)
+    assert nonowner.delete(f"/api/v1/recall/progress/{question_id}").json() == {"deleted": False}
+    assert client.get(f"/api/v1/recall/progress/{question_id}").json()["progress"]["strokes"] == strokes
+
+    admin = TestClient(app)
+    _login(admin, "admin", "jbgsnmm~123")
+    changed = admin.put(f"/api/v1/users/{username}", json={"role": "viewer"})
+    assert changed.status_code == 200, changed.text
+    denied = client.delete(f"/api/v1/recall/progress/{question_id}")
+    assert denied.status_code == 403, denied.text
+    assert client.get(f"/api/v1/recall/progress/{question_id}").json()["progress"]["strokes"] == strokes
+
+    restored = admin.put(f"/api/v1/users/{username}", json={"role": "student"})
+    assert restored.status_code == 200, restored.text
+    assert client.delete(f"/api/v1/recall/progress/{question_id}").json() == {"deleted": True}
+    assert client.get(f"/api/v1/recall/progress/{question_id}").json()["progress"] is None
