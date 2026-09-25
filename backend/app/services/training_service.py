@@ -111,6 +111,7 @@ async def get_recall(db: AsyncSession, owner: str, question_id: str) -> dict | N
     return {
         "nodes": r.nodes or [],
         "edges": r.edges or [],
+        "strokes": r.strokes or [],
         "customNodes": r.custom_nodes or {},
         "activeKeywords": r.active_keywords or [],
         "choiceOffsets": r.choice_offsets or {},

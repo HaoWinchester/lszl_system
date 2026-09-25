@@ -94,10 +94,19 @@ def test_workspace_crud_is_owner_isolated() -> None:
 
     created_response = client_a.post(
         "/api/v1/workspaces",
-        json={"title": "我的归纳画布", "schemaVersion": 6, "payload": {"nodes": {}, "edges": [], "groups": []}},
+        json={"title": "我的归纳画布", "schemaVersion": 6, "payload": {"nodes": {}, "edges": [], "groups": [], "strokes": [{"id": "ink-1", "tool": "highlighter", "color": "#ffee00", "width": 16, "points": [[1, 2], [3, 4]]}]}},
     )
     assert created_response.status_code == 200, created_response.text
     created = created_response.json()["workspace"]
+
+    ink = [{"id": "ink-1", "tool": "highlighter", "color": "#ffee00", "width": 16, "points": [[1, 2], [3, 4]]}]
+    assert created["payload"]["strokes"] == ink
+    assert client_a.get(f"/api/v1/workspaces/{created['id']}").json()["workspace"]["payload"]["strokes"] == ink
+    invalid = client_a.put(f"/api/v1/workspaces/{created['id']}", json={"payload": {"strokes": [{**ink[0], "width": 99}]}})
+    assert invalid.status_code == 400
+    assert client_a.get(f"/api/v1/workspaces/{created['id']}").json()["workspace"]["payload"]["strokes"] == ink
+    invalid_create = client_a.post("/api/v1/workspaces", json={"title": "invalid ink", "payload": {"strokes": None}})
+    assert invalid_create.status_code == 400
 
     assert client_b.get(f"/api/v1/workspaces/{created['id']}").status_code == 404
     assert client_b.put(f"/api/v1/workspaces/{created['id']}", json={"title": "越权"}).status_code == 404
@@ -112,6 +121,7 @@ def test_workspace_crud_is_owner_isolated() -> None:
     )
     assert updated_response.status_code == 200, updated_response.text
     assert updated_response.json()["workspace"]["title"] == "更新后的画布"
+    assert "strokes" not in updated_response.json()["workspace"]["payload"]
     assert client_a.delete(f"/api/v1/workspaces/{created['id']}").status_code == 200
     assert client_a.get(f"/api/v1/workspaces/{created['id']}").status_code == 404
 

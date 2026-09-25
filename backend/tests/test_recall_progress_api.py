@@ -56,6 +56,7 @@ def test_recall_progress_persists_the_full_canvas_in_database_and_is_owner_scope
     _create_student(other)
     bank_id, question_id = _create_published_question()
     canvas = {
+        "strokes": [{"id": "ink-1", "tool": "pen", "color": "#123456", "width": 3, "points": [[1, 2], [-3, 4]]}],
         "nodes": [
             {"instanceId": "root", "dataId": "scope-baseline", "x": 0, "y": 0},
             {
@@ -102,6 +103,20 @@ def test_recall_progress_persists_the_full_canvas_in_database_and_is_owner_scope
     isolated = TestClient(app)
     _login(isolated, other)
     assert isolated.get(f"/api/v1/recall/progress/{question_id}").json()["progress"] is None
+    assert isolated.get(f"/api/v1/recall/session/{question_id}").json()["progress"]["strokes"] == []
+
+    restored = reloaded.get(f"/api/v1/recall/session/{question_id}").json()
+    assert restored["progress"]["strokes"] == canvas["strokes"]
+    stale = reloaded.put(f"/api/v1/recall/progress/{question_id}", json={**payload, "strokes": []})
+    assert stale.status_code == 409
+    assert reloaded.get(f"/api/v1/recall/session/{question_id}").json()["progress"]["strokes"] == canvas["strokes"]
+    reset = reloaded.post(f"/api/v1/recall/progress/{question_id}/reset", json={
+        "expectedRevision": saved.json()["revision"],
+        "targetQuestionRevision": session["currentQuestion"]["revision"],
+    })
+    assert reset.status_code == 200, reset.text
+    assert reset.json()["strokes"] == []
+    assert reloaded.get(f"/api/v1/recall/progress/{question_id}").json()["progress"]["strokes"] == []
     assert isolated.get("/api/v1/recall/progress", params=[("question_ids", question_id)]).json()["questionIds"] == []
 
 

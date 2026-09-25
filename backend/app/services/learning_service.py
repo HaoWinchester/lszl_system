@@ -7,6 +7,7 @@ from datetime import timedelta
 from sqlalchemy import case, or_, select, text as sql_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.schemas.canvas_ink import validate_strokes
 from app.core.security import now_utc, uid
 from app.models.question import Question, QuestionBank
 from app.models.paper_release import PaperRelease, PaperReleaseQuestion
@@ -1775,6 +1776,8 @@ def _workspace_values(data: dict) -> tuple[str, int, dict]:
     payload = data.get("payload")
     if not isinstance(payload, dict):
         raise ValueError("工作区 payload 必须是对象")
+    if "strokes" in payload:
+        payload = {**payload, "strokes": validate_strokes(payload["strokes"])}
     return title[:200], version, payload
 
 

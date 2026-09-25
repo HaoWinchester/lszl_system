@@ -5,7 +5,9 @@ from __future__ import annotations
 import math
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from app.schemas.canvas_ink import validate_strokes
 
 
 class RecallTransform(BaseModel):
@@ -31,6 +33,7 @@ class RecallProgressSaveRequest(BaseModel):
     graph_schema_version: int = Field(alias="graphSchemaVersion", ge=1, le=10)
     nodes: list[dict[str, Any]] = Field(max_length=5000)
     edges: list[dict[str, Any]] = Field(max_length=20000)
+    strokes: list[dict[str, Any]] = Field(default_factory=list)
     custom_nodes: dict[str, dict[str, Any]] = Field(
         default_factory=dict,
         alias="customNodes",
@@ -39,6 +42,11 @@ class RecallProgressSaveRequest(BaseModel):
     choice_offsets: dict[str, Any] = Field(default_factory=dict, alias="choiceOffsets")
     transform: RecallTransform = Field(default_factory=RecallTransform)
     metrics: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("strokes", mode="before")
+    @classmethod
+    def validate_ink(cls, value: Any) -> list[dict]:
+        return validate_strokes(value)
 
     @model_validator(mode="after")
     def validate_graph(self) -> "RecallProgressSaveRequest":
