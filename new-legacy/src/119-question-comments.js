@@ -9,9 +9,9 @@
 ;(function (global) {
   const instances = new Set()
   let active = null
-  const preferenceKey = 'kg.questionDiscussion.danmaku'
-  function enabled() { try { return localStorage.getItem(preferenceKey) !== 'off' } catch (_) { return true } }
-  function remember(value) { try { localStorage.setItem(preferenceKey, value ? 'on' : 'off') } catch (_) {} }
+  const preferenceKey = () => 'kg_question_discussion_danmaku_v1__' + encodeURIComponent(currentUser()?.username || 'guest')
+  function enabled() { try { return global.KGDevicePreferences?.getString(preferenceKey(), 'on') !== 'off' } catch (_) { return true } }
+  function remember(value) { try { global.KGDevicePreferences?.setString(preferenceKey(), value ? 'on' : 'off') } catch (_) {} }
   const API_ROOT = '/api/v1/questions/'
   const MAX_CONTENT = 200
   const DANMAKU_LIMIT = 8
@@ -522,7 +522,7 @@
     article.innerHTML=`<button type="button" data-qc-close-question>关闭题目</button><h2>${escapeHTML(comment.questionTitle)}</h2><p>${escapeHTML(question.stem || (question.stemParts||[]).map(part=>part.text||'').join('') || question.title || '')}</p>${global.KGQuestionMaterials?.render?.(question,{readOnly:true,reveal:true}) || ''}<ol>${(question.options || []).map(option=>`<li>${escapeHTML(option.text || option.content || option)}</li>`).join('')}</ol><p>答案：${escapeHTML((question.correctOptionIds||[]).join('、') || question.correctAnswer || question.answer || '')}</p><p>${escapeHTML(question.analysis || question.explanation || '')}</p>`
     document.body.appendChild(article)
     const focused=mountCard({card:article,questionId:comment.questionId})
-    article.querySelector('[data-qc-close-question]').onclick=()=>{teardown(focused);article.remove();instance.root.querySelector('[data-qc-action="favorites"]')?.focus()}
+    article.querySelector('[data-qc-close-question]').onclick=()=>{teardown(focused);article.remove();activate(instance);instance.root.querySelector('[data-qc-action="favorites"]')?.focus()}
     activate(focused)
     focused.state.expanded=true
     reload(focused)

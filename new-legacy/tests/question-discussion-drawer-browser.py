@@ -18,11 +18,16 @@ with sync_playwright() as p:
         page.goto('http://localhost/harness')
         page.add_style_tag(content=(ROOT/'styles/question-comments.css').read_text())
         page.evaluate("window.KGAuthCore={currentUser:()=>({username:'student',role:'student'})}")
+        page.add_script_tag(content=(ROOT/'src/28-device-preferences.js').read_text())
         page.add_script_tag(content=(ROOT/'src/119-question-comments.js').read_text())
         page.evaluate("KGQuestionComments.mountPanel({panel:document.querySelector('#panel'),questionId:'q1'})")
         page.wait_for_selector('.q-danmaku-item')
         assert page.locator('.q-danmaku').evaluate("e=>getComputedStyle(e).position")=='fixed'
         assert page.locator('.q-danmaku').evaluate('e=>getComputedStyle(e).pointerEvents')=='none'
+        if viewport['width'] < 700:
+            page.emulate_media(reduced_motion='reduce')
+            assert page.locator('.q-danmaku').bounding_box()['y']>=175
+            page.emulate_media(reduced_motion='no-preference')
         page.locator('[data-qc-action="expand"]').click()
         page.wait_for_selector('.q-comments-drawer')
         page.fill('.q-composer-input','未发送草稿')
@@ -64,14 +69,15 @@ with sync_playwright() as p:
         assert page.locator('.q-danmaku-item.is-paused').count()==0
         page.locator('#panel [data-qc-action="favorites"]').click()
         page.wait_for_selector('.q-comments-drawer [data-qc-action="return"]')
-        page.evaluate("KGQuestionComments.teardown(document.querySelector('#panel'));KGQuestionComments.mountCard({card:document.querySelector('#card'),questionId:'q2'})")
-        page.locator('#card [data-qc-action="favorites"]').click()
+        page.evaluate("KGQuestionComments.teardown(document.querySelector('#panel'));KGQuestionComments.mountPanel({panel:document.querySelector('#panel'),questionId:'q2'})")
+        page.locator('#panel [data-qc-action="favorites"]').click()
         page.wait_for_selector('.q-comments-drawer [data-qc-action="return"]')
         page.locator('.q-comments-drawer [data-qc-action="return"]').click()
         page.wait_for_selector('.q-favorite-question')
         assert '收藏题目' in page.locator('.q-favorite-question').inner_text()
         page.locator('[data-qc-close-question]').click()
         assert page.locator('.q-favorite-question').count()==0
+        assert page.locator('.q-danmaku').count()==1
         page.evaluate("window.dispatchEvent(new Event('kg-auth-session-change'))")
         assert page.locator('.q-danmaku,.q-comments-drawer').count()==0
         page.evaluate('KGQuestionComments.teardown()')

@@ -35,6 +35,7 @@ with sync_playwright() as playwright:
     )
     page.goto("http://localhost/test-harness")
     page.add_style_tag(content=(ROOT / "styles/question-comments.css").read_text(encoding="utf-8"))
+    page.add_script_tag(content=(ROOT/'src/28-device-preferences.js').read_text())
     page.add_script_tag(content=(ROOT / "src/119-question-comments.js").read_text(encoding="utf-8"))
     page.evaluate("window.KGAuthCore={currentUser:()=>({username:'stu',role:'student'})}")
 
