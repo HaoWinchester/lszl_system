@@ -18,6 +18,10 @@ test('assistant overlay isolates converter, credentials, storage and memory limi
   const result = spawnSync('docker', ['compose', '--env-file', '.env.uat', ...files.flatMap(f => ['-f', f]), 'config', '--format', 'json'], { cwd: dir, encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr);
   const config = JSON.parse(result.stdout), worker = config.services['assistant-worker'], converter = config.services['document-converter'];
+  assert.deepEqual(worker.build.additional_contexts, { 'backend-runtime': 'service:backend' });
+  const graph = spawnSync('docker', ['compose', '--env-file', '.env.uat', ...files.flatMap(f => ['-f', f]), 'build', '--print'], { cwd: dir, encoding: 'utf8' });
+  assert.equal(graph.status, 0, graph.stderr);
+  assert.equal(JSON.parse(graph.stdout).target['assistant-worker'].contexts['backend-runtime'], 'target:backend');
   assert.equal(worker.mem_limit, '671088640');
   assert.equal(converter.mem_limit, '402653184');
   assert.equal(worker.environment.TEACHER_ASSISTANT_MODEL, 'glm-5.3-flash[1m]');
@@ -46,4 +50,16 @@ test('deployment fails closed on readiness before marking the commit and exclude
   assert.match(script, /os\.chown\(p,10001,10001\)/);
   assert.match(readFileSync(join(root, 'deploy/rsync-excludes.txt'), 'utf8'), /\/backend\/\.env\.teacher-assistant\.local/);
   assert.doesNotMatch(script, /config --format|printenv|cat .*env\.teacher/);
+});
+
+
+test('assistant reuses backend Python runtime without a second dependency install', () => {
+  const backend = readFileSync(join(root, 'backend/Dockerfile'), 'utf8');
+  const assistant = readFileSync(join(root, 'backend/Dockerfile.teacher-assistant'), 'utf8');
+  assert.equal(assistant.match(/^FROM .+$/m)[0], backend.match(/^FROM .+$/m)[0]);
+  assert.match(assistant, /^COPY --from=backend-runtime \/usr\/local \/usr\/local$/m);
+  assert.doesNotMatch(assistant, /^RUN .*pip(?:3)? install/m);
+  assert.ok(assistant.indexOf('apt-get install') < assistant.indexOf('COPY --from=backend-runtime'));
+  assert.ok(assistant.indexOf('COPY --from=backend-runtime') < assistant.indexOf('COPY backend/ /app/backend/'));
+  assert.match(assistant, /^USER assistant$/m);
 });
