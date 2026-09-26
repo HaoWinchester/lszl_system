@@ -15,6 +15,7 @@ from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import load_only
 
 from app.models.course_management import CourseDraft, CourseRelease, LearningTask
 from app.models.paper_release import PaperRelease, PaperReleaseQuestion
@@ -90,12 +91,17 @@ async def complete_relational_reference_snapshot(
     """
 
     await teaching_content_revision_service.acquire_read_lock(db)
-    bank_query = select(QuestionBank)
+    bank_query = select(QuestionBank).options(load_only(
+        QuestionBank.id, QuestionBank.name, QuestionBank.subject, raiseload=True,
+    ))
     if owner_id is not None:
         bank_query = bank_query.where(QuestionBank.owner_id == owner_id)
     banks = list((await db.scalars(bank_query.order_by(QuestionBank.id))).all())
     bank_ids = {bank.id for bank in banks}
-    question_query = select(Question)
+    question_query = select(Question).options(load_only(
+        Question.id, Question.bank_id, Question.title, Question.teacher_number,
+        Question.content_metadata, raiseload=True,
+    ))
     if owner_id is not None:
         question_query = question_query.where(Question.bank_id.in_(bank_ids))
     questions = list(
@@ -123,7 +129,10 @@ async def complete_relational_reference_snapshot(
         for bank in banks
     ]
 
-    paper_query = select(ExamPaper, PaperQuestion).outerjoin(
+    paper_query = select(ExamPaper, PaperQuestion).options(
+        load_only(ExamPaper.id, ExamPaper.name, ExamPaper.subject, ExamPaper.status, raiseload=True),
+        load_only(PaperQuestion.paper_id, PaperQuestion.question_id, PaperQuestion.order_index, PaperQuestion.score, raiseload=True),
+    ).outerjoin(
         PaperQuestion, PaperQuestion.paper_id == ExamPaper.id
     )
     if owner_id is not None:
@@ -156,7 +165,15 @@ async def complete_relational_reference_snapshot(
                 }
             )
 
-    release_query = select(PaperRelease, PaperReleaseQuestion).outerjoin(
+    # A release's source_payload contains the whole paper. Selecting it here
+    # repeats that JSON once per question (over 1 GB on the production data).
+    # The reference index needs identifiers only, never the frozen content.
+    release_query = select(PaperRelease, PaperReleaseQuestion).options(
+        load_only(PaperRelease.id, PaperRelease.paper_id, PaperRelease.version,
+                  PaperRelease.name, PaperRelease.subject, PaperRelease.status, raiseload=True),
+        load_only(PaperReleaseQuestion.release_id, PaperReleaseQuestion.order_index,
+                  PaperReleaseQuestion.bank_id, PaperReleaseQuestion.question_id, raiseload=True),
+    ).outerjoin(
         PaperReleaseQuestion, PaperReleaseQuestion.release_id == PaperRelease.id
     )
     if owner_id is not None:
@@ -307,6 +324,10 @@ async def inventory_question_references(
     relational_snapshot: list[dict[str, object]] = []
     relational = await db.execute(
         select(PaperQuestion, ExamPaper)
+        .options(
+            load_only(PaperQuestion.paper_id, PaperQuestion.question_id, PaperQuestion.order_index, raiseload=True),
+            load_only(ExamPaper.id, ExamPaper.revision, ExamPaper.status, ExamPaper.deleted_at, raiseload=True),
+        )
         .join(ExamPaper, ExamPaper.id == PaperQuestion.paper_id)
         .order_by(PaperQuestion.paper_id, PaperQuestion.order_index, PaperQuestion.question_id)
     )
@@ -335,16 +356,22 @@ async def inventory_question_references(
         )
 
     release_snapshot: list[dict[str, object]] = []
-    releases = await db.execute(
+    releases = await db.stream(
         select(PaperReleaseQuestion, PaperRelease)
+        .options(
+            load_only(PaperReleaseQuestion.release_id, PaperReleaseQuestion.order_index,
+                      PaperReleaseQuestion.question_id, PaperReleaseQuestion.snapshot, raiseload=True),
+            load_only(PaperRelease.id, PaperRelease.status, raiseload=True),
+        )
         .join(PaperRelease, PaperRelease.id == PaperReleaseQuestion.release_id)
         .order_by(
             PaperReleaseQuestion.release_id,
             PaperReleaseQuestion.order_index,
             PaperReleaseQuestion.question_id,
         )
+        .execution_options(yield_per=100)
     )
-    for link, release in releases:
+    async for link, release in releases:
         references.append(
             _reference(
                 container_type="relational_paper_release",
