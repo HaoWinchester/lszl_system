@@ -234,10 +234,26 @@ async def _validate_normalized_question(db: AsyncSession, actor: User, normalize
     await apply_question_material_edit(db, actor, normalized)
 
 
+def question_bank_import_fingerprint(bank: QuestionBank, questions: list[Question]) -> str:
+    """Bounded caller preview token covering bank settings and question revisions."""
+    import hashlib
+    import json
+    snapshot = {
+        'id': bank.id, 'sourceId': bank.source_id, 'revision': bank.revision,
+        'name': bank.name, 'subject': bank.subject, 'description': bank.description,
+        'visibility': bank.visibility, 'version': bank.version,
+        'questions': sorted((row.id, row.source_id, row.revision, row.content_hash) for row in questions),
+    }
+    return hashlib.sha256(json.dumps(snapshot, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+
+
 async def import_question_banks(
     db: AsyncSession,
     owner: User | str,
     request: QuestionBankImportRequest,
+    *,
+    expected_bank_revisions: dict[str, int] | None = None,
+    expected_bank_fingerprints: dict[str, str] | None = None,
 ) -> dict:
     """Persist a normalized JSON import as one all-or-nothing content change."""
 
@@ -294,6 +310,8 @@ async def import_question_banks(
     try:
         async with db.begin():
             await teaching_content_revision_service.acquire_lock(db)
+            # rollback expires the actor before synchronous image authorization.
+            await db.refresh(actor)
             existing_banks = (
                 await db.execute(
                     select(QuestionBank)
@@ -313,6 +331,18 @@ async def import_question_banks(
                 str(question.source_id or question.id): question
                 for question in existing_questions
             }
+            # Caller-authorized updates must validate the preview atomically
+            # under the same lock as the import, before mutating any object.
+            for source_id, expected_revision in (expected_bank_revisions or {}).items():
+                bank = existing_by_source.get(source_id)
+                if bank is None or type(expected_revision) is not int or int(bank.revision) != expected_revision:
+                    raise HTTPException(status_code=409, detail={'code': 'QUESTION_BANK_REVISION_CONFLICT', 'message': '题库已变化，请重新预览后确认。'})
+            for source_id, fingerprint in (expected_bank_fingerprints or {}).items():
+                bank = existing_by_source.get(source_id)
+                rows = [question for question in existing_questions if bank is not None and question.bank_id == bank.id]
+                if bank is None or question_bank_import_fingerprint(bank, rows) != fingerprint:
+                    raise HTTPException(status_code=409, detail={'code': 'QUESTION_BANK_REVISION_CONFLICT', 'message': '题库题目已变化，请重新预览后确认。'})
+
             actions: list[dict] = []
             prepared_banks: list[dict] = []
             for imported_bank in request.banks:

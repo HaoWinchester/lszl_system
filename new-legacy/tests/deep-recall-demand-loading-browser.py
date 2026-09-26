@@ -137,14 +137,20 @@ with sync_playwright() as playwright:
           };
           const item={id:question.id,title:question.title,bankId:'bank-entry',paperId:'paper-entry',releaseId:'release-entry',question};
           const collection={id:'paper-release:release-entry',paperId:'paper-entry',releaseId:'release-entry',name:'直接进入试卷',configuredCount:1,availableCount:1,questions:[item]};
-          window.__entryCollections=[];
+          window.__entryCollections=[{id:'paper-release:other',releaseId:'other',questions:[]},collection];
+          window.KGQuestionCatalogAdapter={ready:new Promise(resolve=>setTimeout(resolve,100))};
           window.__entryAdapterCreates=[];
           window.KGLearningRouteContext={
-            parse:()=>({paperId:'',releaseId:'',questionId:'question-entry',bankId:'bank-entry',returnUrl:'index.html'}),
+            parse:()=>({paperId:'',releaseId:'release-entry',questionId:'',bankId:'',returnUrl:'index.html'}),
             normalize:value=>({...value}),replace:()=>{},remember:()=>{}
           };
           window.KGRecallQuestionSource={
             list:()=>window.__entryCollections,
+            loadCollection:async input=>{
+              if(input.releaseId!=='release-entry')throw new Error('wrong release');
+              await new Promise(resolve=>setTimeout(resolve,80));
+              return collection;
+            },
             findPublished:async input=>{
               window.__entryCollections=[collection];
               return {collection,bank:collection,item,question};

@@ -25,14 +25,17 @@ def _raise(error: ValueError) -> None:
 
 
 @router.get("")
-async def list_comments(question_id: str, db: DB, user: CurrentUser):
-    return {"comments": await service.list_comments(db, user, question_id)}
+async def list_comments(question_id: str, db: DB, user: CurrentUser, cursor: str | None = Query(default=None, max_length=512), limit: int = Query(default=50, ge=1, le=50)):
+    try:
+        return await service.list_comments_page(db, user, question_id, cursor, limit)
+    except ValueError as error:
+        _raise(error)
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_comment(question_id: str, body: dict, db: DB, user: CurrentUser):
     try:
-        comment = await service.create_comment(db, user, question_id, body.get("content"))
+        comment = await service.create_comment(db, user, question_id, body.get("content"), body.get("parentId"))
     except ValueError as error:
         _raise(error)
     return {"comment": comment}
@@ -73,4 +76,33 @@ async def comment_counts(
 ):
     """批量题目可见留言数：报告页折叠条展示“N 条”用，避免逐题请求。"""
     id_list = [item for item in (part.strip() for part in ids.split(",")) if item][:200]
-    return {"counts": await service.count_comments(db, id_list)}
+    accessible = []
+    for identifier in id_list:
+        try:
+            await service.require_question_access(db, user, identifier)
+            accessible.append(identifier)
+        except (service.QuestionCommentNotFoundError, service.QuestionCommentPermissionError):
+            pass
+    return {"counts": await service.count_comments(db, accessible)}
+
+
+@router.put("/{comment_id}/favorite")
+async def favorite_comment(question_id: str, comment_id: str, db: DB, user: CurrentUser):
+    try:
+        return {"comment": await service.set_favorite(db, user, question_id, comment_id, True)}
+    except ValueError as error:
+        _raise(error)
+
+@router.delete("/{comment_id}/favorite")
+async def unfavorite_comment(question_id: str, comment_id: str, db: DB, user: CurrentUser):
+    try:
+        return {"comment": await service.set_favorite(db, user, question_id, comment_id, False)}
+    except ValueError as error:
+        _raise(error)
+
+@counts_router.get("/favorites")
+async def favorites(db: DB, user: CurrentUser, cursor: str | None = Query(default=None, max_length=512), limit: int = Query(default=50, ge=1, le=50)):
+    try:
+        return await service.list_favorites(db, user, cursor, limit)
+    except ValueError as error:
+        _raise(error)

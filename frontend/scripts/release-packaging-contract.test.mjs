@@ -40,6 +40,8 @@ const requiredRsyncExcludes = [
   '/artifacts',
   '/.worktrees',
   '/.mini-test-runtime-*',
+  '/backend/.env.teacher-assistant.local',
+  '/var',
 ]
 
 function assertRuntimePreparedBeforeRsync(script, label) {

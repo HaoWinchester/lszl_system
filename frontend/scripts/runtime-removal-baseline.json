@@ -621,6 +621,11 @@
     },
     {
       "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_question_discussion_danmaku_v1__",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
       "token": "kg_question_language_mode_v1",
       "ordinal": 1
     },
@@ -2656,6 +2661,11 @@
     },
     {
       "path": "frontend/scripts/new-legacy-contract.json",
+      "token": "kg_question_discussion_danmaku_v1__",
+      "ordinal": 1
+    },
+    {
+      "path": "frontend/scripts/new-legacy-contract.json",
       "token": "kg_question_language_mode_v1",
       "ordinal": 1
     },
@@ -3232,6 +3242,11 @@
     {
       "path": "new-legacy/src/101-engagement-repository.js",
       "token": "kg_user_message_reads_v1__",
+      "ordinal": 1
+    },
+    {
+      "path": "new-legacy/src/119-question-comments.js",
+      "token": "kg_question_discussion_danmaku_v1__",
       "ordinal": 1
     },
     {
@@ -4400,6 +4415,21 @@
       "path": "new-legacy/src/practice/practice-attempt-repository.js",
       "token": "key()",
       "ordinal": 2
+    },
+    {
+      "path": "new-legacy/src/teacher/teacher-assistant.js",
+      "token": "slot",
+      "ordinal": 1
+    },
+    {
+      "path": "new-legacy/src/teacher/teacher-assistant.js",
+      "token": "slot",
+      "ordinal": 2
+    },
+    {
+      "path": "new-legacy/src/teacher/teacher-assistant.js",
+      "token": "slot",
+      "ordinal": 3
     }
   ],
   "devicePreferenceStorage": []

@@ -425,6 +425,7 @@ async def update_paper(
     actor: User,
     paper_id: str,
     request: PaperUpdateRequest,
+    *, allow_type_promotion: bool = False,
 ) -> dict | None:
     await teaching_content_revision_service.acquire_lock(db)
     fields = request.model_dump(exclude_unset=True)
@@ -459,7 +460,8 @@ async def update_paper(
                 )
                 or 0
             )
-            if reference_count or int(current.published_version or 0):
+            promotion = allow_type_promotion and current.paper_type in {'standard', 'multiple_choice'} and values['paper_type'] == 'mixed'
+            if (reference_count or int(current.published_version or 0)) and not promotion:
                 raise HTTPException(
                     status_code=409,
                     detail={

@@ -8,7 +8,7 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REMOTE="resume-prod"
 REMOTE_DIR="/home/ubuntu/lszl-kg-uat"
 PROJECT="lszl-kg-uat"
-COMPOSE_ARGS="-f docker-compose.uat.yml -f docker-compose.mini-uat.yml"
+COMPOSE_ARGS="-f docker-compose.uat.yml -f docker-compose.mini-uat.yml -f docker-compose.teacher-assistant.yml"
 ENV_FILE=".env.uat"
 HEALTH_URL="http://127.0.0.1:18087/api/v1/health"
 PUBLIC_HEALTH_URL="https://uat.aihuanpu.com/api/v1/health"
@@ -32,7 +32,14 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 deployment_timing_stage preflight
 
+check_service_prerequisites() {
+  # Only inspect presence/permissions; never source or print provider credentials.
+  ssh "$REMOTE" "cd $REMOTE_DIR && test -s backend/.env.wechat-mini.local && test -s backend/.env.teacher-assistant.local && test -f /usr/lib/node_modules/@anthropic-ai/claude-code/bin/claude.exe && test -x /usr/lib/node_modules/@anthropic-ai/claude-code/bin/claude.exe" \
+    || { local status=$?; echo "✗ UAT 助手前置配置缺失：检查独立凭据文件与 Claude 可执行文件（未显示凭据）" >&2; return "$status"; }
+}
+
 check_mini_config() {
+  check_service_prerequisites || return $?
   # Quiet validation: never print expanded environment values or WeChat secrets.
   ssh "$REMOTE" "cd $REMOTE_DIR && test -s backend/.env.wechat-mini.local && docker compose -p $PROJECT $COMPOSE_ARGS --env-file $ENV_FILE config --quiet"
 }
@@ -50,7 +57,7 @@ if [ -n "$(git -C "$REPO_DIR" status --porcelain)" ]; then
 fi
 
 # Preserve the separate mini credential file; do not begin a deploy without it.
-ssh "$REMOTE" "cd $REMOTE_DIR && test -s backend/.env.wechat-mini.local"
+check_service_prerequisites
 
 version_file="$REPO_DIR/new-legacy/VERSION"
 
@@ -170,6 +177,12 @@ ssh "$REMOTE" "healthy=0; for attempt in \$(seq 1 40); do if curl -fsS $HEALTH_U
   || { echo "✗ 健康检查失败，查看日志：ssh $REMOTE 'cd $REMOTE_DIR && docker compose -p $PROJECT logs backend --tail 50'" >&2; exit 1; }
 echo "      HEALTH_OK"
 ssh "$REMOTE" "cd $REMOTE_DIR && docker compose -p $PROJECT $COMPOSE_ARGS --env-file $ENV_FILE exec -T backend python -m app.cli.check_mini_readiness"
+# A new named volume can initially belong to API root; worker is strictly uid 10001.
+ssh "$REMOTE" "cd $REMOTE_DIR && docker compose -p $PROJECT $COMPOSE_ARGS --env-file $ENV_FILE exec -T backend python -c \"import os; p='/var/lib/teacher-assistant'; os.chown(p,10001,10001); os.chmod(p,0o750)\""
+echo "      核对教师助手 worker / 隔离转换器就绪状态"
+ssh "$REMOTE" "cd $REMOTE_DIR && docker compose -p $PROJECT $COMPOSE_ARGS --env-file $ENV_FILE exec -T assistant-worker python -m app.cli.check_teacher_assistant_readiness" \
+  || { echo "✗ 教师助手配置或运行检查失败，中止部署；不会标记本次版本成功（未显示凭据）" >&2; exit 1; }
+echo "      TEACHER_ASSISTANT_READY"
 
 deployment_timing_stage nginx
 echo "[6/9] 安装 Git 管理的 UAT HTTPS/HTTP2/gzip 配置"

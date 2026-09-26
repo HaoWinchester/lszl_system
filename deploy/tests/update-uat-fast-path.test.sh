@@ -137,6 +137,31 @@ if ! grep -q 'runtime_domain_migration verify' "$CALL_LOG" || ! grep -q 'runtime
 fi
 
 printf '' > "$CALL_LOG"
+set +e
+PATH="$FIXTURE_BIN:$PATH" \
+  UAT_TEST_SCENARIO=fast-path \
+  UAT_TEST_REAL_NODE="$REAL_NODE" \
+  UAT_TEST_DEPLOYED_COMMIT="$BASE_COMMIT" \
+  UAT_TEST_NGINX_HASH="$NGINX_HASH" \
+  UAT_TEST_SOURCE_SNAPSHOT_HASH="$SOURCE_SNAPSHOT_HASH" \
+  UAT_TEST_EXPECTED_BACKFILL_FINGERPRINT="$BACKFILL_FINGERPRINT" \
+  UAT_TEST_REMOTE_BACKFILL_STATE="$REMOTE_BACKFILL_STATE" \
+  UAT_TEST_FAIL_ASSISTANT_READINESS=1 \
+  UAT_TEST_CALL_LOG="$CALL_LOG" \
+  bash "$TEST_REPO/deploy/update-uat.sh" >>"$OUTPUT_LOG" 2>&1
+assistant_status=$?
+set -e
+if [[ "$assistant_status" -eq 0 ]] || grep -q "printf '%s\\n'.*\.deploy-state/git-commit" "$CALL_LOG"; then
+  echo "assistant readiness failure must abort without advancing deployment state" >&2
+  cat "$CALL_LOG" >&2
+  exit 1
+fi
+if ! grep -q '教师助手配置或运行检查失败' "$OUTPUT_LOG"; then
+  echo "assistant configuration failure must provide a safe, explicit error" >&2
+  exit 1
+fi
+
+printf '' > "$CALL_LOG"
 FAST_CONFLICT_STATE="$TEST_ROOT/fast-version-conflict"
 PATH="$FIXTURE_BIN:$PATH" \
   UAT_TEST_SCENARIO=fast-path \

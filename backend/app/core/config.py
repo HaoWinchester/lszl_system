@@ -78,6 +78,12 @@ class Settings(BaseSettings):
     WECHAT_PAY_NOTIFY_URL: str = ""
     WECHAT_PAY_MONTHLY_AMOUNT_FEN: int = 2900
 
+    TEACHER_ASSISTANT_STORAGE: str = str(PROJECT_ROOT / "var" / "teacher-assistant")
+    TEACHER_ASSISTANT_CLAUDE: str = "claude"
+    TEACHER_ASSISTANT_MODEL: str = "glm-5.3-flash[1m]"
+    TEACHER_ASSISTANT_MODEL_TIMEOUT: int = 150
+    TEACHER_ASSISTANT_ENABLED: bool = True
+
     NEW_LEGACY_RELEASE_ROOT: str = str(PROJECT_ROOT / "frontend" / "new-legacy-releases")
     NEW_LEGACY_FALLBACK_SITE: str = str(PROJECT_ROOT / "frontend" / "public" / "new-legacy")
 

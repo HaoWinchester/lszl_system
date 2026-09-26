@@ -452,6 +452,7 @@ async def import_package(
     db: AsyncSession,
     actor: User,
     request: PaperImportRequest,
+    *, allow_type_promotion: bool = False,
 ) -> dict:
     request_hash = _request_hash(request)
     await teaching_content_revision_service.acquire_lock(db)
@@ -586,6 +587,7 @@ async def import_package(
         if (
             existing_paper is not None
             and existing_paper.paper_type != preflight["paperType"]
+            and not (allow_type_promotion and existing_paper.paper_type in {"standard", "multiple_choice"} and preflight["paperType"] == "mixed")
             and (
                 int(existing_paper.published_version or 0)
                 or int(

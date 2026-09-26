@@ -329,6 +329,7 @@ def duplicate_question_signature(payload: dict[str, Any]) -> str:
     if not stem:
         translations = normalized.get("translations")
         english = translations.get("en") if isinstance(translations, dict) else {}
+        english = english if isinstance(english, dict) else {}
         stem = "".join(
             str(part.get("text") or "")
             for part in (english.get("stemParts") or [])

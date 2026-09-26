@@ -3,6 +3,9 @@ set -euo pipefail
 if [[ "${UAT_TEST_SCENARIO:-}" == "fast-path" && -n "${UAT_TEST_CALL_LOG:-}" ]]; then
   echo "ssh $*" >> "$UAT_TEST_CALL_LOG"
 fi
+if [[ "${UAT_TEST_FAIL_ASSISTANT_READINESS:-0}" == "1" && "$*" == *"check_teacher_assistant_readiness"* ]]; then
+  exit 1
+fi
 if [[ "${UAT_TEST_SCENARIO:-}" == "fast-path" && "$*" == *".deploy-state/git-commit"* ]]; then
   echo "${UAT_TEST_DEPLOYED_COMMIT:?}"
   exit 0

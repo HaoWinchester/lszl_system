@@ -167,3 +167,37 @@
 /* 报告页题卡内嵌时收窄外边距 */
 .practice-review-card .q-comments { margin: 10px 0 0; }
 
+
+/* Viewport overlay owns only its moving targets; blank space passes through. */
+.q-danmaku { position:fixed; inset:72px 0 145px; height:auto; margin:0; z-index:180; pointer-events:none; background:none; border-radius:0; }
+.q-danmaku-track { pointer-events:none; }
+.q-danmaku-item { top:calc(12% + var(--q-danmaku-lane,0) * 17%); pointer-events:auto; cursor:pointer; box-shadow:0 2px 8px #28375018; font:inherit; font-size:13px; }
+.q-danmaku-item:nth-child(2n) { margin-top:0; }
+.q-danmaku-item:is(:hover,:focus-visible,.is-paused) { animation-play-state:paused; outline:2px solid #8ab4f8; }
+.q-comments-drawer { position:fixed; top:80px; right:16px; bottom:24px; width:min(440px,calc(100vw - 32px)); z-index:240; overflow:auto; background:#f7f9fc; border:1px solid #ccd6e5; border-radius:16px; box-shadow:0 8px 35px #142d4f30; overscroll-behavior:contain; }
+.q-comments-drawer .q-comments { border:0; margin:0; }
+.q-comments-drawer .q-comment { flex-wrap:wrap; }
+.q-comments-drawer .q-comment-actions { flex-wrap:wrap; }
+.q-comments-drawer button { cursor:pointer; }
+.q-comment-actions button,.q-comments.is-collapsed>button { border:1px solid #d9e1ed; border-radius:8px; background:white; color:#425776; padding:5px 8px; }
+.q-comment-actions [aria-pressed=true] { background:#eaf2ff; color:#2f6bd8; }
+.q-comment-parent { display:block; color:#75849a; margin-top:6px; }
+.q-comments.is-collapsed { display:flex; flex-wrap:wrap; gap:6px; }
+.q-comments-toggle { flex:1; min-width:140px; }
+.q-drawer-handle { width:48px; height:5px; margin:0 auto 12px; border-radius:8px; background:#9eacbf; touch-action:none; cursor:ns-resize; }
+@media(max-width:700px) {
+  .q-comments-drawer { top:auto; left:0; right:0; bottom:0; width:auto; height:55vh; max-height:85vh; border-radius:18px 18px 0 0; padding-bottom:env(safe-area-inset-bottom); }
+  .q-danmaku { inset:64px 0 175px; }
+  .q-comment-actions button { min-height:36px; }
+}
+@media(prefers-reduced-motion:reduce) {
+  .q-danmaku { height:auto; max-height:25vh; inset:80px 12px auto; overflow:auto; padding:0; }
+  .q-danmaku-item { position:static; display:inline-block; }
+}
+.q-favorite-question { position:fixed; inset:70px 20px 30px; z-index:200; overflow:auto; padding:24px; background:white; border:1px solid #ccd6e5; border-radius:14px; box-shadow:0 8px 35px #142d4f30; }
+.q-comment-thread { list-style:none; margin:0 0 8px 12px; border-left:2px solid #dbe5f2; padding-left:12px; }
+.q-comment-thread ul { list-style:none; padding:0; }
+@media(max-width:700px) and (prefers-reduced-motion:reduce) {
+  /* Keep stationary comments below mobile navigation and score controls. */
+  .q-danmaku { top:175px; }
+}

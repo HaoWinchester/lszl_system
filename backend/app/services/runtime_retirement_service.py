@@ -81,6 +81,7 @@ DEVICE_PREFERENCE_EXACT_KEYS = {
 DEVICE_PREFERENCE_PREFIXES = (
     "kg_resizable_", "kg_ui_resizable_region_", "kg_workspace_layout_",
     "kg_recent_selection_", "kg_font_", "kg_language_", "kg_theme_",
+    "kg_question_discussion_danmaku_v1__",
     "kg_multi_question_highlight_color_v1__",
     "kg_multi_question_analysis_sections_v1__",
     "kg_multi_question_paper_selection_v1__",

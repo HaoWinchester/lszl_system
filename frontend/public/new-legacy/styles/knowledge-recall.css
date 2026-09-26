@@ -429,3 +429,6 @@ html[data-question-language-mode="zh"] .kr-bilingual-en{display:none!important}
 
 /* Historical selector retained for compatibility checks; theme variables are shared through :is(.kr-app,.kr-viewport). */
 .kr-viewport[data-theme="neon"]{}
+
+/* 来源页作为题卡缩略图，原尺寸核对继续复用共享图片对话框。 */
+.knowledge-recall-page .kr-question-card .qm-image img{max-height:360px;object-fit:contain}

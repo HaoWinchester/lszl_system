@@ -118,3 +118,11 @@ test('registered content-center and multi-question preferences use the shared fa
     assert.match(source, /KGDevicePreferences/, relative)
   }
 })
+
+test('discussion danmaku is an approved scoped UI preference', () => {
+  const api = bootPreferences().KGDevicePreferences
+  const key = 'kg_question_discussion_danmaku_v1__' + encodeURIComponent('学生')
+  api.setString(key, 'off')
+  assert.equal(api.getString(key), 'off')
+  assert.throws(() => api.setJSON('kg_question_comment_favorites', ['business-record']), /forbidden/)
+})

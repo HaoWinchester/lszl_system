@@ -35,6 +35,7 @@ with sync_playwright() as playwright:
     )
     page.goto("http://localhost/test-harness")
     page.add_style_tag(content=(ROOT / "styles/question-comments.css").read_text(encoding="utf-8"))
+    page.add_script_tag(content=(ROOT/'src/28-device-preferences.js').read_text())
     page.add_script_tag(content=(ROOT / "src/119-question-comments.js").read_text(encoding="utf-8"))
     page.evaluate("window.KGAuthCore={currentUser:()=>({username:'stu',role:'student'})}")
 
@@ -66,9 +67,11 @@ with sync_playwright() as playwright:
     # 练习页面板挂载：讨论块进入面板，弹幕只含短留言，未登录可见登录引导（此处已登录显示输入框）
     page.evaluate("KGQuestionComments.mountPanel({panel:document.querySelector('#panel'),questionId:'q1'})")
     page.wait_for_selector("#panel .q-comments")
-    assert page.locator("#panel .q-danmaku-item").count() == 2
-    assert page.locator("#panel .q-comment").count() == 3
-    assert page.locator("#panel .q-composer-input").count() == 1
+    assert page.locator(".q-danmaku-item").count() == 2
+    page.locator('#panel [data-qc-action="expand"]').click()
+    page.wait_for_selector('.q-comments-drawer .q-comment')
+    assert page.locator(".q-comments-drawer .q-comment").count() == 3
+    assert page.locator(".q-comments-drawer .q-composer-input").count() == 1
     # 本人可删自己的留言（c3），不可删他人（c1）
     assert page.locator('[data-comment-id="c3"] [data-qc-action="delete"]').count() == 1
     assert page.locator('[data-comment-id="c1"] [data-qc-action="delete"]').count() == 0
@@ -79,9 +82,9 @@ with sync_playwright() as playwright:
     assert "is-liked" in (page.locator('[data-comment-id="c1"] .q-comment-like').get_attribute("class") or "")
 
     # 发布留言 → 列表插入新留言
-    page.fill("#panel .q-composer-input", "原来B对在生产环节")
-    assert page.locator('#panel [data-qc-count]').inner_text() == "9/200"
-    page.locator("#panel [data-qc-action='send']").click()
+    page.fill(".q-comments-drawer .q-composer-input", "原来B对在生产环节")
+    assert page.locator('.q-comments-drawer [data-qc-count]').inner_text() == "9/200"
+    page.locator(".q-comments-drawer [data-qc-action='send']").click()
     page.wait_for_selector('[data-comment-id="c9"]')
     assert "原来B对在生产环节" in page.locator('[data-comment-id="c9"]').inner_text()
 
@@ -100,9 +103,9 @@ with sync_playwright() as playwright:
     assert "查看本题讨论（3 条）" in toggle.inner_text()
     assert page.locator("#card .q-comment").count() == 0  # 折叠时不拉留言
     toggle.click()
-    page.wait_for_selector("#card .q-comment")
-    assert page.locator("#card .q-comment").count() == 3
-    page.locator("#card .q-comments-collapse").click()
+    page.wait_for_selector(".q-comments-drawer .q-comment")
+    assert page.locator(".q-comments-drawer .q-comment").count() == 3
+    page.locator(".q-comments-drawer .q-comments-collapse").click()
     page.wait_for_selector("#card .q-comments.is-collapsed")
     assert page.locator("#card .q-comment").count() == 0
 
@@ -112,7 +115,7 @@ with sync_playwright() as playwright:
              KGQuestionComments.mountCards({cards:[{card:document.querySelector('#card'),questionId:'q1',commentCount:3},
                                                    {card:c2,questionId:'q9',commentCount:0}]}) })()
     """)
-    page.wait_for_function("document.querySelectorAll('.q-comments-toggle').length===2")
+    page.wait_for_function("document.querySelectorAll('.q-comments-toggle').length===3")
     assert "还没有留言" in page.locator("#card2 .q-comments-toggle").inner_text()
 
     # 未登录：展开后显示登录引导按钮，点击派发登录事件

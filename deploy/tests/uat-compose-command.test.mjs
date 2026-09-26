@@ -18,6 +18,9 @@ test('UAT read-only config check uses mini overlay and never emits expanded secr
   const result = run(t);
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /-f docker-compose\.uat\.yml -f docker-compose\.mini-uat\.yml/);
+  assert.match(result.stdout, /-f docker-compose\.teacher-assistant\.yml/);
+  assert.match(result.stdout, /test -s backend\/\.env\.teacher-assistant\.local/);
+  assert.match(result.stdout, /test -x .*claude\.exe/);
   assert.match(result.stdout, /config --quiet/);
   assert.match(result.stdout, /test -s backend\/\.env\.wechat-mini\.local/);
   assert.doesNotMatch(result.stdout, /up -d|rsync|docker build|WECHAT_MINI_APP_SECRET=/);

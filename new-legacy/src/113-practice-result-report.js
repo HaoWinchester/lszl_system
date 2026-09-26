@@ -101,6 +101,7 @@
     const labels = { all: '全部', correct: '答对', wrong: '答错' }
     section.innerHTML = `<h2>题目回顾</h2><div class="practice-review-filters" role="group" aria-label="按答题结果筛选">${Object.keys(labels).map(key => `<button type="button" data-review-filter="${key}" aria-pressed="false">${labels[key]}（${counts[key]}）</button>`).join('')}</div><div data-review-content aria-live="polite"></div>`
     const select = filter => {
+      section.querySelectorAll('[data-review-card]').forEach(card=>global.KGQuestionComments?.teardown(card))
       section.querySelectorAll('[data-review-filter]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.reviewFilter === filter)))
       const rows = questions.map((question, index) => ({ question, index })).filter(({ question }) => filter === 'all' || status(question) === filter)
       section.querySelector('[data-review-content]').innerHTML = rows.length ? rows.map(({ question, index }) => {

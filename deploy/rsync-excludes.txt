@@ -30,3 +30,6 @@ __pycache__
 /artifacts
 /.worktrees
 /.mini-test-runtime-*
+
+/backend/.env.teacher-assistant.local
+/var
