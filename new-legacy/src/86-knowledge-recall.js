@@ -256,7 +256,9 @@
       if(!found){
         // 目录经细粒度 API 异步载入：列表为空时先等一次 rebuild 再取首个 release
         if(source&&!source.list().length)await source.rebuild?.();
-        const first=source?.list?.()?.[0]?.questions?.[0];
+        const target=input.releaseId||input.paperId||input.collectionId;
+        const selected=target?await source?.loadCollection?.(input):source?.list?.()?.[0];
+        const first=selected?.questions?.[0];
         if(first)found=await source.findPublished({releaseId:first.releaseId,paperId:first.paperId,bankId:first.bankId,questionId:first.id});
       }
       if(found?.question){
@@ -326,7 +328,7 @@
     if(!id||!hasResolvedContext){
       // 进入页时先按当前题目解析所属 release；不能只拿 questionId 直连会话，
       // 否则按需加载尚未填充缓存时 releaseId 为空，服务端会判定题目不可学习。
-      window.KGQuestionCatalogAdapter?.ready?.catch(()=>{});
+      await window.KGQuestionCatalogAdapter?.ready?.catch(()=>{});
       const requestedId=id;
       const candidate=await loadQuestion();
       const candidateId=String(candidate?.id||candidate?.sourceQuestionId||'').trim();

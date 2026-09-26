@@ -78,3 +78,10 @@ UI 含图但未完成映射时禁用标准JSON下载并说明先保存含图草�
 新增精准回归 `new-legacy/tests/recall-materials-live-browser.py`。结果与截图在 artifacts/teacher-assistant/student-material-result.json、student-material-knowledge-recall.html.png、student-material-question-workspace.html.png。截图已目视检查：题卡、图片、选项与画布工具布局正常。已有2个回忆Node合同、deep-recall-demand-loading-browser与语法检查通过。
 
 源整页包含答案/解析的原文事实已报告；根任务确认回忆/归纳保留原文符合本轮边界，不扩展自动裁剪。
+
+### 实际 served 回忆/归纳图片最终验证
+
+- 无 source override 的真实学生浏览器首次发现 release-only 入口选取了目录第一份未展开试卷，而目标扫描 PDF 位于后续集合；network 已成功读取目标题目，但旧代码 list()[0].questions[0] 为空。
+- 最小修复：等待 catalog ready，再用现有 loadCollection(input) 解析指定 release 首题。定向回归覆盖第一集合空、目标第二集合异步读取。
+- 最终 `RECALL_IMAGE_TEST_SOURCE_OVERRIDE=0 python3 new-legacy/tests/recall-materials-live-browser.py` 通过：回忆与归纳均真实 QuestionAsset 读取成功、图片加载、放大关闭成功、danmaku=0。结果与截图在 artifacts/teacher-assistant/student-material-result.json 和 student-material-*.png。未使用 API mock 或源覆盖；属于开发自检，不替代用户 UAT。
+- deep-recall-demand-loading-browser.py、两个 recall Node 契约、JS syntax 和 diff check 通过。

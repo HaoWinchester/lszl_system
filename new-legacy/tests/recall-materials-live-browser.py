@@ -28,7 +28,9 @@ with sync_playwright() as p:
         return handler
     for filename in ('src/86-knowledge-recall.js','src/118-question-materials.js','styles/knowledge-recall.css'):
         if source_override: context.route('**/'+filename+'*',override_file(filename))
-    page=context.new_page();results=[]
+    page=context.new_page();results=[];network=[]
+    page.on('requestfinished',lambda request:network.append({'url':request.url,'method':request.method,'status':request.response().status if request.response() else None}))
+    page.on('requestfailed',lambda request:network.append({'url':request.url,'method':request.method,'failure':request.failure}))
     page.on('pageerror',lambda error:print('PAGEERROR',error,flush=True))
     page.on('response',lambda response:print('HTTPERROR',response.status,response.url,flush=True) if response.status>=400 else None)
     for filename,card in [('knowledge-recall.html','#krQuestionCard'),('question-workspace.html','.qw-question-card')]:
@@ -42,7 +44,15 @@ with sync_playwright() as p:
                 add.click()
                 page.locator('#qwQuestionDrawerClose').click()
         image=page.locator('.qm-image img').first
-        expect(image).to_be_visible(timeout=30000)
+        try:
+            expect(image).to_be_visible(timeout=30000)
+        except Exception:
+            page.screenshot(path=str(OUT/('student-material-failure-'+filename+'.png')))
+            (OUT/('student-material-failure-'+filename+'.html')).write_text(page.content())
+            (OUT/'student-material-failure-network.json').write_text(json.dumps(network,ensure_ascii=False,indent=2))
+            print('DIAGNOSTIC',page.evaluate('({url:location.href,username:window.KGAuthCore?.currentUser?.()?.username,role:window.KGAuthCore?.currentUser?.()?.role,bootstrap:window.__KG_DIRECT_BOOTSTRAP__?.authenticated,materials:!!window.KGQuestionMaterials,recall:window.KGKnowledgeRecall?.snapshot?.(),loading:document.querySelector("[data-learning-loading]")?.hidden})'),flush=True)
+            print(page.locator('body').inner_text()[-3000:],flush=True)
+            raise
         page.wait_for_function("() => [...document.querySelectorAll('.qm-image img')].some(img=>img.complete&&img.naturalWidth>0)")
         url=image.get_attribute('src')
         assert url.startswith('/api/v1/question-assets/')
