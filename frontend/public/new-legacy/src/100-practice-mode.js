@@ -611,7 +611,7 @@
     if(body)body.innerHTML='<p class="practice-answer-line">'+escapeHTML(correctText)+'</p>'+explanationMarkup;
     const actions=$('practiceExplanationActions');
     if(actions)actions.innerHTML='';
-    global.KGQuestionComments?.mountPanel({panel,questionId:text(question.id)});
+    if(!neutral)global.KGQuestionComments?.mountPanel({panel,questionId:text(question.id)});
     panel.hidden=false;
     panel.scrollIntoView({behavior:'smooth',block:'nearest'});
   }
@@ -640,7 +640,7 @@
     const savedAnswer=state.draft?.answer?.(question.id)||state.session?.answers?.[question.id]||null;
     const practiceAnswered=savedAnswer?{selected:answerSelectedIds(savedAnswer),correct:savedAnswer.correct===true}:null;
     state.locked=false;dom.feedback.hidden=true;hideRemediation();dom.questionCard.classList.remove('is-timeout');
-    if($('practiceExplanationPanel'))$('practiceExplanationPanel').hidden=true;
+    if($('practiceExplanationPanel')){global.KGQuestionComments?.teardown($('practiceExplanationPanel'));$('practiceExplanationPanel').hidden=true;}
     const view=questionLanguageView(question);
     if(view){
       dom.questionStem.innerHTML=escapeHTML(languageText(view.stem))+englishLine(view.stem);

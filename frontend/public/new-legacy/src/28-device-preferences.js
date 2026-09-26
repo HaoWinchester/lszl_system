@@ -39,6 +39,7 @@
     '通用知识点关系图谱工具_新手引导已看_v1',
   ])
   const SCOPED_UI_BASE_KEYS = Object.freeze([
+    'kg_question_discussion_danmaku_v1',
     'kg_multi_question_highlight_color_v1',
     'kg_multi_question_analysis_sections_v1',
     'kg_multi_question_paper_selection_v1',
