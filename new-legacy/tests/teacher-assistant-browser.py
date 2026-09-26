@@ -20,7 +20,7 @@ def run():
     threading.Thread(target=server.serve_forever, daemon=True).start()
     base = f'http://127.0.0.1:{server.server_port}'
     session = {'id': 'one', 'title': '习题课整理', 'revision': 1, 'messages': [], 'uploads': [], 'plan': None, 'job': None, 'receipt': None}
-    state = {'session': session, 'fail': False, 'role': 'teacher', 'calls': [], 'execute': 0}
+    state = {'session': session, 'fail': False, 'role': 'teacher', 'calls': [], 'execute': 0, 'previewFail': True}
     def api(route):
         request = route.request
         url = request.url.split('/api/v1/')[-1]
@@ -37,6 +37,17 @@ def run():
         elif request.method == 'DELETE':
             state['session'] = None
             status = 204
+        elif url.endswith('/preview') and state['previewFail']:
+            status, payload = 503, {'detail': '来源读取暂时失败'}
+        elif url.endswith('/preview'):
+            payload = {'sections': [{'location': '第 1 页', 'text': '原文保留', 'images': [{'url': '/api/v1/teacher-assistant/uploads/file/assets/page-1.png', 'name': 'page-1.png'}]}], 'warnings': []}
+        elif '/assets/' in url:
+            import base64
+            route.fulfill(status=200, content_type='image/png', body=base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a4x8AAAAASUVORK5CYII='))
+            return
+        elif '/export?format=' in url:
+            route.fulfill(status=200, content_type='application/json', headers={'Content-Disposition': 'attachment; filename=teacher-export.json'}, body=json.dumps(state['session']['plan']))
+            return
         elif url.endswith('/messages'):
             if state['fail']:
                 status, payload = 503, {'detail': '模型暂时不可用，请重试'}
@@ -45,11 +56,11 @@ def run():
                 s = state['session']
                 s['messages'].extend([{'role': 'user', 'content': body['content']}, {'role': 'assistant', 'content': '已更新私有方案，请核对。'}])
                 s['revision'] += 1
-                s['plan'] = {'summary': '25 题，保持多选与关联', 'items': [{'id': 'bank', 'name': '财务习题课', 'kind': 'questions', 'questions': [{'stem': '<script>多选原题</script>', 'type': 'multiple', 'options': {'A': '甲', 'B': '乙'}, 'answer': ['A', 'B'], 'clues': ['保留关联'], 'source': {'location': '第 1 页'}, 'aiAdditions': ['建议解析']}], 'warnings': ['相似题仅提示'], 'blockers': [], 'source': {'uploadId': 'file', 'location': '第 1 页'}}], 'blockers': [], 'settings': {'nameSuffix': '习题课', 'accessLevel': 'free', 'allowedRoles': ['teacher', 'student'], 'enabledModes': ['recall', 'induction'], 'duplicatePolicy': 'keep_copy'}}
+                s['plan'] = {'summary': '25 题，保持多选与关联', 'items': [{'id': 'bank', 'name': '财务习题课', 'kind': 'questions', 'questions': [{'stem': '<script>多选原题</script>', 'type': 'multiple', 'options': {'A': '甲', 'B': '乙'}, 'answer': ['A', 'B'], 'clues': ['保留关联'], 'source': {'location': '第 1 页'}, 'aiAdditions': ['建议解析'], 'metadata': {'needsReview': True, 'sourceLocation': '第 1 页'}}], 'warnings': ['相似题仅提示'], 'blockers': [], 'source': {'uploadId': 'file', 'location': '第 1 页'}}], 'blockers': [], 'settings': {'nameSuffix': '习题课', 'accessLevel': 'free', 'allowedRoles': ['teacher', 'student'], 'enabledModes': ['recall', 'induction'], 'duplicatePolicy': 'keep_copy'}}
                 payload = {'session': s}
         elif url.endswith('/uploads'):
             assert 'name="files"' in request.post_data
-            state['session']['uploads'] = [{'id': 'file', 'name': 'sample.json', 'size': 2, 'status': 'ready', 'warnings': [], 'sections': [{'location': '第 1 页', 'text': '原文保留'}]}]
+            state['session']['uploads'] = [{'id': 'file', 'name': 'sample.json', 'size': 2, 'status': 'ready', 'warnings': [], 'previewUrl': '/api/v1/teacher-assistant/uploads/file/preview'}]
             payload = {'session': state['session']}
         elif url.endswith('/execute'):
             assert request.post_data_json['revision'] == state['session']['revision']
@@ -78,8 +89,15 @@ def run():
             page.locator('#assistant-files').set_input_files({'name': 'sample.json', 'mimeType': 'application/json', 'buffer': b'{}'})
             page.locator('#upload-files').click()
             expect(page.locator('#uploads')).to_contain_text('sample.json')
-            page.locator('#uploads details').click()
+            assert not any(call[1].endswith('/preview') for call in state['calls'])
+            page.locator('#uploads > article > details > summary').click()
+            expect(page.locator('#uploads')).to_contain_text('来源读取暂时失败')
+            state['previewFail'] = False
+            page.get_by_role('button', name='重试读取原文').click()
+            page.locator('.ta-source-section > summary').click()
             expect(page.locator('#uploads')).to_contain_text('原文保留')
+            expect(page.locator('#uploads img')).to_have_attribute('loading', 'lazy')
+            expect(page.locator('#uploads img')).to_have_attribute('src', base + '/api/v1/teacher-assistant/uploads/file/assets/page-1.png')
             state['fail'] = True
             page.locator('#assistant-message').fill('习题课，免费给教师和学员，仅回忆归纳，独立副本')
             page.locator('#send-message').click()
@@ -94,10 +112,21 @@ def run():
                 expect(page.locator('#messages')).to_contain_text(content)
                 expect(page.locator('#send-message')).to_be_enabled()
             expect(page.locator('#plan-preview')).to_contain_text('方案版本 4')
+            expect(page.locator('.ta-downloads a').nth(0)).to_have_attribute('href', base + '/api/v1/teacher-assistant/sessions/one/export?format=json')
+            expect(page.locator('.ta-downloads a').nth(1)).to_have_attribute('href', base + '/api/v1/teacher-assistant/sessions/one/export?format=report')
+            for download_index in [0, 1]:
+                with page.expect_download() as download:
+                    page.locator('.ta-downloads a').nth(download_index).click()
+                assert download.value.suggested_filename == 'teacher-export.json'
+                assert json.loads(Path(download.value.path()).read_text())['settings']['duplicatePolicy'] == 'keep_copy'
             page.locator('.ta-question summary').click()
             expect(page.locator('.ta-question')).to_contain_text('保留关联')
             expect(page.locator('.ta-question')).to_contain_text('AI 补充')
             assert page.locator('#plan-preview script').count() == 0
+            expect(page.locator('#confirm-source-review')).to_be_visible()
+            page.locator('#confirm-source-review').click()
+            expect(page.locator('#messages')).to_contain_text('我已逐题核对原文、答案和图表')
+            expect(page.locator('#send-message')).to_be_enabled()
             state['session']['plan']['blockers'] = ['缺少可靠答案']
             page.locator('#refresh-session').click()
             expect(page.locator('#execute-plan')).to_be_disabled()

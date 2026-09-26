@@ -21,3 +21,15 @@
 - 全仓库检查与真实 API/worker 联调由根任务集成后统一运行。
 - 后端 upload.sections 为可选能力；未返回时只显示原件下载与方案来源定位，不编造原文。
 - 当前接口输出的枚举/回执结构以实际后端为准；未识别值仍清楚展示服务器原值。
+
+## 后续源预览与下载
+
+新增按用户展开后才 GET upload.previewUrl 的来源预览（加载、失败重试、位置分组、lazy图片、原件下载）；正常任务轮询不读取原文。新增真实会话导出标准 JSON / 校验报告下载控件并在 Chromium 实际点击验证附件内容。题目包含实际后端 stemParts/analysis/correctOptionIds/reasoningSteps/metadata，原则包与合并预检可展开。需要核对的文档提供“已逐题核对原文与答案”按钮，仅用户明确点击后发送核对确认消息，由后端更新方案。
+
+新增行为验证：来源读取失败/重试、未展开不拉取、图片 loading=lazy、真实点击两种导出下载、明确核对按钮。仍为 mock API Chromium 自检，不代表真实后端验收。
+
+只读后端审查发现并已通知根任务：
+- worker 第89–90行生成 metadata.sourceLocation/needsReview，但 import 第137–142行读取 source.location/顶层needsReview，非JSON方案阻断；根任务修复。
+- worker 第140–142行忽略 execute_plan 返回 partial 并标 succeeded，service 第116行拒绝 succeeded 重试；根任务修复。
+- import 第116行筛选触发词不含“恢复/保留”，旧selectedQuestionIds可导致排除无法撤销；import任务修复。
+- Office图像只有文件名，worker第33行把名字交给模型；无图像内容/OCR不能理解图片题。根任务已授权本代理补 Office 图片 OCR。

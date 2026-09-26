@@ -81,13 +81,14 @@
     const $ = id => doc.getElementById(id);
     const client = createClient(global.fetch.bind(global), () => global.crypto.randomUUID());
     let authorized = false, busy = false, pollTimer = null, epoch = 0;
+    const sourceViews = new Map();
     $('assistant').dataset.tab = 'conversation';
     function text(parent, tag, value, className) { const el = doc.createElement(tag); el.textContent = typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value ?? ''); if (className) el.className = className; parent.appendChild(el); return el; }
-    function link(parent, label, url) {
+    function link(parent, label, url, download = false) {
       if (!url) return;
       let parsed; try { parsed = new URL(url, global.location.href); } catch (_) { return; }
       if (parsed.origin !== global.location.origin || !['http:', 'https:'].includes(parsed.protocol)) return;
-      const el = text(parent, 'a', label); el.href = parsed.href; el.target = '_blank'; el.rel = 'noopener';
+      const el = text(parent, 'a', label); el.href = parsed.href; if (download) el.download = ''; else el.target = '_blank'; el.rel = 'noopener';
     }
     function issue(parent, value, className) { text(parent, 'p', typeof value === 'string' ? value : value.message || value.reason || JSON.stringify(value), className); }
     function showError(error) { $('assistant-error').hidden = false; $('assistant-error').textContent = error.message || String(error); }
@@ -98,6 +99,8 @@
       ['delete-session', 'refresh-session'].forEach(id => { $(id).disabled = disabled || !s; });
       ['assistant-files', 'upload-files', 'assistant-message', 'send-message'].forEach(id => { $(id).disabled = disabled || !s || running; });
       $('execute-plan').disabled = disabled || !s?.plan?.items?.length || running || Boolean(s.plan.blockers?.length) || s.plan.items.some(item => item.blockers?.length || item.questions?.some(question => question.blockers?.length)) || Boolean(s.receipt && s.job?.status === 'succeeded');
+      $('confirm-source-review').hidden = !s?.plan?.items?.some(item => item.questions?.some(question => question.metadata?.needsReview || question.needsReview));
+      $('confirm-source-review').disabled = disabled || running;
       $('retry-job').hidden = !['failed', 'cancelled'].includes(s?.job?.status); $('retry-job').disabled = disabled;
       $('cancel-job').hidden = !running; $('cancel-job').disabled = disabled;
     }
@@ -111,31 +114,71 @@
         if (upload.pageCount != null) text(el, 'span', ' · ' + upload.pageCount + ' 页');
         link(el, '下载原文件', upload.downloadUrl || BASE + '/uploads/' + encodeURIComponent(upload.id) + '/file');
         for (const warning of upload.warnings || []) issue(el, warning, 'ta-warning');
-        if (upload.sections?.length) { const details = text(el, 'details', ''); text(details, 'summary', '原文提取片段'); upload.sections.forEach(section => { text(details, 'p', section.location || section.title || '来源'); text(details, 'pre', section.text || section.content || section); }); }
+        if (upload.previewUrl || upload.sections?.length) {
+          const details = text(el, 'details', ''); text(details, 'summary', '查看原文与页面图片');
+          const content = text(details, 'div', '');
+          const view = sourceViews.get(upload.id) || { open: false, sections: upload.sections || null, warnings: [] };
+          sourceViews.set(upload.id, view); details.open = view.open;
+          function renderSources() {
+            content.replaceChildren();
+            for (const warning of view.warnings || []) issue(content, warning, 'ta-warning');
+            if (!view.sections?.length) { text(content, 'p', '暂未提取到可预览片段，请下载原件核对。'); return; }
+            view.sections.forEach(section => {
+              const part = text(content, 'details', '', 'ta-source-section'); text(part, 'summary', section.location || section.title || '来源片段');
+              text(part, 'pre', section.text || section.content || '此页没有可提取文字，请核对页面图片。');
+              for (const asset of section.images || []) {
+                let url; try { url = new URL(asset.url, global.location.href); } catch (_) { continue; }
+                if (url.origin !== global.location.origin || !['http:', 'https:'].includes(url.protocol)) continue;
+                const figure = text(part, 'figure', ''); const image = doc.createElement('img'); image.loading = 'lazy'; image.src = url.href; image.alt = (section.location || '来源') + ' · ' + (asset.name || '页面图片'); figure.appendChild(image);
+                text(figure, 'figcaption', asset.name || '来源页面图片'); link(figure, '打开图片核对', url.href);
+              }
+            });
+          }
+          async function loadSources() {
+            if (view.loading) return;
+            if (view.sections) { renderSources(); return; }
+            view.loading = true; content.replaceChildren(); text(content, 'p', '正在读取原文预览…');
+            const token = epoch;
+            try {
+              const preview = await client.request(upload.previewUrl);
+              if (token !== epoch) return;
+              view.sections = preview.sections || []; view.warnings = preview.warnings || []; renderSources();
+            } catch (error) {
+              content.replaceChildren(); issue(content, error.message, 'ta-blocker'); const retry = text(content, 'button', '重试读取原文'); retry.type = 'button'; retry.onclick = loadSources;
+            } finally { view.loading = false; }
+          }
+          details.ontoggle = () => { view.open = details.open; if (details.open) loadSources(); };
+          if (view.open) loadSources();
+        }
       }
       const status = { queued: '任务排队中', running: '正在处理', succeeded: '任务已完成，请核对下方回执', failed: '任务失败，可重试未完成步骤', cancelled: '后续步骤已取消，已提交内容不会撤销' };
       $('job-status').textContent = s.job ? status[s.job.status] || s.job.status : '当前为私有草稿，尚未执行。';
       if (s.job?.error) issue($('plan-preview'), s.job.error, 'ta-blocker');
       const plan = s.plan;
-      if (!plan) text($('plan-preview'), 'p', '上传文件并说明需求后，这里将展示可核对的方案。');
+      if (!plan?.items?.length) text($('plan-preview'), 'p', '上传文件并说明需求后，这里将展示可核对的方案。');
       else {
+        const downloads = text($('plan-preview'), 'div', '', 'ta-downloads');
+        link(downloads, '下载标准 JSON', BASE + '/sessions/' + encodeURIComponent(s.id) + '/export?format=json', true);
+        link(downloads, '下载校验报告', BASE + '/sessions/' + encodeURIComponent(s.id) + '/export?format=report', true);
         text($('plan-preview'), 'h3', '方案版本 ' + s.revision); if (plan.summary) text($('plan-preview'), 'p', plan.summary);
         const settings = text($('plan-preview'), 'dl', '', 'ta-settings');
         const labels = { nameSuffix: '名称要求', accessLevel: '收费范围', allowedRoles: '开放对象', enabledModes: '学习模式', duplicatePolicy: '重复处理' };
-        const translated = { teacher: '教师', student: '学员', admin: '管理员', free: '免费', private: '私有', member: '会员', recall: '回忆', induction: '归纳', reasoning: '归纳', preserve: '保留独立副本', independent: '保留独立副本', reuse: '复用', cancel: '取消', keep_copy: '保留独立副本' };
+        const translated = { teacher: '教师', student: '学员', admin: '管理员', free: '免费', private: '私有', member: '会员', recall: '回忆', induction: '归纳', reasoning: '归纳', deep_recall: '回忆画布', multi_question_canvas: '归纳画布', practice_mode: '做题模式', preserve: '保留独立副本', independent: '保留独立副本', reuse: '复用', cancel: '取消', keep_copy: '保留独立副本' };
         for (const [key, label] of Object.entries(labels)) { text(settings, 'dt', label); const value = plan.settings?.[key]; text(settings, 'dd', Array.isArray(value) ? value.map(v => translated[v] || v).join('、') : translated[value] || value || '待确定'); }
         (plan.blockers || []).forEach(value => issue($('plan-preview'), value, 'ta-blocker'));
         for (const item of plan.items || []) {
-          const el = text($('plan-preview'), 'article', '', 'ta-item'); text(el, 'h3', item.name || item.id); text(el, 'p', (item.kind === 'principles' ? '原则与归纳卡' : '题库') + ' · ' + (item.questions?.length || item.principles?.length || 0) + ' 项');
+          const el = text($('plan-preview'), 'article', '', 'ta-item'); text(el, 'h3', item.name || item.id); text(el, 'p', (item.kind === 'principles' ? '原则与归纳卡' : '题库') + ' · ' + (item.questions?.length || item.principles?.length || item.principleBundle?.principles?.length || 0) + ' 项');
           const upload = (s.uploads || []).find(u => u.id === item.source?.uploadId); text(el, 'p', '来源：' + (upload?.name || item.source?.uploadId || '未定位') + ' · ' + (item.source?.location || '待核对'));
           if (upload) link(el, '对照原件', upload.downloadUrl || BASE + '/uploads/' + encodeURIComponent(upload.id) + '/file');
           (item.warnings || []).forEach(v => issue(el, v, 'ta-warning')); (item.blockers || []).forEach(v => issue(el, v, 'ta-blocker'));
           for (const [index, question] of (item.questions || []).entries()) {
             const detail = text(el, 'details', '', 'ta-question'); text(detail, 'summary', (index + 1) + '. ' + (question.stem || question.title || question.question || '题目') + ' [' + (question.type || question.questionType || '题型待核对') + ']');
-            for (const [key, label] of [['options', '选项'], ['answer', '答案'], ['answers', '答案'], ['correctAnswer', '正确答案'], ['explanation', '解析'], ['clues', '联想词'], ['concepts', '原则'], ['reasoning', '推理'], ['source', '来源定位'], ['provenance', '内容来源'], ['aiAdditions', 'AI 补充（待核对）']]) if (question[key] != null) text(detail, 'pre', label + '：' + (typeof question[key] === 'object' ? JSON.stringify(question[key], null, 2) : question[key]));
+            for (const [key, label] of [['stemParts', '题干内容'], ['options', '选项'], ['answer', '答案'], ['answers', '答案'], ['correctAnswer', '正确答案'], ['correctOptionIds', '正确选项'], ['explanation', '解析'], ['analysis', '解析'], ['clues', '联想词'], ['concepts', '原则'], ['reasoning', '推理'], ['reasoningSteps', '推理步骤'], ['metadata', '来源与关联元数据'], ['source', '来源定位'], ['provenance', '内容来源'], ['aiAdditions', 'AI 补充（待核对）']]) if (question[key] != null) text(detail, 'pre', label + '：' + (typeof question[key] === 'object' ? JSON.stringify(question[key], null, 2) : question[key]));
             (question.warnings || []).forEach(v => issue(detail, v, 'ta-warning')); (question.blockers || []).forEach(v => issue(detail, v, 'ta-blocker'));
           }
-          for (const principle of item.principles || []) text(el, 'pre', principle);
+          for (const principle of item.principles || item.principleBundle?.principles || []) text(el, 'pre', principle);
+          if (item.principleBundle) { const bundle = text(el, 'details', ''); text(bundle, 'summary', '原则与归纳卡内容'); text(bundle, 'pre', item.principleBundle); }
+          if (item.mergePreview) { const merge = text(el, 'details', ''); text(merge, 'summary', '原则合并变更预览'); text(merge, 'pre', item.mergePreview); }
           if (item.changes) text(el, 'pre', '变更清单：' + JSON.stringify(item.changes, null, 2));
         }
       }
@@ -164,11 +207,12 @@
       catch (error) { showError(error); }
       finally { busy = false; render(); schedule(); }
     }
-    $('new-session').onclick = () => action(async () => { epoch++; await client.create(); $('assistant-message').value = ''; $('assistant-files').value = ''; }, true);
-    $('session-history').onchange = () => { const id = $('session-history').value; if (id) action(async () => { epoch++; await client.load(id); $('assistant-message').value = ''; $('assistant-files').value = ''; }); };
-    $('delete-session').onclick = () => { if (global.confirm('删除本会话及私人原文件？已发布内容不会撤回。')) action(async () => { epoch++; await client.remove(); }, true); };
+    $('new-session').onclick = () => action(async () => { epoch++; sourceViews.clear(); await client.create(); $('assistant-message').value = ''; $('assistant-files').value = ''; }, true);
+    $('session-history').onchange = () => { const id = $('session-history').value; if (id) action(async () => { epoch++; sourceViews.clear(); await client.load(id); $('assistant-message').value = ''; $('assistant-files').value = ''; }); };
+    $('delete-session').onclick = () => { if (global.confirm('删除本会话及私人原文件？已发布内容不会撤回。')) action(async () => { epoch++; sourceViews.clear(); await client.remove(); }, true); };
     $('upload-form').onsubmit = event => { event.preventDefault(); action(async () => { const files = Array.from($('assistant-files').files); validateFiles(files); await client.upload(files); $('assistant-files').value = ''; }, true); };
     $('message-form').onsubmit = event => { event.preventDefault(); const content = $('assistant-message').value.trim(); if (!content) { showError(new Error('请填写整理需求。')); return; } action(async () => { await client.mutate('messages', { content }); $('assistant-message').value = ''; }, true); };
+    $('confirm-source-review').onclick = () => action(() => client.mutate('messages', { content: '我已逐题核对原文、答案和图表，确认提取内容无误，请更新预览。' }), true);
     $('execute-plan').onclick = () => action(() => client.mutate('execute', { revision: client.session.revision }));
     $('retry-job').onclick = () => action(() => client.mutate('retry'));
     $('cancel-job').onclick = () => action(() => client.mutate('cancel'));
