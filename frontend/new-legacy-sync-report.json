@@ -1,41 +1,12 @@
 {
   "schemaVersion": 1,
   "fromVersion": "v9.0-p4.1.239",
-  "toVersion": "v9.0-p4.1.239",
+  "toVersion": "v9.0-p4.1.240",
   "changes": {
-    "added": [
-      "src/00-import-guard.js",
-      "tests/import-guards.test.js"
-    ],
+    "added": [],
     "changed": [
-      "admin-subjects.html",
-      "content-center.html",
-      "content-prep-studio/build.py",
-      "content-prep-studio/dist/content-prep.html",
-      "content-prep-studio/src/js/16-recall-acceptance.js",
-      "content-prep-studio/src/js/17-question-supplement.js",
-      "content-prep-studio/src/js/20-page-runtime.js",
-      "content-prep-studio/src/js/22-round3-extras.js",
-      "content-prep-studio/src/js/40-events-bootstrap.js",
-      "content-prep-studio/src/js/45-server-events.js",
-      "file-manager.html",
-      "index.html",
-      "paper-management.html",
-      "question-bank.html",
-      "question-workspace.html",
-      "src/20-flashcards-toolbar.js",
-      "src/27-graph-file-manager.js",
-      "src/35-user-management.js",
-      "src/60-question-bank.js",
-      "src/65-question-bank-admin.js",
-      "src/91-content-center-app.js",
-      "src/96-recall-association-admin.js",
-      "src/admin/51-admin-subjects-app.js",
-      "src/admin/53-recall-association-management.js",
-      "src/teacher/paper-management/paper-import-controller.js",
-      "src/teacher/question-bank-import-controller.js",
-      "src/teacher/training-config/principle-preset-controller.js",
-      "user-management.html"
+      "VERSION",
+      "content-prep-studio/dist/content-prep.html"
     ],
     "removed": []
   },
