@@ -756,6 +756,11 @@ async def test_word_standalone_diagram_uses_bounded_question_source_span(db, tmp
     assert not plan['items'][0]['questions'][1]['sourceImages']
     del first['source']['locations']
     assert (await preview())['items'][0]['questions'][0]['sourceImages'][0]['location'] == '段落 3'
+    Image.new('RGB', (20, 20), 'blue').save(extraction / 'diagram2.png')
+    sections[-1]['images'] = ['diagram2.png']
+    filtered = await build_plan(db, ACTOR, [uploaded], {'userInstruction': '第2题不要', 'items': [{'uploadId': 'u', 'questions': [first, second], 'excludedQuestionIds': ['q2']}]}, session_id='s')
+    assert len(filtered['items'][0]['questions']) == 1
+    assert [image['location'] for image in filtered['items'][0]['questions'][0]['sourceImages']] == ['段落 3']
     first['source']['locations'] = ['段落 2', '段落 3', '段落 4', '段落 5']
     assert (await preview())['items'][0]['blockers']
     first['source']['locations'] = ['段落 2', '段落 3']
@@ -763,3 +768,55 @@ async def test_word_standalone_diagram_uses_bounded_question_source_span(db, tmp
     assert (await preview())['items'][0]['blockers']
     first['source']['uploadId'] = 'other-private-upload'
     assert (await preview())['items'][0]['blockers']
+
+@pytest.mark.anyio
+@pytest.mark.parametrize('initial_publish', [False, True])
+@pytest.mark.parametrize('restore_word', ['恢复', '加回', '重新加入'])
+async def test_restore_multiple_choice_promotes_same_paper_to_mixed(initial_publish, restore_word):
+    from uuid import uuid4
+    from sqlalchemy import select
+    from app.db.session import AsyncSessionLocal
+    from app.models.user import User
+    from app.models.teacher_assistant import TeacherAssistantSession
+    from app.models.question import ExamPaper
+    from app.models.paper_release import PaperReleaseQuestion
+    uploaded = source()
+    multiple = question('q2')
+    multiple.update(type='multiple_choice', correctAnswer=None, correctOptionIds=['a', 'b'])
+    multiple['options'].append({'id': 'c', 'text': '错误选项C'})
+    multiple['analysis'] = 'A和B符合题意，C错误。'
+    multiple['stemParts'] = [{'type': 'text', 'text': '恢复的多选题'}]
+    uploaded['extracted']['data']['questions'].append(multiple)
+    async with AsyncSessionLocal() as database:
+        actor = User(username='ta-mixed-' + uuid4().hex[:12], password_hash='test', role='teacher', status='active')
+        database.add(actor)
+        await database.commit()
+        session = TeacherAssistantSession(id='tas-mixed-' + uuid4().hex, owner_id=actor.username, revision=1)
+        initial = await build_plan(database, actor, [uploaded], {'settings': {'duplicatePolicy': 'independent', 'publish': initial_publish, 'accessLevel': 'free', 'allowedRoles': ['student'], 'enabledModes': ['deep_recall', 'multi_question_canvas']}, 'userInstruction': '第2题不要', 'items': [{'uploadId': 'upload1', 'excludedQuestionIds': ['q2']}]}, session_id=session.id)
+        session.plan = initial
+        database.add(session)
+        await database.commit()
+        saved = await execute_plan(database, actor, session, 1)
+        assert saved['status'] == 'succeeded', saved
+        old_release = saved['items'][0].get('releaseId')
+        from app.services import paper_service
+        from app.schemas.paper import PaperUpdateRequest
+        existing_paper = await database.get(ExamPaper, saved['items'][0]['paperId'])
+        with pytest.raises(HTTPException) as locked:
+            await paper_service.update_paper(database, actor, existing_paper.id, PaperUpdateRequest(revision=existing_paper.revision, paperType='mixed'))
+        assert locked.value.detail['code'] == 'PAPER_TYPE_LOCKED'
+        restored = await build_plan(database, actor, [uploaded], {'settings': {'publish': True}, 'userInstruction': restore_word + '第2题并发布', 'items': [{'uploadId': 'upload1', 'selectedQuestionIds': ['q1', 'q2']}]}, session_id=session.id, previous_plan=initial)
+        assert not restored['blockers'], restored
+        assert not restored['items'][0]['blockers'], restored['items'][0]['blockers']
+        session.plan, session.revision = restored, 2
+        await database.commit()
+        result = await execute_plan(database, actor, session, 2)
+        assert result['status'] == 'succeeded', json.dumps(result, ensure_ascii=False)
+        assert result['items'][0]['paperId'] == saved['items'][0]['paperId']
+        assert result['items'][0]['bankId'] == saved['items'][0]['bankId']
+        paper = await database.get(ExamPaper, result['items'][0]['paperId'])
+        assert paper.paper_type == 'mixed'
+        if old_release:
+            old_rows = (await database.execute(select(PaperReleaseQuestion).where(PaperReleaseQuestion.release_id == old_release))).scalars().all()
+            assert len(old_rows) == 1
+            assert old_rows[0].snapshot['type'] == 'single_choice'

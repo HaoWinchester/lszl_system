@@ -438,13 +438,14 @@ async def build_plan(db, actor, sources: list[dict], model_result: dict, *, sess
             item_id = upload_id + ':' + str(bank.get('id') or index)
             old = previous.get(item_id, {})
             questions = deepcopy(bank.get('questions') or [])
+            original_question_starts = [(question.get('source') or {}).get('location') for question in questions]
             warnings = list(extracted.get('warnings') or [])
             item_blockers = []
             instruction = str(model_result.get('userInstruction') or '')
             patches, correction_provenance, source_originals, patch_errors = _apply_question_patches(questions, old, model_item, instruction, actor)
             item_blockers.extend(patch_errors)
             filter_keys = {'selectedQuestionIds', 'excludedQuestionIds'} & set(model_item)
-            if filter_keys and re.search('删除|不要|去掉|只保留|排除|恢复|保留', instruction):
+            if filter_keys and re.search('删除|不要|去掉|只保留|排除|恢复|加回|重新加入|保留', instruction):
                 known = {str(question.get('id')) for question in questions}
                 selected = set(map(str, model_item.get('selectedQuestionIds', known)))
                 excluded = set(map(str, model_item.get('excludedQuestionIds', [])))
@@ -473,7 +474,7 @@ async def build_plan(db, actor, sources: list[dict], model_result: dict, *, sess
                 section_rows = extracted.get('sections') or []
                 sections = {section['location']: section for section in section_rows}
                 section_order = list(sections)
-                starts = [(question.get('source') or {}).get('location') for question in questions]
+                starts = original_question_starts
                 for question in questions:
                     source_ref = question.get('source') or {}
                     location = source_ref.get('location')
@@ -737,6 +738,12 @@ async def execute_plan(db, actor, session, revision, *, before_step=None) -> dic
                     expected_revision = entry.get('paperMutationRevision') or binding['paperRevision']
                     if current.revision != expected_revision:
                         raise _error(409, 'PAPER_REVISION_CONFLICT', '试卷版本已变化，请重新预览。')
+                    if current_payload['paperType'] != desired['paperType'] and current_payload['paperType'] != 'mixed':
+                        await guard()
+                        current_payload = await paper_service.update_paper(db, actor, paper_id, PaperUpdateRequest(revision=expected_revision, paperType='mixed'), allow_type_promotion=True)
+                        expected_revision = current_payload['revision']
+                        entry.update(paperId=paper_id, paperMutationRevision=expected_revision, paperReady=False)
+                        await _checkpoint(db, session, receipt)
                     if _paper_view(current_payload)['questions'] != desired['questions']:
                         await guard()
                         current_payload = await paper_service.replace_questions(db, actor, paper_id, PaperQuestionReplaceRequest(revision=expected_revision, questions=desired['questions']))
@@ -752,7 +759,7 @@ async def execute_plan(db, actor, session, revision, *, before_step=None) -> dic
                     entry['paperId'] = paper_id
                 else:
                     await guard()
-                    result = await paper_import_service.import_package(db, actor, PaperImportRequest(fileName=request.file_name, package=package, preflightHash=preflight['payloadHash'], conflictAction='replace_draft' if current is not None else 'create', expectedRevision=binding.get('paperRevision') if current is not None else None, idempotencyKey='ta-paper-' + _identity(session_id, item['id'], revision)))
+                    result = await paper_import_service.import_package(db, actor, PaperImportRequest(fileName=request.file_name, package=package, preflightHash=preflight['payloadHash'], conflictAction='replace_draft' if current is not None else 'create', expectedRevision=binding.get('paperRevision') if current is not None else None, idempotencyKey='ta-paper-' + _identity(session_id, item['id'], revision)), allow_type_promotion=bool(binding.get('paperId')))
                     entry['paperId'] = result['paper']['id']
                 ready_paper = await db.get(ExamPaper, entry['paperId'])
                 if ready_paper is not None:
