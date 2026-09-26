@@ -305,3 +305,134 @@ async def test_principle_resolution_requires_trusted_direction(db, monkeypatch):
     receipt = await execute_plan(db, ACTOR, session, 1)
     assert receipt['status'] == 'partial'
     assert '变化' in receipt['items'][0]['error']
+
+@pytest.mark.anyio
+async def test_document_images_derive_only_matched_source_section(db, tmp_path, monkeypatch):
+    from PIL import Image
+    from app.core.config import settings
+    monkeypatch.setattr(settings, 'TEACHER_ASSISTANT_STORAGE', str(tmp_path))
+    extraction = tmp_path / 's' / 'u' / 'extracted'
+    extraction.mkdir(parents=True)
+    Image.new('RGB', (20, 20), 'red').save(extraction / 'one.png')
+    Image.new('RGB', (20, 20), 'blue').save(extraction / 'two.png')
+    q = question()
+    q.update(source={'location': '幻灯片 1'}, images=[{'id': 'untrusted-existing-asset'}], sourceImages=['../../secret'])
+    uploaded = {'id': 'u', 'name': 'slides.pptx', 'extracted': {'kind': 'document', 'data': None, 'sections': [{'location': '幻灯片 1', 'text': '题干', 'images': ['one.png']}, {'location': '幻灯片 2', 'text': '其他', 'images': ['two.png']}], 'warnings': []}}
+    plan = await build_plan(db, ACTOR, [uploaded], {'settings': {'duplicatePolicy': 'independent'}, 'items': [{'uploadId': 'u', 'questions': [q]}]}, session_id='s')
+    item = plan['items'][0]
+    assert not item['blockers']
+    assert [image['filename'] for image in item['questions'][0]['sourceImages']] == ['one.png']
+    assert not item['questions'][0].get('images')
+    assert item['questions'][0]['sourceImages'][0]['location'] == '幻灯片 1'
+
+@pytest.mark.anyio
+async def test_bad_source_image_blocks_preview(db, tmp_path, monkeypatch):
+    from app.core.config import settings
+    monkeypatch.setattr(settings, 'TEACHER_ASSISTANT_STORAGE', str(tmp_path))
+    extraction = tmp_path / 's' / 'u' / 'extracted'
+    extraction.mkdir(parents=True)
+    (extraction / 'bad.png').write_bytes(b'not image')
+    q = question()
+    q['source'] = {'location': '第 1 页'}
+    uploaded = {'id': 'u', 'name': 'scan.pdf', 'extracted': {'kind': 'document', 'data': None, 'sections': [{'location': '第 1 页', 'text': 'text', 'images': ['bad.png']}], 'warnings': []}}
+    plan = await build_plan(db, ACTOR, [uploaded], {'settings': {'duplicatePolicy': 'independent'}, 'items': [{'uploadId': 'u', 'questions': [q]}]}, session_id='s')
+    assert any('图片' in blocker for blocker in plan['items'][0]['blockers'])
+
+@pytest.mark.anyio
+async def test_published_source_image_survives_conversation_delete(tmp_path, monkeypatch):
+    from uuid import uuid4
+    from PIL import Image
+    import shutil
+    from sqlalchemy import func, select
+    from app.core.config import settings
+    from app.db.session import AsyncSessionLocal
+    from app.models.user import User
+    from app.models.teacher_assistant import TeacherAssistantSession
+    from app.models.question_material import QuestionAsset
+    from app.models.paper_release import PaperReleaseQuestion
+    from app.services import question_material_service
+    monkeypatch.setattr(settings, 'TEACHER_ASSISTANT_STORAGE', str(tmp_path))
+    suffix = uuid4().hex[:12]
+    sid = 'tas-image-' + suffix
+    extraction = tmp_path / sid / 'diagram-upload' / 'extracted'
+    extraction.mkdir(parents=True)
+    Image.new('RGB', (80, 40), 'green').save(extraction / 'diagram.bmp')  # bounded conversion to PNG
+    q = question()
+    q['source'] = {'location': '幻灯片 1'}
+    uploaded = {'id': 'diagram-upload', 'name': 'slides.pptx', 'extracted': {'kind': 'document', 'data': None, 'sections': [{'location': '幻灯片 1', 'text': '题干', 'images': ['diagram.bmp']}], 'warnings': []}}
+    async with AsyncSessionLocal() as database:
+        teacher = User(username='ta-image-' + suffix, password_hash='test', role='teacher', status='active')
+        student = User(username='ta-student-' + suffix, password_hash='test', role='student', status='active')
+        other_teacher = User(username='ta-other-' + suffix, password_hash='test', role='teacher', status='active')
+        database.add_all([teacher, student, other_teacher])
+        await database.commit()
+        session = TeacherAssistantSession(id=sid, owner_id=teacher.username, revision=1)
+        model = {'settings': {'duplicatePolicy': 'independent', 'publish': True, 'accessLevel': 'free', 'allowedRoles': ['student'], 'enabledModes': ['deep_recall', 'multi_question_canvas']}, 'items': [{'uploadId': uploaded['id'], 'questions': [q]}]}
+        session.plan = await build_plan(database, teacher, [uploaded], model, session_id=sid)
+        assert not session.plan['items'][0]['blockers']
+        database.add(session)
+        await database.commit()
+        first = await execute_plan(database, teacher, session, 1)
+        assert first['status'] == 'succeeded', json.dumps(first, ensure_ascii=False)
+        assets = first['items'][0]['assets']
+        assert len(assets) == 1
+        asset_id = next(iter(assets.values()))['id']
+        snapshot = (await database.execute(select(PaperReleaseQuestion).where(PaperReleaseQuestion.release_id == first['items'][0]['releaseId']))).scalar_one()
+        assert snapshot.snapshot['images'][0]['id'] == asset_id
+        assert snapshot.snapshot['images'][0]['url'] == f'/api/v1/question-assets/{asset_id}'
+        session.receipt = {}
+        await database.commit()
+        replay = await execute_plan(database, teacher, session, 1)
+        assert replay['status'] == 'succeeded', replay
+        assert next(iter(replay['items'][0]['assets'].values()))['id'] == asset_id
+        assert await database.scalar(select(func.count()).select_from(QuestionAsset).where(QuestionAsset.owner_id == teacher.username)) == 1
+        await database.delete(session)
+        await database.commit()
+        shutil.rmtree(tmp_path / sid)
+        granted = await question_material_service.authorized_asset(database, student, asset_id)
+        assert granted.mime_type == 'image/png'
+        assert granted.data.startswith(b'\x89PNG')
+        with pytest.raises(HTTPException) as denied:
+            await question_material_service.authorized_asset(database, other_teacher, asset_id)
+        assert denied.value.status_code == 404
+
+@pytest.mark.anyio
+@pytest.mark.parametrize('malformed', [
+    {'settings': {'publish': 'false', 'directPublish': 'true'}},
+    {'settings': {'allowedRoles': [{'role': 'student'}]}},
+    {'settings': {'enabledModes': [False]}},
+    {'settings': {'names': {'upload1': {'name': 'unsafe'}}}},
+    {'settings': {'nameSuffix': ['suffix']}},
+    {'settings': []},
+    {'items': {'uploadId': 'upload1'}},
+    {'items': [False]},
+    {'blockers': 'not-array'},
+    {'blockers': [{'message': 'bad'}]},
+])
+async def test_malformed_model_blocks_before_execution(db, malformed):
+    plan = await build_plan(db, ACTOR, [source()], malformed, session_id='s')
+    assert plan['blockers']
+    assert plan['settings']['publish'] is False
+    session = SimpleNamespace(id='s', owner_id='teacher', revision=1, plan=plan, receipt={})
+    with pytest.raises(HTTPException) as error:
+        await execute_plan(db, ACTOR, session, 1)
+    assert error.value.status_code == 422
+    assert db.commit.await_count == 0
+
+@pytest.mark.anyio
+async def test_raw_json_cannot_turn_source_images_into_server_file_access(db, monkeypatch):
+    from app.services import teacher_assistant_import as importer
+    q = question()
+    q['sourceImages'] = [{'uploadId': '../../../../private', 'filename': 'secret.png', 'digest': 'forged', 'mimeType': 'image/png', 'location': 'forged'}]
+    plan = await build_plan(db, ACTOR, [source(q)], {'settings': {'duplicatePolicy': 'independent'}}, session_id='s')
+    assert plan['items'][0]['sourceKind'] == 'json'
+    image_reader = AsyncMock(side_effect=AssertionError('raw JSON must not read extraction files'))
+    monkeypatch.setattr(importer, '_ensure_source_asset', image_reader)
+    bank_source = plan['items'][0]['bankPayload']['sourceId']
+    monkeypatch.setattr(importer.question_service, 'import_question_banks', AsyncMock(return_value={'sourceBankIdMap': {bank_source: 'b'}}))
+    monkeypatch.setattr(importer.paper_import_service, 'preflight_package', AsyncMock(return_value={'valid': True, 'payloadHash': 'a' * 64}))
+    monkeypatch.setattr(importer.paper_import_service, 'import_package', AsyncMock(return_value={'paper': {'id': 'p'}}))
+    session = SimpleNamespace(id='s', owner_id='teacher', revision=1, plan=plan, receipt={})
+    receipt = await execute_plan(db, ACTOR, session, 1)
+    assert receipt['status'] == 'succeeded'
+    assert image_reader.await_count == 0

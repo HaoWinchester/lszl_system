@@ -3,6 +3,11 @@ from __future__ import annotations
 
 from copy import deepcopy
 import hashlib
+import base64
+from io import BytesIO
+from pathlib import Path
+import warnings
+from PIL import Image
 import json
 import re
 
@@ -10,11 +15,14 @@ from fastapi import HTTPException
 from pydantic import ValidationError
 from sqlalchemy import select, text
 
+from app.core.config import settings
+from app.models.question_material import QuestionAsset
+from app.schemas.question_material import AssetInput
 from app.models.content_prep import Principle
 from app.models.question import ExamPaper, Question, QuestionBank
 from app.schemas.paper import PaperImportPreflightRequest, PaperImportRequest
 from app.schemas.question_catalog import QuestionBankImportRequest, QuestionPayload
-from app.services import content_prep_shared_service, paper_import_service, paper_release_service, question_answer_service, question_content_service, question_service, teaching_content_projection_service
+from app.services import content_prep_shared_service, paper_import_service, paper_release_service, question_answer_service, question_content_service, question_service, teaching_content_projection_service, question_material_service, idempotency_service
 
 
 def _error(status, code, message):
@@ -23,6 +31,60 @@ def _error(status, code, message):
 
 def _identity(*parts):
     return hashlib.sha256('::'.join(str(part) for part in parts).encode()).hexdigest()[:40]
+
+
+def _source_image(session_id, upload_id, filename):
+    if any(not isinstance(value, str) or value in {'', '.', '..'} or Path(value).name != value or '/' in value or '\\' in value for value in (session_id, upload_id)):
+        raise ValueError('来源图片归属路径无效。')
+    if not isinstance(filename, str) or Path(filename).name != filename or '/' in filename or '\\' in filename:
+        raise ValueError('来源图片路径无效。')
+    directory = (Path(settings.TEACHER_ASSISTANT_STORAGE) / session_id / upload_id / 'extracted').resolve()
+    path = (directory / filename).resolve()
+    if path.parent != directory or not path.is_file():
+        raise ValueError('来源图片不存在，请重新解析。')
+    if path.stat().st_size > 5 * 1024 * 1024:
+        raise ValueError('来源图片超过 5 MiB，请压缩或拆分。')
+    data = path.read_bytes()
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter('error', Image.DecompressionBombWarning)
+            with Image.open(BytesIO(data)) as image:
+                if image.width * image.height > 40_000_000:
+                    raise ValueError('pixels')
+                if getattr(image, 'n_frames', 1) != 1:
+                    raise ValueError('multiple frames')
+                image_format = image.format
+                if image_format not in {'PNG', 'JPEG', 'WEBP', 'GIF', 'BMP', 'TIFF'}:
+                    raise ValueError('format')
+                image.verify()
+            if image_format not in {'PNG', 'JPEG', 'WEBP'}:
+                with Image.open(BytesIO(data)) as image:
+                    image.seek(0)
+                    output = BytesIO()
+                    image.convert('RGB').save(output, format='PNG')
+                    data = output.getvalue()
+                image_format = 'PNG'
+    except Exception as exc:
+        raise ValueError('来源图片格式无效或像素超过安全上限。') from exc
+    if len(data) > 5 * 1024 * 1024:
+        raise ValueError('转换后图片超过 5 MiB，请压缩或拆分。')
+    mime = {'PNG': 'image/png', 'JPEG': 'image/jpeg', 'WEBP': 'image/webp'}[image_format]
+    return data, mime, hashlib.sha256(data).hexdigest()
+
+
+async def _ensure_source_asset(db, actor, session_id, image):
+    data, mime, digest = _source_image(session_id, image['uploadId'], image['filename'])
+    if digest != image['digest'] or mime != image['mimeType']:
+        raise _error(409, 'SOURCE_IMAGE_CHANGED', '来源图片已变化，请重新预览。')
+    extension = {'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp'}[mime]
+    name = 'ta-image-' + _identity(actor.username, session_id, image['uploadId'], image['filename'], digest) + extension
+    await idempotency_service.lock(db, actor.username, name)
+    existing = (await db.execute(select(QuestionAsset).where(QuestionAsset.owner_id == actor.username, QuestionAsset.filename == name).limit(2))).scalars().all()
+    if existing:
+        if len(existing) != 1 or existing[0].data != data or existing[0].mime_type != mime:
+            raise _error(409, 'SOURCE_IMAGE_ASSET_CONFLICT', '来源图片资源冲突，请联系管理员。')
+        return question_material_service.asset_payload(existing[0])
+    return await question_material_service.upload_asset(db, actor, AssetInput(filename=name, mimeType=mime, dataBase64=base64.b64encode(data).decode(), alt=f"{image['location']} 来源图片"))
 
 
 def _banks(data):
@@ -67,9 +129,68 @@ async def _reference_blockers(db, questions, incoming_principle_ids=None):
     return recall_blockers + [f'引用原则不存在或不可用：{value}' for value in sorted(missing)]
 
 
+def _validated_model_result(result):
+    if not isinstance(result, dict):
+        raise _error(422, 'ASSISTANT_MODEL_INVALID', '模型结果必须是对象。')
+    result = deepcopy(result)
+    errors = []
+    if not isinstance(result.get('blockers', []), list) or any(not isinstance(value, str) for value in result.get('blockers', [])):
+        errors.append('模型 blockers 必须为字符串数组。')
+        result['blockers'] = []
+    raw_settings = result.get('settings', {})
+    if not isinstance(raw_settings, dict):
+        errors.append('模型 settings 必须为对象。')
+        result['settings'] = {}
+    else:
+        for flag in ('publish', 'directPublish'):
+            if flag in raw_settings and type(raw_settings[flag]) is not bool:
+                errors.append(f'{flag} 必须为布尔值。')
+                raw_settings[flag] = False
+        for key in ('allowedRoles', 'enabledModes'):
+            if key in raw_settings and (not isinstance(raw_settings[key], list) or any(not isinstance(value, str) for value in raw_settings[key])):
+                errors.append(f'{key} 必须为字符串数组。')
+                raw_settings[key] = []
+        if 'names' in raw_settings and (not isinstance(raw_settings['names'], dict) or any(not isinstance(key, str) or not isinstance(value, str) for key, value in raw_settings['names'].items())):
+            errors.append('names 必须为名称字符串映射。')
+            raw_settings['names'] = {}
+        for key in ('nameSuffix', 'accessLevel', 'duplicatePolicy'):
+            if key in raw_settings and not isinstance(raw_settings[key], str) and not (key == 'duplicatePolicy' and raw_settings[key] is None):
+                errors.append(f'{key} 必须为字符串。')
+                raw_settings[key] = {'nameSuffix': '', 'accessLevel': 'private', 'duplicatePolicy': None}[key]
+    raw_items = result.get('items', [])
+    if not isinstance(raw_items, list) or any(not isinstance(item, dict) for item in raw_items):
+        errors.append('模型 items 必须为对象数组。')
+        result['items'] = []
+    else:
+        for item in raw_items:
+            if not isinstance(item.get('uploadId'), str):
+                errors.append('模型 uploadId 必须为字符串。')
+                item['uploadId'] = ''
+            if 'questions' in item and (not isinstance(item['questions'], list) or any(not isinstance(question, dict) for question in item['questions'])):
+                errors.append('模型 questions 必须为题目对象数组。')
+                item['questions'] = []
+            for key in ('selectedQuestionIds', 'excludedQuestionIds', 'reviewedQuestionIds'):
+                if key in item and (not isinstance(item[key], list) or any(not isinstance(value, str) for value in item[key])):
+                    errors.append(f'{key} 必须为 ID 字符串数组。')
+                    item.pop(key)
+            if 'principleResolutions' in item and (not isinstance(item['principleResolutions'], list) or any(not isinstance(value, dict) or not isinstance(value.get('conflictId'), str) or not isinstance(value.get('resolution'), str) for value in item['principleResolutions'])):
+                errors.append('principleResolutions 必须为对象数组。')
+                item['principleResolutions'] = []
+    if 'reviewedQuestionIds' in result and (not isinstance(result['reviewedQuestionIds'], list) or any(not isinstance(value, str) for value in result['reviewedQuestionIds'])):
+        errors.append('reviewedQuestionIds 必须为 ID 字符串数组。')
+        result['reviewedQuestionIds'] = []
+    for key in ('reply', 'userInstruction'):
+        if key in result and not isinstance(result[key], str):
+            errors.append(f'{key} 必须为字符串。')
+            result[key] = ''
+    result.setdefault('blockers', []).extend(errors)
+    return result
+
+
 async def build_plan(db, actor, sources: list[dict], model_result: dict, *, session_id: str, previous_plan: dict | None = None) -> dict:
     if actor.role not in {'teacher', 'admin'}:
         raise _error(403, 'TEACHER_REQUIRED', '仅教师或管理员可整理教学文件。')
+    model_result = _validated_model_result(model_result)
     settings = deepcopy((previous_plan or {}).get('settings') or {})
     settings.update(deepcopy(model_result.get('settings') or {}))
     settings.setdefault('publish', False)
@@ -82,9 +203,9 @@ async def build_plan(db, actor, sources: list[dict], model_result: dict, *, sess
     for flag in ('publish', 'directPublish'):
         if type(settings[flag]) is not bool:
             blockers.append(f'{flag} 必须为布尔值。')
-    if settings['allowedRoles'] and (not isinstance(settings['allowedRoles'], list) or set(settings['allowedRoles']) - {'teacher', 'student', 'admin', 'viewer'}):
+    if settings['allowedRoles'] and (not isinstance(settings['allowedRoles'], list) or any(not isinstance(value, str) for value in settings['allowedRoles']) or set(settings['allowedRoles']) - {'teacher', 'student', 'admin', 'viewer'}):
         blockers.append('开放角色无效。')
-    if not isinstance(settings['enabledModes'], list) or set(settings['enabledModes']) - {'deep_recall', 'multi_question_canvas', 'practice_mode'}:
+    if not isinstance(settings['enabledModes'], list) or any(not isinstance(value, str) for value in settings['enabledModes']) or set(settings['enabledModes']) - {'deep_recall', 'multi_question_canvas', 'practice_mode'}:
         blockers.append('学习模式无效。')
     if settings['accessLevel'] not in {'private', 'free', 'member'}:
         blockers.append('收费方式无效。')
@@ -97,6 +218,7 @@ async def build_plan(db, actor, sources: list[dict], model_result: dict, *, sess
     proposed = {str(item.get('uploadId')): item for item in model_result.get('items', []) if isinstance(item, dict)}
     previous = {item['id']: item for item in (previous_plan or {}).get('items', [])}
     items = []
+    image_cache = {}
     incoming_principle_ids = set()
     for source in sources:
         data = source['extracted'].get('data') if source['extracted']['kind'] == 'json' else proposed.get(str(source['id']), {}).get('principleBundle')
@@ -170,6 +292,29 @@ async def build_plan(db, actor, sources: list[dict], model_result: dict, *, sess
                     item_blockers.append('核对确认包含不存在的题目 ID。')
                 else:
                     reviewed_ids.update(proposed_reviewed)
+            if extracted['kind'] != 'json':
+                sections = {section['location']: section for section in extracted.get('sections') or []}
+                for question in questions:
+                    location = (question.get('source') or {}).get('location')
+                    # Model-provided asset IDs/paths cannot reference unrelated private resources.
+                    for key in ('images', 'material', 'materialEdit', 'sourceImages'):
+                        question.pop(key, None)
+                    if isinstance(question.get('metadata'), dict):
+                        question['metadata'].pop('_mixedContent', None)
+                    question['sourceImages'] = []
+                    filenames = sections.get(location, {}).get('images') or []
+                    if len(filenames) > 20:
+                        item_blockers.append('单题来源图片超过 20 张，请拆分。')
+                        continue
+                    for filename in filenames:
+                        try:
+                            key = (upload_id, filename)
+                            if key not in image_cache:
+                                _, mime, digest = _source_image(session_id, upload_id, filename)
+                                image_cache[key] = {'uploadId': upload_id, 'filename': filename, 'mimeType': mime, 'digest': digest}
+                            question['sourceImages'].append({**image_cache[key], 'location': location})
+                        except ValueError as error:
+                            item_blockers.append(str(error))
             normalized = []
             for number, question in enumerate(questions, 1):
                 try:
@@ -236,7 +381,7 @@ async def build_plan(db, actor, sources: list[dict], model_result: dict, *, sess
                 if policy != 'reuse':
                     transformed.setdefault('metadata', {})['teacherAssistantSource'] = {'uploadId': upload_id, 'sourceBankId': original_source_id, 'sourceQuestionId': original_id, 'originalId': question['id']}
                 bank_payload['questions'].append(transformed)
-            items.append({'id': item_id, 'name': name, 'kind': 'questions', 'questions': questions, 'selectedQuestionIds': [question['id'] for question in questions], 'reviewedQuestionIds': sorted(reviewed_ids), 'bankPayload': bank_payload, 'reuseBankId': reuse_bank_id, 'source': {'uploadId': upload_id, 'location': 'JSON 原题库' if extracted['kind'] == 'json' else '文档'}, 'warnings': warnings, 'blockers': item_blockers, 'cancelled': policy == 'cancel'})
+            items.append({'id': item_id, 'name': name, 'kind': 'questions', 'questions': questions, 'selectedQuestionIds': [question['id'] for question in questions], 'reviewedQuestionIds': sorted(reviewed_ids), 'bankPayload': bank_payload, 'sourceKind': extracted['kind'], 'reuseBankId': reuse_bank_id, 'source': {'uploadId': upload_id, 'location': 'JSON 原题库' if extracted['kind'] == 'json' else '文档'}, 'warnings': warnings, 'blockers': item_blockers, 'cancelled': policy == 'cancel'})
     items.sort(key=lambda item: item['kind'] != 'principles')
     total = sum(len(item['questions']) for item in items)
     if total > 500:
@@ -302,6 +447,18 @@ async def execute_plan(db, actor, session, revision) -> dict:
             payload = deepcopy(item['bankPayload'])
             bank_source = payload['sourceId']
             if not entry.get('bankId'):
+                for question in payload['questions']:
+                    if item.get('sourceKind') == 'document' and question.get('sourceImages'):
+                        question['images'] = []
+                        for image in question['sourceImages']:
+                            asset_key = image['uploadId'] + ':' + image['filename'] + ':' + image['digest']
+                            asset = (entry.get('assets') or {}).get(asset_key)
+                            if asset is None:
+                                asset = await _ensure_source_asset(db, actor, session_id, image)
+                                entry.setdefault('assets', {})[asset_key] = asset
+                                await _checkpoint(db, session, receipt)
+                            question['images'].append(asset)
+            if not entry.get('bankId'):
                 if item.get('reuseBankId'):
                     bank = await db.get(QuestionBank, item['reuseBankId'])
                     if bank is None or bank.owner_id != actor.username:
@@ -312,6 +469,9 @@ async def execute_plan(db, actor, session, revision) -> dict:
                         raise _error(409, 'REUSE_CONTENT_CHANGED', '复用目标已变化，请重新预览。')
                     entry['bankId'] = bank.id
                 else:
+                    # The shared importer rolls back an existing read transaction;
+                    # close it first so owned image validation retains loaded actor attributes.
+                    await db.commit()
                     result = await question_service.import_question_banks(db, actor, QuestionBankImportRequest(banks=[payload]))
                     entry['bankId'] = result['sourceBankIdMap'][bank_source]
                     await db.refresh(actor)
