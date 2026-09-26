@@ -62,8 +62,9 @@ assert student.post('/api/v1/teacher-assistant/sessions',json={}).status_code ==
 
 ### Task 5: 部署与多轮浏览器验收
 **Files:** deploy/ 独立 worker 配置和安装/运行文档，docs/verification/2026-09-27-teacher-agent-and-discussion.md，浏览器证据 artifacts/。
-- [ ] 既有 backend tests、frontend pnpm test、design 与相关浏览器检查全部通过。
-- [ ] 本地第一轮：真实界面 JSON 混合题导入、连续三轮需求修订、发布访问；第二轮：Word/PDF/扫描/PPT、无答案、断网和重复点击；第三轮：桌面手机弹幕点击、点赞收藏回复、拖动抽屉、跨题/刷新/切账号。
-- [ ] 安装到 UAT 的 worker 复用套餐配置，独立用户/禁网文档转换、内存/并发限制、磁盘持久卷；明确后台健康与错误反馈。
-- [ ] 合入 uat、代理 push 并核对远端，按 manage-new-legacy update 验证 release 文件数，部署 UAT 后重测至少两轮；不改 main/生产。
-- [ ] 审查原需求逐条证据，记录通过与未通过项；请用户 UAT 验收。
+- [x] 既有 backend tests、frontend pnpm test、design 与相关浏览器检查全部通过。
+- [x] 本地第一轮：真实界面 JSON 混合题导入、连续三轮需求修订、发布访问；第二轮：Word/PDF/扫描/PPT、无答案、断网和重复点击；第三轮：桌面手机弹幕点击、点赞收藏回复、拖动抽屉、跨题/刷新/切账号。
+- [x] 安装到 UAT 的 worker 复用套餐配置，独立用户/禁网文档转换、内存/并发限制、磁盘持久卷；明确后台健康与错误反馈。
+- [x] 合入 uat、代理 push 并核对远端，按 manage-new-legacy update 验证 release 文件数，部署 UAT 后重测至少两轮；不改 main/生产。
+- [ ] 完成截图发现的助手布局补丁验证，记录最终证据并交付用户 UAT 验收。
+- [ ] 用户本人业务验收通过后，才允许合入 main / 发布正式环境。
