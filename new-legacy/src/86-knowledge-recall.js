@@ -577,7 +577,14 @@
       ?viewOptions.map((o,i)=>optionRow(o,i,`${wrapKnownKeywords(escapeHTML(o.display?.zh||''),{inline:true})}${englishLine(o.display)}`))
       :(question.options||[]).map((o,i)=>optionRow(o,i,wrapKnownKeywords(escapeHTML(o.text||''),{inline:true})));
     const stemEn=view?.stem||{hasEnglish:false};
-    questionCard.innerHTML=`${questionIndex}<div class="kr-stem">${stem}${englishLine(stemEn)}</div>${rows.length?`<ol class="qw-card-options">${rows.join('')}</ol>`:''}<p class="kr-option-feedback lp-visually-hidden" data-kr-option-feedback aria-live="polite"></p><div class="qw-card-actions qw-card-learning-actions"><button type="button" class="qw-card-action-square qw-card-icon-action${krAnalysisOpen?' is-active':''}" data-qw-action="analysis" title="显示或关闭本题解析" aria-label="显示或关闭本题解析" aria-pressed="${krAnalysisOpen?'true':'false'}">${KR_ANALYSIS_ICON}</button></div>`;
+    questionCard.innerHTML=`${questionIndex}<div class="kr-stem">${stem}${englishLine(stemEn)}</div>${window.KGQuestionMaterials?.renderMaterials(question)||''}${rows.length?`<ol class="qw-card-options">${rows.join('')}</ol>`:''}<p class="kr-option-feedback lp-visually-hidden" data-kr-option-feedback aria-live="polite"></p><div class="qw-card-actions qw-card-learning-actions"><button type="button" class="qw-card-action-square qw-card-icon-action${krAnalysisOpen?' is-active':''}" data-qw-action="analysis" title="显示或关闭本题解析" aria-label="显示或关闭本题解析" aria-pressed="${krAnalysisOpen?'true':'false'}">${KR_ANALYSIS_ICON}</button></div>`;
+    window.KGQuestionMaterials?.bindMedia(questionCard);
+    if(!questionCard.dataset.krMediaLayoutBound){
+      questionCard.dataset.krMediaLayoutBound='true';
+      const refreshMaterialLayout=()=>requestAnimationFrame(()=>{renderEdges();canvasRuntime?.refreshMinimap?.(true);if(krAnalysisOpen)positionKrAnalysisPanel()});
+      questionCard.addEventListener('load',event=>{if(event.target.tagName==='IMG')refreshMaterialLayout()},true);
+      questionCard.addEventListener('toggle',event=>{if(event.target.classList.contains('qm-case'))refreshMaterialLayout()},true);
+    }
     if(krAnalysisOpen)requestAnimationFrame(positionKrAnalysisPanel);
   }
   // P4.5.32：题目卡入场动画——从左上滑入并缓停在画布中心（初始载入与切题时触发）。

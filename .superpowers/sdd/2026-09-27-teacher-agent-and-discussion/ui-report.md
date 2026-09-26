@@ -68,3 +68,13 @@ UI 含图但未完成映射时禁用标准JSON下载并说明先保存含图草�
 真实API新增回归完成：6项 teacher_assistant API测试全通过，包含未执行409、成功标准导出、真实图片下载、经现有bank import重新导入成功、缺映射/旧revision/失效资产/外教师资产409与跨教师会话404；原有标准export/report测试保留。
 
 轮回测试额外暴露现有 question_service rollback 后actor过期导致含图导入 MissingGreenlet，document_parser代理已修复；本代理未改import模块。Chromium 控件测试通过含图下载禁用/恢复、单选 `correctOptionIds=[]` 且 `correctAnswer=B` 的可读答案回归；Node 5/5、语法和diff检查通过。
+
+## 已发布文档图片在回忆题卡漏页修复
+
+`knowledge-recall.html` 接入现有 `118-question-materials.js` 与共享 question-materials.css；renderQuestion调用同一renderMaterials/bindMedia入口，保留现有题卡与选项结构。来源页缩略图高度限定360px，点击复用共享授权图片大图对话框；图片load与材料toggle后刷新连线/小地图/解析定位。未新增弹幕/讨论入口，未改backend、generated、VERSION。
+
+真实独立 Chromium 学生上下文通过5187 API登录，发布扫描PDF release `pr_50d27e4ed0114137b076e7c6e8a72727`：回忆与归纳均显示实际QuestionAsset图片、naturalWidth>0、学生授权GET200、放大/关闭正常，`.q-danmaku,.q-comments-drawer,.q-comments`全部0。为了只验证本次源且不手改生成物，live测试仅替换本地源HTML脚本/样式，业务API全真实；根任务同步后用 `RECALL_IMAGE_TEST_SOURCE_OVERRIDE=0` 重跑同一测试可验证实际发布页面。
+
+新增精准回归 `new-legacy/tests/recall-materials-live-browser.py`。结果与截图在 artifacts/teacher-assistant/student-material-result.json、student-material-knowledge-recall.html.png、student-material-question-workspace.html.png。截图已目视检查：题卡、图片、选项与画布工具布局正常。已有2个回忆Node合同、deep-recall-demand-loading-browser与语法检查通过。
+
+源整页包含答案/解析的原文事实已报告；根任务确认回忆/归纳保留原文符合本轮边界，不扩展自动裁剪。
