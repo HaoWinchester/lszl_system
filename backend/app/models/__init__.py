@@ -128,3 +128,5 @@ __all__ = [
     "TeachingContentRevision",
 ]
 from app.models.question_material import QuestionAsset, QuestionMaterial, QuestionMaterialRevision
+
+from app.models.teacher_assistant import TeacherAssistantSession, TeacherAssistantUpload, TeacherAssistantJob

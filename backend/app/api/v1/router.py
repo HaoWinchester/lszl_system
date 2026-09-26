@@ -47,3 +47,6 @@ api_router.include_router(practice_growth.router)
 api_router.include_router(subscriptions.router)
 api_router.include_router(analytics.router)
 api_router.include_router(engagement.router)
+
+from app.api.v1 import teacher_assistant
+api_router.include_router(teacher_assistant.router)

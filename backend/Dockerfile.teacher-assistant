@@ -1,0 +1,11 @@
+FROM python:3.12-slim
+ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 PIP_NO_CACHE_DIR=1
+RUN apt-get update && apt-get install -y --no-install-recommends poppler-utils tesseract-ocr tesseract-ocr-chi-sim libreoffice-writer libreoffice-impress fonts-noto-cjk ca-certificates && rm -rf /var/lib/apt/lists/*
+WORKDIR /app/backend
+COPY backend/requirements.txt /app/backend/requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+COPY backend/ /app/backend/
+RUN useradd --create-home --uid 10001 assistant && mkdir -p /var/lib/teacher-assistant && chown assistant:assistant /var/lib/teacher-assistant
+USER assistant
+ENV TEACHER_ASSISTANT_STORAGE=/var/lib/teacher-assistant TEACHER_ASSISTANT_CLAUDE=/usr/local/bin/claude TEACHER_DOCUMENT_CONVERTER_RUNNER=/app/backend/scripts/teacher-document-convert
+CMD ["python","-m","app.worker.teacher_assistant"]

@@ -1,0 +1,54 @@
+# Include after the UAT compose file. API owns auth/queue; worker owns model and parsing.
+services:
+  backend:
+    environment:
+      TEACHER_ASSISTANT_STORAGE: /var/lib/teacher-assistant
+    volumes:
+      - teacher-assistant-files:/var/lib/teacher-assistant
+  assistant-worker:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile.teacher-assistant
+    image: lszl-teacher-assistant:uat
+    restart: unless-stopped
+    env_file:
+      - backend/.env.teacher-assistant.local
+    environment:
+      ENV: uat
+      DATABASE_URL: postgresql+asyncpg://kg_uat:${POSTGRES_PASSWORD}@${POSTGRES_HOST:-lszl-kg-db-1}:5432/kg_graph_uat
+      TEACHER_ASSISTANT_MODEL: glm-5.3-flash[1m]
+    volumes:
+      - teacher-assistant-files:/var/lib/teacher-assistant
+      - /usr/lib/node_modules/@anthropic-ai/claude-code/bin/claude.exe:/usr/local/bin/claude:ro
+    networks: [default, converter]
+    mem_limit: 1536m
+    cpus: 1.0
+    pids_limit: 100
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m,uid=10001,gid=10001
+      - /home/assistant:size=32m,uid=10001,gid=10001
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    depends_on: [backend, document-converter]
+  document-converter:
+    image: lszl-teacher-assistant:uat
+    restart: unless-stopped
+    command: [uvicorn, app.worker.document_converter:app, --host, 0.0.0.0, --port, '8090']
+    networks: [converter]
+    mem_limit: 768m
+    cpus: 0.75
+    pids_limit: 80
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:size=192m,uid=10001,gid=10001
+      - /home/assistant:size=16m,uid=10001,gid=10001
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+volumes:
+  teacher-assistant-files:
+networks:
+  converter:
+    internal: true

@@ -25,3 +25,6 @@ miniprogram/project.private.config.json
 /project.config.json
 /project.private.config.json
 /需求文档
+
+/backend/.env.teacher-assistant.local
+/var/

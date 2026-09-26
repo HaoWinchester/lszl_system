@@ -44,6 +44,7 @@ TEACHING_PAGES = frozenset({
     "paper-management.html",
     "question-bank.html",
     "teacher-workbench.html",
+    "teacher-assistant.html",
 })
 CONTENT_PREP_PERMISSIONS = (
     "accessQuestionBank",
