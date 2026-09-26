@@ -29,6 +29,7 @@ def build(output=None):
     template=(ROOT/"src"/"index.template.html").read_text(encoding="utf-8")
     css=(ROOT/"src"/"css"/"app.css").read_text(encoding="utf-8").rstrip()
     js="\n\n".join((ROOT/"src"/"js"/name).read_text(encoding="utf-8").rstrip() for name in JS_ORDER)
+    js=(ROOT.parent/"src"/"00-import-guard.js").read_text(encoding="utf-8")+"\n\n"+js
     product_release=(ROOT.parent/"VERSION").read_text(encoding="utf-8").strip()
     # 固定基准数据(知识树/联想库/原则/归纳卡/标签配置)内嵌;baseline.json 不存在时回退 null
     baseline_path=ROOT/"baseline"/"baseline.json"

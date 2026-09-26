@@ -5,6 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.import_guard import import_submission_guard
 from app.core.auth import require_permissions
 from app.db.session import get_db
 from app.models.user import User
@@ -59,7 +60,7 @@ async def create_bank(body: dict, db: DB, user: QuestionBankManager):
     return {"bank": question_service.bank_to_dict(b)}
 
 
-@router.post("/banks/import", response_model=QuestionBankImportResponse)
+@router.post("/banks/import", dependencies=[Depends(import_submission_guard)], response_model=QuestionBankImportResponse)
 async def import_banks(
     request: QuestionBankImportRequest,
     db: DB,
@@ -129,7 +130,7 @@ async def create_question(bank_id: str, body: dict, db: DB, user: QuestionEditor
     return {"question": question_service.question_to_dict(q)}
 
 
-@router.post("/banks/{bank_id}/questions/import")
+@router.post("/banks/{bank_id}/questions/import", dependencies=[Depends(import_submission_guard)])
 async def import_questions(bank_id: str, body: dict, db: DB, user: QuestionEditor):
     items = body.get("questions") if isinstance(body.get("questions"), list) else []
     if not items:

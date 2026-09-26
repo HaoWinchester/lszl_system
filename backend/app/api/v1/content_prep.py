@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.import_guard import import_submission_guard
 from app.core.auth import require_permissions, require_role
 from app.db.session import get_db
 from app.models.question import Question
@@ -221,7 +222,7 @@ async def write_activity_override(collection_id: str, activity_id: str, request:
 
 
 
-@router.put("/recall-libraries/{subject_id}")
+@router.put("/recall-libraries/{subject_id}", dependencies=[Depends(import_submission_guard)])
 async def write_recall_library(subject_id: str, request: RecallLibraryWriteRequest, db: DB, actor: PrepEditor):
     try:
         return await teaching_content_service.upsert_recall_library(db, subject_id=subject_id, content_revision=request.content_revision, version=request.version, nodes=request.nodes, edges=request.edges, metadata=request.metadata, actor=actor.username)
@@ -399,7 +400,7 @@ async def delete_content_prep_draft(draft_id: str, db: DB, actor: PrepEditor):
     return {"ok": True}
 
 
-@router.post("/drafts/{draft_id}/sync")
+@router.post("/drafts/{draft_id}/sync", dependencies=[Depends(import_submission_guard)])
 async def sync_content_prep_draft(
     draft_id: str,
     request: ContentPrepDraftSyncRequest,
@@ -421,7 +422,7 @@ async def sync_content_prep_draft(
     return {"result": result.model_dump(by_alias=True)}
 
 
-@router.put("/shared-content")
+@router.put("/shared-content", dependencies=[Depends(import_submission_guard)])
 async def save_shared_content(
     request: ContentPrepSharedContentRequest,
     db: DB,
@@ -486,7 +487,7 @@ async def list_principles(db: DB, actor: PrepEditor):
     return await content_prep_shared_service.read_principles(db)
 
 
-@router.post("/principle-merges/preview")
+@router.post("/principle-merges/preview", dependencies=[Depends(import_submission_guard)])
 async def preview_principle_merge(body: dict, db: DB, actor: PrepEditor):
     try:
         return await content_prep_shared_service.preview_principle_merge(
@@ -496,7 +497,7 @@ async def preview_principle_merge(body: dict, db: DB, actor: PrepEditor):
         _raise_shared_error(error)
 
 
-@router.post("/principle-merges/apply")
+@router.post("/principle-merges/apply", dependencies=[Depends(import_submission_guard)])
 async def apply_principle_merge(body: dict, db: DB, actor: PrepEditor):
     try:
         return await content_prep_shared_service.apply_principle_merge(
@@ -583,7 +584,7 @@ async def remove_principle(
         _raise_shared_error(error)
 
 
-@router.post("/activities/import")
+@router.post("/activities/import", dependencies=[Depends(import_submission_guard)])
 async def import_activities(
     request: ContentPrepActivityImportRequest,
     db: DB,
@@ -642,7 +643,7 @@ async def delete_principles(body: dict, db: DB, actor: PrepEditor):
         ) from error
 
 
-@router.post("/principles/import")
+@router.post("/principles/import", dependencies=[Depends(import_submission_guard)])
 async def import_principle_card_bundle(body: dict, db: DB, actor: PrepEditor):
     try:
         return await teaching_content_projection_service.import_principle_card_bundle(
@@ -754,7 +755,7 @@ async def force_release_question_lock(question_id: str, db: DB, actor: AdminUser
     return {"ok": True}
 
 
-@router.post("/batches", response_model=ContentPrepBatchResult)
+@router.post("/batches", dependencies=[Depends(import_submission_guard)], response_model=ContentPrepBatchResult)
 async def upload_batch(request: ContentPrepBatchRequest, db: DB, actor: PrepEditor):
     # P4.5.29 差异 16：外部批次导入一律强制 qualityConfirmed=false，只有教师人工确认可为 true。
     # 教师编辑流（共享草稿同步）不走这里，保留教师已确认的状态。

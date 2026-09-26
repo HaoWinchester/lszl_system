@@ -272,11 +272,11 @@ function renderSubjectFacetManager(){  const box=document.getElementById('subjec
   }
   const importBtn=document.getElementById('btnImportFacetSchema'),file=document.getElementById('fileFacetSchema');
   if(importBtn)importBtn.onclick=()=>file?.click();
-  if(file)file.onchange=async()=>{const f=file.files?.[0];if(!f)return;try{
+  if(file)file.onchange=KGImportGuard.fileHandler(async()=>{const f=file.files?.[0];if(!f)return;try{
     const imported=importFacetSchema(await readJsonFile(f));
     state.questionBank.questions.forEach(q=>q.metadata.subjectFacets=normalizeQuestionFacets(q.metadata?.subjectFacets,q.subject||state.questionBank.subject));
     renderSubjectFacetManager();renderQuestionEditor();renderCurrentIssues();markWorkspaceDirty();toast(`已导入科目分类：${imported.name}`);
-  }catch(err){alert('科目分类导入失败：'+err.message)}file.value=''};
+  }catch(err){alert('科目分类导入失败：'+err.message)}file.value=''});
   const exportBtn=document.getElementById('btnExportCurrentFacetSchema');
   if(exportBtn&&schema)exportBtn.onclick=()=>downloadJson({format:'pmp-facet-schema-v1',...clone(schema)},`${schema.schemaId}.json`,{auditType:'subject-facet-schema'});
   const loadBtn=document.getElementById('btnLoadServerFacets');

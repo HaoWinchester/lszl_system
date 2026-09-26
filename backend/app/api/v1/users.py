@@ -5,6 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.import_guard import import_submission_guard
 from app.core.auth import require_role
 from app.db.session import get_db
 from app.models.user import User
@@ -61,7 +62,7 @@ async def export_users(db: DB, _: AdminUser, usernames: str | None = Query(None)
     return await user_service.build_export(db, uns)
 
 
-@router.post("/import")
+@router.post("/import", dependencies=[Depends(import_submission_guard)])
 async def import_users(payload: UserImport, db: DB, admin: AdminUser):
     added, skipped = await user_service.import_users(db, payload, actor=admin.username)
     return {"added": added, "skipped": skipped}

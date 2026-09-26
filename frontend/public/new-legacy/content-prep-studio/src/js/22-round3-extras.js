@@ -70,7 +70,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   const auditFile=document.getElementById('fileAuditTrail');
   if(auditImportBtn&&auditFile){
     auditImportBtn.addEventListener('click',()=>auditFile.click());
-    auditFile.addEventListener('change',async e=>{
+    auditFile.addEventListener('change',KGImportGuard.fileHandler(async e=>{
       const f=e.target.files&&e.target.files[0];if(!f)return;
       const status=document.getElementById('auditImportStatus');
       try{
@@ -86,7 +86,7 @@ document.addEventListener('DOMContentLoaded',()=>{
         if(status){status.textContent='导入失败：'+err.message;status.className='smalltxt bad'}
         alert('审计日志导入失败：'+err.message);
       }finally{e.target.value=''}
-    });
+    }));
   }
   const facetExport=document.getElementById('btnExportFacetRegistry');
   if(facetExport)facetExport.addEventListener('click',()=>downloadJson(clone(state.subjectFacetRegistry),'kg_subject_facet_registry_v1.json',{auditType:'subject-facet-registry'}));

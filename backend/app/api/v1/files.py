@@ -5,6 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.import_guard import import_submission_guard, file_import_submission_guard
 from app.core.auth import CurrentUser
 from app.db.session import get_db
 from app.services import file_service
@@ -35,7 +36,7 @@ async def list_files(
     return {"files": files, "total": total, "page": page, "page_size": page_size}
 
 
-@router.post("")
+@router.post("", dependencies=[Depends(file_import_submission_guard)])
 async def create_file(body: dict, db: DB, user: CurrentUser):
     f = await file_service.create_file(
         db,
@@ -69,7 +70,7 @@ async def stats(db: DB, user: CurrentUser):
     return await file_service.storage_stats(db, user.username)
 
 
-@router.post("/import-legacy")
+@router.post("/import-legacy", dependencies=[Depends(import_submission_guard)])
 async def import_legacy(body: dict, db: DB, user: CurrentUser):
     return await file_service.import_legacy(db, user.username, body)
 

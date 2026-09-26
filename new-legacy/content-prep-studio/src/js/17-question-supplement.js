@@ -219,7 +219,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     downloadJson(questionSupplementTemplatePayload(),`${safeName(state.questionBank.name||'PMP题库')}_Question_Supplement_Template.json`,{auditType:'question-supplement-template'});
   });
   const file=document.getElementById('fileQuestionSupplement');
-  if(file)file.addEventListener('change',async e=>{
+  if(file)file.addEventListener('change',KGImportGuard.fileHandler(async e=>{
     const f=e.target.files&&e.target.files[0];
     if(!f)return;
     const mode=document.getElementById('questionSupplementMode')?.value||'fill-empty';
@@ -230,5 +230,5 @@ document.addEventListener('DOMContentLoaded',()=>{
       const status=document.getElementById('questionSupplementStatus');if(status){status.textContent='补录失败：'+err.message;status.className='supplement-status bad'}
       alert('补录失败：'+err.message);
     }finally{e.target.value=''}
-  });
+  }));
 });

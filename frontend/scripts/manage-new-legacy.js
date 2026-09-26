@@ -136,6 +136,8 @@ function verifyDeterministicUatArtifacts(paths) {
       mkdirSync(generatedSource, { recursive: true })
       cpSync(resolve(repoDir, 'new-legacy', 'content-prep-studio'), resolve(generatedSource, 'content-prep-studio'), { recursive: true })
       cpSync(resolve(repoDir, 'new-legacy', 'VERSION'), resolve(generatedSource, 'VERSION'))
+      mkdirSync(resolve(generatedSource, 'src'), { recursive: true })
+      cpSync(resolve(repoDir, 'new-legacy', 'src', '00-import-guard.js'), resolve(generatedSource, 'src', '00-import-guard.js'))
       const rebuilt = spawnSync('python3', [resolve(generatedSource, 'content-prep-studio', 'build.py')], {
         cwd: repoDir,
         encoding: 'utf8',

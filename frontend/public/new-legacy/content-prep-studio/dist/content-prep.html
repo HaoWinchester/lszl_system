@@ -1155,6 +1155,33 @@ B原则：principle-effective-communication</pre>
 
 <script>
 'use strict';
+
+// Hold an import for its entire async lifetime, including file reads and reloads.
+(function(global){
+  const pending=new Map();
+  function run(key,task,controls=[]){
+    if(pending.has(key))return pending.get(key);
+    const nodes=controls.map(value=>typeof value==='string'?global.document?.getElementById(value):value).filter(Boolean);
+    const previous=nodes.map(node=>({node,disabled:node.disabled}));
+    previous.forEach(({node})=>{node.disabled=true;node.setAttribute?.('aria-busy','true')});
+    let start;
+    const work=new Promise((resolve,reject)=>{start=()=>{try{resolve(task())}catch(error){reject(error)}}});
+    const promise=work.finally(()=>{
+      pending.delete(key);
+      previous.forEach(({node,disabled})=>{node.disabled=disabled;node.removeAttribute?.('aria-busy')});
+    });
+    pending.set(key,promise);
+    start();
+    return promise;
+  }
+  function fileHandler(task){
+    return event=>run('prep-file-import',()=>task(event),Array.from(global.document.querySelectorAll('input[type="file"]')));
+  }
+  global.KGImportGuard=Object.freeze({run,fileHandler,isBusy:key=>pending.has(key)});
+})(globalThis);
+
+
+'use strict';
 const VERSION='0.4.0';
 const KEYWORD_SCHEMA='Question Keyword System v2';
 /* 校验临时关闭开关(2026-08 录入提速需求):true 时第六步校验中心不再产出问题清单、
@@ -2783,7 +2810,7 @@ function raBindEvents(){
     await raClearRecords();
   };
   const file=document.getElementById('raFile');
-  if(file)file.onchange=async e=>{
+  if(file)file.onchange=KGImportGuard.fileHandler(async e=>{
     const f=e.target.files?.[0];if(!f)return;
     try{
       const j=JSON.parse(await f.text());
@@ -2797,7 +2824,7 @@ function raBindEvents(){
       }
     }catch(err){raSetStatus('加载失败：'+raEsc(err.message),'bad')}
     finally{e.target.value=''}
-  };
+  });
 }
 raBindEvents();
 raRenderRecords();
@@ -3024,7 +3051,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     downloadJson(questionSupplementTemplatePayload(),`${safeName(state.questionBank.name||'PMP题库')}_Question_Supplement_Template.json`,{auditType:'question-supplement-template'});
   });
   const file=document.getElementById('fileQuestionSupplement');
-  if(file)file.addEventListener('change',async e=>{
+  if(file)file.addEventListener('change',KGImportGuard.fileHandler(async e=>{
     const f=e.target.files&&e.target.files[0];
     if(!f)return;
     const mode=document.getElementById('questionSupplementMode')?.value||'fill-empty';
@@ -3035,7 +3062,7 @@ document.addEventListener('DOMContentLoaded',()=>{
       const status=document.getElementById('questionSupplementStatus');if(status){status.textContent='补录失败：'+err.message;status.className='supplement-status bad'}
       alert('补录失败：'+err.message);
     }finally{e.target.value=''}
-  });
+  }));
 });
 
 /* Baseline bootstrap: 内嵌固定基准数据(知识树/联想库/八大原则/归纳卡/标签配置)自动预填。
@@ -3350,11 +3377,11 @@ function renderSubjectFacetManager(){  const box=document.getElementById('subjec
   }
   const importBtn=document.getElementById('btnImportFacetSchema'),file=document.getElementById('fileFacetSchema');
   if(importBtn)importBtn.onclick=()=>file?.click();
-  if(file)file.onchange=async()=>{const f=file.files?.[0];if(!f)return;try{
+  if(file)file.onchange=KGImportGuard.fileHandler(async()=>{const f=file.files?.[0];if(!f)return;try{
     const imported=importFacetSchema(await readJsonFile(f));
     state.questionBank.questions.forEach(q=>q.metadata.subjectFacets=normalizeQuestionFacets(q.metadata?.subjectFacets,q.subject||state.questionBank.subject));
     renderSubjectFacetManager();renderQuestionEditor();renderCurrentIssues();markWorkspaceDirty();toast(`已导入科目分类：${imported.name}`);
-  }catch(err){alert('科目分类导入失败：'+err.message)}file.value=''};
+  }catch(err){alert('科目分类导入失败：'+err.message)}file.value=''});
   const exportBtn=document.getElementById('btnExportCurrentFacetSchema');
   if(exportBtn&&schema)exportBtn.onclick=()=>downloadJson({format:'pmp-facet-schema-v1',...clone(schema)},`${schema.schemaId}.json`,{auditType:'subject-facet-schema'});
   const loadBtn=document.getElementById('btnLoadServerFacets');
@@ -4466,7 +4493,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   const auditFile=document.getElementById('fileAuditTrail');
   if(auditImportBtn&&auditFile){
     auditImportBtn.addEventListener('click',()=>auditFile.click());
-    auditFile.addEventListener('change',async e=>{
+    auditFile.addEventListener('change',KGImportGuard.fileHandler(async e=>{
       const f=e.target.files&&e.target.files[0];if(!f)return;
       const status=document.getElementById('auditImportStatus');
       try{
@@ -4482,7 +4509,7 @@ document.addEventListener('DOMContentLoaded',()=>{
         if(status){status.textContent='导入失败：'+err.message;status.className='smalltxt bad'}
         alert('审计日志导入失败：'+err.message);
       }finally{e.target.value=''}
-    });
+    }));
   }
   const facetExport=document.getElementById('btnExportFacetRegistry');
   if(facetExport)facetExport.addEventListener('click',()=>downloadJson(clone(state.subjectFacetRegistry),'kg_subject_facet_registry_v1.json',{auditType:'subject-facet-registry'}));
@@ -5270,11 +5297,11 @@ document.getElementById('btnParsePastedQuestions').onclick=()=>{
   markWorkspaceDirty();toast(`已解析 ${uniqueQuestions.length} 题`);
 };
 
-document.getElementById('fileContentBundle').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{const result=importContentBundle(await readJsonFile(f));if(result?.cancelled){toast('已取消导入，当前内容没有变化');return}markWorkspaceDirty();
+document.getElementById('fileContentBundle').addEventListener('change',KGImportGuard.fileHandler(async e=>{const f=e.target.files[0];if(!f)return;try{const result=importContentBundle(await readJsonFile(f));if(result?.cancelled){toast('已取消导入，当前内容没有变化');return}markWorkspaceDirty();
   {const qs=state.questionBank.questions||[];
    showImportReport('完整内容包',state.questionBank.name||'未命名题库',[`题目 ${qs.length} 道`,`知识树节点 ${(state.knowledgeTree?.nodes||[]).length} 个`,`联想库节点 ${(state.recallLibrary?.nodes||[]).length} 个`,`原则 ${(state.principles?.items||[]).length} 条`,result?.report?.duplicates?.length?`清除重复 ${result.report.duplicates.length} 题`:null].filter(Boolean),questionTitles(qs));}
-  toast(`完整内容包已加载${result?.report?.duplicates?.length?` · 已清除 ${result.report.duplicates.length} 道重复题`:''}`)}catch(err){alert('完整内容包导入失败：'+err.message)}finally{e.target.value=''}});
-document.getElementById('filePrincipleCardBundle').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{const merged=importPrincipleBundleSafe(await readJsonFile(f));if(merged.cancelled){toast('已取消导入，原则与归纳卡没有变化');return}state.principles=merged.applied.principles;state.synthesisPresets=merged.applied.synthesisPresets;state.currentPrincipleId=state.principles.items.some(p=>p.id===state.currentPrincipleId)?state.currentPrincipleId:(state.principles.items[0]?.id||'');refreshAll();markWorkspaceDirty();toast(`原则已安全合并 · 新增 ${merged.added} · 保持 ${merged.unchanged} · 冲突 ${merged.conflicts}（保留现有）`)}catch(err){alert('原则与归纳卡导入失败：'+err.message)}finally{e.target.value=''}});
+  toast(`完整内容包已加载${result?.report?.duplicates?.length?` · 已清除 ${result.report.duplicates.length} 道重复题`:''}`)}catch(err){alert('完整内容包导入失败：'+err.message)}finally{e.target.value=''}}));
+document.getElementById('filePrincipleCardBundle').addEventListener('change',KGImportGuard.fileHandler(async e=>{const f=e.target.files[0];if(!f)return;try{const merged=importPrincipleBundleSafe(await readJsonFile(f));if(merged.cancelled){toast('已取消导入，原则与归纳卡没有变化');return}state.principles=merged.applied.principles;state.synthesisPresets=merged.applied.synthesisPresets;state.currentPrincipleId=state.principles.items.some(p=>p.id===state.currentPrincipleId)?state.currentPrincipleId:(state.principles.items[0]?.id||'');refreshAll();markWorkspaceDirty();toast(`原则已安全合并 · 新增 ${merged.added} · 保持 ${merged.unchanged} · 冲突 ${merged.conflicts}（保留现有）`)}catch(err){alert('原则与归纳卡导入失败：'+err.message)}finally{e.target.value=''}}));
 function importPrincipleBundleSafe(payload){
   const domain=canonicalPrincipleDomain(payload);
   const plan=planPrincipleMerge(domain,{principles:state.principles,synthesisPresets:state.synthesisPresets});
@@ -5300,20 +5327,20 @@ function importPrincipleBundleSafe(payload){
   }
   return {cancelled:false,applied:applyPrincipleMergePlan(plan,{principles:state.principles,synthesisPresets:state.synthesisPresets}),added:plan.added.length,unchanged:plan.unchanged.length,conflicts:plan.conflicts.length};
 }
-document.getElementById('fileTagConfig').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{state.tagConfig=ImportService.tagConfig(await readJsonFile(f));refreshQuestionTagPaths();refreshAll();markWorkspaceDirty();toast('标签配置已加载')}catch(err){alert('标签配置导入失败：'+err.message)}e.target.value=''});
-document.getElementById('fileTree').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{state.knowledgeTree=normalizeTree(await readJsonFile(f));state.questionBank.questions.forEach(q=>{const id=q.metadata?.knowledge?.primaryNodeId;if(id&&state.knowledgeTree.map.has(id))q.metadata.knowledge.pathSnapshot=state.knowledgeTree.pathFor(id)});refreshHeader();renderQuestionEditor();renderRecallAcceptance();markWorkspaceDirty();
+document.getElementById('fileTagConfig').addEventListener('change',KGImportGuard.fileHandler(async e=>{const f=e.target.files[0];if(!f)return;try{state.tagConfig=ImportService.tagConfig(await readJsonFile(f));refreshQuestionTagPaths();refreshAll();markWorkspaceDirty();toast('标签配置已加载')}catch(err){alert('标签配置导入失败：'+err.message)}e.target.value=''}));
+document.getElementById('fileTree').addEventListener('change',KGImportGuard.fileHandler(async e=>{const f=e.target.files[0];if(!f)return;try{state.knowledgeTree=normalizeTree(await readJsonFile(f));state.questionBank.questions.forEach(q=>{const id=q.metadata?.knowledge?.primaryNodeId;if(id&&state.knowledgeTree.map.has(id))q.metadata.knowledge.pathSnapshot=state.knowledgeTree.pathFor(id)});refreshHeader();renderQuestionEditor();renderRecallAcceptance();markWorkspaceDirty();
   showImportReport('知识树',state.knowledgeTree.name||'知识树',[`节点 ${(state.knowledgeTree.nodes||[]).length} 个`,`关系 ${(state.knowledgeTree.edges||[]).length} 条`],(state.knowledgeTree.nodes||[]).map(n=>n.title?.zh||n.title||n.id));
-  toast('知识树已加载')}catch(err){alert('知识树导入失败：'+err.message)}e.target.value=''});
-document.getElementById('fileRecall').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{state.recallLibrary=normalizeRecall(await readJsonFile(f));state.currentRecallId=state.recallLibrary.nodes[0]?.id||'';refreshHeader();renderRecallAcceptance();renderKeywords();markWorkspaceDirty();
+  toast('知识树已加载')}catch(err){alert('知识树导入失败：'+err.message)}e.target.value=''}));
+document.getElementById('fileRecall').addEventListener('change',KGImportGuard.fileHandler(async e=>{const f=e.target.files[0];if(!f)return;try{state.recallLibrary=normalizeRecall(await readJsonFile(f));state.currentRecallId=state.recallLibrary.nodes[0]?.id||'';refreshHeader();renderRecallAcceptance();renderKeywords();markWorkspaceDirty();
   showImportReport('联想库',state.recallLibrary.name||'联想库',[`节点 ${(state.recallLibrary.nodes||[]).length} 个`,`关系 ${(state.recallLibrary.edges||[]).length} 条`],(state.recallLibrary.nodes||[]).map(n=>n.title));
-  toast('联想库已加载')}catch(err){alert('联想库导入失败：'+err.message)}e.target.value=''});
-document.getElementById('fileQuestionBank').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{const imported=ImportService.questionBank(await readJsonFile(f)),report=confirmQuestionDuplicateCleanup(imported.questions,[]);if(report.cancelled)return;imported.questions=report.unique;state.questionBank=imported;stampImportedQuestions(state.questionBank.questions,'question-bank-json');state.currentQuestionId=state.questionBank.questions[0]?.id||'';refreshHeader();renderQuestions();markWorkspaceDirty();
+  toast('联想库已加载')}catch(err){alert('联想库导入失败：'+err.message)}e.target.value=''}));
+document.getElementById('fileQuestionBank').addEventListener('change',KGImportGuard.fileHandler(async e=>{const f=e.target.files[0];if(!f)return;try{const imported=ImportService.questionBank(await readJsonFile(f)),report=confirmQuestionDuplicateCleanup(imported.questions,[]);if(report.cancelled)return;imported.questions=report.unique;state.questionBank=imported;stampImportedQuestions(state.questionBank.questions,'question-bank-json');state.currentQuestionId=state.questionBank.questions[0]?.id||'';refreshHeader();renderQuestions();markWorkspaceDirty();
   showImportReport('题库 JSON',imported.name||'未命名题库',[`共 ${state.questionBank.questions.length} 题`,report.duplicates.length?`清除重复 ${report.duplicates.length} 题`:null].filter(Boolean),questionTitles(state.questionBank.questions));
-  toast(`题库已加载${report.duplicates.length?` · 已清除 ${report.duplicates.length} 道重复题`:''} · 已记录导入批次`)}catch(err){alert('题库导入失败：'+err.message)}e.target.value=''});
+  toast(`题库已加载${report.duplicates.length?` · 已清除 ${report.duplicates.length} 道重复题`:''} · 已记录导入批次`)}catch(err){alert('题库导入失败：'+err.message)}e.target.value=''}));
 
 document.getElementById('btnNewWorkspace').onclick=()=>{if(!confirm('清空当前 Prep Studio 工作区？请先导出需要保留的草稿。'))return;state.knowledgeTree=null;state.recallLibrary={schemaVersion:1,nodes:[],edges:[],updatedAt:''};state.questionBank={id:generateSystemId('bank'),name:'PMP 内容准备题库',subject:'PMP',description:'',version:'1.0',visibility:'private',createdAt:Date.now(),updatedAt:Date.now(),questions:[]};state.principles={schemaVersion:1,items:[],updatedAt:Date.now()};state.synthesisPresets={schemaVersion:1,items:[],updatedAt:Date.now()};state.tagConfig={names:{},groupNames:{},categoryNames:{},aliases:{},slotAliases:{},looseAliases:{}};state.subjectFacetRegistry=normalizeSubjectFacetRegistry({});state.currentQuestionId='';state.currentRecallId='';state.currentPrincipleId='';state.demoQuestionId='';state.demoLang='zh';state.recallPreviewCandidateId='';applyPrepBaseline();refreshAll();setTab('base');markWorkspaceDirty();toast('已重置，固定基准数据已自动就绪，直接导入题目 JSON 即可')};
 document.getElementById('btnImportWorkspace').onclick=()=>document.getElementById('fileWorkspace').click();
-document.getElementById('fileWorkspace').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{const w=await readJsonFile(f);if(!w.prepStudioWorkspaceVersion)throw new Error('不是 Prep Studio 草稿');applyWorkspacePayload(w);markWorkspaceDirty();toast('草稿已恢复')}catch(err){alert('草稿导入失败：'+err.message)}e.target.value=''});
+document.getElementById('fileWorkspace').addEventListener('change',KGImportGuard.fileHandler(async e=>{const f=e.target.files[0];if(!f)return;try{const w=await readJsonFile(f);if(!w.prepStudioWorkspaceVersion)throw new Error('不是 Prep Studio 草稿');applyWorkspacePayload(w);markWorkspaceDirty();toast('草稿已恢复')}catch(err){alert('草稿导入失败：'+err.message)}e.target.value=''}));
 
 document.getElementById('btnExportCompleteBundle').onclick=()=>{const v=runValidation();if(v.metrics.errors&&!confirm(`当前有 ${v.metrics.errors} 个错误。仍要导出完整成品包吗？`))return;try{const payload=completeBundlePayload();downloadJson(payload,'PMP_Content_Complete_Bundle.json',{auditType:'complete-bundle',details:{validation:{errors:v.metrics.errors,warnings:v.metrics.warnings}}})}catch(err){alert('完整成品包导出失败：'+err.message)}};
 document.getElementById('btnExportPrincipleCards').onclick=()=>{try{downloadJson(principleCardBundlePayload(),'kg_principle_card_bundle_v1.json',{auditType:'principle-card-bundle'})}catch(err){alert('原则与归纳卡组合导出失败：'+err.message)}};
@@ -5479,11 +5506,12 @@ window.PMPPrepDraftUi?.open?.();
   if(quickSaveButton)quickSaveButton.onclick=()=>saveDraftToServer();
   if(localSaveButton)localSaveButton.onclick=()=>saveDraftToServer();
 
-  async function syncWorkspaceToServer(){
+  function syncWorkspaceToServer(){
+    return KGImportGuard.run('prep-server-sync',async()=>{
     syncButton.disabled=true;setStatus('正在同步共享草稿到主程序…');setIssues(null);
     try{const result=await window.PMPPrepDraftUi.sync();setStatus(`已同步到主程序 · 批次 ${result.batchId}`,'good');return result}
     catch(error){setStatus(error.message||'同步失败，草稿已保留','bad');setIssues(error);throw error}
-    finally{refreshButtons()}
+    },[syncButton,bankSelect,sourceBankSelect]).finally(refreshButtons);
   }
   window.PMPPrepSyncWorkspace=syncWorkspaceToServer;
   function readTeachingResource(name,normalizer){

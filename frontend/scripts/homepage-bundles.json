@@ -9,7 +9,8 @@
         "runtime-config.override.js",
         "auth-session-bootstrap.js",
         "domain-api-client.js",
-        "src/28-device-preferences.js"
+        "src/28-device-preferences.js",
+        "src/00-import-guard.js"
       ],
       "styles": []
     },

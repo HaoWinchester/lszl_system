@@ -4,7 +4,10 @@
   "toVersion": "v9.0-p4.1.234",
   "changes": {
     "added": [],
-    "changed": [],
+    "changed": [
+      "src/teacher/training-config/principle-preset-controller.js",
+      "tests/import-guards.test.js"
+    ],
     "removed": []
   },
   "incompatible": []

@@ -336,7 +336,7 @@ function raBindEvents(){
     await raClearRecords();
   };
   const file=document.getElementById('raFile');
-  if(file)file.onchange=async e=>{
+  if(file)file.onchange=KGImportGuard.fileHandler(async e=>{
     const f=e.target.files?.[0];if(!f)return;
     try{
       const j=JSON.parse(await f.text());
@@ -350,7 +350,7 @@ function raBindEvents(){
       }
     }catch(err){raSetStatus('加载失败：'+raEsc(err.message),'bad')}
     finally{e.target.value=''}
-  };
+  });
 }
 raBindEvents();
 raRenderRecords();

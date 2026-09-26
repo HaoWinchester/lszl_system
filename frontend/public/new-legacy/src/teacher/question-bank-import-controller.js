@@ -40,6 +40,7 @@
       return {name,payload,banks:normalizeBanks(payload)};
     }
     async function loadFiles(files){
+      if(submitPromise||state.busy)return {ok:false,error:'导入正在处理中，请等待完成。'};
       const entries=Array.from(files||[]),fileNames=entries.map(file=>String(file?.name||'question-bank.json'));
       if(!entries.length){state=initialState();return fail('请至少选择一个题库 JSON 文件。')}
       try{
@@ -71,20 +72,22 @@
     }
     function confirm(){
       if(submitPromise)return submitPromise;
+      if(state.success)return Promise.resolve({ok:true,result:clone(state.success)});
       if(!state.banks.length)return Promise.resolve(fail('请先选择有效的题库 JSON 文件。'));
       state={...state,busy:true,error:'',success:null};emit();
       submitPromise=(async()=>{
         try{
           const result=await submit();
-          state={...state,busy:false,error:'',success:clone(result)};emit();
+          state={...state,error:'',success:clone(result)};
           await options.onReload?.(result);
+          state={...state,busy:false};emit();
           return {ok:true,result:clone(result)};
         }catch(error){return fail(error?.message||error)}
         finally{submitPromise=null}
       })();
       return submitPromise;
     }
-    function cancel(){submitPromise=null;state=initialState();emit();return clone(state)}
+    function cancel(){if(submitPromise||state.busy)return clone(state);state=initialState();emit();return clone(state)}
     return Object.freeze({snapshot:()=>clone(state),load,loadFiles,confirm,retry:confirm,cancel});
   }
   root.QuestionBankImportController=Object.freeze({classify,normalizeBanks,create});

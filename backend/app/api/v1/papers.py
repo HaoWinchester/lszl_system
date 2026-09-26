@@ -5,6 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.import_guard import import_submission_guard
 from app.core.auth import require_permissions
 from app.db.session import get_db
 from app.models.user import User
@@ -81,7 +82,7 @@ async def create_paper_composition_batch(
     }
 
 
-@router.post("/papers/import/preflight")
+@router.post("/papers/import/preflight", dependencies=[Depends(import_submission_guard)])
 async def preflight_paper_import(
     body: PaperImportPreflightRequest,
     db: DB,
@@ -92,7 +93,7 @@ async def preflight_paper_import(
     }
 
 
-@router.post("/papers/import")
+@router.post("/papers/import", dependencies=[Depends(import_submission_guard)])
 async def import_paper(
     body: PaperImportRequest,
     db: DB,
