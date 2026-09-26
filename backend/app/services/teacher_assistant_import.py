@@ -14,7 +14,7 @@ from app.models.content_prep import Principle
 from app.models.question import ExamPaper, Question, QuestionBank
 from app.schemas.paper import PaperImportPreflightRequest, PaperImportRequest
 from app.schemas.question_catalog import QuestionBankImportRequest, QuestionPayload
-from app.services import content_prep_shared_service, paper_import_service, paper_release_service, question_answer_service, question_content_service, question_service
+from app.services import content_prep_shared_service, paper_import_service, paper_release_service, question_answer_service, question_content_service, question_service, teaching_content_projection_service
 
 
 def _error(status, code, message):
@@ -38,7 +38,11 @@ def _banks(data):
     return []
 
 
-async def _reference_blockers(db, questions):
+def _principle_bundle(data):
+    return isinstance(data, dict) and (data.get("format") in {"kg-principle-card-bundle-v1", "pmp-principle-preset-bundle-v1"} or (("principles" in data or "principleRepository" in data) and any(key in data for key in ("synthesisPresets", "presets", "synthesisPresetRepository"))))
+
+
+async def _reference_blockers(db, questions, incoming_principle_ids=None):
     identifiers = set()
     recall_ids = {str(clue['recallNodeId']) for question in questions for clue in (question.get('clues') or []) if isinstance(clue, dict) and clue.get('recallNodeId')}
     recall_blockers = []
@@ -59,7 +63,7 @@ async def _reference_blockers(db, questions):
     if len(identifiers) > 1000:
         return ['关联原则超过检索上限。']
     existing = (await db.execute(select(Principle.id).where(Principle.id.in_(identifiers), Principle.status == 'active').limit(1000))).scalars().all()
-    missing = identifiers - set(existing)
+    missing = identifiers - set(existing) - set(incoming_principle_ids or [])
     return recall_blockers + [f'引用原则不存在或不可用：{value}' for value in sorted(missing)]
 
 
@@ -93,16 +97,41 @@ async def build_plan(db, actor, sources: list[dict], model_result: dict, *, sess
     proposed = {str(item.get('uploadId')): item for item in model_result.get('items', []) if isinstance(item, dict)}
     previous = {item['id']: item for item in (previous_plan or {}).get('items', [])}
     items = []
+    incoming_principle_ids = set()
+    for source in sources:
+        data = source['extracted'].get('data') if source['extracted']['kind'] == 'json' else proposed.get(str(source['id']), {}).get('principleBundle')
+        if _principle_bundle(data):
+            validated = teaching_content_projection_service.validate_principle_card_bundle(data)
+            incoming_principle_ids.update(str(principle['id']) for principle in validated['principles']['items'])
     for source in sources:
         upload_id = str(source['id'])
         extracted = source['extracted']
         model_item = proposed.get(upload_id, {})
         raw_banks = _banks(extracted.get('data')) if extracted['kind'] == 'json' else []
-        principle_bundle = extracted.get('data') if extracted['kind'] == 'json' and isinstance(extracted.get('data'), dict) and (extracted['data'].get('format') in {'kg-principle-card-bundle-v1', 'pmp-principle-preset-bundle-v1'} or ('principles' in extracted['data'] and 'synthesisPresets' in extracted['data'])) else model_item.get('principleBundle') if extracted['kind'] != 'json' else None
+        principle_bundle = extracted.get('data') if extracted['kind'] == 'json' and _principle_bundle(extracted.get('data')) else model_item.get('principleBundle') if extracted['kind'] != 'json' else None
         if principle_bundle:
             preview = await content_prep_shared_service.preview_principle_merge(db, principle_bundle)
-            item_blockers = ['原则合并存在冲突，请明确处理。'] if preview['plan'].get('conflicts') else []
-            items.append({'id': upload_id + ':principles', 'name': source['name'], 'kind': 'principles', 'questions': [], 'principleBundle': deepcopy(principle_bundle), 'mergePreview': preview, 'source': {'uploadId': upload_id, 'location': '文件'}, 'warnings': extracted.get('warnings', []), 'blockers': item_blockers})
+            item_id = upload_id + ':principles'
+            conflicts = preview['plan'].get('conflicts') or []
+            by_conflict = {str(conflict['conflictId']): conflict for conflict in conflicts}
+            old_item = previous.get(item_id, {})
+            old_conflicts = {str(conflict['conflictId']): conflict for conflict in (old_item.get('mergePreview') or {}).get('plan', {}).get('conflicts', [])}
+            approved = {str(resolution['conflictId']): resolution['resolution'] for resolution in old_item.get('principleResolutions') or [] if by_conflict.get(str(resolution['conflictId'])) == old_conflicts.get(str(resolution['conflictId']))}
+            item_blockers = []
+            instruction = str(model_result.get('userInstruction') or '')
+            for resolution in model_item.get('principleResolutions') or []:
+                if not isinstance(resolution, dict) or str(resolution.get('conflictId')) not in by_conflict or resolution.get('resolution') not in {'keep-existing', 'take-incoming'}:
+                    item_blockers.append('原则冲突处理包含无效冲突 ID 或策略。')
+                    continue
+                pattern = '保留现有|保留原有' if resolution['resolution'] == 'keep-existing' else '使用新值|采用新值|使用上传|采用上传|使用新原则'
+                if not re.search(pattern, instruction):
+                    item_blockers.append('原则冲突处理需要明确保留现有或使用新值的用户指令。')
+                    continue
+                approved[str(resolution['conflictId'])] = resolution['resolution']
+            if set(by_conflict) - set(approved):
+                item_blockers.append('原则合并存在冲突，请明确处理。')
+            resolutions = [{'conflictId': key, 'resolution': approved[key]} for key in sorted(approved)]
+            items.append({'id': item_id, 'name': source['name'], 'kind': 'principles', 'questions': [], 'principleBundle': deepcopy(principle_bundle), 'mergePreview': preview, 'principleResolutions': resolutions, 'source': {'uploadId': upload_id, 'location': '文件'}, 'warnings': extracted.get('warnings', []), 'blockers': item_blockers})
             continue
         if not raw_banks and extracted['kind'] != 'json':
             raw_banks = [{'id': upload_id, 'name': source['name'], 'questions': deepcopy(model_item.get('questions') or [])}]
@@ -169,7 +198,7 @@ async def build_plan(db, actor, sources: list[dict], model_result: dict, *, sess
                         item_blockers.append(f'第 {number} 题缺少有效原文位置。')
                     if (question.get('uncertain') or question.get('needsReview') or any('OCR' in value or '公式' in value or '图表' in value for value in warnings)) and str(question.get('id')) not in reviewed_ids:
                         item_blockers.append(f'第 {number} 题识别结果需要教师核对。')
-            item_blockers.extend(await _reference_blockers(db, questions))
+            item_blockers.extend(await _reference_blockers(db, questions, incoming_principle_ids))
             signatures = [question_content_service.duplicate_question_signature(value) for value in normalized]
             if len(signatures) != len(set(signatures)):
                 item_blockers.append('文件内有完全重复题目；请先明确保留范围。')
@@ -208,6 +237,7 @@ async def build_plan(db, actor, sources: list[dict], model_result: dict, *, sess
                     transformed.setdefault('metadata', {})['teacherAssistantSource'] = {'uploadId': upload_id, 'sourceBankId': original_source_id, 'sourceQuestionId': original_id, 'originalId': question['id']}
                 bank_payload['questions'].append(transformed)
             items.append({'id': item_id, 'name': name, 'kind': 'questions', 'questions': questions, 'selectedQuestionIds': [question['id'] for question in questions], 'reviewedQuestionIds': sorted(reviewed_ids), 'bankPayload': bank_payload, 'reuseBankId': reuse_bank_id, 'source': {'uploadId': upload_id, 'location': 'JSON 原题库' if extracted['kind'] == 'json' else '文档'}, 'warnings': warnings, 'blockers': item_blockers, 'cancelled': policy == 'cancel'})
+    items.sort(key=lambda item: item['kind'] != 'principles')
     total = sum(len(item['questions']) for item in items)
     if total > 500:
         blockers.append('单任务超过 500 题；请拆分。')
@@ -238,7 +268,7 @@ async def execute_plan(db, actor, session, revision) -> dict:
         prior = {}
     receipt = {'revision': revision, 'items': prior.get('items') or [], 'status': 'partial'}
     entries = {entry['itemId']: entry for entry in receipt['items']}
-    for item in plan.get('items', []):
+    for item in sorted(plan.get('items', []), key=lambda item: item['kind'] != 'principles'):
         entry = entries.get(item['id'])
         if entry and entry.get('status') in {'succeeded', 'cancelled'}:
             continue
@@ -256,10 +286,14 @@ async def execute_plan(db, actor, session, revision) -> dict:
         try:
             if item['kind'] == 'principles':
                 preview = await content_prep_shared_service.preview_principle_merge(db, item['principleBundle'])
-                if preview['plan'].get('conflicts'):
-                    raise _error(422, 'PRINCIPLE_CONFLICT', '原则合并存在未解决冲突。')
-                result = await content_prep_shared_service.apply_principle_merge(db, actor, content_revision=preview['contentRevision'], bundle=item['principleBundle'], resolutions=[])
-                entry.update(status='succeeded', result=result)
+                approved_conflicts = {str(conflict['conflictId']): conflict for conflict in item['mergePreview']['plan'].get('conflicts') or []}
+                current_conflicts = {str(conflict['conflictId']): conflict for conflict in preview['plan'].get('conflicts') or []}
+                approved = {str(resolution['conflictId']): resolution['resolution'] for resolution in item.get('principleResolutions') or []}
+                if any(identifier not in approved or conflict != approved_conflicts.get(identifier) for identifier, conflict in current_conflicts.items()):
+                    raise _error(409, 'PRINCIPLE_CONFLICT_CHANGED', '原则冲突已变化或未经确认，请重新预览。')
+                resolutions = [{'conflictId': identifier, 'resolution': approved[identifier]} for identifier in sorted(current_conflicts)]
+                result = await content_prep_shared_service.apply_principle_merge(db, actor, content_revision=preview['contentRevision'], bundle=item['principleBundle'], resolutions=resolutions)
+                entry.update(status='succeeded', result={'contentRevision': result['contentRevision'], 'summary': result['summary']})
                 await _checkpoint(db, session, receipt)
                 continue
             reference_errors = await _reference_blockers(db, item['questions'])

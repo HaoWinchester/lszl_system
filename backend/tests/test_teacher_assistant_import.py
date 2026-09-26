@@ -171,11 +171,15 @@ async def test_real_twenty_five_import_preserves_answers_and_associations():
         for clue in q.get('clues') or []:
             if clue.get('recallNodeId'):
                 nodes[clue['recallNodeId']] = {'id': clue['recallNodeId'], 'title': clue.get('text') or clue['recallNodeId']}
+    principle_path = root / '原则与归纳卡-V9.0-P4.6.4.35.json'
+    bundle = json.loads(principle_path.read_text())
+    incoming_principles = {principle['id'] for principle in bundle['principles']}
+    sources.append({'id': 'principle-upload', 'name': principle_path.name, 'extracted': {'kind': 'json', 'data': bundle, 'warnings': [], 'sections': []}})
     suffix = uuid4().hex[:12]
     async with AsyncSessionLocal() as database:
         actor = User(username='ta-original-' + suffix, password_hash='test', role='teacher', status='active')
         database.add(actor)
-        for identifier in principles:
+        for identifier in principles - incoming_principles:
             if await database.get(Principle, identifier) is None:
                 database.add(Principle(id=identifier, name=identifier, status='active'))
         subject = ContentSubject(id='ta-subject-' + suffix, code='ta-' + suffix, name='Fixture')
@@ -187,13 +191,17 @@ async def test_real_twenty_five_import_preserves_answers_and_associations():
         settings = {'duplicatePolicy': 'independent', 'nameSuffix': '习题课', 'publish': True, 'accessLevel': 'free', 'allowedRoles': ['teacher', 'student'], 'enabledModes': ['deep_recall', 'multi_question_canvas']}
         session.plan = await build_plan(database, actor, sources, {'settings': settings}, session_id=session.id)
         assert not session.plan['blockers']
+        assert session.plan['items'][0]['kind'] == 'principles'
         assert all(not item['blockers'] for item in session.plan['items']), session.plan['items']
         database.add(session)
         await database.commit()
         receipt = await execute_plan(database, actor, session, 1)
         assert receipt['status'] == 'succeeded', json.dumps(receipt, ensure_ascii=False)
-        imported = (await database.execute(select(Question).where(Question.bank_id.in_([item['bankId'] for item in receipt['items']])))).scalars().all()
+        imported = (await database.execute(select(Question).where(Question.bank_id.in_([item['bankId'] for item in receipt['items'] if item.get('bankId')])))).scalars().all()
         assert len(imported) == 25
+        rebuilt = await build_plan(database, actor, sources, {'settings': settings}, session_id=session.id, previous_plan=session.plan)
+        assert rebuilt['questionCount'] == 25
+        assert [item['bankPayload']['sourceId'] for item in rebuilt['items'] if item['kind'] == 'questions'] == [item['bankPayload']['sourceId'] for item in session.plan['items'] if item['kind'] == 'questions']
         original_by_id = {q['id']: q for q in questions}
         for stored in imported:
             original_id = stored.content_metadata['teacherAssistantSource']['originalId']
@@ -232,3 +240,68 @@ async def test_cross_teacher_execute_denied(db):
     with pytest.raises(HTTPException) as error:
         await execute_plan(db, ACTOR, session, 1)
     assert error.value.status_code == 403
+
+@pytest.mark.anyio
+async def test_original_principle_bundle_merge_and_response_loss():
+    from uuid import uuid4
+    from app.db.session import AsyncSessionLocal
+    from app.models.user import User
+    from app.models.teacher_assistant import TeacherAssistantSession
+    from app.models.content_prep import Principle, SynthesisPreset
+    from app.services import content_prep_shared_service
+    path = Path('/Users/menghao/Library/Containers/com.tencent.xinWeChat/Data/Documents/xwechat_files/wxid_d26m6zr7um9k51_e8f7/msg/file/2026-09/原则与归纳卡-V9.0-P4.6.4.35.json')
+    if not path.exists():
+        pytest.skip('Original principle bundle unavailable')
+    bundle = json.loads(path.read_text())
+    assert len(bundle['principles']) == 11
+    uploaded = {'id': 'principles-upload', 'name': path.name, 'extracted': {'kind': 'json', 'data': bundle, 'warnings': [], 'sections': []}}
+    suffix = uuid4().hex[:12]
+    async with AsyncSessionLocal() as database:
+        actor = User(username='ta-principles-' + suffix, password_hash='test', role='teacher', status='active')
+        database.add(actor)
+        await database.commit()
+        preview = await content_prep_shared_service.preview_principle_merge(database, bundle)
+        resolutions = [{'conflictId': conflict['conflictId'], 'resolution': 'take-incoming'} for conflict in preview['plan']['conflicts']]
+        model = {'userInstruction': '这些原则和归纳卡使用新值', 'items': [{'uploadId': uploaded['id'], 'principleResolutions': resolutions}]}
+        session = TeacherAssistantSession(id='tas-principles-' + suffix, owner_id=actor.username, revision=1)
+        session.plan = await build_plan(database, actor, [uploaded], model, session_id=session.id)
+        assert session.plan['items'][0]['kind'] == 'principles'
+        assert not session.plan['items'][0]['blockers']
+        database.add(session)
+        await database.commit()
+        first = await execute_plan(database, actor, session, 1)
+        assert first['status'] == 'succeeded', first
+        session.receipt = {}
+        await database.commit()
+        second = await execute_plan(database, actor, session, 1)
+        assert second['status'] == 'succeeded', second
+        for principle in bundle['principles']:
+            stored = await database.get(Principle, principle['id'])
+            assert stored.name == principle['name']
+        for preset in bundle['presets']:
+            stored = await database.get(SynthesisPreset, preset['id'])
+            assert stored.principle_id == preset['principleId']
+            assert stored.content == preset['content']
+        assert 'principles' not in second['items'][0]['result']  # receipt does not copy entire shared library
+
+@pytest.mark.anyio
+async def test_principle_resolution_requires_trusted_direction(db, monkeypatch):
+    from app.services import teacher_assistant_import as importer
+    conflict = {'conflictId': 'same-id-different-name:p1', 'type': 'same-id-different-name', 'principleId': 'p1', 'incomingName': 'new', 'existingName': 'old'}
+    preview = {'plan': {'conflicts': [conflict]}, 'contentRevision': 3}
+    monkeypatch.setattr(importer.content_prep_shared_service, 'preview_principle_merge', AsyncMock(return_value=preview))
+    uploaded = {'id': 'u', 'name': 'p.json', 'extracted': {'kind': 'json', 'data': {'format': 'pmp-principle-preset-bundle-v1', 'principles': [{'id': 'p1', 'name': 'new'}], 'presets': [{'id': 'preset1', 'principleId': 'p1', 'title': 'card', 'content': 'text'}]}, 'warnings': []}}
+    model = {'items': [{'uploadId': 'u', 'principleResolutions': [{'conflictId': conflict['conflictId'], 'resolution': 'take-incoming'}]}], 'userInstruction': '保留现有'}
+    rejected = await build_plan(db, ACTOR, [uploaded], model, session_id='s')
+    assert rejected['items'][0]['blockers']
+    model['items'][0]['principleResolutions'][0]['resolution'] = 'keep-existing'
+    approved = await build_plan(db, ACTOR, [uploaded], model, session_id='s')
+    assert not approved['items'][0]['blockers']
+    assert approved['items'][0]['principleResolutions'][0]['resolution'] == 'keep-existing'
+    changed = copy.deepcopy(preview)
+    changed['plan']['conflicts'][0]['existingName'] = 'changed after preview'
+    monkeypatch.setattr(importer.content_prep_shared_service, 'preview_principle_merge', AsyncMock(return_value=changed))
+    session = SimpleNamespace(id='s', owner_id='teacher', revision=1, plan=approved, receipt={})
+    receipt = await execute_plan(db, ACTOR, session, 1)
+    assert receipt['status'] == 'partial'
+    assert '变化' in receipt['items'][0]['error']
