@@ -4,11 +4,7 @@
   "toVersion": "v9.0-p4.1.242",
   "changes": {
     "added": [],
-    "changed": [
-      "content-prep-studio/dist/content-prep.html",
-      "src/teacher/teacher-assistant.js",
-      "tests/teacher-assistant-browser.py"
-    ],
+    "changed": [],
     "removed": []
   },
   "incompatible": []
