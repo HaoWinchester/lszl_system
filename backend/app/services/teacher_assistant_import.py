@@ -321,9 +321,10 @@ def _apply_question_patches(questions, old, model_item, instruction, actor):
         if question_id not in original_by_id or not patch or set(patch) - allowed:
             errors.append('题目更正包含无效题目 ID 或未授权字段。')
             continue
-        if all(key in stored.get(question_id, {}) and stored[question_id][key] == value for key, value in patch.items()):
+        changed_patch = {key: value for key, value in patch.items() if key not in stored.get(question_id, {}) or stored[question_id][key] != value}
+        if not changed_patch:
             continue  # Repeating an approved correction changes no authority or provenance.
-        if not _patch_authorized(instruction, patch, original_by_id[question_id]):
+        if not _patch_authorized(instruction, changed_patch, original_by_id[question_id]):
             errors.append('题目更正需要本轮明确指定字段的用户修改指令；保留原文或不修改指令优先。')
             continue
         stored.setdefault(question_id, {}).update(deepcopy(patch))

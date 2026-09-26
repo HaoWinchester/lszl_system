@@ -510,6 +510,9 @@ async def test_teacher_correction_requires_instruction_and_persists(db):
     repeated = await build_plan(db, ACTOR, [uploaded], {'items': [command], 'userInstruction': '请保留原答案，不要修改'}, session_id='s', previous_plan=corrected)
     assert not repeated['items'][0]['blockers']
     assert repeated['items'][0]['correctionProvenance'] == corrected['items'][0]['correctionProvenance']
+    reviewed = await build_plan(db, ACTOR, [uploaded], {'items': [command], 'userInstruction': '已逐题核对原文与答案'}, session_id='s', previous_plan=corrected)
+    assert not reviewed['items'][0]['blockers']
+    assert reviewed['items'][0]['correctionProvenance'] == corrected['items'][0]['correctionProvenance']
     forbidden = {**command, 'questionPatches': [{'questionId': 'q1', 'patch': {'metadata': {'principleIds': ['forged']}}}]}
     blocked = await build_plan(db, ACTOR, [uploaded], {'items': [forbidden], 'userInstruction': '更正关联'}, session_id='s')
     assert any('未授权字段' in blocker for blocker in blocked['items'][0]['blockers'])
