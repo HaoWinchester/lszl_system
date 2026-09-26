@@ -17,6 +17,7 @@ MAX_UPLOAD = 20 * 1024 * 1024
 MAX_EXPANDED = 100 * 1024 * 1024
 MAX_PAGES = 200
 MAX_TEXT = 8 * 1024 * 1024
+MAX_IMAGES = 200
 ALLOWED = {'.json', '.docx', '.pptx', '.pdf', '.doc', '.ppt'}
 
 
@@ -172,11 +173,28 @@ def _office(path, extension, output_dir):
                     if suffix not in {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.tif', '.tiff'}:
                         warnings.append(f'{section["location"]} 图片格式 {suffix} 需人工核对。')
                         continue
-                    filename = f'image-{len(list(output_dir.glob("image-*"))) + 1}{suffix}'
+                    image_count = sum(len(part['images']) for part in sections)
+                    if image_count >= MAX_IMAGES:
+                        raise DocumentError('Office 图片超过 200 张；请拆分文档。')
+                    filename = f'image-{image_count + 1}{suffix}'
                     (output_dir / filename).write_bytes(archive.read(member))
                     section['images'].append(filename)
-    if sum(len(section['text'].encode()) for section in sections) > MAX_TEXT:
+    text_size = sum(len(section['text'].encode()) for section in sections)
+    if text_size > MAX_TEXT:
         raise DocumentError('提取文本超过安全上限。')
+    if any(section['images'] for section in sections):
+        languages = _run(['tesseract', '--list-langs'])
+        if not all(language in languages.split() for language in ('chi_sim', 'eng')):
+            raise DocumentError('Office 图片 OCR 需要安装 tesseract chi_sim 和 eng 语言包。')
+        for section in sections:
+            for name in section['images']:
+                recognized = _run(['tesseract', str(output_dir / name), 'stdout', '-l', 'chi_sim+eng'], timeout=90).strip()
+                snippet = '\n[图片 OCR：' + name + ']\n' + recognized
+                text_size += len(snippet.encode())
+                if text_size > MAX_TEXT:
+                    raise DocumentError('图片 OCR 提取文本超过安全上限；请拆分。')
+                section['text'] += snippet
+                warnings.append(f'{section["location"]} 图片 {name} 为 OCR 结果；文字、数字、答案、公式和表格必须核对。')
     return {'kind': 'document', 'data': None, 'sections': sections, 'warnings': list(dict.fromkeys(warnings))}
 
 

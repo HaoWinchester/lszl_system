@@ -33,3 +33,11 @@
 - worker 第140–142行忽略 execute_plan 返回 partial 并标 succeeded，service 第116行拒绝 succeeded 重试；根任务修复。
 - import 第116行筛选触发词不含“恢复/保留”，旧selectedQuestionIds可导致排除无法撤销；import任务修复。
 - Office图像只有文件名，worker第33行把名字交给模型；无图像内容/OCR不能理解图片题。根任务已授权本代理补 Office 图片 OCR。
+
+## Office 图片 OCR 补齐
+
+在现有 Office 提取模块局部扩展：图片原件仍按段落/幻灯片定位保存；逐图片通过已有受限 subprocess `_run` 调用 Tesseract chi_sim+eng，文字注入该来源片段并附 OCR 必须核对警告。最多 200 张图片，所有文本含 OCR 不超过 8 MiB；缺语言包、超限或 OCR 失败明确报错。未新增依赖。复用当前 parser 的文件、CPU、内存与超时限制。
+
+实际检查：使用主工作区已有 backend/.venv Python 执行 `-m pytest tests/test_teacher_assistant_documents.py -q`，18 passed；包括真实图像 DOCX 与 PPTX Tesseract OCR、真实文字/扫描 PDF、缺语言包、OCR文本超限、图片数量超限，以及原有 XML/ZIP/宏/外链拒绝。这些是提取器实际工具测试，仍不代表真实模型/导入发布/UAT验收。
+
+最新 Chromium 完整控件测试已通过，实际 JSON / 报告附件内容通过本地测试 HTTP 服务模拟验证（Chromium attachment 下载可能绕过 Playwright 路由，已将附件 fixture 移到本地测试 HTTP Handler）。Node 5/5 再次通过。

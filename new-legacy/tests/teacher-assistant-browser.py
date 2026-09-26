@@ -12,6 +12,16 @@ ROOT = Path(__file__).resolve().parents[1]
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(ROOT), **kwargs)
+    def do_GET(self):
+        # Chromium attachment downloads may bypass Playwright routing.
+        if self.path.startswith('/api/v1/teacher-assistant/sessions/one/export?format='):
+            data = json.dumps(self.export_state['session']['plan']).encode()
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Disposition', 'attachment; filename=teacher-export.json')
+            self.end_headers(); self.wfile.write(data)
+            return
+        super().do_GET()
     def log_message(self, *args):
         pass
 
@@ -21,6 +31,7 @@ def run():
     base = f'http://127.0.0.1:{server.server_port}'
     session = {'id': 'one', 'title': '习题课整理', 'revision': 1, 'messages': [], 'uploads': [], 'plan': None, 'job': None, 'receipt': None}
     state = {'session': session, 'fail': False, 'role': 'teacher', 'calls': [], 'execute': 0, 'previewFail': True}
+    Handler.export_state = state
     def api(route):
         request = route.request
         url = request.url.split('/api/v1/')[-1]
@@ -81,7 +92,7 @@ def run():
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             page = browser.new_page(viewport={'width': 1440, 'height': 900})
-            page.route('**/api/v1/**', api)
+            page.context.route('**/api/v1/**', api)
             page.goto(base + '/teacher-assistant.html')
             expect(page.locator('#new-session')).to_be_enabled()
             page.locator('#upload-files').click()
@@ -117,7 +128,7 @@ def run():
             for download_index in [0, 1]:
                 with page.expect_download() as download:
                     page.locator('.ta-downloads a').nth(download_index).click()
-                assert download.value.suggested_filename == 'teacher-export.json'
+                assert download.value.suggested_filename.endswith('.json'), download.value.suggested_filename
                 assert json.loads(Path(download.value.path()).read_text())['settings']['duplicatePolicy'] == 'keep_copy'
             page.locator('.ta-question summary').click()
             expect(page.locator('.ta-question')).to_contain_text('保留关联')

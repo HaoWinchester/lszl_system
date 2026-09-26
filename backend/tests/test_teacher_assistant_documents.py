@@ -60,7 +60,9 @@ def test_legacy_requires_isolation(tmp_path, monkeypatch):
     with pytest.raises(DocumentError, match='隔离转换器'): extract_document(path, path.name, tmp_path / 'out')
 
 
-def test_docx_image_location(tmp_path):
+def test_docx_image_location(tmp_path, monkeypatch):
+    import app.services.teacher_assistant_documents as parser
+    monkeypatch.setattr(parser, "_run", lambda args, **kwargs: "chi_sim eng" if "--list-langs" in args else "图片文字")
     xml = '<w:document xmlns:w="urn:w" xmlns:a="urn:a" xmlns:r="urn:r"><w:body><w:p><w:t>图片</w:t><a:blip r:embed="r1"/></w:p></w:body></w:document>'
     path = package(tmp_path / 'x.docx', {'word/document.xml': xml, 'word/_rels/document.xml.rels': '<Relationships><Relationship Id="r1" Target="media/test.png"/></Relationships>', 'word/media/test.png': b'\x89PNG\r\n\x1a\n'})
     result = extract_document(path, path.name, tmp_path / 'out')
@@ -105,3 +107,53 @@ def test_scanned_pdf_real_ocr(tmp_path):
     result = extract_document(path, path.name, tmp_path / 'out')
     assert '123' in result['sections'][0]['text']
     assert any('OCR' in warning for warning in result['warnings'])
+
+
+def office_image_package(tmp_path, extension, picture):
+    if extension == '.docx':
+        xml = '<w:document xmlns:w="urn:w" xmlns:a="urn:a" xmlns:r="urn:r"><w:body><w:p><a:blip r:embed="r1"/></w:p></w:body></w:document>'
+        entries = {'word/document.xml': xml, 'word/_rels/document.xml.rels': '<Relationships><Relationship Id="r1" Target="media/test.png"/></Relationships>', 'word/media/test.png': picture}
+    else:
+        xml = '<p:sld xmlns:p="urn:p" xmlns:a="urn:a" xmlns:r="urn:r"><a:blip r:embed="r1"/></p:sld>'
+        entries = {'ppt/slides/slide1.xml': xml, 'ppt/slides/_rels/slide1.xml.rels': '<Relationships><Relationship Id="r1" Target="../media/test.png"/></Relationships>', 'ppt/media/test.png': picture}
+    return package(tmp_path / ('images' + extension), entries)
+
+
+@pytest.mark.parametrize('extension', ['.docx', '.pptx'])
+def test_image_only_office_real_ocr(tmp_path, extension):
+    import io
+    import shutil
+    import subprocess
+    if not shutil.which('tesseract'):
+        pytest.skip('Tesseract unavailable')
+    languages = subprocess.run(['tesseract', '--list-langs'], capture_output=True, text=True, check=True).stdout.split()
+    if not all(language in languages for language in ('chi_sim', 'eng')):
+        pytest.skip('Tesseract chi_sim+eng unavailable')
+    from PIL import Image, ImageDraw, ImageFont
+    image = Image.new('RGB', (1000, 400), 'white')
+    fonts = [Path('/System/Library/Fonts/Supplemental/Arial.ttf'), Path('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf')]
+    font = ImageFont.truetype(str(next(path for path in fonts if path.exists())), 60)
+    ImageDraw.Draw(image).text((60, 120), 'Question A 123', font=font, fill='black')
+    buffer = io.BytesIO(); image.save(buffer, 'PNG')
+    path = office_image_package(tmp_path, extension, buffer.getvalue())
+    result = extract_document(path, path.name, tmp_path / 'out')
+    assert '123' in result['sections'][0]['text']
+    assert any('OCR' in warning for warning in result['warnings'])
+    assert (tmp_path / 'out' / result['sections'][0]['images'][0]).is_file()
+
+
+@pytest.mark.parametrize('extension', ['.docx', '.pptx'])
+def test_office_ocr_errors_and_limits(tmp_path, monkeypatch, extension):
+    import app.services.teacher_assistant_documents as parser
+    path = office_image_package(tmp_path, extension, b'fake')
+    monkeypatch.setattr(parser, '_run', lambda args, **kwargs: 'eng')
+    with pytest.raises(DocumentError, match='chi_sim'):
+        extract_document(path, path.name, tmp_path / 'out')
+    monkeypatch.setattr(parser, '_run', lambda args, **kwargs: 'chi_sim eng' if '--list-langs' in args else '答案' * 100)
+    monkeypatch.setattr(parser, 'MAX_TEXT', 30)
+    with pytest.raises(DocumentError, match='OCR 提取文本'):
+        extract_document(path, path.name, tmp_path / 'out2')
+    monkeypatch.setattr(parser, 'MAX_TEXT', 8 * 1024 * 1024)
+    monkeypatch.setattr(parser, 'MAX_IMAGES', 0)
+    with pytest.raises(DocumentError, match='图片超过'):
+        extract_document(path, path.name, tmp_path / 'out3')
