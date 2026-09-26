@@ -134,6 +134,16 @@ def run():
                 expect(page.locator('#messages')).to_contain_text(content)
                 expect(page.locator('#send-message')).to_be_enabled()
             expect(page.locator('#plan-preview')).to_contain_text('方案版本 4')
+            state['session']['plan']['items'][0]['questions'][0]['sourceImages'] = [{'uploadId': 'file', 'filename': 'page-1.png', 'digest': 'digest1'}]
+            page.locator('#refresh-session').click()
+            expect(page.locator('.ta-downloads')).to_contain_text('请先保存含图草稿')
+            assert page.locator('.ta-downloads a').count() == 1
+            state['session']['receipt'] = {'revision': state['session']['revision'], 'items': [{'itemId': 'bank', 'bankId': 'saved-bank', 'assets': {'file:page-1.png:digest1': {'id': 'actual-image'}}}]}
+            page.locator('#refresh-session').click()
+            expect(page.locator('.ta-downloads a')).to_have_count(2)
+            state['session']['receipt'] = None
+            state['session']['plan']['items'][0]['questions'][0].pop('sourceImages')
+            page.locator('#refresh-session').click()
             expect(page.locator('.ta-downloads a').nth(0)).to_have_attribute('href', base + '/api/v1/teacher-assistant/sessions/one/export?format=json')
             expect(page.locator('.ta-downloads a').nth(1)).to_have_attribute('href', base + '/api/v1/teacher-assistant/sessions/one/export?format=report')
             for download_index in [0, 1]:
@@ -145,6 +155,13 @@ def run():
             expect(page.locator('.ta-question')).to_contain_text('保留关联')
             expect(page.locator('.ta-question .ta-option').first).to_contain_text('A. 甲')
             expect(page.locator('.ta-question .ta-answer')).to_contain_text('答案：A、B')
+            question = state['session']['plan']['items'][0]['questions'][0]
+            question['type'] = 'single_choice'; question['correctOptionIds'] = []; question['correctAnswer'] = 'B'
+            page.locator('#refresh-session').click(); page.locator('.ta-question > summary').click()
+            expect(page.locator('.ta-question .ta-answer')).to_contain_text('答案：B')
+            expect(page.locator('.ta-question > summary')).to_contain_text('[单选]')
+            expect(page.locator('.ta-question .ta-option').nth(1)).to_contain_text('正确选项')
+            question['type'] = 'multiple'; question.pop('correctAnswer'); question.pop('correctOptionIds')
             expect(page.locator('.ta-publication-state')).to_contain_text('私有草稿')
             expect(page.locator('.ta-question')).to_contain_text('AI 补充')
             assert page.locator('#plan-preview script').count() == 0

@@ -28,8 +28,7 @@ async def detail(sid:str,db:DB,user:Actor): return await service.envelope(db,awa
 @router.delete('/sessions/{sid}',status_code=204)
 async def remove(sid:str,db:DB,user:Actor):
     obj=await service.owned(db,user,sid,lock=True)
-    job=await service.last_job(db,sid)
-    if job and (job.status in service.ACTIVE or (job.lease_until and job.lease_until > datetime.now(timezone.utc))): raise HTTPException(409,'请先取消任务，并等待当前步骤结束后再删除会话')
+    if await service.has_inflight(db,sid=sid): raise HTTPException(409,'请先取消任务，并等待当前步骤结束后再删除会话')
     await db.delete(obj);await db.commit()
     shutil.rmtree(service.storage(sid),ignore_errors=True)
     return Response(status_code=204)
@@ -97,8 +96,12 @@ async def export(sid:str,db:DB,user:Actor,format:str='json'):
     obj=await service.owned(db,user,sid)
     if format not in ('json','report'): raise HTTPException(422,'不支持的导出格式')
     if not obj.plan: raise HTTPException(409,'请先生成预览')
-    data=obj.plan if format=='json' else {'revision':obj.revision,'summary':obj.plan.get('summary'),'blockers':obj.plan.get('blockers',[]),
-        'files':[{'name':i.get('name'),'warnings':i.get('warnings',[]),'blockers':i.get('blockers',[])} for i in obj.plan.get('items',[])],'receipt':obj.receipt}
+    if format=='json':
+        from app.services.teacher_assistant_export import standard_json
+        data=await standard_json(db,user,obj)
+    else:
+        data={'revision':obj.revision,'summary':obj.plan.get('summary'),'blockers':obj.plan.get('blockers',[]),
+            'files':[{'name':i.get('name'),'warnings':i.get('warnings',[]),'blockers':i.get('blockers',[])} for i in obj.plan.get('items',[])],'receipt':obj.receipt}
     return Response(json.dumps(data,ensure_ascii=False,indent=2),media_type='application/json',headers={'Content-Disposition':f'attachment; filename="teacher-assistant-{format}.json"','Cache-Control':'private, no-store'})
 
 

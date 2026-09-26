@@ -58,3 +58,13 @@ Hybrid PDF 检查 embedded image 页（pdfimages）或少量 selectable text 的
 仍未把自动化自检当作用户UAT验收；根任务负责集成worker维护调度、同步产物与真实模型业务联调。
 
 过期上传追加浏览器回归：过期记录仍显示重传提示，隐藏失效的原件/预览链接；上传控件保持可用。前端校验仅当前选中文件的单批数量/大小，历史过期记录不计入本批。Chromium回归通过。
+
+## 含图标准 JSON 导出复审修复
+
+新增 export 专用服务，保留 root 已实现的标准 bundle marker / banks / principleBundles 与单原则包兼容协议，不添加 base64 协议。文档题目的私有 `sourceImages` 必须由当前 revision 的执行回执完整映射到已存在、当前账号有权使用的 `QuestionAsset`；核对资源实际字节 SHA256，生成系统 canonical `images` 引用，移除私有来源字段。尚未保存、映射缺失、资产不存在/无权使用或摘要不符明确409，提示先保存草稿，不静默省略图片。已有标准JSON images也验证当前账号授权与实际资源；原计划不被导出修改。
+
+UI 含图但未完成映射时禁用标准JSON下载并说明先保存含图草稿；实际完成映射才恢复下载。校验报告一直可以导出。执行按钮清楚区分确认保存草稿与确认执行并发布。
+
+真实API新增回归完成：6项 teacher_assistant API测试全通过，包含未执行409、成功标准导出、真实图片下载、经现有bank import重新导入成功、缺映射/旧revision/失效资产/外教师资产409与跨教师会话404；原有标准export/report测试保留。
+
+轮回测试额外暴露现有 question_service rollback 后actor过期导致含图导入 MissingGreenlet，document_parser代理已修复；本代理未改import模块。Chromium 控件测试通过含图下载禁用/恢复、单选 `correctOptionIds=[]` 且 `correctAnswer=B` 的可读答案回归；Node 5/5、语法和diff检查通过。

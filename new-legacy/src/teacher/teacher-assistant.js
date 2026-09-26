@@ -100,6 +100,7 @@
       ['new-session', 'session-history'].forEach(id => { $(id).disabled = disabled; });
       ['delete-session', 'refresh-session'].forEach(id => { $(id).disabled = disabled || !s; });
       ['assistant-files', 'upload-files', 'assistant-message', 'send-message'].forEach(id => { $(id).disabled = disabled || !s || running; });
+      $('execute-plan').textContent = s?.plan?.settings?.publish ? '确认执行并发布' : '确认保存草稿';
       $('execute-plan').disabled = disabled || !s?.plan?.items?.length || running || Boolean(s.plan.blockers?.length) || s.plan.items.some(item => item.blockers?.length || item.questions?.some(question => question.blockers?.length)) || Boolean(s.receipt?.revision === s.revision && s.job?.status === 'succeeded');
       $('confirm-source-review').hidden = !s?.plan?.items?.some(item => item.questions?.some(question => question.metadata?.needsReview || question.needsReview));
       $('confirm-source-review').disabled = disabled || running;
@@ -170,7 +171,13 @@
       if (!plan?.items?.length) text($('plan-preview'), 'p', '上传文件并说明需求后，这里将展示可核对的方案。');
       else {
         const downloads = text($('plan-preview'), 'div', '', 'ta-downloads');
-        link(downloads, '下载标准 JSON', BASE + '/sessions/' + encodeURIComponent(s.id) + '/export?format=json', true);
+        const imageItems = plan.items.filter(item => item.questions?.some(question => question.sourceImages?.length));
+        const readyImages = !imageItems.length || s.receipt?.revision === s.revision && imageItems.every(item => {
+          const entry = s.receipt.items?.find(result => result.itemId === item.id);
+          return entry?.bankId && item.questions.every(question => (question.sourceImages || []).every(image => entry.assets?.[image.uploadId + ':' + image.filename + ':' + image.digest]?.id));
+        });
+        if (readyImages) link(downloads, '下载标准 JSON', BASE + '/sessions/' + encodeURIComponent(s.id) + '/export?format=json', true);
+        else { const unavailable = text(downloads, 'span', '下载标准 JSON（请先保存含图草稿）'); unavailable.setAttribute('aria-disabled', 'true'); text(downloads, 'p', '本方案含来源图片，请先确认保存草稿。保存后导出的 JSON 将包含系统图片引用，图片不会被省略。', 'ta-note'); }
         link(downloads, '下载校验报告', BASE + '/sessions/' + encodeURIComponent(s.id) + '/export?format=report', true);
         text($('plan-preview'), 'p', s.receipt?.revision === s.revision && s.receipt?.items?.some(entry => entry.releaseId) ? '已发布 · 请通过回执入口核对学习内容' : s.receipt?.revision === s.revision && s.receipt?.items?.some(entry => entry.bankId || entry.paperId || entry.status === 'succeeded') ? '已导入 · 尚未发布给学员' : plan.settings?.publish ? '待发布方案 · 确认执行后发布' : '私有草稿 · 尚未发布', 'ta-publication-state');
         text($('plan-preview'), 'h3', '方案版本 ' + s.revision); if (plan.summary) text($('plan-preview'), 'p', plan.summary);
@@ -191,11 +198,11 @@
             text(detail, 'summary', (index + 1) + '. ' + stem + ' [' + type + ']');
             if (question.stemParts) text(detail, 'p', readable(question.stemParts));
             const options = Array.isArray(question.options) ? question.options : Object.entries(question.options || {}).map(([id, value]) => ({ id, text: readable(value) }));
-            const answers = question.correctOptionIds || question.answer || question.answers || question.correctAnswer;
+            const answers = [question.correctOptionIds, question.correctAnswer, question.answer, question.answers].find(value => value != null && value !== '' && (!Array.isArray(value) || value.length > 0)) ?? options.filter(option => option.correct).map(option => option.id);
             const answerIds = Array.isArray(answers) ? answers.map(String) : answers == null ? [] : [String(answers)];
             const optionLabels = new Map();
             options.forEach((option, position) => { const label = option.label || String.fromCharCode(65 + position); optionLabels.set(String(option.id), label); text(detail, 'p', label + '. ' + readable(option) + (option.correct || answerIds.includes(String(option.id)) ? ' ✓ 正确选项' : ''), 'ta-option'); });
-            if (answers != null) text(detail, 'p', '答案：' + (answerIds.length ? answerIds.map(value => optionLabels.get(value) || value).join('、') : readable(answers)), 'ta-answer');
+            if (answers != null && (!Array.isArray(answers) || answers.length)) text(detail, 'p', '答案：' + (answerIds.length ? answerIds.map(value => optionLabels.get(value) || value).join('、') : readable(answers)), 'ta-answer');
             for (const [key, label] of [['explanation', '解析'], ['analysis', '解析'], ['clues', '联想词'], ['concepts', '原则'], ['reasoning', '推理'], ['reasoningSteps', '推理步骤'], ['aiAdditions', 'AI 补充（待核对）']]) if (question[key] != null) text(detail, 'p', label + '：' + readable(question[key]));
             const location = question.source?.location || question.metadata?.sourceLocation;
             if (location) text(detail, 'p', '来源：' + location);
