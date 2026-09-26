@@ -123,11 +123,11 @@
       if (!s) { $('job-status').textContent = '请选择或新建会话。'; controls(); return; }
       for (const message of s.messages || []) { const el = text($('messages'), 'article', '', 'ta-message ' + (message.role === 'user' ? 'user' : 'assistant')); text(el, 'strong', message.role === 'user' ? '你' : '整理助手'); text(el, 'div', message.content); }
       for (const upload of s.uploads || []) {
-        const el = text($('uploads'), 'article', '', 'ta-file'); text(el, 'strong', upload.name); text(el, 'span', ' · ' + Math.ceil((upload.size || 0) / 1024) + ' KiB · ' + (upload.status || '等待处理'));
+        const el = text($('uploads'), 'article', '', 'ta-file'); text(el, 'strong', upload.name); text(el, 'span', ' · ' + Math.ceil((upload.size || 0) / 1024) + ' KiB · ' + ({ ready: '已识别', uploaded: '待识别', failed: '识别失败', expired: '已过期，请重传' }[upload.status] || upload.status || '等待处理'));
         if (upload.pageCount != null) text(el, 'span', ' · ' + upload.pageCount + ' 页');
-        link(el, '下载原文件', upload.downloadUrl || BASE + '/uploads/' + encodeURIComponent(upload.id) + '/file');
+        if (upload.status !== 'expired') link(el, '下载原文件', upload.downloadUrl || BASE + '/uploads/' + encodeURIComponent(upload.id) + '/file');
         for (const warning of upload.warnings || []) issue(el, warning, 'ta-warning');
-        if (upload.previewUrl || upload.sections?.length) {
+        if (upload.status !== 'expired' && (upload.previewUrl || upload.sections?.length)) {
           const details = text(el, 'details', ''); text(details, 'summary', '查看原文与页面图片');
           const content = text(details, 'div', '');
           const view = sourceViews.get(upload.id) || { open: false, sections: upload.sections || null, warnings: [] };
@@ -182,7 +182,7 @@
         for (const item of plan.items || []) {
           const el = text($('plan-preview'), 'article', '', 'ta-item'); text(el, 'h3', item.name || item.id); text(el, 'p', (item.kind === 'principles' ? '原则与归纳卡' : '题库') + ' · ' + (item.questions?.length || item.principles?.length || item.principleBundle?.principles?.length || 0) + ' 项');
           const upload = (s.uploads || []).find(u => u.id === item.source?.uploadId); text(el, 'p', '来源：' + (upload?.name || item.source?.uploadId || '未定位') + ' · ' + (item.source?.location || '待核对'));
-          if (upload) link(el, '对照原件', upload.downloadUrl || BASE + '/uploads/' + encodeURIComponent(upload.id) + '/file');
+          if (upload && upload.status !== 'expired') link(el, '对照原件', upload.downloadUrl || BASE + '/uploads/' + encodeURIComponent(upload.id) + '/file');
           (item.warnings || []).forEach(v => issue(el, v, 'ta-warning')); (item.blockers || []).forEach(v => issue(el, v, 'ta-blocker'));
           for (const [index, question] of (item.questions || []).entries()) {
             const detail = text(el, 'details', '', 'ta-question');
@@ -199,7 +199,7 @@
             for (const [key, label] of [['explanation', '解析'], ['analysis', '解析'], ['clues', '联想词'], ['concepts', '原则'], ['reasoning', '推理'], ['reasoningSteps', '推理步骤'], ['aiAdditions', 'AI 补充（待核对）']]) if (question[key] != null) text(detail, 'p', label + '：' + readable(question[key]));
             const location = question.source?.location || question.metadata?.sourceLocation;
             if (location) text(detail, 'p', '来源：' + location);
-            if (upload) link(detail, '核对来源原件', upload.downloadUrl || BASE + '/uploads/' + encodeURIComponent(upload.id) + '/file');
+            if (upload && upload.status !== 'expired') link(detail, '核对来源原件', upload.downloadUrl || BASE + '/uploads/' + encodeURIComponent(upload.id) + '/file');
             if (question.metadata || question.provenance || question.source) { const advanced = text(detail, 'details', '', 'ta-provenance'); text(advanced, 'summary', '详细来源信息'); text(advanced, 'pre', { source: question.source, provenance: question.provenance, metadata: question.metadata }); }
             (question.warnings || []).forEach(v => issue(detail, v, 'ta-warning')); (question.blockers || []).forEach(v => issue(detail, v, 'ta-blocker'));
           }

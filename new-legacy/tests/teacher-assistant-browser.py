@@ -101,6 +101,11 @@ def run():
             page.context.route('**/api/v1/**', api)
             page.goto(base + '/teacher-assistant.html')
             expect(page.locator('#new-session')).to_be_enabled()
+            state['session']['uploads'] = [{'id': 'old', 'name': 'expired.json', 'status': 'expired', 'size': 2, 'warnings': ['原文件已过期，请重新上传'], 'previewUrl': '/expired/preview', 'downloadUrl': '/expired/file'}]
+            page.locator('#refresh-session').click()
+            expect(page.locator('#uploads')).to_contain_text('已过期，请重传')
+            assert page.locator('#uploads a').count() == 0
+            expect(page.locator('#upload-files')).to_be_enabled()
             page.locator('#upload-files').click()
             expect(page.locator('#assistant-error')).to_contain_text('选择文件')
             page.locator('#assistant-files').set_input_files({'name': 'sample.json', 'mimeType': 'application/json', 'buffer': b'{}'})
