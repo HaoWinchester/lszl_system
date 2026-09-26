@@ -88,6 +88,26 @@ def direct_publish_allowed(instruction):
 def latest_user_instruction(history):
     return next((message['content'] for message in reversed(history) if message.get('role')=='user'),'')
 
+def restoration_missed(instruction,sources,previous,plan):
+    clauses=re.findall(r'(?:恢复|加回|重新加入)([^，。；,\n]{1,80})',instruction)
+    if re.search(r'不要恢复|不恢复|暂不恢复',instruction) or not any('题' in clause and '答案' not in clause for clause in clauses):
+        return False
+    def selected(value):
+        result={}
+        for item in value.get('items',[]):
+            result.setdefault(item.get('source',{}).get('uploadId'),set()).update(str(q['id']) for q in item.get('questions',[]))
+        return result
+    before,after=selected(previous),selected(plan)
+    missing=False
+    for source in sources:
+        extracted=source['extracted']
+        data=extracted.get('data') if extracted.get('kind')=='json' else {'questions':extracted.get('questionCache',{}).get('questions',[])}
+        all_ids={str(q['id']) for bank in summarize_json(data)['banks'] for q in bank['questions']}
+        old=before.get(source['id'],set())
+        missing=missing or bool(old and all_ids-old)
+        if after.get(source['id'],set())-old: return False
+    return missing
+
 async def check_active(db,jid):
     job=await db.get(Job,jid,populate_existing=True)
     if not job or job.status!='running': raise asyncio.CancelledError()
@@ -175,22 +195,36 @@ async def converse(db,user,session,job):
     for message in reversed(history):
         if characters+len(message['content'])>45000: break
         trimmed.insert(0,message);characters+=len(message['content'])
-    response=await model.ask({'system':SYSTEM,'conversation':trimmed,'sources':summaries,
-        'previousPlan':{'settings':previous.get('settings',{}),'summary':previous.get('summary',''),'items':[{'id':i.get('id'),'uploadId':i.get('source',{}).get('uploadId'),'name':i.get('name'),'questionIds':[q.get('id') for q in i.get('questions',[])],'mergePreview':i.get('mergePreview')} for i in previous.get('items',[])]}})
-    await check_active(db,jid)
+    context={'system':SYSTEM,'conversation':trimmed,'sources':summaries,
+        'previousPlan':{'settings':previous.get('settings',{}),'summary':previous.get('summary',''),'items':[{'id':i.get('id'),'uploadId':i.get('source',{}).get('uploadId'),'name':i.get('name'),'questionIds':[q.get('id') for q in i.get('questions',[])],'mergePreview':i.get('mergePreview')} for i in previous.get('items',[])]}}
     # Supplied documents never grant authorization. Latest user message is separate.
     latest=latest_user_instruction(history)
-    response['userInstruction']=latest
-    result_items=response.get('items',[])
-    if not isinstance(result_items,list): raise model.ModelError('模型返回的文件计划格式不正确')
-    by_upload={i.get('uploadId'):i for i in result_items if isinstance(i,dict)}
-    for item in extracted_items:
-        updated=by_upload.get(item['uploadId'],{})
-        by_upload[item['uploadId']]={**item,**updated,'questions':item['questions']}
-    response['items']=list(by_upload.values())
-    if re.search(r'已逐题核对.*确认.*无误|全部.*核对无误',latest):
-        response['reviewedQuestionIds']=[q['id'] for i in previous.get('items',[]) for q in i.get('questions',[])]
-    plan=await build_plan(db,user,sources,response,session_id=sid,previous_plan=previous)
+    for attempt in range(2):
+        await check_active(db,jid)
+        response=await model.ask(context)
+        await check_active(db,jid)
+        response['userInstruction']=latest
+        result_items=response.get('items',[])
+        if not isinstance(result_items,list): raise model.ModelError('模型返回的文件计划格式不正确')
+        by_upload={i.get('uploadId'):i for i in result_items if isinstance(i,dict)}
+        if set(by_upload)-{source['id'] for source in sources}:
+            raise model.ModelError('模型引用了不存在的上传文件，请重试')
+        for item in extracted_items:
+            updated=by_upload.get(item['uploadId'],{})
+            by_upload[item['uploadId']]={**item,**updated,'questions':item['questions']}
+        response['items']=list(by_upload.values())
+        if re.search(r'已逐题核对.*确认.*无误|全部.*核对无误',latest):
+            response['reviewedQuestionIds']=[q['id'] for i in previous.get('items',[]) for q in i.get('questions',[])]
+        plan=await build_plan(db,user,sources,response,session_id=sid,previous_plan=previous)
+        if not restoration_missed(latest,sources,previous,plan): break
+        issue='恢复题目的请求尚未落实：请按 sources.structureSample 的完整题目 ID，在对应 uploadId 的 selectedQuestionIds 中明确列出恢复后的完整保留列表。'
+        if not attempt:
+            context={**context,'validationFeedback':issue}
+        else:
+            plan.setdefault('blockers',[]).append(issue)
+            response['reply']='本次尚未恢复遗漏题目，当前方案不能执行。请明确需要恢复的题目后重试。'
+    counts=[f"{item.get('name','题库')}：{len(item.get('questions',[]))}题" for item in plan.get('items',[]) if item.get('kind')=='questions']
+    if counts: response['reply']+='\n实际预览：'+'；'.join(counts)+'。执行结果以回执为准。'
     await db.refresh(session,with_for_update=True)
     await execution_guard(db,jid,user)
     session.plan=plan;session.revision+=1

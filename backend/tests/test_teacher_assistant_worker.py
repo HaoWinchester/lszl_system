@@ -45,7 +45,8 @@ def test_json_intent_context_does_not_load_full_question_bodies():
     assert 'analysis' not in str(summary) and 'private deep data' not in str(summary)
 
 @pytest.mark.anyio
-async def test_document_remove_then_restore_uses_immutable_extraction(monkeypatch):
+@pytest.mark.parametrize('repair',[True,False])
+async def test_document_remove_then_restore_uses_immutable_extraction(monkeypatch,repair):
     from copy import deepcopy
     from uuid import uuid4
     from app.db.session import AsyncSessionLocal
@@ -53,14 +54,16 @@ async def test_document_remove_then_restore_uses_immutable_extraction(monkeypatc
     from app.models.teacher_assistant import TeacherAssistantSession as Session,TeacherAssistantUpload as Upload,TeacherAssistantJob as Job
     from app.worker import teacher_assistant as worker
     token=uuid4().hex;sid='tas_'+token;uid='tau_'+token;owner='ta-doc-'+token[:12]
-    qids=[uid[-10:]+'-1',uid[-10:]+'-2'];extractions=[];turn=[0]
+    qids=[uid[-10:]+'-1',uid[-10:]+'-2'];extractions=[];turn=[0];restore_calls=[]
     async def model(payload):
         if 'source' in payload:
             extractions.append(payload)
             return {'reply':'提取结果','questions':[{'id':qid,'title':f'题目{i}','stemParts':[{'type':'text','text':f'题目{i}应该如何处理？'}],'type':'single_choice','options':[{'id':'A','text':'甲','correct':True},{'id':'B','text':'乙','correct':False}],'correctAnswer':'A'} for i,qid in enumerate(qids)]}
         item={'uploadId':uid}
         if turn[0]==1:item['excludedQuestionIds']=[qids[1]]
-        if turn[0]==2:item['selectedQuestionIds']=qids
+        if turn[0]==2:
+            restore_calls.append('validationFeedback' in payload)
+            if repair and 'validationFeedback' in payload:item['selectedQuestionIds']=qids
         return {'reply':'预览已更新','settings':{'duplicatePolicy':'independent','publish':False},'items':[item]}
     monkeypatch.setattr(worker.model,'ask',model)
     async with AsyncSessionLocal() as db:
@@ -77,6 +80,10 @@ async def test_document_remove_then_restore_uses_immutable_extraction(monkeypatc
         await worker.run_job(jid)
         async with AsyncSessionLocal() as db:
             s=await db.get(Session,sid)
-            assert len(s.plan['items'][0]['questions'])==([2,1,2][i]),s.plan
+            assert len(s.plan['items'][0]['questions'])==([2,1,2 if repair else 1][i]),s.plan
             assert (await db.get(Job,jid)).status=='succeeded'
+            if i==2 and not repair:
+                assert any('恢复题目' in value for value in s.plan['blockers'])
+                assert '尚未恢复' in s.messages[-1]['content']
     assert len(extractions)==1
+    assert restore_calls==[False,True]
