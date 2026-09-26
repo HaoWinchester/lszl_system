@@ -20,9 +20,11 @@ from app.models.question_material import QuestionAsset
 from app.schemas.question_material import AssetInput
 from app.models.content_prep import Principle
 from app.models.question import ExamPaper, Question, QuestionBank
-from app.schemas.paper import PaperImportPreflightRequest, PaperImportRequest
-from app.schemas.question_catalog import QuestionBankImportRequest, QuestionPayload
-from app.services import content_prep_shared_service, paper_import_service, paper_release_service, question_answer_service, question_content_service, question_service, teaching_content_projection_service, question_material_service, idempotency_service
+from app.models.paper_release import PaperRelease, PaperReleaseQuestion
+from app.models.teacher_assistant import TeacherAssistantSession
+from app.schemas.paper import PaperImportPreflightRequest, PaperImportRequest, PaperUpdateRequest, PaperQuestionReplaceRequest
+from app.schemas.question_catalog import QuestionBankImportRequest, QuestionPayload, QuestionBankImportQuestionPayload
+from app.services import content_prep_shared_service, paper_import_service, paper_release_service, question_answer_service, question_content_service, question_service, teaching_content_projection_service, question_material_service, idempotency_service, paper_service, teaching_content_revision_service
 
 
 def _error(status, code, message):
@@ -173,6 +175,9 @@ def _validated_model_result(result):
                 if key in item and (not isinstance(item[key], list) or any(not isinstance(value, str) for value in item[key])):
                     errors.append(f'{key} 必须为 ID 字符串数组。')
                     item.pop(key)
+            if 'questionPatches' in item and (not isinstance(item['questionPatches'], list) or any(not isinstance(value, dict) or not isinstance(value.get('questionId'), str) or not isinstance(value.get('patch'), dict) for value in item['questionPatches'])):
+                errors.append('questionPatches 必须为题目 ID 与 patch 对象数组。')
+                item['questionPatches'] = []
             if 'principleResolutions' in item and (not isinstance(item['principleResolutions'], list) or any(not isinstance(value, dict) or not isinstance(value.get('conflictId'), str) or not isinstance(value.get('resolution'), str) for value in item['principleResolutions'])):
                 errors.append('principleResolutions 必须为对象数组。')
                 item['principleResolutions'] = []
@@ -187,9 +192,178 @@ def _validated_model_result(result):
     return result
 
 
+def _desired_question_hash(question, subject):
+    raw = QuestionBankImportQuestionPayload.model_validate(question).model_dump(by_alias=True)
+    normalized = question_content_service.normalize_question_payload(raw, subject=subject)
+    normalized['scope'] = 'internal'
+    return question_content_service.canonical_question_hash(normalized)
+
+
+async def _bank_matches(db, bank, payload):
+    if any(getattr(bank, field) != payload.get(field, {'subject': 'PMP', 'version': '1.0', 'visibility': 'private'}.get(field)) for field in ('name', 'subject', 'description', 'version', 'visibility')):
+        return False
+    rows = (await db.execute(select(Question).where(Question.bank_id == bank.id).limit(501).execution_options(populate_existing=True))).scalars().all()
+    hashes = {str(row.source_id or row.id): row.content_hash for row in rows}
+    return len(rows) == len(payload['questions']) and all(hashes.get(question['sourceId']) == _desired_question_hash(question, payload.get('subject') or 'PMP') for question in payload['questions'])
+
+
+def _paper_view(payload):
+    view = {key: deepcopy(payload.get(key)) for key in ('name', 'subject', 'description', 'paperType', 'totalCount', 'enabledModes', 'accessPolicy', 'purpose', 'modeConfigVersion')}
+    view['questions'] = [{key: reference.get(key) for key in ('bankId', 'questionId', 'order', 'score')} for reference in payload.get('questions') or []]
+    return view
+
+
+async def _existing_bindings(db, actor, session_id, item_id, upload_id, payload):
+    errors = []
+    bank = (await db.execute(select(QuestionBank).where(QuestionBank.owner_id == actor.username, QuestionBank.source_id == payload['sourceId']).limit(1))).scalar_one_or_none()
+    if bank is None:
+        return {}, errors
+    rows = (await db.execute(select(Question).where(Question.bank_id == bank.id).limit(501).execution_options(populate_existing=True))).scalars().all()
+    if len(rows) > 500 or any((row.content_metadata.get('teacherAssistantSource') or {}).get('uploadId') != upload_id for row in rows):
+        return {}, ['目标命名空间不是本会话创建的题库，禁止覆盖。']
+    binding = {'bankId': bank.id, 'bankRevision': bank.revision, 'bankFingerprint': question_service.question_bank_import_fingerprint(bank, rows)}
+    paper_id = 'tp_' + _identity(actor.username, session_id, item_id)
+    current_session = await db.get(TeacherAssistantSession, session_id)
+    if current_session is not None and current_session.owner_id == actor.username:
+        entry = next((entry for entry in (current_session.receipt or {}).get('items', []) if entry.get('itemId') == item_id), {})
+        paper_id = entry.get('paperId') or paper_id
+    paper = await db.get(ExamPaper, paper_id)
+    if paper is not None:
+        paper_payload = await paper_service.get_paper(db, actor, paper.id)
+        if paper.owner_id != actor.username or (paper.import_metadata or {}).get('sourcePaperId') != paper.id or paper_payload is None or any(reference.get('bankId') != bank.id for reference in paper_payload.get('questions', [])):
+            errors.append('目标试卷不是本会话题库创建的自有试卷，禁止覆盖。')
+        else:
+            binding.update({'paperId': paper.id, 'paperRevision': paper.revision, 'paperView': _paper_view(paper_payload), 'releaseId': paper.published_release_id})
+    return binding, errors
+
+
+async def _release_matches(db, release_id, paper_id, bank_id, item, settings, payload):
+    release = await db.get(PaperRelease, release_id)
+    if release is None or release.paper_id != paper_id or release.name != item['name'] or release.access_level != settings['accessLevel'] or set(release.allowed_roles or []) != set(settings['allowedRoles']) or set(release.enabled_modes or []) != set(settings['enabledModes']):
+        return False
+    rows = (await db.execute(select(PaperReleaseQuestion).where(PaperReleaseQuestion.release_id == release_id).order_by(PaperReleaseQuestion.order_index).limit(501))).scalars().all()
+    if len(rows) != len(payload['questions']):
+        return False
+    current = (await db.execute(select(Question).where(Question.bank_id == bank_id).limit(501).execution_options(populate_existing=True))).scalars().all()
+    by_source = {str(question.source_id or question.id): question for question in current}
+    return all(by_source.get(question['sourceId']) is not None and row.question_id == by_source[question['sourceId']].id and _desired_question_hash({key: value for key, value in row.snapshot.items() if key != 'releaseScore'}, payload.get('subject') or 'PMP') == _desired_question_hash(question_service.question_to_dict(by_source[question['sourceId']]), payload.get('subject') or 'PMP') for row, question in zip(rows, payload['questions']))
+
+
+def _expand_bundle_sources(sources):
+    expanded = []
+    for source in sources:
+        extracted = source['extracted']
+        data = extracted.get('data')
+        if extracted['kind'] != 'json' or not isinstance(data, dict) or 'principleBundles' not in data:
+            expanded.append(source)
+            continue
+        bundles = data['principleBundles']
+        if not isinstance(bundles, list) or len(bundles) > 5:
+            raise _error(422, 'ASSISTANT_BUNDLE_INVALID', 'principleBundles 必须为不超过 5 个原则包的数组。')
+        principles, presets = [], []
+        for bundle in bundles:
+            validated = teaching_content_projection_service.validate_principle_card_bundle(bundle)
+            principles.extend(validated['principles']['items'])
+            presets.extend(validated['synthesisPresets']['items'])
+        if len(principles) > 1000 or len(presets) > 1000:
+            raise _error(422, 'ASSISTANT_BUNDLE_INVALID', '组合原则或归纳卡超过 1000 条，请拆分。')
+        if bundles:
+            canonical = {'format': 'kg-principle-card-bundle-v1', 'principleCardBundleVersion': 1, 'principles': {'schemaVersion': 1, 'items': principles}, 'synthesisPresets': {'schemaVersion': 1, 'items': presets}}
+            teaching_content_projection_service.validate_principle_card_bundle(canonical)
+            expanded.append({**source, 'extracted': {**extracted, 'data': canonical}})
+        banks = data.get('banks', [])
+        if not isinstance(banks, list):
+            raise _error(422, 'ASSISTANT_BUNDLE_INVALID', '组合 banks 必须为题库数组。')
+        if banks:
+            expanded.append({**source, 'extracted': {**extracted, 'data': {'banks': banks}}})
+        elif not bundles:
+            raise _error(422, 'ASSISTANT_BUNDLE_INVALID', '组合文件没有题库或原则包。')
+    return expanded
+
+
+def _patch_authorized(instruction, patch, original):
+    text = re.sub(r'\s+', '', instruction)
+    if re.search(r'不要修改(?!答案|解析|标题|选项|题干)|不修改(?!答案|解析|标题|选项|题干)|不改题目|不要改题目|原题.*原答案.*照搬|只改名称|只改名字|仅改名称', text):
+        return False
+    fields = {
+        'correctAnswer': '答案|正确选项', 'correctOptionIds': '答案|正确选项',
+        'options': '选项', 'analysis': '解析|分析|说明',
+        'title': '标题|题名|题目名称', 'stemParts': '题干|题面',
+    }
+    verb = r'改为|改成|修改|更正|修正|补充|恢复'
+    for field, value in patch.items():
+        if value == original.get(field):
+            continue
+        aliases = fields.get(field, '')
+        if field in {'correctAnswer', 'correctOptionIds'}:
+            if re.search(r'(?:不改|不要改|不修改|不要修改).{0,8}(?:答案|正确选项)|(?:答案|正确选项).{0,8}(?:不改|不要改|不修改)|保留.{0,8}(?:原答案|原有答案|正确答案)', text):
+                return False
+            positive = bool(re.search(r'(?:答案|正确选项).{0,20}(?:' + verb + r'|是|为)|(?:' + verb + r').{0,20}(?:答案|正确选项)', text))
+        else:
+            positive = bool(aliases and re.search(r'(?:' + aliases + r').{0,20}(?:' + verb + r')|(?:' + verb + r').{0,20}(?:' + aliases + r')', text))
+        # Synchronizing correctness flags changes no option text or identity.
+        if field == 'options' and not positive and ('correctAnswer' in patch or 'correctOptionIds' in patch):
+            old_options = original.get('options') or []
+            positive = isinstance(value, list) and [{k: v for k, v in option.items() if k != 'correct'} for option in value if isinstance(option, dict)] == [{k: v for k, v in option.items() if k != 'correct'} for option in old_options if isinstance(option, dict)]
+        if not positive:
+            return False
+    return True
+
+
+def _apply_question_patches(questions, old, model_item, instruction, actor):
+    original_by_id = {str(question['id']): deepcopy(question) for question in questions if isinstance(question, dict) and question.get('id')}
+    stored = {entry['questionId']: deepcopy(entry['patch']) for entry in old.get('questionPatches', [])}
+    provenance = {entry['questionId']: deepcopy(entry) for entry in old.get('correctionProvenance', [])}
+    errors = []
+    allowed = {'correctAnswer', 'correctOptionIds', 'options', 'analysis', 'title', 'stemParts'}
+    for command in model_item.get('questionPatches') or []:
+        question_id, patch = command['questionId'], command['patch']
+        if question_id not in original_by_id or not patch or set(patch) - allowed:
+            errors.append('题目更正包含无效题目 ID 或未授权字段。')
+            continue
+        if all(key in stored.get(question_id, {}) and stored[question_id][key] == value for key, value in patch.items()):
+            continue  # Repeating an approved correction changes no authority or provenance.
+        if not _patch_authorized(instruction, patch, original_by_id[question_id]):
+            errors.append('题目更正需要本轮明确指定字段的用户修改指令；保留原文或不修改指令优先。')
+            continue
+        stored.setdefault(question_id, {}).update(deepcopy(patch))
+        full_patch = stored[question_id]
+        provenance[question_id] = {'questionId': question_id, 'actor': actor.username, 'kind': 'teacher_correction', 'instruction': instruction, 'originalValues': {key: deepcopy(original_by_id[question_id].get(key)) for key in full_patch}, 'correctedValues': deepcopy(full_patch)}
+    for question in questions:
+        if isinstance(question, dict) and str(question.get('id')) in stored:
+            identifier = str(question['id'])
+            patch = stored[identifier]
+            question.update(deepcopy(patch))
+            option_ids = [str(option.get('id') or '') for option in question.get('options') or [] if isinstance(option, dict)]
+            case_ids = {value.casefold(): value for value in option_ids}
+            if question.get('type', 'single_choice') == 'single_choice':
+                answer = question.get('correctAnswer')
+                if 'correctOptionIds' in patch and 'correctAnswer' not in patch and len(question.get('correctOptionIds') or []) == 1:
+                    answer = question['correctOptionIds'][0]
+                if isinstance(answer, str):
+                    question['correctAnswer'] = case_ids.get(answer.casefold(), answer)
+                selected = {question['correctAnswer']} if isinstance(question.get('correctAnswer'), str) else set()
+                question['correctOptionIds'] = []
+            else:
+                if 'correctAnswer' in patch and 'correctOptionIds' not in patch:
+                    question['correctOptionIds'] = question_answer_service.correct_option_ids({key: value for key, value in question.items() if key != 'correctOptionIds'})
+                if isinstance(question.get('correctOptionIds'), list):
+                    question['correctOptionIds'] = [case_ids.get(str(value).casefold(), value) for value in question['correctOptionIds']]
+                selected = {value for value in question.get('correctOptionIds') or [] if isinstance(value, str)}
+                question['correctAnswer'] = None
+            for option in question.get('options') or []:
+                if isinstance(option, dict):
+                    option['correct'] = option.get('id') in selected
+            if identifier in provenance:
+                provenance[identifier]['correctedValues'] = {key: deepcopy(question.get(key)) for key in set(patch) | {'correctAnswer', 'correctOptionIds', 'options'}}
+    patches = [{'questionId': identifier, 'patch': stored[identifier]} for identifier in sorted(stored)]
+    return patches, [provenance[key] for key in sorted(provenance)], [original_by_id[key] for key in sorted(stored) if key in original_by_id], errors
+
+
 async def build_plan(db, actor, sources: list[dict], model_result: dict, *, session_id: str, previous_plan: dict | None = None) -> dict:
     if actor.role not in {'teacher', 'admin'}:
         raise _error(403, 'TEACHER_REQUIRED', '仅教师或管理员可整理教学文件。')
+    sources = _expand_bundle_sources(sources)
     model_result = _validated_model_result(model_result)
     settings = deepcopy((previous_plan or {}).get('settings') or {})
     settings.update(deepcopy(model_result.get('settings') or {}))
@@ -266,6 +440,8 @@ async def build_plan(db, actor, sources: list[dict], model_result: dict, *, sess
             warnings = list(extracted.get('warnings') or [])
             item_blockers = []
             instruction = str(model_result.get('userInstruction') or '')
+            patches, correction_provenance, source_originals, patch_errors = _apply_question_patches(questions, old, model_item, instruction, actor)
+            item_blockers.extend(patch_errors)
             filter_keys = {'selectedQuestionIds', 'excludedQuestionIds'} & set(model_item)
             if filter_keys and re.search('删除|不要|去掉|只保留|排除|恢复|保留', instruction):
                 known = {str(question.get('id')) for question in questions}
@@ -380,8 +556,14 @@ async def build_plan(db, actor, sources: list[dict], model_result: dict, *, sess
                 transformed['sourceId'] = target_id
                 if policy != 'reuse':
                     transformed.setdefault('metadata', {})['teacherAssistantSource'] = {'uploadId': upload_id, 'sourceBankId': original_source_id, 'sourceQuestionId': original_id, 'originalId': question['id']}
+                correction = next((entry for entry in correction_provenance if entry['questionId'] == question['id']), None)
+                if correction:
+                    transformed.setdefault('metadata', {})['teacherAssistantCorrection'] = deepcopy(correction)
                 bank_payload['questions'].append(transformed)
-            items.append({'id': item_id, 'name': name, 'kind': 'questions', 'questions': questions, 'selectedQuestionIds': [question['id'] for question in questions], 'reviewedQuestionIds': sorted(reviewed_ids), 'bankPayload': bank_payload, 'sourceKind': extracted['kind'], 'reuseBankId': reuse_bank_id, 'source': {'uploadId': upload_id, 'location': 'JSON 原题库' if extracted['kind'] == 'json' else '文档'}, 'warnings': warnings, 'blockers': item_blockers, 'cancelled': policy == 'cancel'})
+            bindings, binding_errors = await _existing_bindings(db, actor, session_id, item_id, upload_id, bank_payload) if policy == 'independent' else ({}, [])
+            item_blockers.extend(binding_errors)
+            changes = {'previousName': (bindings.get('paperView') or {}).get('name'), 'name': name, 'questionCorrections': deepcopy(correction_provenance), 'questionSelection': [question['id'] for question in questions], 'previousPaper': bindings.get('paperView'), 'accessLevel': settings['accessLevel'], 'allowedRoles': settings['allowedRoles'], 'enabledModes': settings['enabledModes']}
+            items.append({'id': item_id, 'name': name, 'kind': 'questions', 'questions': questions, 'questionPatches': patches, 'correctionProvenance': correction_provenance, 'sourceOriginalQuestions': source_originals, 'selectedQuestionIds': [question['id'] for question in questions], 'reviewedQuestionIds': sorted(reviewed_ids), 'bankPayload': bank_payload, 'existingObjects': bindings, 'changePreview': changes, 'sourceKind': extracted['kind'], 'reuseBankId': reuse_bank_id, 'source': {'uploadId': upload_id, 'location': 'JSON 原题库' if extracted['kind'] == 'json' else '文档'}, 'warnings': warnings, 'blockers': item_blockers, 'cancelled': policy == 'cancel'})
     items.sort(key=lambda item: item['kind'] != 'principles')
     total = sum(len(item['questions']) for item in items)
     if total > 500:
@@ -398,7 +580,10 @@ async def _checkpoint(db, session, receipt):
     await db.refresh(session)
 
 
-async def execute_plan(db, actor, session, revision) -> dict:
+async def execute_plan(db, actor, session, revision, *, before_step=None) -> dict:
+    async def guard():
+        if before_step is not None:
+            await before_step()
     if actor.role not in {'teacher', 'admin'} or session.owner_id != actor.username:
         raise _error(403, 'ASSISTANT_OWNER_REQUIRED', '无权执行此会话。')
     if revision != session.revision:
@@ -409,16 +594,21 @@ async def execute_plan(db, actor, session, revision) -> dict:
         raise _error(422, 'ASSISTANT_PLAN_BLOCKED', '方案有待处理问题。')
     settings = plan['settings']
     prior = deepcopy(session.receipt or {})
+    previous_entries = {entry['itemId']: entry for entry in prior.get('items', [])}
     if prior and prior.get('revision') != revision:
         prior = {}
     receipt = {'revision': revision, 'items': prior.get('items') or [], 'status': 'partial'}
     entries = {entry['itemId']: entry for entry in receipt['items']}
     for item in sorted(plan.get('items', []), key=lambda item: item['kind'] != 'principles'):
+        await guard()
         entry = entries.get(item['id'])
         if entry and entry.get('status') in {'succeeded', 'cancelled'}:
             continue
         if entry is None:
             entry = {'itemId': item['id'], 'name': item['name'], 'status': 'pending', 'links': []}
+            old_entry = previous_entries.get(item['id'], {})
+            if (item.get('existingObjects') or {}).get('bankId') == old_entry.get('bankId') and old_entry.get('assets'):
+                entry['assets'] = deepcopy(old_entry['assets'])
             receipt['items'].append(entry)
         if item.get('cancelled'):
             entry['status'] = 'cancelled'
@@ -437,6 +627,7 @@ async def execute_plan(db, actor, session, revision) -> dict:
                 if any(identifier not in approved or conflict != approved_conflicts.get(identifier) for identifier, conflict in current_conflicts.items()):
                     raise _error(409, 'PRINCIPLE_CONFLICT_CHANGED', '原则冲突已变化或未经确认，请重新预览。')
                 resolutions = [{'conflictId': identifier, 'resolution': approved[identifier]} for identifier in sorted(current_conflicts)]
+                await guard()
                 result = await content_prep_shared_service.apply_principle_merge(db, actor, content_revision=preview['contentRevision'], bundle=item['principleBundle'], resolutions=resolutions)
                 entry.update(status='succeeded', result={'contentRevision': result['contentRevision'], 'summary': result['summary']})
                 await _checkpoint(db, session, receipt)
@@ -446,14 +637,31 @@ async def execute_plan(db, actor, session, revision) -> dict:
                 raise _error(422, 'SOURCE_REFERENCE_INVALID', '；'.join(reference_errors))
             payload = deepcopy(item['bankPayload'])
             bank_source = payload['sourceId']
-            if not entry.get('bankId'):
+            binding = item.get('existingObjects') or {}
+            if binding.get('paperId'):
+                current_paper = await db.get(ExamPaper, binding['paperId'])
+                if current_paper is None or current_paper.owner_id != actor.username:
+                    raise _error(409, 'PAPER_REVISION_CONFLICT', '原试卷不存在或权限已变化，请重新预览。')
+                await db.refresh(current_paper)
+                if current_paper.revision != binding['paperRevision'] and current_paper.revision != entry.get('paperMutationRevision'):
+                    actual = _paper_view(await paper_service.get_paper(db, actor, current_paper.id))
+                    # Full semantic equality recovers a committed mutation/publish whose receipt was lost.
+                    expected = deepcopy(binding['paperView'])
+                    expected.update(name=item['name'], enabledModes=settings['enabledModes'], accessPolicy={'accessLevel': settings['accessLevel'], 'allowedRoles': settings['allowedRoles']}, totalCount=len(payload['questions']))
+                    question_rows = (await db.execute(select(Question).where(Question.bank_id == binding['bankId']).limit(501))).scalars().all()
+                    by_source = {str(row.source_id or row.id): row.id for row in question_rows}
+                    expected['questions'] = [{'bankId': binding['bankId'], 'questionId': by_source.get(question['sourceId']), 'order': order, 'score': 1.0} for order, question in enumerate(payload['questions'], 1)]
+                    if actual != expected:
+                        raise _error(409, 'PAPER_REVISION_CONFLICT', '试卷已被其他操作修改，请重新预览后确认。')
+            if item.get('sourceKind') == 'document':
                 for question in payload['questions']:
-                    if item.get('sourceKind') == 'document' and question.get('sourceImages'):
+                    if question.get('sourceImages'):
                         question['images'] = []
                         for image in question['sourceImages']:
                             asset_key = image['uploadId'] + ':' + image['filename'] + ':' + image['digest']
                             asset = (entry.get('assets') or {}).get(asset_key)
                             if asset is None:
+                                await guard()
                                 asset = await _ensure_source_asset(db, actor, session_id, image)
                                 entry.setdefault('assets', {})[asset_key] = asset
                                 await _checkpoint(db, session, receipt)
@@ -463,37 +671,98 @@ async def execute_plan(db, actor, session, revision) -> dict:
                     bank = await db.get(QuestionBank, item['reuseBankId'])
                     if bank is None or bank.owner_id != actor.username:
                         raise _error(403, 'BANK_OWNER_REQUIRED', '无权复用目标题库。')
-                    rows = (await db.execute(select(Question).where(Question.bank_id == bank.id).limit(501))).scalars().all()
+                    rows = (await db.execute(select(Question).where(Question.bank_id == bank.id).limit(501).execution_options(populate_existing=True))).scalars().all()
                     hashes = {str(row.source_id or row.id): row.content_hash for row in rows}
                     if len(rows) != len(payload['questions']) or any(hashes.get(question['sourceId']) != question_content_service.canonical_question_hash(question) for question in payload['questions']):
                         raise _error(409, 'REUSE_CONTENT_CHANGED', '复用目标已变化，请重新预览。')
                     entry['bankId'] = bank.id
                 else:
-                    # The shared importer rolls back an existing read transaction;
-                    # close it first so owned image validation retains loaded actor attributes.
-                    await db.commit()
-                    result = await question_service.import_question_banks(db, actor, QuestionBankImportRequest(banks=[payload]))
-                    entry['bankId'] = result['sourceBankIdMap'][bank_source]
-                    await db.refresh(actor)
+                    existing_bank = (await db.execute(select(QuestionBank).where(QuestionBank.owner_id == actor.username, QuestionBank.source_id == bank_source).limit(1).execution_options(populate_existing=True))).scalar_one_or_none()
+                    if existing_bank is not None and await _bank_matches(db, existing_bank, payload):
+                        entry['bankId'] = existing_bank.id
+                    else:
+                        if existing_bank is not None and binding.get('bankId') != existing_bank.id:
+                            raise _error(409, 'ASSISTANT_BANK_CONFLICT', '目标命名空间已有不同内容，禁止覆盖。')
+                        if binding.get('bankId') and existing_bank is None:
+                            raise _error(409, 'QUESTION_BANK_REVISION_CONFLICT', '原题库已移除，请重新预览。')
+                        expected_revisions = {bank_source: binding['bankRevision']} if binding.get('bankId') else None
+                        expected_fingerprints = {bank_source: binding['bankFingerprint']} if binding.get('bankId') else None
+                        # Close read transaction to retain loaded actor attributes in owned-image validation.
+                        await db.commit()
+                        await guard()
+                        result = await question_service.import_question_banks(db, actor, QuestionBankImportRequest(banks=[payload], confirmReplace=bool(binding.get('bankId'))), expected_bank_revisions=expected_revisions, expected_bank_fingerprints=expected_fingerprints)
+                        entry['bankId'] = result['sourceBankIdMap'][bank_source]
+                        await db.refresh(actor)
                 await _checkpoint(db, session, receipt)
-            paper_id = 'tp_' + _identity(actor.username, session_id, item['id'])
-            if not entry.get('paperId'):
+            paper_id = binding.get('paperId') or 'tp_' + _identity(actor.username, session_id, item['id'])
+            if not entry.get('paperId') or not entry.get('paperReady'):
                 package = {'schema': 'kg-paper-package-v1', 'schemaVersion': 1, 'paper': {'id': paper_id, 'name': item['name'], 'subject': payload.get('subject') or 'PMP', 'paperType': 'mixed' if len({q.get('type', 'single_choice') for q in item['questions']}) > 1 or any(q.get('type') == 'matching' for q in item['questions']) else 'multiple_choice' if item['questions'][0].get('type') == 'multiple_choice' else 'standard', 'totalCount': len(payload['questions']), 'enabledModes': settings['enabledModes'], 'accessPolicy': {'accessLevel': settings['accessLevel'], 'allowedRoles': settings['allowedRoles']}, 'questions': [{'bankId': bank_source, 'questionId': question['sourceId'], 'order': index} for index, question in enumerate(payload['questions'], 1)]}, 'sourceBanks': [{'sourceBankId': bank_source, 'name': item['name']}]}
                 request = PaperImportPreflightRequest(fileName=item['name'] + '.json', package=package)
                 preflight = await paper_import_service.preflight_package(db, actor, request)
                 if not preflight['valid']:
                     raise _error(422, 'PAPER_IMPORT_INVALID', '；'.join(problem['message'] for problem in preflight['errors']))
-                result = await paper_import_service.import_package(db, actor, PaperImportRequest(fileName=request.file_name, package=package, preflightHash=preflight['payloadHash'], conflictAction='create', idempotencyKey='ta-paper-' + _identity(session_id, item['id'], revision)))
-                entry['paperId'] = result['paper']['id']
+                desired = {**package['paper'], 'description': None, 'purpose': 'learning', 'modeConfigVersion': 2, 'questions': [{key: reference[key] for key in ('bankId', 'questionId', 'order', 'score')} for reference in preflight['references']]}
+                current = await db.get(ExamPaper, paper_id)
+                current_payload = await paper_service.get_paper(db, actor, paper_id) if current is not None else None
+                if current is not None and (current.owner_id != actor.username or (current.import_metadata or {}).get('sourcePaperId') != paper_id):
+                    raise _error(403, 'ASSISTANT_PAPER_OWNER_CONFLICT', '试卷不属于本会话，禁止修改。')
+                if current_payload is not None and _paper_view(current_payload) == _paper_view(desired):
+                    entry['paperId'] = paper_id
+                elif current is not None and not binding.get('paperId'):
+                    raise _error(409, 'ASSISTANT_PAPER_CONFLICT', '已有试卷内容不同，请重新预览。')
+                elif current is not None and current.status != 'draft':
+                    expected_revision = entry.get('paperMutationRevision') or binding['paperRevision']
+                    if current.revision != expected_revision:
+                        raise _error(409, 'PAPER_REVISION_CONFLICT', '试卷版本已变化，请重新预览。')
+                    if _paper_view(current_payload)['questions'] != desired['questions']:
+                        await guard()
+                        current_payload = await paper_service.replace_questions(db, actor, paper_id, PaperQuestionReplaceRequest(revision=expected_revision, questions=desired['questions']))
+                        expected_revision = current_payload['revision']
+                        entry.update(paperId=paper_id, paperMutationRevision=expected_revision, paperReady=False)
+                        await _checkpoint(db, session, receipt)
+                    current_view = _paper_view(current_payload)
+                    fields = {key: desired[key] for key in ('name', 'subject', 'description', 'paperType', 'totalCount', 'enabledModes', 'accessPolicy', 'purpose', 'modeConfigVersion') if current_view.get(key) != desired[key]}
+                    if fields:
+                        await guard()
+                        current_payload = await paper_service.update_paper(db, actor, paper_id, PaperUpdateRequest(revision=expected_revision, **fields))
+                        entry.update(paperMutationRevision=current_payload['revision'])
+                    entry['paperId'] = paper_id
+                else:
+                    await guard()
+                    result = await paper_import_service.import_package(db, actor, PaperImportRequest(fileName=request.file_name, package=package, preflightHash=preflight['payloadHash'], conflictAction='replace_draft' if current is not None else 'create', expectedRevision=binding.get('paperRevision') if current is not None else None, idempotencyKey='ta-paper-' + _identity(session_id, item['id'], revision)))
+                    entry['paperId'] = result['paper']['id']
+                ready_paper = await db.get(ExamPaper, entry['paperId'])
+                if ready_paper is not None:
+                    await db.refresh(ready_paper)
+                    entry['paperReadyRevision'] = ready_paper.revision
+                entry['paperReadyView'] = _paper_view(desired)
+                entry['paperReady'] = True
                 await _checkpoint(db, session, receipt)
             if settings['publish'] and not entry.get('releaseId'):
+                await guard()
+                # The final preview comparison and snapshot freeze share the
+                # existing global content write lock until publish commits.
+                await teaching_content_revision_service.acquire_lock(db)
+                bank = await db.get(QuestionBank, entry['bankId'])
+                if bank is None or bank.owner_id != actor.username:
+                    raise _error(409, 'QUESTION_BANK_REVISION_CONFLICT', '发布题库不存在或权限已变化。')
+                await db.refresh(bank)
+                if not await _bank_matches(db, bank, payload):
+                    raise _error(409, 'QUESTION_PREVIEW_CHANGED', '题目已被其他操作修改，不能发布未预览的内容。')
                 paper = await db.get(ExamPaper, entry['paperId'])
+                if paper is not None:
+                    await db.refresh(paper)
                 if paper is None or paper.owner_id != actor.username:
                     raise _error(403, 'PAPER_OWNER_REQUIRED', '无权发布目标试卷。')
+                current_view = _paper_view(await paper_service.get_paper(db, actor, paper.id))
+                if entry.get('paperReadyView') and current_view != entry['paperReadyView']:
+                    raise _error(409, 'PAPER_PREVIEW_CHANGED', '试卷配置已被其他操作修改，不能发布未预览的内容。')
                 # A commit may succeed before the receipt: recover the persisted paper release.
-                if paper.published_release_id:
+                if paper.published_release_id and await _release_matches(db, paper.published_release_id, paper.id, entry['bankId'], item, settings, payload):
                     entry['releaseId'] = paper.published_release_id
                 else:
+                    if entry.get('paperReadyRevision') is not None and paper.revision != entry['paperReadyRevision']:
+                        raise _error(409, 'PAPER_REVISION_CONFLICT', '试卷版本已变化，请重新预览。')
                     release = await paper_release_service.publish(db, actor, paper.id, expected_revision=paper.revision, access_level=settings['accessLevel'], enabled_modes=settings['enabledModes'], allowed_roles=settings['allowedRoles'], metadata={'teacherAssistantSessionId': session_id, 'teacherAssistantItemId': item['id'], 'teacherAssistantRevision': revision})
                     entry['releaseId'] = release.id
                 await _checkpoint(db, session, receipt)
@@ -507,6 +776,9 @@ async def execute_plan(db, actor, session, revision) -> dict:
             await db.refresh(actor)
             message = exc.detail.get('message', exc.detail.get('code', '导入失败')) if isinstance(exc, HTTPException) and isinstance(exc.detail, dict) else '导入失败，请检查方案后重试。'
             entry.update(status='failed', error=message)
+            if isinstance(exc, HTTPException):
+                entry['errorStatus'] = exc.status_code
+                entry['errorCode'] = exc.detail.get('code') if isinstance(exc.detail, dict) else None
             await _checkpoint(db, session, receipt)
     receipt['status'] = 'succeeded' if receipt['items'] and all(entry['status'] in {'succeeded', 'cancelled'} for entry in receipt['items']) else 'partial'
     await _checkpoint(db, session, receipt)

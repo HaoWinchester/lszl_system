@@ -11,6 +11,24 @@ from app.services.teacher_assistant_import import build_plan, execute_plan
 def anyio_backend():
     return 'asyncio'
 
+@pytest.fixture(autouse=True)
+async def isolated_import_database(anyio_backend, monkeypatch):
+    # Shared services commit normally to savepoints; every test rolls back its
+    # outer transaction so global principle fixtures and mixed papers cannot
+    # leak into unrelated tests or migration downgrades later in this process.
+    from sqlalchemy.ext.asyncio import async_sessionmaker
+    from app.db import session as database_module
+    async with database_module.engine.connect() as connection:
+        transaction = await connection.begin()
+        factory = async_sessionmaker(bind=connection, expire_on_commit=False, join_transaction_mode='create_savepoint')
+        monkeypatch.setattr(database_module, 'AsyncSessionLocal', factory)
+        try:
+            yield
+        finally:
+            if transaction.is_active:
+                await transaction.rollback()
+
+
 ACTOR = SimpleNamespace(username='teacher', role='teacher')
 
 def question(identifier='q1', answer='a'):
@@ -224,7 +242,7 @@ async def test_partial_receipt_preserved_and_success_not_replayed(db, monkeypatc
     banks = AsyncMock(return_value={'sourceBankIdMap': {bank_source: 'real-bank'}})
     papers = AsyncMock(return_value={'paper': {'id': 'real-paper'}})
     monkeypatch.setattr(importer.question_service, 'import_question_banks', banks)
-    monkeypatch.setattr(importer.paper_import_service, 'preflight_package', AsyncMock(return_value={'valid': True, 'payloadHash': 'a' * 64}))
+    monkeypatch.setattr(importer.paper_import_service, 'preflight_package', AsyncMock(return_value={'valid': True, 'payloadHash': 'a' * 64, 'references': [{'bankId': 'b', 'questionId': 'q', 'order': 1, 'score': 1.0}]}))
     monkeypatch.setattr(importer.paper_import_service, 'import_package', papers)
     first = await execute_plan(db, ACTOR, session, 1)
     assert first['status'] == 'partial'
@@ -372,6 +390,16 @@ async def test_published_source_image_survives_conversation_delete(tmp_path, mon
         assert not session.plan['items'][0]['blockers']
         database.add(session)
         await database.commit()
+        from app.services import paper_release_service
+        publish = paper_release_service.publish
+        async def fail_publish(*args, **kwargs):
+            raise HTTPException(status_code=503, detail='temporary publication failure')
+        monkeypatch.setattr(paper_release_service, 'publish', fail_publish)
+        failed = await execute_plan(database, teacher, session, 1)
+        assert failed['status'] == 'partial'
+        assert failed['items'][0]['bankId'] and failed['items'][0]['paperReady']
+        monkeypatch.setattr(paper_release_service, 'publish', publish)
+        (extraction / 'diagram.bmp').unlink()
         first = await execute_plan(database, teacher, session, 1)
         assert first['status'] == 'succeeded', json.dumps(first, ensure_ascii=False)
         assets = first['items'][0]['assets']
@@ -380,6 +408,7 @@ async def test_published_source_image_survives_conversation_delete(tmp_path, mon
         snapshot = (await database.execute(select(PaperReleaseQuestion).where(PaperReleaseQuestion.release_id == first['items'][0]['releaseId']))).scalar_one()
         assert snapshot.snapshot['images'][0]['id'] == asset_id
         assert snapshot.snapshot['images'][0]['url'] == f'/api/v1/question-assets/{asset_id}'
+        Image.new('RGB', (80, 40), 'green').save(extraction / 'diagram.bmp')
         session.receipt = {}
         await database.commit()
         replay = await execute_plan(database, teacher, session, 1)
@@ -389,6 +418,8 @@ async def test_published_source_image_survives_conversation_delete(tmp_path, mon
         await database.delete(session)
         await database.commit()
         shutil.rmtree(tmp_path / sid)
+        await database.refresh(student)
+        await database.refresh(other_teacher)
         granted = await question_material_service.authorized_asset(database, student, asset_id)
         assert granted.mime_type == 'image/png'
         assert granted.data.startswith(b'\x89PNG')
@@ -430,9 +461,272 @@ async def test_raw_json_cannot_turn_source_images_into_server_file_access(db, mo
     monkeypatch.setattr(importer, '_ensure_source_asset', image_reader)
     bank_source = plan['items'][0]['bankPayload']['sourceId']
     monkeypatch.setattr(importer.question_service, 'import_question_banks', AsyncMock(return_value={'sourceBankIdMap': {bank_source: 'b'}}))
-    monkeypatch.setattr(importer.paper_import_service, 'preflight_package', AsyncMock(return_value={'valid': True, 'payloadHash': 'a' * 64}))
+    monkeypatch.setattr(importer.paper_import_service, 'preflight_package', AsyncMock(return_value={'valid': True, 'payloadHash': 'a' * 64, 'references': [{'bankId': 'b', 'questionId': 'q', 'order': 1, 'score': 1.0}]}))
     monkeypatch.setattr(importer.paper_import_service, 'import_package', AsyncMock(return_value={'paper': {'id': 'p'}}))
     session = SimpleNamespace(id='s', owner_id='teacher', revision=1, plan=plan, receipt={})
     receipt = await execute_plan(db, ACTOR, session, 1)
     assert receipt['status'] == 'succeeded'
     assert image_reader.await_count == 0
+
+@pytest.mark.anyio
+async def test_cancel_guard_stops_after_committed_bank_before_paper():
+    import asyncio
+    from uuid import uuid4
+    from sqlalchemy import select,func
+    from app.db.session import AsyncSessionLocal
+    from app.models.user import User
+    from app.models.teacher_assistant import TeacherAssistantSession
+    from app.models.question import QuestionBank,ExamPaper
+    from app.services import teacher_assistant_import as imports
+    async with AsyncSessionLocal() as database:
+        actor=User(username='ta-cancel-'+uuid4().hex[:10],password_hash='test',role='teacher',status='active')
+        database.add(actor);await database.commit()
+        session=TeacherAssistantSession(id='tas-'+uuid4().hex,owner_id=actor.username,revision=1)
+        session.plan=await imports.build_plan(database,actor,[source()],{'settings':{'duplicatePolicy':'independent','publish':False}},session_id=session.id)
+        database.add(session);await database.commit()
+        async def cancelled_after_bank():
+            if session.receipt and any(i.get('bankId') for i in session.receipt.get('items',[])):
+                raise asyncio.CancelledError()
+        with pytest.raises(asyncio.CancelledError):
+            await imports.execute_plan(database,actor,session,1,before_step=cancelled_after_bank)
+        assert await database.scalar(select(func.count()).select_from(QuestionBank).where(QuestionBank.owner_id==actor.username))==1
+        assert await database.scalar(select(func.count()).select_from(ExamPaper).where(ExamPaper.owner_id==actor.username))==0
+
+@pytest.mark.anyio
+async def test_teacher_correction_requires_instruction_and_persists(db):
+    uploaded = source(question(answer=None))
+    command = {'uploadId': 'upload1', 'questionPatches': [{'questionId': 'q1', 'patch': {'correctAnswer': 'b', 'analysis': '教师更正'}}]}
+    rejected = await build_plan(db, ACTOR, [uploaded], {'settings': {'duplicatePolicy': 'independent'}, 'items': [command]}, session_id='s')
+    assert rejected['items'][0]['questions'][0]['correctAnswer'] is None
+    assert rejected['items'][0]['blockers']
+    corrected = await build_plan(db, ACTOR, [uploaded], {'settings': {'duplicatePolicy': 'independent'}, 'items': [command], 'userInstruction': '第1题答案更正为b并补充解析'}, session_id='s')
+    assert not corrected['items'][0]['blockers']
+    assert corrected['items'][0]['questions'][0]['correctAnswer'] == 'b'
+    assert corrected['items'][0]['sourceOriginalQuestions'][0]['correctAnswer'] is None
+    assert corrected['items'][0]['bankPayload']['questions'][0]['metadata']['teacherAssistantCorrection']['kind'] == 'teacher_correction'
+    persisted = await build_plan(db, ACTOR, [uploaded], {'settings': {'nameSuffix': '习题课'}}, session_id='s', previous_plan=corrected)
+    assert persisted['items'][0]['questions'][0]['correctAnswer'] == 'b'
+    assert not persisted['items'][0]['blockers']
+    repeated = await build_plan(db, ACTOR, [uploaded], {'items': [command], 'userInstruction': '请保留原答案，不要修改'}, session_id='s', previous_plan=corrected)
+    assert not repeated['items'][0]['blockers']
+    assert repeated['items'][0]['correctionProvenance'] == corrected['items'][0]['correctionProvenance']
+    forbidden = {**command, 'questionPatches': [{'questionId': 'q1', 'patch': {'metadata': {'principleIds': ['forged']}}}]}
+    blocked = await build_plan(db, ACTOR, [uploaded], {'items': [forbidden], 'userInstruction': '更正关联'}, session_id='s')
+    assert any('未授权字段' in blocker for blocker in blocked['items'][0]['blockers'])
+
+@pytest.mark.anyio
+async def test_combined_export_reupload_includes_questions_and_principles(db, monkeypatch):
+    from app.services import teacher_assistant_import as importer
+    monkeypatch.setattr(importer.content_prep_shared_service, 'preview_principle_merge', AsyncMock(return_value={'plan': {'conflicts': []}, 'contentRevision': 1}))
+    root = Path('/Users/menghao/Library/Containers/com.tencent.xinWeChat/Data/Documents/xwechat_files/wxid_d26m6zr7um9k51_e8f7/msg/file/2026-09')
+    paths = [root / 'PMP_财务绩效域_12题母题整理批次_PrepStudio.json', root / 'PMP_进度绩效域_13题母题整理批次_PrepStudio.json', root / '原则与归纳卡-V9.0-P4.6.4.35.json']
+    if not all(path.exists() for path in paths):
+        pytest.skip('Original combined fixtures unavailable')
+    payload = {'format': 'teacher-assistant-bundle-v1', 'banks': [json.loads(path.read_text()) for path in paths[:2]], 'principleBundles': [json.loads(paths[2].read_text())]}
+    uploaded = {'id': 'combined', 'name': 'combined.json', 'extracted': {'kind': 'json', 'data': payload, 'warnings': [], 'sections': []}}
+    plan = await build_plan(db, ACTOR, [uploaded], {'settings': {'duplicatePolicy': 'independent'}}, session_id='s')
+    assert plan['questionCount'] == 25
+    assert len(plan['items']) == 3
+    assert plan['items'][0]['kind'] == 'principles'
+    assert len(plan['items'][0]['principleBundle']['principles']['items']) == 11
+    assert all(item['source']['uploadId'] == 'combined' for item in plan['items'])
+    for item, original in zip(plan['items'][1:], payload['banks']):
+        assert item['questions'] == original['questions']
+        assert item['name'] == original['name']
+
+@pytest.mark.anyio
+@pytest.mark.parametrize('instruction', ['请保留原答案，不要修改', '不改答案', '原题原答案照搬', '不要修改', '只改名称不改题目'])
+async def test_preserve_instruction_cannot_authorize_model_answer_patch(db, instruction):
+    model = {'settings': {'duplicatePolicy': 'independent'}, 'userInstruction': instruction, 'items': [{'uploadId': 'upload1', 'questionPatches': [{'questionId': 'q1', 'patch': {'correctAnswer': 'b'}}]}]}
+    plan = await build_plan(db, ACTOR, [source()], model, session_id='s')
+    assert plan['items'][0]['questions'][0]['correctAnswer'] == 'a'
+    assert plan['items'][0]['blockers']
+
+@pytest.mark.anyio
+async def test_answer_patch_synchronizes_option_flags(db):
+    q = question()
+    q['options'][0]['correct'] = True
+    q['options'][1]['correct'] = False
+    model = {'settings': {'duplicatePolicy': 'independent'}, 'userInstruction': '第一题答案改为 B', 'items': [{'uploadId': 'upload1', 'questionPatches': [{'questionId': 'q1', 'patch': {'correctAnswer': 'B'}}]}]}
+    plan = await build_plan(db, ACTOR, [source(q)], model, session_id='s')
+    assert not plan['items'][0]['blockers']
+    effective = plan['items'][0]['questions'][0]
+    assert effective['correctAnswer'] == 'b'
+    assert [option['correct'] for option in effective['options']] == [False, True]
+    assert plan['items'][0]['sourceOriginalQuestions'][0]['options'][0]['correct'] is True
+
+@pytest.mark.anyio
+async def test_real_draft_publish_edit_and_revision_response_loss():
+    from uuid import uuid4
+    from sqlalchemy import func, select
+    from app.db.session import AsyncSessionLocal
+    from app.models.user import User
+    from app.models.teacher_assistant import TeacherAssistantSession
+    from app.models.question import ExamPaper, Question, QuestionBank
+    from app.models.paper_release import PaperRelease, PaperReleaseQuestion
+    suffix = uuid4().hex[:12]
+    async with AsyncSessionLocal() as database:
+        actor = User(username='ta-lifecycle-' + suffix, password_hash='test', role='teacher', status='active')
+        database.add(actor)
+        await database.commit()
+        session = TeacherAssistantSession(id='tas-lifecycle-' + suffix, owner_id=actor.username, revision=1)
+        initial = await build_plan(database, actor, [source()], {'settings': {'duplicatePolicy': 'independent'}}, session_id=session.id)
+        session.plan = initial
+        database.add(session)
+        await database.commit()
+        draft = await execute_plan(database, actor, session, 1)
+        assert draft['status'] == 'succeeded', draft
+        assert not draft['items'][0].get('releaseId')
+        settings = {'publish': True, 'accessLevel': 'free', 'allowedRoles': ['student'], 'enabledModes': ['deep_recall', 'multi_question_canvas']}
+        publish_plan = await build_plan(database, actor, [source()], {'settings': settings, 'userInstruction': '发布给免费学员'}, session_id=session.id, previous_plan=initial)
+        assert publish_plan['items'][0]['existingObjects']['bankId'] == draft['items'][0]['bankId']
+        assert publish_plan['items'][0]['existingObjects']['paperId'] == draft['items'][0]['paperId']
+        session.plan, session.revision = publish_plan, 2
+        await database.commit()
+        published = await execute_plan(database, actor, session, 2)
+        assert published['status'] == 'succeeded', json.dumps(published, ensure_ascii=False)
+        assert published['items'][0]['paperId'] == draft['items'][0]['paperId']
+        first_release = published['items'][0]['releaseId']
+        session.receipt = {}
+        await database.commit()
+        replay = await execute_plan(database, actor, session, 2)
+        assert replay['status'] == 'succeeded', replay
+        assert replay['items'][0]['releaseId'] == first_release
+        edited_plan = await build_plan(database, actor, [source()], {'settings': {'names': {'upload1': '新版习题课'}}, 'userInstruction': '名称改成新版习题课，第一题答案改为b', 'items': [{'uploadId': 'upload1', 'questionPatches': [{'questionId': 'q1', 'patch': {'correctAnswer': 'b'}}]}]}, session_id=session.id, previous_plan=publish_plan)
+        assert not edited_plan['items'][0]['blockers'], edited_plan['items'][0]['blockers']
+        session.plan, session.revision = edited_plan, 3
+        await database.commit()
+        edited = await execute_plan(database, actor, session, 3)
+        assert edited['status'] == 'succeeded', json.dumps(edited, ensure_ascii=False)
+        assert edited['items'][0]['paperId'] == draft['items'][0]['paperId']
+        assert edited['items'][0]['releaseId'] != first_release
+        paper = await database.get(ExamPaper, draft['items'][0]['paperId'])
+        assert paper.name == '新版习题课'
+        question_row = (await database.execute(select(Question).where(Question.bank_id == draft['items'][0]['bankId']))).scalar_one()
+        assert question_row.correct_answer == 'b'
+        old_snapshot = (await database.execute(select(PaperReleaseQuestion).where(PaperReleaseQuestion.release_id == first_release))).scalar_one().snapshot
+        assert old_snapshot['correctAnswer'] == 'a'
+        session.receipt = {}
+        await database.commit()
+        final = await execute_plan(database, actor, session, 3)
+        assert final['status'] == 'succeeded', final
+        assert final['items'][0]['releaseId'] == edited['items'][0]['releaseId']
+        assert await database.scalar(select(func.count()).select_from(ExamPaper).where(ExamPaper.owner_id == actor.username)) == 1
+        assert await database.scalar(select(func.count()).select_from(QuestionBank).where(QuestionBank.owner_id == actor.username)) == 1
+        assert await database.scalar(select(func.count()).select_from(PaperRelease).where(PaperRelease.paper_id == paper.id)) == 2
+
+@pytest.mark.anyio
+@pytest.mark.parametrize('external_edit', ['paper', 'question'])
+async def test_real_external_revision_conflict_blocks_owned_update(external_edit):
+    from uuid import uuid4
+    from sqlalchemy import select
+    from app.db.session import AsyncSessionLocal
+    from app.models.user import User
+    from app.models.teacher_assistant import TeacherAssistantSession
+    from app.models.question import ExamPaper, Question
+    suffix = uuid4().hex[:12]
+    async with AsyncSessionLocal() as database:
+        actor = User(username='ta-stale-' + suffix, password_hash='test', role='teacher', status='active')
+        database.add(actor)
+        await database.commit()
+        session = TeacherAssistantSession(id='tas-stale-' + suffix, owner_id=actor.username, revision=1)
+        initial = await build_plan(database, actor, [source()], {'settings': {'duplicatePolicy': 'independent'}}, session_id=session.id)
+        session.plan = initial
+        database.add(session)
+        await database.commit()
+        draft = await execute_plan(database, actor, session, 1)
+        assert draft['status'] == 'succeeded'
+        changed = await build_plan(database, actor, [source()], {'settings': {'names': {'upload1': '已审批的新名称'}}, 'userInstruction': '第一题答案改为b', 'items': [{'uploadId': 'upload1', 'questionPatches': [{'questionId': 'q1', 'patch': {'correctAnswer': 'b'}}]}]}, session_id=session.id, previous_plan=initial)
+        session.plan, session.revision = changed, 2
+        paper = await database.get(ExamPaper, draft['items'][0]['paperId'])
+        question_row = (await database.execute(select(Question).where(Question.bank_id == draft['items'][0]['bankId']))).scalar_one()
+        if external_edit == 'paper':
+            paper.name = '外部操作已修改'
+            paper.revision += 1
+        else:
+            question_row.revision += 1
+            question_row.content_hash = 'external-edited-hash'
+        await database.commit()
+        receipt = await execute_plan(database, actor, session, 2)
+        assert receipt['status'] == 'partial'
+        assert receipt['items'][0]['errorStatus'] == 409, receipt
+        assert receipt['items'][0]['errorCode'] in {'PAPER_REVISION_CONFLICT', 'QUESTION_BANK_REVISION_CONFLICT'}
+        await database.refresh(question_row)
+        assert question_row.correct_answer == 'a'
+
+@pytest.mark.anyio
+async def test_real_draft_rename_and_correction_replace_same_objects():
+    from uuid import uuid4
+    from sqlalchemy import select
+    from app.db.session import AsyncSessionLocal
+    from app.models.user import User
+    from app.models.teacher_assistant import TeacherAssistantSession
+    from app.models.question import ExamPaper, Question
+    suffix = uuid4().hex[:12]
+    async with AsyncSessionLocal() as database:
+        actor = User(username='ta-draft-edit-' + suffix, password_hash='test', role='teacher', status='active')
+        database.add(actor)
+        await database.commit()
+        session = TeacherAssistantSession(id='tas-draft-edit-' + suffix, owner_id=actor.username, revision=1)
+        first_plan = await build_plan(database, actor, [source()], {'settings': {'duplicatePolicy': 'independent'}}, session_id=session.id)
+        session.plan = first_plan
+        database.add(session)
+        await database.commit()
+        first = await execute_plan(database, actor, session, 1)
+        second_plan = await build_plan(database, actor, [source()], {'settings': {'nameSuffix': '习题课'}, 'userInstruction': '第一题答案改为b', 'items': [{'uploadId': 'upload1', 'questionPatches': [{'questionId': 'q1', 'patch': {'correctAnswer': 'b'}}]}]}, session_id=session.id, previous_plan=first_plan)
+        session.plan, session.revision = second_plan, 2
+        await database.commit()
+        second = await execute_plan(database, actor, session, 2)
+        assert second['status'] == 'succeeded', json.dumps(second, ensure_ascii=False)
+        assert second['items'][0]['bankId'] == first['items'][0]['bankId']
+        assert second['items'][0]['paperId'] == first['items'][0]['paperId']
+        assert not second['items'][0].get('releaseId')
+        paper = await database.get(ExamPaper, second['items'][0]['paperId'])
+        assert paper.name.endswith('习题课') and paper.status == 'draft'
+        q = (await database.execute(select(Question).where(Question.bank_id == second['items'][0]['bankId']))).scalar_one()
+        assert q.correct_answer == 'b'
+
+@pytest.mark.anyio
+@pytest.mark.parametrize('changed_object', ['question', 'paper'])
+async def test_publication_rechecks_committed_preview_after_last_guard(changed_object):
+    from uuid import uuid4
+    from sqlalchemy import select, func
+    from app.db.session import AsyncSessionLocal
+    from app.models.user import User
+    from app.models.teacher_assistant import TeacherAssistantSession
+    from app.models.question import Question, ExamPaper
+    from app.models.paper_release import PaperRelease
+    suffix = uuid4().hex[:12]
+    async with AsyncSessionLocal() as database:
+        actor = User(username='ta-publish-race-' + suffix, password_hash='test', role='teacher', status='active')
+        database.add(actor)
+        await database.commit()
+        session = TeacherAssistantSession(id='tas-race-' + suffix, owner_id=actor.username, revision=1)
+        model = {'settings': {'duplicatePolicy': 'independent', 'publish': True, 'accessLevel': 'free', 'allowedRoles': ['student'], 'enabledModes': ['deep_recall']}}
+        session.plan = await build_plan(database, actor, [source()], model, session_id=session.id)
+        database.add(session)
+        await database.commit()
+        mutated = False
+        async def external_edit_after_paper_checkpoint():
+            nonlocal mutated
+            entry = (session.receipt or {}).get('items', [{}])[0]
+            if mutated or not entry.get('paperReady'):
+                return
+            mutated = True
+            async with AsyncSessionLocal() as another_tab:
+                if changed_object == 'question':
+                    row = (await another_tab.execute(select(Question).where(Question.bank_id == entry['bankId']))).scalar_one()
+                    row.correct_answer = 'b'
+                    row.revision += 1
+                    row.content_hash = 'changed-after-preview'
+                else:
+                    row = await another_tab.get(ExamPaper, entry['paperId'])
+                    row.name = '未预览的外部名称'
+                    row.revision += 1
+                await another_tab.commit()
+        receipt = await execute_plan(database, actor, session, 1, before_step=external_edit_after_paper_checkpoint)
+        assert mutated
+        assert receipt['status'] == 'partial', receipt
+        assert receipt['items'][0]['errorStatus'] == 409
+        assert receipt['items'][0]['errorCode'] in {'QUESTION_PREVIEW_CHANGED', 'PAPER_PREVIEW_CHANGED'}
+        assert await database.scalar(select(func.count()).select_from(PaperRelease).where(PaperRelease.paper_id == receipt['items'][0]['paperId'])) == 0
