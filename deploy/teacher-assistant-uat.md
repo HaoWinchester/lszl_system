@@ -25,3 +25,9 @@ bash deploy/tests/update-uat-fast-path.test.sh
 bash deploy/tests/update-uat-version-bump.test.sh
 bash deploy/tests/update-uat-validation.test.sh
 ```
+
+## Reusing the backend Python runtime
+
+The assistant Dockerfile retains its existing Python base and Office/OCR apt layer. Compose supplies the freshly built backend as the named build context `backend-runtime: service:backend`; the assistant copies `/usr/local` from it instead of running another `pip install`. Both images use `python:3.12-slim` and the same backend requirements. This reuses the installed interpreter, packages and console entry points while leaving the converter network and non-root service user unchanged. The backend build remains the dependency installation authority; build the composed project so the named context is resolved. A bare build of the assistant Dockerfile without this context is unsupported.
+
+Local validation uses Compose v2.39.2: normalized `config` retains the service context, and `build --print` resolves it to `target:backend` without starting a build. Deployment must use a Compose/BuildKit combination supporting named service build contexts; fail rather than silently download a second runtime if unavailable. An actual build/cache hit and imports in the resulting server container remain deployment checks. Keep the two Python base images aligned when upgrading.

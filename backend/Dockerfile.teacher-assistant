@@ -3,8 +3,7 @@ ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 PIP_NO_CACHE_DIR=1
 ARG DEBIAN_MIRROR=https://mirrors.aliyun.com
 RUN sed -i "s|http://deb.debian.org|${DEBIAN_MIRROR}|g" /etc/apt/sources.list.d/debian.sources && apt-get update && apt-get install -y --no-install-recommends poppler-utils tesseract-ocr tesseract-ocr-chi-sim libreoffice-writer libreoffice-impress fonts-noto-cjk ca-certificates && rm -rf /var/lib/apt/lists/*
 WORKDIR /app/backend
-COPY backend/requirements.txt /app/backend/requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+COPY --from=backend-runtime /usr/local /usr/local
 COPY backend/ /app/backend/
 RUN useradd --create-home --uid 10001 assistant && mkdir -p /var/lib/teacher-assistant && chown assistant:assistant /var/lib/teacher-assistant
 USER assistant
