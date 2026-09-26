@@ -1,0 +1,319 @@
+"""Lossless teacher plans and resumable calls through existing import boundaries."""
+from __future__ import annotations
+
+from copy import deepcopy
+import hashlib
+import json
+import re
+
+from fastapi import HTTPException
+from pydantic import ValidationError
+from sqlalchemy import select, text
+
+from app.models.content_prep import Principle
+from app.models.question import ExamPaper, Question, QuestionBank
+from app.schemas.paper import PaperImportPreflightRequest, PaperImportRequest
+from app.schemas.question_catalog import QuestionBankImportRequest, QuestionPayload
+from app.services import content_prep_shared_service, paper_import_service, paper_release_service, question_answer_service, question_content_service, question_service
+
+
+def _error(status, code, message):
+    return HTTPException(status_code=status, detail={'code': code, 'message': message})
+
+
+def _identity(*parts):
+    return hashlib.sha256('::'.join(str(part) for part in parts).encode()).hexdigest()[:40]
+
+
+def _banks(data):
+    if isinstance(data, list):
+        if all(isinstance(item, dict) and isinstance(item.get('questions'), list) for item in data):
+            return deepcopy(data)
+        return [{'id': 'questions', 'questions': deepcopy(data)}]
+    if isinstance(data, dict):
+        if isinstance(data.get('banks'), list):
+            return deepcopy(data['banks'])
+        if isinstance(data.get('questions'), list):
+            return [deepcopy(data)]
+    return []
+
+
+async def _reference_blockers(db, questions):
+    identifiers = set()
+    recall_ids = {str(clue['recallNodeId']) for question in questions for clue in (question.get('clues') or []) if isinstance(clue, dict) and clue.get('recallNodeId')}
+    recall_blockers = []
+    if recall_ids:
+        if len(recall_ids) > 1000:
+            recall_blockers.append('联想词关联超过检索上限。')
+        else:
+            existing_nodes = (await db.execute(text("SELECT DISTINCT node->>'id' FROM recall_association_libraries, jsonb_array_elements(nodes) node WHERE status = 'published' AND node->>'id' = ANY(CAST(:ids AS text[])) LIMIT 1000"), {'ids': sorted(recall_ids)})).scalars().all()
+            recall_blockers.extend(f'引用联想词不存在或不可用：{value}' for value in sorted(recall_ids - set(existing_nodes)))
+    for question in questions:
+        metadata = question.get('metadata') or {}
+        identifiers.update(metadata.get('principleIds') or [])
+        identifiers.update(metadata.get('stemPrincipleIds') or [])
+        for values in (metadata.get('optionPrincipleMap') or {}).values():
+            identifiers.update(values or [])
+    if not identifiers:
+        return recall_blockers
+    if len(identifiers) > 1000:
+        return ['关联原则超过检索上限。']
+    existing = (await db.execute(select(Principle.id).where(Principle.id.in_(identifiers), Principle.status == 'active').limit(1000))).scalars().all()
+    missing = identifiers - set(existing)
+    return recall_blockers + [f'引用原则不存在或不可用：{value}' for value in sorted(missing)]
+
+
+async def build_plan(db, actor, sources: list[dict], model_result: dict, *, session_id: str, previous_plan: dict | None = None) -> dict:
+    if actor.role not in {'teacher', 'admin'}:
+        raise _error(403, 'TEACHER_REQUIRED', '仅教师或管理员可整理教学文件。')
+    settings = deepcopy((previous_plan or {}).get('settings') or {})
+    settings.update(deepcopy(model_result.get('settings') or {}))
+    settings.setdefault('publish', False)
+    settings.setdefault('directPublish', False)
+    settings.setdefault('accessLevel', 'private')
+    settings.setdefault('allowedRoles', [])
+    settings.setdefault('enabledModes', [])
+    settings.setdefault('duplicatePolicy', None)
+    blockers = list(model_result.get('blockers') or [])
+    for flag in ('publish', 'directPublish'):
+        if type(settings[flag]) is not bool:
+            blockers.append(f'{flag} 必须为布尔值。')
+    if settings['allowedRoles'] and (not isinstance(settings['allowedRoles'], list) or set(settings['allowedRoles']) - {'teacher', 'student', 'admin', 'viewer'}):
+        blockers.append('开放角色无效。')
+    if not isinstance(settings['enabledModes'], list) or set(settings['enabledModes']) - {'deep_recall', 'multi_question_canvas', 'practice_mode'}:
+        blockers.append('学习模式无效。')
+    if settings['accessLevel'] not in {'private', 'free', 'member'}:
+        blockers.append('收费方式无效。')
+    if settings['duplicatePolicy'] not in {None, 'independent', 'reuse', 'cancel'}:
+        blockers.append('重复处理策略无效。')
+    if settings['publish'] and (settings['accessLevel'] == 'private' or not settings['allowedRoles'] or not settings['enabledModes'] or not settings['duplicatePolicy']):
+        blockers.append('发布前需明确开放对象、收费方式、学习模式与重复处理。')
+    if settings['directPublish'] and not settings['publish']:
+        blockers.append('直接发布需要明确发布指令。')
+    proposed = {str(item.get('uploadId')): item for item in model_result.get('items', []) if isinstance(item, dict)}
+    previous = {item['id']: item for item in (previous_plan or {}).get('items', [])}
+    items = []
+    for source in sources:
+        upload_id = str(source['id'])
+        extracted = source['extracted']
+        model_item = proposed.get(upload_id, {})
+        raw_banks = _banks(extracted.get('data')) if extracted['kind'] == 'json' else []
+        principle_bundle = extracted.get('data') if extracted['kind'] == 'json' and isinstance(extracted.get('data'), dict) and (extracted['data'].get('format') in {'kg-principle-card-bundle-v1', 'pmp-principle-preset-bundle-v1'} or ('principles' in extracted['data'] and 'synthesisPresets' in extracted['data'])) else model_item.get('principleBundle') if extracted['kind'] != 'json' else None
+        if principle_bundle:
+            preview = await content_prep_shared_service.preview_principle_merge(db, principle_bundle)
+            item_blockers = ['原则合并存在冲突，请明确处理。'] if preview['plan'].get('conflicts') else []
+            items.append({'id': upload_id + ':principles', 'name': source['name'], 'kind': 'principles', 'questions': [], 'principleBundle': deepcopy(principle_bundle), 'mergePreview': preview, 'source': {'uploadId': upload_id, 'location': '文件'}, 'warnings': extracted.get('warnings', []), 'blockers': item_blockers})
+            continue
+        if not raw_banks and extracted['kind'] != 'json':
+            raw_banks = [{'id': upload_id, 'name': source['name'], 'questions': deepcopy(model_item.get('questions') or [])}]
+        if not raw_banks:
+            blockers.append(f'{source["name"]} 未识别为题库或原则包。')
+        for index, bank in enumerate(raw_banks):
+            item_id = upload_id + ':' + str(bank.get('id') or index)
+            old = previous.get(item_id, {})
+            questions = deepcopy(bank.get('questions') or [])
+            warnings = list(extracted.get('warnings') or [])
+            item_blockers = []
+            instruction = str(model_result.get('userInstruction') or '')
+            filter_keys = {'selectedQuestionIds', 'excludedQuestionIds'} & set(model_item)
+            if filter_keys and re.search('删除|不要|去掉|只保留|排除|恢复|保留', instruction):
+                known = {str(question.get('id')) for question in questions}
+                selected = set(map(str, model_item.get('selectedQuestionIds', known)))
+                excluded = set(map(str, model_item.get('excludedQuestionIds', [])))
+                if (selected | excluded) - known:
+                    item_blockers.append('筛选包含不存在的来源题目 ID。')
+                else:
+                    questions = [question for question in questions if str(question.get('id')) in selected - excluded]
+            elif old.get('selectedQuestionIds') is not None:
+                questions = [question for question in questions if str(question.get('id')) in old['selectedQuestionIds']]
+            if not questions:
+                item_blockers.append('没有可导入题目。')
+            name = str((settings.get('names') or {}).get(upload_id) or bank.get('name') or source['name'].rsplit('.', 1)[0])
+            suffix = str(settings.get('nameSuffix') or '')
+            if suffix and suffix not in name:
+                name += '｜' + suffix
+            if not name or len(name) > 200:
+                item_blockers.append('内容名称为空或超过 200 字符。')
+            reviewed_ids = set(map(str, old.get('reviewedQuestionIds') or []))
+            if re.search('已核对|核对无误|确认答案|核对.*确认', instruction):
+                proposed_reviewed = set(map(str, model_item.get('reviewedQuestionIds') or model_result.get('reviewedQuestionIds') or []))
+                if proposed_reviewed - {str(question.get('id')) for question in questions}:
+                    item_blockers.append('核对确认包含不存在的题目 ID。')
+                else:
+                    reviewed_ids.update(proposed_reviewed)
+            normalized = []
+            for number, question in enumerate(questions, 1):
+                try:
+                    QuestionPayload.model_validate(question)
+                    value = question_content_service.normalize_question_payload(question, subject=str(bank.get('subject') or 'PMP'))
+                    problems = question_answer_service.validate_question(value)
+                    if value['type'] not in {'single_choice', 'multiple_choice', 'matching'}:
+                        item_blockers.append(f'第 {number} 题题型不受支持。')
+                    if value['type'] == 'single_choice':
+                        option_ids = [str(option.get('id') or '') for option in value.get('options') or []]
+                        answer = value.get('correctAnswer')
+                        if len(option_ids) < 2 or len(option_ids) != len(set(option_ids)) or any(not identifier for identifier in option_ids):
+                            item_blockers.append(f'第 {number} 题选项缺失或 ID 重复。')
+                        if not isinstance(answer, str) or answer not in option_ids:
+                            item_blockers.append(f'第 {number} 题缺少有效单选答案。')
+                    if not any(str(part.get('text') or '').strip() or part.get('imageId') or part.get('url') for part in value.get('stemParts') or []):
+                        item_blockers.append(f'第 {number} 题缺少题干。')
+                    item_blockers.extend(f'第 {number} 题：{problem["message"]}' for problem in problems)
+                    normalized.append(value)
+                except (ValidationError, ValueError, TypeError, AttributeError) as exc:
+                    item_blockers.append(f'第 {number} 题格式不正确：{type(exc).__name__}')
+                if extracted['kind'] != 'json':
+                    location = (question.get('source') or {}).get('location')
+                    available = {section['location'] for section in extracted.get('sections') or []}
+                    if not location or location not in available:
+                        item_blockers.append(f'第 {number} 题缺少有效原文位置。')
+                    if (question.get('uncertain') or question.get('needsReview') or any('OCR' in value or '公式' in value or '图表' in value for value in warnings)) and str(question.get('id')) not in reviewed_ids:
+                        item_blockers.append(f'第 {number} 题识别结果需要教师核对。')
+            item_blockers.extend(await _reference_blockers(db, questions))
+            signatures = [question_content_service.duplicate_question_signature(value) for value in normalized]
+            if len(signatures) != len(set(signatures)):
+                item_blockers.append('文件内有完全重复题目；请先明确保留范围。')
+            candidates = (await db.execute(select(Question).join(QuestionBank, Question.bank_id == QuestionBank.id).where(QuestionBank.owner_id == actor.username, Question.title.in_([q.get('title') or '' for q in questions])).limit(1001))).scalars().all()
+            matching = sum(question_content_service.duplicate_question_signature(question_service.question_to_dict(candidate)) in set(signatures) for candidate in candidates[:1000])
+            if matching:
+                warnings.append(f'本人题库已有 {matching} 道完全相同题目；按明确重复策略处理。')
+            if len(candidates) > 1000:
+                warnings.append('相同标题候选超过 1000 条，仅检查前 1000 条。')
+            namespace = 'ta_' + _identity(actor.username, session_id, item_id)
+            policy = settings['duplicatePolicy']
+            bank_payload = deepcopy(bank)
+            bank_payload.update({'id': namespace, 'sourceId': namespace, 'name': name, 'visibility': 'private', 'questions': []})
+            original_source_id = str(bank.get('sourceId') or bank.get('id') or index)
+            reuse_bank_id = None
+            if policy == 'reuse':
+                existing = (await db.execute(select(QuestionBank).where(QuestionBank.owner_id == actor.username, QuestionBank.source_id == original_source_id).limit(1))).scalar_one_or_none()
+                if existing is None:
+                    item_blockers.append('找不到可复用的本人来源题库；请选择独立副本。')
+                else:
+                    bank_payload['id'] = bank_payload['sourceId'] = original_source_id
+                    reuse_bank_id = existing.id
+                    rows = (await db.execute(select(Question).where(Question.bank_id == existing.id).limit(501))).scalars().all()
+                    existing_signatures = {str(row.source_id or row.id): row.content_hash for row in rows}
+                    if len(rows) != len(questions) or any(existing_signatures.get(str(question.get('sourceId') or question['id'])) != question_content_service.canonical_question_hash(question) for question in questions):
+                        item_blockers.append('复用目标内容不同，禁止未经授权覆盖。')
+            elif policy != 'independent':
+                item_blockers.append('请选择保留独立副本、复用或取消。')
+            for question in questions:
+                transformed = deepcopy(question)
+                original_id = str(question.get('sourceId') or question['id'])
+                target_id = 'tq_' + _identity(namespace, original_id) if policy != 'reuse' else original_id
+                transformed['id'] = target_id[:64]
+                transformed['sourceId'] = target_id
+                if policy != 'reuse':
+                    transformed.setdefault('metadata', {})['teacherAssistantSource'] = {'uploadId': upload_id, 'sourceBankId': original_source_id, 'sourceQuestionId': original_id, 'originalId': question['id']}
+                bank_payload['questions'].append(transformed)
+            items.append({'id': item_id, 'name': name, 'kind': 'questions', 'questions': questions, 'selectedQuestionIds': [question['id'] for question in questions], 'reviewedQuestionIds': sorted(reviewed_ids), 'bankPayload': bank_payload, 'reuseBankId': reuse_bank_id, 'source': {'uploadId': upload_id, 'location': 'JSON 原题库' if extracted['kind'] == 'json' else '文档'}, 'warnings': warnings, 'blockers': item_blockers, 'cancelled': policy == 'cancel'})
+    total = sum(len(item['questions']) for item in items)
+    if total > 500:
+        blockers.append('单任务超过 500 题；请拆分。')
+    result = {'settings': settings, 'items': items, 'questionCount': total, 'blockers': list(dict.fromkeys(blockers)), 'reply': str(model_result.get('reply') or '')}
+    result['digest'] = hashlib.sha256(json.dumps(result, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+    return result
+
+
+async def _checkpoint(db, session, receipt):
+    await db.refresh(session)
+    session.receipt = deepcopy(receipt)
+    await db.commit()
+    await db.refresh(session)
+
+
+async def execute_plan(db, actor, session, revision) -> dict:
+    if actor.role not in {'teacher', 'admin'} or session.owner_id != actor.username:
+        raise _error(403, 'ASSISTANT_OWNER_REQUIRED', '无权执行此会话。')
+    if revision != session.revision:
+        raise _error(409, 'ASSISTANT_REVISION_CONFLICT', '方案已更新，请刷新后确认。')
+    plan = deepcopy(session.plan or {})
+    session_id = str(session.id)
+    if plan.get('blockers'):
+        raise _error(422, 'ASSISTANT_PLAN_BLOCKED', '方案有待处理问题。')
+    settings = plan['settings']
+    prior = deepcopy(session.receipt or {})
+    if prior and prior.get('revision') != revision:
+        prior = {}
+    receipt = {'revision': revision, 'items': prior.get('items') or [], 'status': 'partial'}
+    entries = {entry['itemId']: entry for entry in receipt['items']}
+    for item in plan.get('items', []):
+        entry = entries.get(item['id'])
+        if entry and entry.get('status') in {'succeeded', 'cancelled'}:
+            continue
+        if entry is None:
+            entry = {'itemId': item['id'], 'name': item['name'], 'status': 'pending', 'links': []}
+            receipt['items'].append(entry)
+        if item.get('cancelled'):
+            entry['status'] = 'cancelled'
+            await _checkpoint(db, session, receipt)
+            continue
+        if item.get('blockers'):
+            entry.update(status='blocked', error='；'.join(item['blockers']))
+            await _checkpoint(db, session, receipt)
+            continue
+        try:
+            if item['kind'] == 'principles':
+                preview = await content_prep_shared_service.preview_principle_merge(db, item['principleBundle'])
+                if preview['plan'].get('conflicts'):
+                    raise _error(422, 'PRINCIPLE_CONFLICT', '原则合并存在未解决冲突。')
+                result = await content_prep_shared_service.apply_principle_merge(db, actor, content_revision=preview['contentRevision'], bundle=item['principleBundle'], resolutions=[])
+                entry.update(status='succeeded', result=result)
+                await _checkpoint(db, session, receipt)
+                continue
+            reference_errors = await _reference_blockers(db, item['questions'])
+            if reference_errors:
+                raise _error(422, 'SOURCE_REFERENCE_INVALID', '；'.join(reference_errors))
+            payload = deepcopy(item['bankPayload'])
+            bank_source = payload['sourceId']
+            if not entry.get('bankId'):
+                if item.get('reuseBankId'):
+                    bank = await db.get(QuestionBank, item['reuseBankId'])
+                    if bank is None or bank.owner_id != actor.username:
+                        raise _error(403, 'BANK_OWNER_REQUIRED', '无权复用目标题库。')
+                    rows = (await db.execute(select(Question).where(Question.bank_id == bank.id).limit(501))).scalars().all()
+                    hashes = {str(row.source_id or row.id): row.content_hash for row in rows}
+                    if len(rows) != len(payload['questions']) or any(hashes.get(question['sourceId']) != question_content_service.canonical_question_hash(question) for question in payload['questions']):
+                        raise _error(409, 'REUSE_CONTENT_CHANGED', '复用目标已变化，请重新预览。')
+                    entry['bankId'] = bank.id
+                else:
+                    result = await question_service.import_question_banks(db, actor, QuestionBankImportRequest(banks=[payload]))
+                    entry['bankId'] = result['sourceBankIdMap'][bank_source]
+                    await db.refresh(actor)
+                await _checkpoint(db, session, receipt)
+            paper_id = 'tp_' + _identity(actor.username, session_id, item['id'])
+            if not entry.get('paperId'):
+                package = {'schema': 'kg-paper-package-v1', 'schemaVersion': 1, 'paper': {'id': paper_id, 'name': item['name'], 'subject': payload.get('subject') or 'PMP', 'paperType': 'mixed' if len({q.get('type', 'single_choice') for q in item['questions']}) > 1 or any(q.get('type') == 'matching' for q in item['questions']) else 'multiple_choice' if item['questions'][0].get('type') == 'multiple_choice' else 'standard', 'totalCount': len(payload['questions']), 'enabledModes': settings['enabledModes'], 'accessPolicy': {'accessLevel': settings['accessLevel'], 'allowedRoles': settings['allowedRoles']}, 'questions': [{'bankId': bank_source, 'questionId': question['sourceId'], 'order': index} for index, question in enumerate(payload['questions'], 1)]}, 'sourceBanks': [{'sourceBankId': bank_source, 'name': item['name']}]}
+                request = PaperImportPreflightRequest(fileName=item['name'] + '.json', package=package)
+                preflight = await paper_import_service.preflight_package(db, actor, request)
+                if not preflight['valid']:
+                    raise _error(422, 'PAPER_IMPORT_INVALID', '；'.join(problem['message'] for problem in preflight['errors']))
+                result = await paper_import_service.import_package(db, actor, PaperImportRequest(fileName=request.file_name, package=package, preflightHash=preflight['payloadHash'], conflictAction='create', idempotencyKey='ta-paper-' + _identity(session_id, item['id'], revision)))
+                entry['paperId'] = result['paper']['id']
+                await _checkpoint(db, session, receipt)
+            if settings['publish'] and not entry.get('releaseId'):
+                paper = await db.get(ExamPaper, entry['paperId'])
+                if paper is None or paper.owner_id != actor.username:
+                    raise _error(403, 'PAPER_OWNER_REQUIRED', '无权发布目标试卷。')
+                # A commit may succeed before the receipt: recover the persisted paper release.
+                if paper.published_release_id:
+                    entry['releaseId'] = paper.published_release_id
+                else:
+                    release = await paper_release_service.publish(db, actor, paper.id, expected_revision=paper.revision, access_level=settings['accessLevel'], enabled_modes=settings['enabledModes'], allowed_roles=settings['allowedRoles'], metadata={'teacherAssistantSessionId': session_id, 'teacherAssistantItemId': item['id'], 'teacherAssistantRevision': revision})
+                    entry['releaseId'] = release.id
+                await _checkpoint(db, session, receipt)
+            entry.update(status='succeeded', links=[{'label': '试卷管理', 'url': '/paper-management.html?paperId=' + entry['paperId']}])
+            if entry.get('releaseId'):
+                entry['links'].append({'label': '回忆画布', 'url': '/knowledge-recall.html?releaseId=' + entry['releaseId']})
+            entry.pop('error', None)
+            await _checkpoint(db, session, receipt)
+        except Exception as exc:
+            await db.rollback()
+            await db.refresh(actor)
+            message = exc.detail.get('message', exc.detail.get('code', '导入失败')) if isinstance(exc, HTTPException) and isinstance(exc.detail, dict) else '导入失败，请检查方案后重试。'
+            entry.update(status='failed', error=message)
+            await _checkpoint(db, session, receipt)
+    receipt['status'] = 'succeeded' if receipt['items'] and all(entry['status'] in {'succeeded', 'cancelled'} for entry in receipt['items']) else 'partial'
+    await _checkpoint(db, session, receipt)
+    return receipt
