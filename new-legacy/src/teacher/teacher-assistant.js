@@ -224,7 +224,7 @@
         for (const entry of s.receipt.items || []) {
           const card = text(receipt, 'article', '', 'ta-receipt-item');
           text(card, 'h4', entry.name || '整理结果');
-          text(card, 'p', (labels[entry.status] || (entry.releaseId ? '已发布' : entry.bankId || entry.paperId ? '已保存' : '请核对结果')) + (entry.releaseId ? ' · 已发布给允许访问的用户' : entry.bankId || entry.paperId ? ' · 私有草稿，尚未发布' : ''));
+          text(card, 'p', (labels[entry.status] || (entry.releaseId ? '已发布' : entry.bankId || entry.paperId ? '已保存' : '请核对结果')) + (entry.releaseId ? ' · 已发布给允许访问的用户' : entry.bankId || entry.paperId ? ' · 本次修改尚未发布' : ''));
           const count = entry.questionCount ?? entry.paper?.questions?.length;
           if (count != null) text(card, 'p', '题目：' + count + ' 道');
           if (entry.error) text(card, 'p', typeof entry.error === 'string' ? entry.error : entry.error.message || '该项未完成，请查看校验报告。', 'ta-warning');
