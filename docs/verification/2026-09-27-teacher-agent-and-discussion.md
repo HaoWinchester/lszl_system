@@ -1,12 +1,13 @@
 # 教师整理助手与答题后讨论：开发验证记录
 
-状态：功能已部署 UAT，真实服务器与多轮浏览器开发自检通过；截图复核发现的助手布局问题正在补丁验证。不代表用户 UAT 验收，main 与正式环境未改动。
+状态：功能已部署 UAT，真实服务器与多轮浏览器开发自检通过，截图复核发现的布局与回执文案问题已修复并验证。不代表用户 UAT 验收，main 与正式环境未改动。
 
 ## 发布与验证
-- UAT：https://uat.aihuanpu.com 。已部署代码 d2100c9a19789edeb0645e50d988d01eb3219589，active release v9.0-p4.1.242。
-- 完整发布门禁：后端 876 passed（3 条依赖弃用警告）；前端 pnpm test、设计、跨域浏览器与四个视觉场景均通过。实际运行 site 1017 文件，与候选文件清单一致；旧 1010 文件全部保留，新增 7。
+- UAT：https://uat.aihuanpu.com 。已部署代码 27466b38044b5a5d52ac446aa82e13117b4c5fc9，active release v9.0-p4.1.244。后续提交仅更新验证记录与同步报告。
+- 完整发布门禁：后端 876 passed（3 条依赖弃用警告）；前端 pnpm test、设计、跨域浏览器与四个视觉场景均通过。最终 site 1018 文件，242 的 1017 文件全部保留，新增 1 份布局回归测试；242 已核对 241 的旧 1010 文件全部保留。
 - UAT 备份：/home/ubuntu/lszl-uat-backups/20260926_174340；代码归档和 PostgreSQL dump 非空，tar / pg_restore 目录验证通过，旧镜像保留回滚 tag。
-- 实际容器 health、数据库、助手 worker/模型配置/存储/转换器、HTTPS 均就绪；版本与部署记录吻合。
+- 布局补丁前再次备份：/home/ubuntu/lszl-uat-backups/20260926_183956，代码与数据库归档均非空且可读，回滚镜像已保留。
+- 最终完整校验 729 秒、部署 776 秒，exit 0；实际容器 health、数据库、助手 worker/模型配置/存储/转换器、HTTPS 均就绪，公网版本与部署记录吻合。243 候选因审查发现状态文案不准确而主动中止，未上线；最终 244 重新全量通过。
 
 ## 真实导入与浏览器验证
 - 原 JSON 12+13 题及 11 项原则通过本地真实浏览器与服务器 Claude Code 套餐调用，保存独立习题课副本，保留原则、联想词与单/多选，教师/学员免费，仅回忆和归纳模式。
@@ -27,6 +28,8 @@
 - OCR/模型提取需要教师逐题核对；原答案只在明确要求时更正。恢复请求最多一次结构化修复，不能代替教师判断。
 - 扫描页保留完整原件图片，可能含原文答案，不自动裁剪；图片导出为系统授权引用，不是离线内嵌图片包。
 - 原件/解析缓存保留 30 天，详细回执 180 天；执行结果持久化，删除会话不撤回已发布内容。
-- 长历史会话标题与执行 JSON 造成布局问题已由截图发现，最终补丁证据另记；自动化自检不等于用户业务验收。仅在用户明确验收后才允许合入 main / 发布正式环境。
+- 最终 244 实际页面未覆盖源码、未模拟 API：1440 / 390 视口 scrollWidth 分别为 1440 / 390；标题宽 1392 / 366，均处于页头下方；3 个结果卡、6 个有效结果入口、完整回执默认折叠，无 pageerror。桌面与手机截图目视复核通过。
+- 未发布修订显示“本次修改尚未发布”，不暗示已有发布快照私有化。
+- 自动化自检不等于用户业务验收；仅在用户明确验收后才允许合入 main / 发布正式环境。
 
-证据位于功能工作树 artifacts/teacher-assistant/：uat-live-result.json、uat-student-material-result.json、discussion-uat/result.json、worker-build-reuse.log、legacy-office-smoke-result.json、uat-browser-memory.jsonl 及对应截图。测试账号凭据文件仅保存在忽略目录、0600 权限，不在本记录输出。
+证据位于功能工作树 artifacts/teacher-assistant/：uat-live-result.json、uat-student-material-result.json、discussion-uat/result.json、worker-build-reuse.log、legacy-office-smoke-result.json、uat-browser-memory.jsonl 、uat-assistant-final-layout-result.json 及对应截图。测试账号凭据文件仅保存在忽略目录、0600 权限，不在本记录输出。

@@ -1,18 +1,10 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.242",
+  "fromVersion": "v9.0-p4.1.244",
   "toVersion": "v9.0-p4.1.244",
   "changes": {
-    "added": [
-      "tests/teacher-assistant-layout-browser.py"
-    ],
-    "changed": [
-      "VERSION",
-      "content-prep-studio/dist/content-prep.html",
-      "src/teacher/teacher-assistant.js",
-      "styles/teacher-assistant.css",
-      "teacher-assistant.html"
-    ],
+    "added": [],
+    "changed": [],
     "removed": []
   },
   "incompatible": []
