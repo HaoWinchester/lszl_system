@@ -41,3 +41,18 @@
 实际检查：使用主工作区已有 backend/.venv Python 执行 `-m pytest tests/test_teacher_assistant_documents.py -q`，18 passed；包括真实图像 DOCX 与 PPTX Tesseract OCR、真实文字/扫描 PDF、缺语言包、OCR文本超限、图片数量超限，以及原有 XML/ZIP/宏/外链拒绝。这些是提取器实际工具测试，仍不代表真实模型/导入发布/UAT验收。
 
 最新 Chromium 完整控件测试已通过，实际 JSON / 报告附件内容通过本地测试 HTTP 服务模拟验证（Chromium attachment 下载可能绕过 Playwright 路由，已将附件 fixture 移到本地测试 HTTP Handler）。Node 5/5 再次通过。
+
+## 轻量状态、可读预览与保留期限
+
+轮询改为 GET `/sessions/{sid}/status`，排队/执行期间只更新任务标识；只有方案 revision 改变或任务进入终态才读完整会话。消息完成明确显示“预览已更新”；预览显著区分私有草稿、待发布、已导入、已发布。旧 revision 回执不能禁用新方案或暗示新方案已发布。题目正文、中文题型、选项及正确答案、联想词/原则/解析采用可读排版；详细来源元数据折叠，完整内容仍可导出。回执链接使用服务器提供的具体 label，桌面两面板独立滚动保持对话与输入上下文。暂态网络错误显示中文恢复提示，状态恢复自动清除，业务错误仍保留。
+
+新增 `teacher_assistant_retention.cleanup(db, now=None)`：每次最多20会话；30天未执行私人原件/解析缓存清理、上传标记expired、原会话/草稿保留并添加重新上传阻断及revision；任何执行任务、成功回执或活动任务/活动lease保护原文件；180天完整回执压缩为稳定业务ID与结果状态，保留任务操作键与payload。路径字符与resolve严格检查，拒绝目录symlink逃逸；不触碰发布内容资源。
+
+Hybrid PDF 检查 embedded image 页（pdfimages）或少量 selectable text 的页并执行有界OCR，保留原可选文字并附OCR来源/核对警告，防止仅有页眉导致扫描题目漏识别。
+
+最新验证：
+- parser + retention 21项通过，含真实 PostgreSQL 保留期限/活动与执行保护/第二次清理幂等、目录逃逸拒绝，实际hybridPDF（可选Page1+扫描QuestionB789）OCR。
+- Node 5/5通过。
+- Chromium控制交互再次通过，新增无完整会话轮询、网络中断中文提示/恢复清除、中文可读选项答案、旧版本回执与新预览状态覆盖。
+
+仍未把自动化自检当作用户UAT验收；根任务负责集成worker维护调度、同步产物与真实模型业务联调。

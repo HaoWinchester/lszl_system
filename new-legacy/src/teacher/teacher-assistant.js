@@ -64,6 +64,7 @@
     }
     return {
       request, load, mutate,
+      async status(id) { return request(BASE + "/sessions/" + encodeURIComponent(id) + "/status"); },
       get session() { return session; }, get pending() { return pending; },
       async list() { return (await request(BASE + '/sessions')).sessions || []; },
       async create() { const data = await request(BASE + '/sessions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }); session = data.session; return session; },
@@ -80,7 +81,7 @@
   function init(doc) {
     const $ = id => doc.getElementById(id);
     const client = createClient(global.fetch.bind(global), () => global.crypto.randomUUID());
-    let authorized = false, busy = false, pollTimer = null, epoch = 0;
+    let authorized = false, busy = false, pollTimer = null, epoch = 0, transientError = false;
     const sourceViews = new Map();
     $('assistant').dataset.tab = 'conversation';
     function text(parent, tag, value, className) { const el = doc.createElement(tag); el.textContent = typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value ?? ''); if (className) el.className = className; parent.appendChild(el); return el; }
@@ -91,18 +92,30 @@
       const el = text(parent, 'a', label); el.href = parsed.href; if (download) el.download = ''; else el.target = '_blank'; el.rel = 'noopener';
     }
     function issue(parent, value, className) { text(parent, 'p', typeof value === 'string' ? value : value.message || value.reason || JSON.stringify(value), className); }
-    function showError(error) { $('assistant-error').hidden = false; $('assistant-error').textContent = error.message || String(error); }
+    function clearError(onlyTransient = false) { if (onlyTransient && !transientError) return; $('assistant-error').hidden = true; $('assistant-error').textContent = ''; transientError = false; }
+    function showError(error) { const message = error.message || String(error); transientError = /failed to fetch|network|load failed|连接|网络/i.test(message); $('assistant-error').hidden = false; $('assistant-error').textContent = transientError ? '网络连接暂时中断，已保留输入和会话。请刷新状态或稍后重试。' : message; }
     function controls() {
       const s = client.session, running = activeJob(s), disabled = !authorized || busy;
       $('assistant').setAttribute('aria-busy', String(busy));
       ['new-session', 'session-history'].forEach(id => { $(id).disabled = disabled; });
       ['delete-session', 'refresh-session'].forEach(id => { $(id).disabled = disabled || !s; });
       ['assistant-files', 'upload-files', 'assistant-message', 'send-message'].forEach(id => { $(id).disabled = disabled || !s || running; });
-      $('execute-plan').disabled = disabled || !s?.plan?.items?.length || running || Boolean(s.plan.blockers?.length) || s.plan.items.some(item => item.blockers?.length || item.questions?.some(question => question.blockers?.length)) || Boolean(s.receipt && s.job?.status === 'succeeded');
+      $('execute-plan').disabled = disabled || !s?.plan?.items?.length || running || Boolean(s.plan.blockers?.length) || s.plan.items.some(item => item.blockers?.length || item.questions?.some(question => question.blockers?.length)) || Boolean(s.receipt?.revision === s.revision && s.job?.status === 'succeeded');
       $('confirm-source-review').hidden = !s?.plan?.items?.some(item => item.questions?.some(question => question.metadata?.needsReview || question.needsReview));
       $('confirm-source-review').disabled = disabled || running;
       $('retry-job').hidden = !['failed', 'cancelled'].includes(s?.job?.status); $('retry-job').disabled = disabled;
       $('cancel-job').hidden = !running; $('cancel-job').disabled = disabled;
+    }
+    function jobLabel(s) {
+      if (!s?.job) return '当前为私有草稿，尚未执行。';
+      if (s.job.status === 'succeeded') return s.job.kind === 'message' && s.receipt?.revision !== s.revision ? (s.plan?.items?.length ? '预览已更新，请核对内容。' : '助手已回复，尚未生成方案。') : '执行已完成，请核对实际回执。';
+      return { queued: '任务排队中', running: '正在处理', failed: '任务失败，可重试未完成步骤', cancelled: '后续步骤已取消，已提交内容不会撤销' }[s.job.status] || s.job.status;
+    }
+    function readable(value) {
+      if (value == null) return '';
+      if (Array.isArray(value)) return value.map(readable).filter(Boolean).join('、');
+      if (typeof value === 'object') return value.text || value.title || value.name?.zh || value.name || value.label || value.content || value.term || '';
+      return String(value);
     }
     function render() {
       const s = client.session;
@@ -151,8 +164,7 @@
           if (view.open) loadSources();
         }
       }
-      const status = { queued: '任务排队中', running: '正在处理', succeeded: '任务已完成，请核对下方回执', failed: '任务失败，可重试未完成步骤', cancelled: '后续步骤已取消，已提交内容不会撤销' };
-      $('job-status').textContent = s.job ? status[s.job.status] || s.job.status : '当前为私有草稿，尚未执行。';
+      $('job-status').textContent = jobLabel(s);
       if (s.job?.error) issue($('plan-preview'), s.job.error, 'ta-blocker');
       const plan = s.plan;
       if (!plan?.items?.length) text($('plan-preview'), 'p', '上传文件并说明需求后，这里将展示可核对的方案。');
@@ -160,6 +172,7 @@
         const downloads = text($('plan-preview'), 'div', '', 'ta-downloads');
         link(downloads, '下载标准 JSON', BASE + '/sessions/' + encodeURIComponent(s.id) + '/export?format=json', true);
         link(downloads, '下载校验报告', BASE + '/sessions/' + encodeURIComponent(s.id) + '/export?format=report', true);
+        text($('plan-preview'), 'p', s.receipt?.revision === s.revision && s.receipt?.items?.some(entry => entry.releaseId) ? '已发布 · 请通过回执入口核对学习内容' : s.receipt?.revision === s.revision && s.receipt?.items?.some(entry => entry.bankId || entry.paperId || entry.status === 'succeeded') ? '已导入 · 尚未发布给学员' : plan.settings?.publish ? '待发布方案 · 确认执行后发布' : '私有草稿 · 尚未发布', 'ta-publication-state');
         text($('plan-preview'), 'h3', '方案版本 ' + s.revision); if (plan.summary) text($('plan-preview'), 'p', plan.summary);
         const settings = text($('plan-preview'), 'dl', '', 'ta-settings');
         const labels = { nameSuffix: '名称要求', accessLevel: '收费范围', allowedRoles: '开放对象', enabledModes: '学习模式', duplicatePolicy: '重复处理' };
@@ -172,8 +185,22 @@
           if (upload) link(el, '对照原件', upload.downloadUrl || BASE + '/uploads/' + encodeURIComponent(upload.id) + '/file');
           (item.warnings || []).forEach(v => issue(el, v, 'ta-warning')); (item.blockers || []).forEach(v => issue(el, v, 'ta-blocker'));
           for (const [index, question] of (item.questions || []).entries()) {
-            const detail = text(el, 'details', '', 'ta-question'); text(detail, 'summary', (index + 1) + '. ' + (question.stem || question.title || question.question || '题目') + ' [' + (question.type || question.questionType || '题型待核对') + ']');
-            for (const [key, label] of [['stemParts', '题干内容'], ['options', '选项'], ['answer', '答案'], ['answers', '答案'], ['correctAnswer', '正确答案'], ['correctOptionIds', '正确选项'], ['explanation', '解析'], ['analysis', '解析'], ['clues', '联想词'], ['concepts', '原则'], ['reasoning', '推理'], ['reasoningSteps', '推理步骤'], ['metadata', '来源与关联元数据'], ['source', '来源定位'], ['provenance', '内容来源'], ['aiAdditions', 'AI 补充（待核对）']]) if (question[key] != null) text(detail, 'pre', label + '：' + (typeof question[key] === 'object' ? JSON.stringify(question[key], null, 2) : question[key]));
+            const detail = text(el, 'details', '', 'ta-question');
+            const type = { single_choice: '单选', multiple_choice: '多选', single: '单选', multiple: '多选', matching: '匹配', short_answer: '简答' }[question.type || question.questionType] || question.type || '题型待核对';
+            const stem = question.stem || question.title || question.question || readable(question.stemParts) || '题目';
+            text(detail, 'summary', (index + 1) + '. ' + stem + ' [' + type + ']');
+            if (question.stemParts) text(detail, 'p', readable(question.stemParts));
+            const options = Array.isArray(question.options) ? question.options : Object.entries(question.options || {}).map(([id, value]) => ({ id, text: readable(value) }));
+            const answers = question.correctOptionIds || question.answer || question.answers || question.correctAnswer;
+            const answerIds = Array.isArray(answers) ? answers.map(String) : answers == null ? [] : [String(answers)];
+            const optionLabels = new Map();
+            options.forEach((option, position) => { const label = option.label || String.fromCharCode(65 + position); optionLabels.set(String(option.id), label); text(detail, 'p', label + '. ' + readable(option) + (option.correct || answerIds.includes(String(option.id)) ? ' ✓ 正确选项' : ''), 'ta-option'); });
+            if (answers != null) text(detail, 'p', '答案：' + (answerIds.length ? answerIds.map(value => optionLabels.get(value) || value).join('、') : readable(answers)), 'ta-answer');
+            for (const [key, label] of [['explanation', '解析'], ['analysis', '解析'], ['clues', '联想词'], ['concepts', '原则'], ['reasoning', '推理'], ['reasoningSteps', '推理步骤'], ['aiAdditions', 'AI 补充（待核对）']]) if (question[key] != null) text(detail, 'p', label + '：' + readable(question[key]));
+            const location = question.source?.location || question.metadata?.sourceLocation;
+            if (location) text(detail, 'p', '来源：' + location);
+            if (upload) link(detail, '核对来源原件', upload.downloadUrl || BASE + '/uploads/' + encodeURIComponent(upload.id) + '/file');
+            if (question.metadata || question.provenance || question.source) { const advanced = text(detail, 'details', '', 'ta-provenance'); text(advanced, 'summary', '详细来源信息'); text(advanced, 'pre', { source: question.source, provenance: question.provenance, metadata: question.metadata }); }
             (question.warnings || []).forEach(v => issue(detail, v, 'ta-warning')); (question.blockers || []).forEach(v => issue(detail, v, 'ta-blocker'));
           }
           for (const principle of item.principles || item.principleBundle?.principles || []) text(el, 'pre', principle);
@@ -183,10 +210,10 @@
         }
       }
       if (s.receipt) {
-        const receipt = $('execution-receipt'); text(receipt, 'h3', '服务器操作回执');
+        const receipt = $('execution-receipt'); text(receipt, 'h3', s.receipt.revision === s.revision ? '本次执行回执' : '上一版本执行回执（当前方案尚未执行）');
         // Keep all actual result fields visible, including partial failures and stable content IDs.
         text(receipt, 'pre', JSON.stringify(s.receipt, null, 2));
-        const walk = value => { if (!value || typeof value !== 'object') return; for (const [key, child] of Object.entries(value)) { if (typeof child === 'string' && /url|href/i.test(key)) link(receipt, /download/i.test(key) ? '下载结果 / 校验报告' : '打开结果', child); else if (typeof child === 'object') walk(child); } }; walk(s.receipt);
+        const walk = value => { if (!value || typeof value !== 'object') return; for (const [key, child] of Object.entries(value)) { if (typeof child === 'string' && /url|href/i.test(key)) link(receipt, value.label || value.text || (/download/i.test(key) ? '下载结果 / 校验报告' : '打开结果'), child); else if (typeof child === 'object') walk(child); } }; walk(s.receipt);
       }
       controls();
     }
@@ -198,12 +225,12 @@
       global.clearTimeout(pollTimer);
       if (!activeJob(client.session)) return;
       const id = client.session.id, token = epoch;
-      pollTimer = global.setTimeout(async () => { if (busy || token !== epoch) { schedule(); return; } try { await client.load(id); if (token === epoch) { render(); schedule(); } } catch (error) { showError(error); controls(); } }, 1800);
+      pollTimer = global.setTimeout(async () => { if (busy || token !== epoch) { schedule(); return; } try { const status = await client.status(id); clearError(true); if (token !== epoch) return; if (status.revision !== client.session.revision || !activeJob({ job: status.job })) { await client.load(id); render(); } else { client.session.job = status.job; $('job-status').textContent = jobLabel(client.session); controls(); } schedule(); } catch (error) { showError(error); controls(); if (transientError) schedule(); } }, 1800);
     }
     async function action(fn, refreshHistory = false) {
       if (busy || !authorized) return;
-      busy = true; $('assistant-error').hidden = true; controls();
-      try { await fn(); if (refreshHistory) await history(); }
+      busy = true; clearError(); controls();
+      try { await fn(); if (refreshHistory) await history(); clearError(); }
       catch (error) { showError(error); }
       finally { busy = false; render(); schedule(); }
     }

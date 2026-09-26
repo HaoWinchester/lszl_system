@@ -157,3 +157,22 @@ def test_office_ocr_errors_and_limits(tmp_path, monkeypatch, extension):
     monkeypatch.setattr(parser, 'MAX_IMAGES', 0)
     with pytest.raises(DocumentError, match='图片超过'):
         extract_document(path, path.name, tmp_path / 'out3')
+
+
+def test_hybrid_pdf_header_and_scanned_question(tmp_path):
+    import shutil,subprocess
+    if not all(shutil.which(c) for c in ('pdfinfo','pdftotext','pdftoppm','tesseract')): pytest.skip('tools unavailable')
+    if not all(v in subprocess.run(['tesseract','--list-langs'],capture_output=True,text=True).stdout.split() for v in ('chi_sim','eng')): pytest.skip('OCR languages unavailable')
+    from PIL import Image,ImageDraw,ImageFont
+    image=Image.new('RGB',(1000,500),'white')
+    fonts=[Path('/System/Library/Fonts/Supplemental/Arial.ttf'),Path('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf')]
+    font=ImageFont.truetype(str(next(p for p in fonts if p.exists())),60)
+    ImageDraw.Draw(image).text((80,160),'Question B 789',font=font,fill='black');picture=image.tobytes()
+    content=b'BT /F1 14 Tf 20 360 Td (Page 1) Tj ET\nq 500 0 0 250 0 40 cm /Im1 Do Q'
+    objects=[b'<< /Type /Catalog /Pages 2 0 R >>',b'<< /Type /Pages /Kids [3 0 R] /Count 1 >>',b'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 500 400] /Resources << /Font << /F1 4 0 R >> /XObject << /Im1 6 0 R >> >> /Contents 5 0 R >>',b'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',b'<< /Length '+str(len(content)).encode()+b' >>\nstream\n'+content+b'\nendstream',b'<< /Type /XObject /Subtype /Image /Width 1000 /Height 500 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Length '+str(len(picture)).encode()+b' >>\nstream\n'+picture+b'\nendstream']
+    document=b'%PDF-1.4\n';offsets=[0]
+    for i,obj in enumerate(objects,1): offsets.append(len(document));document+=str(i).encode()+b' 0 obj\n'+obj+b'\nendobj\n'
+    start=len(document);document+=b'xref\n0 7\n0000000000 65535 f \n'+b''.join(f'{o:010} 00000 n \n'.encode() for o in offsets[1:]);document+=b'trailer\n<< /Size 7 /Root 1 0 R >>\nstartxref\n'+str(start).encode()+b'\n%%EOF'
+    path=tmp_path/'hybrid.pdf';path.write_bytes(document);result=extract_document(path,path.name,tmp_path/'out')
+    assert 'Page 1' in result['sections'][0]['text'] and '789' in result['sections'][0]['text']
+    assert any('OCR' in warning for warning in result['warnings'])

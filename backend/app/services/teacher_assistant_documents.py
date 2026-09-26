@@ -203,6 +203,10 @@ def _pdf(path, output_dir):
     match = re.search(r'^Pages:\s+(\d+)', info, re.MULTILINE)
     if not match or not 0 < int(match.group(1)) <= MAX_PAGES:
         raise DocumentError('PDF 无法读取页数或超过 200 页；请拆分。')
+    image_pages = set()
+    if shutil.which('pdfimages'):
+        listing = _run(['pdfimages', '-list', str(path)])
+        image_pages = {int(value) for value in re.findall(r'^\s*(\d+)\s+\d+\s+(?:image|mask|smask)\s', listing, re.MULTILINE)}
     sections, warnings = [], []
     for page in range(1, int(match.group(1)) + 1):
         text = _run(['pdftotext', '-f', str(page), '-l', str(page), '-layout', str(path), '-']).strip()
@@ -211,11 +215,15 @@ def _pdf(path, output_dir):
         image = prefix.with_suffix('.png')
         if sum(item.stat().st_size for item in output_dir.glob('page-*.png')) > MAX_EXPANDED:
             raise DocumentError('PDF 页面图像超过 100 MiB；请拆分。')
-        if not text:
+        if not text or page in image_pages or len(re.sub(r"\s", "", text)) < 160:
             languages = _run(['tesseract', '--list-langs'])
             if not all(language in languages.split() for language in ('chi_sim', 'eng')):
                 raise DocumentError('扫描 PDF OCR 需要安装 tesseract chi_sim 和 eng 语言包。')
-            text = _run(['tesseract', str(image), 'stdout', '-l', 'chi_sim+eng'], timeout=90).strip()
+            recognized = _run(['tesseract', str(image), 'stdout', '-l', 'chi_sim+eng'], timeout=90).strip()
+            if not text:
+                text = recognized
+            elif recognized and recognized not in text:
+                text += '\n[页面图像 OCR，请核对与已有文本的重复]\n' + recognized
             warnings.append(f'第 {page} 页为 OCR 结果；文字、数字、答案、公式和表格必须核对。')
         sections.append({'location': f'第 {page} 页', 'text': text, 'images': [image.name]})
         if sum(len(section['text'].encode()) for section in sections) > MAX_TEXT:

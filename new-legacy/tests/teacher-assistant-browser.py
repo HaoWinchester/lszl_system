@@ -30,7 +30,7 @@ def run():
     threading.Thread(target=server.serve_forever, daemon=True).start()
     base = f'http://127.0.0.1:{server.server_port}'
     session = {'id': 'one', 'title': '习题课整理', 'revision': 1, 'messages': [], 'uploads': [], 'plan': None, 'job': None, 'receipt': None}
-    state = {'session': session, 'fail': False, 'role': 'teacher', 'calls': [], 'execute': 0, 'previewFail': True}
+    state = {'session': session, 'fail': False, 'role': 'teacher', 'calls': [], 'execute': 0, 'previewFail': True, 'statusFail': 0}
     Handler.export_state = state
     def api(route):
         request = route.request
@@ -48,6 +48,12 @@ def run():
         elif request.method == 'DELETE':
             state['session'] = None
             status = 204
+        elif url.endswith('/status'):
+            if state['statusFail']:
+                state['statusFail'] -= 1
+                route.abort('failed')
+                return
+            payload = {'revision': state['session']['revision'], 'job': state['session']['job']}
         elif url.endswith('/preview') and state['previewFail']:
             status, payload = 503, {'detail': '来源读取暂时失败'}
         elif url.endswith('/preview'):
@@ -83,7 +89,7 @@ def run():
             payload = {'session': state['session']}
         elif url.endswith('/retry'):
             state['session']['job']['status'] = 'succeeded'
-            state['session']['receipt'] = {'questionCount': 25, 'bankId': 'actual-bank', 'partialFailures': ['第二份材料待核对'], 'url': '/question-bank.html?bank=actual-bank', 'downloadUrl': '/api/v1/teacher-assistant/uploads/file/file'}
+            state['session']['receipt'] = {'revision': state['session']['revision'], 'questionCount': 25, 'bankId': 'actual-bank', 'partialFailures': ['第二份材料待核对'], 'url': '/question-bank.html?bank=actual-bank', 'downloadUrl': '/api/v1/teacher-assistant/uploads/file/file'}
             payload = {'session': state['session']}
         else:
             payload = {'session': state['session']}
@@ -130,8 +136,11 @@ def run():
                     page.locator('.ta-downloads a').nth(download_index).click()
                 assert download.value.suggested_filename.endswith('.json'), download.value.suggested_filename
                 assert json.loads(Path(download.value.path()).read_text())['settings']['duplicatePolicy'] == 'keep_copy'
-            page.locator('.ta-question summary').click()
+            page.locator('.ta-question > summary').click()
             expect(page.locator('.ta-question')).to_contain_text('保留关联')
+            expect(page.locator('.ta-question .ta-option').first).to_contain_text('A. 甲')
+            expect(page.locator('.ta-question .ta-answer')).to_contain_text('答案：A、B')
+            expect(page.locator('.ta-publication-state')).to_contain_text('私有草稿')
             expect(page.locator('.ta-question')).to_contain_text('AI 补充')
             assert page.locator('#plan-preview script').count() == 0
             expect(page.locator('#confirm-source-review')).to_be_visible()
@@ -148,6 +157,14 @@ def run():
             page.locator('#execute-plan').click()
             expect(page.locator('#cancel-job')).to_be_visible()
             expect(page.locator('#send-message')).to_be_disabled()
+            detail_before = sum(call[1] == 'teacher-assistant/sessions/one' for call in state['calls'])
+            state['statusFail'] = 1
+            page.wait_for_timeout(2100)
+            expect(page.locator('#assistant-error')).to_contain_text('网络连接暂时中断')
+            page.wait_for_timeout(2100)
+            expect(page.locator('#assistant-error')).not_to_be_visible()
+            assert any(call[1].endswith('/status') for call in state['calls'])
+            assert sum(call[1] == 'teacher-assistant/sessions/one' for call in state['calls']) == detail_before
             page.locator('#cancel-job').click()
             expect(page.locator('#retry-job')).to_be_visible()
             page.locator('#retry-job').click()
@@ -157,6 +174,13 @@ def run():
             assert state['execute'] == 1
             page.reload()
             expect(page.locator('#execution-receipt')).to_contain_text('actual-bank')
+            state['session']['job'] = {'id': 'revision-job', 'kind': 'message', 'status': 'succeeded'}
+            state['session']['revision'] += 1
+            page.locator('#refresh-session').click()
+            expect(page.locator('#job-status')).to_contain_text('预览已更新')
+            expect(page.locator('#execute-plan')).to_be_enabled()
+            expect(page.locator('#execution-receipt')).to_contain_text('上一版本')
+            expect(page.locator('.ta-publication-state')).to_contain_text('私有草稿')
             page.set_viewport_size({'width': 390, 'height': 844})
             expect(page.locator('#preview-panel')).not_to_be_visible()
             page.locator('#tab-preview').click()
