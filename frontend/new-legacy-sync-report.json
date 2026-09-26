@@ -5,8 +5,7 @@
   "changes": {
     "added": [],
     "changed": [
-      "src/teacher/training-config/principle-preset-controller.js",
-      "tests/import-guards.test.js"
+      "src/65-question-bank-admin.js"
     ],
     "removed": []
   },

@@ -1667,8 +1667,9 @@
     $('qbPaperImportFile')?.addEventListener('change',event=>globalThis.KGImportGuard.run('paper-file-read',async()=>{if(paperImportController.snapshot().busy)return;paperImportFile=event.currentTarget.files?.[0]||null;if(!paperImportFile)return paperImportController.cancel();await paperImportController.load(paperImportFile.name,await paperImportFile.text())},['qbPaperImportFile','qbImportPaperBtn','qbPaperImportConfirmBtn','qbPaperImportPreflightBtn','qbPaperImportRetryBtn','qbPaperImportCancelBtn','qbPaperImportConflictAction']).catch(error=>toast(error?.message||'文件读取失败。')).finally(()=>renderPaperImportState(paperImportController.snapshot())));
     $('qbPaperImportConflictAction')?.addEventListener('change',event=>paperImportController.setConflictAction(event.currentTarget.value));
     $('qbPaperImportPreflightBtn')?.addEventListener('click',()=>{if(!globalThis.KGImportGuard.isBusy('paper-file-read'))void paperImportController.preflight()});
-    $('qbPaperImportRetryBtn')?.addEventListener('click',()=>paperImportController.retry());
-    $('qbPaperImportConfirmBtn')?.addEventListener('click',async()=>{if(globalThis.KGImportGuard.isBusy('paper-file-read'))return;const result=await paperImportController.confirm();if(result.ok){toast('试卷已导入，题目仍引用系统题库。');closePaperOperationDialog($('qbPaperImportDialog'))}});
+    const submitPaperImport=async(retry=false)=>{if(globalThis.KGImportGuard.isBusy('paper-file-read'))return;const result=await (retry?paperImportController.retry():paperImportController.confirm());if(result.ok&&result.result){toast('试卷已导入，题目仍引用系统题库。');closePaperOperationDialog($('qbPaperImportDialog'))}return result};
+    $('qbPaperImportRetryBtn')?.addEventListener('click',()=>submitPaperImport(true));
+    $('qbPaperImportConfirmBtn')?.addEventListener('click',()=>submitPaperImport());
     $('qbPaperImportCancelBtn')?.addEventListener('click',()=>{if(paperImportController.snapshot().busy||globalThis.KGImportGuard.isBusy('paper-file-read'))return;paperImportFile=null;paperImportController.cancel();closePaperOperationDialog($('qbPaperImportDialog'))});
   }
 
