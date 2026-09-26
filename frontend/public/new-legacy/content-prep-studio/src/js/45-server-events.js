@@ -144,11 +144,12 @@
   if(quickSaveButton)quickSaveButton.onclick=()=>saveDraftToServer();
   if(localSaveButton)localSaveButton.onclick=()=>saveDraftToServer();
 
-  async function syncWorkspaceToServer(){
+  function syncWorkspaceToServer(){
+    return KGImportGuard.run('prep-server-sync',async()=>{
     syncButton.disabled=true;setStatus('正在同步共享草稿到主程序…');setIssues(null);
     try{const result=await window.PMPPrepDraftUi.sync();setStatus(`已同步到主程序 · 批次 ${result.batchId}`,'good');return result}
     catch(error){setStatus(error.message||'同步失败，草稿已保留','bad');setIssues(error);throw error}
-    finally{refreshButtons()}
+    },[syncButton,bankSelect,sourceBankSelect]).finally(refreshButtons);
   }
   window.PMPPrepSyncWorkspace=syncWorkspaceToServer;
   function readTeachingResource(name,normalizer){

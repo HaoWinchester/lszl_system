@@ -224,7 +224,7 @@
   }
   function newPrinciple(){draftPrincipleId='principle-draft-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);activePrincipleId=draftPrincipleId;fillPrincipleEditor(draftPrincipleId);byId('tqPrincipleName')?.focus()}
   function selectedPrinciples(){return [...selectedPrincipleIds]}
-  function revisionConflictMessage(error,fallback){return error?.status===409||error?.detail?.code==='CONTENT_REVISION_CONFLICT'?'服务器内容已被其他教师更新，已重新载入，请确认后再试。':error?.message||fallback}
+  function revisionConflictMessage(error,fallback){if((error?.code||error?.detail?.code)==='IMPORT_IN_PROGRESS')return error?.message||'已有导入正在处理中，请等待完成后再试。';return error?.status===409||error?.detail?.code==='CONTENT_REVISION_CONFLICT'?'服务器内容已被其他教师更新，已重新载入，请确认后再试。':error?.message||fallback}
   async function applySelectedPresetStatus(){
     const ids=selectedPrinciples(),status=String(byId('tqBulkPresetStatus')?.value||'draft');
     if(!ids.length)return toast('请先勾选要修改的原则。');
@@ -233,8 +233,9 @@
   async function exportPrincipleCardBundle(){
     try{ensurePairedPresets();downloadPrincipleCardBundle(currentPrincipleCardBundle());toast('原则与归纳卡组合已导出。')}catch(error){toast('组合导出失败：'+(error?.message||error))}
   }
-  async function importPrincipleCardBundle(file){
-    if(!file)return;
+  function importPrincipleCardBundle(file){
+    if(!file)return Promise.resolve();
+    return global.KGImportGuard.run('principle-card-import',async()=>{
     try{
       const bundle=normalizePrincipleCardBundle(await readJsonFile(file));
       const payload={principleCardBundleVersion:1,format:'kg-principle-card-bundle-v1',...bundle};
@@ -242,6 +243,7 @@
       applyPrincipleCardBundle(result.principles&&result.synthesisPresets?result:payload);
       selectedPrincipleIds.clear();activePrincipleId=(result.principles?.items||payload.principles.items)[0]?.id||'';draftPrincipleId='';renderPrincipleList();toast(`已导入 ${payload.principles.items.length} 条原则与归纳卡。`);
     }catch(error){const counts=error?.detail?.referenceCounts||{},total=Object.values(counts).reduce((sum,value)=>sum+Number(value||0),0);toast(total?`导入会删除仍被 ${total} 道题引用的原则，请先重新绑定题目。`:revisionConflictMessage(error,'组合导入失败。'))}
+    },['tqImportPrincipleCardBundleBtn','tqImportPrincipleCardBundleFile']);
   }
   async function deleteSelectedPrinciples(){
     const ids=selectedPrinciples();if(!ids.length)return toast('请先勾选要删除的原则。');

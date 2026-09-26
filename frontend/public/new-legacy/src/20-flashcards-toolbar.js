@@ -46,6 +46,7 @@ function applyImportedFile(fileRecord){
   return true;
 }
 async function importLearningPackageFile(file){
+  return globalThis.KGImportGuard.run("20-flashcards-toolbar.js:importLearningPackageFile",async()=>{
   const data=await parseLearningPackageFile(file);
   if(!data||typeof data!=='object'||!Array.isArray(data.nodes)||!Array.isArray(data.links))throw new Error('格式不正确');
   const clean=sanitizeState(data);
@@ -74,6 +75,8 @@ async function importLearningPackageFile(file){
   render({persist:true});
   showStatus('学习包导入成功，已自动过滤无效节点、关系和颜色值。');
   return clean;
+
+  },["importFile", "importBtn"]);
 }
 
 function addAtCenter(){const r=stage.getBoundingClientRect(),p=screenToWorld(r.left+r.width/2,r.top+r.height/2);createNodeAt(p.x,p.y)}
@@ -574,11 +577,14 @@ function parseDelimitedRows(text,delimiter=','){
 }
 function normHeader(s){return String(s||'').toLowerCase().replace(/\s+/g,'').replace(/[＊*：:]/g,'')}
 async function importFlashcardFile(file){
+  return globalThis.KGImportGuard.run("20-flashcards-toolbar.js:importFlashcardFile",async()=>{
   const content=await file.text();
   const cards=parseFlashTable(content,file.name);
   if(!cards.length)throw new Error('未读取到有效闪卡数据。');
   state.importedFlashcards=[...(state.importedFlashcards||[]),...cards];
   flashMode='imported';flashDueOnly=false;currentFlashIndex=0;save();renderFlashcards();showStatus(`已导入 ${cards.length} 张记忆闪卡。`);
+
+  },["flashImportFile", "flashImportBtn"]);
 }
 function downloadFlashcardTemplate(){
   const rows=[

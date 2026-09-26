@@ -554,6 +554,7 @@
     exportUsersPayload(users,selectedOnly?`用户_${state.selected}`:'用户管理_全部用户',selectedOnly?'导出当前用户':'导出全部用户',selectedOnly?state.selected:'ALL');
   }
   async function importUsers(file){
+    return globalThis.KGImportGuard.run("35-user-management.js:importUsers",async()=>{
     if(!file)return;
     try{
       const payload=JSON.parse(await file.text());
@@ -571,6 +572,8 @@
     }finally{
       $('umImportFile').value='';
     }
+
+    },["umImportFile", "umImportBtn"]);
   }
   function bindEvents(){
     $('umAddUserBtn').onclick=addUser;$('umRefreshBtn').onclick=async()=>{if(await loadUsers()){render();toast('已刷新')}};$('umUserForm').addEventListener('submit',saveSelected);$('umResetPasswordBtn').onclick=resetPassword;$('umArchiveUserBtn').onclick=()=>setStatus('archived');$('umRestoreUserBtn').onclick=()=>setStatus('active');$('umDeleteUserBtn').onclick=deleteUser;$('umSetActiveBtn').onclick=()=>setStatus('active');$('umSetPausedBtn').onclick=()=>setStatus('paused');$('umDuplicateUserBtn').onclick=duplicateUser;$('umExportBtn').onclick=()=>exportData(false);$('umExportSelectedBtn').onclick=()=>exportData(true);$('umImportBtn').onclick=()=>$('umImportFile').click();$('umImportFile').onchange=e=>importUsers(e.target.files&&e.target.files[0]);$('umClearLogsBtn').onclick=async()=>{if(confirm('确认清空操作日志？')){try{await window.KGSystemDomain?.clearAdminLogs?.();renderLogs();toast('日志已清空')}catch(error){toast(error?.message||'日志清空失败')}}};

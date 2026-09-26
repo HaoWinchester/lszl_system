@@ -824,6 +824,7 @@
     try{packages.downloadPackage(file.graphData,{filename:packages.safeFileBase(file.name)+'-学习包.zip'});toast('学习包已开始下载。')}catch(err){toast('导出失败：'+err.message,'error')}
   }
   async function importFiles(fileList){
+    return globalThis.KGImportGuard.run("27-graph-file-manager.js:importFiles",async()=>{
     if(state.busy)return;
     if(!requireEdit('登录后才能导入图谱文件。'))return;
     const files=[...fileList||[]];if(!files.length)return;
@@ -847,6 +848,8 @@
     state.view='files';state.filter='all';state.query='';$('fmSearchInput').value='';await refreshData({skipStoreRefresh:true});
     if(success)toast(`成功导入 ${success} 个图谱文件。`);
     if(errors.length)toast(errors.slice(0,3).join('\n')+(errors.length>3?`\n另有 ${errors.length-3} 个错误。`:''),'error',6500);
+
+    },["fmFileInput", "fmImportBtn"]);
   }
 
 

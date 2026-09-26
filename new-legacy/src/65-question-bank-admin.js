@@ -1202,7 +1202,12 @@
     $('qbRecallLibraryText').value=api.toText(api.read(bank.subject));state.recallLibraryPreview=null;parseRecallLibrary(false);refreshRecallNodeSelector();
   }
   function importRecallLibraryFile(file){
-    if(!file)return;const reader=new FileReader();reader.onload=()=>{$('qbRecallLibraryText').value=String(reader.result||'').replace(/^\ufeff/,'');parseRecallLibrary(false);$('qbRecallLibraryFile').value=''};reader.onerror=()=>toast('读取联想库文件失败。');reader.readAsText(file,'utf-8');
+    if(!file)return Promise.resolve();
+    return globalThis.KGImportGuard.run('teacher-recall-file',async()=>{
+      try{$('qbRecallLibraryText').value=String(await file.text()).replace(/^\ufeff/,'');await parseRecallLibrary(false)}
+      catch(error){toast('读取联想库文件失败。')}
+      finally{$('qbRecallLibraryFile').value=''}
+    },['qbRecallLibraryFile','qbImportRecallLibraryBtn']);
   }
 
   function recallStudioLibrary(){const api=recallLibraryApi(),bank=currentBank();return api&&bank?api.read(bank.subject):null}
@@ -1605,6 +1610,7 @@
   function findingRows(items,type){return (items||[]).map(item=>`<li class="${type}">${escapeHTML(item?.message||String(item||''))}</li>`).join('')}
   let questionBankImportController=null,questionBankImportFiles=[];
   function renderQuestionBankImportState(snapshot){
+    ['qbBankImportFile','qbImportBankBtn','qbBankImportCancelBtn'].forEach(id=>{if($(id))$(id).disabled=snapshot.busy});
     const results=$('qbBankImportResults'),fileName=$('qbBankImportFileName');
     if(fileName)fileName.textContent=snapshot.fileCount?`已选择 ${Number(snapshot.fileCount)} 个文件：${(snapshot.fileNames||[]).join('、')}`:'尚未选择文件。';
     if(results){
@@ -1631,15 +1637,16 @@
       }
     });
     renderQuestionBankImportState(questionBankImportController.snapshot());
-    const submitQuestionBankImport=async()=>{const result=await questionBankImportController.confirm();if(result.ok){toast('题库已通过 API 导入，可用于组卷。');closePaperOperationDialog($('qbBankImportDialog'))}return result};
-    $('qbImportBankBtn')?.addEventListener('click',()=>{questionBankImportFiles=[];questionBankImportController.cancel();if($('qbBankImportFile'))$('qbBankImportFile').value='';openPaperOperationDialog($('qbBankImportDialog'))});
-    $('qbBankImportFile')?.addEventListener('change',async event=>{questionBankImportFiles=Array.from(event.currentTarget.files||[]);if(!questionBankImportFiles.length)return questionBankImportController.cancel();const files=await Promise.all(questionBankImportFiles.map(async file=>({name:file.name,text:await file.text()})));await questionBankImportController.loadFiles(files)});
+    const submitQuestionBankImport=async()=>{if(globalThis.KGImportGuard.isBusy('bank-file-read'))return {ok:false};const result=await questionBankImportController.confirm();if(result.ok){toast('题库已通过 API 导入，可用于组卷。');closePaperOperationDialog($('qbBankImportDialog'))}return result};
+    $('qbImportBankBtn')?.addEventListener('click',()=>{if(questionBankImportController.snapshot().busy||globalThis.KGImportGuard.isBusy('bank-file-read'))return;questionBankImportFiles=[];questionBankImportController.cancel();if($('qbBankImportFile'))$('qbBankImportFile').value='';openPaperOperationDialog($('qbBankImportDialog'))});
+    $('qbBankImportFile')?.addEventListener('change',event=>globalThis.KGImportGuard.run('bank-file-read',async()=>{if(questionBankImportController.snapshot().busy)return;questionBankImportFiles=Array.from(event.currentTarget.files||[]);if(!questionBankImportFiles.length)return questionBankImportController.cancel();const files=await Promise.all(questionBankImportFiles.map(async file=>({name:file.name,text:await file.text()})));await questionBankImportController.loadFiles(files)},['qbBankImportFile','qbImportBankBtn','qbBankImportConfirmBtn','qbBankImportCancelBtn']).catch(error=>toast(error?.message||'文件读取失败。')).finally(()=>renderQuestionBankImportState(questionBankImportController.snapshot())));
     $('qbBankImportConfirmBtn')?.addEventListener('click',submitQuestionBankImport);
     $('qbBankImportRetryBtn')?.addEventListener('click',submitQuestionBankImport);
-    $('qbBankImportCancelBtn')?.addEventListener('click',()=>{questionBankImportFiles=[];questionBankImportController.cancel();closePaperOperationDialog($('qbBankImportDialog'))});
+    $('qbBankImportCancelBtn')?.addEventListener('click',()=>{if(questionBankImportController.snapshot().busy||globalThis.KGImportGuard.isBusy('bank-file-read'))return;questionBankImportFiles=[];questionBankImportController.cancel();closePaperOperationDialog($('qbBankImportDialog'))});
   }
   let paperImportController=null,paperImportFile=null;
   function renderPaperImportState(snapshot){
+    ['qbPaperImportFile','qbImportPaperBtn','qbPaperImportCancelBtn','qbPaperImportConflictAction'].forEach(id=>{if($(id))$(id).disabled=snapshot.busy});
     const results=$('qbPaperImportResults'),fileName=$('qbPaperImportFileName'),action=$('qbPaperImportConflictAction'),preflight=snapshot.preflight,allowed=preflight?.allowedActions||{};
     if(fileName)fileName.textContent=snapshot.fileName?`已选择：${snapshot.fileName}`:'尚未选择文件。';
     if(action){Array.from(action.options).forEach(option=>{const key=option.value==='replace_draft'?'replaceDraft':option.value;option.disabled=!!preflight&&!allowed[key]});action.value=snapshot.conflictAction}
@@ -1651,18 +1658,18 @@
       else results.innerHTML='<div class="qb-empty">选择 JSON 后将显示包内名称、题量、题库引用、缺失项和冲突信息。</div>';
     }
     const actionKey=snapshot.conflictAction==='replace_draft'?'replaceDraft':snapshot.conflictAction,canConfirm=!!preflight?.valid&&!!allowed[actionKey]&&!snapshot.busy;
-    if($('qbPaperImportConfirmBtn'))$('qbPaperImportConfirmBtn').disabled=!canConfirm;if($('qbPaperImportPreflightBtn'))$('qbPaperImportPreflightBtn').disabled=!snapshot.packageData||snapshot.busy;if($('qbPaperImportRetryBtn')){$('qbPaperImportRetryBtn').hidden=!snapshot.error;$('qbPaperImportRetryBtn').disabled=snapshot.busy}
+    if($('qbPaperImportConfirmBtn'))$('qbPaperImportConfirmBtn').disabled=!canConfirm;if($('qbPaperImportPreflightBtn'))$('qbPaperImportPreflightBtn').disabled=!snapshot.packageData||snapshot.busy;if($('qbPaperImportRetryBtn')){$('qbPaperImportRetryBtn').textContent=snapshot.retryImport?'重试导入':'重试预检';$('qbPaperImportRetryBtn').hidden=!snapshot.error;$('qbPaperImportRetryBtn').disabled=snapshot.busy}
   }
   function initPaperImportControls(){
     const factory=TeacherDomains.PaperManagement?.PaperImportController;if(!factory?.create)return;
     paperImportController=factory.create({api:PaperDraftApi,onChange:renderPaperImportState,onReload:result=>reloadPaperDrafts({selectedId:result?.paper?.id})});renderPaperImportState(paperImportController.snapshot());
-    $('qbImportPaperBtn')?.addEventListener('click',()=>{paperImportFile=null;paperImportController.cancel();if($('qbPaperImportFile'))$('qbPaperImportFile').value='';openPaperOperationDialog($('qbPaperImportDialog'))});
-    $('qbPaperImportFile')?.addEventListener('change',async event=>{paperImportFile=event.currentTarget.files?.[0]||null;if(!paperImportFile)return paperImportController.cancel();await paperImportController.load(paperImportFile.name,await paperImportFile.text())});
+    $('qbImportPaperBtn')?.addEventListener('click',()=>{if(paperImportController.snapshot().busy||globalThis.KGImportGuard.isBusy('paper-file-read'))return;paperImportFile=null;paperImportController.cancel();if($('qbPaperImportFile'))$('qbPaperImportFile').value='';openPaperOperationDialog($('qbPaperImportDialog'))});
+    $('qbPaperImportFile')?.addEventListener('change',event=>globalThis.KGImportGuard.run('paper-file-read',async()=>{if(paperImportController.snapshot().busy)return;paperImportFile=event.currentTarget.files?.[0]||null;if(!paperImportFile)return paperImportController.cancel();await paperImportController.load(paperImportFile.name,await paperImportFile.text())},['qbPaperImportFile','qbImportPaperBtn','qbPaperImportConfirmBtn','qbPaperImportPreflightBtn','qbPaperImportRetryBtn','qbPaperImportCancelBtn','qbPaperImportConflictAction']).catch(error=>toast(error?.message||'文件读取失败。')).finally(()=>renderPaperImportState(paperImportController.snapshot())));
     $('qbPaperImportConflictAction')?.addEventListener('change',event=>paperImportController.setConflictAction(event.currentTarget.value));
-    $('qbPaperImportPreflightBtn')?.addEventListener('click',async()=>{if(paperImportController.snapshot().packageData)await paperImportController.preflight();else if(paperImportFile)await paperImportController.load(paperImportFile.name,await paperImportFile.text())});
+    $('qbPaperImportPreflightBtn')?.addEventListener('click',()=>{if(!globalThis.KGImportGuard.isBusy('paper-file-read'))void paperImportController.preflight()});
     $('qbPaperImportRetryBtn')?.addEventListener('click',()=>paperImportController.retry());
-    $('qbPaperImportConfirmBtn')?.addEventListener('click',async()=>{const result=await paperImportController.confirm();if(result.ok){toast('试卷已导入，题目仍引用系统题库。');closePaperOperationDialog($('qbPaperImportDialog'))}});
-    $('qbPaperImportCancelBtn')?.addEventListener('click',()=>{paperImportFile=null;paperImportController.cancel();closePaperOperationDialog($('qbPaperImportDialog'))});
+    $('qbPaperImportConfirmBtn')?.addEventListener('click',async()=>{if(globalThis.KGImportGuard.isBusy('paper-file-read'))return;const result=await paperImportController.confirm();if(result.ok){toast('试卷已导入，题目仍引用系统题库。');closePaperOperationDialog($('qbPaperImportDialog'))}});
+    $('qbPaperImportCancelBtn')?.addEventListener('click',()=>{if(paperImportController.snapshot().busy||globalThis.KGImportGuard.isBusy('paper-file-read'))return;paperImportFile=null;paperImportController.cancel();closePaperOperationDialog($('qbPaperImportDialog'))});
   }
 
   let paperCompositionController=null;
@@ -4635,17 +4642,12 @@
     }
   }
   function importJson(file){
-    if(!file)return;
-    const reader=new FileReader();
-    reader.onload=async()=>{
-      try{
-        const raw=String(reader.result||'').replace(/^\ufeff/,'');
-        await importQuestionBanks(JSON.parse(raw));
-      }catch(error){
-        alert('导入未提交：'+(error?.message||error));
-      }finally{$('qbImportFile').value=''};
-    };
-    reader.readAsText(file,'utf-8');
+    if(!file)return Promise.resolve();
+    return globalThis.KGImportGuard.run('legacy-bank-file',async()=>{
+      try{await importQuestionBanks(JSON.parse(String(await file.text()).replace(/^\ufeff/,'')))}
+      catch(error){alert('导入未提交：'+(error?.message||error))}
+      finally{$('qbImportFile').value=''}
+    },['qbImportFile','qbImportBtn']);
   }
   function downloadJson(filename, obj){
     const blob = new Blob([JSON.stringify(obj, null, 2)], {type:'application/json;charset=utf-8'});

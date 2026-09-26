@@ -47,6 +47,7 @@
     return parsed;
   }
   async function saveCurrent(){
+    return globalThis.KGImportGuard.run("96-recall-association-admin.js:saveCurrent",async()=>{
     const libraryApi=api(),text=$('ccRecallLibraryText');if(!libraryApi||!text)return;
     const subject=currentSubject(),mode=$('ccRecallLibraryMode')?.value||'merge';
     const parsed=parseCurrent();if(!parsed?.valid)return;
@@ -64,8 +65,11 @@
       report(conflict?'保存冲突':'保存失败',conflict?'服务器内容已被其他人更新，请重新载入后再保存。':`${candidate.nodes.length} 个知识点 · ${candidate.edges.length} 条关系 · 服务器保存失败：${escapeHTML(error?.message||'未知错误')}`,'error');
       toast('服务器同步失败，学员端尚未生效。');
     }
+
+    },["ccRecallLibrarySaveBtn", "ccRecallLibraryFile", "ccRecallLibraryImportBtn"]);
   }
   async function importFile(file){
+    return globalThis.KGImportGuard.run("96-recall-association-admin.js:importFile",async()=>{
     if(!file)return;const input=$('ccRecallLibraryFile');
     try{
       const raw=String(await file.text()).replace(/^\ufeff/,'');
@@ -80,6 +84,8 @@
       toast('文件已载入，请检查后保存。');
     }catch(error){report('导入失败',error.message||String(error),'error')}
     finally{if(input)input.value=''}
+
+    },["ccRecallLibraryFile", "ccRecallLibraryImportBtn"]);
   }
   async function handleSubjectChange(){
     const next=currentSubject();
