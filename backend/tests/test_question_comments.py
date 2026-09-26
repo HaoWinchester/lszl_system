@@ -60,6 +60,7 @@ async def _seed(ids: dict[str, str]) -> None:
                 id=ids["bank"],
                 owner_id=ids["teacher"],
                 name="评论测试题库",
+                visibility="published",
             )
         )
         await db.flush()
@@ -68,12 +69,12 @@ async def _seed(ids: dict[str, str]) -> None:
                 id=ids["question"],
                 bank_id=ids["bank"],
                 title="评论测试题",
-                scope="internal",
+                scope="public",
             ), Question(
                 id=ids["other_question"],
                 bank_id=ids["bank"],
                 title="另一道评论测试题",
-                scope="internal",
+                scope="public",
             )]
         )
         await db.commit()
@@ -331,5 +332,61 @@ def test_deleting_question_cascades_comments_and_likes() -> None:
                 return len(comments), len(likes)
 
         assert asyncio.run(delete_question_and_count_children()) == (0, 0)
+    finally:
+        _cleanup(ids)
+
+
+def test_favorites_replies_paging_and_access():
+    ids = _ids()
+    asyncio.run(_seed(ids))
+    try:
+        with TestClient(app) as client:
+            _login(client, ids['student'])
+            url = _comments_url(ids)
+            comment = client.post(url, json={'content': '收藏与回复'}).json()['comment']
+            target = f"{url}/{comment['id']}/favorite"
+            assert client.put(target).status_code == 200
+            assert client.put(target).status_code == 200
+            assert len(client.get('/api/v1/question-comments/favorites').json()['comments']) == 1
+            assert client.get(url).json()['comments'][0]['myFavorite'] is True
+            with TestClient(app) as other:
+                _login(other, ids['other'])
+                assert other.get('/api/v1/question-comments/favorites').json()['comments'] == []
+            reply = client.post(url, json={'content': '回复', 'parentId': comment['id']})
+            assert reply.status_code == 201
+            assert reply.json()['comment']['parentId'] == comment['id']
+            wrong = client.post(f"/api/v1/questions/{ids['other_question']}/comments", json={'content': '跨题回复', 'parentId': comment['id']})
+            assert wrong.status_code == 422
+            first = client.get(url+'?limit=1').json()
+            assert len(first['comments']) == 1 and first['nextCursor']
+            second = client.get(url+'?limit=1&cursor='+first['nextCursor']).json()
+            assert second['comments'][0]['id'] != first['comments'][0]['id']
+            assert client.get(url+'?cursor=bad').status_code == 422
+            assert client.delete(target).status_code == 200
+            assert client.get('/api/v1/question-comments/favorites').json()['comments'] == []
+    finally:
+        _cleanup(ids)
+
+
+def test_discussion_denies_private_question_and_hidden_reply():
+    ids = _ids()
+    asyncio.run(_seed(ids))
+    try:
+        with TestClient(app) as client:
+            _login(client, ids['student'])
+            url=_comments_url(ids)
+            comment=client.post(url,json={'content':'父留言'}).json()['comment']
+            client.delete(f"{url}/{comment['id']}")
+            assert client.post(url,json={'content':'回复已删', 'parentId':comment['id']}).status_code==422
+            async def make_private():
+                async with AsyncSessionLocal() as db:
+                    question=await db.get(Question,ids['question'])
+                    question.scope='internal'
+                    await db.commit()
+            asyncio.run(make_private())
+            assert client.get(url).status_code==403
+            assert client.post(url,json={'content':'绕过题目权限'}).status_code==403
+            assert client.put(f"{url}/{comment['id']}/favorite").status_code==403
+            assert client.get('/api/v1/question-comments/counts?ids='+ids['question']).json()['counts']=={}
     finally:
         _cleanup(ids)
