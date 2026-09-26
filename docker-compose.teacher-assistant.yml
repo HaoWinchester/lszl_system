@@ -9,8 +9,8 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile.teacher-assistant
-      additional_contexts:
-        backend-runtime: service:backend
+      args:
+        BACKEND_RUNTIME: ${BACKEND_RUNTIME:-lszl-kg-backend:uat-27c39ab}
     image: lszl-teacher-assistant:uat
     restart: unless-stopped
     env_file:

@@ -169,6 +169,8 @@ rsync -az --delete --stats \
 deployment_timing_stage image-restart
 echo "[4/9] 重建 UAT 后端镜像并重启（alembic 迁移自动执行）"
 check_mini_config
+# Build the runtime tag first: Compose 2.28 cannot resolve service build contexts here.
+ssh "$REMOTE" "cd $REMOTE_DIR && docker compose -p $PROJECT $COMPOSE_ARGS --env-file $ENV_FILE build backend"
 ssh "$REMOTE" "cd $REMOTE_DIR && docker compose -p $PROJECT $COMPOSE_ARGS --env-file $ENV_FILE up -d --build"
 
 deployment_timing_stage health
