@@ -21,13 +21,13 @@ services:
       - teacher-assistant-files:/var/lib/teacher-assistant
       - /usr/lib/node_modules/@anthropic-ai/claude-code/bin/claude.exe:/usr/local/bin/claude:ro
     networks: [default, converter]
-    mem_limit: 1536m
+    mem_limit: 640m
     cpus: 1.0
     pids_limit: 100
     init: true
     read_only: true
     tmpfs:
-      - /tmp:size=256m,uid=10001,gid=10001
+      - /tmp:size=128m,uid=10001,gid=10001
       - /home/assistant:size=32m,uid=10001,gid=10001
     security_opt: [no-new-privileges:true]
     cap_drop: [ALL]
@@ -37,13 +37,13 @@ services:
     restart: unless-stopped
     command: [uvicorn, app.worker.document_converter:app, --host, 0.0.0.0, --port, '8090']
     networks: [converter]
-    mem_limit: 768m
+    mem_limit: 384m
     cpus: 0.75
     pids_limit: 80
     init: true
     read_only: true
     tmpfs:
-      - /tmp:size=192m,uid=10001,gid=10001
+      - /tmp:size=96m,uid=10001,gid=10001
       - /home/assistant:size=16m,uid=10001,gid=10001
     security_opt: [no-new-privileges:true]
     cap_drop: [ALL]

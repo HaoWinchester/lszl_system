@@ -14,3 +14,6 @@ def test_cli_is_explicit_package_model_and_has_no_host_tools():
     assert args[args.index('--tools')+1]==''
     assert '--bare' in args and '--no-session-persistence' in args
     assert '--dangerously-skip-permissions' not in args
+    args=command('仅提取原文，不修改答案')
+    assert args[args.index('--system-prompt')+1]=='仅提取原文，不修改答案'
+    assert args[args.index('--effort')+1]=='low'

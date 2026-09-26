@@ -3,10 +3,11 @@ from datetime import datetime,timezone
 from pathlib import Path
 from uuid import uuid4
 from copy import deepcopy
+import os
 import hashlib
 import shutil
 from fastapi import HTTPException, UploadFile
-from sqlalchemy import select, text
+from sqlalchemy import select, text, or_
 from app.core.config import settings
 from app.models.teacher_assistant import TeacherAssistantSession as Session, TeacherAssistantUpload as Upload, TeacherAssistantJob as Job
 from app.services.teacher_assistant_documents import validate_upload, DocumentError
@@ -29,6 +30,12 @@ async def actor_lock(db,user):
 
 async def last_job(db,sid):
     return (await db.execute(select(Job).where(Job.session_id==sid).order_by(Job.created_at.desc(),Job.id.desc()).limit(1))).scalar_one_or_none()
+
+async def has_inflight(db,*,owner=None,sid=None):
+    query=select(Job.id).where(or_(Job.status.in_(ACTIVE),Job.lease_until>datetime.now(timezone.utc)))
+    if owner is not None: query=query.where(Job.owner_id==owner)
+    if sid is not None: query=query.where(Job.session_id==sid)
+    return (await db.execute(query.limit(1))).scalar_one_or_none() is not None
 
 async def envelope(db,obj):
     uploads=(await db.execute(select(Upload).where(Upload.session_id==obj.id).order_by(Upload.created_at))).scalars().all()
@@ -55,7 +62,7 @@ async def enqueue(db,user,sid,kind,payload,request_id):
     if existing:
         if existing.kind!=kind or existing.payload!=payload: raise HTTPException(409,'相同请求标识不能用于不同操作')
         return await envelope(db,obj)
-    busy=(await db.execute(select(Job.id).where(Job.owner_id==user.username,Job.status.in_(ACTIVE)).limit(1))).scalar_one_or_none()
+    busy=await has_inflight(db,owner=user.username)
     if busy: raise HTTPException(409,'已有整理任务正在执行，请等待或取消')
     if kind=='message':
         content=payload['content'].strip()
@@ -74,9 +81,8 @@ async def enqueue(db,user,sid,kind,payload,request_id):
 async def upload_files(db,user,sid,files:list[UploadFile]):
     await actor_lock(db,user)
     obj=await owned(db,user,sid,lock=True)
-    job=await last_job(db,sid)
-    if job and job.status in ACTIVE: raise HTTPException(409,'请等待当前任务完成再上传')
-    prior=(await db.execute(select(Upload).where(Upload.session_id==sid))).scalars().all()
+    if await has_inflight(db,sid=sid): raise HTTPException(409,'请等待当前任务结束后再上传')
+    prior=(await db.execute(select(Upload).where(Upload.session_id==sid,Upload.status!='expired'))).scalars().all()
     if not files or len(files)+len(prior)>5: raise HTTPException(422,'每个会话最多上传 5 个文件')
     total=sum(u.size for u in prior); pending=[]
     try:
@@ -85,6 +91,11 @@ async def upload_files(db,user,sid,files:list[UploadFile]):
             validate_upload(name,1)
             uid=new_id('tau_'); directory=storage(sid,uid); directory.mkdir(parents=True,exist_ok=False)
             pending.append(directory)
+            # API runs as root in Docker; the isolated worker uses uid/gid10001.
+            # Give only that worker access to the shared private volume.
+            for private_dir in (storage(sid).parent,storage(sid),directory):
+                private_dir.chmod(0o750)
+                if os.geteuid()==0: os.chown(private_dir,10001,10001)
             size=0; digest=hashlib.sha256()
             with (directory/'original').open('wb') as target:
                 while chunk:=await file.read(64*1024):
@@ -92,6 +103,8 @@ async def upload_files(db,user,sid,files:list[UploadFile]):
                     if size>20*1024*1024 or total>50*1024*1024: raise DocumentError('单文件限 20 MiB，会话合计限 50 MiB')
                     digest.update(chunk);target.write(chunk)
             validate_upload(name,size)
+            (directory/'original').chmod(0o640)
+            if os.geteuid()==0: os.chown(directory/'original',10001,10001)
             if any(u.digest==digest.hexdigest() for u in prior):
                 shutil.rmtree(directory);pending.remove(directory);continue
             entry=Upload(id=uid,session_id=sid,name=name,size=size,digest=digest.hexdigest(),status='uploaded',extracted={},warnings=[])
@@ -122,7 +135,7 @@ async def retry(db,user,sid,request_id):
     # Message is already durable. Retrying must not append it a second time.
     await actor_lock(db,user)
     obj=await owned(db,user,sid,lock=True)
-    busy=(await db.execute(select(Job.id).where(Job.owner_id==user.username,Job.status.in_(ACTIVE)).limit(1))).scalar_one_or_none()
+    busy=await has_inflight(db,owner=user.username)
     if busy: raise HTTPException(409,'已有任务执行中')
     job.status='queued';job.error='';job.lease_until=None;job.attempts=0
     await db.commit();await db.refresh(obj);return await envelope(db,obj)

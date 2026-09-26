@@ -10,10 +10,11 @@ from app.core.config import settings
 class ModelError(ValueError):
     pass
 
-def command():
+def command(system_prompt='仅根据用户提供的数据完成教师整理任务，返回 JSON。'):
     return [settings.TEACHER_ASSISTANT_CLAUDE,'--bare','-p','--model',settings.TEACHER_ASSISTANT_MODEL,
             '--tools','','--strict-mcp-config','--mcp-config','{"mcpServers":{}}',
-            '--setting-sources','','--no-session-persistence','--output-format','json']
+            '--setting-sources','','--no-session-persistence','--output-format','json',
+            '--effort','low','--system-prompt',system_prompt]
 
 def decode_reply(raw):
     text=str(raw).strip()
@@ -28,14 +29,15 @@ def decode_reply(raw):
 
 async def ask(payload: dict) -> dict:
     # Stateless CLI; application-owned messages preserve multi-turn conversations.
-    prompt=json.dumps(payload,ensure_ascii=False)
+    system_prompt=payload.get('system','仅根据用户提供的数据完成教师整理任务，返回 JSON。')
+    prompt=json.dumps({key:value for key,value in payload.items() if key!='system'},ensure_ascii=False)
     if len(prompt.encode())>220000:
         raise ModelError('本次上下文过大，请拆分文档或开启新会话。')
     if not os.environ.get('ANTHROPIC_AUTH_TOKEN') and not os.environ.get('ANTHROPIC_API_KEY'):
         raise ModelError('套餐模型尚未配置，请联系管理员；已保留会话和文件。')
     with tempfile.TemporaryDirectory(prefix='teacher-model-') as cwd, tempfile.TemporaryFile() as output, tempfile.TemporaryFile() as error:
         try:
-            process=await asyncio.create_subprocess_exec(*command(),stdin=asyncio.subprocess.PIPE,stdout=output,stderr=error,cwd=cwd,start_new_session=True)
+            process=await asyncio.create_subprocess_exec(*command(system_prompt),stdin=asyncio.subprocess.PIPE,stdout=output,stderr=error,cwd=cwd,start_new_session=True)
         except OSError as exc:
             raise ModelError('套餐调用程序暂不可用，请联系管理员。') from exc
         try:

@@ -77,3 +77,8 @@ def test_duplicate_signature_preserves_punctuation_option_order_and_answer() -> 
     assert duplicate_question_signature(base) != duplicate_question_signature(punctuation)
     assert duplicate_question_signature(base) != duplicate_question_signature(answer)
     assert duplicate_question_signature(base) != duplicate_question_signature(reordered)
+
+
+def test_duplicate_signature_accepts_missing_stem_and_null_translation() -> None:
+    from app.services.question_content_service import duplicate_question_signature
+    assert duplicate_question_signature({'title': '待补题干', 'translations': {'en': None}}) == duplicate_question_signature({'title': '待补题干'})

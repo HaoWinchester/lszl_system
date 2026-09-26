@@ -23,3 +23,7 @@ backend/tests
 **/.env.*
 /backups/
 /frontend/new-legacy-releases/
+
+/artifacts/
+/var/
+/.worktrees/
