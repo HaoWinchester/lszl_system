@@ -733,3 +733,33 @@ async def test_publication_rechecks_committed_preview_after_last_guard(changed_o
         assert receipt['items'][0]['errorStatus'] == 409
         assert receipt['items'][0]['errorCode'] in {'QUESTION_PREVIEW_CHANGED', 'PAPER_PREVIEW_CHANGED'}
         assert await database.scalar(select(func.count()).select_from(PaperRelease).where(PaperRelease.paper_id == receipt['items'][0]['paperId'])) == 0
+
+@pytest.mark.anyio
+async def test_word_standalone_diagram_uses_bounded_question_source_span(db, tmp_path, monkeypatch):
+    from PIL import Image
+    from app.core.config import settings
+    monkeypatch.setattr(settings, 'TEACHER_ASSISTANT_STORAGE', str(tmp_path))
+    extraction = tmp_path / 's' / 'u' / 'extracted'
+    extraction.mkdir(parents=True)
+    Image.new('RGB', (20, 20), 'red').save(extraction / 'diagram.png')
+    sections = [{'location': '段落 2', 'text': '第1题题干', 'images': []}, {'location': '段落 3', 'text': '', 'images': ['diagram.png']}, {'location': '段落 4', 'text': '选项AB', 'images': []}, {'location': '段落 5', 'text': '第2题题干', 'images': []}]
+    uploaded = {'id': 'u', 'name': 'exam.docx', 'extracted': {'kind': 'document', 'data': None, 'sections': sections, 'warnings': []}}
+    first, second = question(), question('q2')
+    second['stemParts'] = [{'type': 'text', 'text': '第二题不同题干'}]
+    first['source'] = {'uploadId': 'u', 'location': '段落 2', 'locations': ['段落 2', '段落 3', '段落 4']}
+    second['source'] = {'uploadId': 'u', 'location': '段落 5'}
+    async def preview():
+        return await build_plan(db, ACTOR, [uploaded], {'settings': {'duplicatePolicy': 'independent'}, 'items': [{'uploadId': 'u', 'questions': [first, second]}]}, session_id='s')
+    plan = await preview()
+    assert not plan['items'][0]['blockers']
+    assert plan['items'][0]['questions'][0]['sourceImages'][0]['location'] == '段落 3'
+    assert not plan['items'][0]['questions'][1]['sourceImages']
+    del first['source']['locations']
+    assert (await preview())['items'][0]['questions'][0]['sourceImages'][0]['location'] == '段落 3'
+    first['source']['locations'] = ['段落 2', '段落 3', '段落 4', '段落 5']
+    assert (await preview())['items'][0]['blockers']
+    first['source']['locations'] = ['段落 2', '段落 3']
+    second['source']['location'] = '段落 2'
+    assert (await preview())['items'][0]['blockers']
+    first['source']['uploadId'] = 'other-private-upload'
+    assert (await preview())['items'][0]['blockers']

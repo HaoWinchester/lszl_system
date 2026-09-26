@@ -470,26 +470,48 @@ async def build_plan(db, actor, sources: list[dict], model_result: dict, *, sess
                 else:
                     reviewed_ids.update(proposed_reviewed)
             if extracted['kind'] != 'json':
-                sections = {section['location']: section for section in extracted.get('sections') or []}
+                section_rows = extracted.get('sections') or []
+                sections = {section['location']: section for section in section_rows}
+                section_order = list(sections)
+                starts = [(question.get('source') or {}).get('location') for question in questions]
                 for question in questions:
-                    location = (question.get('source') or {}).get('location')
+                    source_ref = question.get('source') or {}
+                    location = source_ref.get('location')
+                    default_locations = [location]
+                    if str(source.get('name') or '').lower().endswith(('.docx', '.doc')) and location in sections and starts.count(location) == 1:
+                        start_index = section_order.index(location)
+                        following = [section_order.index(value) for value in starts if value in sections and section_order.index(value) > start_index]
+                        end_index = min(following) if following else len(section_order)
+                        default_locations = section_order[start_index:end_index]
+                    locations = source_ref.get('locations', question.get('sourceLocations', default_locations))
+                    valid_span = isinstance(locations, list) and bool(locations) and all(isinstance(value, str) and value in sections for value in locations)
+                    if valid_span:
+                        indexes = [section_order.index(value) for value in locations]
+                        valid_span = locations[0] == location and indexes == list(range(indexes[0], indexes[0] + len(indexes)))
+                        valid_span = valid_span and not any(value in starts for value in locations[1:])
+                        valid_span = valid_span and (len(locations) == 1 or starts.count(location) == 1)
+                    if source_ref.get('uploadId', upload_id) != upload_id or not valid_span:
+                        item_blockers.append('题目来源区段无效或跨越其他题目，请核对来源位置。')
+                        locations = [location] if location in sections else []
                     # Model-provided asset IDs/paths cannot reference unrelated private resources.
                     for key in ('images', 'material', 'materialEdit', 'sourceImages'):
                         question.pop(key, None)
                     if isinstance(question.get('metadata'), dict):
                         question['metadata'].pop('_mixedContent', None)
                     question['sourceImages'] = []
-                    filenames = sections.get(location, {}).get('images') or []
+                    source_files = [(value, filename) for value in locations for filename in sections[value].get('images') or []]
+                    filenames = list(dict.fromkeys(filename for _, filename in source_files))
                     if len(filenames) > 20:
                         item_blockers.append('单题来源图片超过 20 张，请拆分。')
                         continue
                     for filename in filenames:
+                        image_location = next(value for value, name in source_files if name == filename)
                         try:
                             key = (upload_id, filename)
                             if key not in image_cache:
                                 _, mime, digest = _source_image(session_id, upload_id, filename)
                                 image_cache[key] = {'uploadId': upload_id, 'filename': filename, 'mimeType': mime, 'digest': digest}
-                            question['sourceImages'].append({**image_cache[key], 'location': location})
+                            question['sourceImages'].append({**image_cache[key], 'location': image_location})
                         except ValueError as error:
                             item_blockers.append(str(error))
             normalized = []
