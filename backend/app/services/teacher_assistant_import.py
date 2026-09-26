@@ -654,6 +654,8 @@ async def execute_plan(db, actor, session, revision, *, before_step=None) -> dic
                 await guard()
                 result = await content_prep_shared_service.apply_principle_merge(db, actor, content_revision=preview['contentRevision'], bundle=item['principleBundle'], resolutions=resolutions)
                 entry.update(status='succeeded', result={'contentRevision': result['contentRevision'], 'summary': result['summary']})
+                for error_key in ('error', 'errorStatus', 'errorCode'):
+                    entry.pop(error_key, None)
                 await _checkpoint(db, session, receipt)
                 continue
             reference_errors = await _reference_blockers(db, item['questions'])
@@ -799,7 +801,8 @@ async def execute_plan(db, actor, session, revision, *, before_step=None) -> dic
             entry.update(status='succeeded', links=[{'label': '试卷管理', 'url': '/paper-management.html?paperId=' + entry['paperId']}])
             if entry.get('releaseId'):
                 entry['links'].append({'label': '回忆画布', 'url': '/knowledge-recall.html?releaseId=' + entry['releaseId']})
-            entry.pop('error', None)
+            for error_key in ('error', 'errorStatus', 'errorCode'):
+                entry.pop(error_key, None)
             await _checkpoint(db, session, receipt)
         except Exception as exc:
             await db.rollback()

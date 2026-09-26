@@ -122,6 +122,7 @@ async def test_real_import_publish_and_lost_receipt_recovery():
         await database.commit()
         first = await execute_plan(database, actor, session, 1)
         assert first['status'] == 'succeeded', json.dumps(first, ensure_ascii=False)
+        assert not {'error', 'errorStatus', 'errorCode'} & first['items'][0].keys()
         identifiers = {key: first['items'][0][key] for key in ('bankId', 'paperId', 'releaseId')}
         # Simulate commits succeeding but no step receipt surviving.
         session.receipt = {}
