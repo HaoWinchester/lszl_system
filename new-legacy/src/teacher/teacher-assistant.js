@@ -218,9 +218,25 @@
       }
       if (s.receipt) {
         const receipt = $('execution-receipt'); text(receipt, 'h3', s.receipt.revision === s.revision ? '本次执行回执' : '上一版本执行回执（当前方案尚未执行）');
-        // Keep all actual result fields visible, including partial failures and stable content IDs.
-        text(receipt, 'pre', JSON.stringify(s.receipt, null, 2));
-        const walk = value => { if (!value || typeof value !== 'object') return; for (const [key, child] of Object.entries(value)) { if (typeof child === 'string' && /url|href/i.test(key)) link(receipt, value.label || value.text || (/download/i.test(key) ? '下载结果 / 校验报告' : '打开结果'), child); else if (typeof child === 'object') walk(child); } }; walk(s.receipt);
+        const labels = { succeeded: '已完成', failed: '未完成', cancelled: '已取消', skipped: '已跳过', partial: '部分完成', running: '处理中', queued: '等待处理' };
+        text(receipt, 'p', labels[s.receipt.status] || '执行结果已返回，请核对各项内容。');
+        if (s.receipt.error) text(receipt, 'p', typeof s.receipt.error === 'string' ? s.receipt.error : s.receipt.error.message || '部分步骤未完成，请查看校验报告。', 'ta-warning');
+        for (const entry of s.receipt.items || []) {
+          const card = text(receipt, 'article', '', 'ta-receipt-item');
+          text(card, 'h4', entry.name || '整理结果');
+          text(card, 'p', (labels[entry.status] || (entry.releaseId ? '已发布' : entry.bankId || entry.paperId ? '已保存' : '请核对结果')) + (entry.releaseId ? ' · 已发布给允许访问的用户' : entry.bankId || entry.paperId ? ' · 私有草稿，尚未发布' : ''));
+          const count = entry.questionCount ?? entry.paper?.questions?.length;
+          if (count != null) text(card, 'p', '题目：' + count + ' 道');
+          if (entry.error) text(card, 'p', typeof entry.error === 'string' ? entry.error : entry.error.message || '该项未完成，请查看校验报告。', 'ta-warning');
+          for (const warning of entry.warnings || []) text(card, 'p', typeof warning === 'string' ? warning : warning.message || JSON.stringify(warning), 'ta-warning');
+          for (const target of entry.links || []) link(card, target.label || target.text || '打开结果', target.url || target.href);
+        }
+        for (const failure of s.receipt.partialFailures || []) text(receipt, 'p', typeof failure === 'string' ? failure : failure.error || failure.message || '部分步骤未完成', 'ta-warning');
+        if (!s.receipt.items?.length && s.receipt.questionCount != null) text(receipt, 'p', '题目：' + s.receipt.questionCount + ' 道');
+        const technical = text(receipt, 'details', '', 'ta-receipt-details');
+        text(technical, 'summary', '查看完整回执与资源编号');
+        text(technical, 'pre', JSON.stringify(s.receipt, null, 2));
+        const walk = value => { if (!value || typeof value !== 'object') return; for (const [key, child] of Object.entries(value)) { if (typeof child === 'string' && /url|href/i.test(key)) link(receipt, value.label || value.text || (/download/i.test(key) ? '下载结果 / 校验报告' : '打开结果'), child); else if (typeof child === 'object') walk(child); } }; if (!s.receipt.items?.length) walk(s.receipt);
       }
       controls();
     }
