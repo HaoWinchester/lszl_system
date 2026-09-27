@@ -229,6 +229,23 @@ def check_page(context,base,kind):
     expect(answer).to_have_attribute('aria-pressed','true')
     record(kind+': choosing an answer works again after exiting pen mode')
     flush(page,kind)
+    original=persisted(context,base,kind)
+    target=page.locator('.canvas-ink-layer path').last
+    target_id=target.get_attribute('data-stroke-id')
+    spot=target.evaluate('(el)=>{const p=el.getPointAtLength(el.getTotalLength()/2),s=new DOMPoint(p.x,p.y).matrixTransform(el.getScreenCTM());return {x:s.x,y:s.y}}')
+    tool.locator('[data-ink-tool=eraser]').click()
+    page.mouse.click(spot['x'],spot['y']);stroke_count(page,3)
+    undo.click();stroke_count(page,4)
+    redo.click();stroke_count(page,3)
+    expected=[stroke for stroke in original if stroke['id']!=target_id]
+    flush(page,kind);assert persisted(context,base,kind)==expected
+    page.reload(wait_until='networkidle');stroke_count(page,3)
+    assert persisted(context,base,kind)==expected
+    expect(page.locator(card)).to_have_count(1)
+    record(kind+': single-stroke eraser, undo/redo and reload preserve other strokes and card')
+    tool.locator('[data-ink-tool=pen]').click();draw(page,card,10);stroke_count(page,4)
+    page.keyboard.press('Escape')
+    flush(page,kind)
     assert not errors,errors
     page.close()
 
@@ -248,7 +265,7 @@ def check_viewer(browser,base):
             continue
         stroke_count(page,1)
         tool=page.locator('.canvas-ink-toolbar')
-        for selector in ('[data-ink-tool=pen]','[data-ink-tool=highlighter]','[data-ink-action=clear]'):
+        for selector in ('[data-ink-tool=pen]','[data-ink-tool=highlighter]','[data-ink-tool=eraser]','[data-ink-action=clear]'):
             expect(tool.locator(selector)).to_be_disabled()
         page.mouse.move(650,430);page.mouse.down();page.mouse.move(750,460,steps=8);page.mouse.up()
         stroke_count(page,1)
@@ -277,7 +294,7 @@ def check_recall_readonly(context,base):
     page.route('**/api/v1/recall/session/**',readonly_session)
     page.goto(base+RECALL,wait_until='networkidle')
     stroke_count(page,4)
-    for selector in ('[data-ink-tool=pen]','[data-ink-tool=highlighter]','[data-ink-action=clear]'):
+    for selector in ('[data-ink-tool=pen]','[data-ink-tool=highlighter]','[data-ink-tool=eraser]','[data-ink-action=clear]'):
         expect(page.locator('.canvas-ink-toolbar '+selector)).to_be_disabled()
     draw(page,'#krQuestionCard')
     stroke_count(page,4)

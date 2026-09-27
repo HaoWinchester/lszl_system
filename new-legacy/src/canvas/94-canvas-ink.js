@@ -39,7 +39,7 @@
     const doc=viewport.ownerDocument,ns='http://www.w3.org/2000/svg';
     const layer=doc.createElementNS(ns,'svg');layer.classList.add('canvas-ink-layer');layer.setAttribute('aria-hidden','true');world.append(layer);
     const toolbar=doc.createElement('div');toolbar.className='canvas-ink-toolbar';toolbar.dataset.canvasUi='true';toolbar.setAttribute('role','group');toolbar.setAttribute('aria-label','画笔工具');
-    toolbar.innerHTML='<div class="canvas-ink-tools"><button type="button" data-ink-tool="select" title="选择（Esc）" aria-label="选择">↖</button><button type="button" data-ink-tool="pen" aria-label="画笔" title="画笔"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 4 5 5M4 20l5-1L20 8a2 2 0 0 0-5-5L4 14z"/></svg></button><button type="button" data-ink-tool="highlighter" aria-label="荧光笔" title="荧光笔"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 15 5 5 7-10-8-8-10 7 5 5M5 15l4 4-4 3-3-3zM2 23h16"/></svg></button><span class="canvas-ink-divider"></span><button type="button" data-ink-action="undo" aria-label="撤销笔迹" title="撤销笔迹（Ctrl/Command+Z）">↶</button><button type="button" data-ink-action="redo" aria-label="重做笔迹" title="重做笔迹（Ctrl/Command+Shift+Z）">↷</button><button type="button" data-ink-action="clear" aria-label="清空笔迹" title="清空笔迹"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 10v7M14 10v7"/></svg></button></div><div class="canvas-ink-options" hidden><div class="canvas-ink-colors" aria-label="笔迹颜色"></div><label class="canvas-ink-width">粗细 <input type="range" aria-label="笔迹粗细" step="1"><output></output></label><svg class="canvas-ink-preview" viewBox="0 0 180 52" aria-label="笔触预览"><path d="M 12 32 Q 45 10 80 26 T 168 24" fill="none" stroke-linecap="round"/></svg><small>Esc 选择 · 空格 / 右键移动</small></div>';
+    toolbar.innerHTML='<div class="canvas-ink-tools"><button type="button" data-ink-tool="select" title="选择（Esc）" aria-label="选择">↖</button><button type="button" data-ink-tool="pen" aria-label="画笔" title="画笔"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 4 5 5M4 20l5-1L20 8a2 2 0 0 0-5-5L4 14z"/></svg></button><button type="button" data-ink-tool="highlighter" aria-label="荧光笔" title="荧光笔"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 15 5 5 7-10-8-8-10 7 5 5M5 15l4 4-4 3-3-3zM2 23h16"/></svg></button><button type="button" data-ink-tool="eraser" aria-label="橡皮擦" title="橡皮擦：点击删除单笔，可撤销"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 3 7 7-11 11H6l-4-4zM8 11l7 7M10 21h12"/></svg></button><span class="canvas-ink-divider"></span><button type="button" data-ink-action="undo" aria-label="撤销笔迹" title="撤销笔迹（Ctrl/Command+Z）">↶</button><button type="button" data-ink-action="redo" aria-label="重做笔迹" title="重做笔迹（Ctrl/Command+Shift+Z）">↷</button><button type="button" data-ink-action="clear" aria-label="清空笔迹" title="清空笔迹"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 10v7M14 10v7"/></svg></button></div><div class="canvas-ink-options" hidden><div class="canvas-ink-colors" aria-label="笔迹颜色"></div><label class="canvas-ink-width">粗细 <input type="range" aria-label="笔迹粗细" step="1"><output></output></label><svg class="canvas-ink-preview" viewBox="0 0 180 52" aria-label="笔触预览"><path d="M 12 32 Q 45 10 80 26 T 168 24" fill="none" stroke-linecap="round"/></svg><small>Esc 选择 · 空格 / 右键移动</small></div>';
     (options.toolbarHost||viewport).append(toolbar);
     const panel=toolbar.querySelector('.canvas-ink-options'),range=toolbar.querySelector('input[type=range]'),preview=toolbar.querySelector('.canvas-ink-preview path');
     const prefs={pen:{...TOOLS.pen},highlighter:{...TOOLS.highlighter}};
@@ -65,8 +65,8 @@
       toolbar.querySelectorAll('[data-ink-tool]').forEach(btn=>{btn.setAttribute('aria-pressed',String(btn.dataset.inkTool===tool));btn.disabled=locked&&btn.dataset.inkTool!=='select'});
       for(const action of ['undo','redo']){const btn=toolbar.querySelector('[data-ink-action='+action+']');btn.hidden=!ownHistory;btn.disabled=locked||!state[action==='undo'?'canUndo':'canRedo']}
       toolbar.querySelector('[data-ink-action=clear]').disabled=locked||!getStrokes().length;
-      panel.hidden=tool==='select';
-      if(tool!=='select'){
+      panel.hidden=!TOOLS[tool];
+      if(TOOLS[tool]){
         const pref=prefs[tool];range.min=pref.min;range.max=pref.max;range.value=pref.width;toolbar.querySelector('output').textContent=pref.width;
         toolbar.querySelector('input[type=color]').value=pref.color;
         toolbar.querySelectorAll('[data-ink-color]').forEach(btn=>btn.setAttribute('aria-pressed',String(btn.dataset.inkColor===pref.color)));
@@ -93,7 +93,7 @@
       try{if(viewport.hasPointerCapture(id))viewport.releasePointerCapture(id)}catch(_){}
     }
     function setTool(value){
-      cancel();tool=TOOLS[value]&&!readonly()?value:'select';
+      cancel();tool=(TOOLS[value]||value==='eraser')&&!readonly()?value:'select';
       viewport.classList.toggle('canvas-ink-drawing',tool!=='select');viewport.dataset.inkTool=tool;
       if(tool!=='select')options.onDrawMode?.();
       refreshControls();
@@ -131,6 +131,19 @@
       if(destroyed||active||tool==='select'||space||readonly()||event.button!==0||event.isPrimary===false||!inside(event.target))return;
       stop(event);
       try{
+        if(tool==='eraser'){
+          const view=options.getViewport(),location=point(event,viewport.getBoundingClientRect(),view);
+          const target=new global.DOMPoint(...location),padding=16/(view.scale||view.zoom||1);
+          // Use SVG's actual smoothed curve geometry; a polyline approximation
+          // would miss bends and accidentally erase nearby strokes.
+          for(const el of [...layer.querySelectorAll('[data-stroke-id]')].reverse()){
+            const width=el.getAttribute('stroke-width');let hit=false;
+            try{el.setAttribute('stroke-width',Number(width)+padding);hit=el.isPointInStroke(target)}
+            finally{el.setAttribute('stroke-width',width)}
+            if(hit){change(getStrokes().filter(stroke=>stroke.id!==el.dataset.strokeId),'擦除笔迹');break}
+          }
+          suppressClickUntil=Date.now()+400;return;
+        }
         const strokes=normalize(getStrokes()),remaining=LIMITS.total-strokes.reduce((sum,s)=>sum+s.points.length,0);
         if(strokes.length>=LIMITS.strokes||remaining<1)throw new Error('当前画布笔迹已达上限，请清理部分笔迹后继续');
         const pref=prefs[tool],stroke={id:'ink-'+Date.now().toString(36)+'-'+(++sequence)+'-'+Math.random().toString(36).slice(2,8),tool,color:pref.color,width:pref.width,points:[]};

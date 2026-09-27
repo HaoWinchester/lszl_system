@@ -48,6 +48,15 @@ with sync_playwright() as pw:
     assert page.locator('.canvas-ink-layer path').nth(1).get_attribute('opacity')=='0.3'
     page.get_by_role('button',name='撤销笔迹',exact=True).click();assert page.evaluate('strokes.length')==1
     page.get_by_role('button',name='重做笔迹',exact=True).click();assert page.evaluate('strokes.length')==2
+    originals=page.evaluate('JSON.parse(JSON.stringify(strokes))')
+    page.get_by_role('button',name='橡皮擦',exact=True).click(timeout=3000)
+    page.mouse.click(180,172)
+    assert page.evaluate('strokes')==[originals[1]], 'Only the clicked pen stroke should be erased'
+    page.get_by_role('button',name='撤销笔迹',exact=True).click();assert page.evaluate('strokes')==originals
+    page.get_by_role('button',name='重做笔迹',exact=True).click();assert page.evaluate('strokes')==[originals[1]]
+    page.mouse.click(620,500);assert page.evaluate('strokes')==[originals[1]], 'Blank eraser click must do nothing'
+    page.get_by_role('button',name='撤销笔迹',exact=True).click();assert page.evaluate('strokes')==originals
+    page.get_by_role('button',name='荧光笔',exact=True).click()
     page.once('dialog',lambda dialog:dialog.dismiss());page.get_by_role('button',name='清空笔迹',exact=True).click();assert page.evaluate('strokes.length')==2
     page.once('dialog',lambda dialog:dialog.accept());page.get_by_role('button',name='清空笔迹',exact=True).click();assert page.evaluate('strokes.length')==0
     page.get_by_role('button',name='撤销笔迹',exact=True).click();assert page.evaluate('strokes.length')==2
