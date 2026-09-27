@@ -1,13 +1,13 @@
 (function (global) {
   'use strict';
   const BASE = '/api/v1/teacher-assistant';
-  const activeJob = session => ['queued', 'running'].includes(session?.job?.status);
+  const activeJob = session => (['queued', 'running'].includes(session?.job?.status) || session?.runtime?.status === 'stopping');
   function validateFiles(files) {
     if (!files.length) throw new Error('请先选择文件。');
     if (files.length > 5) throw new Error('一次最多上传 5 份文件，请分批上传。');
     let total = 0;
     for (const file of files) {
-      if (!/\.(json|docx?|pdf|pptx?)$/i.test(file.name)) throw new Error('仅支持 JSON、Word、PDF 和 PPT 文件。');
+      if (!/\.(json|docx?|pdf|pptx?|png|jpe?g|webp)$/i.test(file.name)) throw new Error('仅支持 JSON、Word、PDF、PPT 和 PNG/JPG/WebP 图片。');
       if (file.size > 20 * 1024 * 1024) throw new Error(file.name + ' 超过 20 MiB，请拆分文件。');
       total += file.size;
     }
@@ -16,7 +16,7 @@
   }
   function createClient(fetcher, uuid) {
     let session = null;
-    let pending = false;
+    let pending = false, generation = 0;
     const keys = new Map();
     // Browser storage contains only short-lived opaque operation IDs, never conversations or uploads.
     function operationSlot(identity) {
@@ -33,16 +33,16 @@
       try { payload = await response.json(); } catch (_) { throw new Error('服务器返回了无法读取的结果，请刷新状态后重试。'); }
       if (!response.ok) {
         const detail = payload?.detail;
-        throw new Error(typeof detail === 'string' ? detail : detail?.message || payload?.message || '请求失败（' + response.status + '），请重试。');
+        const error = new Error(typeof detail === 'string' ? detail : detail?.message || payload?.message || '请求失败（' + response.status + '），请重试。'); error.status = response.status; throw error;
       }
       return payload;
     }
-    async function load(id) { const data = await request(BASE + '/sessions/' + encodeURIComponent(id)); session = data.session; return session; }
+    async function load(id) { const token = ++generation; const data = await request(BASE + '/sessions/' + encodeURIComponent(id)); if (token === generation) session = data.session; return data.session; }
     async function mutate(action, body = {}) {
       if (pending) throw new Error('正在提交，请等待当前请求完成。');
       if (!session) throw new Error('请先新建或选择会话。');
       pending = true;
-      const id = session.id;
+      const id = session.id, token = ++generation;
       const identity = id + ':' + action + ':' + JSON.stringify(body);
       const slot = operationSlot(identity);
       if (!keys.has(identity)) keys.set(identity, readKey(slot) || uuid());
@@ -53,28 +53,30 @@
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(keyed ? { ...body, requestId: keys.get(identity) } : body),
         });
-        session = data.session;
+        if (token === generation) session = data.session;
         keys.delete(identity); writeKey(slot, null);
         return session;
       } catch (error) {
         // A lost response may have committed. Reconcile before offering the same operation key again.
-        try { await load(id); } catch (_) { /* retain operation key and caller input */ }
+        if (token === generation) { try { await load(id); } catch (_) { /* retain operation key and caller input */ } }
         throw error;
       } finally { pending = false; }
     }
     return {
       request, load, mutate,
+      async activate(id) { const token = ++generation; const data = await request(BASE + '/sessions/' + encodeURIComponent(id) + '/activate', { method: 'POST' }); if (token === generation) session = data.session; return data.session; },
       async status(id) { return request(BASE + "/sessions/" + encodeURIComponent(id) + "/status"); },
       get session() { return session; }, get pending() { return pending; },
       async list() { return (await request(BASE + '/sessions')).sessions || []; },
-      async create() { const data = await request(BASE + '/sessions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }); session = data.session; return session; },
-      async remove() { if (!session) return; await request(BASE + '/sessions/' + encodeURIComponent(session.id), { method: 'DELETE' }); session = null; },
+      async create() { const token = ++generation; const data = await request(BASE + '/sessions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }); if (token === generation) session = data.session; return data.session; },
+      async remove() { const token = ++generation; if (!session) return; await request(BASE + '/sessions/' + encodeURIComponent(session.id), { method: 'DELETE' }); if (token === generation) session = null; },
       async upload(files) {
         validateFiles(files);
         if (!session) throw new Error('请先新建或选择会话。');
         const form = new global.FormData(); files.forEach(file => form.append('files', file));
-        const data = await request(BASE + '/sessions/' + encodeURIComponent(session.id) + '/uploads', { method: 'POST', body: form });
-        session = data.session; return session;
+        const id = session.id, token = ++generation;
+        try { const data = await request(BASE + '/sessions/' + encodeURIComponent(id) + '/uploads', { method: 'POST', body: form }); if (token === generation) session = data.session; return data.session; }
+        catch (error) { if (token === generation) { try { await load(id); } catch (_) {} } throw error; }
       },
     };
   }
@@ -82,8 +84,12 @@
     const $ = id => doc.getElementById(id);
     const client = createClient(global.fetch.bind(global), () => global.crypto.randomUUID());
     let authorized = false, busy = false, pollTimer = null, epoch = 0, transientError = false;
+    let stream = null, cursor = 0, pendingFiles = [], activated = false, tools = [], streamText = '', nearBottom = true;
+    let targetSession = null;
+    const scroller = $('conversation-panel');
     const sourceViews = new Map();
     $('assistant').dataset.tab = 'conversation';
+    $('assistant').classList.toggle('ta-sidebar-collapsed', global.innerWidth <= 760);
     function text(parent, tag, value, className) { const el = doc.createElement(tag); el.textContent = typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value ?? ''); if (className) el.className = className; parent.appendChild(el); return el; }
     function link(parent, label, url, download = false) {
       if (!url) return;
@@ -99,13 +105,17 @@
       $('assistant').setAttribute('aria-busy', String(busy));
       ['new-session', 'session-history'].forEach(id => { $(id).disabled = disabled; });
       ['delete-session', 'refresh-session'].forEach(id => { $(id).disabled = disabled || !s; });
-      ['assistant-files', 'upload-files', 'assistant-message', 'send-message'].forEach(id => { $(id).disabled = disabled || !s || running; });
+      ['assistant-files', 'attach-files', 'assistant-message', 'send-message'].forEach(id => { $(id).disabled = disabled || !s || !activated || running; });
       $('execute-plan').textContent = s?.plan?.settings?.publish ? '确认执行并发布' : '确认保存草稿';
       $('execute-plan').disabled = disabled || !s?.plan?.items?.length || running || Boolean(s.plan.blockers?.length) || s.plan.items.some(item => item.blockers?.length || item.questions?.some(question => question.blockers?.length)) || Boolean(s.receipt?.revision === s.revision && s.job?.status === 'succeeded');
       $('confirm-source-review').hidden = !s?.plan?.items?.some(item => item.questions?.some(question => question.metadata?.needsReview || question.needsReview));
       $('confirm-source-review').disabled = disabled || running;
       $('retry-job').hidden = !['failed', 'cancelled'].includes(s?.job?.status); $('retry-job').disabled = disabled;
       $('cancel-job').hidden = !running; $('cancel-job').disabled = disabled;
+      $('stop-message').hidden = !running; $('stop-message').disabled = disabled; $('send-message').hidden = running;
+      $('tab-preview').disabled = !s?.plan?.items?.length && !s?.receipt;
+      $('toggle-sidebar').setAttribute('aria-expanded', String(!$('assistant').classList.contains('ta-sidebar-collapsed')));
+      renderPending();
     }
     function jobLabel(s) {
       if (!s?.job) return '当前为私有草稿，尚未执行。';
@@ -120,9 +130,12 @@
     }
     function render() {
       const s = client.session;
+      nearBottom = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 100;
       for (const id of ['messages', 'uploads', 'plan-preview', 'execution-receipt']) $(id).replaceChildren();
+      $('welcome').hidden = Boolean(s?.messages?.length); $('files-details').hidden = !s?.uploads?.length;
+      $('conversation-result').replaceChildren();
       if (!s) { $('job-status').textContent = '请选择或新建会话。'; controls(); return; }
-      for (const message of s.messages || []) { const el = text($('messages'), 'article', '', 'ta-message ' + (message.role === 'user' ? 'user' : 'assistant')); text(el, 'strong', message.role === 'user' ? '你' : '整理助手'); text(el, 'div', message.content); }
+      for (const message of s.messages || []) { const el = text($('messages'), 'article', '', 'ta-message ' + (message.role === 'user' ? 'user' : 'assistant')); text(el, 'strong', message.role === 'user' ? '你' : '教学助手'); text(el, 'div', message.content); }
       for (const upload of s.uploads || []) {
         const el = text($('uploads'), 'article', '', 'ta-file'); text(el, 'strong', upload.name); text(el, 'span', ' · ' + Math.ceil((upload.size || 0) / 1024) + ' KiB · ' + ({ ready: '已识别', uploaded: '待识别', failed: '识别失败', expired: '已过期，请重传' }[upload.status] || upload.status || '等待处理'));
         if (upload.pageCount != null) text(el, 'span', ' · ' + upload.pageCount + ' 页');
@@ -210,10 +223,10 @@
             if (question.metadata || question.provenance || question.source) { const advanced = text(detail, 'details', '', 'ta-provenance'); text(advanced, 'summary', '详细来源信息'); text(advanced, 'pre', { source: question.source, provenance: question.provenance, metadata: question.metadata }); }
             (question.warnings || []).forEach(v => issue(detail, v, 'ta-warning')); (question.blockers || []).forEach(v => issue(detail, v, 'ta-blocker'));
           }
-          for (const principle of item.principles || item.principleBundle?.principles || []) text(el, 'pre', principle);
+          for (const principle of item.principles || item.principleBundle?.principles || []) text(el, 'p', readable(principle) || '请展开原则与归纳卡内容核对。');
           if (item.principleBundle) { const bundle = text(el, 'details', ''); text(bundle, 'summary', '原则与归纳卡内容'); text(bundle, 'pre', item.principleBundle); }
           if (item.mergePreview) { const merge = text(el, 'details', ''); text(merge, 'summary', '原则合并变更预览'); text(merge, 'pre', item.mergePreview); }
-          if (item.changes) text(el, 'pre', '变更清单：' + JSON.stringify(item.changes, null, 2));
+          if (item.changes) { const changes = text(el, 'details', ''); text(changes, 'summary', '变更清单'); text(changes, 'pre', item.changes); }
         }
       }
       if (s.receipt) {
@@ -238,42 +251,199 @@
         text(technical, 'pre', JSON.stringify(s.receipt, null, 2));
         const walk = value => { if (!value || typeof value !== 'object') return; for (const [key, child] of Object.entries(value)) { if (typeof child === 'string' && /url|href/i.test(key)) link(receipt, value.label || value.text || (/download/i.test(key) ? '下载结果 / 校验报告' : '打开结果'), child); else if (typeof child === 'object') walk(child); } }; if (!s.receipt.items?.length) walk(s.receipt);
       }
+      if (s.plan?.items?.length || s.receipt) {
+        const result = text($('conversation-result'), 'button', s.receipt?.revision === s.revision ? '查看教学成果与执行回执 ↗' : '查看整理方案 ↗', 'ta-result'); result.type = 'button';
+        text(result, 'small', s.plan?.summary || '核对内容、保存草稿或下载结果'); result.onclick = () => panel(true);
+      }
+      if (s.job?.status === 'failed') {
+        issue($('conversation-result'), s.job.error || '这次处理未完成，你可以重试或继续发消息。', 'ta-blocker');
+        const retry = text($('conversation-result'), 'button', '重试这次处理'); retry.type = 'button'; retry.disabled = busy; retry.onclick = () => $('retry-job').click();
+      }
+      streamText = s.stream?.text || ''; cursor = Number(s.stream?.lastEventId || 0); renderStream();
       controls();
+      if (nearBottom) scroller.scrollTop = scroller.scrollHeight;
     }
     async function history() {
       const sessions = await client.list(); const select = $('session-history'); select.replaceChildren(); const empty = text(select, 'option', '选择会话'); empty.value = '';
-      sessions.forEach(s => { const option = text(select, 'option', s.title || '未命名会话'); option.value = s.id; }); select.value = client.session?.id || '';
+      $('session-list').replaceChildren();
+      sessions.forEach(s => { const option = text(select, 'option', s.title || '新对话'); option.value = s.id;
+        const button = text($('session-list'), 'button', s.title || '新对话', 'ta-history-item'); button.dataset.sessionId = s.id;
+        button.setAttribute('aria-current', String(client.session?.id === s.id)); button.onclick = () => switchSession(s.id);
+      }); select.value = client.session?.id || '';
+    }
+    function panel(open) {
+      $('preview-panel').hidden = !open; $('tab-preview').setAttribute('aria-expanded', String(open));
+      $('preview-panel').setAttribute('aria-modal', String(open && global.innerWidth <= 760));
+      if (open) $('tab-conversation').focus(); else $('tab-preview').focus();
+    }
+    function sidebar(open) {
+      $('assistant').classList.toggle('ta-sidebar-collapsed', !open);
+      $('sidebar-backdrop').hidden = !open || global.innerWidth > 760;
+      $('toggle-sidebar').setAttribute('aria-expanded', String(open));
+      $('toggle-sidebar').setAttribute('aria-label', open ? '收起会话列表' : '展开会话列表');
+    }
+    function disconnect() { global.clearTimeout(pollTimer); if (stream) stream.close(); stream = null; }
+    function renderStream() {
+      const running = activeJob(client.session);
+      $('stream-message').hidden = !streamText; $('stream-text').textContent = streamText;
+      $('activity-details').hidden = !running && !tools.length;
+      if (!running && !busy) $('runtime-status').textContent = client.session?.job?.status === 'failed' ? '处理未完成，可重试' : client.session?.job?.status === 'cancelled' ? '已停止，可继续对话' : '处理记录';
+      $('tool-activity').replaceChildren(); tools.forEach(value => text($('tool-activity'), 'p', value));
+      if (nearBottom) scroller.scrollTop = scroller.scrollHeight;
+    }
+    async function reconcile(id, token) {
+      if (token !== epoch) return;
+      await client.load(id); if (token !== epoch) return;
+      clearError(true); render(); await history(); schedule();
     }
     function schedule() {
-      global.clearTimeout(pollTimer);
+      disconnect();
       if (!activeJob(client.session)) return;
       const id = client.session.id, token = epoch;
-      pollTimer = global.setTimeout(async () => { if (busy || token !== epoch) { schedule(); return; } try { const status = await client.status(id); clearError(true); if (token !== epoch) return; if (status.revision !== client.session.revision || !activeJob({ job: status.job })) { await client.load(id); render(); } else { client.session.job = status.job; $('job-status').textContent = jobLabel(client.session); controls(); } schedule(); } catch (error) { showError(error); controls(); if (transientError) schedule(); } }, 1800);
+      if (!global.EventSource) return;
+      stream = new global.EventSource(BASE + '/sessions/' + encodeURIComponent(id) + '/events?after=' + cursor);
+      stream.onmessage = event => {
+        if (token !== epoch) return;
+        let value; try { value = JSON.parse(event.data); } catch (_) { return; }
+        if (Number(value.id) <= cursor) return;
+        if (value.type === 'status' && value.data?.status === 'resync_required') {
+          disconnect(); reconcile(id, token).catch(error => { showError(error); reconnect(id, token); }); return;
+        }
+        cursor = Number(value.id);
+        if (value.jobId && client.session.job?.id && value.jobId !== client.session.job.id) return;
+        const data = value.data || {}; clearError(true);
+        if (value.type === 'text_delta') { streamText += data.text || ''; $('runtime-status').textContent = '正在回复'; }
+        if (value.type === 'status') $('runtime-status').textContent = ({queued:'等待处理',running:'正在处理',stopping:'正在停止，请稍候',reading:'正在读取文件'})[data.status] || '正在处理';
+        if (value.type === 'tool_start' || value.type === 'tool_end') {
+          const label = data.label || (data.uploadId ? '读取文件' : '处理教学内容');
+          tools.push(label + (value.type === 'tool_start' ? ' · 进行中' : data.ok === false ? ' · 未完成' : ' · 已完成'));
+        }
+        if (value.type === 'error') showError(new Error(data.message || '处理未完成，请重试。'));
+        renderStream();
+        if (value.type === 'done') { disconnect(); reconcile(id, token).catch(error => { showError(error); reconnect(id, token); }); }
+      };
+      stream.onerror = () => { disconnect(); reconnect(id, token); };
+    }
+    function reconnect(id, token) {
+      pollTimer = global.setTimeout(async () => {
+        if (token !== epoch) return;
+        try { await reconcile(id, token); } catch (error) { showError(error); reconnect(id, token); }
+      }, 1200);
+    }
+    async function activate(id) {
+      activated = false; targetSession = id;
+      for (let attempt = 0; attempt < 8; attempt++) {
+        try { await client.activate(id); activated = true; targetSession = null; return; }
+        catch (error) { if (error.status !== 409 || attempt === 7) throw error;
+          $('runtime-status').textContent = '正在结束上一段对话，请稍候'; $('activity-details').hidden = false;
+          await new Promise(resolve => global.setTimeout(resolve, Math.min(500 * (attempt + 1), 2000)));
+        }
+      }
     }
     async function action(fn, refreshHistory = false) {
       if (busy || !authorized) return;
-      busy = true; clearError(); controls();
+      busy = true; epoch++; disconnect(); clearError(); controls();
       try { await fn(); if (refreshHistory) await history(); clearError(); }
       catch (error) { showError(error); }
       finally { busy = false; render(); schedule(); }
     }
-    $('new-session').onclick = () => action(async () => { epoch++; sourceViews.clear(); await client.create(); $('assistant-message').value = ''; $('assistant-files').value = ''; }, true);
-    $('session-history').onchange = () => { const id = $('session-history').value; if (id) action(async () => { epoch++; sourceViews.clear(); await client.load(id); $('assistant-message').value = ''; $('assistant-files').value = ''; }); };
-    $('delete-session').onclick = () => { if (global.confirm('删除本会话及私人原文件？已发布内容不会撤回。')) action(async () => { epoch++; sourceViews.clear(); await client.remove(); }, true); };
-    $('upload-form').onsubmit = event => { event.preventDefault(); action(async () => { const files = Array.from($('assistant-files').files); validateFiles(files); await client.upload(files); $('assistant-files').value = ''; }, true); };
-    $('message-form').onsubmit = event => { event.preventDefault(); const content = $('assistant-message').value.trim(); if (!content) { showError(new Error('请填写整理需求。')); return; } action(async () => { await client.mutate('messages', { content }); $('assistant-message').value = ''; }, true); };
+    function clearDraft() { pendingFiles = []; $('assistant-message').value = ''; $('assistant-files').value = ''; tools = []; renderPending(); }
+    function switchSession(id) {
+      action(async () => { epoch++; disconnect(); sourceViews.clear(); await activate(id); clearDraft(); panel(false); if (global.innerWidth <= 760) sidebar(false); }, true);
+    }
+    function reconcilePending() {
+      const uploads = (client.session?.uploads || []).filter(upload => upload.status !== 'expired');
+      for (const entry of pendingFiles) {
+        entry.stored = entry.sha256 ? uploads.find(upload => upload.sha256 === entry.sha256) : null;
+        entry.uploaded = Boolean(entry.stored);
+      }
+    }
+    async function hashPending() {
+      if (!global.crypto?.subtle) throw new Error('当前浏览器无法校验文件内容，请使用安全连接或更新浏览器后重试。');
+      await Promise.all(pendingFiles.map(async entry => {
+        if (!entry.sha256) { const digest = await global.crypto.subtle.digest('SHA-256', await entry.file.arrayBuffer()); entry.sha256 = Array.from(new Uint8Array(digest), value => value.toString(16).padStart(2, '0')).join(''); }
+      }));
+    }
+    function renderPending() {
+      reconcilePending();
+      $('pending-files').replaceChildren();
+      pendingFiles.forEach((entry, index) => { const chip = text($('pending-files'), 'div', '', 'ta-attachment'); text(chip, 'span', entry.file.name + (entry.uploaded ? entry.stored.name !== entry.file.name ? ' · 已复用 ' + entry.stored.name : ' · 已上传' : ' · 待发送'));
+        const remove = text(chip, 'button', '×'); remove.type = 'button'; remove.setAttribute('aria-label', '移除 ' + entry.file.name); remove.disabled = busy;
+        remove.onclick = () => { pendingFiles.splice(index, 1); renderPending(); };
+      });
+    }
+    function addFiles(files) {
+      if (!authorized || busy || activeJob(client.session)) return;
+      try { const added = Array.from(files); if (!added.length) return; validateFiles([...pendingFiles.map(entry => entry.file), ...added]); pendingFiles.push(...added.map(file => ({file, uploaded:false}))); renderPending(); clearError(); }
+      catch (error) { showError(error); }
+      $('assistant-files').value = '';
+    }
+    $('new-session').onclick = () => action(async () => { epoch++; disconnect(); sourceViews.clear(); const s = await client.create(); await activate(s.id); clearDraft(); panel(false); if (global.innerWidth <= 760) sidebar(false); }, true);
+    $('session-history').onchange = () => { if ($('session-history').value) switchSession($('session-history').value); };
+    $('delete-session').onclick = () => { if (global.confirm('删除本会话及私人原文件？已发布内容不会撤回。')) action(async () => { epoch++; disconnect(); sourceViews.clear(); await client.remove(); clearDraft(); activated = false; panel(false); }, true); };
+    $('attach-files').onclick = () => $('assistant-files').click();
+    $('assistant-files').onchange = () => addFiles($('assistant-files').files);
+    $('assistant-message').onpaste = event => { const files = Array.from(event.clipboardData?.files || []); if (files.length) { event.preventDefault(); addFiles(files); } };
+    $('assistant').ondragover = event => { if (Array.from(event.dataTransfer?.types || []).includes('Files')) { event.preventDefault(); $('assistant').classList.add('ta-dragging'); } };
+    $('assistant').ondragleave = event => { if (!$('assistant').contains(event.relatedTarget)) $('assistant').classList.remove('ta-dragging'); };
+    $('assistant').ondrop = event => { event.preventDefault(); $('assistant').classList.remove('ta-dragging'); addFiles(event.dataTransfer.files); };
+    $('message-form').onsubmit = event => {
+      event.preventDefault(); if (!activated || activeJob(client.session)) return;
+      const content = $('assistant-message').value.trim() || (pendingFiles.length ? '请先阅读这些文件，帮我概括主要内容。' : '');
+      if (!content) { showError(new Error('请填写消息或添加文件。')); return; }
+      action(async () => {
+        $('activity-details').hidden = false; $('runtime-status').textContent = '等待处理'; tools = [];
+        if (pendingFiles.length) {
+          $('runtime-status').textContent = '正在校验文件';
+          await hashPending();
+          // Always reconcile the current owner snapshot first, including after a lost response + failed GET.
+          await client.load(client.session.id); renderPending();
+          const unique = new Map();
+          pendingFiles.filter(entry => !entry.uploaded).forEach(entry => unique.set(entry.sha256, entry));
+          const files = Array.from(unique.values());
+          const existing = (client.session.uploads || []).filter(upload => upload.status !== 'expired');
+          if (existing.length + files.length > 5 || [...existing, ...files.map(entry => entry.file)].reduce((total, file) => total + Number(file.size || 0), 0) > 50 * 1024 * 1024) throw new Error('每段对话最多 5 份不同文件，合计 50 MiB，请新建对话继续。');
+          if (files.length) {
+            $('runtime-status').textContent = '正在上传文件';
+            try { await client.upload(files.map(entry => entry.file)); } catch (error) { renderPending(); throw error; }
+          }
+          renderPending();
+          if (pendingFiles.some(entry => !entry.uploaded)) throw new Error('服务器尚未确认收到文件，请重试上传。');
+        }
+        await client.mutate('messages', { content }); clearDraft();
+        $('runtime-status').textContent = '等待处理';
+      }, true);
+    };
+    $('assistant-message').onkeydown = event => { if (event.key === 'Enter' && !event.shiftKey && !event.isComposing && event.keyCode !== 229) { event.preventDefault(); $('message-form').requestSubmit(); } };
     $('confirm-source-review').onclick = () => action(() => client.mutate('messages', { content: '我已逐题核对原文、答案和图表，确认提取内容无误，请更新预览。' }), true);
     $('execute-plan').onclick = () => action(() => client.mutate('execute', { revision: client.session.revision }));
     $('retry-job').onclick = () => action(() => client.mutate('retry'));
-    $('cancel-job').onclick = () => action(() => client.mutate('cancel'));
-    $('refresh-session').onclick = () => action(() => client.load(client.session.id));
-    for (const tab of ['conversation', 'preview']) $('tab-' + tab).onclick = () => { $('assistant').dataset.tab = tab; for (const candidate of ['conversation', 'preview']) $('tab-' + candidate).setAttribute('aria-selected', String(candidate === tab)); };
+    $('cancel-job').onclick = $('stop-message').onclick = () => action(() => client.mutate('cancel'));
+    $('refresh-session').onclick = () => action(async () => { epoch++; disconnect(); if (targetSession) await activate(targetSession); else await client.load(client.session.id); }, true);
+    $('tab-preview').onclick = () => panel(true); $('tab-conversation').onclick = () => panel(false);
+    $('toggle-sidebar').onclick = () => sidebar($('assistant').classList.contains('ta-sidebar-collapsed'));
+    let mobileLayout = global.innerWidth <= 760;
+    global.addEventListener('resize', () => { const mobile = global.innerWidth <= 760; if (mobile !== mobileLayout) { sidebar(!mobile); mobileLayout = mobile; } });
+    $('sidebar-backdrop').onclick = () => { sidebar(false); $('toggle-sidebar').focus(); };
+    doc.addEventListener('keydown', event => {
+      if (event.key === 'Tab') {
+        const modal = !$('preview-panel').hidden && global.innerWidth <= 760 ? $('preview-panel') : !$('sidebar-backdrop').hidden ? $('sidebar') : null;
+        if (modal) { const focusable = Array.from(modal.querySelectorAll('button:not(:disabled),a[href],summary,textarea:not(:disabled)')).filter(el => el.getClientRects().length); const first = focusable[0], last = focusable.at(-1);
+          if (event.shiftKey && (doc.activeElement === first || !modal.contains(doc.activeElement))) { event.preventDefault(); last?.focus(); }
+          else if (!event.shiftKey && (doc.activeElement === last || !modal.contains(doc.activeElement))) { event.preventDefault(); first?.focus(); }
+        }
+      }
+      if (event.key === 'Escape') { if (!$('preview-panel').hidden) panel(false); sidebar(false); $('toggle-sidebar').focus(); } });
+    doc.querySelectorAll('[data-prompt]').forEach(button => { button.onclick = () => { $('assistant-message').value = button.dataset.prompt; $('assistant-message').focus(); }; });
+    scroller.onscroll = () => { nearBottom = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 100; $('jump-bottom').hidden = nearBottom; };
+    $('jump-bottom').onclick = () => { nearBottom = true; scroller.scrollTop = scroller.scrollHeight; };
     async function start() {
-      try { const data = await client.request('/api/v1/auth/me'); const user = data.user; if (!user || !['teacher', 'admin'].includes(user.role)) throw new Error('文件整理助手仅供已登录的教师和管理员使用，请返回工作台登录有权限的账号。'); authorized = true; $('assistant-account').textContent = (user.name || user.username || '') + ' · ' + (user.role === 'admin' ? '管理员' : '教师'); await history(); const id = new URL(global.location.href).searchParams.get('session'); if (id) { await client.load(id); $('session-history').value = id; } else if ($('session-history').options.length > 1) { await client.load($('session-history').options[1].value); $('session-history').value = client.session.id; } }
-      catch (error) { showError(error); } finally { render(); schedule(); }
+      busy = true; controls();
+      try { const data = await client.request('/api/v1/auth/me'); const user = data.user; if (!user || !['teacher', 'admin'].includes(user.role)) throw new Error('文件整理助手仅供已登录的教师和管理员使用，请返回工作台登录有权限的账号。'); authorized = true; $('assistant-account').textContent = (user.name || user.username || '') + ' · ' + (user.role === 'admin' ? '管理员' : '教师'); await history(); const id = new URL(global.location.href).searchParams.get('session'); if (id) { await activate(id); $('session-history').value = id; } else if ($('session-history').options.length > 1) { await activate($('session-history').options[1].value); $('session-history').value = client.session.id; } else { const session = await client.create(); await activate(session.id); } await history(); }
+      catch (error) { showError(error); } finally { busy = false; render(); schedule(); }
     }
     start();
-    global.addEventListener('pagehide', () => { epoch++; global.clearTimeout(pollTimer); });
+    global.addEventListener('pagehide', () => { epoch++; disconnect(); });
     return { client, render, start };
   }
   global.KGTeacherAssistant = { createClient, validateFiles, activeJob, init };

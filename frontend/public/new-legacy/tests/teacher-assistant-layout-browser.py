@@ -12,7 +12,7 @@ with sync_playwright() as p:
     response=context.request.post(BASE+'/api/v1/auth/login',data={**accounts['teacher'],'acceptedTermsVersion':'2026-08-13-v1'})
     assert response.ok,'测试教师登录失败'
     def html(route):
-        response=route.fetch();route.fulfill(response=response,body=response.text().replace('class="teacher-admin-shell"','class="teacher-admin-shell ta-page"'))
+        route.fulfill(status=200,content_type='text/html',body=(ROOT/'teacher-assistant.html').read_text())
     context.route('**/teacher-assistant.html?*',html)
     for filename in ('styles/teacher-assistant.css','src/teacher/teacher-assistant.js'):
         def override(route,request=None,filename=filename):route.fulfill(status=200,content_type='text/css' if filename.endswith('.css') else 'application/javascript',body=(ROOT/filename).read_text())
@@ -21,12 +21,10 @@ with sync_playwright() as p:
     for width,height in ((1440,1000),(390,844)):
         page.set_viewport_size({'width':width,'height':height});page.goto(BASE+'/teacher-assistant.html?session='+SESSION)
         expect(page.locator('#execution-receipt .ta-receipt-item')).to_have_count(3,timeout=30000)
-        if width<760:page.locator('#tab-preview').click()
-        metrics=page.evaluate('''() => {const title=document.querySelector('.ta-toolbar h1').getBoundingClientRect(),header=document.querySelector('.tw-topbar').getBoundingClientRect();return {width:innerWidth,scrollWidth:document.documentElement.scrollWidth,titleWidth:title.width,titleHeight:title.height,titleTop:title.top,headerBottom:header.bottom,receiptHeight:document.querySelector('#execution-receipt').getBoundingClientRect().height,detailsOpen:document.querySelector('.ta-receipt-details').open}}''')
-        assert metrics['scrollWidth']<=width+1,metrics
-        assert metrics['titleWidth']>width*.6,metrics
-        assert metrics['titleHeight']<70,metrics
-        assert metrics['titleTop']>=metrics['headerBottom'],metrics
+        page.locator('#tab-preview').click()
+        metrics=page.evaluate("""() => ({width:innerWidth,scrollWidth:document.documentElement.scrollWidth,panelWidth:document.querySelector('#preview-panel').getBoundingClientRect().width,receiptHeight:document.querySelector('#execution-receipt').getBoundingClientRect().height,detailsOpen:document.querySelector('.ta-receipt-details').open})""")
+        assert metrics['scrollWidth']<=width,metrics
+        assert metrics['panelWidth']>300,metrics
         assert not metrics['detailsOpen'],metrics
         assert metrics['receiptHeight']<1000,metrics
         assert page.locator('#execution-receipt .ta-receipt-item a').count()>=3

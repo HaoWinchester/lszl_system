@@ -1,6 +1,6 @@
 # 持久对话与历史练习重进：验证记录
 
-当前状态：本地实现与独立代码审查通过，正在准备 UAT 发布候选；尚未部署本轮修改。UAT 仍为 v9.0-p4.1.244；main 和正式环境未修改。本记录后续随实际验证更新，开发自检不代表用户 UAT 验收。
+当前状态：本地实现与独立代码审查通过，已合入本地 uat，v9.0-p4.1.245 已通过完整发布校验；尚未部署本轮修改。UAT 仍为 v9.0-p4.1.244；main 和正式环境未修改。本记录后续随实际验证更新，开发自检不代表用户 UAT 验收。
 
 ## 历史练习重进
 
@@ -47,3 +47,15 @@
 2026-09-27 本地访问服务器 SSH 22 端口多次连接超时；现有 UAT HTTPS 和 `/api/v1/health` 仍返回应用及数据库正常。未因此修改防火墙、重启服务或部署代码。原生模型探针尚未到达服务器，不能将该情况描述为模型调用超时。
 
 正式部署前必须另做新一轮 UAT 代码和数据库备份，校验并记录目录；仅发布 UAT。当前无本轮部署备份或发布成功结论。
+
+## 245 发布候选
+
+- 本地 uat 已快进合入 62bac687；main 保持 00edf978。
+- 按既有 VERSION 递增和 content-prep 构建流程生成 245，运行 `node frontend/scripts/manage-new-legacy.js update new-legacy --validation-profile full`；未使用跳过校验参数。
+- 244 的 1018 个路径全部保留，245 为 1021 文件，新增 3 个回归测试；admin-console、teacher-assistant、question-training、practice-mode、knowledge-recall 页面均存在。
+- `frontend/public/new-legacy` 与候选 site 的 1021 个文件 SHA-256 逐一相同。
+- 首轮完整测试脚本退出 0：后端 896 项、前端 280 项、Python 契约 9 项、部署脚本、接口、练习/跨域浏览器和视觉检查通过，总计 835 秒。管理器最后因校验期间同步产物发生变化而拒绝 promote；此轮不记为发布门禁通过。随后固定文件重新完整校验，通过全部门禁并本地 promote；尚未远端部署。
+
+- 第二轮管理器退出 0：后端 896 passed（3 条既有警告）、前端 280、Python 契约 9、部署脚本、API、练习和跨域浏览器、视觉检查均通过；全程 833 秒。校验输入未变化，`validation.json` 为 `passed=true`、`profile=full`、未跳过。四组既有视觉基线差异均为 0%。
+- 本地 active release 为 245，previousVersion=244；sourceHash `780bc7d7825221d251fcd21968b15a9420fb60a7b0cf395864284bab300cc907`。这是本地发布候选状态，不代表服务器版本。
+- 最终 SSH 重试仍为端口 22 连接超时；同期 UAT health 为应用/数据库正常。远端未备份、未部署、未重启，仍是 244。需 SSH 恢复后进行新备份、真实 Claude/GLM/MCP/图片验证及已发布页面回归。
