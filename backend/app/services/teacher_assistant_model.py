@@ -83,7 +83,12 @@ async def stream_reply(*,session_id,resume,cwd,mcp_config,prompt,system_prompt,o
     if len(prompt.encode())>220000: raise ModelError('本次上下文过大，请拆分需求。')
     cwd=Path(cwd);cwd.mkdir(parents=True,exist_ok=True,mode=0o700)
     config=cwd/'config';config.mkdir(exist_ok=True,mode=0o700)
-    env={**os.environ,'CLAUDE_CONFIG_DIR':str(config)}
+    # Pydantic dotenv values are not os.environ entries. The fresh MCP
+    # interpreter runs in this private cwd, so pass its effective configuration
+    # through inherited environment, never through CLI args/MCP JSON or logs.
+    env={**os.environ,'CLAUDE_CONFIG_DIR':str(config),
+        'DATABASE_URL':settings.DATABASE_URL,
+        'TEACHER_ASSISTANT_STORAGE':str(Path(settings.TEACHER_ASSISTANT_STORAGE).resolve())}
     output_size=0;reply='';result_seen=False
     # Neither stderr nor CLI internals are stored as user-facing events.
     try:

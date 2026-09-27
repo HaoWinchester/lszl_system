@@ -303,3 +303,59 @@ def test_scoped_image_tool_returns_real_image_block(tmp_path,monkeypatch):
             block=result['content'][1];assert block['type']=='image' and block['mimeType']=='image/jpeg'
             with Image.open(io.BytesIO(base64.b64decode(block['data']))) as image: assert image.size==(40,30)
         asyncio.run(read())
+
+
+def test_native_mcp_inherits_effective_dotenv_database_and_storage(tmp_path,monkeypatch):
+    """The CLI and its real MCP child run away from the directory owning .env."""
+    import sys
+    from pathlib import Path
+    from PIL import Image
+    from app.core.config import Settings,settings
+    from app.services import teacher_assistant_model as model
+    from app.db.session import AsyncSessionLocal
+    from app.models.teacher_assistant import TeacherAssistantUpload as Upload,TeacherAssistantJob as Job
+    a,_,_=users();uid='tau_'+uuid4().hex
+    with TestClient(app) as c:
+        login(c,a);sid=c.post('/api/v1/teacher-assistant/sessions').json()['session']['id'];url='/api/v1/teacher-assistant/sessions/'+sid
+        jid=c.post(url+'/messages',json={'content':'读取附件','requestId':uuid4().hex}).json()['session']['job']['id']
+    directory=tmp_path/'private-uploads'/sid/uid/'extracted';directory.mkdir(parents=True)
+    Image.new('RGB',(27,19),'green').save(directory/'image.png')
+    async def seed():
+        async with AsyncSessionLocal() as db:
+            db.add(Upload(id=uid,session_id=sid,name='dotenv.png',size=99,digest='d'*64,status='ready',extracted={'kind':'image','sections':[{'text':'','images':['image.png']}]}))
+            job=await db.get(Job,jid);job.status='running';await db.commit()
+    asyncio.run(seed())
+    cli=tmp_path/'fake-claude'
+    cli.write_text('#!'+sys.executable+'\n'+'''import json,os,subprocess,sys
+sys.stdin.read()
+config=json.loads(sys.argv[sys.argv.index('--mcp-config')+1])
+assert 'DATABASE_URL' not in json.dumps(config)
+server=config['mcpServers']['teacher']
+child=subprocess.Popen([server['command'],*server['args']],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,text=True,env={**os.environ,**server['env']})
+try:
+    def call(method,params={}):
+        child.stdin.write(json.dumps({'jsonrpc':'2.0','id':1,'method':method,'params':params})+'\\n');child.stdin.flush()
+        return json.loads(child.stdout.readline())['result']
+    call('initialize')
+    listed=call('tools/call',{'name':'list_files','arguments':{}})
+    files=json.loads(listed['content'][0]['text'])['files'];assert files[0]['name']=='dotenv.png'
+    picture=call('tools/call',{'name':'read_image','arguments':{'uploadId':files[0]['uploadId'],'name':'image.png'}})
+    assert picture['content'][1]['type']=='image'
+    print(json.dumps({'type':'result','result':'真实 MCP 已读取 dotenv 附件'}),flush=True)
+finally:
+    child.terminate();child.wait()
+''');cli.chmod(0o700)
+    dotenv=tmp_path/'.env'
+    dotenv.write_text('DATABASE_URL='+settings.DATABASE_URL+'\nTEACHER_ASSISTANT_STORAGE='+str(tmp_path/'private-uploads')+'\nTEACHER_ASSISTANT_CLAUDE='+str(cli)+'\n')
+    for key in ('DATABASE_URL','TEACHER_ASSISTANT_STORAGE','TEACHER_ASSISTANT_CLAUDE'):monkeypatch.delenv(key,raising=False)
+    effective=Settings(_env_file=dotenv)
+    monkeypatch.setattr(model,'settings',effective);monkeypatch.setenv('ANTHROPIC_AUTH_TOKEN','test-only')
+    config={'mcpServers':{'teacher':{'command':sys.executable,'args':['-m','app.services.teacher_assistant_mcp'],'env':{'PYTHONPATH':str(Path(__file__).resolve().parents[1]),'TEACHER_TOOL_OWNER':a,'TEACHER_TOOL_SESSION':sid,'TEACHER_TOOL_JOB':jid}}}}
+    output=[]
+    async def run():
+        async def event(kind,data):output.append(data)
+        async def started():pass
+        async def active():return True
+        await model.stream_reply(session_id=str(uuid4()),resume=False,cwd=tmp_path/'unrelated-runtime',mcp_config=config,prompt='文件',system_prompt='safe',on_event=event,on_started=started,is_active=active)
+    asyncio.run(run())
+    assert output==[{'text':'真实 MCP 已读取 dotenv 附件'}]
