@@ -55,9 +55,9 @@
     function positionToolbar(){
       if(!opened||!trigger())return;
       const rect=trigger().getBoundingClientRect(),box=toolbar.getBoundingClientRect(),settings=panel.hidden?null:panel.getBoundingClientRect();
-      const left=Math.max(8,Math.min(rect.right-box.width,global.innerWidth-box.width-8));
+      const left=Math.max(8,Math.min(options.placement==='right'?rect.right+8:rect.right-box.width,global.innerWidth-box.width-8));
       toolbar.style.left=left+'px';
-      toolbar.style.top=Math.max(8,Math.min(rect.bottom+8,global.innerHeight-box.height-(settings?settings.height+8:0)-8))+'px';
+      toolbar.style.top=Math.max(8,Math.min(options.placement==='right'?rect.top:rect.bottom+8,global.innerHeight-box.height-(settings?settings.height+8:0)-8))+'px';
       if(settings){panel.style.right='auto';panel.style.left=(Math.max(8,Math.min(left+box.width-settings.width,global.innerWidth-settings.width-8))-left)+'px'}
     }
     function setOpen(value){opened=!!value;if(!opened){settingsOpen=false;setTool('select')}else setTool('pen');refreshControls();positionToolbar()}
@@ -195,6 +195,7 @@
     },true);
     listen(global,'keyup',event=>{if(event.code==='Space'){space=false;viewport.classList.remove('canvas-ink-panning')}},true);
     listen(global,'resize',()=>{cancel();positionToolbar()});
+    listen(doc,'scroll',()=>{cancel();positionToolbar()},true);
     listen(global,'blur',()=>{cancel();space=false;viewport.classList.remove('canvas-ink-panning')});
     // Cancel instead of mixing coordinate systems if zoom changes mid-stroke.
     listen(global,'wheel',event=>{if(active&&viewport.contains(event.target))cancel()},true);

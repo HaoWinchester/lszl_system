@@ -6,7 +6,7 @@
     if(global.KGHomeInk||!global.KGCanvasInk||!stage||!world)return;
     let previous;
     const ink=global.KGCanvasInk.create({
-      viewport:stage,world,trigger:()=>document.getElementById('homeInkBtn'),
+      viewport:stage,world,placement:'right',trigger:()=>document.getElementById('homeInkBtn'),
       getViewport:()=>state.viewport,getStrokes:()=>state.strokes||[],
       isReadonly:()=>!canWriteGraph(),
       history:ensureGraphHistoryController(),showHistory:true,

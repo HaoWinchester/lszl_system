@@ -42,10 +42,14 @@ def main():
         assert len(response.json()['graphData']['strokes'])==1,response.text()[:300]
         page.reload(wait_until='networkidle');expect(page.locator('.canvas-ink-layer path')).to_have_count(1)
         expect(tool).to_be_hidden()
+        page.locator('#homeInkBtn').click()
+        assert page.locator('#homeCaptureBtn').evaluate('(el)=>{const r=el.getBoundingClientRect();return el.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))}'), 'open ink panel must not cover screenshot entry'
+        before_capture=page.locator('#stage').bounding_box()
         with page.expect_download(timeout=30000) as download: page.locator('#homeCaptureBtn').click()
+        assert page.locator('#stage').bounding_box()==before_capture, 'capture must not scroll live canvas'
         download.value.save_as(str(OUT/'graph-capture.png'))
         page.screenshot(path=str(OUT/'graph-page.png'))
-        page.locator('#homeInkBtn').click();tool.locator('[data-ink-tool=eraser]').dblclick()
+        tool.locator('[data-ink-tool=eraser]').dblclick()
         expect(page.locator('.canvas-ink-layer path')).to_have_count(0)
         tool.locator('[data-ink-action=undo]').click();expect(page.locator('.canvas-ink-layer path')).to_have_count(1)
         assert len(page.evaluate('state.nodes'))==2

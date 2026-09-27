@@ -1,11 +1,12 @@
 {
   "schemaVersion": 1,
   "fromVersion": "v9.0-p4.1.253",
-  "toVersion": "v9.0-p4.1.253",
+  "toVersion": "v9.0-p4.1.254",
   "changes": {
     "added": [],
     "changed": [
-      "tests/graph-file-tabs-remote.test.js"
+      "VERSION",
+      "content-prep-studio/dist/content-prep.html"
     ],
     "removed": []
   },
