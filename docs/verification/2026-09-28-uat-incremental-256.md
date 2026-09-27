@@ -24,3 +24,16 @@
 - 画布验证器使用候选 release、隔离 PostgreSQL 和单独 Chrome；不连接用户已打开的浏览器。
 
 发布完成后的版本、提交、完整验证与 UAT 浏览器结果在本文件追加记录。正式环境不在本次发布范围内。
+
+
+## 发布结果
+
+- UAT 版本：v9.0-p4.1.256；运行代码提交：faa6d494c017208cc258737e645c03944aab4f3a。已快进合入 uat 并通过代理推送，远端引用一致；main 未变。
+- 完整受管验证通过：903 项后端测试、283 项前端 Node 契约、9 项 Python 契约、部署脚本夹具、做题/跨业务/归纳卡与错题/画布/视觉检查。完整验证约 951 秒，实际部署复用结果，release-validation 仅 2 秒。
+- 本次实际部署约 55 秒：rsync 6 秒，发送 7,536,563 字节（约 7.5 MB），镜像与服务步骤 15 秒，健康检查 14 秒。服务器剩余约 8.1 GiB。
+- 已保留 UAT 回退镜像标签 lszl-kg-backend:uat-before-256 和 lszl-teacher-assistant:uat-before-256。本次不涉及正式环境部署。
+- 上线后独立 Chrome 验证通过：知识图谱、多题归纳、深度回忆的入口折叠、手形光标/提示、颜色、绘画、PNG、双击清除/撤销、持久化；两个不同试卷的标签页保留正确试卷和选中卡片，观察期间 DOM 不被重建。
+- 从 UAT HTTPS 读取的 77-multi-question-workspace.js、94-canvas-ink.js 和 canvas-ink.css 哈希与发布产物一致。
+- 临时验证账号与其依赖数据已清理，未改动真实教师/学员内容。此次浏览器验证是开发自检，待用户业务验收后才考虑 main/正式发布。
+
+证据：artifacts/canvas-flicker/release-256.log、deploy-uat-256.log、verify-uat-256.log、cleanup-uat-256.log；frontend/new-legacy-releases/v9.0-p4.1.256/validation.json；artifacts/canvas-tools/uat-results.json。

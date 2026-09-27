@@ -1,14 +1,10 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.255",
+  "fromVersion": "v9.0-p4.1.256",
   "toVersion": "v9.0-p4.1.256",
   "changes": {
     "added": [],
-    "changed": [
-      "VERSION",
-      "content-prep-studio/dist/content-prep.html",
-      "tests/helpers/canvas_ink_server.py"
-    ],
+    "changed": [],
     "removed": []
   },
   "incompatible": []
