@@ -142,7 +142,11 @@ def check_page(context,base,kind):
     zoom=page.locator('#qwZoomInBtn' if kind=='workspace' else '#krZoomInBtn')
     old=page.locator('.canvas-ink-layer path').first.bounding_box()
     zoom.click()
-    page.wait_for_timeout(200)
+    if kind=='recall':
+        # Recall zoom animates for 420ms; sample anchored boxes only after it ends.
+        page.locator('#krWorld').evaluate('async el=>{await Promise.all(el.getAnimations().map(a=>a.finished))}')
+    else:
+        page.wait_for_timeout(200)
     new=page.locator('.canvas-ink-layer path').first.bounding_box()
     assert new['width']>old['width'],'Zoom did not scale path'
     assert paths==page.locator('.canvas-ink-layer path').evaluate_all('(els)=>els.map(e=>e.getAttribute("d"))'),'Zoom changed world coordinates'
