@@ -1,13 +1,13 @@
 <!doctype html>
-<html data-release="v9.0-p4.1.245" lang="zh-CN"><head>
-<script src="./teaching-content-sync.js?v=v9.0-p4.1.245"></script><!-- kg-teaching-content-sync:generated -->
+<html data-release="v9.0-p4.1.246" lang="zh-CN"><head>
+<script src="./teaching-content-sync.js?v=v9.0-p4.1.246"></script><!-- kg-teaching-content-sync:generated -->
 <!-- kg-direct-bootstrap-anchor -->
-<script src="./runtime-config.override.js?v=v9.0-p4.1.245"></script><!-- kg-runtime:generated -->
-<script src="./auth-session-bootstrap.js?v=v9.0-p4.1.245"></script><!-- kg-auth-session:generated -->
-<script src="./domain-api-client.js?v=v9.0-p4.1.245"></script><!-- kg-domain-api:generated -->
-<script src="src/28-device-preferences.js?v=v9.0-p4.1.245"></script><!-- kg-device-preferences:generated -->
-<script defer src="./direct-entry.js?v=v9.0-p4.1.245"></script><!-- kg-direct-entry:generated -->
-<script defer src="./feature-analytics.js?v=v9.0-p4.1.245"></script><!-- kg-feature-analytics:generated --><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>教学助手｜幻谱</title><link rel="stylesheet" href="styles/teacher-assistant.css?v=v9.0-p4.1.245"></head>
+<script src="./runtime-config.override.js?v=v9.0-p4.1.246"></script><!-- kg-runtime:generated -->
+<script src="./auth-session-bootstrap.js?v=v9.0-p4.1.246"></script><!-- kg-auth-session:generated -->
+<script src="./domain-api-client.js?v=v9.0-p4.1.246"></script><!-- kg-domain-api:generated -->
+<script src="src/28-device-preferences.js?v=v9.0-p4.1.246"></script><!-- kg-device-preferences:generated -->
+<script defer src="./direct-entry.js?v=v9.0-p4.1.246"></script><!-- kg-direct-entry:generated -->
+<script defer src="./feature-analytics.js?v=v9.0-p4.1.246"></script><!-- kg-feature-analytics:generated --><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>教学助手｜幻谱</title><link rel="stylesheet" href="styles/teacher-assistant.css?v=v9.0-p4.1.246"></head>
 <body class="ta-page"><main id="assistant" aria-busy="true">
 <button id="sidebar-backdrop" class="ta-backdrop" aria-label="关闭会话列表" hidden></button>
 <aside id="sidebar" class="ta-sidebar" aria-label="会话列表"><a class="ta-brand" href="teacher-workbench.html"><span class="ta-brand-mark">幻</span><strong>幻谱 <span>教学助手</span></strong></a><button id="new-session" disabled>＋ 新建对话</button><h2>最近对话</h2><select id="session-history" aria-label="历史会话" hidden disabled></select><nav id="session-list" aria-label="历史对话"></nav><div class="ta-sidebar-footer"><button id="delete-session" disabled>删除当前对话</button><a href="teacher-workbench.html">← 返回教师工作台</a><span id="assistant-account">正在检查权限</span></div></aside>
@@ -15,4 +15,4 @@
 <section id="conversation-panel" class="ta-conversation" aria-label="对话"><div class="ta-chat-width"><div id="welcome" class="ta-welcome"><span class="ta-eyebrow">幻谱 · 教师工作空间</span><h1>今天，一起准备什么？</h1><p>聊聊教学想法，或发来一份文件。<br>从理解材料开始，把内容整理成你需要的样子。</p><div class="ta-suggestions"><button data-prompt="帮我梳理这份教学材料的重点">梳理材料重点 <span>↗</span></button><button data-prompt="我想设计一节课，请先了解我的教学目标">一起设计一节课 <span>↗</span></button></div></div><div id="messages" role="log" aria-live="polite"></div><details id="files-details" class="ta-files-details" hidden><summary>本次对话的文件</summary><div id="uploads"></div></details><article id="stream-message" class="ta-message assistant" hidden><strong>教学助手</strong><div id="stream-text"></div></article><div id="conversation-result"></div><details id="activity-details" hidden><summary id="runtime-status" role="status">等待处理</summary><div id="tool-activity"></div></details></div></section>
 <div class="ta-composer-area"><button id="jump-bottom" hidden aria-label="滚动到最新消息">↓ 最新消息</button><div id="assistant-error" role="alert" hidden></div><form id="message-form"><div id="pending-files" aria-live="polite"></div><label class="ta-sr-only" for="assistant-message">发送消息</label><textarea id="assistant-message" rows="2" maxlength="10000" placeholder="发消息，或添加教学文件…" disabled></textarea><div class="ta-composer-tools"><input id="assistant-files" type="file" accept=".json,.doc,.docx,.pdf,.ppt,.pptx,.png,.jpg,.jpeg,.webp" multiple hidden disabled><button id="attach-files" type="button" aria-label="添加文件或图片" title="添加文件或图片" disabled>＋</button><span>文件 · 图片 · 教学想法</span><button id="stop-message" type="button" aria-label="停止回复" hidden>■</button><button id="send-message" aria-label="发送消息" disabled>↑</button></div></form><details class="ta-disclosure"><summary>AI 内容请核对 · 文件与隐私说明</summary><p>上传内容可能交由管理员配置的模型或 OCR 服务处理。对话中已使用的文件会随对话保留；未使用且未执行的上传按 30 天清理。完整操作回执保留 180 天。删除会话会删除私人历史，但不撤回已发布内容及其受保护来源。每段对话最多 5 份、单份 20 MiB、合计 50 MiB、单文档 200 页。</p></details></div></section>
 <section id="preview-panel" class="ta-panel" role="dialog" aria-modal="false" aria-label="教学成果" hidden><header><div><small>教学成果</small><h2>核对与使用</h2></div><button id="tab-conversation" aria-label="关闭成果面板">×</button></header><p id="job-status" role="status">请选择或新建会话。</p><div id="plan-preview"></div><div class="ta-actions"><button id="confirm-source-review" hidden disabled>已逐题核对原文与答案</button><button id="execute-plan" disabled>确认保存草稿</button><button id="retry-job" hidden>重试未完成步骤</button><button id="cancel-job" hidden>取消后续步骤</button></div><p class="ta-note">执行以当前方案为准。停止不能撤销已提交的结果，请以回执为准。</p><div id="execution-receipt"></div></section>
-</main><script src="src/teacher/teacher-assistant.js?v=v9.0-p4.1.245"></script></body></html>
+</main><script src="src/teacher/teacher-assistant.js?v=v9.0-p4.1.246"></script></body></html>

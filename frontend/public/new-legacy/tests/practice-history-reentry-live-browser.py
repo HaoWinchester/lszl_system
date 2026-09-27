@@ -136,7 +136,7 @@ with sync_playwright() as p:
         posted = pending.value
         assert posted.status == 201, posted.text()
         comment = posted.json()['comment']
-        page.locator(f'[data-comment-id="{comment["id"]}"]').wait_for(state='visible')
+        page.locator(f'.q-comments-drawer [data-comment-id="{comment["id"]}"]').wait_for(state='visible')
         check('posted real comment through completed-report UI')
         page.locator('.q-comments-drawer [data-qc-action="collapse"]').click()
         page.locator('[data-report-lobby]').click()

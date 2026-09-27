@@ -1,23 +1,13 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.244",
-  "toVersion": "v9.0-p4.1.245",
+  "fromVersion": "v9.0-p4.1.245",
+  "toVersion": "v9.0-p4.1.246",
   "changes": {
-    "added": [
-      "tests/practice-history-reentry-browser.py",
-      "tests/practice-history-reentry-live-browser.py",
-      "tests/teacher-assistant-conversation-browser.py"
-    ],
+    "added": [],
     "changed": [
       "VERSION",
       "content-prep-studio/dist/content-prep.html",
-      "src/100-practice-mode.js",
-      "src/teacher/teacher-assistant.js",
-      "styles/teacher-assistant.css",
-      "teacher-assistant.html",
-      "tests/teacher-assistant-browser.py",
-      "tests/teacher-assistant-layout-browser.py",
-      "tests/teacher-assistant.test.js"
+      "tests/practice-history-reentry-live-browser.py"
     ],
     "removed": []
   },
