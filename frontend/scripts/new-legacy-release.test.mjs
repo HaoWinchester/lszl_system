@@ -288,16 +288,16 @@ test('a matching validated release is reused without running the validator twice
   assert.match(report.validatorHash, /^[a-f0-9]{64}$/)
 })
 
-test('uat-fast validation cannot be selected without an authoritative deployed base', () => {
+for (const profile of ['uat-fast', 'uat-canvas']) test(`${profile} validation cannot be selected without an authoritative deployed base`, () => {
   const root = makeRoot()
   const validator = resolve(root, 'never-run-fast-validation.sh')
   writeFileSync(validator, '#!/bin/sh\nexit 0\n')
   chmodSync(validator, 0o755)
 
-  const result = runWithValidationProfile(root, validator, 'uat-fast')
+  const result = runWithValidationProfile(root, validator, profile)
 
   assert.notEqual(result.status, 0)
-  assert.match(result.stderr, /uat-fast.*UAT 已部署基线/s)
+  assert.match(result.stderr, new RegExp(`${profile}.*UAT 已部署基线`, 's'))
 })
 
 test('uat-fast rejects a caller base that differs from remote UAT state', () => {

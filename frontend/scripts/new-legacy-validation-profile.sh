@@ -2,6 +2,9 @@
 
 new_legacy_validation_groups() {
   case "${1:-full}" in
+    uat-canvas)
+      printf '%s\n' frontend-contracts integrated-core canvas-e2e workspace-assets-e2e visual-regression
+      ;;
     uat-fast)
       printf '%s\n' \
         frontend-contracts \
@@ -17,6 +20,8 @@ new_legacy_validation_groups() {
         integrated-core \
         practice-e2e \
         cross-domain-e2e \
+        canvas-e2e \
+        workspace-assets-e2e \
         visual-regression
       ;;
     *)

@@ -68,6 +68,10 @@ if ! grep -q "^update .* --validation-profile uat-fast --uat-base-commit $BASE_C
   sed -n '1,180p' "$OUTPUT_LOG" >&2
   exit 1
 fi
+if grep -q 'up -d --build' "$CALL_LOG" || ! grep -q 'up -d --no-deps backend' "$CALL_LOG"; then
+  echo 'Frontend-only deployments must replace only backend, retaining assistant services' >&2
+  exit 1
+fi
 if grep -q '^build ' "$CALL_LOG"; then
   echo "page-only UAT deployment must not rebuild content-prep" >&2
   cat "$CALL_LOG" >&2

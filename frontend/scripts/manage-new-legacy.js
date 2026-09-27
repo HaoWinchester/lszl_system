@@ -58,7 +58,7 @@ function parseArgs(argv) {
     } else if (value === '--validation-profile') {
       if (!argv[index + 1]) throw new Error('--validation-profile 缺少参数')
       validationProfile = argv[index + 1]
-      if (!['full', 'uat-fast'].includes(validationProfile)) {
+      if (!['full', 'uat-fast', 'uat-canvas'].includes(validationProfile)) {
         throw new Error(`不支持的验收级别：${validationProfile}`)
       }
       index += 1
@@ -73,8 +73,8 @@ function parseArgs(argv) {
   return { command: positional[0] || 'status', argument: positional[1], root, skipValidation, validationProfile, uatBaseCommit }
 }
 
-function requireAuthorizedUatFast(baseCommit) {
-  if (!baseCommit) throw new Error('uat-fast 必须提供 UAT 已部署基线')
+function requireAuthorizedUatFast(baseCommit, profile = 'uat-fast') {
+  if (!baseCommit) throw new Error(`${profile} 必须提供 UAT 已部署基线`)
   const deployed = spawnSync('ssh', [uatRemote, `cat ${uatRemoteStatePath} 2>/dev/null || true`], {
     cwd: repoDir,
     encoding: 'utf8',
@@ -97,8 +97,8 @@ function requireAuthorizedUatFast(baseCommit) {
   })
   if (classified.status !== 0) throw new Error(classified.stderr.trim() || '无法识别 UAT 改动范围')
   const decision = JSON.parse(classified.stdout)
-  if (decision.validationProfile !== 'uat-fast') {
-    throw new Error('UAT 实际改动不属于页面快速白名单，拒绝 uat-fast')
+  if (decision.validationProfile !== profile) {
+    throw new Error(`UAT 实际改动不属于对应页面白名单，拒绝 ${profile}`)
   }
   verifyDeterministicUatArtifacts(paths)
 }
@@ -616,7 +616,7 @@ function rollback(root) {
 
 function main() {
   const args = parseArgs(process.argv.slice(2))
-  if (args.validationProfile === 'uat-fast') requireAuthorizedUatFast(args.uatBaseCommit)
+  if (args.validationProfile !== 'full') requireAuthorizedUatFast(args.uatBaseCommit, args.validationProfile)
   let result
   if (args.command === 'inspect') result = inspect(args.argument)
   else if (args.command === 'update') result = update(args.root, args.argument, args.skipValidation, args.validationProfile)

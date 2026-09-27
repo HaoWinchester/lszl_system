@@ -141,3 +141,27 @@ test('operational Markdown records do not force a practice-only deployment to fu
     assert.equal(classify(['new-legacy/practice-mode.html', path]).validationProfile, 'full')
   }
 })
+
+test('canvas changes select three-page checks without unrelated practice or backend suites', () => {
+  assert.equal(classify([
+    'new-legacy/src/77-multi-question-workspace.js',
+    'new-legacy/src/canvas/94-canvas-ink.js',
+    'new-legacy/styles/canvas-ink.css',
+    'new-legacy/tests/workspace-multitab-browser.py',
+    'new-legacy/tests/helpers/canvas_ink_server.py',
+    'new-legacy/VERSION',
+    'frontend/public/new-legacy/index.html',
+  ]).validationProfile, 'uat-canvas')
+  const result = spawnSync('bash', [validationProfileCommand, 'uat-canvas'], {encoding:'utf8'})
+  assert.equal(result.status, 0, result.stderr)
+  const groups = new Set(result.stdout.trim().split(/\r?\n/))
+  for (const group of ['frontend-contracts', 'integrated-core', 'canvas-e2e', 'workspace-assets-e2e', 'visual-regression']) assert.ok(groups.has(group))
+  for (const group of ['backend-tests', 'practice-e2e', 'cross-domain-e2e']) assert.ok(!groups.has(group))
+})
+
+test('canvas fast validation rejects backend, deployment, authentication and mixed-domain edits', () => {
+  for (const path of ['backend/app/main.py', 'backend/app/seed/guided_course_v8_6_0.json', 'deploy/update-uat.sh', 'new-legacy/src/41-account-menu.js', 'new-legacy/src/100-practice-mode.js']) {
+    assert.equal(classify(['new-legacy/src/77-multi-question-workspace.js', path]).validationProfile, 'full', path)
+  }
+  assert.equal(classify(['new-legacy/tests/workspace-multitab-browser.py']).validationProfile, 'full')
+})

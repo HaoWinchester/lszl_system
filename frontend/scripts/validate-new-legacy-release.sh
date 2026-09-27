@@ -117,10 +117,12 @@ cd "$REPO_DIR/frontend"
 pnpm test
 
 cd "$REPO_DIR"
+if [ "$VALIDATION_PROFILE" != "uat-canvas" ]; then
 deployment_timing_stage landing-contracts-browser
 node new-legacy/tests/landing-page-contract.test.js
 node new-legacy/tests/shared-auth-dialog.test.js
 python3 new-legacy/tests/landing-page-browser.py
+fi
 if new_legacy_validation_group_enabled "$VALIDATION_PROFILE" extended-contracts; then
   deployment_timing_stage extended-contracts
   node --test \
@@ -201,6 +203,7 @@ deployment_timing_stage core-practice-browser
 E2E_BASE_URL="http://127.0.0.1:$INTEGRATED_PORT" \
 E2E_RELEASE_VERSION="$RELEASE_VERSION" \
   python3 frontend/e2e/new_legacy_smoke.py
+if new_legacy_validation_group_enabled "$VALIDATION_PROFILE" practice-e2e; then
 E2E_BASE_URL="http://127.0.0.1:$INTEGRATED_PORT" \
   python3 frontend/e2e/practice_mode_initial_view.py
 E2E_BASE_URL="http://127.0.0.1:$INTEGRATED_PORT" \
@@ -208,6 +211,11 @@ KG_E2E_ACTIVE_RELEASE_ROOT="$VALIDATION_ROOT/releases" \
   python3 frontend/e2e/practice_resumable_report.py
 python3 new-legacy/tests/practice-answer-sheet-browser.py
 python3 new-legacy/tests/practice-result-report-browser.py
+fi
+if new_legacy_validation_group_enabled "$VALIDATION_PROFILE" canvas-e2e; then
+  deployment_timing_stage canvas-browser
+  python3 frontend/e2e/canvas_release_regression.py --release-root "$VALIDATION_ROOT/releases"
+fi
 if new_legacy_validation_group_enabled "$VALIDATION_PROFILE" cross-domain-e2e; then
   deployment_timing_stage cross-domain-browser
   E2E_BASE_URL="http://127.0.0.1:$INTEGRATED_PORT" \
@@ -220,6 +228,9 @@ if new_legacy_validation_group_enabled "$VALIDATION_PROFILE" cross-domain-e2e; t
     python3 frontend/e2e/membership_checkout.py
   E2E_BASE_URL="http://127.0.0.1:$INTEGRATED_PORT" \
     python3 frontend/e2e/p4515_flow_indicator.py
+fi
+if new_legacy_validation_group_enabled "$VALIDATION_PROFILE" workspace-assets-e2e; then
+  deployment_timing_stage workspace-assets-browser
   E2E_BASE_URL="http://127.0.0.1:$INTEGRATED_PORT" \
     python3 frontend/e2e/multi_question_learning_assets.py
 fi

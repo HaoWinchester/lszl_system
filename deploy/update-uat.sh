@@ -120,9 +120,9 @@ cd "$REPO_DIR/frontend"
 # 若本地已有同版本号但内容不同的 release（开发分支忘记递增 VERSION），自动递增末段重打包。
 # 只有 update 真正成功才允许继续，防止把旧包当新版本发布出去。
 run_release_update() {
-  if [ "$VALIDATION_PROFILE" = "uat-fast" ]; then
+  if [ "$VALIDATION_PROFILE" != "full" ]; then
     node scripts/manage-new-legacy.js update ../new-legacy \
-      --validation-profile uat-fast \
+      --validation-profile "$VALIDATION_PROFILE" \
       --uat-base-commit "$DEPLOYED_COMMIT" > /tmp/kg-uat-release.log 2>&1
   else
     node scripts/manage-new-legacy.js update ../new-legacy \
@@ -171,7 +171,12 @@ echo "[4/9] 重建 UAT 后端镜像并重启（alembic 迁移自动执行）"
 check_mini_config
 # Build the runtime tag first: Compose 2.28 cannot resolve service build contexts here.
 ssh "$REMOTE" "cd $REMOTE_DIR && docker compose -p $PROJECT $COMPOSE_ARGS --env-file $ENV_FILE build backend"
-ssh "$REMOTE" "cd $REMOTE_DIR && docker compose -p $PROJECT $COMPOSE_ARGS --env-file $ENV_FILE up -d --build"
+if [ "$VALIDATION_PROFILE" != "full" ]; then
+  echo "      纯前端改动：复用依赖缓存，只替换网页服务，不重建助手服务"
+  ssh "$REMOTE" "cd $REMOTE_DIR && docker compose -p $PROJECT $COMPOSE_ARGS --env-file $ENV_FILE up -d --no-deps backend"
+else
+  ssh "$REMOTE" "cd $REMOTE_DIR && docker compose -p $PROJECT $COMPOSE_ARGS --env-file $ENV_FILE up -d --build"
+fi
 
 deployment_timing_stage health
 echo "[5/9] 等待健康检查（18087）"

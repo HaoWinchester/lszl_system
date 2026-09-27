@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / 'backend'))
 os.environ['LEGAL_CONSENT_REQUIRED'] = 'false'
 os.environ['GRAPH_FILES_API_CUTOVER_ENABLED'] = 'true'
-os.environ['NEW_LEGACY_RELEASE_ROOT'] = str(ROOT / 'artifacts/canvas-ink/no-release')
+os.environ['NEW_LEGACY_RELEASE_ROOT'] = os.environ.get('CANVAS_TEST_RELEASE_ROOT', str(ROOT / 'artifacts/canvas-ink/no-release'))
 os.environ['NEW_LEGACY_FALLBACK_SITE'] = str(ROOT / 'frontend/public/new-legacy')
 # Reuse the repository's isolation and migration lifecycle. It creates a unique
 # kg_pytest_* database before importing app and drops exactly that DB at exit.
