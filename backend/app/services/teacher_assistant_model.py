@@ -6,6 +6,7 @@ from pathlib import Path
 import signal
 import tempfile
 from app.core.config import settings
+from app.services.teacher_assistant_tool_catalog import definitions
 
 class ModelError(ValueError):
     pass
@@ -58,10 +59,15 @@ async def ask(payload: dict) -> dict:
         return decode_reply(envelope.get('result',''))
 
 
+def native_session_exists(cwd,session_id):
+    """Init may precede the first native transcript write; only resume saved history."""
+    return any(path.is_file() and path.stat().st_size for path in (Path(cwd)/"config"/"projects").glob("*/"+session_id+".jsonl"))
+
+
 def stream_command(session_id,resume,mcp_config,system_prompt):
     return [settings.TEACHER_ASSISTANT_CLAUDE,'--bare','-p','--model',settings.TEACHER_ASSISTANT_MODEL,
         '--tools','','--strict-mcp-config','--mcp-config',json.dumps(mcp_config),
-        '--allowedTools','mcp__teacher__list_files','mcp__teacher__read_file','mcp__teacher__read_image','mcp__teacher__prepare_import',
+        '--allowedTools',*['mcp__teacher__'+tool['name'] for tool in definitions()],
         '--setting-sources','','--output-format','stream-json','--verbose','--include-partial-messages',
         '--effort','low','--system-prompt',system_prompt,
         '--resume' if resume else '--session-id',session_id]
@@ -90,6 +96,8 @@ async def stream_reply(*,session_id,resume,cwd,mcp_config,prompt,system_prompt,o
         'DATABASE_URL':settings.DATABASE_URL,
         'TEACHER_ASSISTANT_STORAGE':str(Path(settings.TEACHER_ASSISTANT_STORAGE).resolve())}
     output_size=0;reply='';result_seen=False
+    requires_tools='teacher' in mcp_config.get('mcpServers',{})
+    tools_ready=not requires_tools
     # Neither stderr nor CLI internals are stored as user-facing events.
     try:
         process=await asyncio.create_subprocess_exec(*stream_command(session_id,resume,mcp_config,system_prompt),
@@ -97,7 +105,7 @@ async def stream_reply(*,session_id,resume,cwd,mcp_config,prompt,system_prompt,o
             cwd=cwd,env=env,start_new_session=True,limit=1024*1024)
     except OSError as exc: raise ModelError('套餐调用程序暂不可用，请联系管理员。') from exc
     async def consume():
-        nonlocal output_size,reply,result_seen
+        nonlocal output_size,reply,result_seen,tools_ready
         process.stdin.write(prompt.encode());await process.stdin.drain();process.stdin.close()
         while line:=await process.stdout.readline():
             output_size+=len(line)
@@ -107,7 +115,14 @@ async def stream_reply(*,session_id,resume,cwd,mcp_config,prompt,system_prompt,o
             if not isinstance(envelope,dict): continue
             if envelope.get('type')=='system' and envelope.get('subtype')=='init':
                 if envelope.get('session_id')!=session_id: raise ModelError('会话恢复标识不一致，已停止。')
+                if requires_tools:
+                    expected={'mcp__teacher__'+tool['name'] for tool in definitions()}
+                    connected=any(server.get('name')=='teacher' and server.get('status')=='connected' for server in envelope.get('mcp_servers',[]))
+                    tools_ready=connected and expected.issubset(envelope.get('tools',[]))
+                    if not tools_ready: raise ModelError('附件工具尚未连接，已保留会话和文件，请重试。')
                 await on_started()
+            if not tools_ready and envelope.get('type') in ('stream_event','assistant','result'):
+                raise ModelError('附件工具尚未就绪，已保留会话和文件，请重试。')
             for kind,data in public_events(envelope):
                 if len(reply)+len(data['text'])>64000: raise ModelError('模型回复超过上限，请拆分需求。')
                 reply+=data['text'];await on_event(kind,data)

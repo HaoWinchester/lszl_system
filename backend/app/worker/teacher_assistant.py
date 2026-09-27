@@ -246,8 +246,9 @@ async def converse(db,user,session,job):
     from app.services.teacher_assistant_service import native_id
     from app.services.teacher_assistant_events import emit
     sid,jid,owner=session.id,job.id,user.username
-    history=deepcopy(session.messages);runtime=deepcopy(session.runtime or {})
+    history=deepcopy(session.messages)
     native=native_id(session)
+    resume=model.native_session_exists(storage(sid)/'runtime',native)
     await db.commit()
     # Parsing stays in this worker before CLI creation; no detached OCR processes
     # can survive cancellation and cause early release of the global heavy lock.
@@ -259,7 +260,7 @@ async def converse(db,user,session,job):
     context={'instruction':latest_user_instruction(history),'files':manifest,'attachmentStatus':'实际附件清单' if manifest else '当前没有附件',
         'previousPlan':{'settings':session.plan.get('settings',{}),'revision':session.revision,
             'items':[{'uploadId':i.get('source',{}).get('uploadId'),'name':i.get('name'),'questionIds':[q.get('id') for q in i.get('questions',[])],'mergePreview':i.get('mergePreview')} for i in session.plan.get('items',[])]}}
-    if not runtime.get('started'):
+    if not resume:
         context['priorConversation']=history[-30:]
     await db.commit()
     async def active():
@@ -280,7 +281,7 @@ async def converse(db,user,session,job):
     config={'mcpServers':{'teacher':{'command':sys.executable,'args':['-m','app.services.teacher_assistant_mcp'],
         'env':{'PYTHONPATH':str(Path(__file__).resolve().parents[2]),'TEACHER_TOOL_OWNER':owner,'TEACHER_TOOL_SESSION':sid,'TEACHER_TOOL_JOB':jid}}}}
     try:
-        await model.stream_reply(session_id=native,resume=bool(runtime.get('started')),cwd=storage(sid)/'runtime',mcp_config=config,
+        await model.stream_reply(session_id=native,resume=resume,cwd=storage(sid)/'runtime',mcp_config=config,
             prompt=json.dumps(context,ensure_ascii=False),system_prompt=CONVERSATION_SYSTEM,on_event=event,on_started=started,is_active=active)
     finally:
         # Commit visible partial output even on stop/failure; snapshot text and

@@ -58,7 +58,9 @@ with audit.open('a+') as log:
         try:os.kill(row['pid'],0);alive+=1
         except ProcessLookupError:pass
     log.write(json.dumps({'pid':os.getpid(),'parent':os.getppid(),'sessionId':native,'flag':flag,'active':alive+1})+'\\n');log.flush()
-print(json.dumps({'type':'system','subtype':'init','session_id':native}),flush=True)
+transcript=Path(os.environ['CLAUDE_CONFIG_DIR'])/'projects'/'test'/(native+'.jsonl')
+transcript.parent.mkdir(parents=True,exist_ok=True);transcript.write_text('{}')
+print(json.dumps({'type':'system','subtype':'init','session_id':native,'tools':['mcp__teacher__'+n for n in ('list_files','read_file','read_image','prepare_import')],'mcp_servers':[{'name':'teacher','status':'connected'}]}),flush=True)
 print(json.dumps({'type':'stream_event','event':{'type':'content_block_delta','delta':{'type':'text_delta','text':'可恢复的真实部分回复'}}}),flush=True)
 while not audit.with_name('finish-'+str(os.getpid())).exists():time.sleep(.02)
 print(json.dumps({'type':'result','result':'可恢复的真实部分回复'}),flush=True)

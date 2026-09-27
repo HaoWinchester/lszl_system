@@ -142,6 +142,8 @@ def test_natural_file_qa_stream_does_not_extract_questions(tmp_path,monkeypatch)
         seen=[]
         async def streaming(**kw):
             seen.append(kw)
+            transcript=kw['cwd']/'config'/'projects'/'test'/(kw['session_id']+'.jsonl')
+            transcript.parent.mkdir(parents=True,exist_ok=True);transcript.write_text('{}\n')
             assert '说明.docx' in kw['prompt']
             await kw['on_started']()
             await kw['on_event']('text_delta',{'text':'这是一份说明书。'})
@@ -337,6 +339,8 @@ try:
         child.stdin.write(json.dumps({'jsonrpc':'2.0','id':1,'method':method,'params':params})+'\\n');child.stdin.flush()
         return json.loads(child.stdout.readline())['result']
     call('initialize')
+    names=['mcp__teacher__'+tool['name'] for tool in call('tools/list')['tools']]
+    print(json.dumps({'type':'system','subtype':'init','session_id':sys.argv[sys.argv.index('--session-id')+1],'tools':names,'mcp_servers':[{'name':'teacher','status':'connected'}]}),flush=True)
     listed=call('tools/call',{'name':'list_files','arguments':{}})
     files=json.loads(listed['content'][0]['text'])['files'];assert files[0]['name']=='dotenv.png'
     picture=call('tools/call',{'name':'read_image','arguments':{'uploadId':files[0]['uploadId'],'name':'image.png'}})
@@ -396,3 +400,56 @@ def test_document_reader_defaults_to_bounded_full_document_and_explicit_page_con
         assert value['nextOffset'] is None and value['nextRead']=={'uploadId':uid,'page':2,'offset':0}
         assert value['scope']=='section'
     asyncio.run(read())
+
+
+def test_mcp_handshake_does_not_wait_for_business_database_imports():
+    import os,subprocess,sys
+    script='''import importlib.abc,runpy,sys
+class BlockBusiness(importlib.abc.MetaPathFinder):
+ def find_spec(self,fullname,path=None,target=None):
+  if fullname=='sqlalchemy' or fullname.startswith(('app.models','app.db','app.core','app.services.teacher_assistant_service','app.services.teacher_assistant_tools','app.services.teacher_assistant_events')):
+   raise ImportError('business dependencies must load only after MCP handshake')
+sys.meta_path.insert(0,BlockBusiness())
+runpy.run_module('app.services.teacher_assistant_mcp',run_name='__main__')
+'''
+    requests='\n'.join(json.dumps({'jsonrpc':'2.0','id':i,'method':m}) for i,m in [(1,'initialize'),(2,'tools/list')])+'\n'
+    process=subprocess.run([sys.executable,'-c',script],input=requests,text=True,capture_output=True,timeout=10,
+        env={**os.environ,'TEACHER_TOOL_OWNER':'test','TEACHER_TOOL_SESSION':'session','TEACHER_TOOL_JOB':'job'})
+    assert process.returncode==0,process.stderr
+    messages=[json.loads(line) for line in process.stdout.splitlines()]
+    assert messages[0]['result']['capabilities']=={'tools':{}}
+    assert {v['name'] for v in messages[1]['result']['tools']}=={'list_files','read_file','read_image','prepare_import'}
+
+
+def test_pending_native_mcp_fails_before_public_answer(tmp_path,monkeypatch):
+    import sys,pytest
+    from app.core.config import settings
+    from app.services import teacher_assistant_model as model
+    cli=tmp_path/'pending-claude'
+    cli.write_text('#!'+sys.executable+'\n'+'''import json,sys
+sys.stdin.read()
+print(json.dumps({'type':'system','subtype':'init','session_id':'native-id','tools':[],'mcp_servers':[{'name':'teacher','status':'pending'}]}),flush=True)
+print(json.dumps({'type':'result','result':'我先读取文件内容。'}),flush=True)
+''');cli.chmod(0o700)
+    monkeypatch.setattr(settings,'TEACHER_ASSISTANT_CLAUDE',str(cli));monkeypatch.setenv('ANTHROPIC_AUTH_TOKEN','test-only')
+    output=[];started=[]
+    async def run():
+        async def event(kind,data):output.append(data)
+        async def init():started.append(True)
+        async def active():return True
+        with pytest.raises(model.ModelError,match='工具'):
+            await model.stream_reply(session_id='native-id',resume=False,cwd=tmp_path/'runtime',mcp_config={'mcpServers':{'teacher':{}}},prompt='请读取',system_prompt='safe',on_event=event,on_started=init,is_active=active)
+    asyncio.run(run())
+    assert started==[] and output==[]
+
+
+def test_native_resume_requires_saved_transcript_even_if_database_says_started(tmp_path):
+    from app.services.teacher_assistant_model import native_session_exists
+    sid=str(uuid4())
+    assert not native_session_exists(tmp_path,sid)
+    transcript=tmp_path/'config'/'projects'/'private-cwd'/(sid+'.jsonl')
+    transcript.parent.mkdir(parents=True);transcript.touch()
+    assert not native_session_exists(tmp_path,sid)
+    transcript.write_text('{}\n')
+    assert native_session_exists(tmp_path,sid)
+    assert not native_session_exists(tmp_path,str(uuid4()))

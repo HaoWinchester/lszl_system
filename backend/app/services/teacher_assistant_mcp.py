@@ -3,8 +3,7 @@ import asyncio
 import json
 import os
 import sys
-from app.services.teacher_assistant_tools import definitions,call_tool
-from app.services.teacher_assistant_events import emit
+from app.services.teacher_assistant_tool_catalog import definitions
 
 async def main():
     owner=os.environ['TEACHER_TOOL_OWNER'];sid=os.environ['TEACHER_TOOL_SESSION'];jid=os.environ['TEACHER_TOOL_JOB']
@@ -23,10 +22,13 @@ async def main():
             elif method=='ping': result={}
             elif method=='tools/list': result={'tools':definitions()}
             elif method=='tools/call':
+                # Keep initialize/tools/list independent of cold database imports.
+                from app.services.teacher_assistant_tools import call_tool
+                from app.services.teacher_assistant_events import emit
                 params=request.get('params',{});name=params.get('name');args=params.get('arguments',{})
                 safe_name=name if name in {t['name'] for t in definitions()} else 'unknown'
                 # No raw arguments, file contents or exception messages enter public events.
-                info={'name':safe_name,'label':{'read_file':'正在读取附件','read_image':'正在查看图片','list_files':'正在核对附件','prepare_import':'正在生成预览'}.get(safe_name,'工具调用')}
+                info={'origin':'mcp','name':safe_name,'label':{'read_file':'正在读取附件','read_image':'正在查看图片','list_files':'正在核对附件','prepare_import':'正在生成预览'}.get(safe_name,'工具调用')}
                 if safe_name in ('read_file','read_image') and isinstance(args,dict):
                     try:
                         listing=await call_tool(owner,sid,jid,'list_files',{})
@@ -38,7 +40,7 @@ async def main():
                     result=await call_tool(owner,sid,jid,name,args);ok=True
                 except Exception:
                     result={'isError':True,'content':[{'type':'text','text':'工具执行失败：附件不可读取、参数无效或任务已停止。请核对真实文件状态，不得声称读取成功。'}]};ok=False
-                await emit(sid,jid,'tool_end',{'name':safe_name,'ok':ok})
+                await emit(sid,jid,'tool_end',{'origin':'mcp','name':safe_name,'ok':ok})
             else:
                 sys.stdout.write(json.dumps({'jsonrpc':'2.0','id':rid,'error':{'code':-32601,'message':'Method not found'}})+'\n');sys.stdout.flush();continue
             sys.stdout.write(json.dumps({'jsonrpc':'2.0','id':rid,'result':result},ensure_ascii=False)+'\n');sys.stdout.flush()
