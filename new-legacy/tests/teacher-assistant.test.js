@@ -62,3 +62,19 @@ test('worker unavailable is an error, failed jobs never become client success, d
   deny = false; await client.mutate('retry'); await client.remove(); assert.equal(client.session, null);
   assert.equal(calls.at(-1).options.method, 'DELETE');
 });
+test('activation rejects lease conflict with status and protects selection against stale loads', async () => {
+  let release; const other = { ...session, id: 'second' };
+  const { client } = runtime(async (url, options) => {
+    if (url.endsWith('/blocked/activate')) return response({detail:'正在停止'},409);
+    if (url.endsWith('/slow')) { await new Promise(resolve => { release = resolve; }); return response({session}); }
+    return response({session:other});
+  });
+  const loading = client.load('slow'); await client.activate('second'); release(); await loading;
+  assert.equal(client.session.id,'second');
+  await assert.rejects(client.activate('blocked'), error => error.status === 409);
+});
+test('native images accepted and stopping lease remains an active job', () => {
+  const {api}=runtime(async()=>response({session}));
+  for(const name of ['a.png','a.jpg','a.jpeg','a.webp']) assert.equal(api.validateFiles([{name,size:8}]).length,1);
+  assert.equal(api.activeJob({job:{status:'cancelled'},runtime:{status:'stopping'}}),true);
+});

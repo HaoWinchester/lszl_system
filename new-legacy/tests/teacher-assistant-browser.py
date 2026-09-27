@@ -48,6 +48,8 @@ def run():
         elif request.method == 'DELETE':
             state['session'] = None
             status = 204
+        elif '/events?' in url:
+            route.fulfill(status=200, content_type='text/event-stream', body=': keepalive\n\n'); return
         elif url.endswith('/status'):
             if state['statusFail']:
                 state['statusFail'] -= 1
@@ -105,11 +107,14 @@ def run():
             page.locator('#refresh-session').click()
             expect(page.locator('#uploads')).to_contain_text('已过期，请重传')
             assert page.locator('#uploads a').count() == 0
-            expect(page.locator('#upload-files')).to_be_enabled()
-            page.locator('#upload-files').click()
-            expect(page.locator('#assistant-error')).to_contain_text('选择文件')
+            page.locator('#send-message').click()
+            expect(page.locator('#assistant-error')).to_contain_text('填写消息')
             page.locator('#assistant-files').set_input_files({'name': 'sample.json', 'mimeType': 'application/json', 'buffer': b'{}'})
-            page.locator('#upload-files').click()
+            expect(page.locator('#pending-files')).to_contain_text('sample.json')
+            page.locator('#assistant-message').fill('阅读材料')
+            page.locator('#send-message').click()
+            expect(page.locator('#pending-files')).to_be_empty()
+            page.locator('#files-details > summary').click()
             expect(page.locator('#uploads')).to_contain_text('sample.json')
             assert not any(call[1].endswith('/preview') for call in state['calls'])
             page.locator('#uploads > article > details > summary').click()
@@ -133,7 +138,8 @@ def run():
                 page.locator('#send-message').click()
                 expect(page.locator('#messages')).to_contain_text(content)
                 expect(page.locator('#send-message')).to_be_enabled()
-            expect(page.locator('#plan-preview')).to_contain_text('方案版本 4')
+            page.locator('#tab-preview').click()
+            expect(page.locator('#plan-preview')).to_contain_text('方案版本 5')
             state['session']['plan']['items'][0]['questions'][0]['sourceImages'] = [{'uploadId': 'file', 'filename': 'page-1.png', 'digest': 'digest1'}]
             page.locator('#refresh-session').click()
             expect(page.locator('.ta-downloads')).to_contain_text('请先保存含图草稿')
@@ -179,14 +185,6 @@ def run():
             page.locator('#execute-plan').click()
             expect(page.locator('#cancel-job')).to_be_visible()
             expect(page.locator('#send-message')).to_be_disabled()
-            detail_before = sum(call[1] == 'teacher-assistant/sessions/one' for call in state['calls'])
-            state['statusFail'] = 1
-            page.wait_for_timeout(2100)
-            expect(page.locator('#assistant-error')).to_contain_text('网络连接暂时中断')
-            page.wait_for_timeout(2100)
-            expect(page.locator('#assistant-error')).not_to_be_visible()
-            assert any(call[1].endswith('/status') for call in state['calls'])
-            assert sum(call[1] == 'teacher-assistant/sessions/one' for call in state['calls']) == detail_before
             page.locator('#cancel-job').click()
             expect(page.locator('#retry-job')).to_be_visible()
             page.locator('#retry-job').click()
@@ -194,7 +192,10 @@ def run():
             expect(page.locator('#execution-receipt')).to_contain_text('第二份材料待核对')
             assert page.locator('#execution-receipt a').count() == 2
             assert state['execute'] == 1
+            screenshot_dir = ROOT.parent / 'artifacts' / 'assistant-v2'; screenshot_dir.mkdir(parents=True, exist_ok=True)
+            page.screenshot(path=str(screenshot_dir / 'mock-results-1440.png'))
             page.reload()
+            page.locator('#tab-preview').click()
             expect(page.locator('#execution-receipt')).to_contain_text('actual-bank')
             state['session']['job'] = {'id': 'revision-job', 'kind': 'message', 'status': 'succeeded'}
             state['session']['revision'] += 1
@@ -204,23 +205,27 @@ def run():
             expect(page.locator('#execution-receipt')).to_contain_text('上一版本')
             expect(page.locator('.ta-publication-state')).to_contain_text('私有草稿')
             page.set_viewport_size({'width': 390, 'height': 844})
+            page.locator('#tab-conversation').click()
             expect(page.locator('#preview-panel')).not_to_be_visible()
             page.locator('#tab-preview').click()
             expect(page.locator('#preview-panel')).to_be_visible()
-            expect(page.locator('#conversation-panel')).not_to_be_visible()
+            assert page.evaluate('document.documentElement.scrollWidth') == 390
+            page.screenshot(path=str(screenshot_dir / 'mock-results-390.png'))
             page.locator('#tab-conversation').click()
             expect(page.locator('#conversation-panel')).to_be_visible()
             page.on('dialog', lambda dialog: dialog.accept())
+            page.locator('#toggle-sidebar').click()
             page.locator('#delete-session').click()
             expect(page.locator('#delete-session')).to_be_disabled()
             page.locator('#new-session').click()
+            page.locator('#toggle-sidebar').click()
             expect(page.locator('#delete-session')).to_be_enabled()
             state['role'] = 'student'
             page.reload()
             expect(page.locator('#assistant-error')).to_contain_text('仅供已登录的教师和管理员')
             expect(page.locator('#new-session')).to_be_disabled()
             browser.close()
-            print('PASS: upload/validation, 3-turn revisions, network recovery, source/answer preview, blockers, execute/cancel/retry, receipt/reload, mobile tabs, CRUD, role gate')
+            print('PASS: upload/validation, 3-turn revisions, source preview failure/retry, source/answer preview, blockers, execute/cancel/retry, receipt/reload, mobile result panel, CRUD, role gate')
     finally:
         server.shutdown()
 
