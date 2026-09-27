@@ -359,3 +359,40 @@ finally:
         await model.stream_reply(session_id=str(uuid4()),resume=False,cwd=tmp_path/'unrelated-runtime',mcp_config=config,prompt='文件',system_prompt='safe',on_event=event,on_started=started,is_active=active)
     asyncio.run(run())
     assert output==[{'text':'真实 MCP 已读取 dotenv 附件'}]
+
+
+def test_document_reader_defaults_to_bounded_full_document_and_explicit_page_continuation(tmp_path,monkeypatch):
+    from app.services import teacher_assistant_tools as tools
+    from app.core.config import settings
+    from app.db.session import AsyncSessionLocal
+    from app.models.teacher_assistant import TeacherAssistantUpload as Upload,TeacherAssistantJob as Job
+    monkeypatch.setattr(settings,'TEACHER_ASSISTANT_STORAGE',str(tmp_path))
+    a,_,_=users();uid='tau_'+uuid4().hex
+    with TestClient(app) as c:
+        login(c,a);sid=c.post('/api/v1/teacher-assistant/sessions').json()['session']['id'];url='/api/v1/teacher-assistant/sessions/'+sid
+        jid=c.post(url+'/messages',json={'content':'最后的地点和代号是什么','requestId':uuid4().hex}).json()['session']['job']['id']
+    sections=[{'location':'标题','text':'研修说明','images':[]},
+        {'location':'正文','text':'学习记录。'*2000,'images':['page.png']},
+        {'location':'最终安排','text':'地点：青禾会议室；代号：海棠73。','images':[]}]
+    async def read():
+        async with AsyncSessionLocal() as db:
+            db.add(Upload(id=uid,session_id=sid,name='活动.docx',size=99,digest='d'*64,status='ready',extracted={'kind':'document','sections':sections}))
+            job=await db.get(Job,jid);job.status='running';await db.commit()
+        offset=0;texts=[];images=set()
+        while True:
+            r=await tools.call_tool(a,sid,jid,'read_file',{'uploadId':uid,'offset':offset,'limit':8000})
+            value=json.loads(r['content'][0]['text'])
+            assert value['scope']=='document' and len(value['text'])<=8000
+            texts.append(value['text']);images.update(value['images'])
+            if value['nextOffset'] is None:break
+            assert value['nextOffset']>offset
+            offset=value['nextOffset']
+        content=''.join(texts)
+        assert content=='\n'.join(f"[{s['location']}]\n{s['text']}" for s in sections)
+        assert '青禾会议室' in content and '海棠73' in content
+        assert images=={'page.png'}
+        r=await tools.call_tool(a,sid,jid,'read_file',{'uploadId':uid,'page':1})
+        value=json.loads(r['content'][0]['text'])
+        assert value['nextOffset'] is None and value['nextRead']=={'uploadId':uid,'page':2,'offset':0}
+        assert value['scope']=='section'
+    asyncio.run(read())

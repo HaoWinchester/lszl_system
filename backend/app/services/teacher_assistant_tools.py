@@ -16,12 +16,27 @@ def text_result(value):
     return {'content':[{'type':'text','text':json.dumps(value,ensure_ascii=False)}]}
 
 
+def document_chunk(sections,offset,limit):
+    """Read across paragraph/page boundaries without joining the full document."""
+    cursor=0;parts=[];images=[]
+    for index,section in enumerate(sections):
+        start=cursor
+        for piece in (('\n' if index else '')+'['+section.get('location','')+']\n',section.get('text','')):
+            end=cursor+len(piece)
+            if cursor<offset+limit and end>offset:
+                parts.append(piece[max(0,offset-cursor):max(0,min(len(piece),offset+limit-cursor))])
+            cursor=end
+        if start<offset+limit and cursor>offset:
+            images.extend(section.get('images',[]))
+    return ''.join(parts),list(dict.fromkeys(images)),cursor
+
+
 def definitions():
     def tool(name,description,properties,required=()):
         return {'name':name,'description':description,'inputSchema':{'type':'object','properties':properties,'required':list(required),'additionalProperties':False}}
     uid={'type':'string','description':'list_files 中真实的上传 ID'}
     return [tool('list_files','列出此会话实际附件及解析状态；没有附件时明确返回空列表。',{}),
-        tool('read_file','分页读取完整 JSON 原结构或文档段落/页；按 nextOffset 继续，不能把一页当全文。',{'uploadId':uid,'page':{'type':'integer','minimum':1},'offset':{'type':'integer','minimum':0},'limit':{'type':'integer','minimum':1,'maximum':8000}},['uploadId']),
+        tool('read_file','默认不传 page，按全文 offset 连续读取完整 JSON 或有来源标注的文档，每次最多8000字符。按 nextRead 续读；仅定位特定段落/页时传 page，单段结束不代表全文结束。',{'uploadId':uid,'page':{'type':'integer','minimum':1},'offset':{'type':'integer','minimum':0},'limit':{'type':'integer','minimum':1,'maximum':8000}},['uploadId']),
         tool('read_image','读取附件页面真实图像。返回视觉 image block；OCR 文本不等于视觉理解。',{'uploadId':uid,'name':{'type':'string'}},['uploadId','name']),
         tool('prepare_import','仅在老师要求导入、整理题库或修改预览时生成可审核预览。不能执行导入/发布。settings/items 使用教师整理协议；文档首次提取 questions 须由你读取原文后忠实提交，最多500题，之后用筛选/patch修改，不能重写原题。',{'intent':{'type':'object'}},['intent'])]
 
@@ -42,17 +57,27 @@ async def call_tool(owner,sid,jid,name,args):
         if not upload or upload.status!='ready': raise ValueError('附件不存在、已过期或未能解析')
         data=upload.extracted
         if name=='read_file':
-            page=args.get('page',1);offset=args.get('offset',0);limit=args.get('limit',8000)
-            if any(type(v) is not int for v in (page,offset,limit)) or page<1 or offset<0 or not 1<=limit<=8000: raise ValueError('分页参数无效')
+            page=args.get('page');offset=args.get('offset',0);limit=args.get('limit',8000)
+            if any(type(v) is not int for v in (offset,limit)) or (page is not None and (type(page) is not int or page<1)) or offset<0 or not 1<=limit<=8000: raise ValueError('分页参数无效')
             sections=data.get('sections',[])
+            scope='document'
             if data.get('kind')=='json':
-                if page!=1: raise ValueError('JSON 仅有一页，请用 offset 续读')
+                if page not in (None,1): raise ValueError('JSON 仅有一页，请用 offset 续读')
                 value=json.dumps(data.get('data'),ensure_ascii=False);location='完整 JSON';images=[];pages=1
+                total=len(value);chunk=value[offset:offset+limit]
+            elif page is None:
+                chunk,images,total=document_chunk(sections,offset,limit)
+                location='全文（来源按段落/页标注）';pages=len(sections)
             else:
                 if page>len(sections): raise ValueError('页码不存在')
                 section=sections[page-1];value=section.get('text','');location=section.get('location','');images=section.get('images',[]);pages=len(sections)
-            return text_result({'uploadId':upload.id,'page':page,'pages':pages,'location':location,'text':value[offset:offset+limit],
-                'nextOffset':offset+limit if offset+limit<len(value) else None,'images':images,'warnings':upload.warnings})
+                scope='section';total=len(value);chunk=value[offset:offset+limit]
+            next_offset=offset+limit if offset+limit<total else None
+            next_read={'uploadId':upload.id,'offset':next_offset,**({'page':page} if page is not None else {})} if next_offset is not None else None
+            if next_read is None and scope=='section' and page<pages:
+                next_read={'uploadId':upload.id,'page':page+1,'offset':0}
+            return text_result({'uploadId':upload.id,'scope':scope,'page':page,'pages':pages,'location':location,'text':chunk,
+                'nextOffset':next_offset,'nextRead':next_read,'images':images,'warnings':upload.warnings})
         filename=args.get('name','')
         allowed={image for section in data.get('sections',[]) for image in section.get('images',[])}
         if filename not in allowed or Path(filename).name!=filename: raise ValueError('图片不存在')
