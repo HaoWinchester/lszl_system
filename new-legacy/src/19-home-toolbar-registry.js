@@ -42,8 +42,8 @@
 
   let activeMode = "efficient";
   const MODE_TOOL_IDS = Object.freeze({
-    reading: new Set(["focusBtn", "flowModeBtn", "relationViewMenuBtn", "largeGraphLinesBtn", "largeGraphRelatedBtn"]),
-    efficient: new Set(["templateBtn", "addBtn", "addTextElementBtn", "focusBtn", "flashcardBtn", "pointerModeBtn", "flowModeBtn", "relationViewMenuBtn", "largeGraphLinesBtn", "largeGraphRelatedBtn", "importFile"]),
+    reading: new Set(["homeCaptureBtn", "focusBtn", "flowModeBtn", "relationViewMenuBtn", "largeGraphLinesBtn", "largeGraphRelatedBtn"]),
+    efficient: new Set(["templateBtn", "addBtn", "addTextElementBtn", "focusBtn", "flashcardBtn", "homeInkBtn", "homeCaptureBtn", "pointerModeBtn", "flowModeBtn", "relationViewMenuBtn", "largeGraphLinesBtn", "largeGraphRelatedBtn", "importFile"]),
     professional: null
   });
   function normalizeMode(value){
@@ -67,7 +67,9 @@
         {id:"addBtn", label:"新增知识点", tooltip:"新增知识点", icon:"add", shortcut:"N", className:"primary", permission:"editGraph", action:"addNode", shortTip:"新增"},
         {id:"addTextElementBtn", label:"新增文本框", tooltip:"新增独立文本框", icon:"textBox", permission:"editGraph", action:"addTextElement", shortTip:"文本"},
         {id:"focusBtn", label:"重点聚焦", tooltip:"重点聚焦", icon:"focus", shortcut:"F", className:"focus-menu-btn", action:"toggleFocus", shortTip:"聚焦"},
-        {id:"flashcardBtn", label:"记忆闪卡", tooltip:"记忆闪卡", icon:"flashcard", shortcut:"K", className:"flash-menu-btn", permission:"editGraph", action:"openFlashcards", shortTip:"闪卡"}
+        {id:"flashcardBtn", label:"记忆闪卡", tooltip:"记忆闪卡", icon:"flashcard", shortcut:"K", className:"flash-menu-btn", permission:"editGraph", action:"openFlashcards", shortTip:"闪卡"},
+        {id:"homeInkBtn", label:"画笔工具", tooltip:"画笔工具", permission:"editGraph"},
+        {id:"homeCaptureBtn", label:"截取当前画布", tooltip:"截取当前画布并下载 PNG"}
       ]
     },
     {
@@ -318,6 +320,7 @@
       roleApi.decoratePermissionElements(box);
     }
     bindHandlers();
+    window.dispatchEvent(new Event("kg-home-toolbar-rendered"));
   }
   function setMode(mode){
     const next = normalizeMode(mode);

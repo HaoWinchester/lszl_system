@@ -158,6 +158,8 @@
       </div>
 
       <div class="qw-overlay qw-overlay-right" aria-label="多题画布工具">
+        <button type="button" id="qwInkBtn" class="qw-pointer-mode" aria-label="画笔工具" title="画笔工具" aria-expanded="false" data-canvas-ui="true"></button>
+        <button type="button" id="qwCaptureBtn" class="qw-pointer-mode" aria-label="截取当前画布" title="截取当前画布并下载 PNG" data-canvas-ui="true"></button>
         <button type="button" id="qwPointerModeBtn" class="qw-pointer-mode" title="选择/手型（V）" aria-label="选择/手型（V）"></button>
         <button type="button" id="qwFontScaleBtn" class="qw-font-scale" title="调整多题页面文字大小" aria-label="调整多题页面文字大小">Aa</button>
         <span class="qw-overlay-divider" aria-hidden="true"></span>
@@ -424,6 +426,7 @@
   <script defer src="src/graph/shared-color-picker-v2.js"></script>
   <script defer src="src/graph/context-menu-controller.js"></script>
   <script defer src="src/canvas/94-canvas-ink.js"></script>
+<script defer src="src/canvas/96-canvas-capture.js"></script>
 <script defer src="src/65-canvas-workspace-store.js"></script>
   <script defer src="src/canvas/78-canvas-policy.js"></script>
   <script defer src="src/canvas/79-canvas-viewport-controller.js"></script>

@@ -9,6 +9,7 @@ function graphModeAllows(capability){
   const api=window.KGHomeInteractionModes;
   return !api||typeof api.can!=='function'?true:api.can(capability);
 }
+function canWriteGraph(){return graphModeAllows('editGraph')&&!document.body.classList.contains('auth-readonly')&&window.KGRolePermissions?.can?.('editGraph')!==false&&!window.KGGraphFileTabs?.isSwitching?.()}
 function currentGraphInteractionMode(){
   const api=window.KGHomeInteractionModes;
   return api&&typeof api.getMode==='function'?api.getMode():'professional';
@@ -941,7 +942,7 @@ function syncGraphModeClasses(){
   updateGraphModeIndicator();
   return large;
 }
-function render(options={}){if(options&&options.persist)invalidateGraphSearchIndex();const renderer=ensureGraphRenderer();if(renderer){const result=renderer.render(options.mode||'full',options);window.KGHomeCanvasRuntime?.refreshMinimap?.(true);return result}syncGraphModeClasses();applyTransform();renderHeader();renderEdges();renderCards();renderDetails();renderSelectedEdgeQuickStylePanel();updateCardQuickActions();window.KGHomeCanvasRuntime?.refreshMinimap?.(true);if(options&&options.persist)save()}
+function render(options={}){window.KGHomeInk?.sync?.();if(options&&options.persist)invalidateGraphSearchIndex();const renderer=ensureGraphRenderer();if(renderer){const result=renderer.render(options.mode||'full',options);window.KGHomeCanvasRuntime?.refreshMinimap?.(true);return result}syncGraphModeClasses();applyTransform();renderHeader();renderEdges();renderCards();renderDetails();renderSelectedEdgeQuickStylePanel();updateCardQuickActions();window.KGHomeCanvasRuntime?.refreshMinimap?.(true);if(options&&options.persist)save()}
 window.addEventListener('kg-graph-preferences-change',event=>{
   const keys=event&&event.detail&&Array.isArray(event.detail.changedKeys)?event.detail.changedKeys:[];
   if(!keys.includes('largeGraphMode'))return;
@@ -1538,6 +1539,7 @@ function graphUndoSnapshot(){
     nodes:cloneGraphValue(state.nodes||[]),
     links:cloneGraphValue(state.links||[]),
     elements:cloneGraphValue(state.elements||[]),
+    strokes:cloneGraphValue(state.strokes||[]),
     defaults:cloneGraphValue(state.defaults||{}),
     selection:{...selected,selectedElementId:state.selectedElementId||null,selectedTextElementIds:[...selectedTextElementIds]}
   };
@@ -1548,6 +1550,7 @@ function applyGraphHistorySnapshot(snapshot={}){
   if(nodeContextMenuController)nodeContextMenuController.hide();
   state.nodes=cloneGraphValue(snapshot.nodes||[]).map(node=>window.KGGraphModel&&window.KGGraphModel.normalizeNode?window.KGGraphModel.normalizeNode(node):node);
   state.links=cloneGraphValue(snapshot.links||[]);
+  state.strokes=cloneGraphValue(snapshot.strokes||[]);
   state.elements=cloneGraphValue(snapshot.elements||[]).map(item=>window.KGGraphModel&&window.KGGraphModel.normalizeTextElement?window.KGGraphModel.normalizeTextElement(item):item);
   state.defaults={...state.defaults,...cloneGraphValue(snapshot.defaults||{})};
   const nodeIds=new Set(state.nodes.map(n=>n.id)),linkIds=new Set(state.links.map(l=>l.id)),elementIds=new Set((state.elements||[]).map(item=>item.id));
@@ -1571,22 +1574,24 @@ function ensureGraphHistoryController(){
   if(graphKernelControllers.history)return graphKernelControllers.history;
   const factory=window.KGGraphHistoryController;
   if(!factory||typeof factory.create!=='function')return null;
-  graphKernelControllers.history=factory.create({limit:GRAPH_UNDO_LIMIT,capture:graphUndoSnapshot,restore:applyGraphHistorySnapshot});
+  graphKernelControllers.history=factory.create({limit:GRAPH_UNDO_LIMIT,capture:graphUndoSnapshot,restore:applyGraphHistorySnapshot,onChange:()=>window.KGHomeInk?.refreshControls?.()});
   return graphKernelControllers.history;
 }
-function resetGraphHistory(){const history=ensureGraphHistoryController();history?.clear?.();graphKernelControllers.clipboard?.clear?.();graphClipboardNodes=null;graphClipboardTextElement=null;return true}
+function resetGraphHistory(){window.KGHomeInk?.reset?.();const history=ensureGraphHistoryController();history?.clear?.();graphKernelControllers.clipboard?.clear?.();graphClipboardNodes=null;graphClipboardTextElement=null;return true}
 window.resetGraphHistory=resetGraphHistory;
 function pushGraphUndoSnapshot(label='操作'){
   const history=ensureGraphHistoryController();
   return history?history.checkpoint(label):false;
 }
 function restoreGraphUndoSnapshot(){
+  if(!canWriteGraph())return false;
   const history=ensureGraphHistoryController(),item=history&&history.undo();
   if(!item){showStatus('暂无可撤销的操作。');return true}
   showStatus(`已撤销：${item.label}。可按 Ctrl/Command+Shift+Z 恢复。`);
   return true;
 }
 function restoreGraphRedoSnapshot(){
+  if(!canWriteGraph())return false;
   const history=ensureGraphHistoryController(),item=history&&history.redo();
   if(!item){showStatus('暂无可恢复的操作。');return true}
   showStatus(`已恢复：${item.label}。`);
@@ -3768,6 +3773,7 @@ function setTemporaryGraphPanMode(active,reason=''){
 }
 function setGraphPointerMode(mode,announce=false){
   graphPointerMode=mode==='pan'?'pan':'edit';
+  if(graphPointerMode==='pan')window.KGHomeInk?.setTool('select');
   temporaryPanMode=false;
   temporaryPanReason='';
   updateGraphPointerModeUI();
@@ -3775,12 +3781,12 @@ function setGraphPointerMode(mode,announce=false){
 }
 function toggleGraphPointerMode(){setGraphPointerMode(graphPointerMode==='pan'?'edit':'pan',true)}
 function isPanBlockedUI(target){
-  return !!(target&&target.closest&&target.closest('[data-stage-ui],.canvas-toolbar-left,.canvas-toolbar-right,.account-menu-shell,.account-menu,.detail-panel,.mobile-bar,.toolbar,.floating-toolbox,.modal-backdrop,.help-card'));
+  return !!(target&&target.closest&&target.closest('[data-stage-ui],[data-canvas-ui],.canvas-toolbar-left,.canvas-toolbar-right,.account-menu-shell,.account-menu,.detail-panel,.mobile-bar,.toolbar,.floating-toolbox,.modal-backdrop,.help-card'));
 }
 const activePointers=new Map();let pan=null,pinch=null,viewportDirty=false,stageTap=null;
 let stageInteractingTimer=null;
 function markStageInteracting(){if(!stage.classList.contains('is-interacting'))stage.classList.add('is-interacting');clearTimeout(stageInteractingTimer);stageInteractingTimer=setTimeout(()=>{stage.classList.remove('is-interacting');stageInteractingTimer=null},220)}
-function isUI(target){return !!(target&&target.closest&&target.closest('[data-stage-ui],.canvas-toolbar-left,.canvas-toolbar-right,.account-menu-shell,.account-menu,.knowledge-card,.edge-hit,.detail-panel,.mobile-bar,.toolbar,.floating-toolbox,.modal-backdrop,.help-card'))}
+function isUI(target){return !!(target&&target.closest&&target.closest('[data-stage-ui],[data-canvas-ui],.canvas-toolbar-left,.canvas-toolbar-right,.account-menu-shell,.account-menu,.knowledge-card,.edge-hit,.detail-panel,.mobile-bar,.toolbar,.floating-toolbox,.modal-backdrop,.help-card'))}
 // C-1.4.2：为画布内的悬浮 UI 建立显式事件隔离层。
 // 即使后续 DOM 结构或选择器变化，悬浮模块上的按下、双击和滚轮也不会冒泡到画布平移/缩放/新建节点逻辑。
 function bindStageUIEventGuards(){

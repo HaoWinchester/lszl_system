@@ -150,7 +150,18 @@
     renderTabs();
     return true;
   }
-  async function openFile(id){
+  let switching=false;
+  async function withFileTransition(action,fallback=false){
+    if(switching)return fallback;
+    switching=true;
+    global.dispatchEvent(new Event('kg-graph-file-transition'));
+    try{return await action()}
+    finally{switching=false;global.dispatchEvent(new Event('kg-graph-file-transition'))}
+  }
+  function openFile(id){return withFileTransition(()=>openFileNow(id))}
+  function closeFile(id){return withFileTransition(()=>closeFileNow(id))}
+  function createFile(){return withFileTransition(createFileNow,null)}
+  async function openFileNow(id){
     const store=fileStore();if(!store||!id)return false;
     markOpen(id);
     if(id===store.getCurrentFileId()){renderTabs();return true}
@@ -214,7 +225,7 @@
     if(typeof global.showStatus==='function')global.showStatus('已调整图谱页签顺序。');
     return true;
   }
-  async function closeFile(id){
+  async function closeFileNow(id){
     const store=fileStore();if(!store||!id)return false;
     const files=visibleFiles(),index=files.findIndex(file=>String(file.id)===String(id));
     if(index<0)return false;
@@ -255,7 +266,7 @@
     if(typeof global.showStatus==='function')global.showStatus(`已关闭“${target.name}”页签，图谱文件未删除。`);
     return true;
   }
-  async function createFile(){
+  async function createFileNow(){
     if(!canCreate())return null;
     const store=fileStore();if(!store)return null;
     const input=global.prompt('请输入新图谱文件名称：','新图谱文件');
@@ -345,13 +356,13 @@
     }
     if(home&&!home.dataset.bound){
       home.dataset.bound='1';
-      home.addEventListener('click',async()=>{
+      home.addEventListener('click',()=>withFileTransition(async()=>{
         if(!await saveBeforeSwitch()){
           if(typeof global.showStatus==='function')global.showStatus('当前图谱保存失败，已取消进入文件管理。');
           return;
         }
         global.location.href='file-manager.html';
-      })
+      }))
     }
     global.addEventListener('kg-graph-file-change',event=>{
       const detail=event.detail||{};
@@ -366,5 +377,5 @@
   async function init(options={}){if(initialized)return;initialized=true;await initializeStore(options);bind();renderTabs()}
   async function refresh(options={}){await initializeStore(options);renderTabs()}
 
-  global.KGGraphFileTabs={init,refresh,renderTabs,openFile,closeFile,createFile,manualSave,updateCurrentFileDisplay};
+  global.KGGraphFileTabs={isSwitching:()=>switching,init,refresh,renderTabs,openFile,closeFile,createFile,manualSave,updateCurrentFileDisplay};
 })(window);

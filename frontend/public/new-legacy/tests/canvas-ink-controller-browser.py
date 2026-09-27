@@ -8,7 +8,7 @@ with sync_playwright() as pw:
     page = browser.new_page(viewport={'width': 1100, 'height': 780})
     errors=[]
     page.on('pageerror', lambda error: errors.append(str(error)))
-    page.set_content('''<style>#view{position:relative;width:1000px;height:680px;overflow:hidden;background:#f8fafc}#world{position:absolute;transform-origin:0 0;transform:translate(100px,100px) scale(2)}#card{position:absolute;width:160px;height:90px;background:white;border:1px solid #ccc}</style><div id="view"><div id="world"><button id="card">卡片选项</button></div></div>''')
+    page.set_content('''<style>#view{position:relative;width:1000px;height:680px;overflow:hidden;background:#f8fafc}#world{position:absolute;transform-origin:0 0;transform:translate(100px,100px) scale(2)}#card{position:absolute;width:160px;height:90px;background:white;border:1px solid #ccc}</style><button id="launch" style="position:absolute;right:0;top:0" type="button">画笔工具</button><button id="outside" style="position:absolute;right:0;top:740px" type="button">其他</button><div id="view"><div id="world"><button id="card">卡片选项</button></div></div>''')
     page.add_style_tag(content=(ROOT/'styles/canvas-ink.css').read_text())
     for name in ['83-canvas-history-controller.js','94-canvas-ink.js']:
         page.add_script_tag(content=(ROOT/'src/canvas'/name).read_text())
@@ -16,10 +16,18 @@ with sync_playwright() as pw:
       window.strokes=[];window.locked=false;window.cardClicks=0;window.errors=[];window.panStarts=0;
       document.querySelector('#card').onclick=()=>window.cardClicks++;
       document.querySelector('#view').addEventListener('pointerdown',()=>window.panStarts++);
-      window.ink=KGCanvasInk.create({viewport:document.querySelector('#view'),world:document.querySelector('#world'),getViewport:()=>({x:100,y:100,scale:2}),getStrokes:()=>window.strokes,setStrokes:s=>{window.strokes=s},isReadonly:()=>window.locked,onError:message=>window.errors.push(message)});
+      window.ink=KGCanvasInk.create({trigger:document.querySelector('#launch'),viewport:document.querySelector('#view'),world:document.querySelector('#world'),getViewport:()=>({x:100,y:100,scale:2}),getStrokes:()=>window.strokes,setStrokes:s=>{window.strokes=s},isReadonly:()=>window.locked,onError:message=>window.errors.push(message)});
     }''')
+    expect(page.locator('.canvas-ink-toolbar')).to_be_hidden()
+    page.locator('#launch').click()
+    expect(page.locator('.canvas-ink-toolbar')).to_be_visible()
     pen=page.get_by_role('button',name='画笔',exact=True)
     pen.click()
+    expect(page.locator('.canvas-ink-options')).to_be_visible()
+    pen.click();expect(page.locator('.canvas-ink-options')).to_be_hidden()
+    pen.click();expect(page.locator('.canvas-ink-options')).to_be_visible()
+    page.locator('#outside').click();expect(page.locator('.canvas-ink-options')).to_be_hidden()
+    assert page.evaluate('ink.tool')=='pen'
     page.evaluate('''() => {
       window.overlayClicks=0;
       for(const [index,attribute] of ['class="qw-analysis-panel"','data-canvas-ui','data-stage-ui'].entries()){
@@ -44,6 +52,8 @@ with sync_playwright() as pw:
     page.get_by_role('button',name='红色',exact=True).click()
     page.get_by_role('slider',name='笔迹粗细').fill('24')
     page.mouse.move(148,220);page.mouse.down();page.mouse.move(230,220,steps=6);page.mouse.up()
+    icon_color=page.get_by_role('button',name='荧光笔',exact=True).locator('svg').evaluate('(el)=>getComputedStyle(el).color')
+    assert icon_color=='rgb(239, 68, 68)',(icon_color,page.evaluate('strokes'),page.evaluate('errors'))
     assert page.evaluate('strokes[1].color')=='#ef4444' and page.evaluate('strokes[1].width')==24
     assert page.locator('.canvas-ink-layer path').nth(1).get_attribute('opacity')=='0.3'
     page.get_by_role('button',name='撤销笔迹',exact=True).click();assert page.evaluate('strokes.length')==1
@@ -57,8 +67,9 @@ with sync_playwright() as pw:
     page.mouse.click(620,500);assert page.evaluate('strokes')==[originals[1]], 'Blank eraser click must do nothing'
     page.get_by_role('button',name='撤销笔迹',exact=True).click();assert page.evaluate('strokes')==originals
     page.get_by_role('button',name='荧光笔',exact=True).click()
-    page.once('dialog',lambda dialog:dialog.dismiss());page.get_by_role('button',name='清空笔迹',exact=True).click();assert page.evaluate('strokes.length')==2
-    page.once('dialog',lambda dialog:dialog.accept());page.get_by_role('button',name='清空笔迹',exact=True).click();assert page.evaluate('strokes.length')==0
+    page.on('dialog',lambda dialog: (_ for _ in ()).throw(AssertionError('Clear must not ask for confirmation')))
+    expect(page.locator('[data-ink-action=clear]')).to_have_count(0)
+    page.get_by_role('button',name='橡皮擦',exact=True).dblclick();assert page.evaluate('strokes.length')==0
     page.get_by_role('button',name='撤销笔迹',exact=True).click();assert page.evaluate('strokes.length')==2
     page.mouse.move(500,200);page.mouse.down();page.mouse.move(550,250)
     page.evaluate("document.querySelector('#view').dispatchEvent(new PointerEvent('pointercancel',{pointerId:1,bubbles:true}))")
@@ -72,6 +83,13 @@ with sync_playwright() as pw:
     page.evaluate('''() => {const el=document.querySelector('#view');for(const [type,x] of [['pointerdown',500],['pointermove',540],['pointerup',560]])el.dispatchEvent(new PointerEvent(type,{bubbles:true,pointerId:7,pointerType:'touch',isPrimary:true,button:0,clientX:x,clientY:200}));}''')
     # Synthetic pointer capture is unavailable: controller cancels safely rather than leaving half a stroke.
     assert page.evaluate('strokes.length')==0
+    page.set_viewport_size({'width':360,'height':420})
+    page.locator('#launch').evaluate("el=>el.style.zIndex='200'")
+    page.evaluate('ink.setOpen(false)')
+    expect(page.locator('.canvas-ink-toolbar')).to_be_hidden();assert page.evaluate('ink.tool')=='select'
+    page.locator('#launch').click();pen.click()
+    panel=page.locator('.canvas-ink-options');expect(panel).to_be_visible()
+    box=panel.bounding_box();assert box['x']>=0 and box['y']>=0 and box['x']+box['width']<=360 and box['y']+box['height']<=420,box
     assert errors==[],errors
     page.evaluate('ink.destroy()');assert page.locator('.canvas-ink-toolbar').count()==0
     browser.close()

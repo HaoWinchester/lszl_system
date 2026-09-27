@@ -25,7 +25,7 @@ const bridge = {
   createFile: async input => { calls.push(['remote-create', input.name]); return created; },
 };
 const context = {
-  console, Promise, Date, JSON, setTimeout, clearTimeout,
+  console, Promise, Date, JSON, Event, setTimeout, clearTimeout,
   state: { meta: {}, nodes: [], links: [] },
   lastSavedSnapshot: '',
   document: { getElementById: () => null, documentElement: { dataset: {} } },

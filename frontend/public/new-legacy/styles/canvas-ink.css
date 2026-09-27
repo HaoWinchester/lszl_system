@@ -27,3 +27,8 @@
 /* Both pages reserve the bottom center strip for canvas/session statistics. */
 .knowledge-recall-page .canvas-ink-toolbar,.question-workspace-page .canvas-ink-toolbar{bottom:64px}
 @media(max-width:700px){.knowledge-recall-page .canvas-ink-toolbar,.question-workspace-page .canvas-ink-toolbar{bottom:96px}}
+
+.canvas-ink-toolbar[hidden]{display:none!important}
+.canvas-ink-toolbar.canvas-ink-popover{position:fixed;bottom:auto!important;transform:none;z-index:110}
+.canvas-ink-popover .canvas-ink-options{top:calc(100% + 8px);bottom:auto;left:auto;right:0;transform:none}
+.canvas-ink-entry-icon{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}

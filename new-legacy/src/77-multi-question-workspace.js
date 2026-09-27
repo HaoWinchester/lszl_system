@@ -5708,7 +5708,7 @@
     state.workspaceId=workspace?.id||requested;
     initUnifiedCanvasRuntime();
     state.ink=global.KGCanvasInk?.create?.({
-      viewport:state.viewport,world:state.world,history:state.kernel.history,
+      trigger:byId('qwInkBtn'),viewport:state.viewport,world:state.world,history:state.kernel.history,
       getViewport:()=>({x:state.panX,y:state.panY,scale:state.zoom}),
       getStrokes:()=>state.workspace?.strokes||[],isReadonly:()=>state.readonly||!state.workspace,
       setStrokes:strokes=>{
@@ -5720,6 +5720,7 @@
       onError:notify,onDrawMode:()=>{setPointerMode('edit');clearCardSelection();clearEdgeSelection();setActiveGroup('')}
     });
     global.KGWorkspaceInk=state.ink;
+    global.KGCanvasCapture?.bind(byId('qwCaptureBtn'),state.viewport,{filename:()=>state.workspace?.title||'多题归纳',onError:notify});
     bind();
     loadWorkspace(state.workspaceId,{focusNodeId});
   }

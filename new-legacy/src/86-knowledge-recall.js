@@ -1592,12 +1592,13 @@
     }
     window.KGLearningProgress?.registerAdapter?.('deep_recall',{flush:flushProgress,clearTransient:()=>{cancelProgressSave();destroyingNodeIds.clear();state.nodes=[];state.edges=[];state.strokes=[];inkController?.reset();state.customNodes={};state.activeKeywords=[];state.choiceOffsets={};state.activeNodeId=null;state.lastNewEdgeId='';state.lastNewNodeId='';}});
     inkController=window.KGCanvasInk?.create?.({
-      viewport,world,getViewport:()=>state.transform,getStrokes:()=>state.strokes,
+      trigger:$('krInkBtn'),viewport,world,getViewport:()=>state.transform,getStrokes:()=>state.strokes,
       setStrokes:strokes=>{state.strokes=strokes;saveProgress()},
       isReadonly:()=>isRecallReadonly()||isTeacherDraftPreview(),onError:notifyRecallLimit,
       onDrawMode:()=>{closeGuide();closeNodeSearch()}
     });
     window.KGRecallInk=inkController;
+    window.KGCanvasCapture?.bind($('krCaptureBtn'),viewport,{filename:'深度回忆',onError:notifyRecallLimit});
     applyRandomHighlight();bindThemeSelect();bindCanvas();bindQuestionInteractions();bindNodeInteractions();bindQuestionDrawer();bindLanguageMode();bindNodeSearch();renderAll();initUnifiedCanvasRuntime();bindTools();
     $('krRevealKeywordsBtn')?.addEventListener('click',revealKeywords);
     $('krSaveRetryBtn')?.addEventListener('click',async()=>{

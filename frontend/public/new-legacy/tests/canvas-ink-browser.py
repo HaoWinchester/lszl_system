@@ -68,6 +68,9 @@ def check_page(context,base,kind):
     page.on('pageerror',lambda error: errors.append(str(error)))
     page.goto(base+(RECALL if kind=='recall' else WORKSPACE),wait_until='networkidle')
     page.wait_for_function('!!window.'+('KGRecallInk' if kind=='recall' else 'KGWorkspaceInk'))
+    launcher=page.locator('#krInkBtn' if kind=='recall' else '#qwInkBtn')
+    expect(page.locator('.canvas-ink-toolbar')).to_be_hidden()
+    launcher.click()
     if kind=='workspace':
         for name in ('pen','highlighter','select'):
             page.locator('.canvas-ink-toolbar [data-ink-tool='+name+']').click(timeout=5000)
@@ -130,13 +133,10 @@ def check_page(context,base,kind):
     redo=page.locator('#qwRedoBtn') if kind=='workspace' else tool.locator('[data-ink-action=redo]')
     undo.click();stroke_count(page,2)
     redo.click();stroke_count(page,3)
-    page.once('dialog',lambda d:d.dismiss())
-    tool.locator('[data-ink-action=clear]').click();stroke_count(page,3)
-    page.once('dialog',lambda d:d.accept())
-    tool.locator('[data-ink-action=clear]').click();stroke_count(page,0)
+    tool.locator('[data-ink-tool=eraser]').dblclick();stroke_count(page,0)
     undo.click();stroke_count(page,3)
     expect(page.locator(card)).to_have_count(1)
-    record(kind+': undo/redo and clear cancel/confirm/undo preserve cards')
+    record(kind+': undo/redo and double-click clear without confirmation/undo preserve cards')
 
     paths=page.locator('.canvas-ink-layer path').evaluate_all('(els)=>els.map(e=>e.getAttribute("d"))')
     zoom=page.locator('#qwZoomInBtn' if kind=='workspace' else '#krZoomInBtn')
@@ -160,11 +160,16 @@ def check_page(context,base,kind):
     assert abs((new_path['x']-old_path['x'])-(new_card['x']-old_card['x']))<1
     assert abs(new_path['x']-old_path['x'])>20,'Pan did not move canvas'
     record(kind+': zoom/pan retain world-coordinate anchoring')
+    with page.expect_download(timeout=30000) as capture:
+        page.locator('#qwCaptureBtn' if kind=='workspace' else '#krCaptureBtn').click()
+    capture.value.save_as(str(ARTIFACTS/(kind+'-capture.png')))
+    record(kind+': visible canvas PNG downloaded with ink')
     page.screenshot(path=str(ARTIFACTS/(kind+'-drawn.png')))
     flush(page,kind)
     saved=persisted(context,base,kind)
     assert len(saved)==3,saved
     page.reload(wait_until='networkidle')
+    launcher.click()
     stroke_count(page,3)
     assert paths==page.locator('.canvas-ink-layer path').evaluate_all('(els)=>els.map(e=>e.getAttribute("d"))')
     record(kind+': API reads persisted strokes; reload restores exact world paths')
@@ -239,7 +244,7 @@ def check_page(context,base,kind):
     redo.click();stroke_count(page,3)
     expected=[stroke for stroke in original if stroke['id']!=target_id]
     flush(page,kind);assert persisted(context,base,kind)==expected
-    page.reload(wait_until='networkidle');stroke_count(page,3)
+    page.reload(wait_until='networkidle');launcher.click();stroke_count(page,3)
     assert persisted(context,base,kind)==expected
     expect(page.locator(card)).to_have_count(1)
     record(kind+': single-stroke eraser, undo/redo and reload preserve other strokes and card')
@@ -265,7 +270,7 @@ def check_viewer(browser,base):
             continue
         stroke_count(page,1)
         tool=page.locator('.canvas-ink-toolbar')
-        for selector in ('[data-ink-tool=pen]','[data-ink-tool=highlighter]','[data-ink-tool=eraser]','[data-ink-action=clear]'):
+        for selector in ('[data-ink-tool=pen]','[data-ink-tool=highlighter]','[data-ink-tool=eraser]'):
             expect(tool.locator(selector)).to_be_disabled()
         page.mouse.move(650,430);page.mouse.down();page.mouse.move(750,460,steps=8);page.mouse.up()
         stroke_count(page,1)
@@ -294,7 +299,7 @@ def check_recall_readonly(context,base):
     page.route('**/api/v1/recall/session/**',readonly_session)
     page.goto(base+RECALL,wait_until='networkidle')
     stroke_count(page,4)
-    for selector in ('[data-ink-tool=pen]','[data-ink-tool=highlighter]','[data-ink-tool=eraser]','[data-ink-action=clear]'):
+    for selector in ('[data-ink-tool=pen]','[data-ink-tool=highlighter]','[data-ink-tool=eraser]'):
         expect(page.locator('.canvas-ink-toolbar '+selector)).to_be_disabled()
     draw(page,'#krQuestionCard')
     stroke_count(page,4)
@@ -328,6 +333,7 @@ def check_switch_save_barriers(context,base,kind):
     page.goto(base+(RECALL if kind=='recall' else WORKSPACE+'&workspace=pmp-pattern-workspace'),wait_until='networkidle')
     card='#krQuestionCard' if kind=='recall' else '.qw-question-card'
     tool=page.locator('.canvas-ink-toolbar')
+    page.locator('#krInkBtn' if kind=='recall' else '#qwInkBtn').click()
     old_id='ink-question-1' if kind=='recall' else page.evaluate('KGMultiQuestionWorkspace.activeWorkspaceId()')
     initial=page.locator('.canvas-ink-layer path').count()
     pattern='**/api/v1/recall/progress/**' if kind=='recall' else '**/api/v1/workspaces**'

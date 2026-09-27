@@ -110,7 +110,9 @@
       </div>
       <div class="kr-canvas-overlay-right">
         <div class="kr-canvas-action-group" role="group" aria-label="本题知识点工具">
-          <button class="kr-reset-question-btn kr-node-search-btn" id="krNodeSearchBtn" type="button" title="搜索本页知识点" aria-label="搜索本页知识点" aria-expanded="false" aria-controls="krNodeSearchPanel">
+          <button type="button" id="krInkBtn" class="kr-reset-question-btn" aria-label="画笔工具" title="画笔工具" aria-expanded="false" data-canvas-ui="true"></button>
+        <button type="button" id="krCaptureBtn" class="kr-reset-question-btn" aria-label="截取当前画布" title="截取当前画布并下载 PNG" data-canvas-ui="true"></button>
+        <button class="kr-reset-question-btn kr-node-search-btn" id="krNodeSearchBtn" type="button" title="搜索本页知识点" aria-label="搜索本页知识点" aria-expanded="false" aria-controls="krNodeSearchPanel">
             <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"></circle><path d="m16 16 4 4"></path></svg>
           </button>
           <button class="kr-reset-question-btn" id="krResetBtn" type="button" title="重置本题知识点" aria-label="重置本题知识点">
@@ -233,6 +235,7 @@
 <script defer src="src/canvas/89-canvas-runtime.js"></script>
 <script defer src="src/canvas/83-canvas-history-controller.js"></script>
 <script defer src="src/canvas/94-canvas-ink.js"></script>
+<script defer src="src/canvas/96-canvas-capture.js"></script>
 <script defer src="src/118-question-materials.js"></script>
 <script defer src="src/119-question-analysis.js"></script>
 <script defer src="src/86-knowledge-recall.js"></script>
