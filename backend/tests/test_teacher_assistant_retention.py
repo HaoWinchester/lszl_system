@@ -40,3 +40,46 @@ def test_retention_path_safety(tmp_path,monkeypatch):
     monkeypatch.setattr(settings,'TEACHER_ASSISTANT_STORAGE',str(root));(root/'session').symlink_to(outside,target_is_directory=True)
     assert _safe_directory('session','upload') is None and _safe_directory('../outside','upload') is None
     assert (outside/'keep').read_text()=='safe'
+
+
+def test_protected_sources_do_not_starve_bounded_cleanup(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, 'TEACHER_ASSISTANT_STORAGE', str(tmp_path))
+    async def run():
+        now = datetime.now(timezone.utc)
+        old = now - timedelta(days=200)
+        owner = 'ret-' + uuid4().hex[:10]
+        protected = []
+        async with AsyncSessionLocal() as db:
+            db.add(User(username=owner, password_hash='unused', role='teacher', status='active'))
+            await db.flush()
+            # More than a batch of both native and published sources precede unused uploads.
+            for index in range(42):
+                sid, uid = 'tas_' + uuid4().hex, 'tau_' + uuid4().hex
+                native = index < 21
+                receipt = {} if native else {'items': [{'status': 'succeeded', 'bankId': 'bank'}]}
+                if index == 0:
+                    receipt = {'summary': 'verbose', 'items': []}
+                db.add(Session(id=sid, owner_id=owner, title='protected', runtime={'started': True} if native else {}, receipt=receipt, created_at=old, updated_at=old))
+                await db.flush()
+                db.add(Upload(id=uid, session_id=sid, name='source', size=2, digest='a'*64, status='ready', extracted={}, created_at=old))
+                directory = tmp_path / sid / uid
+                directory.mkdir(parents=True)
+                (directory / 'original').write_text('{}')
+                protected.append((sid, uid, directory))
+            sid, uid = 'tas_' + uuid4().hex, 'tau_' + uuid4().hex
+            db.add(Session(id=sid, owner_id=owner, title='unused', created_at=old + timedelta(days=1), updated_at=old + timedelta(days=1)))
+            await db.flush()
+            db.add(Upload(id=uid, session_id=sid, name='source', size=2, digest='a'*64, status='ready', extracted={}, created_at=old))
+            directory = tmp_path / sid / uid
+            directory.mkdir(parents=True)
+            (directory / 'original').write_text('{}')
+            await db.commit()
+            result = await cleanup(db, now)
+            assert result['sessions'] <= 20
+            assert (await db.get(Upload, uid, populate_existing=True)).status == 'expired'
+            assert not directory.exists()
+            for protected_sid, protected_uid, protected_directory in protected:
+                assert (await db.get(Upload, protected_uid, populate_existing=True)).status == 'ready'
+                assert (protected_directory / 'original').exists()
+            assert (await db.get(Session, protected[0][0], populate_existing=True)).receipt == {'items': []}
+    asyncio.run(run())

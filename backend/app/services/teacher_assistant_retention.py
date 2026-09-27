@@ -9,7 +9,7 @@ from pathlib import Path
 import re
 import shutil
 
-from sqlalchemy import cast, exists, literal, or_, select
+from sqlalchemy import cast, exists, literal, or_, select, func
 from sqlalchemy.dialects.postgresql import JSONPATH
 from sqlalchemy.orm import defer
 
@@ -50,7 +50,14 @@ async def cleanup(db, now=None):
     # is the conservative fallback for direct-publish message jobs.
     verbose_receipt = Session.receipt.has_key('questionCount') | Session.receipt.has_key('summary') | Session.receipt.op('@?')(cast(literal('$.items[*] ? (exists(@.name) || exists(@.links) || exists(@.error) || exists(@.result))'), JSONPATH))
     old_receipt = verbose_receipt & (Session.updated_at <= receipt_cutoff)
-    query = select(Session).where(~active, or_(expired & ~executed, old_receipt)).order_by(Session.updated_at).limit(20).with_for_update(skip_locked=True)
+    started = func.coalesce(Session.runtime['started'].as_boolean(), False)
+    successful = Session.receipt.op('@?')(cast(literal(
+        '$.items[*] ? (@.status == "succeeded" || (exists(@.bankId) && @.bankId != null && @.bankId != "") || (exists(@.paperId) && @.paperId != null && @.paperId != "") || (exists(@.releaseId) && @.releaseId != null && @.releaseId != ""))'
+    ), JSONPATH))
+    # Protected sources must not repeatedly fill the batch. Old verbose receipts
+    # remain independently eligible even when their original files are protected.
+    upload_eligible = expired & ~executed & ~started & ~successful
+    query = select(Session).where(~active, or_(upload_eligible, old_receipt)).order_by(Session.updated_at).limit(20).with_for_update(skip_locked=True)
     sessions = (await db.execute(query.options(defer(Session.messages)))).scalars().all()
     counts = {'sessions': 0, 'uploadsExpired': 0, 'receiptsCompacted': 0, 'unsafePathsSkipped': 0}
     for session in sessions:
