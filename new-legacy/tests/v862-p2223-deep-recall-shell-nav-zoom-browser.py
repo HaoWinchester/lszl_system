@@ -41,7 +41,7 @@ with sync_playwright() as p:
       localStorage.setItem('kg_question_banks_v1__public',JSON.stringify([{id:'recall-bank',name:'回忆测试题集',subject:'PMP',questions:[q1,q2]}]));
       localStorage.setItem('kg_deep_recall_current_question_v1',JSON.stringify({question:q1,sourceBankId:'recall-bank',sourceQuestionId:q1.id}));
     }""")
-    add_script(page,'src/86-activity-schema-v1.js','src/86-free-mode-language.js','src/85-knowledge-recall-data.js','src/94-practice-navigation.js','src/95-recall-association-library.js','src/97-recall-storage.js','src/96-recall-question-source.js','src/98-recall-graph-model.js', 'src/86-knowledge-recall.js')
+    add_script(page,'src/86-activity-schema-v1.js','src/86-free-mode-language.js','src/85-knowledge-recall-data.js','src/94-practice-navigation.js','src/95-recall-association-library.js','src/97-recall-storage.js','src/96-recall-question-source.js','src/98-recall-graph-model.js', 'src/119-question-analysis.js', 'src/86-knowledge-recall.js')
     page.evaluate("document.dispatchEvent(new Event('DOMContentLoaded'))")
     page.wait_for_timeout(260)
 

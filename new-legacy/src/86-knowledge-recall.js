@@ -763,24 +763,6 @@
     const option=(Array.isArray(question.options)?question.options:[]).find(item=>item?.correct);
     return String(option?.id||'');
   }
-  // P4.5.33：题目未录 concepts 时，按关键词 recallNodeId 从联想库解析本题对应知识点
-  // （只取节点 title 与 hint 解释，不展开关系链条），去重后作为解析面板的知识点内容。
-  function krLibraryConcepts(){
-    const library=associationLibrary();
-    if(!library?.nodes?.length)return [];
-    const api=window.KGRecallAssociationLibrary;
-    if(!api?.resolve)return [];
-    const seen=new Set(),result=[];
-    (Array.isArray(question.clues)?question.clues:[]).forEach(clue=>{
-      const nodeId=String(clue?.recallNodeId||'').trim();
-      if(!nodeId||seen.has(nodeId))return;
-      const node=api.resolve(library,nodeId);
-      if(!node)return;
-      seen.add(nodeId);
-      result.push({title:node.title,rule:String(node.hint||'').trim()});
-    });
-    return result.slice(0,6);
-  }
   function krQuestionAnalysisMarkup(){
     const view=recallQuestionDisplay()||{};
     const options=Array.isArray(question.options)?question.options:[];
@@ -790,16 +772,7 @@
     const displayCorrect=viewOptions.find(item=>String(item.id)===String(answerId))||null;
     const explicit=String(view.explanation?.zh||question.analysis||question.explanation||question.rationale||question.solution||'').trim();
     const pathText=String(view.path?.zh||question.keyPath?.ruleText||question.keyPath?.label||'').trim();
-    // P4.5.33 知识点：题目 concepts 为空时，用关键词的 recallNodeId 从联想库解析
-    // 对应知识点（title + hint 解释）——录入侧只需照常绑定关键词入口，无需额外录入。
-    const rawConcepts=(Array.isArray(question.concepts)?question.concepts:[]).filter(item=>String(item?.title||'').trim()).slice(0,6);
-    const concepts=rawConcepts.length?rawConcepts:krLibraryConcepts();
-    // P4.5.33 关键词：优先显示核心关键词（isCore 标记，Prep Studio 录入时已标注），
-    // 有讲解（explain）则附上；无核心标记时回退为带讲解的关键词。
-    const allClues=Array.isArray(question.clues)?question.clues:[];
-    const coreClues=allClues.filter(item=>item?.isCore).slice(0,6);
-    const clues=coreClues.length?coreClues:allClues.filter(item=>String(item?.explain||'').trim()).slice(0,6);
-    const traps=options.filter(item=>String(item?.trap||'').trim()).slice(0,8);
+    const {concepts,clues,traps,clueTitle}=window.KGQuestionAnalysis.sections(question,associationLibrary());
     const sections=[];
     if(krAnalysisSectionEnabled('analysis')&&explicit)sections.push(krAnalysisSectionMarkup('analysis','题目解析',`<p>${escapeHTML(explicit)}${englishLine(view.explanation)}</p>`));
     if(krAnalysisSectionEnabled('answer')&&(answerId||correct)){
@@ -809,8 +782,11 @@
     }
     if(krAnalysisSectionEnabled('path')&&pathText)sections.push(krAnalysisSectionMarkup('path','判断主线',`<p>${escapeHTML(pathText)}${englishLine(view.path)}</p>`));
     if(krAnalysisSectionEnabled('concepts')&&concepts.length)sections.push(krAnalysisSectionMarkup('concepts','知识点',`<ul>${concepts.map(item=>`<li><strong>${escapeHTML(item.title||'知识点')}</strong>${item.rule||item.summary?'：'+escapeHTML(item.rule||item.summary):''}</li>`).join('')}</ul>`));
-    if(krAnalysisSectionEnabled('clues')&&clues.length)sections.push(krAnalysisSectionMarkup('clues',coreClues.length?'核心关键词':'关键词讲解',`<ul>${clues.map(item=>`<li><strong>${escapeHTML(item.text||'线索')}</strong>${String(item.explain||'').trim()?'：'+escapeHTML(item.explain):''}</li>`).join('')}</ul>`));
+    if(krAnalysisSectionEnabled('clues')&&clues.length)sections.push(krAnalysisSectionMarkup('clues',clueTitle,`<ul>${clues.map(item=>`<li><strong>${escapeHTML(item.text||'线索')}</strong>${String(item.explain||'').trim()?'：'+escapeHTML(item.explain):''}</li>`).join('')}</ul>`));
     if(krAnalysisSectionEnabled('traps')&&traps.length)sections.push(krAnalysisSectionMarkup('traps','选项提示',`<ul>${traps.map(item=>`<li><strong>${escapeHTML(item.id||'')}</strong>：${escapeHTML(item.trap||'')}</li>`).join('')}</ul>`));
+    for(const [key,items,label] of [['concepts',concepts,'知识点'],['clues',clues,'关键词'],['traps',traps,'选项提示']]){
+      if(krAnalysisSectionEnabled(key)&&!items.length)sections.push(krAnalysisSectionMarkup(key,label,'<p>本题尚未录入'+label+'。</p>'));
+    }
     if(!sections.length)sections.push('<section class="qw-analysis-empty"><h4>暂无可展示内容</h4><p>可在“显示内容”中勾选其他项目；若仍为空，请先在题库中补充解析、知识点或选项提示。</p></section>');
     return sections.join('');
   }

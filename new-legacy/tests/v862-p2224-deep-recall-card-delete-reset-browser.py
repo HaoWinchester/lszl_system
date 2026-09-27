@@ -45,7 +45,7 @@ def setup(page):
       localStorage.setItem('kg_deep_recall_current_question_v1',JSON.stringify({question:q1,sourceBankId:'recall-delete-bank',sourceQuestionId:q1.id}));
     }""")
     add_style(page,'styles/knowledge-recall.css','styles/account-menu.css','styles/learning-practice-shell.css','styles/knowledge-recall-p2223.css','styles/knowledge-recall-p2224.css')
-    add_script(page,'src/28-app-storage.js','src/50-question-data.js','src/86-activity-schema-v1.js','src/86-free-mode-language.js','src/85-knowledge-recall-data.js','src/94-practice-navigation.js','src/95-recall-association-library.js','src/97-recall-storage.js','src/96-recall-question-source.js','src/98-recall-graph-model.js', 'src/86-knowledge-recall.js')
+    add_script(page,'src/28-app-storage.js','src/50-question-data.js','src/86-activity-schema-v1.js','src/86-free-mode-language.js','src/85-knowledge-recall-data.js','src/94-practice-navigation.js','src/95-recall-association-library.js','src/97-recall-storage.js','src/96-recall-question-source.js','src/98-recall-graph-model.js', 'src/119-question-analysis.js', 'src/86-knowledge-recall.js')
     page.evaluate("document.dispatchEvent(new Event('DOMContentLoaded'))")
     page.wait_for_timeout(240)
 

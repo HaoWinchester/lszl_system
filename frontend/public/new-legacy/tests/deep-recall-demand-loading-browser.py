@@ -75,6 +75,7 @@ with sync_playwright() as playwright:
           };
         }"""
     )
+    page.add_script_tag(content=source("src/119-question-analysis.js"))
     page.add_script_tag(content=source("src/86-knowledge-recall.js"))
     page.evaluate("document.dispatchEvent(new Event('DOMContentLoaded'))")
     loading = page.locator("[data-learning-loading]")
@@ -176,6 +177,7 @@ with sync_playwright() as playwright:
           }};
         }"""
     )
+    entry.add_script_tag(content=source("src/119-question-analysis.js"))
     entry.add_script_tag(content=source("src/86-knowledge-recall.js"))
     entry.evaluate("document.dispatchEvent(new Event('DOMContentLoaded'))")
     entry.wait_for_function("document.querySelector('[data-learning-loading]').hidden")
@@ -242,6 +244,7 @@ with sync_playwright() as playwright:
           }};
         }"""
     )
+    auth.add_script_tag(content=source("src/119-question-analysis.js"))
     auth.add_script_tag(content=source("src/86-knowledge-recall.js"))
     auth.evaluate("document.dispatchEvent(new Event('DOMContentLoaded'))")
     auth.wait_for_function("document.querySelector('[data-learning-loading]').hidden")

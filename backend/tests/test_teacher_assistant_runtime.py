@@ -137,7 +137,7 @@ def test_natural_file_qa_stream_does_not_extract_questions(tmp_path,monkeypatch)
         login(c,a);sid=c.post('/api/v1/teacher-assistant/sessions').json()['session']['id'];url='/api/v1/teacher-assistant/sessions/'+sid
         async def setup():
             async with AsyncSessionLocal() as db:
-                db.add(Upload(id='tau_'+uuid4().hex,session_id=sid,name='说明.docx',size=50,digest='a'*64,status='ready',extracted={'kind':'document','sections':[{'location':'段落1','text':'这是一份没有题目的说明书','images':[]}],'warnings':[]}));await db.commit()
+                db.add(Upload(id='tau_'+uuid4().hex,session_id=sid,name='说明.docx',size=50,digest='a'*64,status='ready',extracted={'kind':'document','sections':[{'location':'段落1','text':'这是一份没有题目的说明书','images':['page-1.png']}],'warnings':[]}));await db.commit()
         asyncio.run(setup())
         seen=[]
         async def streaming(**kw):
@@ -145,6 +145,7 @@ def test_natural_file_qa_stream_does_not_extract_questions(tmp_path,monkeypatch)
             transcript=kw['cwd']/'config'/'projects'/'test'/(kw['session_id']+'.jsonl')
             transcript.parent.mkdir(parents=True,exist_ok=True);transcript.write_text('{}\n')
             assert '说明.docx' in kw['prompt']
+            assert json.loads(kw['prompt'])['files'][0]['images']==[{'name':'page-1.png','location':'段落1'}]
             await kw['on_started']()
             await kw['on_event']('text_delta',{'text':'这是一份说明书。'})
             return '这是一份说明书。'

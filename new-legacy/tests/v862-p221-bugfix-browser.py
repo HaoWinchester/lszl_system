@@ -68,7 +68,7 @@ def test_recall_theme_focus(browser):
            'src/28-app-storage.js', 'src/50-question-data.js', 'src/86-activity-schema-v1.js',
            'src/86-free-mode-language.js', 'src/85-knowledge-recall-data.js',
            'src/95-recall-association-library.js', 'src/97-recall-storage.js', 'src/96-recall-question-source.js',
-           'src/99-learning-practice-shell.js', 'src/98-recall-graph-model.js', 'src/86-knowledge-recall.js')
+           'src/99-learning-practice-shell.js', 'src/98-recall-graph-model.js', 'src/119-question-analysis.js', 'src/86-knowledge-recall.js')
     page.evaluate("document.dispatchEvent(new Event('DOMContentLoaded'))")
     page.wait_for_timeout(180)
 

@@ -35,7 +35,7 @@ def open_page(browser,mobile=False):
     page.set_content('<meta name="viewport" content="width=device-width, initial-scale=1"><body class="knowledge-recall-page">'+body_html('knowledge-recall.html')+'</body>')
     mock_storage(page)
     style(page,'styles/knowledge-recall.css','styles/learning-practice-shell.css')
-    script(page,'src/28-app-storage.js','src/50-question-data.js','src/86-activity-schema-v1.js','src/86-free-mode-language.js','src/85-knowledge-recall-data.js','src/95-recall-association-library.js','src/97-recall-storage.js','src/96-recall-question-source.js','src/99-learning-practice-shell.js','src/98-recall-graph-model.js', 'src/86-knowledge-recall.js')
+    script(page,'src/28-app-storage.js','src/50-question-data.js','src/86-activity-schema-v1.js','src/86-free-mode-language.js','src/85-knowledge-recall-data.js','src/95-recall-association-library.js','src/97-recall-storage.js','src/96-recall-question-source.js','src/99-learning-practice-shell.js','src/98-recall-graph-model.js', 'src/119-question-analysis.js', 'src/86-knowledge-recall.js')
     page.evaluate("document.dispatchEvent(new Event('DOMContentLoaded'))")
     page.wait_for_timeout(220)
     return page

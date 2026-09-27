@@ -1,0 +1,32 @@
+{
+  "status": "prepared-not-applied",
+  "bankId": "b_a6e66ae062e04bf0a7c88dce61ca0869",
+  "paperId": "p_64e865c23c9246c29097e940189d201b",
+  "expectedActiveReleaseId": "pr_707cd52ad9f04829b308557834c8716e",
+  "items": [
+    {
+      "questionId": "q_251467c872cf48c8a3b9161b4d658bc6",
+      "expectedRevision": 2,
+      "position": 8,
+      "file": "finance-08.png",
+      "mimeType": "image/png",
+      "alt": "前三个迭代的进度绩效指数 SPI 和成本绩效指数 CPI",
+      "sha256": "09fd63e55f5db5be56354cbf53e8784b142bb57c6d750625ff5dc7b6d4943052"
+    },
+    {
+      "questionId": "q_9aff9de4a14d407c844935893fca13c8",
+      "expectedRevision": 2,
+      "position": 10,
+      "file": "finance-10.png",
+      "mimeType": "image/png",
+      "alt": "项目各周的进度指标 S 与成本指标 C",
+      "sha256": "a8ea5329a050199d356ead487b134e449b1c035804246872ec04ba5c4fed582c"
+    }
+  ],
+  "instructions": [
+    "发布前重新核对题目revision与当前试卷release；变更时停止核对，不覆盖。",
+    "使用question-assets上传原图，将返回的assetId/url/alt通过现有题目更新服务添加images。",
+    "保留全部答案、关键词、原则映射和题目ID；仅删除第10题中已失效的原图待补文字。",
+    "发布新试卷版本并沿用当前免费、教师学员可用、仅回忆和多题画布的设置；不得修改旧发布快照或个人回忆记录。"
+  ]
+}

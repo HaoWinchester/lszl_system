@@ -1104,6 +1104,8 @@
     }).filter(Boolean);
     return rows.length?rows.join(''):'';
   }
+  const analysisLibraries=global.KGQuestionAnalysis.createLibraryLoader((...args)=>global.fetch(...args));
+  const analysisLibraryErrors=new Map();
   function questionAnalysisMarkup(question={},node={}){
     const view=questionDisplayView(question);
     const options=Array.isArray(question.options)?question.options:[];
@@ -1112,9 +1114,8 @@
     const displayCorrect=view.options.find(item=>String(item.id)===String(answerId))||null;
     const explicit=String(view.explanation?.zh||question.analysis||question.explanation||question.rationale||question.solution||'').trim();
     const pathText=String(view.path?.zh||question.keyPath?.ruleText||question.keyPath?.label||'').trim();
-    const concepts=(Array.isArray(question.concepts)?question.concepts:[]).slice(0,6);
-    const clues=(Array.isArray(question.clues)?question.clues:[]).filter(item=>String(item?.explain||'').trim()).slice(0,6);
-    const traps=options.filter(item=>String(item?.trap||'').trim()).slice(0,8);
+    const subject=String(question.subject||'PMP');
+    const {concepts,clues,traps,clueTitle}=global.KGQuestionAnalysis.sections(question,analysisLibraries.peek(subject));
     const sections=[];
     if(analysisSectionEnabled('analysis')&&explicit)sections.push(analysisSectionMarkup('analysis','题目解析','<p>'+escapeHTML(explicit)+englishLine(view.explanation)+'</p>'));
     if(analysisSectionEnabled('answer')&&(answerId||correct)){
@@ -1128,8 +1129,11 @@
       if(principleBody)sections.push(analysisSectionMarkup('principle','原则解析',principleBody,'qw-analysis-principle'));
     }
     if(analysisSectionEnabled('concepts')&&concepts.length)sections.push(analysisSectionMarkup('concepts','知识点','<ul>'+concepts.map(item=>'<li><strong>'+escapeHTML(item.title||'知识点')+'</strong>'+(item.rule||item.summary?'：'+escapeHTML(item.rule||item.summary):'')+(languageMode()==='bilingual'&&String(item.titleEn||item.ruleEn||item.summaryEn||'').trim()?'<span class="qw-bilingual-en">'+escapeHTML([item.titleEn,item.ruleEn||item.summaryEn].filter(Boolean).join(': '))+'</span>':'')+'</li>').join('')+'</ul>'));
-    if(analysisSectionEnabled('clues')&&clues.length)sections.push(analysisSectionMarkup('clues','关键词讲解','<ul>'+clues.map(item=>'<li><strong>'+escapeHTML(item.text||'线索')+'</strong>：'+escapeHTML(item.explain||'')+(languageMode()==='bilingual'&&String(item.textEn||item.explainEn||'').trim()?'<span class="qw-bilingual-en">'+escapeHTML([item.textEn,item.explainEn].filter(Boolean).join(': '))+'</span>':'')+'</li>').join('')+'</ul>'));
+    if(analysisSectionEnabled('clues')&&clues.length)sections.push(analysisSectionMarkup('clues',clueTitle,'<ul>'+clues.map(item=>'<li><strong>'+escapeHTML(item.text||'线索')+'</strong>'+(item.explain?'：'+escapeHTML(item.explain):'')+(languageMode()==='bilingual'&&String(item.textEn||item.explainEn||'').trim()?'<span class="qw-bilingual-en">'+escapeHTML([item.textEn,item.explainEn].filter(Boolean).join(': '))+'</span>':'')+'</li>').join('')+'</ul>'));
     if(analysisSectionEnabled('traps')&&traps.length)sections.push(analysisSectionMarkup('traps','选项提示','<ul>'+traps.map(item=>'<li><strong>'+escapeHTML(item.id||'')+'</strong>：'+escapeHTML(item.trap||'')+(languageMode()==='bilingual'&&String(item.trapEn||'').trim()?'<span class="qw-bilingual-en">'+escapeHTML(item.trapEn)+'</span>':'')+'</li>').join('')+'</ul>'));
+    for(const [key,items,label] of [['concepts',concepts,'知识点'],['clues',clues,'关键词'],['traps',traps,'选项提示']]){
+      if(analysisSectionEnabled(key)&&!items.length)sections.push(analysisSectionMarkup(key,label,'<p>'+escapeHTML(key==='concepts'?(analysisLibraryErrors.get(subject)||'本题暂无已关联的知识点。'):'本题尚未录入'+label+'。')+'</p>'));
+    }
     if(!sections.length)sections.push('<section class="qw-analysis-empty"><h4>暂无可展示内容</h4><p>可在“显示内容”中勾选其他项目；若仍为空，请先在题库中补充解析、知识点或选项提示。</p></section>');
     if(question.type==='matching')sections.unshift(global.KGQuestionMaterials?.renderMatching(question,{selectedPairs:state.answerSelections.get(String(node.id))||{},readOnly:true,reveal:true})||'');
     return sections.join('');
@@ -1636,6 +1640,11 @@
     while(state.analysisNodeIds.length>=MAX_ANALYSIS_PANELS){
       const removed=state.analysisNodeIds.shift();
       setAnalysisButtonState(removed,false);
+    }
+    const analysisQuestion=resolvedQuestionForNode(state.cards.get(nodeId)?.node)||{};
+    const subject=String(analysisQuestion.subject||'PMP');
+    if(!analysisLibraries.peek(subject)){
+      analysisLibraries.load(subject).then(()=>{analysisLibraryErrors.delete(subject);refreshAnalysisPanelContents()}).catch(error=>{analysisLibraryErrors.set(subject,error.message);refreshAnalysisPanelContents()});
     }
     state.analysisNodeIds.push(nodeId);
     setAnalysisButtonState(nodeId,true);

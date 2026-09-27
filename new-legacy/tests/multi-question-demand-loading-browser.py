@@ -48,6 +48,7 @@ with sync_playwright() as playwright:
         "src/59-published-paper-repository.js",
         "src/59a-published-question-resolver.js",
         "src/60-question-bank.js",
+        "src/119-question-analysis.js",
         "src/77-multi-question-workspace.js",
         "src/94-practice-navigation.js",
         "src/99-learning-practice-shell.js",
@@ -110,6 +111,7 @@ with sync_playwright() as playwright:
       KGCanvasWorkspaceStore.addQuestionReference(item.question,item.bank.id,{x:50,y:50},{userId:'student'});
     }""")
     page.add_script_tag(content=source("src/96-recall-question-source.js"))
+    page.add_script_tag(content=source("src/119-question-analysis.js"))
     page.add_script_tag(content=source("src/77-multi-question-workspace.js"))
     page.evaluate("document.dispatchEvent(new Event('DOMContentLoaded'))")
     page.wait_for_timeout(150)
