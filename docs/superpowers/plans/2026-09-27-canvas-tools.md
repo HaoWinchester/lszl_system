@@ -9,4 +9,4 @@
 - [x] 图谱：在 `19-home-toolbar-registry.js` 注册画笔和截图；`00-config-state.js` 保留经过 normalize 的 strokes；通过新 `canvas/95-home-canvas-tools.js` 连接图谱 state/save/render 与共用笔迹控制器；在图谱历史快照包含 strokes，并在切文件 reset/render 时同步，验证文件隔离和撤销顺序。
 - [x] 截图：新 `canvas/96-canvas-capture.js` 提供 `capture(viewport, options)` 与 `bind(button, viewport, options)`，克隆视口样式、内嵌图片、排除操作控件，下载 PNG。先用真实浏览器夹具测试缩放、可见区尺寸、图片/中文/笔迹、界外内容裁剪、重复点击和资源失败恢复，再接入三页。
 - [x] 自检：三页真实浏览器检查按钮位置、默认隐藏、画笔/荧光笔、颜色、空白/单笔/全部擦除及撤销重做、保存刷新、切文件、只读、截图内容/尺寸与失败提示；运行既有契约、单元、完整受管发布校验。
-- [ ] 发布：版本 254（含 UAT 发现的图谱面板遮挡修正），提交源及同步生成产物，合入/推送 uat，部署并实测；等待用户验收，不改 main/正式。
+- [x] 发布：版本 254（含 UAT 发现的图谱面板遮挡修正），提交源及同步生成产物，合入/推送 uat，部署并实测；等待用户验收，不改 main/正式。
