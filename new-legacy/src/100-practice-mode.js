@@ -481,7 +481,7 @@
     loadReleases();
     const release=state.releases.find(row=>row.id===paperId||row.paperId===paperId);
     if(!release){showToast('该试卷已不在当前发布目录，无法继续练习。');return}
-    state.selectedPaperId=release.id;
+    selectPaper(release.id);
     closeHistoryDrawer();
     startPractice('practice');
   }

@@ -660,6 +660,56 @@ def test_short_paper_count_is_supported_by_the_session_api() -> None:
         asyncio.run(_cleanup_released_pmp_paper(ids))
 
 
+def test_short_paper_complete_comment_and_reenter_preserves_report() -> None:
+    ids = _practice_fixture_ids()
+    asyncio.run(_seed_released_pmp_paper(ids, domains=["people", "process", "business-environment"]))
+    try:
+        with TestClient(app) as client:
+            assert client.post(
+                "/api/v1/auth/login", json={"username": ids["student"], "password": PASSWORD}
+            ).status_code == 200
+            entry = {"paperId": ids["paper"], "releaseId": ids["release"],
+                     "mode": "challenge", "count": 3, "order": "paper"}
+            started = client.post("/api/v1/learning/practice/sessions/enter", json=entry)
+            assert started.status_code == 200, started.text
+            body = started.json()
+            session = body["session"]
+            question_ids = [row["questionId"] for row in body["questions"]]
+            completed = client.post(
+                f"/api/v1/learning/practice/sessions/{session['id']}/complete",
+                json={"revision": session["revision"], "answers": {
+                    qid: {"selectedAnswer": "A" if index == 0 else "B", "selectionIndex": index + 1}
+                    for index, qid in enumerate(question_ids)
+                }},
+            )
+            assert completed.status_code == 200, completed.text
+            report = completed.json()["report"]
+            assert report["counts"] == {"total": 3, "answered": 3, "correct": 1, "wrong": 2, "unanswered": 0}
+            comments_url = f"/api/v1/questions/{question_ids[0]}/comments"
+            comment = client.post(comments_url, json={"content": "完成后留言，再次进入练习"})
+            assert comment.status_code == 201, comment.text
+
+            # The history entry uses ordinary practice; the completed challenge stays frozen.
+            entry["mode"] = "practice"
+            reopened = client.post("/api/v1/learning/practice/sessions/enter", json=entry)
+            assert reopened.status_code == 200, reopened.text
+            reopened_body = reopened.json()
+            assert reopened_body["resumed"] is False
+            assert reopened_body["session"]["id"] != session["id"]
+            assert reopened_body["session"]["stats"]["total"] == 3
+            assert len(reopened_body["questions"]) == 3
+            refreshed = client.post("/api/v1/learning/practice/sessions/enter", json=entry)
+            assert refreshed.status_code == 200, refreshed.text
+            assert refreshed.json()["resumed"] is True
+            assert refreshed.json()["session"]["id"] == reopened_body["session"]["id"]
+            frozen_report = client.get(f"/api/v1/learning/practice/sessions/{session['id']}/report")
+            assert frozen_report.status_code == 200, frozen_report.text
+            assert frozen_report.json()["report"] == report
+            assert client.get(comments_url).json()["comments"][0]["id"] == comment.json()["comment"]["id"]
+    finally:
+        asyncio.run(_cleanup_released_pmp_paper(ids))
+
+
 def test_mini_bearer_competitive_session_supports_local_feedback_but_hides_explanation() -> None:
     ids = _practice_fixture_ids()
     asyncio.run(_seed_released_pmp_paper(ids))
