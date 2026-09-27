@@ -1,0 +1,305 @@
+import asyncio
+import json
+from uuid import uuid4
+from fastapi.testclient import TestClient
+from app.main import app
+from test_teacher_assistant import users,login
+
+
+def test_runtime_switch_waits_for_exit_and_events_are_owner_private():
+    from app.db.session import AsyncSessionLocal
+    from app.models.teacher_assistant import TeacherAssistantJob as Job
+    from datetime import datetime,timedelta,timezone
+    a,b,_=users()
+    with TestClient(app) as c:
+        login(c,a)
+        first=c.post('/api/v1/teacher-assistant/sessions').json()['session']
+        sid=first['id'];url='/api/v1/teacher-assistant/sessions/'+sid
+        assert first.get('runtime',{}).get('sessionId')
+        second=c.post('/api/v1/teacher-assistant/sessions').json()['session'];other='/api/v1/teacher-assistant/sessions/'+second['id']
+        job=c.post(url+'/messages',json={'content':'你好','requestId':uuid4().hex}).json()['session']['job']
+        async def running():
+            async with AsyncSessionLocal() as db:
+                j=await db.get(Job,job['id']);j.status='running';j.lease_until=datetime.now(timezone.utc)+timedelta(minutes=5);await db.commit()
+        asyncio.run(running())
+        assert c.post(other+'/activate').status_code==409
+        assert c.post(other+'/messages',json={'content':'第二个','requestId':uuid4().hex}).status_code==409
+        assert c.get(url).json()['session']['runtime']['status']=='stopping'
+        async def exited():
+            async with AsyncSessionLocal() as db:
+                j=await db.get(Job,job['id']);j.lease_until=None;await db.commit()
+        asyncio.run(exited())
+        assert c.post(other+'/activate').status_code==200
+        assert c.post(url+'/activate').json()['session']['runtime']['sessionId']==first['runtime']['sessionId']
+        login(c,b)
+        assert c.get(url+'/events').status_code==404
+        assert c.post(url+'/activate').status_code==404
+
+
+def test_stream_parser_omits_thinking_arguments_and_system_secrets():
+    from app.services import teacher_assistant_model as m
+    assert hasattr(m,'public_events')
+    assert m.public_events({'type':'system','apiKey':'secret'})==[]
+    assert m.public_events({'type':'stream_event','event':{'type':'content_block_delta','delta':{'type':'thinking_delta','thinking':'private'}}})==[]
+    assert m.public_events({'type':'stream_event','event':{'type':'content_block_delta','delta':{'type':'text_delta','text':'你好'}}})==[('text_delta',{'text':'你好'})]
+
+
+def test_persistent_command_uses_scoped_mcp_and_same_session_id():
+    from app.services import teacher_assistant_model as m
+    assert hasattr(m,'stream_command')
+    for resume in (False,True):
+        cmd=m.stream_command('uuid',resume,{'mcpServers':{}},'system')
+        assert cmd[cmd.index('--resume' if resume else '--session-id')+1]=='uuid'
+        assert '--no-session-persistence' not in cmd
+        assert cmd[cmd.index('--tools')+1]==''
+        assert cmd[cmd.index('--model')+1]=='glm-5.3-flash[1m]'
+        assert '--include-partial-messages' in cmd
+        assert cmd[cmd.index('--output-format')+1]=='stream-json'
+
+
+def test_event_snapshot_and_cursor_are_atomic_and_replay_has_no_duplicates():
+    from app.services import teacher_assistant_events as events
+    from app.db.session import AsyncSessionLocal
+    from app.models.teacher_assistant import TeacherAssistantJob as Job
+    a,_,_=users()
+    with TestClient(app) as c:
+        login(c,a);sid=c.post('/api/v1/teacher-assistant/sessions').json()['session']['id'];url='/api/v1/teacher-assistant/sessions/'+sid
+        jid=c.post(url+'/messages',json={'content':'hi','requestId':uuid4().hex}).json()['session']['job']['id']
+        async def emit():
+            await events.emit(sid,jid,'text_delta',{'text':'第一段'})
+        asyncio.run(emit())
+        snapshot=c.get(url).json()['session']['stream']
+        assert snapshot['text']=='第一段'
+        async def more():
+            await events.emit(sid,jid,'text_delta',{'text':'第二段'})
+            async with AsyncSessionLocal() as db:
+                j=await db.get(Job,jid);j.status='succeeded';await db.commit()
+            await events.emit(sid,jid,'done',{'status':'succeeded'})
+        asyncio.run(more())
+        data=c.get(url+'/events?after='+str(snapshot['lastEventId'])).text
+        rows=[json.loads(line[6:]) for line in data.splitlines() if line.startswith('data: ')]
+        assert [r['data']['text'] for r in rows if r['type']=='text_delta']==['第二段']
+        assert len({r['id'] for r in rows})==len(rows)
+
+
+def test_tools_read_full_paginated_json_and_cannot_escape_owner(tmp_path,monkeypatch):
+    import pytest
+    from app.services import teacher_assistant_tools as tools
+    from app.core.config import settings
+    from app.db.session import AsyncSessionLocal
+    from app.models.teacher_assistant import TeacherAssistantUpload as Upload,TeacherAssistantJob as Job
+    monkeypatch.setattr(settings,'TEACHER_ASSISTANT_STORAGE',str(tmp_path))
+    a,b,_=users()
+    with TestClient(app) as c:
+        login(c,a);sid=c.post('/api/v1/teacher-assistant/sessions').json()['session']['id'];url='/api/v1/teacher-assistant/sessions/'+sid
+        uid=c.post(url+'/uploads',files={'files':('anything.json',json.dumps({'long':'开头'+'x'*30000+'结尾','nested':{'answer':'真实答案'}}).encode(),'application/json')}).json()['session']['uploads'][0]['id']
+        jid=c.post(url+'/messages',json={'content':'文档写了什么','requestId':uuid4().hex}).json()['session']['job']['id']
+        async def check():
+            async with AsyncSessionLocal() as db:
+                upload=await db.get(Upload,uid);upload.status='ready';upload.extracted={'kind':'json','data':{'long':'开头'+'x'*30000+'结尾','nested':{'answer':'真实答案'}},'sections':[]}
+                j=await db.get(Job,jid);j.status='running';await db.commit()
+            value='';offset=0
+            while True:
+                result=await tools.call_tool(a,sid,jid,'read_file',{'uploadId':uid,'offset':offset,'limit':8000})
+                page=json.loads(result['content'][0]['text']);value+=page['text']
+                if page['nextOffset'] is None: break
+                offset=page['nextOffset']
+            assert json.loads(value)['nested']['answer']=='真实答案'
+            assert json.loads(value)['long'].endswith('结尾')
+            with pytest.raises(Exception): await tools.call_tool(b,sid,jid,'read_file',{'uploadId':uid})
+            with pytest.raises(Exception): await tools.call_tool(a,sid,jid,'read_file',{'uploadId':'../../secrets'})
+        asyncio.run(check())
+
+
+def test_real_image_validation_and_visual_block(tmp_path,monkeypatch):
+    import pytest
+    from PIL import Image
+    from app.services import teacher_assistant_documents as docs
+    bad=tmp_path/'fake';bad.write_bytes(b'not image')
+    with pytest.raises(docs.DocumentError):docs.extract_document(bad,'fake.png',tmp_path/'out')
+    image=tmp_path/'real';Image.new('RGB',(30,20),'red').save(image,format='PNG')
+    monkeypatch.setattr(docs,'_run',lambda args,**kw:'eng\nchi_sim' if '--list-langs' in args else 'OCR 文字')
+    result=docs.extract_document(image,'photo.png',tmp_path/'image-out')
+    assert result['kind']=='image'
+    assert result['sections'][0]['images']
+    assert 'OCR' in result['sections'][0]['text']
+    assert any('视觉' in text for text in result['warnings'])
+
+
+def test_natural_file_qa_stream_does_not_extract_questions(tmp_path,monkeypatch):
+    from app.worker import teacher_assistant as worker
+    from app.core.config import settings
+    from app.db.session import AsyncSessionLocal
+    from app.models.teacher_assistant import TeacherAssistantSession as Session,TeacherAssistantUpload as Upload,TeacherAssistantJob as Job
+    monkeypatch.setattr(settings,'TEACHER_ASSISTANT_STORAGE',str(tmp_path))
+    a,_,_=users()
+    with TestClient(app) as c:
+        login(c,a);sid=c.post('/api/v1/teacher-assistant/sessions').json()['session']['id'];url='/api/v1/teacher-assistant/sessions/'+sid
+        async def setup():
+            async with AsyncSessionLocal() as db:
+                db.add(Upload(id='tau_'+uuid4().hex,session_id=sid,name='说明.docx',size=50,digest='a'*64,status='ready',extracted={'kind':'document','sections':[{'location':'段落1','text':'这是一份没有题目的说明书','images':[]}],'warnings':[]}));await db.commit()
+        asyncio.run(setup())
+        seen=[]
+        async def streaming(**kw):
+            seen.append(kw)
+            assert '说明.docx' in kw['prompt']
+            await kw['on_started']()
+            await kw['on_event']('text_delta',{'text':'这是一份说明书。'})
+            return '这是一份说明书。'
+        async def old_ask(*args,**kw):raise AssertionError('must not invoke stateless extraction')
+        monkeypatch.setattr(worker.model,'stream_reply',streaming,raising=False)
+        monkeypatch.setattr(worker.model,'ask',old_ask)
+        for turn in range(2):
+            jid=c.post(url+'/messages',json={'content':'文件讲了什么','requestId':uuid4().hex}).json()['session']['job']['id']
+            async def run():
+                async with AsyncSessionLocal() as db:
+                    j=await db.get(Job,jid);j.status='running';await db.commit()
+                await worker.run_job(jid)
+            asyncio.run(run())
+        state=c.get(url).json()['session']
+        assert state['messages'][-1]['content']=='这是一份说明书。'
+        assert state['plan']=={}
+        assert seen[0]['session_id']==seen[1]['session_id']
+        assert [k['resume'] for k in seen]==[False,True]
+        assert state['stream']['text']==''
+
+
+def test_native_stream_cancellation_reaps_process_and_preserves_public_text(tmp_path,monkeypatch):
+    import os,sys,pytest
+    from app.services import teacher_assistant_model as model
+    from app.core.config import settings
+    executable=tmp_path/'fake-claude'
+    executable.write_text('#!'+sys.executable+'\n'+'''import json,sys,time,os
+from pathlib import Path
+Path('pid').write_text(str(os.getpid()))
+sys.stdin.read()
+print(json.dumps({'type':'system','subtype':'init','session_id':'native-id'}),flush=True)
+print(json.dumps({'type':'stream_event','event':{'type':'content_block_delta','delta':{'type':'thinking_delta','thinking':'private'}}}),flush=True)
+print(json.dumps({'type':'stream_event','event':{'type':'content_block_delta','delta':{'type':'text_delta','text':'实际部分回复'}}}),flush=True)
+time.sleep(30)
+''');executable.chmod(0o700)
+    monkeypatch.setattr(settings,'TEACHER_ASSISTANT_CLAUDE',str(executable));monkeypatch.setenv('ANTHROPIC_AUTH_TOKEN','test-only')
+    events=[];started=[]
+    async def scenario():
+        async def emit(kind,data):events.append((kind,data))
+        async def init():started.append(True)
+        async def active():return not events
+        with pytest.raises(asyncio.CancelledError):
+            await model.stream_reply(session_id='native-id',resume=False,cwd=tmp_path/'runtime',mcp_config={},prompt='hello',system_prompt='safe',on_event=emit,on_started=init,is_active=active)
+    asyncio.run(scenario())
+    assert started==[True] and events==[('text_delta',{'text':'实际部分回复'})]
+    pid=int((tmp_path/'runtime'/'pid').read_text())
+    with pytest.raises(ProcessLookupError):os.kill(pid,0)
+
+
+def test_retry_clears_old_partial_snapshot_but_keeps_cursor():
+    from app.db.session import AsyncSessionLocal
+    from app.models.teacher_assistant import TeacherAssistantJob as Job
+    from app.services.teacher_assistant_events import emit
+    a,_,_=users()
+    with TestClient(app) as c:
+        login(c,a);sid=c.post('/api/v1/teacher-assistant/sessions').json()['session']['id'];url='/api/v1/teacher-assistant/sessions/'+sid
+        jid=c.post(url+'/messages',json={'content':'hi','requestId':uuid4().hex}).json()['session']['job']['id']
+        async def fail():
+            await emit(sid,jid,'text_delta',{'text':'上次部分'})
+            async with AsyncSessionLocal() as db:
+                j=await db.get(Job,jid);j.status='failed';await db.commit()
+        asyncio.run(fail());old=c.get(url).json()['session']['stream']
+        response=c.post(url+'/retry',json={'requestId':uuid4().hex})
+        assert response.status_code==200,response.text
+        current=response.json()['session']['stream']
+        assert current['text']==''
+        assert current['lastEventId']>=old['lastEventId']
+
+
+def test_natural_chat_never_executes_stale_direct_publish_plan(tmp_path,monkeypatch):
+    from app.worker import teacher_assistant as worker
+    from app.services import teacher_assistant_import as imports
+    from app.core.config import settings
+    from app.db.session import AsyncSessionLocal
+    from app.models.teacher_assistant import TeacherAssistantSession as Session,TeacherAssistantJob as Job
+    monkeypatch.setattr(settings,'TEACHER_ASSISTANT_STORAGE',str(tmp_path))
+    a,_,_=users()
+    with TestClient(app) as c:
+        login(c,a);sid=c.post('/api/v1/teacher-assistant/sessions').json()['session']['id'];url='/api/v1/teacher-assistant/sessions/'+sid
+        jid=c.post(url+'/messages',json={'content':'直接发布','requestId':uuid4().hex}).json()['session']['job']['id']
+        async def setup():
+            async with AsyncSessionLocal() as db:
+                s=await db.get(Session,sid);s.plan={'settings':{'directPublish':True},'items':[{'id':'stale','questions':[]}],'blockers':[]}
+                j=await db.get(Job,jid);j.status='running';await db.commit()
+        asyncio.run(setup())
+        async def streaming(**kw):await kw['on_event']('text_delta',{'text':'这是解释。'});return '这是解释。'
+        async def execute(*a,**kw):raise AssertionError('stale plan was executed by Q&A')
+        monkeypatch.setattr(worker.model,'stream_reply',streaming);monkeypatch.setattr(imports,'execute_plan',execute)
+        asyncio.run(worker.run_job(jid))
+
+
+def test_pruned_events_require_snapshot_resync(monkeypatch):
+    from app.services import teacher_assistant_events as events
+    from app.db.session import AsyncSessionLocal
+    from app.models.teacher_assistant import TeacherAssistantJob as Job
+    monkeypatch.setattr(events,'MAX_EVENTS',2)
+    a,_,_=users()
+    with TestClient(app) as c:
+        login(c,a);sid=c.post('/api/v1/teacher-assistant/sessions').json()['session']['id'];url='/api/v1/teacher-assistant/sessions/'+sid
+        queued=c.post(url+'/messages',json={'content':'hi','requestId':uuid4().hex}).json()['session'];jid=queued['job']['id'];cursor=queued['stream']['lastEventId']
+        async def emit():
+            for text in ('甲','乙','丙'):await events.emit(sid,jid,'text_delta',{'text':text})
+            async with AsyncSessionLocal() as db:
+                j=await db.get(Job,jid);j.status='succeeded';await db.commit()
+        asyncio.run(emit())
+        rows=[json.loads(line[6:]) for line in c.get(url+'/events?after='+str(cursor)).text.splitlines() if line.startswith('data: ')]
+        assert rows[0]['type']=='status' and rows[0]['data']['status']=='resync_required'
+        assert c.get(url).json()['session']['stream']['text']=='甲乙丙'
+
+
+def test_scoped_import_tool_preserves_json_answers_and_marks_current_job(tmp_path,monkeypatch):
+    from app.services import teacher_assistant_tools as tools
+    from app.core.config import settings
+    from app.db.session import AsyncSessionLocal
+    from app.models.teacher_assistant import TeacherAssistantSession as Session,TeacherAssistantUpload as Upload,TeacherAssistantJob as Job
+    from test_teacher_assistant_import import question
+    monkeypatch.setattr(settings,'TEACHER_ASSISTANT_STORAGE',str(tmp_path))
+    a,_,_=users()
+    with TestClient(app) as c:
+        login(c,a);sid=c.post('/api/v1/teacher-assistant/sessions').json()['session']['id'];url='/api/v1/teacher-assistant/sessions/'+sid
+        uid=c.post(url+'/uploads',files={'files':('题库.json',json.dumps({'id':'bank','questions':[question()]}).encode(),'application/json')}).json()['session']['uploads'][0]['id']
+        jid=c.post(url+'/messages',json={'content':'导入私有草稿，保留独立副本','requestId':uuid4().hex}).json()['session']['job']['id']
+        async def prepare():
+            async with AsyncSessionLocal() as db:
+                upload=await db.get(Upload,uid);upload.status='ready';upload.extracted={'kind':'json','data':{'id':'bank','questions':[question()]},'warnings':[]}
+                j=await db.get(Job,jid);j.status='running';await db.commit()
+            result=await tools.call_tool(a,sid,jid,'prepare_import',{'intent':{'settings':{'duplicatePolicy':'independent'},'items':[{'uploadId':uid,'questions':[question(answer='b')]}]}})
+            assert json.loads(result['content'][0]['text'])['questionCount']==1
+            async with AsyncSessionLocal() as db:
+                session=await db.get(Session,sid);job=await db.get(Job,jid)
+                assert session.plan['items'][0]['questions'][0]['correctAnswer']=='a'
+                assert session.plan['settings']['publish'] is False
+                assert job.stream['preparedRevision']==session.revision
+                assert session.receipt=={}
+        asyncio.run(prepare())
+
+
+def test_scoped_image_tool_returns_real_image_block(tmp_path,monkeypatch):
+    import base64,io
+    from PIL import Image
+    from app.services import teacher_assistant_tools as tools
+    from app.core.config import settings
+    from app.db.session import AsyncSessionLocal
+    from app.models.teacher_assistant import TeacherAssistantUpload as Upload,TeacherAssistantJob as Job
+    monkeypatch.setattr(settings,'TEACHER_ASSISTANT_STORAGE',str(tmp_path))
+    a,_,_=users()
+    with TestClient(app) as c:
+        login(c,a);sid=c.post('/api/v1/teacher-assistant/sessions').json()['session']['id'];url='/api/v1/teacher-assistant/sessions/'+sid
+        raw=io.BytesIO();Image.new('RGB',(40,30),'blue').save(raw,format='PNG')
+        uid=c.post(url+'/uploads',files={'files':('图片.png',raw.getvalue(),'image/png')}).json()['session']['uploads'][0]['id']
+        jid=c.post(url+'/messages',json={'content':'查看图形','requestId':uuid4().hex}).json()['session']['job']['id']
+        directory=tmp_path/sid/uid/'extracted';directory.mkdir();(directory/'image-1.png').write_bytes(raw.getvalue())
+        async def read():
+            async with AsyncSessionLocal() as db:
+                upload=await db.get(Upload,uid);upload.status='ready';upload.extracted={'kind':'image','sections':[{'location':'图片1','text':'OCR','images':['image-1.png']}]}
+                j=await db.get(Job,jid);j.status='running';await db.commit()
+            result=await tools.call_tool(a,sid,jid,'read_image',{'uploadId':uid,'name':'image-1.png'})
+            block=result['content'][1];assert block['type']=='image' and block['mimeType']=='image/jpeg'
+            with Image.open(io.BytesIO(base64.b64decode(block['data']))) as image: assert image.size==(40,30)
+        asyncio.run(read())

@@ -1,6 +1,6 @@
 """Teacher-private conversations and durable, bounded background operations."""
 from datetime import datetime
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import BigInteger, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.base import Base
@@ -13,6 +13,7 @@ class TeacherAssistantSession(Base):
     messages: Mapped[list]=mapped_column(JSONB,default=list)
     plan: Mapped[dict]=mapped_column(JSONB,default=dict)
     receipt: Mapped[dict]=mapped_column(JSONB,default=dict)
+    runtime: Mapped[dict]=mapped_column(JSONB,default=dict,server_default='{}')
     revision: Mapped[int]=mapped_column(Integer,default=1)
     created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True),server_default=func.now())
     updated_at: Mapped[datetime]=mapped_column(DateTime(timezone=True),server_default=func.now(),onupdate=func.now())
@@ -40,7 +41,16 @@ class TeacherAssistantJob(Base):
     status: Mapped[str]=mapped_column(String(24),default='queued',index=True)
     payload: Mapped[dict]=mapped_column(JSONB,default=dict)
     error: Mapped[str]=mapped_column(Text,default='')
+    stream: Mapped[dict]=mapped_column(JSONB,default=dict,server_default='{}')
     attempts: Mapped[int]=mapped_column(Integer,default=0)
     lease_until: Mapped[datetime|None]=mapped_column(DateTime(timezone=True),nullable=True)
     created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True),server_default=func.now())
     updated_at: Mapped[datetime]=mapped_column(DateTime(timezone=True),server_default=func.now(),onupdate=func.now())
+
+class TeacherAssistantEvent(Base):
+    __tablename__='teacher_assistant_events'
+    id: Mapped[int]=mapped_column(BigInteger,primary_key=True,autoincrement=True)
+    session_id: Mapped[str]=mapped_column(ForeignKey('teacher_assistant_sessions.id',ondelete='CASCADE'),index=True)
+    job_id: Mapped[str]=mapped_column(ForeignKey('teacher_assistant_jobs.id',ondelete='CASCADE'))
+    type: Mapped[str]=mapped_column(String(24))
+    data: Mapped[dict]=mapped_column(JSONB)

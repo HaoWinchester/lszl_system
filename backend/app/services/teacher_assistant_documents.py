@@ -18,7 +18,7 @@ MAX_EXPANDED = 100 * 1024 * 1024
 MAX_PAGES = 200
 MAX_TEXT = 8 * 1024 * 1024
 MAX_IMAGES = 200
-ALLOWED = {'.json', '.docx', '.pptx', '.pdf', '.doc', '.ppt'}
+ALLOWED = {'.json', '.docx', '.pptx', '.pdf', '.doc', '.ppt', '.png', '.jpg', '.jpeg', '.webp'}
 
 
 class DocumentError(ValueError):
@@ -27,7 +27,7 @@ class DocumentError(ValueError):
 
 def validate_upload(filename: str, size: int) -> None:
     if Path(filename).suffix.lower() not in ALLOWED:
-        raise DocumentError('不支持此文件类型；请上传 JSON、Word、PDF 或 PPT。')
+        raise DocumentError('不支持此文件类型；请上传 JSON、Word、PDF、PPT 或 PNG/JPEG/WebP 图片。')
     if size <= 0 or size > MAX_UPLOAD:
         raise DocumentError('文件为空或超过 20 MiB；请拆分后上传。')
 
@@ -231,11 +231,45 @@ def _pdf(path, output_dir):
     return {'kind': 'document', 'data': None, 'sections': sections, 'warnings': warnings}
 
 
+def validate_image(path,extension):
+    from PIL import Image
+    import warnings
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter('error',Image.DecompressionBombWarning)
+            with Image.open(path) as image:
+                expected={'.png':'PNG','.jpg':'JPEG','.jpeg':'JPEG','.webp':'WEBP'}
+                if image.format!=expected[extension] or max(image.size)>12000 or image.width*image.height>25000000:
+                    raise DocumentError('图片真实格式与扩展名不符，或尺寸/像素超过上限。')
+                image.verify()
+    except (OSError,ValueError,Image.DecompressionBombError,Image.DecompressionBombWarning) as exc:
+        raise DocumentError('图片无法验证，请上传有效 PNG/JPEG/WebP 图片。') from exc
+
+
+def _image(path,extension,output_dir):
+    from PIL import Image
+    validate_image(path,extension)
+    target=output_dir/'image-1.png'
+    with Image.open(path) as image:
+        image.thumbnail((2400,2400));image.convert('RGB').save(target,format='PNG')
+    warnings=['OCR 文字可能遗漏布局、颜色和图形；视觉解读须以实际图片工具结果及模型能力为准。']
+    text=''
+    try:
+        languages=_run(['tesseract','--list-langs'])
+        if not all(lang in languages.split() for lang in ('chi_sim','eng')): raise DocumentError('OCR 语言包不可用')
+        text=_run(['tesseract',str(target),'stdout','-l','chi_sim+eng'],timeout=90).strip()
+    except DocumentError:
+        warnings.append('OCR 未成功，仍可使用图片工具读取实际图片。')
+    return {'kind':'image','data':None,'sections':[{'location':'图片 1','text':text,'images':[target.name]}],'warnings':warnings}
+
+
 def extract_document(path: Path, filename: str, output_dir: Path) -> dict:
     path, output_dir = Path(path).resolve(), Path(output_dir).resolve()
     validate_upload(filename, path.stat().st_size)
     extension = Path(filename).suffix.lower()
     output_dir.mkdir(parents=True, exist_ok=True)
+    if extension in {'.png','.jpg','.jpeg','.webp'}:
+        return _image(path,extension,output_dir)
     if extension == '.json':
         try:
             data = json.loads(path.read_text(encoding='utf-8-sig'), parse_constant=lambda value: (_ for _ in ()).throw(ValueError('Non-finite JSON number')))

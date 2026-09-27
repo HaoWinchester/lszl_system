@@ -4,6 +4,7 @@ from pathlib import Path
 from uuid import uuid4
 from copy import deepcopy
 import os
+import asyncio
 import hashlib
 import shutil
 from fastapi import HTTPException, UploadFile
@@ -29,7 +30,7 @@ async def actor_lock(db,user):
     await db.execute(text('SELECT pg_advisory_xact_lock(hashtext(:key))'),{'key':'teacher-assistant:'+user.username})
 
 async def last_job(db,sid):
-    return (await db.execute(select(Job).where(Job.session_id==sid).order_by(Job.created_at.desc(),Job.id.desc()).limit(1))).scalar_one_or_none()
+    return (await db.execute(select(Job).where(Job.session_id==sid).order_by(Job.created_at.desc(),Job.id.desc()).limit(1).execution_options(populate_existing=True))).scalar_one_or_none()
 
 async def has_inflight(db,*,owner=None,sid=None):
     query=select(Job.id).where(or_(Job.status.in_(ACTIVE),Job.lease_until>datetime.now(timezone.utc)))
@@ -37,12 +38,41 @@ async def has_inflight(db,*,owner=None,sid=None):
     if sid is not None: query=query.where(Job.session_id==sid)
     return (await db.execute(query.limit(1))).scalar_one_or_none() is not None
 
+def native_id(obj):
+    # Stable also for existing sessions, without mutating on GET.
+    from uuid import uuid5,NAMESPACE_URL
+    return str(uuid5(NAMESPACE_URL,'teacher-assistant:'+obj.id))
+
+def runtime_state(obj,job):
+    active=bool(job and (job.status=='running' or job.lease_until and job.lease_until>datetime.now(timezone.utc)))
+    status='stopping' if active and job.status=='cancelled' else (job.status if job and job.status in ACTIVE else 'idle')
+    return {'sessionId':native_id(obj),'active':active,'status':status}
+
+async def activate(db,user,sid):
+    await actor_lock(db,user)
+    obj=await owned(db,user,sid)
+    jobs=(await db.execute(select(Job).where(Job.owner_id==user.username,Job.session_id!=sid,
+        or_(Job.status.in_(ACTIVE),Job.lease_until>datetime.now(timezone.utc))).with_for_update())).scalars().all()
+    for job in jobs:
+        job.status='cancelled';job.error='切换会话，正在结束当前步骤'
+    stopped=[(job.session_id,job.id,bool(job.lease_until and job.lease_until>datetime.now(timezone.utc))) for job in jobs]
+    stopping=any(live for _,_,live in stopped)
+    await db.commit();await db.refresh(obj)
+    from app.services.teacher_assistant_events import emit
+    for prior_sid,jid,live in stopped:
+        await emit(prior_sid,jid,'status' if live else 'done',{'status':'stopping' if live else 'cancelled'})
+    if stopping: raise HTTPException(409,'正在停止之前的会话，请等待进程退出后重试')
+    return await envelope(db,obj)
+
 async def envelope(db,obj):
+    # Protect the messages-to-stream handoff while taking a consistent snapshot.
+    await db.refresh(obj,with_for_update={"read":True})
     uploads=(await db.execute(select(Upload).where(Upload.session_id==obj.id).order_by(Upload.created_at))).scalars().all()
     job=await last_job(db,obj.id)
     plan=deepcopy(obj.plan)
     for item in plan.get('items',[]): item.pop('bankPayload',None)
     return {'session':{'id':obj.id,'title':obj.title,'revision':obj.revision,'messages':obj.messages,'plan':plan,'receipt':obj.receipt or None,
+        'runtime':runtime_state(obj,job),'stream':{'jobId':job.id if job else None,'text':(job.stream or {}).get('text','') if job and not (job.stream or {}).get('committed') else '', 'lastEventId':(job.stream or {}).get('lastEventId',0) if job else 0},
         'uploads':[{'id':u.id,'name':u.name,'size':u.size,'status':u.status,'warnings':u.warnings,'previewUrl':f'/api/v1/teacher-assistant/uploads/{u.id}/preview','downloadUrl':f'/api/v1/teacher-assistant/uploads/{u.id}/file'} for u in uploads],
         'job':({'id':job.id,'kind':job.kind,'status':job.status,'error':job.error} if job else None)}}
 
@@ -74,8 +104,11 @@ async def enqueue(db,user,sid,kind,payload,request_id):
         if payload['revision']!=obj.revision: raise HTTPException(409,'预览已更新，请查看最新内容后再确认')
         if not obj.plan.get('items'): raise HTTPException(422,'请先上传文件并生成预览')
         if obj.plan.get('blockers'): raise HTTPException(422,'仍有待核对内容，请先处理')
-    db.add(Job(id=new_id('taj_'),session_id=sid,owner_id=user.username,request_id=request_id,kind=kind,payload=payload,status='queued'))
+    jid=new_id('taj_')
+    db.add(Job(id=jid,session_id=sid,owner_id=user.username,request_id=request_id,kind=kind,payload=payload,status='queued'))
     await db.commit(); await db.refresh(obj)
+    from app.services.teacher_assistant_events import emit
+    await emit(sid,jid,'status',{'status':'queued'})
     return await envelope(db,obj)
 
 async def upload_files(db,user,sid,files:list[UploadFile]):
@@ -103,6 +136,9 @@ async def upload_files(db,user,sid,files:list[UploadFile]):
                     if size>20*1024*1024 or total>50*1024*1024: raise DocumentError('单文件限 20 MiB，会话合计限 50 MiB')
                     digest.update(chunk);target.write(chunk)
             validate_upload(name,size)
+            if Path(name).suffix.lower() in {'.png','.jpg','.jpeg','.webp'}:
+                from app.services.teacher_assistant_documents import validate_image
+                await asyncio.to_thread(validate_image,directory/'original',Path(name).suffix.lower())
             (directory/'original').chmod(0o640)
             if os.geteuid()==0: os.chown(directory/'original',10001,10001)
             if any(u.digest==digest.hexdigest() for u in prior):
@@ -122,9 +158,15 @@ async def upload_files(db,user,sid,files:list[UploadFile]):
 
 async def cancel(db,user,sid):
     obj=await owned(db,user,sid,lock=True);job=await last_job(db,sid)
-    if job and job.status in ACTIVE:
+    changed=bool(job and job.status in ACTIVE)
+    if changed:
         job.status='cancelled';job.error='已取消未执行步骤；已提交的结果仍保留'
-    await db.commit();await db.refresh(obj);return await envelope(db,obj)
+        jid=job.id;live=bool(job.lease_until and job.lease_until>datetime.now(timezone.utc))
+    await db.commit();await db.refresh(obj)
+    if changed:
+        from app.services.teacher_assistant_events import emit
+        await emit(sid,jid,'status' if live else 'done',{'status':'stopping' if live else 'cancelled'})
+    return await envelope(db,obj)
 
 async def retry(db,user,sid,request_id):
     await owned(db,user,sid)
@@ -138,4 +180,5 @@ async def retry(db,user,sid,request_id):
     busy=await has_inflight(db,owner=user.username)
     if busy: raise HTTPException(409,'已有任务执行中')
     job.status='queued';job.error='';job.lease_until=None;job.attempts=0
+    job.stream={'text':'','lastEventId':(job.stream or {}).get('lastEventId',0)}
     await db.commit();await db.refresh(obj);return await envelope(db,obj)

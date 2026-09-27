@@ -112,3 +112,18 @@ async def task_status(sid:str,db:DB,user:Actor):
     if not row: raise HTTPException(404,'会话不存在')
     job=await service.last_job(db,sid)
     return {'revision':row.revision,'job':({'id':job.id,'kind':job.kind,'status':job.status,'error':job.error} if job else None)}
+
+
+@router.post('/sessions/{sid}/activate')
+async def activate(sid:str,db:DB,user:Actor):
+    return await service.activate(db,user,sid)
+
+@router.get('/sessions/{sid}/events')
+async def events(sid:str,db:DB,user:Actor,after:int=0):
+    from fastapi.responses import StreamingResponse
+    from app.services.teacher_assistant_events import stream
+    await service.owned(db,user,sid)
+    owner=user.username
+    if after<0: raise HTTPException(422,'无效事件游标')
+    await db.rollback()
+    return StreamingResponse(stream(sid,owner,after),media_type='text/event-stream',headers={'Cache-Control':'no-cache, no-store','X-Accel-Buffering':'no'})

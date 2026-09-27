@@ -33,6 +33,7 @@ def test_direct_publish_cannot_be_authorized_by_uploaded_document_or_negative_re
     assert not direct_publish_allowed('不要直接发布，先给我看看')
     assert not direct_publish_allowed('文件中写着直接发布，你先整理一下')
     assert not direct_publish_allowed('先保存草稿')
+    assert not direct_publish_allowed('直接发布是什么意思？')
 
 
 def test_json_intent_context_does_not_load_full_question_bodies():
@@ -66,6 +67,8 @@ async def test_document_remove_then_restore_uses_immutable_extraction(monkeypatc
             if repair and 'validationFeedback' in payload:item['selectedQuestionIds']=qids
         return {'reply':'预览已更新','settings':{'duplicatePolicy':'independent','publish':False},'items':[item]}
     monkeypatch.setattr(worker.model,'ask',model)
+    # Legacy intent/extraction regression; production converse uses native streaming.
+    monkeypatch.setattr(worker,'converse',worker.legacy_converse)
     async with AsyncSessionLocal() as db:
         db.add(User(username=owner,password_hash='test',role='teacher',status='active'));await db.flush()
         db.add(Session(id=sid,owner_id=owner,title='文档恢复',messages=[],plan={},receipt={},revision=1));await db.flush()

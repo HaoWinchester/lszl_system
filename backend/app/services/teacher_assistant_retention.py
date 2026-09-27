@@ -60,7 +60,7 @@ async def cleanup(db, now=None):
         counts['sessions'] += 1
         receipt = deepcopy(session.receipt or {})
         successful = any(entry.get('status') == 'succeeded' or entry.get('bankId') or entry.get('paperId') or entry.get('releaseId') for entry in receipt.get('items', []))
-        if not successful and not any(job.kind == 'execute' for job in jobs):
+        if not successful and not (session.runtime or {}).get('started') and not any(job.kind == 'execute' for job in jobs):
             uploads = (await db.execute(select(Upload).where(Upload.session_id == session.id,
                 Upload.created_at <= upload_cutoff, Upload.status != 'expired'))).scalars().all()
             changed = False
