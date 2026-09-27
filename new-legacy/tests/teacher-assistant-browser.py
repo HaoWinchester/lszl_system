@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Real DOM interaction tests; API routes are mocked, never production data."""
 import copy
+import hashlib
 import json
 import threading
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -79,7 +80,7 @@ def run():
                 payload = {'session': s}
         elif url.endswith('/uploads'):
             assert 'name="files"' in request.post_data
-            state['session']['uploads'] = [{'id': 'file', 'name': 'sample.json', 'size': 2, 'status': 'ready', 'warnings': [], 'previewUrl': '/api/v1/teacher-assistant/uploads/file/preview'}]
+            state['session']['uploads'] = [{'id': 'file', 'name': 'sample.json', 'size': 2, 'sha256': hashlib.sha256(b'{}').hexdigest(), 'status': 'ready', 'warnings': [], 'previewUrl': '/api/v1/teacher-assistant/uploads/file/preview'}]
             payload = {'session': state['session']}
         elif url.endswith('/execute'):
             assert request.post_data_json['revision'] == state['session']['revision']

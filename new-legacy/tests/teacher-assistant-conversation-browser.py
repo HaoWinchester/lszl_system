@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Real browser UI with deterministic mock transport; never proof of model output."""
-import copy,json,threading
+import copy,json,threading,hashlib
+from email.parser import BytesParser
+from email.policy import default
 from pathlib import Path
 from http.server import SimpleHTTPRequestHandler,ThreadingHTTPServer
 from playwright.sync_api import sync_playwright,expect
@@ -12,7 +14,7 @@ class Handler(SimpleHTTPRequestHandler):
 server=ThreadingHTTPServer(('127.0.0.1',0),Handler);threading.Thread(target=server.serve_forever,daemon=True).start()
 base=f'http://127.0.0.1:{server.server_port}'
 def session(id):return dict(id=id,title='新对话' if id=='a' else '另一段对话',revision=0,messages=[],uploads=[],plan=None,job=None,receipt=None,stream={'text':'','lastEventId':0},runtime={'status':'idle'})
-sessions={'a':session('a'),'b':session('b')};calls=[];state={'uploadFail':False,'messageFail':False,'emptyUploads':False,'resync':False,'streamMode':'complete','activated':False,'activation409':0,'failLoad':0,'failEvents':0,'uploadLost':False}
+sessions={'a':session('a'),'b':session('b')};calls=[];state={'uploadFail':False,'messageFail':False,'emptyUploads':False,'resync':False,'streamMode':'complete','activated':False,'activation409':0,'failLoad':0,'failEvents':0,'uploadLost':False,'failReconcile':False,'wrongReceipt':False}
 def api(route):
     r=route.request;path=r.url.split('/api/v1/')[-1];calls.append((r.method,path));body={};status=200
     if path=='auth/me':body={'user':{'username':'测试教师','role':'teacher'}}
@@ -27,9 +29,21 @@ def api(route):
         elif action=='uploads':
             if state['uploadFail']:status=503;body={'detail':'文件上传失败，请重试'}
             else:
-                if not state['emptyUploads']:s['uploads'].append({'id':str(len(s['uploads'])+1),'name':'lesson.png','size':3,'status':'uploaded'})
+                content_type=r.headers['content-type'];parts=BytesParser(policy=default).parsebytes(('Content-Type: '+content_type+'\r\n\r\n').encode()+r.post_data_buffer)
+                incoming=[(part.get_filename(),part.get_payload(decode=True)) for part in parts.iter_parts()]
+                assert len(incoming)<=5
+                for name,data in incoming:
+                    digest=hashlib.sha256(data).hexdigest()
+                    if not state['emptyUploads'] and not any(u['sha256']==digest for u in s['uploads']):s['uploads'].append({'id':str(len(s['uploads'])+1),'name':name,'size':len(data),'sha256':digest,'status':'uploaded'})
+                assert len(s['uploads'])<=5
                 body={'session':s}
-                if state['uploadLost']:state['uploadLost']=False;route.abort('failed');return
+                if state['wrongReceipt']:
+                    body=copy.deepcopy(body)
+                    for item in body['session']['uploads']:item['sha256']=hashlib.sha256(b'wrong bytes').hexdigest()
+                if state['uploadLost']:
+                    state['uploadLost']=False
+                    if state['failReconcile']:state['failLoad']=1;state['failReconcile']=False
+                    route.abort('failed');return
         elif action=='messages':
             assert state['activated']; assert not state['emptyUploads']
             if state['messageFail']:status=503;body={'detail':'暂时不可用，请重试'}
@@ -64,7 +78,7 @@ try:
     page.locator('#assistant-files').set_input_files({'name':'lesson.png','mimeType':'image/png','buffer':b'123'});expect(page.locator('#pending-files')).to_contain_text('lesson.png');assert not any(path.endswith('/uploads') for _,path in calls)
     page.locator('#assistant-message').fill('请看看这张图片');state['uploadFail']=True;page.locator('#send-message').click();expect(page.locator('#assistant-error')).to_contain_text('文件上传失败');expect(page.locator('#assistant-message')).to_have_value('请看看这张图片');assert not any(path.endswith('/messages') for _,path in calls)
     state['uploadFail']=False;state['emptyUploads']=True;page.locator('#send-message').click();expect(page.locator('#assistant-error')).to_contain_text('尚未确认');assert not any(path.endswith('/messages') for _,path in calls)
-    state['emptyUploads']=False;state['uploadLost']=True;page.locator('#send-message').click();expect(page.locator('#assistant-error')).to_contain_text('网络连接暂时中断');expect(page.locator('#pending-files')).to_contain_text('已上传');upload_count=sum(path.endswith('/uploads') for _,path in calls)
+    state['emptyUploads']=False;state['uploadLost']=True;state['failReconcile']=True;page.locator('#send-message').click();expect(page.locator('#assistant-error')).to_contain_text('网络连接暂时中断');expect(page.locator('#pending-files')).to_contain_text('待发送');page.locator('#refresh-session').click();expect(page.locator('#pending-files')).to_contain_text('已上传');upload_count=sum(path.endswith('/uploads') for _,path in calls)
     state['messageFail']=True;page.locator('#send-message').click();expect(page.locator('#assistant-error')).to_contain_text('暂时不可用');expect(page.locator('#pending-files')).to_contain_text('已上传');count=sum(path.endswith('/uploads') for _,path in calls)
     assert sum(path.endswith('/uploads') for _,path in calls)==upload_count
     state['messageFail']=False;page.locator('#send-message').click();expect(page.locator('#messages')).to_contain_text('已阅读材料');expect(page.locator('#pending-files')).to_be_empty();assert sum(path.endswith('/uploads') for _,path in calls)==count
@@ -95,6 +109,27 @@ try:
     page.screenshot(path=str(OUT/'mock-conversation-390.png'))
     # Another real browser tab reads server snapshot; no business browser storage.
     tab=context.new_page();tab.goto(base+'/teacher-assistant.html?session=b');expect(tab.locator('#send-message')).to_be_enabled();expect(tab.locator('#messages')).to_be_empty()
+    state['streamMode']='complete'
+    # SHA identity: duplicate queue bytes map to one stored file, renamed existing bytes skip upload.
+    def send_files(target,files):
+        expect(target.locator('#send-message')).to_be_enabled();target.locator('#assistant-files').set_input_files([{'name':name,'mimeType':'application/json','buffer':data} for name,data in files]);target.locator('#assistant-message').fill('核对附件');target.locator('#send-message').click();expect(target.locator('#pending-files')).to_be_empty();expect(target.locator('#send-message')).to_be_enabled()
+    send_files(tab,[('same.json',b'abc'),('renamed.json',b'abc')]);assert len(sessions['b']['uploads'])==1
+    uploaded_before=sum(path.endswith('/uploads') for _,path in calls)
+    # Force message failure to keep truthful dedup confirmation visible.
+    state['messageFail']=True;tab.locator('#assistant-files').set_input_files({'name':'renamed-again.json','mimeType':'application/json','buffer':b'abc'});tab.locator('#send-message').click();expect(tab.locator('#assistant-error')).to_contain_text('暂时不可用');expect(tab.locator('#pending-files')).to_contain_text('已复用 renamed.json');assert sum(path.endswith('/uploads') for _,path in calls)==uploaded_before
+    state['messageFail']=False;tab.locator('#send-message').click();expect(tab.locator('#pending-files')).to_be_empty();expect(tab.locator('#send-message')).to_be_enabled()
+    # Same name+size but different bytes must upload a new file, never claim identity.
+    send_files(tab,[('same.json',b'def')]);assert len(sessions['b']['uploads'])==2
+    send_files(tab,[('3.json',b'3'),('4.json',b'4'),('5.json',b'5')]);assert len(sessions['b']['uploads'])==5
+    uploaded_before=sum(path.endswith('/uploads') for _,path in calls)
+    send_files(tab,[('full-capacity-rename.json',b'abc')]);assert len(sessions['b']['uploads'])==5;assert sum(path.endswith('/uploads') for _,path in calls)==uploaded_before
+    # Full browser reload + reselect uses server digest, not volatile state.
+    tab.reload();send_files(tab,[('after-reload.json',b'abc')]);assert sum(path.endswith('/uploads') for _,path in calls)==uploaded_before
+    # A nonempty receipt with matching name/size but WRONG digest must still block the message.
+    tab.locator('#new-session').click();expect(tab.locator('#send-message')).to_be_enabled();state['wrongReceipt']=True
+    message_count=sum(path.endswith('/messages') for _,path in calls)
+    tab.locator('#assistant-files').set_input_files({'name':'wrong-receipt.json','mimeType':'application/json','buffer':b'abc'});tab.locator('#send-message').click();expect(tab.locator('#assistant-error')).to_contain_text('尚未确认');assert sum(path.endswith('/messages') for _,path in calls)==message_count
+    state['wrongReceipt']=False;tab.locator('#send-message').click();expect(tab.locator('#pending-files')).to_be_empty();expect(tab.locator('#send-message')).to_be_enabled()
     assert not errors,errors
     browser.close();print('PASS: ordered attachments / failures / empty server files / no duplicate retry / SSE / 3 turns / A-B activate / resync / stop / reload / multi-tab / IME / mobile390; mocked transport, real DOM')
 finally:server.shutdown()

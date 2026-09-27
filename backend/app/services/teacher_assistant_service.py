@@ -73,7 +73,7 @@ async def envelope(db,obj):
     for item in plan.get('items',[]): item.pop('bankPayload',None)
     return {'session':{'id':obj.id,'title':obj.title,'revision':obj.revision,'messages':obj.messages,'plan':plan,'receipt':obj.receipt or None,
         'runtime':runtime_state(obj,job),'stream':{'jobId':job.id if job else None,'text':(job.stream or {}).get('text','') if job and not (job.stream or {}).get('committed') else '', 'lastEventId':(job.stream or {}).get('lastEventId',0) if job else 0},
-        'uploads':[{'id':u.id,'name':u.name,'size':u.size,'status':u.status,'warnings':u.warnings,'previewUrl':f'/api/v1/teacher-assistant/uploads/{u.id}/preview','downloadUrl':f'/api/v1/teacher-assistant/uploads/{u.id}/file'} for u in uploads],
+        'uploads':[{'id':u.id,'name':u.name,'size':u.size,'sha256':u.digest,'status':u.status,'warnings':u.warnings,'previewUrl':f'/api/v1/teacher-assistant/uploads/{u.id}/preview','downloadUrl':f'/api/v1/teacher-assistant/uploads/{u.id}/file'} for u in uploads],
         'job':({'id':job.id,'kind':job.kind,'status':job.status,'error':job.error} if job else None)}}
 
 async def create_session(db,user):
@@ -116,8 +116,8 @@ async def upload_files(db,user,sid,files:list[UploadFile]):
     obj=await owned(db,user,sid,lock=True)
     if await has_inflight(db,sid=sid): raise HTTPException(409,'请等待当前任务结束后再上传')
     prior=(await db.execute(select(Upload).where(Upload.session_id==sid,Upload.status!='expired'))).scalars().all()
-    if not files or len(files)+len(prior)>5: raise HTTPException(422,'每个会话最多上传 5 个文件')
-    total=sum(u.size for u in prior); pending=[]
+    if not files or len(files)>5: raise HTTPException(422,'每批最多上传 5 个文件')
+    total=sum(u.size for u in prior); incoming=0; pending=[]; added=False
     try:
         for file in files:
             name=Path(file.filename or '').name[:255]
@@ -132,8 +132,8 @@ async def upload_files(db,user,sid,files:list[UploadFile]):
             size=0; digest=hashlib.sha256()
             with (directory/'original').open('wb') as target:
                 while chunk:=await file.read(64*1024):
-                    size+=len(chunk); total+=len(chunk)
-                    if size>20*1024*1024 or total>50*1024*1024: raise DocumentError('单文件限 20 MiB，会话合计限 50 MiB')
+                    size+=len(chunk); incoming+=len(chunk)
+                    if size>20*1024*1024 or incoming>50*1024*1024: raise DocumentError('单文件限 20 MiB，每批合计限 50 MiB')
                     digest.update(chunk);target.write(chunk)
             validate_upload(name,size)
             if Path(name).suffix.lower() in {'.png','.jpg','.jpeg','.webp'}:
@@ -143,9 +143,12 @@ async def upload_files(db,user,sid,files:list[UploadFile]):
             if os.geteuid()==0: os.chown(directory/'original',10001,10001)
             if any(u.digest==digest.hexdigest() for u in prior):
                 shutil.rmtree(directory);pending.remove(directory);continue
+            if len(prior)>=5 or total+size>50*1024*1024:
+                raise DocumentError('每个会话最多 5 个不同文件，合计限 50 MiB')
+            total+=size;added=True
             entry=Upload(id=uid,session_id=sid,name=name,size=size,digest=digest.hexdigest(),status='uploaded',extracted={},warnings=[])
             db.add(entry);prior.append(entry)
-        obj.plan={};obj.revision+=1
+        if added: obj.plan={};obj.revision+=1
         await db.commit();await db.refresh(obj)
         return await envelope(db,obj)
     except BaseException as exc:

@@ -351,16 +351,30 @@
     function switchSession(id) {
       action(async () => { epoch++; disconnect(); sourceViews.clear(); await activate(id); clearDraft(); panel(false); if (global.innerWidth <= 760) sidebar(false); }, true);
     }
+    function reconcilePending() {
+      const uploads = (client.session?.uploads || []).filter(upload => upload.status !== 'expired');
+      for (const entry of pendingFiles) {
+        entry.stored = entry.sha256 ? uploads.find(upload => upload.sha256 === entry.sha256) : null;
+        entry.uploaded = Boolean(entry.stored);
+      }
+    }
+    async function hashPending() {
+      if (!global.crypto?.subtle) throw new Error('当前浏览器无法校验文件内容，请使用安全连接或更新浏览器后重试。');
+      await Promise.all(pendingFiles.map(async entry => {
+        if (!entry.sha256) { const digest = await global.crypto.subtle.digest('SHA-256', await entry.file.arrayBuffer()); entry.sha256 = Array.from(new Uint8Array(digest), value => value.toString(16).padStart(2, '0')).join(''); }
+      }));
+    }
     function renderPending() {
+      reconcilePending();
       $('pending-files').replaceChildren();
-      pendingFiles.forEach((entry, index) => { const chip = text($('pending-files'), 'div', '', 'ta-attachment'); text(chip, 'span', entry.file.name + (entry.uploaded ? ' · 已上传' : ' · 待发送'));
+      pendingFiles.forEach((entry, index) => { const chip = text($('pending-files'), 'div', '', 'ta-attachment'); text(chip, 'span', entry.file.name + (entry.uploaded ? entry.stored.name !== entry.file.name ? ' · 已复用 ' + entry.stored.name : ' · 已上传' : ' · 待发送'));
         const remove = text(chip, 'button', '×'); remove.type = 'button'; remove.setAttribute('aria-label', '移除 ' + entry.file.name); remove.disabled = busy;
         remove.onclick = () => { pendingFiles.splice(index, 1); renderPending(); };
       });
     }
     function addFiles(files) {
       if (!authorized || busy || activeJob(client.session)) return;
-      try { const added = Array.from(files); if (!added.length) return; const existing = (client.session?.uploads || []).filter(upload => upload.status !== 'expired'); const unuploaded = pendingFiles.filter(entry => !entry.uploaded).map(entry => entry.file); if (existing.length + unuploaded.length + added.length > 5) throw new Error('每段对话最多 5 份文件，请新建对话继续。'); if ([...existing, ...unuploaded, ...added].reduce((total, file) => total + Number(file.size || 0), 0) > 50 * 1024 * 1024) throw new Error('本段对话文件合计超过 50 MiB，请新建对话。'); validateFiles([...unuploaded, ...added]); pendingFiles.push(...added.map(file => ({file, uploaded:false}))); renderPending(); clearError(); }
+      try { const added = Array.from(files); if (!added.length) return; validateFiles([...pendingFiles.map(entry => entry.file), ...added]); pendingFiles.push(...added.map(file => ({file, uploaded:false}))); renderPending(); clearError(); }
       catch (error) { showError(error); }
       $('assistant-files').value = '';
     }
@@ -379,18 +393,22 @@
       if (!content) { showError(new Error('请填写消息或添加文件。')); return; }
       action(async () => {
         $('activity-details').hidden = false; $('runtime-status').textContent = '等待处理'; tools = [];
-        renderPending(); const files = pendingFiles.filter(entry => !entry.uploaded);
-        if (files.length) {
-          $('runtime-status').textContent = '正在上传文件';
-          const previousIds = new Set((client.session.uploads || []).map(upload => upload.id));
-          function confirmUploads() {
-            const received = (client.session.uploads || []).filter(upload => !previousIds.has(upload.id));
-            files.forEach(entry => { const index = received.findIndex(upload => upload.name === entry.file.name && Number(upload.size) === entry.file.size); if (index >= 0) { entry.uploaded = true; received.splice(index, 1); } });
-            renderPending();
+        if (pendingFiles.length) {
+          $('runtime-status').textContent = '正在校验文件';
+          await hashPending();
+          // Always reconcile the current owner snapshot first, including after a lost response + failed GET.
+          await client.load(client.session.id); renderPending();
+          const unique = new Map();
+          pendingFiles.filter(entry => !entry.uploaded).forEach(entry => unique.set(entry.sha256, entry));
+          const files = Array.from(unique.values());
+          const existing = (client.session.uploads || []).filter(upload => upload.status !== 'expired');
+          if (existing.length + files.length > 5 || [...existing, ...files.map(entry => entry.file)].reduce((total, file) => total + Number(file.size || 0), 0) > 50 * 1024 * 1024) throw new Error('每段对话最多 5 份不同文件，合计 50 MiB，请新建对话继续。');
+          if (files.length) {
+            $('runtime-status').textContent = '正在上传文件';
+            try { await client.upload(files.map(entry => entry.file)); } catch (error) { renderPending(); throw error; }
           }
-          try { await client.upload(files.map(entry => entry.file)); } catch (error) { confirmUploads(); throw error; }
-          confirmUploads();
-          if (files.some(entry => !entry.uploaded)) throw new Error('服务器尚未确认收到文件，请重试上传。');
+          renderPending();
+          if (pendingFiles.some(entry => !entry.uploaded)) throw new Error('服务器尚未确认收到文件，请重试上传。');
         }
         await client.mutate('messages', { content }); clearDraft();
         $('runtime-status').textContent = '等待处理';
