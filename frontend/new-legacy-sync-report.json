@@ -1,16 +1,10 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.249",
+  "fromVersion": "v9.0-p4.1.251",
   "toVersion": "v9.0-p4.1.251",
   "changes": {
     "added": [],
-    "changed": [
-      "VERSION",
-      "content-prep-studio/dist/content-prep.html",
-      "src/teacher/teacher-assistant.js",
-      "tests/teacher-assistant-conversation-browser.py",
-      "tests/teacher-assistant.test.js"
-    ],
+    "changed": [],
     "removed": []
   },
   "incompatible": []
