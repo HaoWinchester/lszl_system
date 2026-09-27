@@ -30,7 +30,7 @@ from app.services import deep_recall_service
 from app.main import app
 import uvicorn
 
-async def seed():
+async def seed(multiple_papers=False):
     async with AsyncSessionLocal() as db:
         db.add(User(username='ink-browser', password_hash=hash_password('ink-browser-test'), role='teacher', status='active', subject='PMP'))
         db.add(User(username='ink-viewer', password_hash=hash_password('ink-browser-test'), role='viewer', status='active', subject='PMP'))
@@ -45,6 +45,12 @@ async def seed():
             snapshot={'id':qid,'bankId':'ink-bank','title':f'笔迹验证题 {i}：风险发生后应该先做什么？','subject':'PMP','scope':'public','revision':1,'contentHash':str(i)*64,'stemParts':[{'text':'请先分析影响，然后采取措施。'}],'options':[{'id':'A','text':'分析影响','correct':True},{'id':'B','text':'立即变更'}],'correctAnswer':'A','concepts':[{'id':'impact','title':'分析影响','isCore':True}]}
             db.add(Question(id=qid, bank_id='ink-bank', title=snapshot['title'], subject='PMP', scope='public', revision=1, content_hash=str(i)*64, stem_parts=snapshot['stemParts'], options=snapshot['options'], correct_answer='A', concepts=snapshot['concepts']))
             db.add(PaperReleaseQuestion(release_id='ink-release',order_index=i-1,bank_id='ink-bank',question_id=qid,snapshot=snapshot))
+        if multiple_papers:
+            db.add(ExamPaper(id='ink-paper-2', owner_id='ink-browser', name='第二份跨标签页测试试卷', subject='PMP', status='published'))
+            await db.flush()
+            db.add(PaperRelease(id='ink-release-2', paper_id='ink-paper-2', version=1, status='published', name='第二份跨标签页测试试卷', subject='PMP', publisher_id='ink-browser', access_level='free', enabled_modes=['multi_question_canvas'], allowed_roles=['teacher'], question_count=1))
+            await db.flush()
+            db.add(PaperReleaseQuestion(release_id='ink-release-2', order_index=0, bank_id='ink-bank', question_id=qid, snapshot=snapshot))
         await db.commit()
         viewer=await db.get(User,'ink-viewer')
         session=await deep_recall_service.get_session(db,viewer,'ink-question-1',release_id='ink-release')
@@ -69,8 +75,9 @@ class DisposableServer(uvicorn.Server):
 if __name__ == '__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--port',type=int,default=5189)
+    parser.add_argument('--multiple-papers',action='store_true')
     args=parser.parse_args()
-    asyncio.run(seed())
+    asyncio.run(seed(args.multiple_papers))
     try:
         DisposableServer(uvicorn.Config(app,host='127.0.0.1',port=args.port,log_level='warning')).run()
     finally:

@@ -507,6 +507,9 @@
     };
   }
   let questionSourcesLoading=false;
+  function isPublishedPaperStorageKey(key){
+    return key==='kg_exam_papers_published_v1'||key==='kg_exam_paper_release_history_v1';
+  }
   async function rebuildQuestionSources(options={}){
     // 目录仅取摘要，按需解析当前试卷和画布引用的 release。
     if(questionSourcesLoading)return false;
@@ -5629,7 +5632,9 @@
     });
     global.addEventListener('storage',event=>{
       const key=String(event.key||'');
-      if(!key.includes('question')&&!key.includes('exam_papers'))return;
+      // 只响应发布目录变化。试卷选择等设备偏好也含 question，若在此
+      // 重载，会由 savePaperSelection 写回并让不同试卷的标签页循环重绘。
+      if(!isPublishedPaperStorageKey(key))return;
       invalidateQuestionSources();
       void rebuildQuestionSources();
       if(byId('qwQuestionDrawer')?.classList.contains('open'))renderQuestionDock();
@@ -5805,7 +5810,7 @@
   },0));
   global.addEventListener('kg-app-storage-change',event=>{
     const key=String(event?.detail?.key||'');
-    if(key==='kg_exam_papers_published_v1'||key==='kg_exam_paper_release_history_v1'){
+    if(isPublishedPaperStorageKey(key)){
       if(state.initialized)try{void rebuildQuestionSources()}catch(error){}
     }
   });

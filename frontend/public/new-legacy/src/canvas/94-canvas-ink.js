@@ -78,8 +78,8 @@
       toolbar.querySelectorAll('[data-ink-tool]').forEach(btn=>{btn.setAttribute('aria-pressed',String(btn.dataset.inkTool===tool));btn.disabled=locked&&btn.dataset.inkTool!=='select'});
       for(const action of ['undo','redo']){const btn=toolbar.querySelector('[data-ink-action='+action+']');btn.hidden=!(ownHistory||options.showHistory);btn.disabled=locked||!state[action==='undo'?'canUndo':'canRedo']}
       toolbar.hidden=!opened;
-      const launch=trigger();if(launch){if(!launch.querySelector('svg'))launch.innerHTML=penIcon;launch.setAttribute('aria-expanded',String(opened));launch.disabled=locked;launch.querySelector('svg')?.style.setProperty('color',prefs[TOOLS[tool]?tool:'pen'].color)}
-      for(const name of Object.keys(prefs))toolbar.querySelector('button[data-ink-tool='+name+'] svg')?.style.setProperty('color',prefs[name].color);
+      const launch=trigger();if(launch){if(!launch.querySelector('svg'))launch.innerHTML=penIcon;launch.classList.add('canvas-ink-entry');launch.setAttribute('aria-expanded',String(opened));launch.disabled=locked;const tip=locked?'当前画布只读，无法使用画笔':opened?'收起画笔工具并退出绘画':'展开画笔工具，在画布上书写或标注';if(launch.hasAttribute('data-tooltip')){launch.dataset.tooltip=tip;launch.removeAttribute('title')}else launch.title=tip;launch.querySelector('svg')?.style.setProperty('color',prefs[TOOLS[tool]?tool:'pen'].color)}
+      for(const name of Object.keys(prefs)){const btn=toolbar.querySelector('button[data-ink-tool='+name+']');btn.querySelector('svg')?.style.setProperty('color',prefs[name].color);btn.title=(name==='pen'?'画笔：拖动绘制笔迹':'荧光笔：拖动高亮标注')+'；点击'+(tool===name&&settingsOpen?'收起颜色和粗细设置':'调整颜色和粗细')}
       panel.hidden=!settingsOpen||!TOOLS[tool];
       if(TOOLS[tool]){
         const pref=prefs[tool];range.min=pref.min;range.max=pref.max;range.value=pref.width;toolbar.querySelector('output').textContent=pref.width;

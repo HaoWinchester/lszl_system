@@ -48,3 +48,9 @@ UAT 252 镜像保留为 `lszl-kg-backend:uat-before-canvas-tools-253` 和 `lszl-
 - 公网正式环境仍为 `v9.0-p4.1.252`，main 保持 `2b7d3721`。本次停在 UAT 等待用户业务验收，不合入 main。
 
 证据：`artifacts/canvas-tools/deploy-uat-254.log`、`verify-uat-254.log`、`uat-results.json`、三页 `*-uat-capture.png` / `*-uat-page.png`，受管发布目录 `frontend/new-legacy-releases/v9.0-p4.1.254/validation.json`。
+
+## 255 悬停体验修正
+
+用户反馈选择画笔时需要手型光标和操作说明。根因是共享工具条后代 `cursor:auto!important` 覆盖 SVG 上继承的 pointer；修正子图形继承按钮光标，工具和入口可用时显示 pointer，只读/禁用保留 default，按空格平移时工具按钮仍可辨认为可点击。共用入口增加展开/收起说明，画笔/荧光笔提示拖动绘制和颜色粗细设置，图谱复用既有 data-tooltip 提示。
+
+真实 Chrome 旧代码复现 SVG cursor=auto，修改后按钮、SVG/path、入口、提示文案、空格平移和禁用状态通过；原画笔控制器全套交互检查通过。随后执行受管发布检查，待 UAT 部署。
