@@ -1,0 +1,44 @@
+{
+  "status": "applied-production",
+  "bankId": "b_a6e66ae062e04bf0a7c88dce61ca0869",
+  "paperId": "p_64e865c23c9246c29097e940189d201b",
+  "expectedActiveReleaseId": "pr_2114a2204487440db5f26c16f40f80ef",
+  "items": [
+    {
+      "questionId": "q_251467c872cf48c8a3b9161b4d658bc6",
+      "expectedRevision": 3,
+      "position": 8,
+      "file": "finance-08.png",
+      "mimeType": "image/png",
+      "alt": "前三个迭代的进度绩效指数 SPI 和成本绩效指数 CPI",
+      "sha256": "ae606663f4bdc3835f355aa9c8df1a9e4f897d5ce54216328e3c36c16bd33bb8",
+      "expectedImageIds": [
+        "qa_77bb23b3bb77471197ec58c4c7ac8ebd"
+      ]
+    },
+    {
+      "questionId": "q_9aff9de4a14d407c844935893fca13c8",
+      "expectedRevision": 3,
+      "position": 10,
+      "file": "finance-10.png",
+      "mimeType": "image/png",
+      "alt": "项目各周的进度指标 S 与成本指标 C",
+      "sha256": "f6c891801cb0c9c222e1661f868bc5f6b6e1665b2ade8df495ad317ebe4d1e60",
+      "expectedImageIds": [
+        "qa_0c89e016da3f4e9e83c50d48fd38cf2e"
+      ]
+    }
+  ],
+  "instructions": [
+    "只替换第8、10题的images，保留题目正文、原题ID、答案与全部关联。",
+    "使用用户提供的原始高清PNG，禁止压缩或重绘。",
+    "发布前验证当前题目revision与release，事务演练回滚后再执行。",
+    "新发布沿用免费、教师与学员可用、仅回忆与多题画布；旧快照保持不变。"
+  ],
+  "activeReleaseId": "pr_499872f5acd74a94ab9706f38d892c27",
+  "backupDirectory": "/home/ubuntu/lszl-backups/20260927_155620",
+  "verifiedRoles": [
+    "teacher",
+    "student"
+  ]
+}

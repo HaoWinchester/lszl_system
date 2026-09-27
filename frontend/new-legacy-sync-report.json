@@ -1,13 +1,15 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.248",
-  "toVersion": "v9.0-p4.1.249",
+  "fromVersion": "v9.0-p4.1.249",
+  "toVersion": "v9.0-p4.1.251",
   "changes": {
     "added": [],
     "changed": [
       "VERSION",
       "content-prep-studio/dist/content-prep.html",
-      "tests/canvas-ink-browser.py"
+      "src/teacher/teacher-assistant.js",
+      "tests/teacher-assistant-conversation-browser.py",
+      "tests/teacher-assistant.test.js"
     ],
     "removed": []
   },

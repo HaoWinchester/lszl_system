@@ -90,3 +90,13 @@ async def test_document_remove_then_restore_uses_immutable_extraction(monkeypatc
                 assert '尚未恢复' in s.messages[-1]['content']
     assert len(extractions)==1
     assert restore_calls==[False,True]
+
+
+def test_json_summary_marks_omitted_banks_and_questions_without_miscounting():
+    from app.worker.teacher_assistant import summarize_json
+    banks=[{'id':str(i),'questions':[{'id':str(q)} for q in range(501)]} for i in range(6)]
+    summary=summarize_json({'banks':banks})
+    assert summary.get('bankCount')==6 and summary.get('banksTruncated') is True
+    assert len(summary['banks'])==5
+    assert summary['banks'][0]['count']==501
+    assert summary['banks'][0].get('questionsTruncated') is True

@@ -60,8 +60,8 @@ def api(route):
                 events=[{'id':21,'jobId':jid,'type':'text_delta','data':{'text':'逐步回复'}}] if after<21 else []
                 if after<21:s['stream']={'jobId':jid,'text':s['stream']['text']+'逐步回复','lastEventId':21}
             else:
-                events=[{'id':30,'jobId':jid,'type':'tool_start','data':{'label':'读取教学材料'}},{'id':31,'jobId':jid,'type':'tool_end','data':{'label':'读取教学材料','ok':True}},{'id':32,'jobId':jid,'type':'text_delta','data':{'text':'已阅读材料，接下来可以一起讨论。'}},{'id':33,'jobId':jid,'type':'done','data':{'status':'succeeded'}}]
-                s['messages'].append({'role':'assistant','content':'已阅读材料，接下来可以一起讨论。'});s['job']['status']='succeeded';s['stream']={'text':'','lastEventId':33}
+                events=[{'id':n,'jobId':jid,'type':'tool_start' if n%2==0 else 'tool_end','data':({'origin':'mcp','name':'read_file','uploadId':'1','label':'正在读取附件：教学材料'} if n%2==0 else {'origin':'mcp','name':'read_file','ok':True})} for n in range(30,36)] + [{'id':36,'jobId':jid,'type':'text_delta','data':{'text':'已阅读材料，接下来可以一起讨论。'}},{'id':37,'jobId':jid,'type':'done','data':{'status':'succeeded'}}]
+                s['messages'].append({'role':'assistant','content':'已阅读材料，接下来可以一起讨论。'});s['job']['status']='succeeded';s['stream']={'text':'','lastEventId':37}
             route.fulfill(status=200,content_type='text/event-stream',body=''.join('id: '+str(e['id'])+'\ndata: '+json.dumps(e,ensure_ascii=False)+'\n\n' for e in events));return
         elif action=='retry':s['job']['status']='running';s['job'].pop('error',None);body={'session':s}
         elif action=='cancel':s['job']['status']='cancelled';s['runtime']['status']='idle';body={'session':s}
@@ -82,6 +82,7 @@ try:
     state['messageFail']=True;page.locator('#send-message').click();expect(page.locator('#assistant-error')).to_contain_text('暂时不可用');expect(page.locator('#pending-files')).to_contain_text('已上传');count=sum(path.endswith('/uploads') for _,path in calls)
     assert sum(path.endswith('/uploads') for _,path in calls)==upload_count
     state['messageFail']=False;page.locator('#send-message').click();expect(page.locator('#messages')).to_contain_text('已阅读材料');expect(page.locator('#pending-files')).to_be_empty();assert sum(path.endswith('/uploads') for _,path in calls)==count
+    expect(page.locator('#tool-activity p')).to_have_count(1);expect(page.locator('#tool-activity')).to_contain_text('已读取 3 段');expect(page.locator('#tool-activity')).not_to_contain_text('进行中')
     assert next(i for i,c in enumerate(calls) if c[1].endswith('/uploads'))<next(i for i,c in enumerate(calls) if c[1].endswith('/messages'))
     for text in ['帮我梳理重点','用更简洁的话解释']:
         expect(page.locator('#send-message')).to_be_enabled();page.locator('#assistant-message').fill(text);page.locator('#send-message').click();expect(page.locator('#messages .assistant')).to_have_count(2 if text=='帮我梳理重点' else 3)

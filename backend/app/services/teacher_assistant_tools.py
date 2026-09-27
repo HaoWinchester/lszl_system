@@ -123,6 +123,6 @@ async def prepare(db,user,session,job,intent):
     job.stream={**(job.stream or {}),"preparedRevision":session.revision}
     revision=session.revision
     await db.commit()
-    return text_result({'revision':revision,'summary':plan.get('summary'),'questionCount':plan.get('questionCount'),
+    return text_result({'revision':revision,'summary':plan.get('summary'),'questionCount':plan.get('questionCount'),'settings':plan.get('settings',{}),
         'blockers':plan.get('blockers',[]),'items':[{'id':i['id'],'name':i.get('name'),'count':len(i.get('questions',[])),'blockers':i.get('blockers',[])} for i in plan.get('items',[])],
         'result':'预览已保存，尚未执行导入或发布。'})

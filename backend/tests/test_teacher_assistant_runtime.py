@@ -1,4 +1,5 @@
 import asyncio
+import pytest
 import json
 from uuid import uuid4
 from fastapi.testclient import TestClient
@@ -126,7 +127,8 @@ def test_real_image_validation_and_visual_block(tmp_path,monkeypatch):
     assert any('视觉' in text for text in result['warnings'])
 
 
-def test_natural_file_qa_stream_does_not_extract_questions(tmp_path,monkeypatch):
+@pytest.mark.parametrize("structured", [False, True])
+def test_natural_file_qa_stream_does_not_extract_questions(tmp_path,monkeypatch,structured):
     from app.worker import teacher_assistant as worker
     from app.core.config import settings
     from app.db.session import AsyncSessionLocal
@@ -137,7 +139,7 @@ def test_natural_file_qa_stream_does_not_extract_questions(tmp_path,monkeypatch)
         login(c,a);sid=c.post('/api/v1/teacher-assistant/sessions').json()['session']['id'];url='/api/v1/teacher-assistant/sessions/'+sid
         async def setup():
             async with AsyncSessionLocal() as db:
-                db.add(Upload(id='tau_'+uuid4().hex,session_id=sid,name='说明.docx',size=50,digest='a'*64,status='ready',extracted={'kind':'document','sections':[{'location':'段落1','text':'这是一份没有题目的说明书','images':['page-1.png']}],'warnings':[]}));await db.commit()
+                db.add(Upload(id='tau_'+uuid4().hex,session_id=sid,name='说明.docx',size=50,digest='a'*64,status='ready',extracted=({'kind':'json','data':{'name':'十三题','questions':[{'id':f'q{i}','title':f'题目{i}','type':'single_choice','analysis':'原解析'*8000} for i in range(13)]},'warnings':[]} if structured else {'kind':'document','sections':[{'location':'段落1','text':'这是一份没有题目的说明书','images':['page-1.png']}],'warnings':[]})));await db.commit()
         asyncio.run(setup())
         seen=[]
         async def streaming(**kw):
@@ -145,7 +147,12 @@ def test_natural_file_qa_stream_does_not_extract_questions(tmp_path,monkeypatch)
             transcript=kw['cwd']/'config'/'projects'/'test'/(kw['session_id']+'.jsonl')
             transcript.parent.mkdir(parents=True,exist_ok=True);transcript.write_text('{}\n')
             assert '说明.docx' in kw['prompt']
-            assert json.loads(kw['prompt'])['files'][0]['images']==[{'name':'page-1.png','location':'段落1'}]
+            if structured:
+                overview=json.loads(kw['prompt'])['files'][0].get('summary',{})
+                assert overview.get('banks',[{}])[0].get('count')==13
+                assert len(kw['prompt'])<6000 and '原解析' not in kw['prompt']
+            else:
+                assert json.loads(kw['prompt'])['files'][0]['images']==[{'name':'page-1.png','location':'段落1'}]
             await kw['on_started']()
             await kw['on_event']('text_delta',{'text':'这是一份说明书。'})
             return '这是一份说明书。'
@@ -274,6 +281,7 @@ def test_scoped_import_tool_preserves_json_answers_and_marks_current_job(tmp_pat
                 j=await db.get(Job,jid);j.status='running';await db.commit()
             result=await tools.call_tool(a,sid,jid,'prepare_import',{'intent':{'settings':{'duplicatePolicy':'independent'},'items':[{'uploadId':uid,'questions':[question(answer='b')]}]}})
             assert json.loads(result['content'][0]['text'])['questionCount']==1
+            assert json.loads(result['content'][0]['text']).get('settings',{}).get('duplicatePolicy')=='independent'
             async with AsyncSessionLocal() as db:
                 session=await db.get(Session,sid);job=await db.get(Job,jid)
                 assert session.plan['items'][0]['questions'][0]['correctAnswer']=='a'
@@ -454,3 +462,12 @@ def test_native_resume_requires_saved_transcript_even_if_database_says_started(t
     transcript.write_text('{}\n')
     assert native_session_exists(tmp_path,sid)
     assert not native_session_exists(tmp_path,str(uuid4()))
+
+
+def test_import_tool_schema_distinguishes_exact_names_suffix_and_explicit_roles():
+    from app.services.teacher_assistant_tool_catalog import definitions
+    tool=next(t for t in definitions() if t['name']=='prepare_import')
+    settings=tool['inputSchema']['properties']['intent'].get('properties',{}).get('settings',{}).get('properties',{})
+    assert 'names' in settings and 'nameSuffix' in settings
+    assert settings.get('allowedRoles',{}).get('items',{}).get('enum')==['teacher','student','admin','viewer']
+    assert settings['allowedRoles'].get('minItems',0)==0  # Explicitly clearing prior roles remains valid.

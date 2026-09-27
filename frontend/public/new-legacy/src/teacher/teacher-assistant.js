@@ -80,6 +80,28 @@
       },
     };
   }
+  // MCP calls and upload parsing emit ordered start/end pairs. Keep one visible
+  // row per file/operation; the end event may omit its filename and upload ID.
+  function updateActivity(rows, event) {
+    const data = event.data || {}, origin = data.origin || 'parser';
+    if (event.type === 'done') {
+      return rows.map(row => row.status === 'running' ? { ...row, status: data.status === 'succeeded' ? 'succeeded' : data.status === 'cancelled' ? 'cancelled' : 'failed' } : row);
+    }
+    if (!['tool_start', 'tool_end'].includes(event.type)) return rows;
+    const next = rows.map(row => ({ ...row }));
+    const match = row => row.origin === origin && row.name === data.name;
+    let index = event.type === 'tool_start'
+      ? next.findIndex(row => match(row) && row.uploadId === data.uploadId)
+      : next.findLastIndex(row => match(row) && row.status === 'running' && (!data.uploadId || row.uploadId === data.uploadId));
+    if (index < 0) {
+      index = next.length;
+      next.push({ origin, name: data.name, uploadId: data.uploadId, label: (data.label || ({ read_file: '读取文件', read_image: '查看图片', prepare_import: '生成预览', list_files: '核对附件' })[data.name] || '处理教学内容').replace(/^正在/, ''), count: 0 });
+    }
+    const row = next[index];
+    row.status = event.type === 'tool_start' ? 'running' : data.ok === false ? 'failed' : 'succeeded';
+    if (event.type === 'tool_end' && data.ok !== false) row.count++;
+    return next;
+  }
   function init(doc) {
     const $ = id => doc.getElementById(id);
     const client = createClient(global.fetch.bind(global), () => global.crypto.randomUUID());
@@ -285,10 +307,11 @@
     function disconnect() { global.clearTimeout(pollTimer); if (stream) stream.close(); stream = null; }
     function renderStream() {
       const running = activeJob(client.session);
+      if (!running && client.session?.job) tools = updateActivity(tools, {type:'done',data:{status:client.session.job.status}});
       $('stream-message').hidden = !streamText; $('stream-text').textContent = streamText;
       $('activity-details').hidden = !running && !tools.length;
       if (!running && !busy) $('runtime-status').textContent = client.session?.job?.status === 'failed' ? '处理未完成，可重试' : client.session?.job?.status === 'cancelled' ? '已停止，可继续对话' : '处理记录';
-      $('tool-activity').replaceChildren(); tools.forEach(value => text($('tool-activity'), 'p', value));
+      $('tool-activity').replaceChildren(); tools.forEach(row => text($('tool-activity'), 'p', row.label + ' · ' + ({running:'进行中',succeeded:'已完成',failed:'未完成',cancelled:'已停止'})[row.status] + (row.origin === 'mcp' && row.name === 'read_file' && row.count ? '（已读取 ' + row.count + ' 段）' : '')));
       if (nearBottom) scroller.scrollTop = scroller.scrollHeight;
     }
     async function reconcile(id, token) {
@@ -314,10 +337,7 @@
         const data = value.data || {}; clearError(true);
         if (value.type === 'text_delta') { streamText += data.text || ''; $('runtime-status').textContent = '正在回复'; }
         if (value.type === 'status') $('runtime-status').textContent = ({queued:'等待处理',running:'正在处理',stopping:'正在停止，请稍候',reading:'正在读取文件'})[data.status] || '正在处理';
-        if (value.type === 'tool_start' || value.type === 'tool_end') {
-          const label = data.label || (data.uploadId ? '读取文件' : '处理教学内容');
-          tools.push(label + (value.type === 'tool_start' ? ' · 进行中' : data.ok === false ? ' · 未完成' : ' · 已完成'));
-        }
+        tools = updateActivity(tools, value);
         if (value.type === 'error') showError(new Error(data.message || '处理未完成，请重试。'));
         renderStream();
         if (value.type === 'done') { disconnect(); reconcile(id, token).catch(error => { showError(error); reconnect(id, token); }); }
@@ -446,6 +466,6 @@
     global.addEventListener('pagehide', () => { epoch++; disconnect(); });
     return { client, render, start };
   }
-  global.KGTeacherAssistant = { createClient, validateFiles, activeJob, init };
+  global.KGTeacherAssistant = { createClient, validateFiles, activeJob, updateActivity, init };
   if (global.document?.getElementById('assistant')) init(global.document);
 })(typeof window !== 'undefined' ? window : globalThis);

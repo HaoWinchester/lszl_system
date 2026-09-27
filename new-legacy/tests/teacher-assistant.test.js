@@ -78,3 +78,27 @@ test('native images accepted and stopping lease remains an active job', () => {
   for(const name of ['a.png','a.jpg','a.jpeg','a.webp']) assert.equal(api.validateFiles([{name,size:8}]).length,1);
   assert.equal(api.activeJob({job:{status:'cancelled'},runtime:{status:'stopping'}}),true);
 });
+
+test('file progress updates the original row and coalesces chunks without false running entries', () => {
+  const {api}=runtime(async()=>response({session}));
+  assert.equal(typeof api.updateActivity,'function');
+  let rows=[];
+  const event=(type,data)=>{rows=api.updateActivity(rows,{type,data});};
+  event('tool_start',{name:'read_file',uploadId:'file-a',label:'正在解析 A'});
+  event('tool_end',{name:'read_file',uploadId:'file-a',ok:true});
+  for(let i=0;i<3;i++){
+    event('tool_start',{origin:'mcp',name:'read_file',uploadId:'file-a',label:'正在读取附件：A'});
+    event('tool_end',{origin:'mcp',name:'read_file',ok:true});
+  }
+  assert.equal(rows.length,2);
+  assert.ok(rows.every(row=>row.status==='succeeded'));
+  assert.equal(rows[1].count,3);
+  assert.match(rows[1].label,/A/);
+  event('tool_start',{origin:'mcp',name:'read_image',uploadId:'file-b',label:'查看 B'});
+  event('done',{status:'failed'});
+  assert.equal(rows[2].status,'failed');
+  assert.equal(rows[1].status,'succeeded');
+  event('tool_start',{origin:'mcp',name:'read_file',uploadId:'file-a',label:'读取 A'});
+  event('done',{status:'cancelled'});
+  assert.equal(rows[1].status,'cancelled');
+});
