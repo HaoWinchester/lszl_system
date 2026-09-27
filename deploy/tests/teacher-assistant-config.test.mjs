@@ -72,3 +72,26 @@ test('UAT builds the backend runtime tag before rebuilding and starting the assi
   assert.match(script, /^set -euo pipefail$/m);
   assert.doesNotMatch(script.slice(prebuild, start), /\|\| true/);
 });
+
+test('production assistant uses production DB/runtime and project-isolated files', t => {
+ const dir=mkdtempSync(join(tmpdir(),'prod-assistant-config-'));
+ t.after(()=>rmSync(dir,{recursive:true,force:true}));mkdirSync(join(dir,'backend'));
+ for(const file of ['docker-compose.mini-uat.yml','docker-compose.teacher-assistant.yml','docker-compose.teacher-assistant-prod.yml'])copyFileSync(join(root,file),join(dir,file));
+ writeFileSync(join(dir,'docker-compose.prod.yml'),readFileSync(join(root,'docker-compose.prod.yml'),'utf8').replace('/opt/lszl/secrets/wechatpay/payment.env','./payment.env'));
+ writeFileSync(join(dir,'payment.env'),'WECHAT_PAY_MCH_ID=test-only\n');
+ writeFileSync(join(dir,'.env.prod'),'POSTGRES_PASSWORD=test-only\nSECRET_KEY=test-only\n');
+ writeFileSync(join(dir,'backend/.env.wechat-mini.local'),'WECHAT_MINI_APP_ID=test-only\n');
+ writeFileSync(join(dir,'backend/.env.teacher-assistant.local'),'ANTHROPIC_AUTH_TOKEN=test-only\nANTHROPIC_BASE_URL=https://example.invalid\n');
+ const files=['docker-compose.prod.yml','docker-compose.mini-uat.yml','docker-compose.teacher-assistant.yml','docker-compose.teacher-assistant-prod.yml'];
+ const r=spawnSync('docker',['compose','-p','lszl-kg','--env-file','.env.prod',...files.flatMap(f=>['-f',f]),'config','--format','json'],{cwd:dir,encoding:'utf8'});assert.equal(r.status,0,r.stderr);
+ const c=JSON.parse(r.stdout),worker=c.services['assistant-worker'];
+ assert.equal(worker.environment.DATABASE_URL,c.services.backend.environment.DATABASE_URL);
+ assert.equal(worker.environment.ENV,'prod');assert.equal(worker.build.args.BACKEND_RUNTIME,'lszl-kg-backend:latest');
+ assert.equal(worker.image,'lszl-teacher-assistant:prod');assert.equal(c.services['document-converter'].image,worker.image);
+ assert.equal(c.volumes['teacher-assistant-files'].name,'lszl-kg_teacher-assistant-files');
+ assert.equal(c.services.backend.environment.ANTHROPIC_AUTH_TOKEN,undefined);
+ const script=readFileSync(join(root,'deploy/update.sh'),'utf8');
+ assert.match(script,/-f docker-compose\.teacher-assistant-prod\.yml/);
+ assert.ok(script.indexOf('--env-file ${ENV_FILE} build backend')<script.indexOf('--env-file ${ENV_FILE} up -d --build'));
+ assert.match(script,/python -m app.cli.check_teacher_assistant_readiness/);
+});

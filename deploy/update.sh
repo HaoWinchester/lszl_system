@@ -7,7 +7,7 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REMOTE="resume-prod"
 REMOTE_DIR="/home/ubuntu/lszl-kg"
 COMPOSE_BASE_ARGS="-f docker-compose.prod.yml"
-COMPOSE_ARGS="$COMPOSE_BASE_ARGS -f docker-compose.mini-uat.yml"
+COMPOSE_ARGS="$COMPOSE_BASE_ARGS -f docker-compose.mini-uat.yml -f docker-compose.teacher-assistant.yml -f docker-compose.teacher-assistant-prod.yml"
 ENV_FILE=".env.prod"
 PROJECT="lszl-kg"
 REMOTE_BACKUP_ROOT="/home/ubuntu/lszl-backups"
@@ -59,6 +59,7 @@ EOF"
 # The same isolated mini overlay is used in UAT and production. Its filename is
 # retained for compatibility; the base compose still owns PC/payment/DB settings.
 check_mini_config() {
+  ssh "$REMOTE" "cd $REMOTE_DIR && test -s backend/.env.teacher-assistant.local && test -x /usr/lib/node_modules/@anthropic-ai/claude-code/bin/claude.exe"
   ssh "$REMOTE" "cd $REMOTE_DIR && test -s backend/.env.wechat-mini.local && docker compose -p $PROJECT $COMPOSE_BASE_ARGS -f - --env-file $ENV_FILE config --quiet" < "$REPO_DIR/docker-compose.mini-uat.yml"
 }
 case "${1:-}" in
@@ -94,12 +95,17 @@ rsync -az --delete --stats \
 
 deployment_timing_stage image-restart
 echo "[3/5] 重建后端镜像并重启"
+ssh "$REMOTE" "cd $REMOTE_DIR && docker compose -p ${PROJECT} ${COMPOSE_ARGS} --env-file ${ENV_FILE} config --quiet"
+ssh "$REMOTE" "cd $REMOTE_DIR && docker compose -p ${PROJECT} ${COMPOSE_ARGS} --env-file ${ENV_FILE} build backend"
 ssh "$REMOTE" "cd $REMOTE_DIR && docker compose -p ${PROJECT} ${COMPOSE_ARGS} --env-file ${ENV_FILE} up -d --build"
 
 deployment_timing_stage health-maintenance
 echo "[4/5] 等待健康检查并执行非阻断空间维护"
 ssh "$REMOTE" 'healthy=0; for attempt in $(seq 1 30); do if curl -fsS http://127.0.0.1:18086/api/v1/health >/dev/null; then healthy=1; break; fi; sleep 1; done; test "$healthy" -eq 1'
 ssh "$REMOTE" "cd $REMOTE_DIR && docker compose -p $PROJECT $COMPOSE_ARGS --env-file $ENV_FILE exec -T backend python -m app.cli.check_mini_readiness"
+# Initialize only the shared root; per-session data stays private and untouched.
+ssh "$REMOTE" "cd $REMOTE_DIR && docker compose -p $PROJECT $COMPOSE_ARGS --env-file $ENV_FILE exec -T backend python -c \"import os; p='/var/lib/teacher-assistant'; os.chown(p,10001,10001); os.chmod(p,0o750)\""
+ssh "$REMOTE" "cd $REMOTE_DIR && docker compose -p $PROJECT $COMPOSE_ARGS --env-file $ENV_FILE exec -T assistant-worker python -m app.cli.check_teacher_assistant_readiness"
 ssh "$REMOTE" 'docker image prune -f >/dev/null || true; docker builder prune -f --filter until=168h >/dev/null || true; sudo -n journalctl --vacuum-size=512M >/dev/null || true; df -h /'
 
 echo
