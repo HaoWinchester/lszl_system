@@ -45,14 +45,15 @@
     const dataUrl=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result||''));reader.onerror=()=>reject(new Error('截图读取失败。'));reader.readAsDataURL(file)});
     return {name:file.name,type:file.type,size:file.size,dataUrl};
   }
-  function renderFeedbackForm(body){
+  function renderFeedbackForm(body,prefill={}){
     body.innerHTML=`<div class="engagement-tabs"><button type="button" class="active" data-feedback-tab="new">提交反馈</button><button type="button" data-feedback-tab="mine"><span>我的反馈</span><b class="feedback-tab-badge" id="feedbackTabBadge" hidden>0</b></button></div><section id="feedbackTabContent"></section>`;
-    body.querySelectorAll('[data-feedback-tab]').forEach(button=>button.addEventListener('click',()=>{body.querySelectorAll('[data-feedback-tab]').forEach(item=>item.classList.toggle('active',item===button));button.dataset.feedbackTab==='mine'?renderMyFeedback(body):renderNewFeedback(body)}));
-    renderNewFeedback(body);
+    body.querySelectorAll('[data-feedback-tab]').forEach(button=>button.addEventListener('click',()=>{body.querySelectorAll('[data-feedback-tab]').forEach(item=>item.classList.toggle('active',item===button));button.dataset.feedbackTab==='mine'?renderMyFeedback(body):renderNewFeedback(body,prefill)}));
+    renderNewFeedback(body,prefill);
   }
-  function renderNewFeedback(body){
+  function renderNewFeedback(body,prefill={}){
     const content=body.querySelector('#feedbackTabContent');if(!content)return;
     content.innerHTML=`<form class="engagement-form" id="feedbackForm" novalidate><div class="engagement-form-row"><label>反馈类型<select id="feedbackType"><option value="suggestion">功能建议</option><option value="bug">问题反馈</option><option value="content">内容问题</option><option value="other">其他</option></select></label><label>联系方式（选填）<input id="feedbackContact" maxlength="120" placeholder="邮箱或手机号"/></label></div><label>标题<input id="feedbackTitle" maxlength="100" aria-describedby="feedbackFormError" placeholder="请简要说明问题或建议"/></label><label>详细描述<textarea id="feedbackDetail" maxlength="4000" aria-describedby="feedbackFormError" placeholder="请描述发生了什么、期望结果以及复现步骤"></textarea></label><label>截图（选填，最大 160KB）<input id="feedbackAttachment" type="file" accept="image/png,image/jpeg,image/webp,image/gif"/></label><div class="engagement-form-error" id="feedbackFormError" role="alert" hidden></div><div class="engagement-note">将自动记录当前页面、账号角色和应用版本，不会自动提交图谱或题目内容。</div><button class="engagement-primary" type="submit">提交反馈</button></form>`;
+    $('feedbackType').value=prefill.type||'suggestion';$('feedbackTitle').value=prefill.title||'';$('feedbackDetail').value=prefill.detail||'';
     $('feedbackForm').addEventListener('submit',async event=>{
       event.preventDefault();const title=$('feedbackTitle').value.trim(),detail=$('feedbackDetail').value.trim(),errorBox=$('feedbackFormError');
       if(!title||!detail){errorBox.textContent='请填写反馈标题和详细描述。';errorBox.hidden=false;(title?$('feedbackDetail'):$('feedbackTitle')).focus();return}
@@ -73,7 +74,13 @@
       if(unreadRows.length){await Promise.all(unreadRows.map(item=>Repository().markFeedbackRead(item.id)));refreshUnread()}
     }catch(error){content.innerHTML=`<div class="engagement-empty">${escapeHtml(error.message||'反馈读取失败。')}</div>`}
   }
-  function openFeedback(){closePopover();const body=openDialog('需求反馈','提交问题、建议或内容反馈，并查看处理进度。');renderFeedbackForm(body);refreshUnread()}
+  function openFeedback(prefill={}){closePopover();const body=openDialog('需求反馈','提交问题、建议或内容反馈，并查看处理进度。');renderFeedbackForm(body,prefill);refreshUnread()}
+  function questionFeedbackDraft(context={}){
+    const labels={questionId:'题目 ID',paperId:'试卷 ID',releaseId:'发布版本 ID',sessionId:'练习 ID'};
+    const detail='题目解析缺失或需要核对，请补充具体问题：\n\n'+Object.entries(labels).map(([key,label])=>label+'：'+String(context[key]||'未提供')).join('\n');
+    return {type:'content',title:'题目解析反馈',detail};
+  }
+  function openQuestionFeedback(context){const opener=document.activeElement;openFeedback(questionFeedbackDraft(context));if(opener)dialogReturnFocus=opener}
   function openContact(){closePopover();const body=openDialog('联系我们','如需帮助可扫码添加客服。');body.innerHTML=`<div class=\"contact-service-card\"><p class=\"contact-service-title\">扫码添加客服</p><p class=\"contact-service-subtitle\">账号问题、课程问题、学习问题，均可在对话中说明。</p><img class=\"contact-service-qrcode\" src=\"assets/客服二维码/1.jpg\" alt=\"客服二维码\"/><p class=\"contact-service-tip\">添加后请备注你的用户名（例如：学校/课程），便于我们快速处理。</p></div>`}
   async function openMessages(){
     closePopover();const body=openDialog('消息','查看管理员和运营人员发布的通知。');body.innerHTML='<div class="engagement-empty">正在读取消息…</div>';
@@ -103,11 +110,11 @@
   }
   function init(){
     if(!Repository())return;if(!ensureShell())return;trigger=$('supportCenterBtn');popover=$('supportCenterMenu');badge=$('supportCenterBadge');feedbackMenuBadge=$('supportFeedbackMenuBadge');messageMenuBadge=$('supportMessageMenuBadge');if(shell.dataset.bound==='1')return;shell.dataset.bound='1';
-    trigger.addEventListener('click',event=>{event.stopPropagation();togglePopover()});popover.querySelector('[data-support-action="help"]').addEventListener('click',openHelp);popover.querySelector('[data-support-action="contact"]').addEventListener('click',openContact);popover.querySelector('[data-support-action="feedback"]').addEventListener('click',openFeedback);popover.querySelector('[data-support-action="messages"]').addEventListener('click',openMessages);
+    trigger.addEventListener('click',event=>{event.stopPropagation();togglePopover()});popover.querySelector('[data-support-action="help"]').addEventListener('click',openHelp);popover.querySelector('[data-support-action="contact"]').addEventListener('click',openContact);popover.querySelector('[data-support-action="feedback"]').addEventListener('click',()=>openFeedback());popover.querySelector('[data-support-action="messages"]').addEventListener('click',openMessages);
     document.addEventListener('click',event=>{if(!shell.contains(event.target))closePopover()});document.addEventListener('keydown',onKeydown);global.addEventListener('blur',()=>closePopover());global.addEventListener('resize',()=>closePopover());
     global.addEventListener(Repository().eventName,refreshUnread);global.addEventListener('storage',event=>{if(!event.key||event.key===Repository().feedbackStorageKey||event.key===Repository().announcementStorageKey||event.key?.startsWith(Repository().readStoragePrefix)||event.key?.startsWith(Repository().feedbackReadStoragePrefix))refreshUnread()});global.addEventListener('kg-auth-session-change',refreshUnread);
     refreshUnread();refreshTimer=global.setInterval(refreshUnread,60000);
   }
-  global.KGSupportCenter=Object.freeze({openFeedback,openMessages,refreshUnread,closePopover});
+  global.KGSupportCenter=Object.freeze({openFeedback,openQuestionFeedback,questionFeedbackDraft,openMessages,refreshUnread,closePopover});
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })(window);

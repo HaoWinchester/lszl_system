@@ -109,7 +109,7 @@
         const selected = Array.isArray(answer.selectedAnswerIds) ? answer.selectedAnswerIds.map(text) : [text(answer.selectedAnswer)].filter(Boolean)
         const correct = (question.correctAnswerIds || []).map(text)
         const outcome = status(question)
-        return `<article class="practice-review-card" data-review-card="${escapeHTML(question.id)}"><header><h3>第 ${index + 1} 题</h3><span class="practice-review-status is-${outcome}">${outcome === 'correct' ? '答对' : outcome === 'wrong' ? '答错' : '未作答'}</span></header><p class="practice-review-stem">${escapeHTML(question.stem)}</p>${global.KGQuestionMaterials?.render(question,{selectedPairs:answer.selectedPairs||{},readOnly:true,reveal:true})||''}<ol class="practice-review-options">${(question.options || []).map(option => `<li class="${correct.includes(text(option.id)) ? 'is-correct' : selected.includes(text(option.id)) ? 'is-wrong' : ''}"><strong>${escapeHTML(option.id)}</strong><span>${escapeHTML(option.text)}</span></li>`).join('')}</ol><div class="practice-review-answers"><span>你的答案：${escapeHTML(question.type==='matching'?global.KGQuestionAnswerSet?.answerText(question,answer.selectedPairs):selected.join('、') || '未作答')}</span><span>正确答案：${escapeHTML(question.type==='matching'?global.KGQuestionAnswerSet?.answerText(question,question.matching?.correctPairs):correct.join('、') || '暂无')}</span></div><div class="practice-review-explanation"><strong>题目解析</strong><p>${escapeHTML(question.explanation || '暂无解析')}</p></div></article>`
+        return `<article class="practice-review-card" data-review-card="${escapeHTML(question.id)}"><header><h3>第 ${index + 1} 题</h3><span class="practice-review-status is-${outcome}">${outcome === 'correct' ? '答对' : outcome === 'wrong' ? '答错' : '未作答'}</span></header><p class="practice-review-stem">${escapeHTML(question.stem)}</p>${global.KGQuestionMaterials?.render(question,{selectedPairs:answer.selectedPairs||{},readOnly:true,reveal:true})||''}<ol class="practice-review-options">${(question.options || []).map(option => `<li class="${correct.includes(text(option.id)) ? 'is-correct' : selected.includes(text(option.id)) ? 'is-wrong' : ''}"><strong>${escapeHTML(option.id)}</strong><span>${escapeHTML(option.text)}</span></li>`).join('')}</ol><div class="practice-review-answers"><span>你的答案：${escapeHTML(question.type==='matching'?global.KGQuestionAnswerSet?.answerText(question,answer.selectedPairs):selected.join('、') || '未作答')}</span><span>正确答案：${escapeHTML(question.type==='matching'?global.KGQuestionAnswerSet?.answerText(question,question.matching?.correctPairs):correct.join('、') || '暂无')}</span></div><div class="practice-review-explanation"><strong>题目解析</strong><p>${escapeHTML(text(question.explanation).trim() || '暂无解析')}</p><button type="button" class="practice-secondary-btn" data-question-feedback="${escapeHTML(question.id)}">解析有误或缺失？反馈此题</button></div></article>`
       }).join('') : `<p class="practice-review-empty">${filter === 'wrong' ? '本次没有答错的题目。' : filter === 'correct' ? '本次没有答对的题目。' : '暂无可回顾的题目。'}</p>`
     }
     const mountComments = () => {
@@ -117,7 +117,13 @@
       const cards = Array.from(section.querySelectorAll('[data-review-card]')).map(card => ({ card, questionId: card.dataset.reviewCard }))
       global.KGQuestionComments.mountCards({ cards })
     }
-    const selectWithComments = filter => { select(filter); mountComments() }
+    const selectWithComments = filter => {
+      select(filter); mountComments()
+      section.querySelectorAll('[data-question-feedback]').forEach(button => button.addEventListener('click', () => {
+        const question=questions.find(item=>text(item.id)===button.dataset.questionFeedback)
+        global.KGSupportCenter?.openQuestionFeedback({questionId:button.dataset.questionFeedback,paperId:question?.paperId || options.paperId || report.paperId,releaseId:question?.releaseId || options.releaseId || report.releaseId,sessionId:report.sessionId})
+      }))
+    }
     section.querySelectorAll('[data-review-filter]').forEach(button => button.addEventListener('click', () => selectWithComments(button.dataset.reviewFilter)))
     selectWithComments(options.reviewFilter === 'all' ? 'all' : 'wrong')
     root.querySelector('[data-report-review-all]')?.addEventListener('click', () => {
@@ -153,7 +159,7 @@
       ${Array.isArray(options.questions) ? '<section class="practice-report-review" data-question-review></section>' : ''}
       <section class="practice-report-next"><h2>下一步建议</h2><ul>${(Array.isArray(report.recommendations) ? report.recommendations : []).map(item => `<li>${escapeHTML(item)}</li>`).join('')}</ul></section>
       <p class="practice-report-disclaimer">${escapeHTML(report.disclaimer || '幻谱模拟判定，不代表 PMI 官方考试成绩')}</p>
-      <footer class="practice-report-actions">${options.onReviewAll || Array.isArray(options.questions) ? '<button type="button" class="practice-secondary-btn" data-report-review-all="true">回看全部题目</button>' : ''}<button type="button" class="practice-primary-btn" data-report-again="true">再练一次</button><button type="button" class="practice-secondary-btn" data-report-lobby="true">返回大厅</button></footer>
+      <footer class="practice-report-actions">${options.onReviewAll || Array.isArray(options.questions) ? '<button type="button" class="practice-secondary-btn" data-report-review-all="true">回看全部题目与解析</button>' : ''}<button type="button" class="practice-primary-btn" data-report-again="true">再练一次</button><button type="button" class="practice-secondary-btn" data-report-lobby="true">返回大厅</button></footer>
       <div class="practice-report-page">${escapeHTML(report.pageNumber || '1 / 1')}</div>
     </article>`
     root.querySelectorAll('[data-review-question]').forEach(button => button.addEventListener('click', () => options.onReviewWrong?.(button.dataset.reviewQuestion)))

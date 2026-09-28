@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
 from app.core.permissions import can
+from app.core.security import now_utc
 from app.models.user import ACTIVE, User
 from app.services import user_service
 from app.services import wechat_mini_service
@@ -34,6 +35,27 @@ def establish_authenticated_session(request: Request, username: str) -> str:
     request.session["username"] = username
     request.session["login_session_id"] = login_session_id
     return login_session_id
+
+
+def record_wechat_password_proof(request: Request, username: str, authenticated_at: float | None = None) -> None:
+    """Only call after successful official WeChat authentication, never a demo/bind."""
+    request.session["wechat_password_proof"] = {
+        "username": username,
+        "authenticated_at": authenticated_at if authenticated_at is not None else now_utc().timestamp(),
+    }
+
+
+def has_recent_wechat_password_proof(request: Request, username: str) -> bool:
+    # A mini-program bearer must never inherit an unrelated browser cookie proof.
+    if getattr(request.state, "auth_transport", None) != "cookie":
+        return False
+    proof = request.session.get("wechat_password_proof")
+    if not isinstance(proof, dict) or proof.get("username") != username:
+        return False
+    authenticated_at = proof.get("authenticated_at")
+    if not isinstance(authenticated_at, (int, float)) or isinstance(authenticated_at, bool):
+        return False
+    return 0 <= now_utc().timestamp() - authenticated_at <= 600
 
 
 def get_login_session_id(request: Request) -> str:

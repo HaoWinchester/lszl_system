@@ -66,7 +66,7 @@ test('all theme body, action and answer-state text meets 4.5:1 contrast', async 
 
 test('page decoration preserves business lifecycle and updates cached views without navigation', async () => {
   const api = await appearance();
-  const { withAppearance } = await loadModule('domain/appearance-page.ts', api, ['withAppearance']);
+  const { withAppearance } = await loadModule('domain/appearance-page.ts', { ...api, usageShow() {}, usageHide() {}, usageTouch() {} }, ['withAppearance']);
   const calls = [];
   const tabState = {};
   const page = withAppearance({ data: { answers: ['B'] }, onLoad(query) { calls.push(query.id); }, onShow() { calls.push('show'); }, onUnload() { calls.push('unload'); } });
@@ -179,7 +179,7 @@ test('directly opened appearance preview has a working return path', async () =>
 
 test('shared appearance exposes actual status-bar height for scroll-safe native navigation', async () => {
   const api = await appearance();
-  const { withAppearance } = await loadModule('domain/appearance-page.ts', api, ['withAppearance']);
+  const { withAppearance } = await loadModule('domain/appearance-page.ts', { ...api, usageShow() {}, usageHide() {}, usageTouch() {} }, ['withAppearance']);
   const page = withAppearance({ data: { statusBarHeight: 44 } });
   page.setData = values => Object.assign(page.data, values);
   page.onShow();
@@ -193,7 +193,7 @@ test('shared appearance exposes actual status-bar height for scroll-safe native 
 
 test('returning to an unchanged tab does not resend palette or native chrome updates', async () => {
   const api = await appearance();
-  const { withAppearance } = await loadModule('domain/appearance-page.ts', api, ['withAppearance']);
+  const { withAppearance } = await loadModule('domain/appearance-page.ts', { ...api, usageShow() {}, usageHide() {}, usageTouch() {} }, ['withAppearance']);
   let pageWrites = 0, tabWrites = 0, shows = 0;
   const tab = { data: {}, setData(value) { tabWrites++; Object.assign(this.data, value); } };
   const page = withAppearance({ data: { statusBarHeight: 44 }, onShow() { shows++; } });

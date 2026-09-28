@@ -133,8 +133,17 @@
     container.querySelector('.wechat-login-retry').onclick=()=>renderPanel(container);
     bindPasswordLoginReturn(container);
   }
+  function isMobileLogin(){
+    return /Android|iPhone|iPad|iPod|Mobile/i.test(window.navigator?.userAgent||'') ||
+      !!window.matchMedia?.('(max-width: 640px)').matches;
+  }
   async function renderPanel(container){
     if(!container)return;
+    if(isMobileLogin()){
+      container.innerHTML='<div class="wechat-login-card"><div class="wechat-login-copy"><strong>手机登录</strong><p>当前微信网页登录使用电脑二维码。手机上请使用账号密码登录，无需扫描本机屏幕。</p><button type="button" class="wechat-login-back">使用账号密码登录</button><p>只有微信账号、还没设置密码？请先在电脑上微信登录，在 10 分钟内到用户中心设置首次密码，并记下用户名，再回手机登录。</p><p>也可在微信的小程序中搜索“幻谱知习”。已有会员请关联原账号，共用学习记录；不要重复创建账号。</p></div></div>';
+      bindPasswordLoginReturn(container);
+      return;
+    }
     const qrId='wechatLoginQr_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);
     container.innerHTML=`<div class="wechat-login-card"><div class="wechat-login-copy"><strong>请使用微信扫码</strong><p>在手机上确认后，将自动登录当前页面。</p><div class="wechat-login-qr" id="${qrId}"><span>正在生成微信授权二维码…</span></div><button type="button" class="wechat-login-back">使用账号密码登录</button></div></div>`;
     bindPasswordLoginReturn(container);
@@ -178,6 +187,7 @@
     actions.insertAdjacentElement('afterend',wrap);
     const entry=wrap.querySelector('.wechat-login-entry');
     const panel=wrap.querySelector('.wechat-login-panel');
+    if(isMobileLogin())entry.textContent='手机登录与小程序指引';
     entry.onclick=()=>{
       if(!window.KGAuthRuntime?.requireLegalConsent?.())return;
       setWechatLoginMode(modal,true);panel.hidden=false;renderPanel(panel)

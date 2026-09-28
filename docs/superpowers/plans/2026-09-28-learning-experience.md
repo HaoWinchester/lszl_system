@@ -1,0 +1,43 @@
+# Learning Experience Implementation Plan
+
+> Use subagent-driven-development for independent scoped implementation and review; parent owns integration and UAT.
+
+**Goal:** 完成 A1—A5、S5—S7 与教师常用页面布局优化，部署 UAT 等待验收。
+**Architecture:** 扩展既有公共模块，不重复造认证、练习会话或分析系统。
+**Tech Stack:** FastAPI / SQLAlchemy / PostgreSQL / 原生 JS / 微信 TypeScript。
+
+## Global Constraints
+- 工作树 .worktrees/learning-experience-20260928，基线 main c2c636b7。
+- 只编辑权威源与公共模块；生成产物由父任务同步；不覆盖任何其他任务文件。
+- 不修改 main，不替代用户 UAT 验收；无新增依赖。
+- 各子任务先复现/失败测试，再最小实现和针对性验证，记录未验证部分。
+
+## Task 1: S5 移动登录与首次设密
+- [x] 检查 backend/app/services/user_service.py、auth/wechat 路由、会话认证凭证和前端登录/个人资料组件。
+- [x] 用后端测试验证无密码账号近期微信认证可设密、非近期不可、已有密码仍须旧密码；保留账号隔离。
+- [x] 完成移动网页登录说明和可行入口，避免手机要求扫描自己屏幕且无替代路线；复用已配置小程序入口。
+- [x] 运行认证专项测试和登录组件回归，提供所有相关页浏览器验证清单。
+
+## Task 2: S6—S7 续做与解析
+- [x] 检查 new-legacy/src/100-practice-mode.js、113-practice-result-report.js、小程序练习/报告页和会话服务。
+- [x] 先为下一未答题续做、短练习、解析打开与缺失反馈补有意义的测试。
+- [x] 改善实际入口，沿用现有会话；反馈关联题目/试卷/版本，不扩展成完整教师内容处理系统。
+- [x] 提供已发布解析完整性的只读检查方法，运行专项测试。
+
+## Task 3: A1—A5 统计准确性
+- [x] 扩展 analytics schema/model/service 和迁移，保留 v1 兼容，新增 v2 事件 ID/会话/终端/前台与有效时长/时段；服务端身份绑定和幂等。
+- [x] 编写可控时钟 JS 测试覆盖已复现问题、后台、空闲、长停留、缓存返回、重试、账号切换和多窗口。
+- [x] 改共享采集器并接入遗漏页与小程序生命周期，采集失败不阻断业务。
+- [x] 聚合人数/频率/时间并区分历史，扩展现有分析面板筛选、排序和说明。
+- [x] 运行后端分析测试、JS 生命周期测试、小程序测试和现有契约。
+
+## Task 4: 教师页面使用布局
+- [x] 浏览器检查工作台、题目管理/训练配置、试卷管理桌面与窄屏。
+- [x] 统一导航层次，简化重复三步卡片和说明；主要内容直接可见，保持原 ID/行为和数据接口。
+- [x] 补布局/交互回归，执行主要操作、空态、失败态与键盘/窄屏检查。
+
+## Task 5: 集成与 UAT
+- [x] 子任务审查、修复、同步生成产物与完整测试。
+- [ ] 核对源/候选/active 文件与关键页面，受管 release 更新；按代理要求推送并核对远端。
+- [ ] 合入 uat 部署，核验公网版本、资源哈希及实际业务浏览器回归。
+- [ ] 记录 UAT 链接、范围、验证结果、剩余真机验收项，停止等待用户验收。

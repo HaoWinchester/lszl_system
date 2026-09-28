@@ -228,12 +228,20 @@ async def update_self_profile(
     db: AsyncSession,
     user: User,
     data: SelfProfileUpdate,
+    *,
+    recent_wechat_auth: bool = False,
 ) -> User:
     if data.email and not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", data.email):
         raise ValueError("邮箱格式不正确")
     if data.new_password:
-        if not data.current_password or not verify_password(data.current_password, user.password_hash):
-            raise ValueError("当前密码不正确")
+        # Serialize first setup: a second request must see the password just set.
+        user = (await db.execute(select(User).where(User.username == user.username)
+                .with_for_update().execution_options(populate_existing=True))).scalar_one()
+        if user.password_hash:
+            if not data.current_password or not verify_password(data.current_password, user.password_hash):
+                raise ValueError("当前密码不正确")
+        elif not recent_wechat_auth or not wechat_summary(user.wechat):
+            raise ValueError("首次设置密码需要近期微信认证，请重新微信登录后在 10 分钟内设置。")
         user.password_hash = hash_password(data.new_password)
     for field in ("display_name", "email", "phone", "subject", "note"):
         value = getattr(data, field)

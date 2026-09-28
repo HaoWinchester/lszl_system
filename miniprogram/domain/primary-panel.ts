@@ -13,6 +13,7 @@ export function withPrimaryPanel(key: string, page: any) {
       panel.panelInitialized = true;
       page.onLoad?.call(panel, {});
     }
+    panel.usageFeature = key;
     panel.panelVisible = true;
     page.onShow?.call(panel);
   };

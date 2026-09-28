@@ -40,11 +40,13 @@ test('inline matching collapses on cancel and assignment, and locks after submis
 });
 test('analysis disclosure requires answered state and policy, and resets when changing questions',async()=>{
  let definition;await loadModule('components/question-view/index.ts',{Component:x=>definition=x,assignPair,pairLabel},[]);
- const component={...definition.methods,data:{...definition.data},properties:{allowAnalysis:true,showResult:false},setData(v){Object.assign(this.data,v);},loadAssets(){}};
+ const events=[];
+ const component={...definition.methods,data:{...definition.data},properties:{question:{id:'current'},allowAnalysis:true,showResult:false},setData(v){Object.assign(this.data,v);},loadAssets(){},triggerEvent(name,detail){events.push({name,detail});}};
  component.toggleAnalysis();assert.equal(component.data.analysisExpanded,false);
  component.properties.showResult=true;component.properties.allowAnalysis=false;component.toggleAnalysis();assert.equal(component.data.analysisExpanded,false);
  component.properties.allowAnalysis=true;component.toggleAnalysis();assert.equal(component.data.analysisExpanded,true);
  Object.values(definition.observers)[0].call(component,{id:'new',options:[]},[],false,false,{});assert.equal(component.data.analysisExpanded,false);
+ assert.deepEqual(events,[{name:'analysischange',detail:{expanded:true,questionId:'current'}},{name:'analysischange',detail:{expanded:false,questionId:'new'}}]);
 });
 test('six to nine question papers retain full-paper practice alongside the quick five choice',async()=>{
  for(const total of [6,7,8,9]){

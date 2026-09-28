@@ -1175,7 +1175,14 @@
     q.clues=[...advanced,...quick];
     q.stemParts=rebuildStemParts(stemText(q),stemClues(q.clues));
     q.status={...(q.status||{}),keywordsReady:q.clues.length>0};
-    if(!saveBanks(state.banks,{silent:true})){setRecallConfigSaveState('dirty','保存失败');return {ok:false,missing,saved:0}}
+    try{
+      await persistCatalogQuestionChanges([q],bank.id,q.id);
+    }catch(error){
+      state.dirty=true;
+      setRecallConfigSaveState('dirty','保存失败');
+      if(!options.silent)toast('训练配置保存失败：'+(error.message||error)+'，请重试。');
+      return {ok:false,missing,saved:0};
+    }
     if(options.render!==false)renderRecallConfig();else setRecallConfigSaveState('saved');
     const message=missing.length?`已保存 ${quick.length} 个关键词；${missing.length} 个未找到：${missing.join('、')}`:`已保存 ${quick.length} 个关键词与知识入口。`;
     if(!options.silent)toast(message);

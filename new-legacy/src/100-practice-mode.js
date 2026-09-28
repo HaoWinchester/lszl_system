@@ -68,6 +68,7 @@
     const path=Array.isArray(knowledge.pathSnapshot)?knowledge.pathSnapshot:[];
     return {
       id:text(q.id||ref?.questionId||('q-'+index)),bankId:text(ref?.bankId||q.sourceBankId),mistakeId:text(ref?.mistakeId),previousWrongAnswer:text(ref?.previousWrongAnswer),previousWrongAnswerIds:Array.isArray(ref?.previousWrongAnswerIds)?ref.previousWrongAnswerIds.map(text):[],
+      sourcePaperId:text(ref?.sourcePaperId),sourceReleaseId:text(ref?.sourceReleaseId),
       title:text(q.title||'未命名题目'),stem:stemText(q),options,correctAnswer:type==='multiple_choice'?'':resolvedCorrect,correctOptionIds,
       type,raw:q,matching:q.matching||q.metadata?.matching,material:q.material||q.metadata?.material,images:q.images||q.metadata?.images,caseGroup:q.caseGroup||q.metadata?.caseGroup,previousWrongPairs:clone(ref?.previousWrongPairs||ref?.selectedPairs||{}),
       knowledge:{taxonomyId:text(knowledge.taxonomyId),nodeId:text(knowledge.primaryNodeId||knowledge.nodeId),title:text(path[path.length-1]||knowledge.title||q.topic),path}
@@ -235,6 +236,7 @@
     if(state.submitting||state.pendingRequestKey||state.reconciling)return false;
     if(state.active&&shouldAutoComplete()){finishPractice();return false}
     const index=state.questions.findIndex(question=>question.id===text(questionId));if(index<0||(!state.active&&!state.reviewing))return false;
+    global.clearTimeout(state.feedbackTimer);state.feedbackTimer=0;
     state.index=index;state.locked=false;dom.feedback.hidden=true;hideRemediation();clearVerification();renderQuestion();
     // 题号切题后统一关闭抽屉（无论来自答题卡跳题还是其他入口）
     if(dom.answerSheetDrawer&&!dom.answerSheetDrawer.hidden)closeAnswerSheetDrawer(true);
@@ -244,10 +246,10 @@
     if(!state.report||!global.KGPracticeResultReport?.render)return false;
     const questionNumbers=Object.fromEntries(state.questions.map((question,index)=>[question.id,index+1]));
     const rendered=global.KGPracticeResultReport.render(dom.result,state.report,{questionNumbers,
-      experience:state.session?.stats?.experience,
+      experience:state.session?.stats?.experience,paperId:state.session?.paperId,releaseId:state.session?.releaseId,
       questions:state.questions.map(question=>{
         const view=questionLanguageView(question);
-        return {id:question.id,stem:view?languageText(view.stem):question.stem,
+        return {id:question.id,paperId:question.sourcePaperId,releaseId:question.sourceReleaseId,stem:view?languageText(view.stem):question.stem,
           options:question.options.map(option=>({id:option.id,text:view?languageText(view.options?.find(item=>text(item.id)===text(option.id))?.display)||option.text:option.text})),
           type:question.type,matching:question.matching,material:question.material,images:question.images,caseGroup:question.caseGroup,correctAnswerIds:questionCorrectIds(question),explanation:view?languageText(view.explanation):text(question.raw?.analysis||question.raw?.explanation)};
       }),
@@ -602,7 +604,7 @@
     const head=$('practiceExplanationHead'),body=$('practiceExplanationBody');
     const view=questionLanguageView(question);
     const correctText='正确答案：'+(question.type==='matching'?AnswerSet.answerText(question,question.matching?.correctPairs):questionCorrectIds(question).join('、'));
-    const explanationMarkup=view?escapeHTML(languageText(view.explanation))+englishLine(view.explanation):escapeHTML(text(question?.raw?.analysis||question?.raw?.explanation||'暂无解析'));
+    const explanationMarkup=view?(escapeHTML(languageText(view.explanation).trim())+englishLine(view.explanation)||'暂无解析'):escapeHTML(text(question?.raw?.analysis||question?.raw?.explanation).trim()||'暂无解析');
     if(head){
       // 未答题中性回放不带正误配色；已答题保持"回答正确/错误 · 正确答案：XX"。
       head.textContent=neutral?correctText:((correct?'回答正确':'回答错误')+' · '+correctText);
@@ -610,7 +612,10 @@
     }
     if(body)body.innerHTML='<p class="practice-answer-line">'+escapeHTML(correctText)+'</p>'+explanationMarkup;
     const actions=$('practiceExplanationActions');
-    if(actions)actions.innerHTML='';
+    if(actions){
+      actions.innerHTML='<button type="button" class="practice-secondary-btn" data-question-feedback>解析有误或缺失？反馈此题</button>';
+      actions.querySelector('[data-question-feedback]')?.addEventListener('click',()=>global.KGSupportCenter?.openQuestionFeedback({questionId:text(question.id),paperId:question.sourcePaperId||state.session?.paperId,releaseId:question.sourceReleaseId||state.session?.releaseId,sessionId:state.session?.id}));
+    }
     if(!neutral)global.KGQuestionComments?.mountPanel({panel,questionId:text(question.id)});
     panel.hidden=false;
     panel.scrollIntoView({behavior:'smooth',block:'nearest'});
@@ -714,6 +719,12 @@
     dom.questionPos.textContent=(state.index+1)+' / '+state.questions.length;
     if(dom.prevBtn)dom.prevBtn.disabled=state.index<=0;
     if(dom.nextBtn)dom.nextBtn.disabled=state.index>=state.questions.length-1;
+    const unansweredButton=$('practiceNextUnansweredBtn');
+    if(unansweredButton){
+      const next=global.KGPracticeSessionCore.nextUnansweredIndex(answerSheetSession(),state.index);
+      unansweredButton.hidden=state.reviewing||next<0;
+      unansweredButton.textContent=next<0?'已全部作答':'下一未答题 · 第 '+(next+1)+' 题';
+    }
   }
   function switchQuestion(delta){
     if(!state.active||state.submitting||state.pendingRequestKey||state.reconciling)return false;
@@ -809,7 +820,7 @@
     // 挑战/学霸：作答与答题卡回看均不展示解析；
     // 复仇模式保留"答错即见解析与补救"的既有交互。
     if(shouldShowExplanation()&&(state.mode!=='revenge'||!correct))renderPracticeExplanation(question,correct);
-    renderAnswerSheet();
+    renderAnswerSheet();updateQuestionNav();
     // 游戏反馈分支：挑战/学霸用生命与时间驱动，复仇用错题状态推进（全部本地）。
     if(state.mode==='revenge'){
       if(!correct){
@@ -1331,6 +1342,10 @@
     // 复仇模式：底部按钮 + 触屏左右滑动切题
     dom.prevBtn?.addEventListener('click',()=>switchQuestion(-1));
     dom.nextBtn?.addEventListener('click',()=>switchQuestion(1));
+    $('practiceNextUnansweredBtn')?.addEventListener('click',()=>{
+      const session=answerSheetSession(),next=global.KGPracticeSessionCore.nextUnansweredIndex(session,state.index);
+      if(next>=0)navigateToQuestionId(session.questions[next].questionId);
+    });
     // 语言单按钮循环切换：中 → EN → 双 → 中
     const autoExplain=$('practiceAutoExplain');
     autoExplain?.addEventListener('change',()=>{global.KGActivitySchemaV1?.setPracticeAutoExplain?.(autoExplain.checked);renderQuestion()});

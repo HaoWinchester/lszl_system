@@ -466,7 +466,7 @@
         <section class="uc-info-card uc-binding-card" id="ucWechatBox" aria-label="微信登录"></section>
         <section class="uc-info-card uc-membership-card" id="ucSubscriptionBox" aria-label="我的订阅"></section>
         <label class="uc-field uc-notes-field"><span>个人备注 / 学习说明</span><div class="uc-textarea-wrap"><textarea id="ucNote" maxlength="500" placeholder="例如：所在班级、学习目标、备考进度等，保存后会同步到服务器。"></textarea><em id="ucNoteCount">0/500</em></div></label>
-        <section class="uc-password-card"><h3>安全设置 · 修改密码（可选）</h3><p>不修改密码时请留空；微信账号或未设置密码的账号可直接设置新密码。</p><div class="uc-form-grid uc-password-grid"><label class="uc-field"><span>当前密码</span><div><input id="ucCurrentPassword" type="password" autocomplete="current-password" placeholder="修改密码时填写" /></div></label><label class="uc-field"><span>新密码</span><div><input id="ucNewPassword" type="password" autocomplete="new-password" placeholder="至少 4 位" /></div></label><label class="uc-field"><span>确认新密码</span><div><input id="ucConfirmPassword" type="password" autocomplete="new-password" placeholder="再次输入新密码" /></div></label></div></section>
+        <section class="uc-password-card"><h3>安全设置 · 修改密码（可选）</h3><p id="ucPasswordHelp">不修改密码时请留空。已有密码须填写当前密码；首次设置须在微信登录后 10 分钟内完成。</p><div class="uc-form-grid uc-password-grid"><label class="uc-field"><span>当前密码</span><div><input id="ucCurrentPassword" type="password" autocomplete="current-password" placeholder="修改密码时填写" /></div></label><label class="uc-field"><span>新密码</span><div><input id="ucNewPassword" type="password" autocomplete="new-password" placeholder="至少 4 位" /></div></label><label class="uc-field"><span>确认新密码</span><div><input id="ucConfirmPassword" type="password" autocomplete="new-password" placeholder="再次输入新密码" /></div></label></div></section>
         </div>
         <footer class="kg-user-center-footer" data-uc-footer><div class="kg-user-center-msg uc-message" id="userCenterMsg"></div><div class="uc-actions"><button class="uc-button uc-button-secondary" id="userCenterCancelBtn" type="button">取消</button><button class="uc-button uc-button-primary" id="userCenterSaveBtn" type="button">保存个人资料</button></div></footer>
       </div>`;
@@ -509,6 +509,11 @@
     $("ucStatusChip").textContent="状态："+statusLabel(user.status||"active");
     renderWechatBox(user);
     renderSubscriptionBox(user);
+    const firstPassword=user.has_password===false;
+    $("ucCurrentPassword").closest("label").hidden=firstPassword;
+    $("ucPasswordHelp").textContent=firstPassword
+      ?"首次设置密码：请在微信登录后 10 分钟内完成，无需当前密码。若提示认证过期，请关闭用户中心、退出后重新微信登录。请记下上方用户名，手机网页登录时使用。"
+      :"不修改密码时请留空；修改密码必须填写当前密码。";
     $("ucCurrentPassword").value="";
     $("ucNewPassword").value="";
     $("ucConfirmPassword").value="";
@@ -566,16 +571,18 @@
         msg("两次输入的新密码不一致。");
         return;
       }
-      if(user.hash){
+      if(!authCore()?.providerStatus?.().remote&&user.hash){
         const ok=verifyPassword(username,currentPassword,user);
         if(!ok){
           msg("当前密码不正确。");
           return;
         }
       }
-      const salt=makeSalt();
-      user.salt=salt;
-      user.hash=passwordHash(username,newPassword,salt);
+      if(!authCore()?.providerStatus?.().remote){
+        const salt=makeSalt();
+        user.salt=salt;
+        user.hash=passwordHash(username,newPassword,salt);
+      }
     }
 
     const patch={

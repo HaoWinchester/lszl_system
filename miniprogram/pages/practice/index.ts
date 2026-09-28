@@ -71,7 +71,10 @@ Page(withAppearance(withAppShare({
     marked: false,
     submitted: false,
     showAnalysis: false,
+    analysisExpanded: false,
     nextActionLabel: '下一题',
+    nextUnansweredIndex: -1,
+    feedbackContext: {},
     sheetOpen: false,
     sheetItems: [] as any[],
     saveState: 'local',
@@ -168,7 +171,10 @@ Page(withAppearance(withAppShare({
     const selectedIds = this.data.answers[questionId] || [];
     const lastQuestion = this.data.currentIndex + 1 === this.data.session.questions.length;
     this.setData({
+      ...(this.data.currentQuestion.id !== entry.question.id ? {analysisExpanded:false} : {}),
       currentQuestion: entry.question,
+      nextUnansweredIndex: this.run?.nextUnansweredIndex(this.data.currentIndex) ?? -1,
+      feedbackContext: {questionId, paperId:entry.sourcePaperId || this.data.session.paperId, releaseId:entry.sourceReleaseId || this.data.session.releaseId, sessionId:this.data.session.id},
       selectedIds,
       selectedPairs:this.run?.answer(questionId)?.selectedPairs||this.data.matches[questionId]||{},
       matchingComplete:!!normalizePairs(entry.question,this.data.matches[questionId]||{},true),
@@ -437,8 +443,17 @@ Page(withAppearance(withAppShare({
     this.saveDraft();
   },
 
+  onAnalysisChange(event: any) {
+    if (event.detail.questionId !== this.data.currentQuestion.id) return;
+    this.setData({analysisExpanded:event.detail.expanded === true});
+  },
+
   onShowAnswers(event: any) { this.setData({ showAnswers: event.detail.value }); this.refreshCurrent(); this.saveDraft(); },
 
+  onNextUnanswered() {
+    const index = this.run?.nextUnansweredIndex(this.data.currentIndex) ?? -1;
+    if (index >= 0) this.goTo(index);
+  },
   onPrevious() { this.goTo(moveQuestion(this.data.currentIndex, this.data.session.questions.length, -1)); },
   async onNext() {
     if (this.data.busy || this.leaving || this.syncCoordinator.pendingCount()) return;

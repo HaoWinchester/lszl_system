@@ -104,7 +104,7 @@
                 <small id="practicePaperMeta">正在读取已发布试卷…</small>
               </div>
               <fieldset class="practice-choice-group">
-                <legend>题目数量</legend>
+                <legend>题目数量 · 时间不多可选 10 题短练</legend>
                 <div class="practice-count-options" id="practiceCountOptions">
                   <label><input type="radio" name="practiceCount" value="10" checked/><span>10</span></label>
                   <label><input type="radio" name="practiceCount" value="20"/><span>20</span></label>
@@ -213,6 +213,7 @@
             <label id="practiceExplanationToggle" class="practice-explanation-toggle" hidden><input type="checkbox" id="practiceAutoExplain" checked/><span>显示解析</span></label>
             <label id="practiceShowAnswersToggle" class="practice-explanation-toggle" hidden><input type="checkbox" id="practiceShowAnswers"/><span>显示答案</span></label>
             <label id="practicePreviousWrongToggle" class="practice-explanation-toggle practice-previous-wrong-toggle" hidden><input type="checkbox" id="practiceShowPreviousWrong" checked/><span>显示上次错选</span></label>
+            <button type="button" class="practice-nav-btn" id="practiceNextUnansweredBtn" hidden>下一未答题</button>
             <span class="practice-question-pos" id="practiceQuestionPos">1 / 10</span>
             <button type="button" class="practice-nav-btn" id="practiceNextBtn" aria-label="下一题">下一题<span data-kg-icon="chevron-right" data-kg-icon-size="16" aria-hidden="true"></span></button>
           </div>

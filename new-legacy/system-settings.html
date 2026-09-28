@@ -110,14 +110,17 @@
           <div class="um-panel ss-analytics-panel">
             <div class="um-card-head small">
               <div>
-                <h2>功能分析</h2>
-                <p>按日期和角色查看去标识化的功能使用与成果汇总；数据从发布后开始累计，不展示个人记录。</p>
+                <h2>学员使用分析</h2>
+                <p>分别查看使用人数、使用频率和使用时长。仅展示群体汇总，不展示个人行为轨迹。</p>
               </div>
             </div>
             <div class="ss-analytics-filters">
               <label>开始日期<input id="ssAnalyticsStart" type="date"></label>
               <label>结束日期<input id="ssAnalyticsEnd" type="date"></label>
-              <label>角色<select id="ssAnalyticsRole"><option value="">全部角色</option><option value="teacher">教师/教研</option><option value="student">学员</option><option value="viewer">游客</option></select></label>
+              <label>角色<select id="ssAnalyticsRole"><option value="">全部角色</option><option value="teacher">教师/教研</option><option value="student" selected>学员</option><option value="viewer">只读用户</option></select></label>
+              <label>终端<select id="ssAnalyticsClient"><option value="">全部终端</option><option value="web">网页</option><option value="mini">小程序</option></select></label>
+              <label>排序<select id="ssAnalyticsSort"><option value="time">有效使用时长</option><option value="users">有效使用人数</option><option value="visits">有效访问次数</option></select></label>
+              <label>统计口径<select id="ssAnalyticsVersion"><option value="2">新口径 · 分段计时</option><option value="1">历史口径 · 仅供参考</option></select></label>
               <button id="ssAnalyticsRefresh" type="button">刷新分析</button>
             </div>
             <div class="ss-analytics-content" id="ssAnalyticsContent" aria-live="polite"></div>

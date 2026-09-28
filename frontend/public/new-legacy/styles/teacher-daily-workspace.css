@@ -1,0 +1,118 @@
+/* Daily teacher surfaces share one navigation and compact task controls. */
+body[data-teacher-daily="true"]{
+  --teacher-primary:#6d5dfc;--teacher-primary-soft:#f1efff;--teacher-border:#e4e4e7;
+  --teacher-muted:#52525b;--teacher-foreground:#18181b;--teacher-card:#fff;
+  --tw-primary:var(--teacher-primary);--tw-primary-dark:#5040da;--tw-line:var(--teacher-border);
+  --tw-muted:var(--teacher-muted);--tw-bg:#fafafa;--tw-text:var(--teacher-foreground);
+  background:var(--tw-bg);margin:0;
+}
+body[data-teacher-daily] .tw-topbar{grid-template-columns:auto minmax(0,1fr) auto;gap:16px;padding:12px 20px;border-top:0;box-shadow:none}
+body[data-teacher-daily] .tw-tabs{justify-content:flex-start;background:transparent;border:0;padding:0;gap:4px;min-width:0}
+body[data-teacher-daily] .tw-tabs a{padding:0 12px;min-height:38px}
+body[data-teacher-daily] .tw-brand-copy small{display:none}
+body[data-teacher-daily] .tw-user{gap:12px}
+body[data-teacher-daily] .tw-user-badge{max-width:120px}
+body[data-teacher-daily].teacher-shell-ready>.tw-topbar{top:0}
+body[data-teacher-daily].teacher-shell-ready>.tw-workflow{display:none}
+body[data-teacher-daily] :where(a,button,summary,input,select,textarea):focus-visible{outline:2px solid var(--teacher-primary);outline-offset:3px}
+.tw-admin-menu,.tw-more-actions{position:relative}
+.tw-admin-menu>summary,.tw-more-actions>summary{cursor:pointer;min-height:38px;display:flex;align-items:center;gap:8px;list-style:none;white-space:nowrap;font-size:13px;font-weight:600;color:#3f3f46}
+.tw-admin-menu>summary::-webkit-details-marker,.tw-more-actions>summary::-webkit-details-marker{display:none}
+.tw-admin-menu>summary::after,.tw-more-actions>summary::after{content:'⌄';font-size:14px}
+body[data-teacher-daily] .tw-admin-menu .admin-context-nav,.tw-more-actions-panel{position:absolute;right:0;top:calc(100% + 8px);z-index:80;display:grid;grid-template-columns:1fr;gap:4px;min-width:190px;padding:8px;margin:0;border:1px solid var(--teacher-border);border-radius:10px;background:#fff;box-shadow:none}
+body[data-teacher-daily] .tw-admin-menu:not([open]) .admin-context-nav,.tw-more-actions:not([open]) .tw-more-actions-panel{display:none}
+body[data-teacher-daily] .tw-admin-menu .admin-context-nav a{justify-content:flex-start;padding:9px 12px;min-height:38px}
+.tw-more-actions>summary{padding:0 12px;border:1px solid var(--teacher-border);border-radius:8px;background:#fff}
+.tw-more-actions-panel button{width:100%;text-align:left;justify-content:flex-start;white-space:nowrap}
+body[data-teacher-daily] .wb-main{padding-top:24px}
+body[data-teacher-daily] .wb-hero{grid-template-columns:minmax(0,1.6fr) minmax(280px,1fr);gap:32px;align-items:start}
+body[data-teacher-daily] .wb-hero-copy{border:0;border-radius:0;padding:0;background:transparent;box-shadow:none}
+body[data-teacher-daily] .wb-hero-copy h1{margin:0;font-size:26px}
+body[data-teacher-daily] .wb-hero-copy>span{margin-top:6px;font-size:14px;line-height:1.6}
+body[data-teacher-daily] .wb-path{display:grid;grid-template-columns:1fr;gap:0;margin-top:18px}
+body[data-teacher-daily] .wb-path a{display:grid;grid-template-columns:26px minmax(0,1fr) auto;grid-template-rows:auto auto;gap:4px 12px;min-height:0;padding:12px 0;border:0;border-bottom:1px solid var(--teacher-border);border-radius:0;background:transparent;box-shadow:none;transition:background .15s ease}
+body[data-teacher-daily] .wb-path a:hover{transform:none;background:var(--teacher-primary-soft)}
+body[data-teacher-daily] .wb-path b{grid-row:1/3;width:26px;height:26px;background:#efedff;color:#5040da;font-size:12px}
+body[data-teacher-daily] .wb-path strong{font-size:14px}
+body[data-teacher-daily] .wb-path span{grid-column:2;line-height:1.5;color:#52525b}
+body[data-teacher-daily] .wb-path em{grid-column:3;grid-row:1/3;align-self:center;font-size:12px;color:#5040da}
+body[data-teacher-daily] .wb-next{padding:20px;border:1px solid var(--teacher-border);border-radius:10px;background:#fff;box-shadow:none}
+body[data-teacher-daily] .wb-next h2{margin-top:10px;font-size:18px}
+body[data-teacher-daily] .wb-next-action{margin-top:20px;min-height:40px;border-radius:8px;box-shadow:none;background:var(--teacher-primary)}
+body[data-teacher-daily] .wb-next-action:active{transform:none}
+body[data-teacher-daily] .wb-next small{color:#52525b}
+body[data-teacher-daily] .wb-metrics{gap:0;border:1px solid var(--teacher-border);border-radius:10px;background:#fff}
+body[data-teacher-daily] .wb-metric{padding:16px 20px;border:0;border-radius:0;box-shadow:none;background:transparent}
+body[data-teacher-daily] .wb-metric+.wb-metric{border-left:1px solid var(--teacher-border)}
+body[data-teacher-daily] .wb-metric strong{font-size:24px}
+body[data-teacher-daily] .wb-metric a{color:#5040da}
+body[data-teacher-daily] .wb-help-section{padding:14px 0;border-top:1px solid var(--teacher-border)}
+body[data-teacher-daily] .wb-help-section>summary{cursor:pointer;font-size:14px;font-weight:600}
+body[data-teacher-daily] .wb-help-section>p{color:#52525b;font-size:13px}
+body[data-teacher-daily] .wb-tip{padding:0;border:0;border-radius:0;background:transparent;box-shadow:none}
+body[data-teacher-daily] .wb-tip>span{display:none}
+body[data-teacher-daily] .wb-advanced{margin-top:0;border:0;border-top:1px solid var(--teacher-border);padding:0;border-radius:0;background:transparent}
+body[data-teacher-daily].qb-simple-mode .qb-topbar{padding:16px 22px 10px}
+body[data-teacher-daily].qb-simple-mode .qb-brand p{margin-top:4px}
+body[data-teacher-daily].qb-simple-mode .tq-step-guide{margin:0;padding:10px 22px;border:0;border-bottom:1px solid var(--teacher-border);border-radius:0;background:#fff;gap:12px}
+body[data-teacher-daily].qb-simple-mode .tq-step-guide-copy strong{display:none}
+body[data-teacher-daily].qb-simple-mode .tq-step-guide-copy span{font-size:12px;color:#52525b;max-width:65ch}
+body[data-teacher-daily].qb-simple-mode .qb-subject-strip{padding-top:8px;padding-bottom:8px}
+body[data-teacher-daily].qb-simple-mode .qb-subject-strip>div>span{display:none}
+body[data-teacher-daily] .pm-page-head{align-items:center;padding:0 0 16px;border:0;border-bottom:1px solid var(--teacher-border);border-radius:0;background:transparent;box-shadow:none}
+body[data-teacher-daily] .pm-primary-actions{flex-wrap:wrap;max-width:none}
+body[data-teacher-daily] .pm-paper-workspace{padding:0;border:0;border-radius:0;background:transparent;box-shadow:none}
+body[data-teacher-daily] .pm-paper-list-section,body[data-teacher-daily] .pm-editor-section{box-shadow:none}
+@media(max-width:1200px){
+  body[data-teacher-daily] .tw-topbar{grid-template-columns:1fr auto;gap:8px}
+  body[data-teacher-daily] .tw-tabs{grid-column:1/-1;grid-row:2}
+  body[data-teacher-daily] .tw-user{grid-column:2;grid-row:1}
+  body[data-teacher-daily] .tq-step-guide{flex-wrap:wrap}
+  body[data-teacher-daily] .pm-page-head{flex-wrap:wrap}
+}
+@media(max-width:760px){
+  body[data-teacher-daily] .tw-topbar{position:static;padding:10px 12px}
+  body[data-teacher-daily] .tw-user{gap:8px}
+  body[data-teacher-daily] .tw-user-badge{display:none}
+  body[data-teacher-daily] .tw-tabs{overflow-x:auto;max-width:100%;padding-bottom:3px}
+  body[data-teacher-daily] .tw-tabs a{flex-shrink:0;min-height:44px;padding:0 11px}
+  body[data-teacher-daily] .tw-brand-mark{width:30px;height:30px;border-radius:8px}
+  body[data-teacher-daily] .tw-brand-copy strong{font-size:14px}
+  body[data-teacher-daily] .tw-user>a:not([href="index.html"]){display:none}
+  body[data-teacher-daily] .wb-hero{grid-template-columns:1fr;gap:20px}
+  body[data-teacher-daily] .wb-path a{grid-template-columns:26px minmax(0,1fr);padding:12px 0}
+  body[data-teacher-daily] .wb-path em{grid-column:2;grid-row:3}
+  body[data-teacher-daily] .wb-metrics{grid-template-columns:1fr 1fr}
+  body[data-teacher-daily] .wb-metric:nth-child(3){border-left:0}
+  body[data-teacher-daily] .wb-metric:nth-child(n+3){border-top:1px solid var(--teacher-border)}
+  body[data-teacher-daily] .wb-metric{padding:14px}
+  body[data-teacher-daily].qb-simple-mode .tq-step-guide{padding:10px 12px}
+  body[data-teacher-daily] .tq-step-guide-actions{gap:6px}
+  body[data-teacher-daily] .tq-step-guide-actions :where(a,button){min-height:40px}
+  body[data-teacher-daily] .pm-app{padding:16px 12px 40px}
+  body[data-teacher-daily] .pm-primary-actions{justify-content:flex-start;gap:8px}
+  body[data-teacher-daily] .pm-primary-actions>button{min-height:40px}
+  body[data-teacher-daily] .tw-more-actions-panel{right:0;min-width:180px}
+}
+@media(prefers-reduced-motion:reduce){body[data-teacher-daily] .wb-path a{transition:none}}
+body[data-teacher-daily] :where(.pm-primary-actions,.pm-paper-library-head) button{border-radius:8px;box-shadow:none;background-image:none;white-space:nowrap}
+body[data-teacher-daily] .pm-primary-actions button.accent{background:var(--teacher-primary);color:#fff}
+@media(max-width:760px){
+  body[data-teacher-daily] .pm-paper-library-head{align-items:flex-start;flex-direction:column;gap:12px}
+  body[data-teacher-daily] .pm-paper-library-head .qb-inline-actions{display:flex;flex-wrap:wrap;width:100%;gap:8px}
+  body[data-teacher-daily] .pm-paper-library-head button{min-height:40px;flex:0 1 auto;writing-mode:horizontal-tb}
+  body[data-teacher-daily] .tw-more-actions-panel{left:0;right:auto}
+}
+body[data-teacher-daily] .tq-step-guide-actions .primary{background:var(--teacher-primary)!important;border-color:var(--teacher-primary)!important}
+@media(max-width:1080px){
+  body[data-teacher-daily].qb-training-step #qbLibraryWorkbench #qbBankTabPanel{display:none!important}
+  body[data-teacher-daily].qb-training-step .qb-editor>#qbMainWorkspace{min-height:0;height:auto}
+  body[data-teacher-daily].qb-training-step #qbQuestionTabPanel{min-height:0}
+  body[data-teacher-daily].qb-training-step #qbQuestionPaneBody{min-height:220px}
+  body[data-teacher-daily].qb-training-step .tq-training-preview{min-height:160px;max-height:260px;overflow:auto}
+}
+@media(max-width:760px){
+  body[data-teacher-daily] .tq-step-guide-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%}
+  body[data-teacher-daily] .tq-step-guide-actions :where(a,button){white-space:normal;line-height:1.35;padding:8px;font-size:12px;border-radius:8px;box-shadow:none}
+  body[data-teacher-daily].qb-simple-mode :where(.qb-card,.qb-management-section,.qb-library-pane){border-radius:10px!important;box-shadow:none}
+}

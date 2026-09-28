@@ -59,3 +59,17 @@ test('server internal runtime metadata never goes back in writable runtime', () 
   assert.equal(run.runtime().gradedAnswers, undefined);
   assert.equal(run.runtime().durationMs, 1000);
 });
+
+test('next unanswered wraps in frozen order and skips locked timeout answers', () => {
+  const value = session('scholar');
+  value.questions = value.questions.slice(0, 3);
+  value.answers = { q0: { selectedAnswer: 'B' } };
+  const run = createPracticeRun(value);
+  assert.equal(typeof run.nextUnansweredIndex, 'function');
+  assert.equal(run.nextUnansweredIndex(0), 1);
+  run.select('q1', [], true);
+  assert.equal(run.nextUnansweredIndex(0), 2);
+  assert.equal(run.nextUnansweredIndex(2), 2);
+  run.select('q2', [], true);
+  assert.equal(run.nextUnansweredIndex(0), -1);
+});

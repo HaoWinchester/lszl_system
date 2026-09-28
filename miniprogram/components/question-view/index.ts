@@ -1,7 +1,9 @@
+import { reportQuestionContent } from '../../services/question-feedback';
 import { assignPair, pairLabel } from '../../domain/pc-practice';
 import { loadQuestionAsset, removeQuestionAsset } from '../../services/question-assets';
 Component({
   properties: {
+    feedbackContext: { type: Object, value: {} },
     question: { type: Object, value: {} },
     selectedIds: { type: Array, value: [] },
     selectedPairs: {type:Object,value:{}},
@@ -11,7 +13,7 @@ Component({
     allowAnalysis: { type: Boolean, value: false },
     compact: { type: Boolean, value: false },
   },
-  data: { analysisExpanded:false, questionKey:'', caseOpen:true, activeLeft:'', pairRows:[], matchingStatus:'', assetImages:[], assetErrors:[], materialImages:[], displayQuestion: { images: [], options: [] }, displayOptions: [], answerLabel: '', selectedLabel: '', outcome: '' },
+  data: { feedbackBusy: false, feedbackSent: false, analysisExpanded:false, questionKey:'', caseOpen:true, activeLeft:'', pairRows:[], matchingStatus:'', assetImages:[], assetErrors:[], materialImages:[], displayQuestion: { images: [], options: [] }, displayOptions: [], answerLabel: '', selectedLabel: '', outcome: '' },
   observers: {
     'question, selectedIds, showAnalysis, showResult, selectedPairs'(question: any, selectedIds: string[], showAnalysis: boolean, showResult: boolean, selectedPairs:Record<string,string>) {
       const selected = new Set((selectedIds || []).map(String));
@@ -22,7 +24,7 @@ Component({
       const pairs=selectedPairs||{}, matching=safeQuestion.type==='matching';
       const changed = this.data.questionKey !== String(safeQuestion.id || '');
       this.setData({
-        ...(changed ? { questionKey: String(safeQuestion.id || ''), activeLeft: '', matchingStatus: '', analysisExpanded: false } : {}),
+        ...(changed ? { questionKey: String(safeQuestion.id || ''), activeLeft: '', matchingStatus: '', analysisExpanded: false, feedbackSent: false } : {}),
         pairRows:(safeQuestion.matching?.left||[]).map((left:any,index:number)=>({id:left.id,text:left.text,number:index+1,selectedId:pairs[left.id]||'',selectedText:safeQuestion.matching.right.find((r:any)=>r.id===pairs[left.id])?.text||'选择候选答案',correctText:reveal?safeQuestion.matching.right.find((r:any)=>r.id===safeQuestion.matching.correctPairs?.[left.id])?.text:'',verdict:reveal?(pairs[left.id]===safeQuestion.matching.correctPairs?.[left.id]?'correct':'wrong'):''})),
         displayQuestion: { ...safeQuestion, images: safeQuestion.images || [], options: safeQuestion.options || [] },
         displayOptions: (safeQuestion.options || []).map((option: any) => ({
@@ -33,11 +35,21 @@ Component({
         selectedLabel: matching?pairLabel(safeQuestion,pairs):[...selected].join('、') || '未作答',
         outcome: matching ? !Object.keys(pairs).length ? '本题未作答' : (safeQuestion.matching?.left||[]).every((item:any)=>pairs[item.id]===safeQuestion.matching.correctPairs?.[item.id]) ? '回答正确' : '回答有误' : !correct.size ? '作答已记录' : correct.size === selected.size && [...correct].every(id => selected.has(id)) ? '回答正确' : selected.size ? '回答有误' : '本题未作答',
       });
+      if (changed) this.triggerEvent('analysischange', {expanded:false, questionId:String(safeQuestion.id || '')});
       this.loadAssets?.(safeQuestion);
     },
   },
   lifetimes:{detached(){(this as any)._assetToken=((this as any)._assetToken||0)+1;for(const file of (this as any)._assetFiles||[])removeQuestionAsset(file);}},
   methods: {
+    async reportAnalysis() {
+      if (this.data.feedbackBusy || this.data.feedbackSent || !this.properties.feedbackContext.questionId) return;
+      const questionId = this.properties.feedbackContext.questionId;
+      this.setData({feedbackBusy:true});
+      try {
+        const sent = await reportQuestionContent(this.properties.feedbackContext, !String(this.properties.question.analysis || this.properties.question.explanation || '').trim());
+        if (this.properties.feedbackContext.questionId === questionId) this.setData({feedbackSent:sent});
+      } finally { this.setData({feedbackBusy:false}); }
+    },
     async loadAssets(question:any,force=false){
       const list=[...(question.imageAssets||[]).map((asset:any)=>({...asset,material:false})),...(question.material?.images||[]).map((asset:any)=>({...asset,material:true}))];
       const key=JSON.stringify(list.map((item:any)=>[item.id,item.material]));if(!force&&(this as any)._assetKey===key)return;
@@ -49,7 +61,12 @@ Component({
       (this as any)._assetFiles=results.filter((item:any)=>item.src).map((item:any)=>item.src);
       this.setData({assetImages:results.filter((item:any)=>!item.material&&!item.error),materialImages:results.filter((item:any)=>item.material&&!item.error),assetErrors:results.filter((item:any)=>item.error)});
     },
-    toggleAnalysis(){ if(this.properties.allowAnalysis && this.properties.showResult) this.setData({analysisExpanded:!this.data.analysisExpanded}); },
+    toggleAnalysis(){
+      if (!this.properties.allowAnalysis || !this.properties.showResult) return;
+      const expanded = !this.data.analysisExpanded;
+      this.setData({analysisExpanded:expanded});
+      this.triggerEvent('analysischange', {expanded, questionId:String(this.properties.question.id || '')});
+    },
     retryAssets(){this.loadAssets(this.properties.question,true);},
     toggleCase(){this.setData({caseOpen:!this.data.caseOpen});},
     chooseLeft(event:any){if(this.properties.submitted)return;const id=String(event.currentTarget.dataset.id);const activeLeft=this.data.activeLeft===id?'':id;this.setData({activeLeft,matchingStatus:activeLeft?'请选择此条目下的候选答案':''});},

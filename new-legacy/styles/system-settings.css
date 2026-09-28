@@ -104,3 +104,20 @@
     grid-template-columns:repeat(2,minmax(0,1fr));
   }
 }
+
+/* Usage analysis is a comparison table, with narrow-screen scroll contained. */
+.ss-analytics-filters{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px}
+.ss-analytics-filters label{display:grid;gap:5px;min-width:130px}
+.ss-analytics-table-wrap{max-width:100%;overflow:auto;margin:16px 0}
+.ss-analytics-table-wrap table{width:100%;border-collapse:collapse;white-space:nowrap}
+.ss-analytics-table-wrap th,.ss-analytics-table-wrap td{padding:11px 14px;text-align:left;border-bottom:1px solid var(--border,#ddd)}
+.ss-analytics-notice,.ss-analytics-method{line-height:1.7;color:var(--text,#334155)}
+.ss-analytics-method{margin-top:16px}.ss-analytics-method summary{cursor:pointer;font-weight:600}
+@media(max-width:800px){
+  body[data-admin-skin="focus-vega"][data-admin-context="settings"] .ss-layout{grid-template-columns:minmax(0,1fr)}
+  body[data-admin-skin="focus-vega"][data-admin-context="settings"] .ss-sidebar{position:static;display:flex;flex-direction:row;flex-wrap:wrap;padding:8px;gap:6px}
+  body[data-admin-skin="focus-vega"][data-admin-context="settings"] .ss-sidebar button{width:auto;flex:1 0 28%;min-height:40px}
+  body[data-admin-skin="focus-vega"][data-admin-context="settings"] .ss-analytics-filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+  body[data-admin-skin="focus-vega"][data-admin-context="settings"] .ss-analytics-filters label{min-width:0}
+  body[data-admin-skin="focus-vega"][data-admin-context="settings"] .ss-analytics-filters input,body[data-admin-skin="focus-vega"][data-admin-context="settings"] .ss-analytics-filters select{width:100%;min-width:0;box-sizing:border-box}
+}

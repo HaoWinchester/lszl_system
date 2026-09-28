@@ -18,8 +18,9 @@
   <link rel="stylesheet" href="styles/focus-vega-teacher.css" />
   <link rel="stylesheet" href="styles/close-button.css"/>
 <link rel="stylesheet" href="styles/question-materials.css"/>
+<link rel="stylesheet" href="styles/teacher-daily-workspace.css"/>
 </head>
-<body class="teacher-admin-shell paper-management-page" data-admin-context="teacher" data-paper-management-page="true" data-ui-skin="focus-vega" data-question-catalog-mode="managed">
+<body class="teacher-admin-shell paper-management-page" data-admin-context="teacher" data-teacher-daily="true" data-paper-management-page="true" data-ui-skin="focus-vega" data-question-catalog-mode="managed">
 <nav class="admin-context-nav" aria-label="管理后台一级导航">
   <a data-admin-nav="overview" href="admin-console.html">总览</a>
   <a data-admin-nav="subjects" href="admin-subjects.html">科目与知识树</a>
@@ -40,22 +41,24 @@
 <main class="qb-app pm-app">
   <header class="pm-page-head">
     <div>
-      <p class="qb-kicker">PAPER MANAGEMENT</p>
+
       <h1 class="kg-module-title">试卷管理 <button class="kg-module-help-trigger" type="button" data-module-help="paper-management" aria-label="查看试卷管理帮助" title="查看帮助">?</button></h1>
       <p>从正式题库手动选择题目组成试卷；发布版本可供学员在独立做题模式中选择。</p>
     </div>
     <div class="qb-inline-actions pm-primary-actions">
+      <button id="qbAddPaperBtn" type="button"><span data-ui-icon="plus" data-ui-icon-size="16" aria-hidden="true"></span>新试卷</button>
+      <button id="qbSavePaperBtn" type="button">保存试卷</button>
+      <button id="qbPublishPaperBtn" class="accent" type="button">发布试卷</button>
+      <details class="tw-more-actions"><summary>更多操作</summary><div class="tw-more-actions-panel">
       <button id="qbImportBankBtn" type="button"><span data-ui-icon="database" data-ui-icon-size="16" aria-hidden="true"></span>导入题库</button>
       <button id="qbImportPaperBtn" type="button"><span data-ui-icon="upload" data-ui-icon-size="16" aria-hidden="true"></span>导入试卷</button>
       <button id="qbComposePapersBtn" type="button"><span data-ui-icon="sparkles" data-ui-icon-size="16" aria-hidden="true"></span>一键组卷</button>
-      <button id="qbAddPaperBtn" type="button"><span data-ui-icon="plus" data-ui-icon-size="16" aria-hidden="true"></span>新试卷</button>
-      <button id="qbSavePaperBtn" type="button">保存试卷</button>
       <button id="qbBuildPaperBtn" type="button">按配额补充</button>
-      <button id="qbPublishPaperBtn" class="accent" type="button">发布试卷</button>
       <button id="qbWithdrawPaperBtn" type="button" hidden>取消发布</button>
       <button id="qbArchivePaperBtn" type="button">归档试卷</button>
       <button id="qbUnarchivePaperBtn" type="button" hidden>取消归档</button>
       <button id="qbDeletePaperBtn" class="danger" type="button">删除草稿</button>
+      </div></details>
     </div>
   </header>
 
@@ -325,5 +328,6 @@
 <script defer src="src/admin/resizable-region.js"></script>
 <script src="src/109-focus-vega-ui-icons.js"></script>
 <script defer src="src/39-global-shortcuts.js"></script>
+<script src="src/teacher/shared/workspace-shell.js"></script>
 </body>
 </html>

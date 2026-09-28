@@ -28,3 +28,19 @@ class FeatureUsageEvent(Base):
     occurred_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), index=True
     )
+
+
+class FeatureUsageInterval(Base):
+    """V2 sampled intervals; idempotent per owner and client event UUID."""
+    __tablename__ = 'feature_usage_intervals'
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    owner_id: Mapped[str] = mapped_column(String(64), ForeignKey('users.username', ondelete='CASCADE'), nullable=False, index=True)
+    role: Mapped[str] = mapped_column(String(16), nullable=False)
+    client: Mapped[str] = mapped_column(String(8), nullable=False)
+    visit_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    feature_key: Mapped[str] = mapped_column(String(32), nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    ended_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    foreground_seconds: Mapped[int] = mapped_column(Integer, nullable=False)
+    active_seconds: Mapped[int] = mapped_column(Integer, nullable=False)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

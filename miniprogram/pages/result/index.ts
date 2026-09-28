@@ -57,6 +57,7 @@ Page(withAppearance(withAppShare({
     reviewOpen: false,
     reviewQuestion: {} as PracticeQuestion,
     reviewNumber: 0,
+    feedbackContext: {},
     reviewAnswer: '',
     reviewSelectedPairs:{} as Record<string,string>,
     reviewSelectedIds: [] as string[],
@@ -121,6 +122,7 @@ Page(withAppearance(withAppShare({
     this.setData({
       reviewOpen: true,
       reviewQuestion: item.question,
+      feedbackContext: {questionId:item.questionId,paperId:item.sourcePaperId || this.data.session.paperId,releaseId:item.sourceReleaseId || this.data.session.releaseId,sessionId:this.data.session.id},
       reviewNumber: item.number,
       reviewSelectedPairs:this.data.session.answers?.[item.questionId]?.selectedPairs||{},
       reviewAnswer: correctIds.join('、') || item.question.correctAnswer || '请参考解析',

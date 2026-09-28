@@ -5067,6 +5067,9 @@ g.is-batch-selected .edge-visible{
 /* 第二轮紧凑化：与工作区的字号和密度保持一致。 */
 .kg-user-center-modal.uc-dialog{width:min(740px,calc(100vw - 48px));max-height:calc(100vh - 96px);border-radius:23px}.uc-dialog .uc-header{min-height:94px;padding:17px 26px 15px}.uc-dialog .uc-avatar{width:54px;height:54px;border-radius:17px;font-size:23px}.uc-dialog .uc-header h2{font-size:26px}.uc-dialog .uc-header p{font-size:12.5px}.uc-dialog .uc-close{width:38px;height:38px;font-size:23px}.uc-dialog .uc-body{padding:18px 26px}.uc-dialog .uc-form-grid{gap:13px 16px}.uc-dialog .uc-field{font-size:13px}.uc-dialog .uc-field input{height:44px;font-size:14px}.uc-dialog .uc-status-chip{font-size:12px}.uc-dialog .uc-card-content h3,.uc-dialog .uc-membership-main h3{font-size:15px}.uc-dialog .uc-card-content p,.uc-dialog .uc-membership-main p{font-size:12px}.uc-dialog .uc-button{min-height:36px;font-size:13px}.uc-dialog .uc-button-compact{min-height:35px}.uc-dialog .uc-meta-chips span{font-size:11px}.uc-dialog .uc-field textarea{font-size:12px}.uc-dialog .uc-password-card h3{font-size:14px}.uc-dialog .uc-password-card>p,.uc-dialog .uc-message{font-size:11px}.uc-dialog .kg-user-center-footer[data-uc-footer]{min-height:64px;padding:12px 26px}
 .dialog-close .modal-close-icon{display:block;width:18px;height:18px;margin:0;background-image:url('../assets/membership-ui/icons/close.svg');background-position:center;background-repeat:no-repeat;background-size:contain}
+
+/* Keep the old-password field absent for accounts that have never set one. */
+.uc-dialog .uc-password-grid .uc-field[hidden]{display:none}
 /* style: styles/membership-ui.css */
 /* 会员中心成品稿：所有规则限定在会员弹窗内，避免影响图谱工作区。 */
 .membership-ui-backdrop{z-index:2147483300;background:rgba(29,42,58,.42);backdrop-filter:blur(8px)}

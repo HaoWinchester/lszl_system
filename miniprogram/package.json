@@ -8,6 +8,6 @@
   "scripts": {
     "test": "node --experimental-strip-types --test tests/*.test.mjs",
     "sync:legal": "node scripts/sync-legal-documents.mjs",
-    "pretest": "node scripts/sync-legal-documents.mjs --check"
+    "pretest": "node scripts/sync-legal-documents.mjs --check && node scripts/sync-usage-clock.mjs --check"
   }
 }

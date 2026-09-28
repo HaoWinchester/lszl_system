@@ -634,6 +634,7 @@ function injectPage(html, page, version) {
     retiredSingleDeepRedirectShell || !['admin-console.html', 'admin-operations.html'].includes(page) ? '' : '<script src="./admin-domain-summary.js"></script><!-- kg-admin-domain-summary:generated -->',
     retiredSingleDeepRedirectShell ? '' : '<script src="src/28-device-preferences.js"></script><!-- kg-device-preferences:generated -->',
     '<script defer src="./direct-entry.js"></script><!-- kg-direct-entry:generated -->',
+    retiredSingleDeepRedirectShell || page === 'learning-path.html' ? '' : '<script defer src="src/feature-usage-clock.js"></script><!-- kg-feature-usage-clock:generated -->',
     '<script defer src="./feature-analytics.js"></script><!-- kg-feature-analytics:generated -->',
     page === 'index.html' ? '<script defer src="./homepage-loader.js"></script><!-- kg-homepage-loader:generated -->' : '',
   ].filter(Boolean).join('\n')

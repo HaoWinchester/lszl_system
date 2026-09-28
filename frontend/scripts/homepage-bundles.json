@@ -20,6 +20,7 @@
       "defer": true,
       "scripts": [
         "direct-entry.js",
+        "src/feature-usage-clock.js",
         "feature-analytics.js",
         "homepage-loader.js",
         "src/01-runtime-config.js",

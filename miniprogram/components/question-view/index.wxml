@@ -33,5 +33,6 @@
     <view class="answer-summary"><text>你的答案：{{selectedLabel}}</text><text>正确答案：{{answerLabel}}</text></view>
     <text class="analysis-label">解析</text>
     <text class="analysis-copy">{{displayQuestion.analysis || displayQuestion.explanation || '这道题尚未提供解析。'}}</text>
+    <button wx:if="{{feedbackContext.questionId}}" class="analysis-toggle" disabled="{{feedbackBusy || feedbackSent}}" loading="{{feedbackBusy}}" bindtap="reportAnalysis">{{feedbackSent ? '反馈已提交' : '解析有误或缺失？反馈此题'}}</button>
   </view>
 </view>

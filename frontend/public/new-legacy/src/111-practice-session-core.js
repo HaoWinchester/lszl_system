@@ -63,6 +63,16 @@
     }
   }
 
+  function nextUnansweredIndex(session, currentIndex = -1) {
+    const questions = Array.isArray(session?.questions) ? session.questions : []
+    const start = Number.isInteger(currentIndex) ? currentIndex : -1
+    for (let step = 1; step <= questions.length; step += 1) {
+      const index = ((start + step) % questions.length + questions.length) % questions.length
+      if (questionStatus(session, questions[index].questionId) === 'unanswered') return index
+    }
+    return -1
+  }
+
   function resumableRuntime(session) {
     const runtime = session?.runtimeState && typeof session.runtimeState === 'object'
       ? session.runtimeState
@@ -75,6 +85,7 @@
   }
 
   global.KGPracticeSessionCore = Object.freeze({
+    nextUnansweredIndex,
     normalizeSession,
     questionStatus,
     answerSheetStats,

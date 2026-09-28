@@ -95,7 +95,16 @@ export function createPracticeRun(session: PracticeSession, local?: { lockedAnsw
     const values = Object.values(answers), correct = values.filter(answer => answer.correct).length;
     return { total: questions.size, answered: values.length, correct, wrong: values.length - correct, unanswered: questions.size - values.length };
   }
-  return { select, submission, stats, maxHealth,
+  function nextUnansweredIndex(currentIndex = -1): number {
+    const ids = [...questions.keys()];
+    const start = Number.isInteger(currentIndex) ? currentIndex : -1;
+    for (let step = 1; step <= ids.length; step += 1) {
+      const index = ((start + step) % ids.length + ids.length) % ids.length;
+      if (!answers[ids[index]]) return index;
+    }
+    return -1;
+  }
+  return { select, submission, stats, maxHealth, nextUnansweredIndex,
     answer: (id: string) => answers[id] ? { ...answers[id] } : null,
     runtime: () => ({ ...runtime }),
     patchRuntime: (patch: Record<string, any>) => Object.assign(runtime, writableRuntime(patch)),

@@ -84,7 +84,7 @@ async def aggregate_feature_analytics(db: AsyncSession, query: FeatureAnalyticsQ
     metrics_stmt = (
         select(
             FeatureUsageEvent.feature_key,
-            func.count(FeatureUsageEvent.owner_id.distinct()).label("active_users"),
+            func.count(FeatureUsageEvent.owner_id.distinct()).filter(FeatureUsageEvent.event_type != "opened").label("active_users"),
             func.count(FeatureUsageEvent.id)
             .filter(FeatureUsageEvent.event_type == "key_action")
             .label("key_actions"),

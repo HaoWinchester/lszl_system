@@ -13,6 +13,8 @@ from app.core.auth import CurrentUser, require_role
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.analytics import FeatureAnalyticsQuery
+from app.schemas.feature_usage import UsageQuery
+from app.services import feature_usage_service
 from app.services import analytics_service, system_service, user_service
 
 router = APIRouter(prefix="/system", tags=["system"])
@@ -103,10 +105,18 @@ async def feature_analytics(
     start: date,
     end: date,
     role: str | None = None,
+    version: int = 1,
+    client: str | None = None,
+    sort: str = "time",
 ):
     """管理员查看各功能的常用度与成果用户率聚合（不含任何用户标识）。"""
     try:
         query = FeatureAnalyticsQuery(start=start, end=end, role=role)
+        options = UsageQuery(client=client, sort=sort)
+        if version not in (1, 2):
+            raise ValueError("统计口径仅支持 1 或 2")
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
+    if version == 2:
+        return await feature_usage_service.aggregate_usage(db, query, options)
     return await analytics_service.aggregate_feature_analytics(db, query)

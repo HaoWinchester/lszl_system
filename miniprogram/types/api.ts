@@ -44,6 +44,8 @@ export interface PracticeQuestion {
 }
 
 export interface SessionQuestion {
+  sourcePaperId?: string;
+  sourceReleaseId?: string;
   questionId: string;
   bankId?: string;
   question: PracticeQuestion;

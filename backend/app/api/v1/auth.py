@@ -12,8 +12,9 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
-from app.core.auth import CurrentUser, establish_authenticated_session, get_login_session_id
+from app.core.auth import CurrentUser, establish_authenticated_session, get_login_session_id, has_recent_wechat_password_proof, record_wechat_password_proof
 from app.core.config import settings
+from app.core.security import now_utc
 from app.core.legal import LEGAL_CONSENT_VERSION, accepted_legal_consent
 from app.db.session import get_db
 from app.schemas.auth import AuthenticatedResponse, LoginRequest, RegisterRequest, SelfProfileUpdate, WechatAccountChoice
@@ -167,11 +168,15 @@ async def me(request: Request, user: CurrentUser):
 
 
 @router.put("/me")
-async def update_me(req: SelfProfileUpdate, user: CurrentUser, db: DB):
+async def update_me(req: SelfProfileUpdate, request: Request, user: CurrentUser, db: DB):
     try:
-        updated = await user_service.update_self_profile(db, user, req)
+        updated = await user_service.update_self_profile(
+            db, user, req, recent_wechat_auth=has_recent_wechat_password_proof(request, user.username)
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if req.new_password:
+        request.session.pop("wechat_password_proof", None)
     return {"user": user_service.to_dict(updated)}
 
 
@@ -262,10 +267,12 @@ async def wechat_callback(code: str, state: str, request: Request, db: DB):
                 request.session.clear()
                 request.session["wechat_account"] = {
                     "ticket": raw, "returnPath": return_path, "acceptedTermsVersion": accepted_terms_version,
+                    "authenticatedAt": now_utc().timestamp(),
                 }
                 return _wechat_redirect(return_path, "account-required")
             user_service.record_legal_consent(user, accepted_terms_version)
             establish_authenticated_session(request, user.username)
+            record_wechat_password_proof(request, user.username)
             action, detail, result = "wechat_login", "微信扫码登录", "login-success"
     except (PermissionError, ValueError) as exc:
         await db.rollback()
@@ -356,5 +363,8 @@ async def complete_wechat_account(req: WechatAccountChoice, request: Request, db
     except PermissionError as exc:
         await db.rollback()
         raise HTTPException(status_code=403, detail=str(exc)) from exc
+    authenticated_at = pending.get("authenticatedAt")
     session_id = establish_authenticated_session(request, user.username)
+    if isinstance(authenticated_at, (int, float)):
+        record_wechat_password_proof(request, user.username, authenticated_at)
     return {'user': user_service.to_dict(user), 'loginSessionId': session_id}

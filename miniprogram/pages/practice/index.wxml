@@ -13,12 +13,13 @@
   </view>
   <view wx:if="{{draftError}}" class="inline-notice" role="alert"><text>{{draftError}}</text></view>
   <view wx:if="{{!loading && !loadError && session.mode !== 'practice'}}" class="game-status"><text>生命 {{health}} / {{maxHealth}}</text><text>连对 {{streak}}</text><text>经验 {{experience}}</text></view>
+  <button wx:if="{{!loading && !loadError && nextUnansweredIndex >= 0}}" class="quiet-button next-unanswered" disabled="{{busy}}" bindtap="onNextUnanswered">下一未答题 · 第 {{nextUnansweredIndex + 1}} 题</button>
   <text wx:if="{{feedback}}" class="answer-feedback">{{feedback}}</text>
 
   <empty-state wx:if="{{navigationError}}" title="页面未打开" body="{{navigationError}}" action-text="重试跳转" bind:action="retryNavigation" />
   <view wx:elif="{{loading}}" class="question-loading"><view class="question-loading-line is-short"></view><view class="question-loading-line"></view><view class="question-loading-line is-block"></view><view class="question-loading-line is-block"></view></view>
   <empty-state wx:elif="{{loadError}}" title="题目没有载入" body="{{loadError}}" action-text="重新加载" bind:action="loadSession" />
-  <view wx:else class="reading-surface"><question-view question="{{currentQuestion}}" selected-ids="{{selectedIds}}" selected-pairs="{{selectedPairs}}" submitted="{{submitted || busy || showAnswers || writeError !== ''}}" show-result="{{showResult}}" show-analysis="{{showAnalysis}}" allow-analysis="{{policy.revealAfterAnswer}}" bind:change="onAnswerChange" /></view>
+  <view wx:else class="reading-surface"><question-view feedback-context="{{feedbackContext}}" question="{{currentQuestion}}" selected-ids="{{selectedIds}}" selected-pairs="{{selectedPairs}}" submitted="{{submitted || busy || showAnswers || writeError !== ''}}" show-result="{{showResult}}" show-analysis="{{showAnalysis}}" allow-analysis="{{policy.revealAfterAnswer}}" bind:change="onAnswerChange" bind:analysischange="onAnalysisChange" /></view>
 
   <button wx:if="{{!loading && !loadError && currentQuestion.type === 'matching' && !submitted && !showAnswers}}" class="primary-button" disabled="{{busy || !matchingComplete}}" bindtap="onConfirmMatching">确认配对答案</button>
   <view wx:if="{{writeError && !loading && !loadError}}" class="write-error"><text class="write-error-copy">{{writeError}}</text><button class="write-error-action" bindtap="retryWrites">重试同步</button></view>

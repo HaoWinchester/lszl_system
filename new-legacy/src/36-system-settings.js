@@ -471,28 +471,40 @@
   function renderFeatureAnalytics(data){
     const content=$('ssAnalyticsContent');if(!content)return;
     const features=Array.isArray(data?.features)?data.features:[];
-    const insights=Array.isArray(data?.insights)?data.insights:[];
-    const trends=Array.isArray(data?.trends)?data.trends:[];
     const percent=value=>`${Math.round(Number(value||0)*100)}%`;
-    const featureRows=features.map(item=>`<tr><th>${escapeHTML(ANALYTICS_FEATURE_LABELS[item.featureKey]||item.featureKey||'未知功能')}</th><td>${Number(item.activeUsers||0)}</td><td>${Number(item.keyActions||0)}</td><td>${Math.round(Number(item.engagedSeconds||0)/60)} 分钟</td><td>${percent(item.outcomeUserRate)}</td><td>${item.quality?.value==null?'—':percent(item.quality.value)}</td></tr>`).join('');
-    const trendRows=trends.map(item=>`<li><span>${escapeHTML(item.date||'—')}</span><strong>${Number(item.events||0)} 次事件 · ${Number(item.activeUsers||0)} 位活跃用户</strong></li>`).join('');
-    const insightRows=insights.map(item=>`<article><strong>${escapeHTML(item.title||'分析结论')}</strong><p>${escapeHTML(item.detail||'')}</p></article>`).join('');
-    content.innerHTML=`<div class="ss-analytics-summary"><strong>${Number(data?.sampleSize||0)}</strong><span>条有效事件</span></div><div class="ss-analytics-table-wrap"><table><thead><tr><th>功能</th><th>活跃用户</th><th>关键操作</th><th>有效停留</th><th>成果用户率</th><th>质量指标</th></tr></thead><tbody>${featureRows||'<tr><td colspan="6">暂无数据</td></tr>'}</tbody></table></div><div class="ss-analytics-lower"><section><h3>每日趋势</h3><ul>${trendRows||'<li>当前区间暂无趋势数据</li>'}</ul></section><section><h3>确定性洞察</h3><div class="ss-analytics-insights">${insightRows||'<p>样本积累后将显示洞察。</p>'}</div></section></div>`;
+    const duration=value=>{const seconds=Math.max(0,Math.round(Number(value)||0));return seconds<60?`${seconds} 秒`:seconds<3600?`${Math.floor(seconds/60)} 分 ${seconds%60} 秒`:`${Math.floor(seconds/3600)} 小时 ${Math.floor(seconds%3600/60)} 分`};
+    if(data.methodologyVersion!==2){
+      const rows=features.map(item=>`<tr><th>${escapeHTML(ANALYTICS_FEATURE_LABELS[item.featureKey]||item.featureKey)}</th><td>${Number(item.activeUsers||0)}</td><td>${Number(item.keyActions||0)}</td><td>${duration(item.engagedSeconds)}</td><td>${percent(item.outcomeUserRate)}</td></tr>`).join('');
+      content.innerHTML=`<p class="ss-analytics-notice">历史口径仅供参考：覆盖旧功能，可能漏采、挂机计时或截断长停留。它与新口径不混算，终端与排序筛选不适用于历史记录。</p><div class="ss-analytics-table-wrap" tabindex="0" role="region" aria-label="历史统计表"><table><thead><tr><th>功能</th><th>有效用户</th><th>操作数</th><th>历史时长</th><th>成果用户率</th></tr></thead><tbody>${rows}</tbody></table></div>`;return;
+    }
+    const rows=features.map(item=>`<tr><th>${escapeHTML(item.label)}</th><td>${Number(item.activeUsers)}</td><td>${Number(item.visits)}</td><td>${Number(item.usageDays)}</td><td>${percent(item.returningUserRate)}</td><td>${duration(item.engagedSeconds)}</td><td>${duration(item.averageSeconds)}</td><td>${duration(item.medianVisitSeconds)}</td><td>${duration(item.foregroundSeconds)}</td></tr>`).join('');
+    const since=data.collectionStartedAt?new Date(data.collectionStartedAt).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'}):'尚未收到新口径样本';
+    const trends=(data.trends||[]).map(item=>`<tr><th>${escapeHTML(item.date)}</th><td>${Number(item.activeUsers)}</td><td>${duration(item.engagedSeconds)}</td></tr>`).join('');
+    content.innerHTML=`<p class="ss-analytics-notice">${Number(data.sampleSize||0)} 个采样片段 · 首次收到新口径数据：${escapeHTML(since)}（北京时间）</p>${data.sampleSize?'':'<p class="um-empty">当前筛选没有新口径数据。请确认学员已使用更新后的网页或小程序；无数据不代表无人使用。</p>'}<div class="ss-analytics-table-wrap" tabindex="0" role="region" aria-label="功能使用统计，可横向滚动"><table><thead><tr><th>功能</th><th>有效人数</th><th>有效访问</th><th>使用人天</th><th>再次使用率</th><th>总有效时长</th><th>人均有效时长</th><th>单次中位数</th><th>前台停留</th></tr></thead><tbody>${rows}</tbody></table></div><details class="ss-analytics-method"><summary>计时规则与采集范围</summary><p>${escapeHTML(data.methodology)}</p><p>${escapeHTML(data.legacyNotice)}</p><ul>${(data.coverage||[]).map(item=>`<li>${item.client==='mini'?'小程序':'网页'}：${item.features.map(key=>escapeHTML(features.find(f=>f.featureKey===key)?.label||key)).join('、')}</li>`).join('')}</ul><p>有效访问是至少累计 1 秒估算有效使用的访问；人数按账号去重，使用人天按账号与日期去重。同一网页只在获得焦点时计时。数据用于产品使用分析，不能证明学生是否认真学习。</p></details><details class="ss-analytics-method"><summary>每日趋势</summary><div class="ss-analytics-table-wrap"><table><thead><tr><th>日期</th><th>有效学员数</th><th>有效时长</th></tr></thead><tbody>${trends||'<tr><td colspan="3">暂无数据</td></tr>'}</tbody></table></div></details>`;
   }
+  let analyticsRequest=0;
+
   async function loadFeatureAnalytics(){
     const content=$('ssAnalyticsContent');if(!content)return;
+    const requestId=++analyticsRequest;
     const start=$('ssAnalyticsStart')?.value||analyticsDate(29);
     const end=$('ssAnalyticsEnd')?.value||analyticsDate();
     const role=$('ssAnalyticsRole')?.value||'';
     if(start>end){content.innerHTML='<div class="um-empty">开始日期不能晚于结束日期。</div>';return}
     content.innerHTML='<div class="um-empty">正在加载汇总数据…</div>';
-    const query=new URLSearchParams({start,end});if(role)query.set('role',role);
+    const version=$('ssAnalyticsVersion')?.value||'2';
+    const client=$('ssAnalyticsClient')?.value||'';
+    const sort=$('ssAnalyticsSort')?.value||'time';
+    const query=new URLSearchParams({start,end,version});if(role)query.set('role',role);
+    if(version==='2'){if(client)query.set('client',client);query.set('sort',sort)}
+    if($('ssAnalyticsClient'))$('ssAnalyticsClient').disabled=version==='1';
+    if($('ssAnalyticsSort'))$('ssAnalyticsSort').disabled=version==='1';
     try{
       const response=await fetch(`/api/v1/system/feature-analytics?${query}`,{credentials:'include'});
       const data=await response.json().catch(()=>({}));
       if(!response.ok)throw new Error(data?.detail||`加载失败（${response.status}）`);
-      renderFeatureAnalytics(data);
-    }catch(error){content.innerHTML=`<div class="um-empty">${escapeHTML(error?.message||'功能分析加载失败，请稍后重试。')}</div>`}
+      if(requestId===analyticsRequest)renderFeatureAnalytics(data);
+    }catch(error){if(requestId===analyticsRequest)content.innerHTML=`<div class="um-empty">${escapeHTML(error?.message||'功能分析加载失败，请稍后重试。')}</div>`}
   }
 
   function setTab(tab){
@@ -549,6 +561,7 @@
     });
     const clear=$('ssClearLogsBtn');
     if(clear)clear.addEventListener('click',clearLogs);
+    $('ssAnalyticsVersion')?.addEventListener('change',loadFeatureAnalytics);
     const analyticsRefresh=$('ssAnalyticsRefresh');
     if(analyticsRefresh)analyticsRefresh.addEventListener('click',loadFeatureAnalytics);
   }
@@ -594,6 +607,7 @@
       window.addEventListener('kg-subscription-redeem-code-change',()=>renderSubscriptionPlans());
     }
     render();
+    if(new URLSearchParams(location.search).get('tab')==='analytics')setTab('analytics');
     return true;
   }
 

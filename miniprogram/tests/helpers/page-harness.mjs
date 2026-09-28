@@ -51,7 +51,7 @@ export async function loadPage(name, dependencies = {}, wxOverrides = {}) {
     Component(options) { page = options; page.setData = (values, done) => { Object.assign(page.data, values); done?.(); }; },
   };
   const appearance = await loadModule('domain/appearance.ts', { wx }, ['appearanceData', 'readAppearance', 'subscribeAppearance', 'updateAppearanceChrome']);
-  const { withAppearance } = await loadModule('domain/appearance-page.ts', { ...appearance, ...dependencies }, ['withAppearance']);
+  const { withAppearance } = await loadModule('domain/appearance-page.ts', { ...appearance, usageShow() {}, usageHide() {}, usageTouch() {}, ...dependencies }, ['withAppearance']);
   host.withAppearance = withAppearance;
   const routing = await loadModule('domain/navigation.ts', { wx, getCurrentPages: dependencies.getCurrentPages || (() => []) }, ['navigation', 'openPaperCatalog', 'consumePaperMode', 'consumePaperOptions', 'returnToPage']);
   const growth = await loadModule('domain/growth-view.ts', {}, ['growthView', 'GROWTH_GOALS']);

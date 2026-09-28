@@ -7,7 +7,7 @@ const css = fs.readFileSync(new URL('../styles/practice-mode.css', import.meta.u
 
 test('practice exit button keeps accessible contract', () => {
   assert.match(html, /id="practiceExitBtn"[^>]*aria-label="退出本次练习"/);
-  assert.match(html, /id="practiceExitBtn"[^>]*>\s*<span[^>]*data-kg-icon="x"/);
+  assert.match(html, /id="practiceExitBtn"[^>]*>\s*<span[^>]*data-kg-icon="log-out"/);
 });
 
 test('paper drawer close button keeps accessible contract', () => {

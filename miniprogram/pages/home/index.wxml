@@ -13,7 +13,7 @@
         <view class="path-art" aria-hidden="true"><view class="path-orbit"></view><view class="path-step step-one"></view><view class="path-step step-two"></view><view class="path-step step-three"></view><view class="path-sun"></view><view class="path-flag"></view></view>
         <text class="hero-title">{{activeSession ? (activeSession.paperName || '未完成练习') : '开始练习'}}</text>
         <text class="hero-copy">{{activeSession ? '已答 ' + (activeSession.stats.answered || 0) + ' / ' + (activeSession.stats.total || 0) + ' 题' : '选一份免费试卷，轻松开始'}}</text>
-        <button wx:if="{{activeSession}}" class="primary-button continue-button" loading="{{continuing}}" disabled="{{continuing}}" bindtap="onContinue">继续作答</button>
+        <button wx:if="{{activeSession}}" class="primary-button continue-button" loading="{{continuing}}" disabled="{{continuing}}" bindtap="onContinue">继续上次练习</button>
         <button wx:else class="primary-button continue-button" bindtap="onQuickPractice">先练 5 题</button>
       </view>
       <view class="revenge-card">
@@ -23,6 +23,7 @@
         <button class="review-button" data-mode="revenge" bindtap="onMode">去巩固</button>
       </view>
     </view>
+    <button wx:if="{{activeSession}}" class="quiet-button" bindtap="onQuickPractice">时间不多？先选卷练 5 题</button>
     <text wx:if="{{activeSession}}" class="section-copy review-timing">完成或结束练习后，错题会加入复习；保存退出可保留进度。</text>
     <view class="learning-card today-card">
       <view class="section-heading"><text class="section-title">今日目标</text><button class="text-action" bindtap="onGrowth">查看成长 <ui-icon name="chevron" size="26" /></button></view>
