@@ -1,10 +1,18 @@
 {
   "schemaVersion": 1,
   "fromVersion": "v9.0-p4.1.257",
-  "toVersion": "v9.0-p4.1.257",
+  "toVersion": "v9.0-p4.1.258",
   "changes": {
-    "added": [],
-    "changed": [],
+    "added": [
+      "tests/practice-selection-notice.test.js"
+    ],
+    "changed": [
+      "VERSION",
+      "content-prep-studio/dist/content-prep.html",
+      "practice-mode.html",
+      "src/100-practice-mode.js",
+      "styles/practice-mode.css"
+    ],
     "removed": []
   },
   "incompatible": []

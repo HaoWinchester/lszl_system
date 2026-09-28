@@ -1,0 +1,10 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {selectionNotice}=require('../src/100-practice-mode.js');
+const summary={requestedCount:10,actualCount:10,unseenCount:3,reviewCount:7,totalCount:23,completedCount:20,remainingUnseen:3};
+assert.equal(selectionNotice({}), '', 'historical sessions must not invent coverage');
+assert.equal(selectionNotice({selectionSummary:summary}), '本轮 10 题：未做 3 题 · 复习 7 题。优先未做题，保留完整案例，其余由已做题补足。');
+assert.equal(selectionNotice({selectionSummary:{...summary,unseenCount:10,reviewCount:0}}), '本轮 10 题：均为未做题。');
+assert.equal(selectionNotice({scoringSnapshot:{selectionSummary:{...summary,unseenCount:0,reviewCount:10}}}), '本轮复习 10 题。');
+assert.equal(selectionNotice({mode:'revenge',selectionSummary:summary}), '');
+console.log('practice-selection-notice-ok');

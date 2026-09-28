@@ -17,11 +17,26 @@ function backendMode(mode: PracticeMode): string {
   return mode === 'normal' ? 'practice' : mode;
 }
 
+// One session-bound notice is shared by the practice and result pages, including restores.
+function selectionNotice(raw: any): string {
+  const summary = raw.selectionSummary || raw.scoringSnapshot?.selectionSummary;
+  if (!summary || raw.mode === 'revenge') return '';
+  const count = Number(summary.actualCount) || 0;
+  const unseen = Number(summary.unseenCount) || 0;
+  const review = Number(summary.reviewCount) || 0;
+  if (!count) return '';
+  if (!unseen) return `本轮复习 ${count} 题。`;
+  if (!review) return `本轮 ${count} 题：均为未做题。`;
+  return `本轮 ${count} 题：未做 ${unseen} 题 · 复习 ${review} 题。优先未做题，保留完整案例，其余由已做题补足。`;
+}
+
 function normalizeSession(rawValue: any): PracticeSession {
   const raw = rawValue && typeof rawValue === 'object' ? rawValue : {};
   const questions = Array.isArray(raw.questions) ? raw.questions : [];
   return {
     ...raw,
+    selectionSummary: raw.selectionSummary || raw.scoringSnapshot?.selectionSummary,
+    selectionNotice: selectionNotice(raw),
     paperName: String(raw.paperName || raw.scoringSnapshot?.paperName || '未完成练习'),
     id: String(raw.id || ''),
     mode: String(raw.mode || 'practice'),

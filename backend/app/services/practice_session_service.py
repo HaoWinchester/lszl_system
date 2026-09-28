@@ -16,7 +16,7 @@ from app.core.security import now_utc, uid
 from app.models.paper_release import PaperRelease, PaperReleaseQuestion
 from app.models.training import LearningEvent, PracticeMistake, PracticeSession
 from app.models.user import User
-from app.services import learning_service, practice_experience_service, practice_growth_service, paper_composition_service, paper_release_service, question_answer_service
+from app.services import practice_coverage_service, learning_service, practice_experience_service, practice_growth_service, paper_composition_service, paper_release_service, question_answer_service
 from app.services.practice_scoring_service import (
     DEFAULT_DOMAIN_WEIGHTS,
     DEFAULT_SIMULATION_SCORING,
@@ -134,6 +134,7 @@ def _select_questions(
     order: str,
     seed: str,
     weights: dict[str, int],
+    unseen_ids: set[str] | None = None,
 ) -> tuple[list[dict], dict[str, int], bool]:
     # 已发布试卷直接使用冻结题目；领域配比由新组卷/发布预检负责，
     # 不能在学习入口重新组卷而拦住题量充足的历史试卷。
@@ -146,9 +147,15 @@ def _select_questions(
             requested=count,
         )
     from app.services.question_group_service import select_grouped
-    candidates, available_counts = select_grouped(rows, count, random_key=(lambda row: _stable_random_key(seed, row)) if order == "random" else None)
+    candidates, available_counts = select_grouped(rows, count, random_key=(lambda row: _stable_random_key(seed, row)) if order == "random" else None, unseen_ids=unseen_ids)
     if not candidates:
-        raise _error(422, "PRACTICE_GROUP_COUNT_UNSATISFIABLE", "无法保持案例完整并满足指定题数", availableCounts=available_counts, requested=count)
+        message = "无法保持案例完整并满足指定题数"
+        if unseen_ids:
+            choices = [size for size in available_counts if 1 <= size <= PRACTICE_QUESTION_COUNT_MAX]
+            message = "当前题量无法容纳完整的未做案例，请调整题量"
+            if choices:
+                message += "（可选 " + "、".join(str(size) for size in choices[:8]) + " 题）"
+        raise _error(422, "PRACTICE_GROUP_COUNT_UNSATISFIABLE", message, availableCounts=available_counts, requested=count)
     selected = [
         {
             "questionId": row.question_id,
@@ -506,6 +513,7 @@ async def _session_payload(db: AsyncSession, session: PracticeSession) -> dict:
         "domainWeights": scoring.get("domainWeights", DEFAULT_DOMAIN_WEIGHTS),
         "domainTargets": scoring.get("domainTargets", {}),
         "scoringSnapshot": scoring,
+        "selectionSummary": scoring.get("selectionSummary"),
         "reportSnapshot": session.report_snapshot,
         "revision": session.revision,
         "startedAt": session.started_at.isoformat() if session.started_at else None,
@@ -677,6 +685,7 @@ async def start_session(
         )
 
     selection_seed = secrets.token_hex(16)
+    selection_summary = None
     if mode == "revenge":
         revenge_pool = await learning_service.global_revenge_pool(db, owner)
         candidates = revenge_pool["candidates"]
@@ -730,8 +739,10 @@ async def start_session(
             str(item.get("domain") or "") in weights for item in question_order
         )
     else:
+        answered_ids = await practice_coverage_service.answered_question_ids(db, owner, release_id)
         if release.paper_type == "mixed":
             rows = list((await _release_question_rows(db, release_id)).values())
+            all_ids = {row.question_id for row in rows}
         else:
             headers = await _release_question_headers(db, release_id)
             if len(headers) < count:
@@ -742,11 +753,11 @@ async def start_session(
                     available=len(headers),
                     requested=count,
                 )
-            ordered_headers = (
-                sorted(headers, key=lambda row: _stable_random_key(selection_seed, row))
-                if order == "random"
-                else sorted(headers, key=lambda row: row.order_index)
-            )
+            all_ids = {row.question_id for row in headers}
+            ordered_headers = sorted(headers, key=lambda row: (
+                row.question_id in answered_ids,
+                _stable_random_key(selection_seed, row) if order == "random" else row.order_index,
+            ))
             selected_ids = [row.question_id for row in ordered_headers[:count]]
             row_map = await _release_question_rows(
                 db,
@@ -761,7 +772,9 @@ async def start_session(
             order=order,
             seed=selection_seed,
             weights=weights,
+            unseen_ids=all_ids - answered_ids,
         )
+        selection_summary = practice_coverage_service.selection_summary(question_order, all_ids, answered_ids, count)
     actual_count = len(question_order)
     session = PracticeSession(
         id=uid("ps_"),
@@ -788,6 +801,7 @@ async def start_session(
             "domainTargets": targets,
             "domainDataComplete": domain_data_complete,
             "selectionSeed": selection_seed,
+            **({"selectionSummary": selection_summary} if selection_summary is not None else {}),
             "order": order,
         },
         revision=1,
@@ -835,6 +849,7 @@ def _entry_response(session: dict, *, resumed: bool) -> dict:
             "mode",
             "status",
             "questionOrder",
+            "selectionSummary",
             "answers",
             "runtimeState",
             "stats",

@@ -51,7 +51,20 @@ export interface SessionQuestion {
   question: PracticeQuestion;
 }
 
+export interface PracticeSelectionSummary {
+  requestedCount: number;
+  actualCount: number;
+  unseenCount: number;
+  reviewCount: number;
+  totalCount: number;
+  completedCount: number;
+  remainingUnseen: number;
+}
+
 export interface PracticeSession {
+  selectionSummary?: PracticeSelectionSummary;
+  scoringSnapshot?: { selectionSummary?: PracticeSelectionSummary; [key: string]: unknown };
+  selectionNotice?: string;
   id: string;
   paperId?: string;
   releaseId?: string;

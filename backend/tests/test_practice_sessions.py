@@ -1082,7 +1082,7 @@ def test_180_question_published_papers_start_save_and_restore_in_all_modes(domai
             assert client.post("/api/v1/auth/login", json={
                 "username": ids["student"], "password": PASSWORD,
             }).status_code == 200
-            for mode in ("challenge", "scholar", "practice"):
+            for mode_index, mode in enumerate(("challenge", "scholar", "practice")):
                 response = client.post("/api/v1/learning/practice/sessions/start", json={
                     "paperId": ids["paper"], "releaseId": ids["release"],
                     "mode": mode, "count": 180, "order": "paper",
@@ -1090,8 +1090,14 @@ def test_180_question_published_papers_start_save_and_restore_in_all_modes(domai
                 assert response.status_code == 200, response.text
                 session = response.json()["session"]
                 assert len(session["questions"]) == 180
-                assert session["domainTargets"] == expected_targets
-                assert [ref["orderIndex"] for ref in session["questionOrder"]] == list(range(180))
+                # Each previous mode saved its first answer. Cross-mode coverage
+                # now advances the next batch while keeping exact frozen domain totals.
+                selected_domains = domains[mode_index:mode_index + 180]
+                targets = {key: selected_domains.count(key) for key in expected_targets}
+                if mode_index == 0:
+                    assert targets == expected_targets
+                assert session["domainTargets"] == targets
+                assert [ref["orderIndex"] for ref in session["questionOrder"]] == list(range(mode_index, mode_index + 180))
                 first_id = session["questions"][0]["questionId"]
                 assert session["questions"][0]["question"]["correctAnswer"] == "A"
                 saved = client.post(f"/api/v1/learning/practice/sessions/{session['id']}/pause", json={

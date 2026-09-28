@@ -9,7 +9,7 @@ const read = path => readFileSync(join(root, path), 'utf8');
 
 test('result presents actionable feedback without a dashboard card wall', () => {
   const page = read('pages/result/index.wxml');
-  for (const label of ['正确率', '错题', '薄弱知识点', '查看解析', '再练一次']) {
+  for (const label of ['正确率', '错题', '薄弱知识点', '查看解析', '开始新一轮练习']) {
     assert.match(page, new RegExp(label));
   }
   assert.doesNotMatch(read('pages/result/index.wxss'), /grid-template-columns:\s*repeat\([3-9]/);

@@ -137,6 +137,20 @@
     if(!state.saves)state.saves=global.KGPracticeSessionSave.create({api:practiceApi()});
     return state.saves;
   }
+  function selectionNotice(session){
+    const summary=session?.selectionSummary||session?.scoringSnapshot?.selectionSummary;
+    if(!summary||session?.mode==='revenge')return '';
+    const count=Number(summary.actualCount)||0,unseen=Number(summary.unseenCount)||0,review=Number(summary.reviewCount)||0;
+    if(!count)return '';
+    if(!unseen)return '本轮复习 '+count+' 题。';
+    if(!review)return '本轮 '+count+' 题：均为未做题。';
+    return '本轮 '+count+' 题：未做 '+unseen+' 题 · 复习 '+review+' 题。优先未做题，保留完整案例，其余由已做题补足。';
+  }
+  function renderSelectionNotice(){
+    const notice=$('practiceSelectionNotice');
+    if(!notice)return;
+    notice.textContent=selectionNotice(state.session);notice.hidden=!notice.textContent;
+  }
   function normalizedSession(session){
     return global.KGPracticeSessionCore?.normalizeSession?.(session)||clone(session||{});
   }
@@ -256,6 +270,11 @@
       answers:state.session?.answers||{},
       onReviewAll:state.mode==='practice'?()=>openQuestionReview(state.questions[state.index]?.id||state.questions[0]?.id):null,
       onReviewWrong:reviewWrongQuestion,onAgain:startAgain,onLobby:showLobby});
+    if(rendered){
+      const copy=selectionNotice(state.session);
+      if(copy){const notice=document.createElement('p');notice.className='practice-selection-notice';notice.textContent=copy;dom.result.querySelector('.practice-report-overall')?.after(notice)}
+      const again=dom.result.querySelector('[data-report-again]');if(again)again.textContent=state.mode==='revenge'?'再练一次':'开始新一轮练习';
+    }
     renderModeOutcome();
     if(rendered&&!dom.challengeOutcome.hidden)dom.result.querySelector('.practice-report-overall')?.after(dom.challengeOutcome);
     return rendered;
@@ -323,6 +342,7 @@
   function setView(name){
     dom.lobby.hidden=name!=='lobby';dom.game.hidden=name!=='game';dom.checkpoint.hidden=name!=='checkpoint';dom.result.hidden=name!=='result';
     document.body.dataset.practiceView=name;
+    if(name==='game')renderSelectionNotice();
     if(name!=='game'){setDangerVignette(false);if(dom.questionNav)dom.questionNav.hidden=true}
   }
   function renderHeartIcon(){
@@ -1453,6 +1473,6 @@
 
   const api=Object.freeze({init,startPractice,answerById:id=>answer(id,dom.options.querySelector('[data-option-id="'+CSS.escape(text(id))+'"]')),finishPractice,showLobby,loadReleases,snapshot,constants:Object.freeze({COUNTS:[...COUNTS],MAX_HEALTH,SCHOLAR_MAX_SECONDS})});
   global.KGPracticeMode=api;
-  if(typeof module!=='undefined'&&module.exports)module.exports={streakBonus,formatDuration,resolveRelease,practiceModeEnabled,renderHeartIcon,readRetiredModeNavigation,prioritizeRetiredQuestion,constants:api.constants};
+  if(typeof module!=='undefined'&&module.exports)module.exports={selectionNotice,streakBonus,formatDuration,resolveRelease,practiceModeEnabled,renderHeartIcon,readRetiredModeNavigation,prioritizeRetiredQuestion,constants:api.constants};
   if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',init,{once:true});
 })(typeof window!=='undefined'?window:globalThis);

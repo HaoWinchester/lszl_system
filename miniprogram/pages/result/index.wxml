@@ -17,6 +17,8 @@
       <view class="accuracy-line"><text class="accuracy-number">{{accuracy}}</text><text class="accuracy-unit">%</text><text class="accuracy-label">正确率</text></view>
     </view>
 
+    <text wx:if="{{session.selectionNotice}}" class="section-intro">{{session.selectionNotice}}</text>
+
     <view class="result-facts">
       <view class="result-fact"><text class="result-fact-value">{{score}}%</text><text class="result-fact-label">得分</text></view>
       <view class="result-fact with-divider"><text class="result-fact-value">{{report.counts.correct || 0}} / {{report.counts.total || 0}}</text><text class="result-fact-label">答对</text></view>
@@ -46,7 +48,7 @@
     <view class="next-actions">
       <button wx:if="{{wrongQuestions.length}}" class="primary-button next-action" bindtap="onRevenge">进入错题复习</button>
       <text wx:if="{{wrongQuestions.length}}" class="section-aside">进入全部待复习错题，按学习进度安排重答与验证。</text>
-      <button class="secondary-button next-action" bindtap="onRetry">再练一次</button>
+      <button class="secondary-button next-action" bindtap="onRetry">开始新一轮练习</button>
       <button class="quiet-button next-action" bindtap="onHome">回到首页</button>
     </view>
   </block>

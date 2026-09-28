@@ -431,3 +431,5 @@ body.practice-mode-page:not([data-practice-view="lobby"]) .practice-exp-fab{disp
 .practice-review-explanation{padding:16px;background:#f8fafc;border-radius:10px;font-size:14px}.practice-review-explanation p{margin:8px 0 0}
 .practice-review-empty{padding:24px 0;color:#667085}
 @media(max-width:600px){.practice-report-review{padding:18px 14px}.practice-review-filters button{padding:10px 12px}.practice-review-options li{padding:10px}}
+
+.practice-selection-notice{margin:12px 0;color:var(--text-secondary,#64748b);font-size:13px;line-height:1.6}

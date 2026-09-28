@@ -39,7 +39,7 @@ def validate_case_groups(snapshots: list[dict]) -> None:
             raise ValueError('案例子题必须连续排列')
 
 
-def select_grouped(rows: list, count: int, *, random_key=None) -> tuple[list, list[int]]:
+def select_grouped(rows: list, count: int, *, random_key=None, unseen_ids: set[str] | None = None) -> tuple[list, list[int]]:
     units = []
     groups = {}
     for row in sorted(rows, key=lambda item: item.order_index):
@@ -56,10 +56,19 @@ def select_grouped(rows: list, count: int, *, random_key=None) -> tuple[list, li
         unit.sort(key=lambda row: ((row.snapshot or {}).get('caseGroup') or {}).get('order', 1))
     if random_key:
         units.sort(key=lambda unit: random_key(unit[0]))
+    if unseen_ids is not None:
+        # Keep cases intact; new-containing units precede wholly reviewed units.
+        units.sort(key=lambda unit: not any(row.question_id in unseen_ids for row in unit))
     reachable = {0: []}
+    unseen_scores = {0: 0}
     for index, unit in enumerate(units):
-        for size, picked in list(reachable.items()):
+        previous = [(size, picked, unseen_scores[size]) for size, picked in reachable.items()]
+        unit_score = sum(row.question_id in unseen_ids for row in unit) if unseen_ids is not None else 0
+        for size, picked, score in previous:
             target = size + len(unit)
-            if target not in reachable:
+            if target not in reachable or score + unit_score > unseen_scores[target]:
                 reachable[target] = picked + [index]
-    return ([row for i in reachable[count] for row in units[i]] if count in reachable else []), sorted(reachable)
+                unseen_scores[target] = score + unit_score
+    available_counts = sorted(size for size in reachable if not unseen_ids or unseen_scores[size] > 0)
+    selected = [row for i in reachable[count] for row in units[i]] if count in available_counts else []
+    return selected, available_counts

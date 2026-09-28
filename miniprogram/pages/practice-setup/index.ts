@@ -28,6 +28,7 @@ Page(withAppearance(withAppShare({
   onLoad(query: Record<string, string>) {
     const total = Math.max(1, Number(query.count || 1));
     const values = total <= 5 ? [total] : total < 10 ? [5, total] : [5, 10, 20, 60, 180].filter(value => value <= total);
+    const requestedCount = Number(query.practiceCount);
     const quick = query.quick === '1';
     this.setData({
       statusBarHeight: wx.getWindowInfo?.().statusBarHeight || 24,
@@ -37,7 +38,7 @@ Page(withAppearance(withAppShare({
       totalCount: total,
       countChoices: values.map(value => ({ label: value === total ? `全卷 ${value}` : `${value} 题`, value })),
       quick,
-      count: quick ? Math.min(5, total) : Math.min(10, total),
+      count: quick ? Math.min(5, total) : values.includes(requestedCount) ? requestedCount : Math.min(10, total),
       mode: (quick ? 'normal' : query.mode || 'normal') as PracticeMode,
     });
   },

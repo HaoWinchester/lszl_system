@@ -112,6 +112,7 @@
                   <label><input type="radio" name="practiceCount" value="180"/><span>180</span></label>
                 </div>
               </fieldset>
+              <p class="practice-selection-notice">优先练未做题，不足所选题量时用已做题补足；案例题保留完整。全部做过后进入复习。</p>
               <fieldset class="practice-choice-group">
                 <legend>答题顺序</legend>
                 <div class="practice-order-options">
@@ -179,6 +180,7 @@
           <div class="practice-time-rail" id="practiceTimeRail"><span id="practiceTimeBar"></span></div>
         </div>
         <div class="practice-streak-pop" id="practiceStreakPop" hidden role="status"></div>
+        <p class="practice-selection-notice" id="practiceSelectionNotice" hidden role="status"></p>
         <div class="practice-feedback" id="practiceFeedback" hidden role="status"></div>
         <div class="practice-session-conflict" id="practiceSessionConflict" hidden role="alert">
           <div><strong>进度已在另一页更新</strong><span>加载服务端最新进度后可继续作答。</span></div>
@@ -257,7 +259,7 @@
           <div><span>经验值</span><strong id="practiceResultExperience">0</strong></div>
         </div>
         <div class="practice-result-actions">
-          <button type="button" class="practice-primary-btn" id="practiceAgainBtn">再练一次</button>
+          <button type="button" class="practice-primary-btn" id="practiceAgainBtn">开始新一轮练习</button>
           <button type="button" class="practice-secondary-btn" id="practiceLobbyBtn">返回大厅</button>
         </div>
       </section>

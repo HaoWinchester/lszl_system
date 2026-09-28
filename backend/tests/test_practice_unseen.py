@@ -1,0 +1,105 @@
+"""Repeated short sessions prioritize actual unanswered questions across clients."""
+import asyncio
+from types import SimpleNamespace
+import pytest
+from fastapi.testclient import TestClient
+from app.main import app
+from app.services.question_group_service import select_grouped
+from test_practice_sessions import _practice_fixture_ids, _seed_released_pmp_paper, _cleanup_released_pmp_paper, PASSWORD
+
+@pytest.fixture
+def paper():
+    ids=_practice_fixture_ids()
+    asyncio.run(_seed_released_pmp_paper(ids,domains=['people']*23))
+    yield ids
+    asyncio.run(_cleanup_released_pmp_paper(ids))
+
+def login(ids,key='student'):
+    c=TestClient(app)
+    assert c.post('/api/v1/auth/login',json={'username':ids[key],'password':PASSWORD}).status_code==200
+    return c
+
+def start(c,ids,**changes):
+    r=c.post('/api/v1/learning/practice/sessions/start',json=dict(paperId=ids['paper'],releaseId=ids['release'],mode='practice',count=10,order='paper')|changes)
+    assert r.status_code==200,r.text
+    return r.json()['session']
+
+def qids(s):return [q['questionId'] for q in s['questions']]
+
+def finish(c,s,answers=None):
+    if answers is None:answers={qid:{'selectedAnswer':'A','selectionIndex':i+1} for i,qid in enumerate(qids(s))}
+    r=c.post(f"/api/v1/learning/practice/sessions/{s['id']}/complete",json={'revision':s['revision'],'answers':answers})
+    assert r.status_code==200,r.text
+    return r.json()['session']
+
+@pytest.mark.parametrize('order',['paper','random'])
+def test_two_batches_then_three_new_plus_seven_review(paper,order):
+    c=login(paper);first=start(c,paper,order=order);finish(c,first)
+    second=start(c,paper,order=order)
+    assert set(qids(first)).isdisjoint(qids(second))
+    finish(c,second);seen=set(qids(first)+qids(second))
+    third=start(c,paper,order=order)
+    assert len(qids(third))==10 and len(set(qids(third))-seen)==3
+    summary=third['selectionSummary']
+    assert summary['unseenCount']==3 and summary['reviewCount']==7 and summary['completedCount']==20
+    assert all(qid not in seen for qid in qids(third)[:3])
+    finish(c,third);review=start(c,paper,order=order)
+    assert review['selectionSummary']['unseenCount']==0 and review['selectionSummary']['reviewCount']==10
+    other=start(login(paper,'other_student'),paper)
+    assert other['selectionSummary']['completedCount']==0 and other['selectionSummary']['unseenCount']==10
+
+
+def test_skip_timeout_and_resume(paper):
+    c=login(paper);first=start(c,paper,mode='scholar');a,b,*_=qids(first)
+    finish(c,first,{a:{'selectedAnswer':'B','selectionIndex':1},b:{'selectedAnswer':'__timeout__','timedOut':True,'selectionIndex':2}})
+    second=start(c,paper,mode='challenge')
+    assert a not in qids(second) and b in qids(second)
+    assert second['selectionSummary']['completedCount']==1
+    resumed=c.post('/api/v1/learning/practice/sessions/enter',json=dict(paperId=paper['paper'],releaseId=paper['release'],mode='challenge',count=20,order='random')).json()
+    assert resumed['resumed'] and [q['questionId'] for q in resumed['questions']]==qids(second)
+    assert resumed['session']['selectionSummary']==second['selectionSummary']
+
+
+def test_abandoned_graded_answers_count_but_unsubmitted_questions_do_not(paper):
+    c=login(paper);first=start(c,paper);a=qids(first)[0]
+    r=c.post(f"/api/v1/learning/practice/sessions/{first['id']}/answers",json={'revision':first['revision'],'questionId':a,'selectedAnswer':'A'})
+    assert r.status_code==200,r.text
+    s=r.json()['session']
+    r=c.post(f"/api/v1/learning/practice/sessions/{s['id']}/abandon",json={'revision':s['revision']})
+    assert r.status_code==200,r.text
+    next_session=start(c,paper)
+    assert a not in qids(next_session) and qids(first)[1] in qids(next_session)
+    assert next_session['selectionSummary']['completedCount']==1
+
+
+def test_grouped_selection_maximizes_unseen_without_splitting_cases():
+    def row(i,group=None):return SimpleNamespace(question_id=str(i),order_index=i,snapshot={'caseGroup':group} if group else {})
+    rows=[row(0),row(1,{'id':'c','order':1,'total':2}),row(2,{'id':'c','order':2,'total':2}),row(3)]
+    selected,counts=select_grouped(rows,2,unseen_ids={'1','2','3'})
+    assert [r.question_id for r in selected]==['1','2']
+    selected,_=select_grouped(rows,3,unseen_ids={'2','3'})
+    assert [r.question_id for r in selected]==['1','2','3'] and 4 in counts
+
+
+def test_too_small_batch_for_unseen_case_does_not_silently_return_only_review():
+    rows=[SimpleNamespace(question_id=str(i),order_index=i,snapshot={'caseGroup':{'id':'large','order':i+1,'total':3}} if i<3 else {}) for i in range(5)]
+    selected,counts=select_grouped(rows,2,unseen_ids={'0','1','2'})
+    assert selected==[]
+    assert counts==[3,4,5]
+
+
+def test_coverage_answer_shapes_history_hidden_and_release_scope(paper):
+    from app.db.session import AsyncSessionLocal
+    from app.models.training import PracticeSession
+    from app.services.practice_coverage_service import answered_question_ids
+    c=login(paper);session=start(c,paper);ids=qids(session)
+    async def verify():
+        async with AsyncSessionLocal() as db:
+            row=await db.get(PracticeSession,session['id'])
+            row.answers={ids[0]:{'selectedAnswerIds':['A','C']},ids[1]:{'selectedPairs':{'left':'right'}},ids[2]:{'selectedAnswer':'B'},ids[3]:{'selectedAnswer':'A','draft':True},ids[4]:{'selectedAnswer':'__timeout__','timedOut':True},ids[5]:{'selectedAnswerIds':[]},ids[6]:{'selectedPairs':{}}}
+            row.stats={'historyHidden':True};row.status='abandoned'
+            await db.commit()
+            assert await answered_question_ids(db,paper['student'],paper['release'])==set(ids[:3])
+            assert await answered_question_ids(db,paper['other_student'],paper['release'])==set()
+            assert await answered_question_ids(db,paper['student'],'another-release')==set()
+    asyncio.run(verify())

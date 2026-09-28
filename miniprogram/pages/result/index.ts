@@ -144,8 +144,9 @@ Page(withAppearance(withAppShare({
     const query = [
       `paperId=${encodeURIComponent(String(session.paperId || report.paperId || ''))}`,
       `releaseId=${encodeURIComponent(String(session.releaseId || report.releaseId || ''))}`,
-      `title=${encodeURIComponent(String(report.paperName || session.paperName || '再练一次'))}`,
-      `count=${session.questions.length}`,
+      `title=${encodeURIComponent(String(report.paperName || session.paperName || '新一轮练习'))}`,
+      `count=${session.selectionSummary?.totalCount || session.questions.length}`,
+      `practiceCount=${session.selectionSummary?.requestedCount || session.questions.length}`,
       `mode=${getModePolicy(session.mode).id}`,
     ].join('&');
     navigation.redirectTo({ url: `/pages/practice-setup/index?${query}` });
