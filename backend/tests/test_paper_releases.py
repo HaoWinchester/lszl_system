@@ -78,6 +78,7 @@ async def _seed(ids: dict[str, str]) -> None:
                     {"id": "B", "text": "干扰项", "correct": False},
                 ],
                 correct_answer="A",
+                analysis="题目解析",
                 content_metadata={
                     "subjectFacets": [
                         {
@@ -340,7 +341,8 @@ def test_multiple_choice_publish_requires_analysis_and_freezes_answer_array() ->
                     allowed_roles=["teacher", "student"],
                     metadata={},
                 )
-            assert missing_analysis.value.detail["code"] == "MULTIPLE_CHOICE_ANALYSIS_REQUIRED"
+            assert missing_analysis.value.detail["code"] == "PUBLICATION_CHECK_FAILED"
+            assert missing_analysis.value.detail["issues"][0]["code"] == "MULTIPLE_CHOICE_ANALYSIS_REQUIRED"
 
             questions[0].analysis = "补齐解析"
             await db.commit()

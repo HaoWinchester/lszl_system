@@ -1016,10 +1016,27 @@
       return published;
     }catch(error){
       console.warn('发布请求失败',error);
+      if(error?.detail?.code==='PUBLICATION_CHECK_FAILED')throw error;
       toast(error?.message||'发布请求失败，请检查网络后重试。');
       return null;
     }
   }
+
+  function showPublicationChecklist(checklist, paper){
+    return new Promise(resolve=>{
+      const old=$('qbPublicationChecklist');if(old)old.remove();
+      const previousFocus=document.activeElement;
+      const overlay=document.createElement('div');overlay.id='qbPublicationChecklist';overlay.className='pm-publication-checklist';
+      const issues=Array.isArray(checklist?.issues)?checklist.issues:[],warnings=Array.isArray(checklist?.warnings)?checklist.warnings:[];
+      const rows=items=>items.map(item=>{const target=item.questionId&&item.bankId?questionBasicInfoUrl(item.questionId,item.bankId):'';return `<li><strong>${escapeHTML(item.title||paper.name)}${item.number?` · 第 ${Number(item.number)} 题`:''}</strong>：${escapeHTML(item.message||'内容不完整')}${target?` <a href="${escapeHTML(target)}" target="_blank" rel="noopener">修改题目</a>`:''}</li>`}).join('');
+      overlay.innerHTML=`<section role="dialog" aria-modal="true" aria-labelledby="qbPublicationChecklistTitle"><h2 id="qbPublicationChecklistTitle">发布检查 · ${escapeHTML(paper.name)}</h2><p>${issues.length?`发现 ${issues.length} 处需要修改的问题。保存题目后点击重新检查。`:'题目答案与解析已通过检查。'}</p>${issues.length?`<ul>${rows(issues)}</ul>`:''}${warnings.length?`<p>提醒：${warnings.length} 道题的英文题干、选项或解析尚未填写。</p><ul>${rows(warnings)}</ul>`:''}<div class="pm-publication-actions"><button type="button" data-check-action="cancel">退出</button><button type="button" data-check-action="retry">重新检查</button>${issues.length?'':'<button type="button" data-check-action="publish">确认发布</button>'}</div></section>`;
+      document.body.appendChild(overlay);overlay.querySelector('[data-check-action="cancel"]')?.focus();
+      const close=action=>{overlay.remove();previousFocus?.focus?.();resolve(action)};
+      overlay.addEventListener('click',event=>{const action=event.target.closest('[data-check-action]')?.dataset.checkAction;if(action)close(action);else if(event.target===overlay)close('cancel')});
+      overlay.addEventListener('keydown',event=>{if(event.key==='Escape')close('cancel');if(event.key==='Tab'){const choices=[...overlay.querySelectorAll('a[href],button')],first=choices[0],last=choices.at(-1);if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus()}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus()}}});
+    });
+  }
+  let publicationCheckBusy=false;
   async function withdrawPaperRelease(paper){
     if(!window.KGPaperReleaseApi?.withdrawPaper){toast('试卷发布 API 未加载，请刷新页面后重试。');return false}
     try{
@@ -3548,6 +3565,10 @@
     }catch(error){toast(`配额补题失败：${error.message||error}`);return false}
   }
   async function togglePublishPaper(){
+    if(publicationCheckBusy)return;
+    publicationCheckBusy=true;
+    const publishButton=$('qbPublishPaperBtn');if(publishButton)publishButton.disabled=true;
+    try{
     if(window.KGRolePermissions&&!window.KGRolePermissions.can('publishPapers'))return toast('当前角色无试卷发布权限。');
     let paper=currentPaper();if(!paper)return toast('请先新建试卷。');
     if(isPaperArchived(paper))return toast('请先取消归档，再发布新版本。');
@@ -3555,7 +3576,17 @@
     if(!(paper.questions||[]).length)return toast('请先从题库选择题目后再发布。');
     const integrity=paperIntegrity(paper);if(integrity.missingCount)return toast(`试卷中有 ${integrity.missingCount} 道题目引用已失效，请先移除。`);if(integrity.duplicateCount)return toast(`试卷中有 ${integrity.duplicateCount} 个重复题目引用，请先处理。`);
     if(!(paper.enabledModes||[]).length)return toast('请至少选择一种学习模式后再发布。');
-    const release=await publishPaperRelease(paper);if(!release)return;await reloadPaperDrafts({selectedId:paper.id}).catch(()=>{});paper=currentPaper();setCurrentPaper(paper);renderPaperManager();toast(`已发布 v${release.version}，开放：${(paper?.enabledModes||[]).map(mode=>PAPER_MODE_LABELS[mode]||mode).join('、')}。`);
+    if(!window.KGPaperReleaseApi?.preflight)return toast('发布检查 API 未加载，请刷新页面后重试。');
+    while(true){
+      let checklist;try{checklist=await window.KGPaperReleaseApi.preflight(paper.id)}catch(error){toast(error?.message||'发布检查失败，请重试。');return}
+      const action=await showPublicationChecklist(checklist,paper);
+      if(action==='cancel')return;
+      if(action==='retry')continue;
+      try{
+        const release=await publishPaperRelease(paper);if(!release)return;await reloadPaperDrafts({selectedId:paper.id}).catch(()=>{});paper=currentPaper();setCurrentPaper(paper);renderPaperManager();toast(`已发布 v${release.version}，开放：${(paper?.enabledModes||[]).map(mode=>PAPER_MODE_LABELS[mode]||mode).join('、')}。`);return;
+      }catch(error){if(error?.detail?.code!=='PUBLICATION_CHECK_FAILED')throw error;const next=await showPublicationChecklist(error.detail,paper);if(next==='cancel')return}
+    }
+    }finally{publicationCheckBusy=false;if(publishButton)publishButton.disabled=!currentPaper()||isPaperArchived(currentPaper())}
   }
   async function withdrawCurrentPaper(){
     if(window.KGRolePermissions&&!window.KGRolePermissions.can('publishPapers'))return toast('当前角色无试卷取消发布权限。');

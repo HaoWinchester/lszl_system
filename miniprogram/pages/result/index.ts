@@ -47,6 +47,8 @@ Page(withAppearance(withAppShare({
     score: '0',
     duration: '0 分钟',
     conclusion: '继续巩固',
+    reportKind: 'practice',
+    scoreLabel: '本次正确率',
     gameOutcome: '',
     gameDetail: '',
     domains: [] as Array<{ id: string; label: string; score: string; weak: boolean }>,
@@ -78,15 +80,19 @@ Page(withAppearance(withAppShare({
         getReport(this.data.sessionId),
         getSession(this.data.sessionId),
       ]);
-      const domainRows = Object.entries(report.domains || {})
-        .filter(([, value]) => Number(value?.total || 0) > 0)
-        .map(([id, value]) => ({
+      const isSimulation = report.reportKind === 'simulation' || (!report.reportKind && Number(report.counts?.total || 0) >= 60 && !['revenge', 'scholar'].includes(String(report.mode || session.mode)));
+      const domainRows = Object.keys(domainLabels)
+        .map(id => {
+          const value = report.domains?.[id];
+          const assessed = Number(value?.total || 0) > 0;
+          return {
           id,
           label: domainLabels[id] || id,
-          score: percent(value?.scorePercent),
-          weak: Number(value?.scorePercent || 0) < 60,
-        }))
-        .sort((left, right) => Number(left.score) - Number(right.score));
+          score: assessed ? percent(isSimulation ? value?.scorePercent : Number(value?.correct || 0) / Number(value?.total || 1) * 100) : '未评估',
+          weak: assessed && Number(isSimulation ? value?.scorePercent : Number(value?.correct || 0) / Number(value?.total || 1) * 100) < 60,
+          };
+        })
+        .sort((left, right) => left.score === '未评估' ? 1 : right.score === '未评估' ? -1 : Number(left.score) - Number(right.score));
       const wrongIds = new Set((report.wrongQuestionIds || []).map(String));
       const wrongQuestions = session.questions
         .map((entry, index) => ({ questionId: entry.questionId, number: index + 1, question: entry.question }))
@@ -98,9 +104,11 @@ Page(withAppearance(withAppShare({
         report,
         session,
         accuracy: percent(report.accuracyPercent),
-        score: percent(report.scorePercent),
+        score: percent(isSimulation ? report.scorePercent : report.accuracyPercent),
+        scoreLabel: isSimulation ? '模拟得分' : '本次正确率',
+        reportKind: isSimulation ? 'simulation' : 'practice',
         duration: formatDuration(report.durationMs),
-        conclusion: report.passed ? '本次练习达标' : '还有可以补强的地方',
+        conclusion: isSimulation ? (report.resultLabel || `模拟考试结果：${report.passed ? 'PASS' : 'FAIL'}`) : '本次练习摘要',
         gameOutcome: runtime ? `${session.mode === 'scholar' ? '学霸挑战' : '挑战'}${runtime.health > 0 ? '成功' : '失败'}` : '',
         gameDetail: runtime ? `剩余生命 ${runtime.health} / ${run?.maxHealth}${session.mode === 'scholar' ? ` · 最高连对 ${runtime.maxStreak}` : ''}` : '',
         domains: domainRows,

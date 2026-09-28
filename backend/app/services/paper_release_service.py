@@ -49,6 +49,61 @@ def _error(status: int, code: str, message: str) -> HTTPException:
     return HTTPException(status_code=status, detail={"code": code, "message": message})
 
 
+def _publication_checklist(questions: list[dict], metadata: dict | None = None, policy: dict | None = None) -> dict:
+    """Collect all editable defects from the same answer validator used by publishing."""
+    configs = [config for config in (metadata, policy) if isinstance(config, dict)]
+    english_required = any(config.get("languageMode") in {"en", "bilingual"} or "en" in (config.get("enabledLanguages") or []) for config in configs)
+    issues: list[dict] = []
+    warnings: list[dict] = []
+    for entry in questions:
+        snapshot = entry["question"]
+        context = {
+            "number": entry["order"], "bankId": entry["bankId"],
+            "questionId": entry["questionId"],
+            "title": str(snapshot.get("title") or f"第 {entry['order']} 题"),
+        }
+        stem = "".join(str(part.get("text") or "") for part in snapshot.get("stemParts") or [] if isinstance(part, dict)) or str(snapshot.get("stem") or "")
+        if not stem.strip():
+            issues.append({**context, "field": "stemParts", "code": "QUESTION_STEM_REQUIRED", "message": "中文题干不能为空"})
+        if snapshot.get("type") != "matching" and any(not str(option.get("text") or "").strip() for option in snapshot.get("options") or [] if isinstance(option, dict)):
+            issues.append({**context, "field": "options", "code": "QUESTION_OPTION_TEXT_REQUIRED", "message": "中文选项文字不能为空"})
+        issues.extend({**context, **issue} for issue in question_answer_service.validate_question(snapshot, require_analysis=True))
+        english = (snapshot.get("translations") or {}).get("en") or {}
+        english_stem = "".join(str(part.get("text") or "") for part in english.get("stemParts") or [] if isinstance(part, dict))
+        english_options = {str(option.get("id") or ""): str(option.get("text") or "").strip() for option in english.get("options") or [] if isinstance(option, dict)}
+        source_options = [str(option.get("id") or "") for option in snapshot.get("options") or [] if isinstance(option, dict)]
+        missing_options = snapshot.get("type") != "matching" and any(not english_options.get(option_id) for option_id in source_options)
+        if not english_stem.strip() or not str(english.get("analysis") or "").strip() or missing_options:
+            target = issues if english_required else warnings
+            target.append({**context, "field": "translations.en", "code": "QUESTION_ENGLISH_INCOMPLETE", "message": "英文题干、选项或解析未填写"})
+    return {"ready": not issues, "issues": issues, "warnings": warnings}
+
+
+def _require_publication_ready(checklist: dict) -> None:
+    if checklist["issues"]:
+        raise HTTPException(status_code=422, detail={"code": "PUBLICATION_CHECK_FAILED", "message": f"发布检查发现 {len(checklist['issues'])} 处需要修改的问题", **checklist})
+
+
+async def preflight(db: AsyncSession, actor: User, paper_id: str) -> dict:
+    if actor.role not in {"admin", "teacher"}:
+        raise _error(403, "PUBLISH_FORBIDDEN", "仅教师或管理员可以检查试卷")
+    paper = await db.get(ExamPaper, paper_id)
+    if paper is None or paper.deleted_at is not None:
+        raise _error(404, "PAPER_NOT_FOUND", "试卷不存在或无权访问")
+    rows = (await db.execute(
+        select(Question, PaperQuestion.order_index)
+        .join(PaperQuestion, PaperQuestion.question_id == Question.id)
+        .where(PaperQuestion.paper_id == paper_id)
+        .order_by(PaperQuestion.order_index, Question.id)
+    )).all()
+    if not rows:
+        return {"ready": False, "issues": [{"number": 0, "bankId": "", "questionId": "", "title": paper.name, "field": "questions", "code": "EMPTY_PAPER_RELEASE", "message": "试卷至少需要一道题目"}], "warnings": []}
+    return _publication_checklist([
+        {"order": index + 1, "bankId": question.bank_id, "questionId": question.id, "question": question_catalog_service.question_to_payload(question)}
+        for index, (question, _) in enumerate(rows)
+    ], paper.access_policy if isinstance(paper.access_policy, dict) else {})
+
+
 def _snapshot_is_learnable(snapshot: dict) -> bool:
     """快照必须自带可学习内容（题干 + ≥2 选项 + 正确答案），摘要桩不算。"""
     if not isinstance(snapshot, dict) or snapshot.get("__paperSummaryOnly"):
@@ -131,15 +186,13 @@ async def _repair_release_snapshots(db: AsyncSession, canonical: dict) -> None:
     for question in broken:
         row = await db.get(Question, question["questionId"])
         if row is None or row.bank_id != question["bankId"]:
-            issues.append(f"第 {question['order']} 题（{question['questionId']}）在题库中不存在")
+            if question["question"].get("__paperSummaryOnly"):
+                issues.append(f"第 {question['order']} 题（{question['questionId']}）在题库中不存在")
             continue
         if (row.lifecycle or {}).get("status") == "deleted":
             issues.append(f"第 {question['order']} 题（{question['questionId']}）已被安全删除")
             continue
         payload = question_catalog_service.question_to_payload(row)
-        if not _snapshot_is_learnable(payload):
-            issues.append(f"第 {question['order']} 题（{question['questionId']}）缺少题干、选项或正确答案")
-            continue
         question["question"] = payload
     if issues:
         preview = "；".join(issues[:5])
@@ -334,6 +387,10 @@ async def publish(
     ).all()
     if not rows:
         raise _error(422, "EMPTY_PAPER_RELEASE", "试卷至少需要一道题目")
+    _require_publication_ready(_publication_checklist([
+        {"order": index + 1, "bankId": question.bank_id, "questionId": question.id, "question": question_catalog_service.question_to_payload(question)}
+        for index, (question, _, _) in enumerate(rows)
+    ], metadata, paper.access_policy))
     frozen_questions = []
     for question, order_index, score in rows:
         if not paper_service.question_matches_paper_type(
@@ -348,13 +405,6 @@ async def publish(
         snapshot = question_catalog_service.question_to_payload(question)
         from app.services.question_material_service import freeze_question_resources
         snapshot = await freeze_question_resources(db, actor, snapshot)
-        issues = question_answer_service.validate_question(
-            snapshot,
-            require_analysis=True,
-        )
-        if issues:
-            issue = issues[0]
-            raise _error(422, issue["code"], issue["message"])
         frozen_score = float(score if score is not None else 1)
         snapshot["releaseScore"] = frozen_score
         frozen_questions.append((question, order_index, frozen_score, snapshot))
@@ -696,13 +746,6 @@ async def publish_from_payload(db: AsyncSession, actor: User, payload: dict) -> 
                 "PAPER_TYPE_QUESTION_MISMATCH",
                 "试卷类型与所选题目类型不一致",
             )
-        issues = question_answer_service.validate_question(
-            snapshot,
-            require_analysis=True,
-        )
-        if issues:
-            issue = issues[0]
-            raise _error(422, issue["code"], issue["message"])
         raw_score = question.get("score")
         snapshot["releaseScore"] = float(raw_score if raw_score is not None else 1)
         question["question"] = snapshot
@@ -722,6 +765,7 @@ async def publish_from_payload(db: AsyncSession, actor: User, payload: dict) -> 
             .with_for_update()
         )
     ).scalar_one_or_none()
+    _require_publication_ready(_publication_checklist(canonical["questions"], canonical["metadata"], draft.access_policy if draft else None))
     if draft is not None and draft.paper_type != canonical["paperType"]:
         reference_count = int(
             await db.scalar(

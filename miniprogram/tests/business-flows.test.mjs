@@ -344,6 +344,28 @@ test('report includes unanswered questions and reuses the original practice mode
   page.onRetry(); assert.match(navigation[0].url, /mode=challenge/);
 });
 
+test('short practice result uses actual coverage and leaves unsampled domains unassessed', async () => {
+  const s = session();
+  const report = { reportKind: 'practice', passed: null, accuracyPercent: 50, counts: { total: 2, correct: 1 },
+    domains: { people: { total: 2, correct: 1, scorePercent: 50 }, process: { total: 0 }, 'business-environment': { total: 0 } } };
+  const { page } = await loadPage('result', { createPracticeRun, normalizePairs, getModePolicy, messageOf: e => e.message,
+    getSession: async () => s, getReport: async () => report });
+  await page.loadResult();
+  assert.equal(page.data.conclusion, '本次练习摘要');
+  assert.equal(page.data.domains.length, 3);
+  assert.equal(page.data.domains.find(row => row.id === 'process').score, '未评估');
+  assert.equal(page.data.scoreLabel, '本次正确率');
+});
+
+test('historical ten-question report does not reuse its old pass verdict', async () => {
+  const s = session();
+  const { page } = await loadPage('result', { createPracticeRun, normalizePairs, getModePolicy, messageOf: e => e.message,
+    getSession: async () => s, getReport: async () => ({ passed: true, resultLabel: '模拟考试结果：PASS', counts: { total: 2, correct: 1 } }) });
+  await page.loadResult();
+  assert.equal(page.data.conclusion, '本次练习摘要');
+  assert.equal(page.data.scoreLabel, '本次正确率');
+});
+
 test('scholar result uses remaining life rather than exam pass percentage', async () => {
   const s = session('scholar'); s.status = 'completed'; s.runtimeState = { health: 0, maxStreak: 4 };
   const { page } = await loadPage('result', { createPracticeRun, normalizePairs, getModePolicy, messageOf: e => e.message,

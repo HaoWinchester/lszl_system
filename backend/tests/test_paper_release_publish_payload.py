@@ -18,12 +18,15 @@ def _payload(paper_id="paper-t1", version=1):
         "id": "q_test_1", "title": "测试题", "stemParts": [{"text": "题干"}],
         "options": [{"id": "A", "text": "方案一"}, {"id": "B", "text": "方案二"}],
         "correctAnswer": "A", "bankId": "b_test",
+        "analysis": "题目解析",
         "metadata": {
             "subjectFacets": [
                 {"dimensionId": "exam-domain", "valueId": "process"}
             ]
         },
     }
+
+
     return {
         "id": f"{paper_id}-v{version}-test", "releaseId": f"{paper_id}-v{version}-test",
         "paperId": paper_id, "version": version, "name": "载荷发布测试卷", "subject": "PMP",
@@ -33,6 +36,47 @@ def _payload(paper_id="paper-t1", version=1):
         "questions": [{"bankId": "b_test", "questionId": "q_test_1", "order": 1}],
         "questionSnapshots": [{"bankId": "b_test", "questionId": "q_test_1", "question": question}],
     }
+
+
+def test_publish_payload_returns_editable_checklist_and_retry_succeeds() -> None:
+    with TestClient(app) as client:
+        login(client, "admin")
+        paper_id = f"paper-check-{uuid4().hex[:8]}"
+        payload = _payload(paper_id=paper_id)
+        payload["questionSnapshots"][0]["question"]["analysis"] = ""
+        rejected = client.post("/api/v1/paper-releases/publish-payload", json=payload)
+        assert rejected.status_code == 422
+        detail = rejected.json()["detail"]
+        assert detail["code"] == "PUBLICATION_CHECK_FAILED"
+        assert detail["issues"][0]["questionId"] == "q_test_1"
+        assert detail["issues"][0]["bankId"] == "b_test"
+        assert detail["issues"][0]["field"] == "analysis"
+        payload["questionSnapshots"][0]["question"]["analysis"] = "补齐解析"
+        accepted = client.post("/api/v1/paper-releases/publish-payload", json=payload)
+        assert accepted.status_code == 200, accepted.text
+
+
+def test_publish_payload_missing_answer_returns_question_context() -> None:
+    with TestClient(app) as client:
+        login(client, "admin")
+        payload = _payload(paper_id=f"paper-answer-{uuid4().hex[:8]}")
+        payload["questionSnapshots"][0]["question"]["correctAnswer"] = ""
+        rejected = client.post("/api/v1/paper-releases/publish-payload", json=payload)
+        assert rejected.status_code == 422
+        issue = rejected.json()["detail"]["issues"][0]
+        assert issue["field"] == "correctAnswer"
+        assert issue["questionId"] == "q_test_1"
+
+
+def test_payload_cannot_override_existing_bilingual_paper_policy() -> None:
+    with TestClient(app) as client:
+        login(client, "admin")
+        paper = client.post("/api/v1/papers", json={"name": "双语试卷", "subject": "PMP", "accessPolicy": {"languageMode": "bilingual"}}).json()["paper"]
+        payload = _payload(paper_id=paper["id"])
+        payload["metadata"] = {"languageMode": "zh"}
+        rejected = client.post("/api/v1/paper-releases/publish-payload", json=payload)
+        assert rejected.status_code == 422
+        assert rejected.json()["detail"]["issues"][0]["field"] == "translations.en"
 
 
 def test_publish_payload_creates_release_and_withdraw_all(client=None) -> None:
@@ -197,6 +241,7 @@ def test_publish_payload_repairs_summary_only_stubs_from_bank() -> None:
                 "stemParts": [{"text": "题库里的完整题干"}],
                 "options": [{"id": "A", "text": "方案一"}, {"id": "B", "text": "方案二"}],
                 "correctAnswer": "A",
+                "analysis": "题库解析",
                 "metadata": {
                     "subjectFacets": [
                         {"dimensionId": "exam-domain", "valueId": "process"}

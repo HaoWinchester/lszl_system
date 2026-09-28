@@ -646,6 +646,10 @@ def test_admin_and_teacher_share_paper_crud_compose_publish_and_audit() -> None:
         assert after_compose["updatedBy"] == actor
         assert after_compose["revision"] == 3
 
+        preflight = client.get(f"/api/v1/paper-releases/papers/{paper_id}/preflight")
+        assert preflight.status_code == 200
+        assert preflight.json()["ready"] is True
+
         for revision in (None, "invalid"):
             suffix = "" if revision is None else f"?revision={revision}"
             rejected = client.post(f"/api/v1/papers/{paper_id}/publish{suffix}")
@@ -740,8 +744,10 @@ def test_admin_and_teacher_share_paper_crud_compose_publish_and_audit() -> None:
                                 {"dimensionId": "exam-domain", "valueId": "process"}
                             ]
                         },
-                        "options": [{"id": "A", "text": "正确", "correct": True}],
+                        "options": [{"id": "A", "text": "正确", "correct": True}, {"id": "B", "text": "错误"}],
                         "correctAnswer": "A",
+                        "stemParts": [{"text": "跨账号题干"}],
+                        "analysis": "跨账号解析",
                     },
             ).json()["question"]
             question_id = question["id"]
@@ -1165,8 +1171,10 @@ def test_concurrent_compose_and_publish_share_one_atomic_revision(monkeypatch) -
                 json={
                     "title": "并发组卷题",
                     "domain": "并发领域",
-                    "options": [{"id": "A", "text": "正确", "correct": True}],
+                    "stemParts": [{"text": "并发题干"}],
+                    "options": [{"id": "A", "text": "正确", "correct": True}, {"id": "B", "text": "错误"}],
                     "correctAnswer": "A",
+                    "analysis": "并发解析",
                 },
             ).json()["question"]
             question_id = question["id"]

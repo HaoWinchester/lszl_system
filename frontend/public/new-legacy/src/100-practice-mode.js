@@ -1142,7 +1142,7 @@
     if(!modePolicy().canSubmit)return false;
     const stats=global.KGPracticeSessionCore?.answerSheetStats?.(answerSheetSession())||{unanswered:0};
     if(!stats.unanswered){finishPractice();return}
-    if(dom.submitMessage)dom.submitMessage.textContent=`还有 ${stats.unanswered} 题未作答，未答题将按 0 分计入模拟成绩。`;
+    if(dom.submitMessage)dom.submitMessage.textContent=`还有 ${stats.unanswered} 题未作答，未答题将计入本次结果。`;
     dom.submitConfirm.hidden=false;dom.submitConfirm.setAttribute('aria-hidden','false');
   }
   function closeSubmitConfirm(){dom.submitConfirm.hidden=true;dom.submitConfirm.setAttribute('aria-hidden','true')}

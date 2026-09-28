@@ -1940,7 +1940,10 @@ def test_report_uses_frozen_question_scores_and_history_reopens_by_session_id() 
             assert report["domains"]["people"]["rawScore"] == 5
             assert report["domains"]["people"]["maxScore"] == 8
             assert report["domains"]["people"]["scorePercent"] == 62.5
-            assert report["passPercent"] == 75
+            assert report["reportKind"] == "practice"
+            assert report["passPercent"] is None
+            assert report["passed"] is None
+            assert report["resultLabel"] == "本次练习摘要"
             assert report["paperName"] == "PMP 会话模拟卷"
             assert report["learner"] == ids["student"]
             assert report["reportNumber"] == started["id"]
@@ -3125,7 +3128,7 @@ def test_complete_regrades_whole_submission_and_ignores_client_truth(client, act
     body = response.json()
     assert body["session"]["answers"][first_id]["correct"] is False
     assert body["report"]["counts"]["wrong"] == 1
-    assert body["report"]["passed"] is False
+    assert body["report"]["passed"] is None
 
 
 def test_pause_never_records_mistakes_until_complete_does(client, active_session):

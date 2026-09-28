@@ -1789,6 +1789,16 @@ async def _build_report(db: AsyncSession, session: PracticeSession) -> dict:
         else:
             domain_counts[domain]["wrong"] += 1
     total = len(refs)
+    selection = scoring.get("selectionSummary")
+    paper_total = selection.get("totalCount") if isinstance(selection, dict) else None
+    # A simulated exam covers an entire sizeable frozen paper. A sampled set and
+    # the independent game modes are practice, even if scoring defaults exist.
+    is_simulation = (
+        session.mode in {"practice", "challenge"}
+        and total >= 60
+        and paper_total == total
+        and bool(session.release_id)
+    )
     score_percent = round((raw_score / max_score * 100) if max_score else 0, 2)
     pass_percent = float(scoring.get("passPercent", 60))
     passed = score_percent >= pass_percent
@@ -1802,13 +1812,13 @@ async def _build_report(db: AsyncSession, session: PracticeSession) -> dict:
             2,
         )
         domains[domain] = {
-            "weight": int(weights.get(domain, 0)),
+            "weight": int(weights.get(domain, 0)) if is_simulation else round(domain_total / total * 100) if total else 0,
             **counts,
             "unanswered": domain_total - counts["answered"],
             "rawScore": round(domain_raw_score, 2),
             "maxScore": round(domain_max_score, 2),
             "scorePercent": domain_percent,
-            "performanceBand": performance_band(domain_percent, scoring),
+            "performanceBand": performance_band(domain_percent, scoring) if is_simulation and domain_total else None,
         }
     stats = session.stats if isinstance(session.stats, dict) else {}
     release = (
@@ -1826,15 +1836,16 @@ async def _build_report(db: AsyncSession, session: PracticeSession) -> dict:
         "paperId": session.paper_id,
         "releaseId": session.release_id,
         "mode": session.mode,
-        "resultLabel": f"模拟考试结果：{'PASS' if passed else 'FAIL'}",
-        "passed": passed,
+        "reportKind": "simulation" if is_simulation else "practice",
+        "resultLabel": f"模拟考试结果：{'PASS' if passed else 'FAIL'}" if is_simulation else "本次练习摘要",
+        "passed": passed if is_simulation else None,
         "scorePercent": score_percent,
         "accuracyPercent": round((correct_count / total * 100) if total else 0, 2),
         "rawScore": round(raw_score, 2),
         "maxScore": round(max_score, 2),
-        "passPercent": pass_percent,
+        "passPercent": pass_percent if is_simulation else None,
         "bands": deepcopy(scoring.get("bands") or DEFAULT_SIMULATION_SCORING["bands"]),
-        "overallBand": performance_band(score_percent, scoring),
+        "overallBand": performance_band(score_percent, scoring) if is_simulation else None,
         "counts": {
             "total": total,
             "answered": answered_count,
@@ -1842,7 +1853,7 @@ async def _build_report(db: AsyncSession, session: PracticeSession) -> dict:
             "wrong": answered_count - correct_count,
             "unanswered": total - answered_count,
         },
-        "domainWeights": {domain: int(value) for domain, value in weights.items()},
+        "domainWeights": {domain: row["weight"] for domain, row in domains.items()},
         "domainDataComplete": domain_data_complete,
         "domains": domains,
         "wrongQuestionIds": wrong_question_ids,
@@ -1854,11 +1865,11 @@ async def _build_report(db: AsyncSession, session: PracticeSession) -> dict:
         "reportNumber": session.id,
         "recommendations": [
             "优先复盘本次错题及对应知识点",
-            "根据领域表现安排下一轮针对性练习",
+            "根据领域表现安排下一轮针对性练习" if is_simulation else "扩大题目覆盖后再判断各领域的整体表现",
         ],
         "pageNumber": "1 / 1",
         "official": False,
-        "disclaimer": "幻谱模拟判定，不代表 PMI 官方考试成绩",
+        "disclaimer": "幻谱模拟判定，不代表 PMI 官方考试成绩" if is_simulation else "本报告只反映本次练习题目，不代表考试通过情况",
     }
 
 

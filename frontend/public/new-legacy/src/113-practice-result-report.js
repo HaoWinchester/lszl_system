@@ -31,6 +31,7 @@
     return { x: cx + radius * Math.cos(radians), y: cy + radius * Math.sin(radians) }
   }
   function slicePath(cx, cy, radius, start, end) {
+    if (end - start >= 359.9) return `M ${cx} ${cy - radius} A ${radius} ${radius} 0 1 1 ${cx} ${cy + radius} A ${radius} ${radius} 0 1 1 ${cx} ${cy - radius} Z`
     const first = point(cx, cy, radius, start)
     const last = point(cx, cy, radius, end)
     return `M ${cx} ${cy} L ${first.x.toFixed(2)} ${first.y.toFixed(2)} A ${radius} ${radius} 0 ${end - start > 180 ? 1 : 0} 1 ${last.x.toFixed(2)} ${last.y.toFixed(2)} Z`
@@ -45,7 +46,10 @@
   function pieMarkup(report) {
     const weights = report?.domainWeights || {}
     const domains = report?.domains || {}
-    const entries = Object.keys(DOMAIN_LABELS).map(domain => ({ domain, weight: Math.max(0, number(weights[domain])) }))
+    const hasUnsampled = Object.keys(DOMAIN_LABELS).some(domain => number(domains[domain]?.total) === 0)
+    const entries = Object.keys(DOMAIN_LABELS).filter(domain => number(domains[domain]?.total) > 0).map(domain => ({
+      domain, weight: hasUnsampled ? Math.round(number(domains[domain].total) / number(report?.counts?.total) * 100) : Math.max(0, number(weights[domain])),
+    }))
     const total = entries.reduce((sum, entry) => sum + entry.weight, 0) || 100
     let angle = 0
     const paths = []
@@ -79,11 +83,13 @@
       return `<span class="practice-report-band-segment" style="--band-color:${BAND_COLORS[band]};flex:${width} 0 0">${BAND_LABELS[band]}</span>`
     }).join('')
   }
-  function domainRows(report) {
+  function domainRows(report, isSimulation) {
     const domains = report?.domains || {}
     return Object.keys(DOMAIN_LABELS).map((domain) => {
       const row = domains[domain] || {}
       const band = row.performanceBand || 'target'
+      if (!isSimulation) return `<tr><th>${DOMAIN_LABELS[domain]}</th><td>${number(row.total)} / ${number(report?.counts?.total)} 题</td><td>${number(row.correct)} / ${number(row.total)}</td><td>${number(row.total) ? `${number(row.correct / row.total * 100).toFixed(2).replace(/\.00$/, '')}%` : '未评估'}</td><td>${number(row.total) ? '本次覆盖' : '未评估'}</td></tr>`
+      if (!number(row.total)) return `<tr><th>${DOMAIN_LABELS[domain]}</th><td>0%</td><td>0 / 0</td><td>未评估</td><td>未评估</td></tr>`
       return `<tr><th>${DOMAIN_LABELS[domain]}</th><td>${number(row.weight ?? report?.domainWeights?.[domain])}%</td><td>${number(row.correct)} / ${number(row.total)}</td><td>${number(row.scorePercent).toFixed(2).replace(/\.00$/, '')}%</td><td><span class="practice-report-band" style="--band-color:${BAND_COLORS[band] || BAND_COLORS.target}">${BAND_LABELS[band] || band}</span></td></tr>`
     }).join('')
   }
@@ -137,6 +143,7 @@
     root.classList.add('has-practice-report')
     const counts = report.counts || {}
     const score = number(report.scorePercent)
+    const isSimulation = report.reportKind === 'simulation' || (!report.reportKind && number(counts.total) >= 60 && !['revenge', 'scholar'].includes(report.mode))
     const resultClass = report.passed ? 'is-pass' : 'is-fail'
     const questionNumbers = options.questionNumbers || {}
     const wrongIds = Array.isArray(report.wrongQuestionIds) ? report.wrongQuestionIds : []
@@ -146,19 +153,20 @@
       return `<button type="button" data-review-question="${escapeHTML(id)}" aria-label="回看${escapeHTML(label)}">${escapeHTML(label)}</button>`
     }).join('')
     root.innerHTML = `<article class="practice-result-report">
-      <header class="practice-report-header"><img class="practice-report-logo" src="/assets/logo.jpg" alt="幻谱"/><div><span>HUANPU SIMULATION REPORT</span><h1>幻谱 PMP 模拟成绩分析报告</h1></div></header>
+      <header class="practice-report-header"><img class="practice-report-logo" src="/assets/logo.jpg" alt="幻谱"/><div><span>${isSimulation ? 'HUANPU SIMULATION REPORT' : 'HUANPU PRACTICE SUMMARY'}</span><h1>${isSimulation ? '幻谱 PMP 模拟成绩分析报告' : '本次练习摘要'}</h1></div></header>
       <section class="practice-report-meta"><div><span>学员</span><strong>${escapeHTML(report.learner || '当前学员')}</strong></div><div><span>试卷</span><strong>${escapeHTML(report.paperName || 'PMP 模拟练习')}</strong></div><div><span>日期</span><strong>${escapeHTML(report.examDate || report.completedAt || '')}</strong></div><div><span>报告编号</span><strong>${escapeHTML(report.reportNumber || report.sessionId || '')}</strong></div></section>
-      <section class="practice-report-overall ${resultClass}"><div><span>OVERALL PERFORMANCE</span><h2>${escapeHTML(report.resultLabel || `模拟考试结果：${report.passed ? 'PASS' : 'FAIL'}`)}</h2><p>本结果按本次会话的冻结规则生成。</p></div><div class="practice-report-score"><strong>${score.toFixed(2).replace(/\.00$/, '')}</strong><span>模拟分 / 100${report.maxScore ? ` · ${number(report.rawScore)} / ${number(report.maxScore)} 原始分` : ''}</span></div></section>
-      <section class="practice-report-band-scale" aria-label="总体表现区间"><div class="practice-report-band-track">${bandScaleMarkup(report)}<i style="left:${Math.max(0, Math.min(100, score))}%" aria-label="你的模拟分 ${score}"></i></div></section>
+      <section class="practice-report-overall ${isSimulation ? resultClass : ''}"><div><span>${isSimulation ? 'OVERALL PERFORMANCE' : 'PRACTICE COVERAGE'}</span><h2>${isSimulation ? escapeHTML(report.resultLabel || `模拟考试结果：${report.passed ? 'PASS' : 'FAIL'}`) : '本次练习摘要'}</h2><p>${isSimulation ? '本结果按本次会话的冻结规则生成。' : '仅反映本次抽取题目的表现。'}</p></div><div class="practice-report-score"><strong>${isSimulation ? score.toFixed(2).replace(/\.00$/, '') : number(report.accuracyPercent).toFixed(2).replace(/\.00$/, '')}</strong><span>${isSimulation ? `模拟分 / 100${report.maxScore ? ` · ${number(report.rawScore)} / ${number(report.maxScore)} 原始分` : ''}` : '本次正确率 / 100'}</span></div></section>
+      ${isSimulation ? `<section class="practice-report-band-scale" aria-label="总体表现区间"><div class="practice-report-band-track">${bandScaleMarkup(report)}<i style="left:${Math.max(0, Math.min(100, score))}%" aria-label="你的模拟分 ${score}"></i></div></section>` : ''}
       <section class="practice-report-counts"><div><span>总题数</span><strong>${number(counts.total)}</strong></div><div><span>答对</span><strong>${number(counts.correct)}</strong></div><div><span>答错</span><strong>${number(counts.wrong)}</strong></div><div><span>未答</span><strong>${number(counts.unanswered)}</strong></div><div><span>正确率</span><strong>${number(report.accuracyPercent ?? score).toFixed(2).replace(/\.00$/, '')}%</strong></div><div><span>累计用时</span><strong>${durationLabel(report.durationMs)}</strong></div>${options.experience == null ? '' : `<div><span>本次经验</span><strong>${number(options.experience)}</strong></div>`}</section>
-      ${domainDataComplete
+      ${domainDataComplete && isSimulation
         ? `<section class="practice-report-breakdown"><header><span>EXAM BREAKDOWN</span><h2>考试领域分析</h2><p>扇区大小代表领域占比，颜色代表本领域的模拟表现等级。</p>${legendMarkup()}</header>${pieMarkup(report)}</section>
-      <section class="practice-report-domains"><h2>各领域成绩</h2><div class="practice-report-table-scroll"><table class="practice-report-domain-table"><thead><tr><th>领域</th><th>占比</th><th>答对 / 总数</th><th>得分率</th><th>表现</th></tr></thead><tbody>${domainRows(report)}</tbody></table></div></section>`
-        : '<section class="practice-report-domain-unavailable" role="status"><h2>领域分析暂不可用</h2><p>本试卷包含未标注 PMP 领域的历史题目；总体成绩仍按全部题目计算，为避免误导，本次不展示领域饼图与领域等级。</p></section>'}
+      <section class="practice-report-domains"><h2>各领域成绩</h2><div class="practice-report-table-scroll"><table class="practice-report-domain-table"><thead><tr><th>领域</th><th>占比</th><th>答对 / 总数</th><th>得分率</th><th>表现</th></tr></thead><tbody>${domainRows(report, true)}</tbody></table></div></section>`
+        : isSimulation ? '<section class="practice-report-domain-unavailable" role="status"><h2>领域分析暂不可用</h2><p>本试卷包含未标注 PMP 领域的历史题目；总体成绩仍按全部题目计算，为避免误导，本次不展示领域饼图与领域等级。</p></section>'
+        : `<section class="practice-report-domains"><h2>本次领域覆盖</h2><div class="practice-report-table-scroll"><table class="practice-report-domain-table"><thead><tr><th>领域</th><th>覆盖</th><th>答对 / 总数</th><th>本次正确率</th><th>状态</th></tr></thead><tbody>${domainRows(report, false)}</tbody></table></div>${domainDataComplete ? '' : '<p>部分历史题目缺少领域标注；只显示已标注题目的覆盖情况。</p>'}</section>`}
       <section class="practice-report-wrong"><div><h2>本次错题</h2><p>${wrongIds.length ? `共 ${wrongIds.length} 道，${Array.isArray(options.questions) ? '下方已统一展开错题与解析，也可筛选全部或答对的题目。' : '点击题号只读回看答案与解析。'}` : '本次作答没有错题。'}</p></div><div class="practice-report-wrong-list">${wrongButtons}</div></section>
       ${Array.isArray(options.questions) ? '<section class="practice-report-review" data-question-review></section>' : ''}
-      <section class="practice-report-next"><h2>下一步建议</h2><ul>${(Array.isArray(report.recommendations) ? report.recommendations : []).map(item => `<li>${escapeHTML(item)}</li>`).join('')}</ul></section>
-      <p class="practice-report-disclaimer">${escapeHTML(report.disclaimer || '幻谱模拟判定，不代表 PMI 官方考试成绩')}</p>
+      <section class="practice-report-next"><h2>下一步建议</h2><ul>${(isSimulation ? (Array.isArray(report.recommendations) ? report.recommendations : []) : ['优先复盘本次错题及对应知识点', '扩大题目覆盖后再判断各领域的整体表现']).map(item => `<li>${escapeHTML(item)}</li>`).join('')}</ul></section>
+      <p class="practice-report-disclaimer">${isSimulation ? escapeHTML(report.disclaimer || '幻谱模拟判定，不代表 PMI 官方考试成绩') : '本报告只反映本次练习题目，不代表考试通过情况'}</p>
       <footer class="practice-report-actions">${options.onReviewAll || Array.isArray(options.questions) ? '<button type="button" class="practice-secondary-btn" data-report-review-all="true">回看全部题目与解析</button>' : ''}<button type="button" class="practice-primary-btn" data-report-again="true">再练一次</button><button type="button" class="practice-secondary-btn" data-report-lobby="true">返回大厅</button></footer>
       <div class="practice-report-page">${escapeHTML(report.pageNumber || '1 / 1')}</div>
     </article>`

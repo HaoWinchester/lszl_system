@@ -95,7 +95,9 @@ def test_question_bank_and_paper():
                     {"dimensionId": "exam-domain", "valueId": "process"}
                 ]
             },
-            "options": [{"id": "A", "text": "x", "correct": True}],
+            "stemParts": [{"text": "应该选择哪项？"}],
+            "options": [{"id": "A", "text": "x", "correct": True}, {"id": "B", "text": "y"}],
+            "analysis": "A 符合题意。",
             "correctAnswer": "A",
         },
     ).json()["question"]

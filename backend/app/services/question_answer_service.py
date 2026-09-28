@@ -156,9 +156,20 @@ def validate_question(question: dict, *, require_analysis: bool = False) -> list
         validate_case_reference(question)
     except ValueError as error:
         return [_issue('caseGroup', 'CASE_GROUP_INVALID', str(error))]
-    if question.get('type') == 'matching':
-        return validate_matching(question)
-    return validate_multiple_choice(question, require_analysis=require_analysis)
+    kind = str(question.get('type') or 'single_choice')
+    if kind == 'matching':
+        issues = validate_matching(question)
+    elif kind == 'multiple_choice':
+        issues = validate_multiple_choice(question, require_analysis=require_analysis)
+    else:
+        option_ids = _option_ids(question)
+        answer = correct_option_ids(question)
+        issues = []
+        if require_analysis and (not answer or len(answer) != 1 or len(option_ids) < 2 or len(option_ids) != len(set(option_ids))):
+            issues.append(_issue('correctAnswer', 'SINGLE_CHOICE_ANSWER_INVALID', '单选题必须选择一个有效的正确答案'))
+    if require_analysis and kind != 'multiple_choice' and not str(question.get('analysis') or '').strip():
+        issues.append(_issue('analysis', 'QUESTION_ANALYSIS_REQUIRED', '发布前必须填写题目解析'))
+    return issues
 
 
 def grade_matching(question: dict, selected_pairs: object, *, timed_out: bool = False) -> dict:

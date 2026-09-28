@@ -38,6 +38,11 @@ async def publish_paper(paper_id: str, body: PaperReleasePublishRequest, db: DB,
     return {"release": paper_release_service.release_to_dict(release)}
 
 
+@router.get("/papers/{paper_id}/preflight")
+async def publication_preflight(paper_id: str, db: DB, user: Publisher):
+    return await paper_release_service.preflight(db, user, paper_id)
+
+
 @router.post("/{release_id}/withdraw")
 async def withdraw_release(
     release_id: str,

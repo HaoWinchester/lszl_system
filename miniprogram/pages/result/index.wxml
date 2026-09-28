@@ -20,16 +20,16 @@
     <text wx:if="{{session.selectionNotice}}" class="section-intro">{{session.selectionNotice}}</text>
 
     <view class="result-facts">
-      <view class="result-fact"><text class="result-fact-value">{{score}}%</text><text class="result-fact-label">得分</text></view>
+      <view class="result-fact"><text class="result-fact-value">{{score}}%</text><text class="result-fact-label">{{scoreLabel}}</text></view>
       <view class="result-fact with-divider"><text class="result-fact-value">{{report.counts.correct || 0}} / {{report.counts.total || 0}}</text><text class="result-fact-label">答对</text></view>
       <view class="result-fact with-divider"><text class="result-fact-value">{{duration}}</text><text class="result-fact-label">用时</text></view>
     </view>
 
     <view class="result-section">
-      <text class="section-kicker">薄弱知识点</text>
-      <text class="section-intro" wx:if="{{domains.length}}">从得分较低的领域开始复习。</text>
+      <text class="section-kicker">{{reportKind === 'simulation' ? '薄弱知识点与各领域成绩' : '本次领域覆盖'}}</text>
+      <text class="section-intro" wx:if="{{domains.length}}">{{reportKind === 'simulation' ? '从得分较低的领域开始复习。' : '未覆盖领域显示未评估；本次题目不足以判断整体水平。'}}</text>
       <view wx:for="{{domains}}" wx:key="id" class="domain-row {{item.weak ? 'is-weak' : ''}}">
-        <text>{{item.label}}</text><text class="domain-score">{{item.score}}%</text>
+        <text>{{item.label}}</text><text class="domain-score">{{item.score}}{{item.score === '未评估' ? '' : '%'}}</text>
       </view>
       <text wx:if="{{!domains.length}}" class="section-empty">本次暂无可用的领域统计。</text>
     </view>

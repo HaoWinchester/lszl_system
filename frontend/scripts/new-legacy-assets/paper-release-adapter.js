@@ -59,6 +59,12 @@
     return clone(response?.release || null);
   }
 
+  async function preflight(paperId) {
+    const id = text(paperId);
+    if (!id) throw new Error('请先选择试卷。');
+    return clone(await request(`/papers/${encodeURIComponent(id)}/preflight`));
+  }
+
   async function withdrawPaper(paperId) {
     const id = text(paperId);
     if (!id) throw new Error('请先选择试卷。');
@@ -331,6 +337,7 @@
     managementCatalog,
     mergeManagementPapers,
     publish,
+    preflight,
     withdrawPaper,
     findInCatalog,
     detail,

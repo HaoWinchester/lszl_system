@@ -15,7 +15,7 @@
     const clues=Array.isArray(question?.clues)?question.clues:[];
     return clues.some(clue=>String(clue?.text||'').trim()&&(String(clue?.recallNodeId||'').trim()||clue?.sourceMode==='quick'));
   }
-  function paperPublished(paper){return paper?.status==='published'||Number(paper?.publishedVersion||0)>0}
+  function paperPublished(paper){return paper?.status==='published'}
   function setText(id,value){const node=byId(id);if(node)node.textContent=String(value)}
   function setNext(title,description,label,href){
     setText('wbNextTitle',title);setText('wbNextDescription',description);setText('wbNextAction',label);

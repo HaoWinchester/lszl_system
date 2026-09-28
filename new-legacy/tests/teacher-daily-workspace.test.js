@@ -56,3 +56,30 @@ test('analytics navigation is created only for admins and removed after role cha
   user={role:'teacher'};events.get('kg-auth-session-change')();assert.equal(links.length,0);
   user=null;events.get('kg-auth-session-change')();assert.equal(links.length,0);
 });
+
+test('workbench counts current published status rather than historical publication',async()=>{
+  const vm=require('node:vm');
+  const elements=new Map(),events=new Map();
+  const node=id=>{if(!elements.has(id))elements.set(id,{textContent:'—'});return elements.get(id)};
+  const papers=[
+    {id:'live',status:'published',publishedVersion:2},
+    {id:'withdrawn',status:'draft',publishedVersion:3,withdrawnAt:100},
+    {id:'draft',status:'draft',publishedVersion:0},
+    {id:'archived',status:'archived',publishedVersion:4},
+    {id:'deleted',status:'published',publishedVersion:1,deletedAt:100},
+  ];
+  const document={body:{dataset:{}},getElementById:node,addEventListener:(key,fn)=>events.set(key,fn)};
+  const window={
+    KGLearningContent:{currentUser:()=>({name:'教师',role:'teacher'})},
+    KGQuestionCatalogAdapter:{ready:Promise.resolve(),snapshot:()=>({banks:[],questions:[]})},
+    KGCourseManagementApi:{ready:async()=>true,snapshot:()=>({drafts:[],tasks:[]})},
+    KGDomainApi:{request:async({path})=>{assert.equal(path,'/api/v1/papers');return {papers}}},
+    addEventListener(){},
+  };
+  vm.runInNewContext(read('src/91-teacher-workbench-app.js'),{window,document});
+  events.get('DOMContentLoaded')();
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(node('wbPublishedPaperCount').textContent,'1');
+  assert.equal(node('wbPaperDraftCount').textContent,'2');
+  assert.equal(node('wbPaperCardState').textContent,'3 张试卷');
+});

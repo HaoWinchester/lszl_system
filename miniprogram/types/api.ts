@@ -107,14 +107,15 @@ export interface PracticeReport {
   releaseId?: string;
   paperName?: string;
   mode?: BackendPracticeMode;
+  reportKind?: 'practice' | 'simulation';
   resultLabel?: string;
-  passed?: boolean;
+  passed?: boolean | null;
   accuracyPercent?: number;
   scorePercent?: number;
   rawScore?: number;
   maxScore?: number;
-  passPercent?: number;
-  overallBand?: string;
+  passPercent?: number | null;
+  overallBand?: string | null;
   counts?: {
     total?: number;
     answered?: number;
@@ -127,7 +128,7 @@ export interface PracticeReport {
     correct?: number;
     wrong?: number;
     scorePercent?: number;
-    performanceBand?: string;
+    performanceBand?: string | null;
   }>;
   wrongQuestionIds?: string[];
   durationMs?: number;

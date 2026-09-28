@@ -1082,6 +1082,10 @@ def test_each_bank_question_and_paper_mutation_bumps_exactly_once() -> None:
                     bank.id,
                         {
                             "title": "revision question",
+                            "stemParts": [{"text": "请选择符合要求的方案。"}],
+                            "options": [{"id": "A", "text": "符合要求"}, {"id": "B", "text": "不符合要求"}],
+                            "correctAnswer": "A",
+                            "analysis": "A 满足题干要求。",
                             "subject": "PMP",
                             "domain": "沟通",
                             "metadata": {

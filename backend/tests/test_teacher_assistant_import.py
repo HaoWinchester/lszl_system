@@ -32,7 +32,7 @@ async def isolated_import_database(anyio_backend, monkeypatch):
 ACTOR = SimpleNamespace(username='teacher', role='teacher')
 
 def question(identifier='q1', answer='a'):
-    return {'id': identifier, 'title': '题目', 'type': 'single_choice', 'stemParts': [{'type': 'text', 'text': '题干'}], 'options': [{'id': 'a', 'text': '选项A'}, {'id': 'b', 'text': '选项B'}], 'correctAnswer': answer, 'metadata': {'principleIds': [], 'original': 'preserved'}}
+    return {'id': identifier, 'title': '题目', 'type': 'single_choice', 'stemParts': [{'type': 'text', 'text': '题干'}], 'options': [{'id': 'a', 'text': '选项A'}, {'id': 'b', 'text': '选项B'}], 'correctAnswer': answer, 'analysis': '根据题干条件，选择与目标一致的选项。', 'metadata': {'principleIds': [], 'original': 'preserved'}}
 
 def source(q=None):
     return {'id': 'upload1', 'name': 'test.json', 'extracted': {'kind': 'json', 'data': {'id': 'bank1', 'name': '原题库', 'questions': [q or question()]}, 'sections': [], 'warnings': []}}

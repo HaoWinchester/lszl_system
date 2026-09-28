@@ -106,6 +106,34 @@ with sync_playwright() as playwright:
     assert page.locator(".practice-report-domain-table").count() == 0
     assert "总体成绩仍按全部题目计算" in page.locator(".practice-report-domain-unavailable").inner_text()
 
+    short = {**report, "reportKind": "practice", "resultLabel": "本次练习摘要",
+             "counts": {"total": 10, "answered": 10, "correct": 8, "wrong": 2, "unanswered": 0},
+             "accuracyPercent": 80,
+             "domains": {"people": {"total": 10, "correct": 8, "scorePercent": 80},
+                         "process": {"total": 0}, "business-environment": {"total": 0}},
+             "domainWeights": {"people": 100, "process": 0, "business-environment": 0}}
+    page.evaluate("report=>KGPracticeResultReport.render(document.querySelector('#report'),report)", short)
+    short_text = page.locator("#report").inner_text()
+    assert "本次练习摘要" in short_text
+    assert "未评估" in short_text
+    assert "PASS" not in short_text and "FAIL" not in short_text
+    assert page.locator(".practice-report-band-scale").count() == 0
+    assert page.locator(".practice-report-pie").count() == 0
+
+    # Old reports are immutable; the view must remove an old simulated verdict
+    # when its frozen ten-question count shows that it was a short practice.
+    old_short = {**short, "resultLabel": "模拟考试结果：PASS", "disclaimer": report["disclaimer"]}
+    del old_short["reportKind"]
+    page.evaluate("report=>KGPracticeResultReport.render(document.querySelector('#report'),report)", old_short)
+    assert "PASS" not in page.locator("#report").inner_text()
+    assert "本次练习摘要" in page.locator("#report").inner_text()
+
+    sparse_exam = {**report, "reportKind": "simulation", "domains": short["domains"]}
+    page.evaluate("report=>KGPracticeResultReport.render(document.querySelector('#report'),report)", sparse_exam)
+    assert page.locator(".practice-report-domain-table tbody tr").count() == 3
+    assert "未评估" in page.locator(".practice-report-domain-table").inner_text()
+    assert page.locator(".practice-report-pie path").count() == 1
+
     source = (ROOT / "src/100-practice-mode.js").read_text(encoding="utf-8")
     html = (ROOT / "practice-mode.html").read_text(encoding="utf-8")
     assert "function reviewWrongQuestion(" in source
