@@ -4,7 +4,6 @@
   const registry={
     version:'9.0-p4.1.7',
     questionBank:domains.QuestionBank||{},
-    questionEditor:domains.QuestionEditor||{},
     questionClassification:domains.QuestionClassification||{},
     trainingConfig:domains.TrainingConfig||{},
     paperManagement:domains.PaperManagement||{},

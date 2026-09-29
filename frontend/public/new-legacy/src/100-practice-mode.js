@@ -1001,17 +1001,6 @@
     state.draft?.markSaved?.();
     state.active=false;state.endedAt=Date.now();clearTimers();hideStreakPop();hideRemediation();clearVerification();setDangerVignette(false);state.abandonedRecorded=true;if(!state.session)recordCompletedSession('abandoned');closeExitConfirm();closeChallengeFailDialog();showLobby();return true;
   }
-  function startRevenge(){
-    const records=activeMistakeRecords();
-    if(!records.length){showToast('暂无待复仇错题，先去挑战或学霸模式练习吧。');return false}
-    const questions=records.map(questionFromMistake).filter(question=>usableQuestion(question));
-    if(!questions.length){showToast('错题内容暂不可用，请稍后刷新重试。');return false}
-    const policy=global.KGRevengeEntryPolicy.derive(questions.length,state.revengeSelectedCount),count=policy.requestCount;
-    clearTimers();hideStreakPop();hideRemediation();clearVerification();setDangerVignette(false);
-    state.mode='revenge';state.showPreviousWrong=true;state.order='weakness_first';state.questions=questions.slice(0,count);state.pendingSelections={};state.pendingMatches={};state.markedQuestions=new Set();state.showAnswers=false;state.index=0;state.health=MAX_HEALTH;state.streak=0;state.experience=0;state.correct=0;state.answered=0;state.startedAt=Date.now();state.endedAt=0;state.locked=false;state.active=true;state.completed=false;state.abandonedRecorded=false;
-    state.lastSettings={paperId:'',count,order:'weakness_first',mode:'revenge'};document.body.dataset.practiceMode='revenge';dom.timer.hidden=true;dom.timeRow.hidden=true;dom.health.hidden=true;
-    setView('game');renderQuestion();return true;
-  }
   function setEntryStarting(mode,starting,{focus=false}={}){
     const activeMode=starting?String(mode||''):String(state.entryStartingMode||mode||'');
     state.entryStartingMode=starting?activeMode:'';

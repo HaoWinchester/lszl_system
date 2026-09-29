@@ -9,7 +9,6 @@
   const Preferences=window.KGDevicePreferences;
   const PAPER_WORKSPACE_LAYOUT_KEY = 'kg_paper_workspace_layout_v1';
   const QUESTION_LIBRARY_WORKSPACE_LAYOUT_KEY = 'kg_question_library_workspace_layout_v1';
-  const DEMO_BANK_ID = 'bank-pmp-demo';
   const DEMO_QUESTION_ID = 'pmp-agile-change-001';
   const QUESTION_PAGE_SIZE = 20;
   const BANK_PAGE_SIZE = 8;
@@ -48,9 +47,7 @@
     const questionPreview=TeacherDomains.QuestionBank?.QuestionPreview||null;
     const paperPreview=TeacherDomains.PaperManagement?.PaperPreview||null;
     const classification=TeacherDomains.QuestionClassification||null;
-    const questionEditorFactory=TeacherDomains.QuestionEditor||null;
-    const paperEditorFactory=TeacherDomains.PaperManagement?.PaperEditorController||null;
-    domainServices={Core,audit,transaction,batch,safeDelete,bankList,questionList,paperList,paperPicker,training,questionPreview,paperPreview,classification,questionEditorFactory,paperEditorFactory};
+    domainServices={Core,audit,transaction,batch,safeDelete,bankList,questionList,paperList,paperPicker,training,questionPreview,paperPreview,classification};
     return domainServices;
   }
 
@@ -300,13 +297,6 @@
   function currentUsername(){
     try{return String(window.KGAuthCore?.currentUsername?.()||'')}catch(e){return ''}
   }
-  let demoSuppressed=false;
-  function isDemoSuppressed(){
-    return demoSuppressed;
-  }
-  function suppressDemoExample(){
-    demoSuppressed=true;
-  }
   function scopeLabel(){
     const scope = sessionScope();
     if(scope === 'public') return '当前空间：未登录';
@@ -394,67 +384,6 @@
       correctAnswer:'',
       analysis:'A、C 分别对应风险识别和风险应对管理；B、D 都会削弱风险管理。'
     });
-  }
-
-  function starterBanks(){
-    const now = Date.now();
-    return [
-      {
-        id:DEMO_BANK_ID,
-        name:'PMP 敏捷场景题示例题库',
-        subject:'PMP',
-        description:'内置演示题库：用于体验题干关键词、知识点绑定、推理步骤和深度回忆预览。',
-        version:'1.0',
-        visibility:'public-demo',
-        createdAt:now,
-        updatedAt:now,
-        questions:[demoQuestion()]
-      },
-      {
-        id:'bank-cspm-starter',
-        name:'CSPM 项目管理能力题库',
-        subject:'CSPM',
-        description:'CSPM 项目管理能力、项目治理、复杂项目和组织级能力的题库占位，可直接新增题目。',
-        version:'1.0',
-        visibility:'private',
-        createdAt:now,
-        updatedAt:now,
-        questions:[]
-      },
-      {
-        id:'bank-p2-starter',
-        name:'P2 / PRINCE2 过程与主题题库',
-        subject:'P2',
-        description:'P2 / PRINCE2 商业论证、组织、阶段控制、例外管理等主题题库占位。',
-        version:'1.0',
-        visibility:'private',
-        createdAt:now,
-        updatedAt:now,
-        questions:[]
-      },
-      {
-        id:'bank-acp-starter',
-        name:'ACP 敏捷项目管理题库',
-        subject:'ACP',
-        description:'ACP 敏捷心态、价值交付、团队协作和持续改进题库占位。',
-        version:'1.0',
-        visibility:'private',
-        createdAt:now,
-        updatedAt:now,
-        questions:[]
-      },
-      {
-        id:'bank-npdp-starter',
-        name:'NPDP 新产品开发题库',
-        subject:'NPDP',
-        description:'NPDP 新产品战略、组合管理、市场研究和产品生命周期题库占位。',
-        version:'1.0',
-        visibility:'private',
-        createdAt:now,
-        updatedAt:now,
-        questions:[]
-      }
-    ].map(normalizeBank);
   }
 
   function normalizeOption(option, index, correctAnswer){
@@ -1024,16 +953,18 @@
 
   function showPublicationChecklist(checklist, paper){
     return new Promise(resolve=>{
-      const old=$('qbPublicationChecklist');if(old)old.remove();
-      const previousFocus=document.activeElement;
-      const overlay=document.createElement('div');overlay.id='qbPublicationChecklist';overlay.className='pm-publication-checklist';
+      $('qbPublicationChecklist')?.close('cancel');
+      const overlay=document.createElement('dialog');overlay.id='qbPublicationChecklist';overlay.className='pm-publication-checklist';overlay.setAttribute('aria-labelledby','qbPublicationChecklistTitle');
       const issues=Array.isArray(checklist?.issues)?checklist.issues:[],warnings=Array.isArray(checklist?.warnings)?checklist.warnings:[];
       const rows=items=>items.map(item=>{const target=item.questionId&&item.bankId?questionBasicInfoUrl(item.questionId,item.bankId):'';return `<li><strong>${escapeHTML(item.title||paper.name)}${item.number?` · 第 ${Number(item.number)} 题`:''}</strong>：${escapeHTML(item.message||'内容不完整')}${target?` <a href="${escapeHTML(target)}" target="_blank" rel="noopener">修改题目</a>`:''}</li>`}).join('');
-      overlay.innerHTML=`<section role="dialog" aria-modal="true" aria-labelledby="qbPublicationChecklistTitle"><h2 id="qbPublicationChecklistTitle">发布检查 · ${escapeHTML(paper.name)}</h2><p>${issues.length?`发现 ${issues.length} 处需要修改的问题。保存题目后点击重新检查。`:'题目答案与解析已通过检查。'}</p>${issues.length?`<ul>${rows(issues)}</ul>`:''}${warnings.length?`<p>提醒：${warnings.length} 道题的英文题干、选项或解析尚未填写。</p><ul>${rows(warnings)}</ul>`:''}<div class="pm-publication-actions"><button type="button" data-check-action="cancel">退出</button><button type="button" data-check-action="retry">重新检查</button>${issues.length?'':'<button type="button" data-check-action="publish">确认发布</button>'}</div></section>`;
-      document.body.appendChild(overlay);overlay.querySelector('[data-check-action="cancel"]')?.focus();
-      const close=action=>{overlay.remove();previousFocus?.focus?.();resolve(action)};
-      overlay.addEventListener('click',event=>{const action=event.target.closest('[data-check-action]')?.dataset.checkAction;if(action)close(action);else if(event.target===overlay)close('cancel')});
-      overlay.addEventListener('keydown',event=>{if(event.key==='Escape')close('cancel');if(event.key==='Tab'){const choices=[...overlay.querySelectorAll('a[href],button')],first=choices[0],last=choices.at(-1);if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus()}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus()}}});
+      overlay.innerHTML=`<h2 id="qbPublicationChecklistTitle">发布检查 · ${escapeHTML(paper.name)}</h2><p>${issues.length?`发现 ${issues.length} 处需要修改的问题。保存题目后点击重新检查。`:'题目答案与解析已通过检查。'}</p>${issues.length?`<ul>${rows(issues)}</ul>`:''}${warnings.length?`<p>提醒：${warnings.length} 道题的英文题干、选项或解析尚未填写。</p><ul>${rows(warnings)}</ul>`:''}<div class="pm-publication-actions"><button type="button" data-check-action="cancel" autofocus>退出</button><button type="button" data-check-action="retry">重新检查</button>${issues.length?'':'<button type="button" data-check-action="publish">确认发布</button>'}</div>`;
+      overlay.addEventListener('close',()=>{overlay.remove();resolve(overlay.returnValue||'cancel')},{once:true});
+      overlay.addEventListener('click',event=>{
+        const action=event.target.closest('[data-check-action]')?.dataset.checkAction;
+        if(action)overlay.close(action);
+        else if(event.target===overlay){const rect=overlay.getBoundingClientRect();if(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)overlay.close('cancel')}
+      });
+      document.body.appendChild(overlay);overlay.showModal();
     });
   }
   let publicationCheckBusy=false;
@@ -1269,37 +1200,6 @@
     let index = 1;
     while(used.has('X' + index)) index++;
     return 'X' + index;
-  }
-
-  function ensureEmbeddedPmpExample(banks){
-    const next = (banks || []).map(normalizeBank);
-    if(isDemoSuppressed()) return {banks:next, changed:false};
-    const demo = demoQuestion();
-    const demoId = String(demo.id || DEMO_QUESTION_ID);
-    let changed = false;
-    let demoBank = next.find(b => b.id === DEMO_BANK_ID) || next.find(b => b.subject === 'PMP' && /示例|演示|demo/i.test(b.name || ''));
-    const alreadyExists = next.some(b => (b.questions || []).some(q => String(q.id) === demoId));
-    if(!demoBank){
-      demoBank = normalizeBank({
-        id:DEMO_BANK_ID,
-        name:'PMP 敏捷场景题示例题库',
-        subject:'PMP',
-        description:'内置 PMP 示例题：用于体验题干关键词、知识点绑定、推理步骤和深度回忆预览。',
-        version:'1.0',
-        visibility:'public-demo',
-        createdAt:Date.now(),
-        updatedAt:Date.now(),
-        questions:[]
-      });
-      next.unshift(demoBank);
-      changed = true;
-    }
-    if(!alreadyExists){
-      demoBank.questions = [demo, ...(demoBank.questions || [])];
-      demoBank.updatedAt = Date.now();
-      changed = true;
-    }
-    return {banks:next, changed};
   }
 
   function loadBanks(){
@@ -3586,7 +3486,7 @@
         const release=await publishPaperRelease(paper);if(!release)return;await reloadPaperDrafts({selectedId:paper.id}).catch(()=>{});paper=currentPaper();setCurrentPaper(paper);renderPaperManager();toast(`已发布 v${release.version}，开放：${(paper?.enabledModes||[]).map(mode=>PAPER_MODE_LABELS[mode]||mode).join('、')}。`);return;
       }catch(error){if(error?.detail?.code!=='PUBLICATION_CHECK_FAILED')throw error;const next=await showPublicationChecklist(error.detail,paper);if(next==='cancel')return}
     }
-    }finally{publicationCheckBusy=false;if(publishButton)publishButton.disabled=!currentPaper()||isPaperArchived(currentPaper())}
+    }finally{publicationCheckBusy=false;if(publishButton){publishButton.disabled=!currentPaper()||isPaperArchived(currentPaper());if(document.activeElement===document.body)publishButton.focus()}}
   }
   async function withdrawCurrentPaper(){
     if(window.KGRolePermissions&&!window.KGRolePermissions.can('publishPapers'))return toast('当前角色无试卷取消发布权限。');
@@ -4083,12 +3983,6 @@
   function deleteQuestion(){
     const q=currentQuestion();if(!q)return;openSafeDeleteDialog([q.id]);
   }
-  function isDemoBank(bank){
-    return !!bank && (bank.id === DEMO_BANK_ID || bank.visibility === 'public-demo' || (bank.subject === 'PMP' && /示例|演示|demo/i.test(bank.name || '')));
-  }
-  function isDemoQuestion(question){
-    return !!question && String(question.id || '') === DEMO_QUESTION_ID;
-  }
   async function deleteCurrentBank(){
     const bank = currentBank();
     if(!bank) return;
@@ -4141,7 +4035,6 @@
     if(!confirm(message)) return;
     try{await Catalog.deleteBank(bank.id)}catch(error){alert('题库删除失败：'+(error.message||error));return false}
     state.clearedTestRecordBankIds.delete(bank.id);
-    if(isDemoBank(bank) || (bank.questions || []).some(isDemoQuestion)) suppressDemoExample();
     const filteredBefore = filteredBanks();
     const filteredIndex = filteredBefore.findIndex(b => b.id === bank.id);
     const index = state.banks.findIndex(b => b.id === bank.id);

@@ -8,7 +8,7 @@
   const Preferences=window.KGDevicePreferences;
   const $=id=>document.getElementById(id);
   const clean=value=>String(value??'').trim();
-  const escapeHTML=value=>String(value??'').replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
+  const escapeHTML=window.KGAuthCore.escapeHTML;
   const SUBJECT_PREF_KEY='kg_teacher_workbench_subject_v1';
   const TYPE_LABELS={single_choice:'单项选择',keyword_recognition:'关键词识别',open_response:'开放表达',ordering:'排序',matching:'连线配对',memory_match:'翻牌记忆',deep_recall:'深度回忆',multi_question_induction:'多题归纳',knowledge_graph:'知识图谱'};
   const storedSubject=clean(Preferences?.getString(SUBJECT_PREF_KEY,''));

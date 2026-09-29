@@ -8,9 +8,7 @@
   const ACTIVE_PAID_MEMBERSHIP_STATUSES=new Set(["active","trial","manual"]);
 
   const $=id=>document.getElementById(id);
-  function escapeHTML(value){
-    return String(value == null ? "" : value).replace(/[&<>\'"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\'":"&#39;",'"':"&quot;"}[c]));
-  }
+  const escapeHTML=window.KGAuthCore.escapeHTML;
   const authCore=()=>window.KGAuthCore||null;
   function makeSalt(){
     const core=authCore();

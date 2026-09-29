@@ -3,7 +3,7 @@
 (function(){
   const Core=window.KGLearningContent;
   const $=id=>document.getElementById(id);
-  const escapeHTML=value=>String(value??'').replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
+  const escapeHTML=window.KGAuthCore.escapeHTML;
   const SUBJECT_PREF_KEY='kg_teacher_workbench_subject_v1';
   const WORKSPACE_KEY='kg_course_admin_workspace_v862_p1';
   const RECENT_KEY='kg_course_admin_recent_v862_p2';

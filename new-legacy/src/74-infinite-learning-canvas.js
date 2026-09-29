@@ -76,14 +76,6 @@
   function cancelSmoothZoom(){
     return state.kernel?.viewport?.cancelAnimation?.()||false;
   }
-  function viewportForScaleAtClientPoint(scale,clientX,clientY){
-    return state.kernel?.viewport?.targetForScale?.(scale,clientX,clientY)||{
-      x:state.panX,y:state.panY,zoom:state.zoom
-    };
-  }
-  function animateViewport(target={},options={}){
-    return state.kernel?.viewport?.animateTo?.(target,options)||false;
-  }
   function smoothZoomAt(scale,clientX,clientY,options={}){
     return state.kernel?.viewport?.zoomAt?.(scale,clientX,clientY,options)||false;
   }
@@ -92,10 +84,6 @@
       direction,levels,clientX,clientY,options
     )||false;
   }
-  function updateCanvasGrid(){
-    return state.kernel?.viewport?.updateGrid?.()||false;
-  }
-
   function readDefault(element){
     const id=String(element.dataset.canvasCard||'');
     const fallback=CARD_DEFAULTS[id]||{x:0,y:0,width:720,height:620};

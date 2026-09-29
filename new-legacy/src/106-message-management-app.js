@@ -1,7 +1,7 @@
 'use strict';
 (function(global){
   const $=id=>document.getElementById(id),Repo=global.KGEngagementRepository,UI=global.KGAdminUI;let rows=[],selectedId='';
-  function escapeHtml(value){return String(value??'').replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]))}
+  const escapeHtml=global.KGAuthCore.escapeHTML;
   function fmt(value){try{return new Date(Number(value||0)).toLocaleString('zh-CN',{hour12:false})}catch(error){return '—'}}
   function toLocalInput(value){if(!value)return '';const date=new Date(Number(value));if(Number.isNaN(date.getTime()))return '';const shifted=new Date(date.getTime()-date.getTimezoneOffset()*60000);return shifted.toISOString().slice(0,16)}
   function fromLocalInput(value){const time=value?new Date(value).getTime():0;return Number.isFinite(time)?time:0}

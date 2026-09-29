@@ -140,6 +140,7 @@ function createRuntime({ resetResult = { valid: true, errors: [] } } = {}) {
   };
   context.window = context;
   context.globalThis = context;
+  vm.runInNewContext(fs.readFileSync(path.resolve(__dirname, "../src/29-auth-core.js"), "utf8"), context);
   return {
     context,
     listeners,

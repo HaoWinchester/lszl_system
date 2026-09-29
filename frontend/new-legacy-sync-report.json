@@ -4,7 +4,10 @@
   "toVersion": "v9.0-p4.1.259",
   "changes": {
     "added": [],
-    "changed": [],
+    "changed": [
+      "src/65-question-bank-admin.js",
+      "tests/publication-checklist-browser.py"
+    ],
     "removed": []
   },
   "incompatible": []

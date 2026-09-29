@@ -748,11 +748,6 @@
     if(slider&&document.activeElement!==slider)slider.value=String(Math.max(1,Math.min(400,value)));
   }
   function showZoomSlider(show=true){const dock=byId('qwCanvasZoomDock'),popover=byId('qwZoomSliderPopover');if(!dock||!popover)return;dock.classList.toggle('slider-open',!!show);popover.setAttribute('aria-hidden',show?'false':'true')}
-  function viewportTarget(scale,clientX,clientY){
-    return state.kernel?.viewport?.targetForScale?.(scale,clientX,clientY)||{
-      x:state.panX,y:state.panY,zoom:state.zoom
-    };
-  }
   function setViewport(next={},options={}){
     return state.kernel?.viewport?.set?.(next,options)||false;
   }

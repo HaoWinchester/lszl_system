@@ -145,48 +145,6 @@ function authLoadCurrentSpace(copyCurrentIfEmpty=false){
   requestAnimationFrame(()=>{if(!had)fitView(true)});
   authRenderStatus();
 }
-function authLocalLogin(username,password){
-  username=authCleanUsername(username);
-  if(!username||!password){authMsg('请输入用户名和密码。');return false}
-  const users=authUsers(),user=users[username];
-  if(!user){authMsg('用户不存在，请先注册。');return false}
-  if(user.status==='archived'){authMsg('该账号已归档，请联系管理员恢复后再登录。');return false}
-  if(user.status==='paused'){authMsg('该账号已暂停，请联系管理员恢复后再登录。');return false}
-  if(authPasswordHash(username,password,user.salt)!==user.hash){authMsg('密码不正确。');return false}
-  user.lastLoginAt=Date.now();
-  user.lastActiveAt=Date.now();
-  user.updatedAt=Date.now();
-  users[username]=user;
-  authSaveUsers(users);
-  authCurrentUser={username};
-  if(AuthCore.setCurrentUsername)AuthCore.setCurrentUsername(username);
-  else if(AppStorage.writeString)AppStorage.writeString(AUTH_SESSION_KEY,username);
-  else localStorage.setItem(AUTH_SESSION_KEY,username);
-  authLogAction('用户登录',username);
-  authClose();
-  authLoadCurrentSpace(false);
-  showStatus(`已登录：${username}`);
-  return true;
-}
-function authLocalRegister(username,password){
-  username=authCleanUsername(username);
-  if(username.length<2){authMsg('用户名至少 2 个字符。');return false}
-  if(String(password||'').length<4){authMsg('密码至少 4 个字符。');return false}
-  const users=authUsers();
-  if(users[username]){authMsg('该用户名已存在，请直接登录。');return false}
-  const salt=authMakeSalt();
-  users[username]=authNormalizeUserRecord(username,{salt,hash:authPasswordHash(username,password,salt),createdAt:Date.now(),updatedAt:Date.now(),lastLoginAt:Date.now(),lastActiveAt:Date.now(),status:'active',role:'student',displayName:username,subject:'PMP',source:'self-register'});
-  authSaveUsers(users);
-  authCurrentUser={username};
-  if(AuthCore.setCurrentUsername)AuthCore.setCurrentUsername(username);
-  else if(AppStorage.writeString)AppStorage.writeString(AUTH_SESSION_KEY,username);
-  else localStorage.setItem(AUTH_SESSION_KEY,username);
-  authLogAction('用户注册',username,'注册并登录');
-  authClose();
-  authLoadCurrentSpace(true);
-  showStatus(`已注册并登录：${username}`);
-  return true;
-}
 async function authLogout(){
   if(authIsLoggedIn()){
     const autosave=window.KGGraphFileAutosave;
