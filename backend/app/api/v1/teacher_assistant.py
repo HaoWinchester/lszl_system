@@ -10,11 +10,18 @@ from app.core.auth import require_role
 from app.db.session import get_db
 from app.models.user import User
 from app.models.teacher_assistant import TeacherAssistantUpload as Upload
-from app.schemas.teacher_assistant import MessageRequest,ExecuteRequest,RetryRequest
+from app.schemas.teacher_assistant import MessageRequest,ExecuteRequest,RetryRequest,QuickPhrasesRequest
 from app.services import teacher_assistant_service as service
 router=APIRouter(prefix='/teacher-assistant',tags=['teacher-assistant'])
 DB=Annotated[AsyncSession,Depends(get_db)]
 Actor=Annotated[User,Depends(require_role('admin','teacher'))]
+
+@router.get('/quick-phrases')
+async def quick_phrases(user:Actor): return service.quick_phrases(user)
+
+@router.put('/quick-phrases')
+async def save_quick_phrases(body:QuickPhrasesRequest,db:DB,user:Actor):
+    return await service.save_quick_phrases(db,user,body)
 
 @router.get('/sessions')
 async def sessions(db:DB,user:Actor): return await service.list_sessions(db,user)

@@ -18,6 +18,7 @@ sessions={'a':session('a'),'b':session('b')};calls=[];state={'uploadFail':False,
 def api(route):
     r=route.request;path=r.url.split('/api/v1/')[-1];calls.append((r.method,path));body={};status=200
     if path=='auth/me':body={'user':{'username':'测试教师','role':'teacher'}}
+    elif path=='teacher-assistant/quick-phrases':body={'username':'测试教师','defaults':[],'custom':[]}
     elif path=='teacher-assistant/sessions':
         if r.method=='POST':sessions['c']=session('c');body={'session':sessions['c']}
         else:body={'sessions':list(sessions.values())}

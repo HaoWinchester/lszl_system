@@ -304,7 +304,7 @@
   }
 
   function difficultyValue(value){return Difficulty.normalize?.(value)||String(value||'')}
-  function difficultyDisplay(value){const normalized=difficultyValue(value);return normalized?(Difficulty.stars?.(normalized,{empty:''})+' '+(Difficulty.label?.(normalized)||normalized)):'难度未设'}
+  function difficultyDisplay(value){const normalized=difficultyValue(value);return normalized?((Difficulty.stars?.(normalized,{empty:''})||'')+' '+(Difficulty.label?.(normalized)||normalized)):'难度未设'}
 
   function emptyQuestion(subject='PMP'){
     return normalizeQuestion({

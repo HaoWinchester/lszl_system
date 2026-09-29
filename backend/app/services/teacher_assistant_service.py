@@ -185,3 +185,24 @@ async def retry(db,user,sid,request_id):
     job.status='queued';job.error='';job.lease_until=None;job.attempts=0
     job.stream={'text':'','lastEventId':(job.stream or {}).get('lastEventId',0)}
     await db.commit();await db.refresh(obj);return await envelope(db,obj)
+
+
+QUICK_PHRASES = [
+    {'title': '梳理材料重点', 'content': '请梳理这份教学材料的核心知识点，按主题归类，并列出容易混淆的概念。'},
+    {'title': '检查题目质量', 'content': '请检查这些题目的题干、选项、答案与解析是否一致，列出有歧义或需要修改的地方，先给建议，不直接发布。'},
+    {'title': '设计一节课', 'content': '我想基于这些材料设计一节课，请先了解教学目标、学员基础和课时，再给出课程结构与练习建议。'},
+    {'title': '解释难点', 'content': '请用通俗语言解释这个知识点，给一个具体例子，并说明常见误区。'},
+]
+
+
+def quick_phrases(user):
+    return {'username': user.username, 'defaults': QUICK_PHRASES, 'custom': user.assistant_phrases or []}
+
+
+async def save_quick_phrases(db, user, body):
+    if body.username != user.username:
+        raise HTTPException(409, '登录账号已变化，请刷新后再保存快捷话语')
+    user.assistant_phrases = [item.model_dump() for item in body.custom]
+    await db.commit()
+    await db.refresh(user)
+    return quick_phrases(user)

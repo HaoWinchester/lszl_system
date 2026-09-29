@@ -115,3 +115,22 @@ test('next batch start failure is recoverable and short papers use the actual co
   assert.equal(starts[1].count,3); assert.equal(starts[1].mode,'normal');
   assert.match(navigation.at(-1).url,/sessionId=new/);
 });
+
+
+test('restart locks the real dialog queue before awaiting confirmation and releases on cancel', async () => {
+  const {createDialogController} = await import('../domain/dialog.ts');
+  let view, confirmations=0, abandons=0, starts=0;
+  const dialog=createDialogController(value=>{view=value;if(value.visible)confirmations++;});
+  const {page}=await loadPage('practice-setup', {MODE_CHOICES:[],showDialog:options=>dialog.open(options),
+    getSession:async()=>({revision:1}), abandonSession:async()=>{abandons++;},
+    startSession:async()=>{starts++;return {id:'new'};},messageOf:e=>e.message});
+  page.data.existingSessionId='old';
+  const cancelled=page.onRestartExisting(); assert.equal(page.data.starting,true); await page.onRestartExisting();
+  assert.equal(confirmations,1);
+  dialog.settle(view.id,false); await cancelled;
+  assert.equal(page.data.starting,false); assert.equal(abandons,0);
+  const confirmed=page.onRestartExisting(); await page.onRestartExisting();
+  assert.equal(confirmations,2);
+  dialog.settle(view.id,true);await confirmed;
+  assert.equal(abandons,1);assert.equal(starts,1);
+});

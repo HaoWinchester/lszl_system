@@ -107,7 +107,7 @@
     const client = createClient(global.fetch.bind(global), () => global.crypto.randomUUID());
     let authorized = false, busy = false, pollTimer = null, epoch = 0, transientError = false;
     let stream = null, cursor = 0, pendingFiles = [], activated = false, tools = [], streamText = '', nearBottom = true;
-    let targetSession = null;
+    let targetSession = null, phrases = null;
     const scroller = $('conversation-panel');
     const sourceViews = new Map();
     $('assistant').dataset.tab = 'conversation';
@@ -137,6 +137,7 @@
       $('stop-message').hidden = !running; $('stop-message').disabled = disabled; $('send-message').hidden = running;
       $('tab-preview').disabled = !s?.plan?.items?.length && !s?.receipt;
       $('toggle-sidebar').setAttribute('aria-expanded', String(!$('assistant').classList.contains('ta-sidebar-collapsed')));
+      phrases?.setEnabled(!$('assistant-message').disabled);
       renderPending();
     }
     function jobLabel(s) {
@@ -454,12 +455,19 @@
         }
       }
       if (event.key === 'Escape') { if (!$('preview-panel').hidden) panel(false); sidebar(false); $('toggle-sidebar').focus(); } });
-    doc.querySelectorAll('[data-prompt]').forEach(button => { button.onclick = () => { $('assistant-message').value = button.dataset.prompt; $('assistant-message').focus(); }; });
+    function usePhrase(content) {
+      const input = $('assistant-message'); if (input.disabled) return;
+      const value = input.value ? input.value + '\n\n' + content : content;
+      if (value.length > input.maxLength) { showError(new Error('加入话语后超出消息长度，请先精简输入。')); return; }
+      input.value = value; input.focus();
+    }
+    phrases = global.KGAssistantPhrases?.init(doc, client.request, usePhrase);
+    doc.querySelectorAll('[data-prompt]').forEach(button => { button.onclick = () => usePhrase(button.dataset.prompt); });
     scroller.onscroll = () => { nearBottom = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 100; $('jump-bottom').hidden = nearBottom; };
     $('jump-bottom').onclick = () => { nearBottom = true; scroller.scrollTop = scroller.scrollHeight; };
     async function start() {
       busy = true; controls();
-      try { const data = await client.request('/api/v1/auth/me'); const user = data.user; if (!user || !['teacher', 'admin'].includes(user.role)) throw new Error('文件整理助手仅供已登录的教师和管理员使用，请返回工作台登录有权限的账号。'); authorized = true; $('assistant-account').textContent = (user.name || user.username || '') + ' · ' + (user.role === 'admin' ? '管理员' : '教师'); await history(); const id = new URL(global.location.href).searchParams.get('session'); if (id) { await activate(id); $('session-history').value = id; } else if ($('session-history').options.length > 1) { await activate($('session-history').options[1].value); $('session-history').value = client.session.id; } else { const session = await client.create(); await activate(session.id); } await history(); }
+      try { const data = await client.request('/api/v1/auth/me'); const user = data.user; if (!user || !['teacher', 'admin'].includes(user.role)) throw new Error('文件整理助手仅供已登录的教师和管理员使用，请返回工作台登录有权限的账号。'); authorized = true; phrases?.load(user.username); $('assistant-account').textContent = (user.name || user.username || '') + ' · ' + (user.role === 'admin' ? '管理员' : '教师'); await history(); const id = new URL(global.location.href).searchParams.get('session'); if (id) { await activate(id); $('session-history').value = id; } else if ($('session-history').options.length > 1) { await activate($('session-history').options[1].value); $('session-history').value = client.session.id; } else { const session = await client.create(); await activate(session.id); } await history(); }
       catch (error) { showError(error); } finally { busy = false; render(); schedule(); }
     }
     start();

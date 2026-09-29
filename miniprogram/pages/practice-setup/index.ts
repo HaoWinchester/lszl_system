@@ -110,10 +110,10 @@ Page(withAppearance(withAppShare({
   async onRestartExisting() {
     const sessionId = this.data.existingSessionId;
     if (!sessionId || this.data.starting) return;
-    const decision = await showDialog({ title: '放弃上次练习？', content: '上次练习将结束，不能再继续作答。随后按当前设置创建新练习。', confirmText: '重新开始', cancelText: '保留进度' });
-    if (!decision.confirm) return;
     this.setData({ starting: true, error: '' });
     try {
+      const decision = await showDialog({ title: '放弃上次练习？', content: '上次练习将结束，不能再继续作答。随后按当前设置创建新练习。', confirmText: '重新开始', cancelText: '保留进度' });
+      if (!decision.confirm) { this.setData({ starting: false }); return; }
       const existing = await getSession(sessionId);
       await abandonSession(sessionId, {
         revision: existing.revision,

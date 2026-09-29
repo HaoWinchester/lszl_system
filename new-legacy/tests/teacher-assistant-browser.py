@@ -41,6 +41,8 @@ def run():
         payload = {}
         if url == 'auth/me':
             payload = {'user': {'username': 'teacher', 'role': state['role']}}
+        elif url == 'teacher-assistant/quick-phrases':
+            payload = {'username': 'teacher', 'defaults': [], 'custom': []}
         elif url == 'teacher-assistant/sessions' and request.method == 'GET':
             payload = {'sessions': [{'id': 'one', 'title': session['title']}] if state['session'] else []}
         elif url == 'teacher-assistant/sessions' and request.method == 'POST':

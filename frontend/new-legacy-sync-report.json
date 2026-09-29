@@ -1,13 +1,12 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.261",
-  "toVersion": "v9.0-p4.1.262",
+  "fromVersion": "v9.0-p4.1.263",
+  "toVersion": "v9.0-p4.1.263",
   "changes": {
     "added": [],
     "changed": [
-      "VERSION",
-      "content-prep-studio/dist/content-prep.html",
-      "src/59-published-paper-repository.js"
+      "tests/teacher-assistant-browser.py",
+      "tests/teacher-assistant-conversation-browser.py"
     ],
     "removed": []
   },

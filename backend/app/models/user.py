@@ -40,6 +40,7 @@ class User(Base):
     email: Mapped[str | None] = mapped_column(String(120), nullable=True)
     phone: Mapped[str | None] = mapped_column(String(40), nullable=True)
     subject: Mapped[str | None] = mapped_column(String(32), nullable=True, default="PMP")
+    assistant_phrases: Mapped[list] = mapped_column(JSONB, nullable=False, default=list, server_default='[]')
     tags: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     source: Mapped[str] = mapped_column(String(32), nullable=False, default="self-register")

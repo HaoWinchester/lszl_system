@@ -196,3 +196,6 @@ async function testCompositionController(){
 }
 
 Promise.resolve().then(testQuestionBankImportController).then(testImportController).then(testCompositionController).then(()=>console.log('paper-management-api-contract-ok')).catch(error=>{console.error(error);process.exitCode=1});
+
+assert.ok(read('paper-management.html').indexOf('src/teacher/shared/difficulty-service.js') >= 0, 'paper manager must load shared difficulty rendering');
+assert.ok(read('paper-management.html').indexOf('src/teacher/shared/difficulty-service.js') < read('paper-management.html').indexOf('src/65-question-bank-admin.js'));
