@@ -9,7 +9,7 @@
     }
     function error(message) { $('phrase-error').textContent = message || ''; }
     function controls() {
-      $('phrase-chips').querySelectorAll('button').forEach(el => { el.disabled = !enabled; });
+      doc.querySelectorAll('#phrase-chips button, #phrase-suggestions button').forEach(el => { el.disabled = !enabled; });
       $('manage-phrases').disabled = !state;
       $('phrase-dialog').querySelectorAll('button,input,textarea').forEach(el => { el.disabled = saving; });
       $('phrase-save').disabled = saving || !state;
@@ -19,7 +19,10 @@
       $('phrase-save').textContent = '添加话语';
     }
     function render() {
-      $('phrase-chips').replaceChildren(); $('phrase-list').replaceChildren();
+      $('phrase-chips').replaceChildren(); $('phrase-list').replaceChildren(); $('phrase-suggestions').replaceChildren();
+      for (const item of (state?.defaults || []).slice(0, 2)) {
+        button($('phrase-suggestions'), item.title + ' ↗', () => { if (enabled) usePhrase(item.content); });
+      }
       for (const item of [...(state?.defaults || []), ...(state?.custom || [])]) {
         const el = button($('phrase-chips'), item.title, () => { if (enabled) usePhrase(item.content); });
         el.title = item.content;

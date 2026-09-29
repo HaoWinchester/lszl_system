@@ -41,6 +41,9 @@ try:
     page.goto('http://127.0.0.1:5179/teacher-assistant.html')
     expect(page.locator('#send-message')).to_be_enabled();expect(page.locator('#phrase-chips button')).to_have_count(4)
     sent=[];page.on('request',lambda r:sent.append(r.url) if r.url.endswith('/messages') else None)
+    page.locator('#phrase-suggestions button').first.click()
+    assert '读取我上传的文件' in page.locator('#assistant-message').input_value()
+    assert len(sent)==0
     page.locator('#assistant-message').fill('已有输入')
     page.locator('#phrase-chips button').first.click()
     assert page.locator('#assistant-message').input_value().startswith('已有输入\n\n')

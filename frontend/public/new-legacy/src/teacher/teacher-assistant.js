@@ -462,7 +462,6 @@
       input.value = value; input.focus();
     }
     phrases = global.KGAssistantPhrases?.init(doc, client.request, usePhrase);
-    doc.querySelectorAll('[data-prompt]').forEach(button => { button.onclick = () => usePhrase(button.dataset.prompt); });
     scroller.onscroll = () => { nearBottom = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 100; $('jump-bottom').hidden = nearBottom; };
     $('jump-bottom').onclick = () => { nearBottom = true; scroller.scrollTop = scroller.scrollHeight; };
     async function start() {

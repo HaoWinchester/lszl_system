@@ -1,12 +1,11 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.263",
-  "toVersion": "v9.0-p4.1.263",
+  "fromVersion": "v9.0-p4.1.264",
+  "toVersion": "v9.0-p4.1.264",
   "changes": {
     "added": [],
     "changed": [
-      "tests/teacher-assistant-browser.py",
-      "tests/teacher-assistant-conversation-browser.py"
+      "tests/assistant-phrases-browser.py"
     ],
     "removed": []
   },
