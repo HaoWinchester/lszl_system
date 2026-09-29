@@ -566,13 +566,13 @@ async def paper_progress(
             .where(
                 PracticeSession.owner_id == owner,
                 PracticeSession.paper_id == paper_id,
-                PracticeSession.mode.in_(["challenge", "scholar"]),
+                PracticeSession.mode.in_(["practice", "challenge", "scholar"]),
                 PracticeSession.status.in_(["active", "paused"]),
             )
             .order_by(PracticeSession.last_saved_at.desc(), PracticeSession.id)
         )
     ).all()
-    latest: dict[str, dict | None] = {"challenge": None, "scholar": None}
+    latest: dict[str, dict | None] = {"practice": None, "challenge": None, "scholar": None}
     for row in rows:
         if latest[row.mode] is None:
             latest[row.mode] = _progress_summary(row, include_release=True)

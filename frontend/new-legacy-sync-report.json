@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.260",
-  "toVersion": "v9.0-p4.1.260",
+  "fromVersion": "v9.0-p4.1.261",
+  "toVersion": "v9.0-p4.1.261",
   "changes": {
     "added": [],
     "changed": [
-      "src/100-practice-mode.js",
-      "tests/practice-continuity-browser.py"
+      "practice-mode.html",
+      "tests/practice-answer-sheet-browser.py"
     ],
     "removed": []
   },

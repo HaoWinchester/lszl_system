@@ -238,14 +238,15 @@ with sync_playwright() as playwright:
     # 普通练习从历史进入；可重做，无生命/时间，解析由统一开关控制。
     page.evaluate("KGPracticeLearningApi.listSessions=async()=>[{sessionId:'old-round',paperId:'paper-1',paperName:'PMP 模拟卷',mode:'challenge',answered:10,correct:8,status:'completed',createdAt:new Date().toISOString(),reportAvailable:false}]")
     page.locator('#practiceHistoryOpenBtn').click()
+    page.locator('.practice-history-group summary').click()
     for width in (1280, 390):
         page.set_viewport_size({"width": width, "height": 900})
         page.wait_for_timeout(200)
-        progress = page.locator('.practice-history-row.is-paper > div:first-child > span')
+        progress = page.locator('.practice-history-attempt p')
         assert progress.is_visible()
         assert "已答 10 题" in progress.inner_text()
-        assert page.locator('.practice-history-row').evaluate("el => el.scrollWidth <= el.clientWidth + 1")
-        page.screenshot(path=f"/tmp/practice-history-{width}.png")
+        assert page.locator('.practice-history-group').evaluate("el => el.scrollWidth <= el.clientWidth + 1")
+        page.screenshot(path=str(ROOT.parent / "artifacts" / "learning-experience" / f"entry-answer-sheet-history-{width}.png"))
     page.set_viewport_size({"width": 1280, "height": 900})
     page.locator('[data-history-practice]').first.click()
     assert page.evaluate('KGPracticeMode.snapshot().mode') == 'practice'

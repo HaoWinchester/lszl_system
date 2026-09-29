@@ -167,6 +167,7 @@
   }
   async function startSession(input) {
     const payload = await request('/sessions/start', { method: 'POST', body: JSON.stringify(input || {}) })
+    invalidateEntrySummaries(input?.mode === 'revenge' ? { revenge: true } : { paperId: input?.paperId })
     return clone(payload.session || null)
   }
   async function enterSession(input) {

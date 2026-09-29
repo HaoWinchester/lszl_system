@@ -1670,8 +1670,7 @@ async def list_practice_sessions(db: AsyncSession, owner: str) -> list[dict]:
                 .join(PaperRelease, PaperRelease.id == PracticeSession.release_id)
                 .where(
                     PracticeSession.owner_id == owner,
-                    or_(PracticeSession.status.in_(["completed", "abandoned"]),
-                        (PracticeSession.status == "paused") & (PracticeSession.stats["answered"].as_integer() > 0)),
+                    PracticeSession.status.in_(["active", "paused", "completed", "abandoned"]),
                     PracticeSession.stats["historyHidden"].as_boolean().isnot(True),
                 )
                 .order_by(PracticeSession.last_saved_at.desc())
@@ -1682,6 +1681,8 @@ async def list_practice_sessions(db: AsyncSession, owner: str) -> list[dict]:
     modern = [
         {
             "sessionId": session.id,
+            "releaseId": session.release_id,
+            "total": max(0, int((session.stats or {}).get("total") or 0)),
             "mode": session.mode,
             "paperId": session.paper_id,
             "paperName": paper_name,

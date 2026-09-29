@@ -440,3 +440,16 @@ body.practice-mode-page:not([data-practice-view="lobby"]) .practice-exp-fab{disp
 .practice-session-unsaved[data-status="saved"]{background:#effaf3;color:#166534}
 .practice-session-unsaved[data-status="error"],.practice-session-unsaved[data-status="conflict"]{color:#991b1b;background:#fef2f2}
 .practice-report-next button{margin:0 12px 12px 0}
+
+.practice-entry-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+.practice-entry-actions .practice-start-btn{flex:1;min-width:160px}
+.practice-mode-card>[data-practice-new]{margin-top:8px}
+.practice-history-group{border:1px solid var(--practice-border);border-radius:14px;padding:14px;background:#fff;min-width:0}
+.practice-history-group header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.practice-history-group header strong{min-width:0;overflow-wrap:anywhere}
+.practice-history-group summary{cursor:pointer;padding:12px 0;color:var(--practice-muted);font-size:13px}
+.practice-history-group ol{margin:0;padding:0;list-style:none}
+.practice-history-attempt{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-top:1px solid var(--practice-border)}
+.practice-history-attempt p{margin:6px 0 0;color:var(--practice-muted);font-size:12px;line-height:1.6;overflow-wrap:anywhere}
+.practice-history-attempt .practice-history-actions{flex-shrink:0}
+@media(max-width:600px){.practice-history-attempt{align-items:flex-start;flex-direction:column}.practice-history-group header{align-items:flex-start}.practice-history-group header>button{flex-shrink:0}}

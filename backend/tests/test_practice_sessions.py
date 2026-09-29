@@ -873,6 +873,7 @@ def test_practice_paper_progress_is_lightweight_paper_scoped_and_owner_scoped() 
             )
             assert response.status_code == 200
             assert response.json()["modes"] == {
+                "practice": None,
                 "challenge": None,
                 "scholar": None,
             }

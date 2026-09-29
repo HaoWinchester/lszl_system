@@ -66,7 +66,7 @@ with sync_playwright() as pw:
         page.locator('#practiceCoverageRetry').click()
         expect(page.locator('#practiceCoverageSummary')).to_contain_text('已练 20 / 23')
         expect(page.locator('.practice-paper-coverage').first).to_be_visible()
-        page.evaluate("window.KGPracticeMode.startPractice('practice')")
+        page.locator('[data-practice-start="practice"]').click()
         expect(page.locator('#practiceSaveStatusText')).to_contain_text('已保存 0/10')
         page.locator('[data-option-id="B"]').click()
         expect(page.locator('#practiceSaveStatusText')).to_contain_text('最新进度尚未保存')

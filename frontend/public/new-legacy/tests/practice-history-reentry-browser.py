@@ -4,7 +4,7 @@ from pathlib import Path
 import re
 import shutil
 
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import sync_playwright, expect
 
 ROOT = Path(__file__).resolve().parents[1]
 source = (ROOT / "practice-mode.html").read_text(encoding="utf-8")
@@ -40,7 +40,8 @@ with sync_playwright() as playwright:
             getPaperProgress:async()=>({modes:{}}),
             getRevengeSummary:async()=>({stats:{active:0},resumable:null}),
             listSessions:async()=>[{sessionId:'completed-3',paperId:'short-paper',paperName:'short-paper',
-              mode:'challenge',status:'completed',answered:3,correct:1,endedAt:Date.now(),reportAvailable:true}],
+              mode:'challenge',status:'completed',answered:3,correct:1,createdAt:1000,reportAvailable:true},
+              {sessionId:'active-3',paperId:'short-paper',paperName:'short-paper',mode:'practice',status:'active',answered:0,total:3,createdAt:2000,reportAvailable:false}],
             enterSession:async input=>{
               window.__entryRequests.push(input);
               if(input.count>3)throw Object.assign(new Error('shortage'),{status:422,
@@ -61,6 +62,12 @@ with sync_playwright() as playwright:
         page.locator('[data-paper-id="large-paper"]').first.click()
         page.locator(f'[name="practiceCount"][value="{selected_count}"]').check(force=True)
         page.locator('#practiceHistoryOpenBtn').click()
+        group=page.locator('[data-history-paper="short-paper"]')
+        expect(group).to_contain_text('进行中')
+        group.locator('summary').click()
+        expect(group.locator('[data-history-session="completed-3"]')).to_be_visible()
+        assert group.locator('[data-history-session="active-3"]').count()==0
+        expect(group.locator('[data-history-resume="active-3"]')).to_be_visible()
         page.locator('[data-history-practice="short-paper"]').click()
         request = page.evaluate('window.__entryRequests[0]')
         assert request == {"paperId":"short-paper", "releaseId":"short-paper-v1", "mode":"practice", "count":3, "order":"paper"}, request

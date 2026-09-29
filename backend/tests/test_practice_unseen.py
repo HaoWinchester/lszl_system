@@ -129,3 +129,28 @@ def test_catalog_and_progress_expose_current_learner_coverage(paper):
     assert catalog_coverage(TestClient(app)) is None
     mismatch = c.get('/api/v1/learning/practice/papers/another-paper/progress', params={'releaseId': paper['release']})
     assert mismatch.json().get('coverage') is None
+
+
+def test_ordinary_practice_resume_and_history_are_session_scoped(paper):
+    c = login(paper)
+    session = start(c, paper)
+    progress_url = f"/api/v1/learning/practice/papers/{paper['paper']}/progress"
+    progress = c.get(progress_url).json()['modes']
+    assert progress['practice']['sessionId'] == session['id']
+    history_url = '/api/v1/learning/practice/sessions'
+    row = next(row for row in c.get(history_url).json()['sessions'] if row.get('sessionId') == session['id'])
+    assert row['status'] == 'active' and row['total'] == 10 and not row['reportAvailable']
+    assert row['releaseId'] == paper['release']
+    other = login(paper, 'other_student')
+    assert other.get(progress_url).json()['modes']['practice'] is None
+    assert not other.get(history_url).json()['sessions']
+    paused = c.post(f"{history_url}/{session['id']}/pause", json={'revision': session['revision'], 'answers': {}})
+    assert paused.status_code == 200
+    assert c.get(history_url).json()['sessions'][0]['status'] == 'paused'
+    finish(c, paused.json()['session'])
+    second = start(c, paper)
+    rows = c.get(history_url).json()['sessions']
+    by_id = {row['sessionId']: row for row in rows}
+    assert by_id[session['id']]['reportAvailable'] is True
+    assert by_id[second['id']]['reportAvailable'] is False
+    assert c.get(progress_url).json()['modes']['practice']['sessionId'] == second['id']

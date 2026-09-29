@@ -244,14 +244,14 @@
   // begin/end 可选：开始/继续入口需要额外维护 aria-busy 与焦点恢复。
   async function runClickedRequest({key,button,title,message},operation,begin,end){
     if(state.pendingRequestKey)return {skipped:true};
-    state.pendingRequestKey=key;renderSaveStatus();
+    state.pendingRequestKey=key;renderSaveStatus();renderResumeActions();
     if(button&&!begin)button.disabled=true;
     if(begin)begin();else global.KGLearningLoading?.show?.({title,message});
     try{return await operation()}
     finally{
       global.KGLearningLoading?.hide?.();
       if(end)end();else if(button)button.disabled=false;
-      state.pendingRequestKey='';renderSaveStatus();
+      state.pendingRequestKey='';renderSaveStatus();if(document.body.dataset.practiceView==='lobby')syncCountOptions();
       // 关闭可能恰好发生在末次作答与自动结算之间，恢复满卷草稿时继续结算。
       if(['start','reload'].includes(key)&&state.active&&shouldAutoComplete())void finishPractice();
     }
@@ -570,6 +570,18 @@
       }catch(error){showToast('成绩报告暂时无法打开，请稍后重试。');return false}
     });
   }
+  async function resumeHistorySession(sessionId){
+    if(!sessionId||state.pendingRequestKey)return false;
+    return runClickedRequest({key:'start',title:'正在继续练习',message:'正在读取已保存进度…'},async()=>{
+      try{
+        const owner=global.KGAuthCore?.currentUser?.()?.username,session=await practiceApi().getSession(sessionId);
+        if(owner!==global.KGAuthCore?.currentUser?.()?.username)return false;
+        if(!['active','paused'].includes(session?.status)){showToast('本次练习已结束，请重新打开学习记录。');await renderHistory();return false}
+        closeHistoryDrawer();
+        return restoreServerSession(session,state.releases.find(row=>row.releaseId===session.releaseId)||null);
+      }catch(error){showToast('进度暂时无法读取，请稍后重试。');return false}
+    });
+  }
   function formatHistoryTime(value){
     const date=new Date(value);if(Number.isNaN(date.getTime()))return '刚刚';
     return date.toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false});
@@ -581,31 +593,33 @@
       if(dom.historyCount)dom.historyCount.hidden=true;return;
     }
     try{
-      const records=await api.listSessions();
-      // 以试卷为记录单位：同卷重复练习只更新次数/最近时间/最近成绩，不新增行
+      const owner=global.KGAuthCore?.currentUser?.()?.username,records=await api.listSessions();
+      if(owner!==global.KGAuthCore?.currentUser?.()?.username)return;
       const byPaper=new Map();
-      records.forEach(record=>{
+      records.slice().sort((a,b)=>new Date(b.createdAt||0)-new Date(a.createdAt||0)).forEach(record=>{
         const paperId=text(record?.paperId)||('__'+text(record?.paperName||'未命名练习'));
-        const answered=Math.max(0,Number(record?.answered)||0),correct=Math.max(0,Number(record?.correct)||0);
-        const rate=answered?Math.round(correct/answered*100):0;
-        const created=Number(new Date(record?.createdAt||0).getTime())||0;
-        const row=byPaper.get(paperId);
-        if(row){
-          row.count+=1;
-          if(created>=row.lastAt){row.lastAt=created;row.lastRate=rate;row.paperName=text(record?.paperName)||row.paperName;row.latestMode=text(record?.mode||'challenge');row.lastAnswered=answered;row.lastStatus=text(record?.status)}
-          if(record?.reportAvailable===true&&created>=row.reportAt){row.reportAt=created;row.reportSessionId=text(record?.sessionId)}
-        }else byPaper.set(paperId,{paperId:row_paperId(paperId),paperName:text(record?.paperName||'未命名练习'),count:1,lastAt:created,lastRate:rate,lastAnswered:answered,lastStatus:text(record?.status),latestMode:text(record?.mode||'challenge'),reportAt:record?.reportAvailable===true?created:0,reportSessionId:record?.reportAvailable===true?text(record?.sessionId):''});
+        if(!byPaper.has(paperId))byPaper.set(paperId,[]);
+        byPaper.get(paperId).push(record);
       });
-      const papers=[...byPaper.values()].sort((a,b)=>b.lastAt-a.lastAt);
+      const statusLabel=record=>({active:'进行中',paused:'已保存',completed:'已完成',abandoned:'已结束'})[record.status]||'状态未知';
+      const attemptMarkup=record=>{
+        const id=escapeHTML(record.sessionId),answered=Math.max(0,Number(record.answered)||0),total=Math.max(0,Number(record.total)||0);
+        const rate=answered?Math.round(Math.max(0,Number(record.correct)||0)/answered*100)+'%':'—';
+        return `<li class="practice-history-attempt"><div><strong>${escapeHTML(historyModeLabel(record.mode))} · ${statusLabel(record)}</strong><p>${escapeHTML(formatHistoryTime(record.createdAt))} · 已答 ${answered}${total?' / '+total:''} 题 · 已答题正确率 ${rate}</p></div><div class="practice-history-actions">${record.sessionId&&['active','paused'].includes(record.status)?`<button type="button" data-history-resume="${id}">继续本次</button>`:''}${record.sessionId&&record.reportAvailable===true?`<button type="button" data-history-session="${id}">查看本次成绩</button>`:''}</div></li>`;
+      };
       if(dom.historyList){
-        dom.historyList.innerHTML=papers.map(paper=>'<article class="practice-history-row is-paper" data-history-paper="'+escapeHTML(paper.paperId)+'"><div><strong>'+escapeHTML(paper.paperName)+'</strong><span>练习 '+paper.count+' 次 · 最近 '+escapeHTML(formatHistoryTime(paper.lastAt))+' · '+(paper.lastStatus==='paused'?'已保存':paper.lastStatus==='abandoned'?'已结束':'已完成')+' · 已答 '+paper.lastAnswered+' 题</span></div><span>最近正确率 '+paper.lastRate+'%</span><div class="practice-history-actions"><button type="button" data-history-practice="'+escapeHTML(paper.paperId)+'">进入练习</button>'+(paper.reportSessionId?'<button type="button" data-history-session="'+escapeHTML(paper.reportSessionId)+'">查看成绩</button>':'')+'</div></article>').join('');
+        dom.historyList.innerHTML=[...byPaper.entries()].map(([id,attempts])=>{
+          const latest=attempts[0];
+          return `<article class="practice-history-group" data-history-paper="${escapeHTML(row_paperId(id))}"><header><strong>${escapeHTML(latest.paperName||'未命名练习')}</strong><button type="button" class="practice-secondary-btn" data-history-practice="${escapeHTML(row_paperId(id))}">进入练习</button></header><details><summary>查看 ${attempts.length} 次记录 · 最近${statusLabel(latest)}</summary><ol>${attempts.map(attemptMarkup).join('')}</ol></details></article>`;
+        }).join('');
         dom.historyList.querySelectorAll('[data-history-practice]').forEach(button=>button.addEventListener('click',()=>startPaperFromHistory(button.dataset.historyPractice)));
         dom.historyList.querySelectorAll('[data-history-session]').forEach(button=>button.addEventListener('click',()=>openReportFromHistory(button.dataset.historySession)));
+        dom.historyList.querySelectorAll('[data-history-resume]').forEach(button=>button.addEventListener('click',()=>resumeHistorySession(button.dataset.historyResume)));
       }
-      if(dom.historyEmpty)dom.historyEmpty.hidden=papers.length>0;
-      if(dom.historySummary)dom.historySummary.textContent=papers.length?'共练习过 '+papers.length+' 份试卷':'暂无练习记录';
-      if(dom.clearHistoryBtn)dom.clearHistoryBtn.disabled=!papers.length;
-      if(dom.historyCount){dom.historyCount.textContent=String(papers.length);dom.historyCount.hidden=!papers.length}
+      if(dom.historyEmpty){dom.historyEmpty.hidden=records.length>0;dom.historyEmpty.textContent='暂无练习记录'}
+      if(dom.historySummary)dom.historySummary.textContent=records.length?`最近 ${records.length} 条记录 · ${byPaper.size} 份试卷（最多显示 100 条）`:'暂无练习记录';
+      if(dom.clearHistoryBtn)dom.clearHistoryBtn.disabled=!records.length;
+      if(dom.historyCount){dom.historyCount.textContent=String(byPaper.size);dom.historyCount.hidden=!records.length}
     }catch(error){
       if(dom.historyList)dom.historyList.innerHTML='';if(dom.historyEmpty){dom.historyEmpty.hidden=false;dom.historyEmpty.textContent='学习记录暂时无法读取，请稍后重试。'}
     }
@@ -1097,6 +1111,16 @@
     if(mode==='revenge')return {mode,count:revengePolicy().requestCount,order};
     return {paperId:text(catalog?.paperId||catalog?.id),releaseId:text(catalog?.releaseId),mode,count,order};
   }
+  async function createFreshSession(input){
+    const api=practiceApi();
+    try{return await api.startSession(input)}catch(error){
+      if(error?.detail?.code!=='RESUMABLE_SESSION_EXISTS'||!error.detail.sessionId)throw error;
+      const previous=await api.getSession(error.detail.sessionId);
+      if(!global.confirm(`还有一轮${historyModeLabel(previous.mode)}未完成，已保存 ${Number(previous.stats?.answered||0)}/${Number(previous.stats?.total||0)} 题。新开将结束旧轮，保留已有记录，但不能再继续旧轮。是否继续？`))return null;
+      await api.abandonSession(previous.id,{revision:previous.revision});
+      try{return await api.startSession(input)}catch(startError){startError.practiceMessage='旧轮已结束并保留记录，新一轮未能开始，请重试。';throw startError}
+    }finally{if(document.body.dataset.practiceView==='lobby')void syncResumableButtons()}
+  }
   async function startPractice(mode,{fresh=false}={}){
     const challenge=mode==='challenge';
     if(state.entryStartingMode)return false;
@@ -1115,7 +1139,8 @@
       try{
         const api=practiceApi();
         if(hasAuthenticatedUser()&&typeof api?.enterSession==='function'){
-          const input=practiceEntryInput(mode,catalog,count),entered=fresh?{session:await api.startSession(input),resumed:false}:await api.enterSession(input),session=entered?.session;
+          const input=practiceEntryInput(mode,catalog,count),entered=fresh?{session:await createFreshSession(input),resumed:false}:await api.enterSession(input),session=entered?.session;
+          if(fresh&&!session)return false;
           if(!session?.id)throw new Error('进入练习未返回会话');
           state.order=input.order;
           return restoreServerSession(session,mode==='revenge'?null:catalog);
@@ -1149,7 +1174,7 @@
       }catch(error){
         restoreFocus=true;
         const errorCode=error?.detail?.code;
-        showToast(errorCode==='NO_REVENGE_QUESTIONS'?'当前没有可用的全局复仇错题。':errorCode==='REVENGE_SNAPSHOT_UNAVAILABLE'?'历史错题内容暂不可用，可先使用其他练习模式。':'试题读取失败，请稍后重试。');
+        showToast(error.practiceMessage||(errorCode==='NO_REVENGE_QUESTIONS'?'当前没有可用的全局复仇错题。':errorCode==='REVENGE_SNAPSHOT_UNAVAILABLE'?'历史错题内容暂不可用，可先使用其他练习模式。':'试题读取失败，请稍后重试。'));
         return false;
       }
     },beginEntry,endEntry);
@@ -1208,12 +1233,24 @@
     const revengeEntry=revengePolicy();
     dom.startButtons.forEach(button=>{
       const revenge=button.dataset.practiceStart==='revenge',revengeStats=getMistakeStats(),revengeAvailable=revengeStats.active>0,revengeUnavailable=Number(revengeStats.unavailable||0)>0;
-      if(!hasAuthenticatedUser()){button.disabled=false;button.classList.remove('is-upgrade');button.textContent='登录后'+(revenge?'开始复仇':button.dataset.practiceStart==='challenge'?'开始挑战':'进入学霸模式');return}
+      if(!hasAuthenticatedUser()){button.disabled=false;button.classList.remove('is-upgrade');button.textContent='登录后'+(revenge?'开始复仇':button.dataset.practiceStart==='practice'?'开始短练':button.dataset.practiceStart==='challenge'?'开始挑战':'进入学霸模式');return}
       button.disabled=revenge?!revengeAvailable&&!revengeUnavailable:(!release||!firstEnabled);
       button.classList.toggle('is-upgrade',!revenge&&!!release&&!access.allowed);
       button.textContent=revenge?(revengeAvailable?`开始复仇（${revengeEntry.automatic?'全部 ':''}${revengeEntry.requestCount} 题）`:revengeUnavailable?'检查错题内容':'暂无错题'):( !release?(button.dataset.defaultLabel||button.textContent):(!access.allowed?'开通会员':button.dataset.defaultLabel||button.textContent));
     });
+    const ordinary=dom.startButtons.find(button=>button.dataset.practiceStart==='practice');
+    if(ordinary&&hasAuthenticatedUser()&&access.allowed)ordinary.textContent=`开始 ${state.selectedCount} 题${state.selectedCount<=20?'短练':'练习'}`;
+    renderResumeActions();
     dom.setupCard?.classList.toggle('is-vip-locked',!!release&&!access.allowed);
+  }
+  function renderResumeActions(){
+    const paperId=text(selectedRelease()?.id);
+    dom.startButtons.forEach(button=>{
+      const mode=button.dataset.practiceStart,session=mode==='revenge'?state.revengeSummary?.resumable:state.paperProgress?.paperId===paperId?state.paperProgress?.modes?.[mode]:null;
+      const fresh=document.querySelector(`[data-practice-new="${mode}"]`),available=hasAuthenticatedUser()&&!!session;
+      if(fresh){fresh.hidden=!available;fresh.disabled=!!state.pendingRequestKey}
+      if(available){button.disabled=!!state.pendingRequestKey;button.textContent=`${mode==='revenge'?'继续上次复仇':'继续上次练习'} ${Number(session.answered||0)}/${Number(session.total||0)}`}
+    });
   }
   async function syncResumableButtons(){
     const release=selectedRelease(),api=practiceApi(),token=++state.resumeLookupToken;
@@ -1226,16 +1263,10 @@
         api.getRevengeSummary().catch(()=>null)
       ]);
       if(token!==state.resumeLookupToken||releaseKey!==text(selectedRelease()?.id))return;
-      state.paperProgress=progress;state.revengeSummary=revenge;
+      state.paperProgress=progress?{...progress,paperId}:null;state.revengeSummary=revenge;
       if(progress?.coverage?.releaseId===release?.releaseId)state.coverageOverrides[release.releaseId]=progress.coverage;
       renderPaperLibrary();renderCoverage();
       syncRevengeStats();syncCountOptions();
-      ['challenge','scholar'].forEach(mode=>{
-        const button=dom.startButtons.find(item=>item.dataset.practiceStart===mode),session=progress?.modes?.[mode];if(!button||!session)return;
-        button.disabled=false;button.textContent='继续上次练习 '+Number(session.answered||0)+'/'+Number(session.total||0);
-      });
-      const revengeButton=dom.startButtons.find(item=>item.dataset.practiceStart==='revenge'),revengeSession=revenge?.resumable;
-      if(revengeButton&&revengeSession){revengeButton.disabled=false;revengeButton.textContent='继续上次复仇 '+Number(revengeSession.answered||0)+'/'+Number(revengeSession.total||0)}
     }catch(error){
       if(token!==state.resumeLookupToken)return;
       if(release)state.coverageOverrides[release.releaseId]=null;renderPaperLibrary();renderCoverage();
@@ -1396,6 +1427,7 @@
     dom.revengeRuleTrigger?.addEventListener('click',event=>{event.stopPropagation();state.revengeRulePinned=!state.revengeRulePinned;setRevengeRuleOpen(state.revengeRulePinned)});
     document.addEventListener('click',event=>{if(!dom.revengeRuleShell?.contains(event.target)){state.revengeRulePinned=false;setRevengeRuleOpen(false)}});
     dom.startButtons.forEach(button=>button.addEventListener('click',()=>startPractice(button.dataset.practiceStart)));
+    document.querySelectorAll('[data-practice-new]').forEach(button=>button.addEventListener('click',()=>startPractice(button.dataset.practiceNew,{fresh:true})));
     dom.confirmAnswerBtn?.addEventListener('click',confirmPendingAnswer);
     $('practiceSettlementRetry')?.addEventListener('click',finishPractice);
     dom.exitBtn.addEventListener('click',openExitConfirm);dom.exitCancel.addEventListener('click',closeExitConfirm);dom.saveExitBtn?.addEventListener('click',saveAndExit);dom.abandonBtn?.addEventListener('click',abandonPractice);
@@ -1456,7 +1488,7 @@
       },{passive:true});
     }
     document.addEventListener('keydown',event=>{if(event.key!=='Escape')return;if(dom.revengeRuleTrigger?.getAttribute('aria-expanded')==='true'){state.revengeRulePinned=false;setRevengeRuleOpen(false)}else if(!dom.submitConfirm.hidden)closeSubmitConfirm();else if(!dom.exitConfirm.hidden)closeExitConfirm();else if(dom.answerSheetDrawer&&!dom.answerSheetDrawer.hidden)closeAnswerSheetDrawer(true);else if(dom.paperDrawer&&!dom.paperDrawer.hidden)closePaperDrawer();else if(dom.historyDrawer&&!dom.historyDrawer.hidden)closeHistoryDrawer()});
-    global.addEventListener('kg-auth-session-change',()=>{state.coverageOverrides={};state.reportNextPractice=null;state.resumeLookupToken++;if(!state.active)syncLobby();if(!state.active)refreshExperiencePanel()});
+    global.addEventListener('kg-auth-session-change',()=>{state.paperProgress=null;state.revengeSummary=null;state.coverageOverrides={};state.reportNextPractice=null;state.resumeLookupToken++;if(!state.active)syncLobby();if(!state.active)refreshExperiencePanel()});
     global.addEventListener('kg-subscription-change',()=>{if(!state.active)syncLobby()});
     global.addEventListener('kg-subscription-plan-change',()=>{if(!state.active)syncLobby()});
     global.addEventListener('kg:published-papers-changed',()=>{if(!state.active)syncLobby()});
