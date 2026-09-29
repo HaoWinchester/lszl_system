@@ -92,3 +92,10 @@
   background: var(--ink);
 }
 :host { display: block; width: 100%; }
+
+.paper-coverage {
+  margin-top: var(--space-2);
+  color: var(--muted);
+  font-size: var(--font-meta);
+  line-height: var(--line-body);
+}

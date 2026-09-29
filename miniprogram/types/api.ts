@@ -2,7 +2,16 @@ export type PracticeMode = 'normal' | 'challenge' | 'scholar' | 'revenge';
 export type BackendPracticeMode = 'practice' | 'challenge' | 'scholar' | 'revenge';
 export type PracticeOrder = 'paper' | 'random';
 
+export interface PaperCoverage {
+  releaseId: string;
+  totalCount: number;
+  completedCount: number;
+  remainingUnseen: number;
+  label: string;
+}
+
 export interface PaperSummary {
+  coverage?: PaperCoverage | null;
   paperId: string;
   releaseId: string;
   version: number;

@@ -48,7 +48,7 @@ export async function createUatClient(account, options = {}) {
   const practice = await loadModule('services/practice.ts', { ...http, normalizeQuestion, invalidateLearningPages },
     ['startSession', 'getSession', 'getActiveSessions', 'pauseSession', 'saveState', 'completeSession', 'abandonSession', 'getReport', 'listSessions',
       'getExperienceSummary', 'getOverview', 'getRevengeSummary', 'getRemediation', 'getVerificationCandidate', 'markRemediationReviewed', 'submitRevengeAnswer', 'submitVerification']);
-  const papers = await loadModule('services/papers.ts', http, ['listPublishedPapers']);
+  const papers = await loadModule('services/papers.ts', http, ['listPublishedPapers','getPaperCoverage']);
   const growth = await loadModule('services/growth.ts', { ...http, invalidateLearningPages }, ['getGrowthSummary', 'updateGrowthGoal']);
   const growthFormatting = await loadModule('domain/growth-view.ts', {}, ['growthView', 'GROWTH_GOALS']);
   const subscription = await loadModule('services/subscription.ts', http, ['getMySubscription']);

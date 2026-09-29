@@ -3,7 +3,8 @@ import { navigation, returnToPage } from "../../domain/navigation";
 import { withAppearance } from '../../domain/appearance-page';
 import { messageOf } from '../../services/http';
 import { getReport, getSession } from '../../services/practice';
-import { PracticeQuestion, PracticeReport, PracticeSession } from '../../types/api';
+import { getPaperCoverage } from '../../services/papers';
+import { PaperCoverage, PracticeQuestion, PracticeReport, PracticeSession } from '../../types/api';
 import { getModePolicy } from '../../domain/mode-policy';
 import { createPracticeRun } from '../../domain/pc-practice';
 
@@ -41,6 +42,12 @@ Page(withAppearance(withAppShare({
     loading: true,
     error: '',
     sessionId: '',
+    coverage: null as PaperCoverage | null,
+    coverageLoading: false,
+    coverageError: '',
+    nextCount: 0,
+    openingNext: false,
+    nextError: '',
     report: {} as PracticeReport,
     session: { questions: [] } as unknown as PracticeSession,
     accuracy: '0',
@@ -117,9 +124,45 @@ Page(withAppearance(withAppShare({
         unansweredCount: Number(report.counts?.unanswered || 0),
         loading: false,
       });
+      await this.loadCoverage();
     } catch (error) {
       this.setData({ loading: false, error: messageOf(error) });
     }
+  },
+
+  async loadCoverage() {
+    if (this.data.coverageLoading) return;
+    const { paperId, releaseId } = this.data.session;
+    this.setData({ coverage: null, nextCount: 0, coverageError: '' });
+    if (!paperId || !releaseId) return;
+    this.setData({ coverageLoading: true });
+    try {
+      const coverage = await getPaperCoverage(paperId, releaseId);
+      if (!coverage) throw new Error('暂时无法获取本版本练习统计');
+      this.setData({ coverage, nextCount: Math.min(10, coverage.totalCount) });
+    } catch (error) {
+      this.setData({ coverageError: messageOf(error) });
+    } finally {
+      this.setData({ coverageLoading: false });
+    }
+  },
+
+  onNextPractice() {
+    if (this.data.openingNext || this.data.coverageLoading || !this.data.nextCount) return;
+    const { session, report, coverage } = this.data;
+    if (!session.paperId || !session.releaseId || !coverage) return;
+    this.setData({ openingNext: true, nextError: '' });
+    const query = [
+      `paperId=${encodeURIComponent(session.paperId)}`,
+      `releaseId=${encodeURIComponent(session.releaseId)}`,
+      `title=${encodeURIComponent(String(report.paperName || session.paperName || '新一轮练习'))}`,
+      `count=${coverage.totalCount}`,
+      'short=1',
+    ].join('&');
+    navigation.redirectTo({
+      url: `/pages/practice-setup/index?${query}`,
+      fail: () => this.setData({ openingNext: false, nextError: '页面未打开，请重试；尚未创建新练习。' }),
+    });
   },
 
   onReview(event: any) {

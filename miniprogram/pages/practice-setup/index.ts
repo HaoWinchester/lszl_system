@@ -21,6 +21,7 @@ Page(withAppearance(withAppShare({
     modes: MODE_CHOICES,
     starting: false,
     quick: false,
+    autoStart: false,
     existingSessionId: '',
     error: '',
   },
@@ -30,6 +31,7 @@ Page(withAppearance(withAppShare({
     const values = total <= 5 ? [total] : total < 10 ? [5, total] : [5, 10, 20, 60, 180].filter(value => value <= total);
     const requestedCount = Number(query.practiceCount);
     const quick = query.quick === '1';
+    const autoStart = quick || query.short === '1';
     this.setData({
       statusBarHeight: wx.getWindowInfo?.().statusBarHeight || 24,
       paperId: decodeURIComponent(query.paperId || ''),
@@ -38,12 +40,13 @@ Page(withAppearance(withAppShare({
       totalCount: total,
       countChoices: values.map(value => ({ label: value === total ? `全卷 ${value}` : `${value} 题`, value })),
       quick,
+      autoStart,
       count: quick ? Math.min(5, total) : values.includes(requestedCount) ? requestedCount : Math.min(10, total),
-      mode: (quick ? 'normal' : query.mode || 'normal') as PracticeMode,
+      mode: (autoStart ? 'normal' : query.mode || 'normal') as PracticeMode,
     });
   },
 
-  onReady() { if (this.data.quick) return this.start(); },
+  onReady() { if (this.data.autoStart) return this.start(); },
 
   updateSetting(field: 'count' | 'order' | 'mode', value: number | string) {
     if (this.data.starting || this.data[field] === value) return;

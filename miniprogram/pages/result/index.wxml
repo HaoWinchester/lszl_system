@@ -46,7 +46,12 @@
     </view>
 
     <view class="next-actions">
-      <button wx:if="{{wrongQuestions.length}}" class="primary-button next-action" bindtap="onRevenge">进入错题复习</button>
+      <text wx:if="{{coverage}}" class="section-aside">{{coverage.label}}。练过不代表已掌握。</text>
+      <view wx:if="{{coverageError}}" class="result-error" role="alert"><text>{{coverageError}}</text><button class="quiet-button" bindtap="loadCoverage">重试获取统计</button></view>
+      <button wx:if="{{session.paperId && session.releaseId}}" class="primary-button next-action" bindtap="onNextPractice" loading="{{coverageLoading || openingNext}}" disabled="{{!nextCount || coverageLoading || openingNext}}">{{coverageLoading ? '正在获取练习进度' : coverage && coverage.remainingUnseen === 0 ? '再复习 ' + nextCount + ' 题' : '再练 ' + (nextCount || 10) + ' 题'}}</button>
+      <text wx:if="{{nextCount}}" class="section-aside">普通练习，优先未做题，不足时补已做题；全卷不足 10 题则练全卷，案例题保留完整。</text>
+      <text wx:if="{{nextError}}" class="error-copy" role="alert">{{nextError}}</text>
+      <button wx:if="{{wrongQuestions.length}}" class="secondary-button next-action" bindtap="onRevenge">进入错题复习</button>
       <text wx:if="{{wrongQuestions.length}}" class="section-aside">进入全部待复习错题，按学习进度安排重答与验证。</text>
       <button class="secondary-button next-action" bindtap="onRetry">开始新一轮练习</button>
       <button class="quiet-button next-action" bindtap="onHome">回到首页</button>

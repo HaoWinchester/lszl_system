@@ -5,6 +5,7 @@
   </view>
   <text class="paper-title">{{item.title}}</text>
   <text wx:if="{{item.description}}" class="paper-copy">{{item.description}}</text>
+  <text wx:if="{{item.coverage}}" class="paper-coverage">{{item.coverage.label}}</text>
   <view class="paper-foot">
     <text>{{item.questionCount}} 题</text>
     <text wx:if="{{progressText}}">{{progressText}}</text>

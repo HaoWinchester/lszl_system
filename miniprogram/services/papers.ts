@@ -1,11 +1,29 @@
 import { request } from './http';
-import { PaperSummary } from '../types/api';
+import { PaperCoverage, PaperSummary } from '../types/api';
+
+function normalizeCoverage(raw: any, releaseId: string): PaperCoverage | null {
+  if (!raw || raw.releaseId !== releaseId) return null;
+  const { totalCount, completedCount, remainingUnseen } = raw;
+  if (![totalCount, completedCount, remainingUnseen].every(value => Number.isInteger(value) && value >= 0)
+      || completedCount + remainingUnseen !== totalCount) return null;
+  return { releaseId, totalCount, completedCount, remainingUnseen,
+    label: `本版本已练 ${completedCount} / ${totalCount} 题 · 未练 ${remainingUnseen} 题` };
+}
+
+export async function getPaperCoverage(paperId: string, releaseId: string): Promise<PaperCoverage | null> {
+  const payload = await request<{ coverage?: unknown }>({
+    path: `/api/v1/learning/practice/papers/${encodeURIComponent(paperId)}/progress?releaseId=${encodeURIComponent(releaseId)}`,
+  });
+  return normalizeCoverage(payload.coverage, releaseId);
+}
 
 function normalizePaper(raw: any): PaperSummary {
+  const releaseId = String(raw?.releaseId || raw?.id || '');
   const access = String(raw?.accessPolicy?.accessLevel || raw?.accessLevel || 'free').toLowerCase();
   return {
     paperId: String(raw?.paperId || ''),
-    releaseId: String(raw?.releaseId || raw?.id || ''),
+    releaseId,
+    coverage: normalizeCoverage(raw?.coverage, releaseId),
     version: Number(raw?.version || 0),
     title: String(raw?.title || raw?.name || '未命名试卷'),
     subject: String(raw?.subject || 'PMP'),
