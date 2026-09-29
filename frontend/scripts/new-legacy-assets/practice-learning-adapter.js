@@ -65,8 +65,8 @@
   function invalidateEntrySummaries(scope = {}) {
     const paperId = text(scope.paperId).trim()
     if (paperId) {
-      progressCache.delete(paperId)
-      progressLoading.delete(paperId)
+      for (const key of progressCache.keys()) if (JSON.parse(key)[0] === paperId) progressCache.delete(key)
+      for (const key of progressLoading.keys()) if (JSON.parse(key)[0] === paperId) progressLoading.delete(key)
       progressVersions.set(paperId, (progressVersions.get(paperId) || 0) + 1)
     } else {
       progressCache.clear()
@@ -80,18 +80,18 @@
     }
   }
   async function getPaperProgress(paperId, releaseId) {
-    const key = text(paperId).trim()
-    if (!key) return { paperId: '', modes: { challenge: null, scholar: null } }
+    const id = text(paperId).trim(), key = JSON.stringify([id, text(releaseId)])
+    if (!id) return { paperId: '', modes: { challenge: null, scholar: null } }
     if (progressCache.has(key)) return clone(progressCache.get(key))
     if (progressLoading.has(key)) return clone(await progressLoading.get(key))
     const params = new URLSearchParams()
     if (releaseId) params.set('releaseId', text(releaseId))
     const query = params.toString() ? `?${params}` : ''
-    const version = `${progressEpoch}:${progressVersions.get(key) || 0}`
+    const version = `${progressEpoch}:${progressVersions.get(id) || 0}`
     const pending = request(`/papers/${encodeURIComponent(paperId)}/progress` + query)
       .then(payload => {
-        const value = clone(payload || { paperId: key, modes: { challenge: null, scholar: null } })
-        if (version === `${progressEpoch}:${progressVersions.get(key) || 0}`) progressCache.set(key, value)
+        const value = clone(payload || { paperId: id, modes: { challenge: null, scholar: null } })
+        if (version === `${progressEpoch}:${progressVersions.get(id) || 0}`) progressCache.set(key, value)
         return value
       })
       .finally(() => { if (progressLoading.get(key) === pending) progressLoading.delete(key) })

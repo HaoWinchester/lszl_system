@@ -103,3 +103,29 @@ def test_coverage_answer_shapes_history_hidden_and_release_scope(paper):
             assert await answered_question_ids(db,paper['other_student'],paper['release'])==set()
             assert await answered_question_ids(db,paper['student'],'another-release')==set()
     asyncio.run(verify())
+
+
+def test_catalog_and_progress_expose_current_learner_coverage(paper):
+    c = login(paper)
+    def catalog_coverage(client):
+        rows = client.get('/api/v1/paper-releases/catalog').json()['releases']
+        return next(row for row in rows if row['releaseId'] == paper['release']).get('coverage')
+    expected = {'releaseId': paper['release'], 'totalCount': 23, 'completedCount': 0, 'remainingUnseen': 23}
+    assert catalog_coverage(c) == expected
+    session = start(c, paper, mode="scholar")
+    ids = qids(session)
+    paused = c.post(f"/api/v1/learning/practice/sessions/{session['id']}/pause",
+                    json={'revision': session['revision'], 'answers': {ids[0]: {'selectedAnswer': 'B', 'selectionIndex': 1}}})
+    assert paused.status_code == 200, paused.text
+    assert catalog_coverage(c)['completedCount'] == 1
+    finish(c, paused.json()['session'], {ids[0]: {'selectedAnswer': 'B', 'selectionIndex': 1},
+                        ids[1]: {'selectedAnswer': '__timeout__', 'timedOut': True, 'selectionIndex': 2}})
+    expected.update(completedCount=1, remainingUnseen=22)
+    assert catalog_coverage(c) == expected
+    response = c.get(f"/api/v1/learning/practice/papers/{paper['paper']}/progress", params={'releaseId': paper['release']})
+    assert response.status_code == 200
+    assert response.json()['coverage'] == expected
+    assert catalog_coverage(login(paper, 'other_student'))['completedCount'] == 0
+    assert catalog_coverage(TestClient(app)) is None
+    mismatch = c.get('/api/v1/learning/practice/papers/another-paper/progress', params={'releaseId': paper['release']})
+    assert mismatch.json().get('coverage') is None

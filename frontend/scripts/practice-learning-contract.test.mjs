@@ -185,6 +185,8 @@ test('practice entry adapter coalesces lean summaries and does not preload overv
   api.invalidateEntrySummaries({ paperId: 'paper-1' })
   await api.getPaperProgress('paper-1', 'release-1')
   assert.equal(calls.filter(call => call.url.includes('/papers/')).length, 2)
+  await api.getPaperProgress('paper-1', 'release-2')
+  assert.equal(calls.filter(call => call.url.includes('/papers/')).length, 3, 'coverage must not reuse another release')
 })
 
 test('invalidating an in-flight paper summary prevents the stale result from repopulating cache', async () => {

@@ -78,3 +78,19 @@ test('180-answer payload fits the close budget, oversized payload is not misrepo
   assert.equal(saves.flushForPageHide({sessionId:'s1',active:true,dirty:true,input}),false);
   assert.equal(calls.length,1);
 });
+
+test('save status distinguishes local answers, confirmed saves, offline, and failures',()=>{
+  const context={window:{},TextEncoder};
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../src/116-practice-session-save.js'),'utf8'),context);
+  const describe=context.window.KGPracticeSessionSave.describeStatus;
+  assert.equal(typeof describe,'function');
+  const base={total:10,saved:2,answered:3,dirty:true,online:true};
+  assert.equal(describe(base).kind,'dirty');
+  assert.match(describe(base).text,/3.*2/);
+  assert.equal(describe({...base,dirty:false,saved:3}).kind,'saved');
+  assert.equal(describe({...base,saving:true}).kind,'saving');
+  assert.equal(describe({...base,online:false}).kind,'offline');
+  assert.equal(describe({...base,error:true}).kind,'error');
+  assert.equal(describe({...base,conflict:true}).kind,'conflict');
+  assert.doesNotMatch(describe({...base,error:true}).text,/自动重试/);
+});

@@ -132,6 +132,9 @@
     }
     section.querySelectorAll('[data-review-filter]').forEach(button => button.addEventListener('click', () => selectWithComments(button.dataset.reviewFilter)))
     selectWithComments(options.reviewFilter === 'all' ? 'all' : 'wrong')
+    root.querySelector('[data-report-review-wrong]')?.addEventListener('click', () => {
+      selectWithComments('wrong');section.scrollIntoView({behavior:'smooth',block:'start'});
+    })
     root.querySelector('[data-report-review-all]')?.addEventListener('click', () => {
       selectWithComments('all')
       section.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -147,6 +150,10 @@
     const resultClass = report.passed ? 'is-pass' : 'is-fail'
     const questionNumbers = options.questionNumbers || {}
     const wrongIds = Array.isArray(report.wrongQuestionIds) ? report.wrongQuestionIds : []
+    const next=options.onNextPractice&&options.nextPractice;
+    const nextCount=number(next?.count),newCount=Math.min(nextCount,number(next?.remainingUnseen));
+    const nextLabel=nextCount?(newCount===nextCount?`继续练 ${nextCount} 道未做题`:newCount?`继续短练 ${nextCount} 题`:`复习 ${nextCount} 题`):'';
+    const nextDetail=nextCount?`未做 ${newCount} 题 · 复习 ${nextCount-newCount} 题。优先未做题，案例题保持完整；以开始时的最新进度为准。`:'';
     const domainDataComplete = report.domainDataComplete !== false
     const wrongButtons = wrongIds.map((id) => {
       const label = questionNumbers[id] ? `第 ${questionNumbers[id]} 题` : text(id)
@@ -158,6 +165,7 @@
       <section class="practice-report-overall ${isSimulation ? resultClass : ''}"><div><span>${isSimulation ? 'OVERALL PERFORMANCE' : 'PRACTICE COVERAGE'}</span><h2>${isSimulation ? escapeHTML(report.resultLabel || `模拟考试结果：${report.passed ? 'PASS' : 'FAIL'}`) : '本次练习摘要'}</h2><p>${isSimulation ? '本结果按本次会话的冻结规则生成。' : '仅反映本次抽取题目的表现。'}</p></div><div class="practice-report-score"><strong>${isSimulation ? score.toFixed(2).replace(/\.00$/, '') : number(report.accuracyPercent).toFixed(2).replace(/\.00$/, '')}</strong><span>${isSimulation ? `模拟分 / 100${report.maxScore ? ` · ${number(report.rawScore)} / ${number(report.maxScore)} 原始分` : ''}` : '本次正确率 / 100'}</span></div></section>
       ${isSimulation ? `<section class="practice-report-band-scale" aria-label="总体表现区间"><div class="practice-report-band-track">${bandScaleMarkup(report)}<i style="left:${Math.max(0, Math.min(100, score))}%" aria-label="你的模拟分 ${score}"></i></div></section>` : ''}
       <section class="practice-report-counts"><div><span>总题数</span><strong>${number(counts.total)}</strong></div><div><span>答对</span><strong>${number(counts.correct)}</strong></div><div><span>答错</span><strong>${number(counts.wrong)}</strong></div><div><span>未答</span><strong>${number(counts.unanswered)}</strong></div><div><span>正确率</span><strong>${number(report.accuracyPercent ?? score).toFixed(2).replace(/\.00$/, '')}%</strong></div><div><span>累计用时</span><strong>${durationLabel(report.durationMs)}</strong></div>${options.experience == null ? '' : `<div><span>本次经验</span><strong>${number(options.experience)}</strong></div>`}</section>
+      <section class="practice-report-next"><h2>下一步建议</h2>${nextCount?`<p>${escapeHTML(nextDetail)}</p><button type="button" class="practice-primary-btn" data-report-next>${escapeHTML(nextLabel)}</button>`:''}${wrongIds.length?'<button type="button" class="practice-secondary-btn" data-report-review-wrong>回看本次错题</button>':''}<ul>${(isSimulation ? (Array.isArray(report.recommendations) ? report.recommendations : []) : ['优先复盘本次错题及对应知识点', '扩大题目覆盖后再判断各领域的整体表现']).map(item => `<li>${escapeHTML(item)}</li>`).join('')}</ul></section>
       ${domainDataComplete && isSimulation
         ? `<section class="practice-report-breakdown"><header><span>EXAM BREAKDOWN</span><h2>考试领域分析</h2><p>扇区大小代表领域占比，颜色代表本领域的模拟表现等级。</p>${legendMarkup()}</header>${pieMarkup(report)}</section>
       <section class="practice-report-domains"><h2>各领域成绩</h2><div class="practice-report-table-scroll"><table class="practice-report-domain-table"><thead><tr><th>领域</th><th>占比</th><th>答对 / 总数</th><th>得分率</th><th>表现</th></tr></thead><tbody>${domainRows(report, true)}</tbody></table></div></section>`
@@ -165,13 +173,14 @@
         : `<section class="practice-report-domains"><h2>本次领域覆盖</h2><div class="practice-report-table-scroll"><table class="practice-report-domain-table"><thead><tr><th>领域</th><th>覆盖</th><th>答对 / 总数</th><th>本次正确率</th><th>状态</th></tr></thead><tbody>${domainRows(report, false)}</tbody></table></div>${domainDataComplete ? '' : '<p>部分历史题目缺少领域标注；只显示已标注题目的覆盖情况。</p>'}</section>`}
       <section class="practice-report-wrong"><div><h2>本次错题</h2><p>${wrongIds.length ? `共 ${wrongIds.length} 道，${Array.isArray(options.questions) ? '下方已统一展开错题与解析，也可筛选全部或答对的题目。' : '点击题号只读回看答案与解析。'}` : '本次作答没有错题。'}</p></div><div class="practice-report-wrong-list">${wrongButtons}</div></section>
       ${Array.isArray(options.questions) ? '<section class="practice-report-review" data-question-review></section>' : ''}
-      <section class="practice-report-next"><h2>下一步建议</h2><ul>${(isSimulation ? (Array.isArray(report.recommendations) ? report.recommendations : []) : ['优先复盘本次错题及对应知识点', '扩大题目覆盖后再判断各领域的整体表现']).map(item => `<li>${escapeHTML(item)}</li>`).join('')}</ul></section>
       <p class="practice-report-disclaimer">${isSimulation ? escapeHTML(report.disclaimer || '幻谱模拟判定，不代表 PMI 官方考试成绩') : '本报告只反映本次练习题目，不代表考试通过情况'}</p>
       <footer class="practice-report-actions">${options.onReviewAll || Array.isArray(options.questions) ? '<button type="button" class="practice-secondary-btn" data-report-review-all="true">回看全部题目与解析</button>' : ''}<button type="button" class="practice-primary-btn" data-report-again="true">再练一次</button><button type="button" class="practice-secondary-btn" data-report-lobby="true">返回大厅</button></footer>
       <div class="practice-report-page">${escapeHTML(report.pageNumber || '1 / 1')}</div>
     </article>`
     root.querySelectorAll('[data-review-question]').forEach(button => button.addEventListener('click', () => options.onReviewWrong?.(button.dataset.reviewQuestion)))
     if (!Array.isArray(options.questions)) root.querySelector('[data-report-review-all]')?.addEventListener('click', () => options.onReviewAll?.())
+    if (!Array.isArray(options.questions)) root.querySelector('[data-report-review-wrong]')?.addEventListener('click',()=>options.onReviewWrong?.(wrongIds[0]))
+    root.querySelector('[data-report-next]')?.addEventListener('click',()=>options.onNextPractice?.())
     renderQuestionReview(root, report, options)
     global.KGQuestionMaterials?.bindMedia(root)
     root.querySelector('[data-report-again]')?.addEventListener('click', () => options.onAgain?.())

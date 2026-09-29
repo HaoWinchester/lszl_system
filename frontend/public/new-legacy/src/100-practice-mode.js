@@ -21,7 +21,7 @@
     feedbackTimer:0,popTimer:0,toastTimer:0,abandonedRecorded:false,catalogAvailable:false,retiredNavigation:null,retiredNoticeShown:false,
     remediationPending:false,verification:null,entryStartingMode:'',revengeRulePinned:false,showPreviousWrong:true,
     session:null,report:null,reviewing:false,answerSheet:null,pendingSelections:{},pendingMatches:{},casePositions:{},submitting:false,pendingRequestKey:'',resumeLookupToken:0,
-    draft:null,revengeState:null,saves:null,reconciling:false,paperProgress:null,revengeSummary:null,
+    draft:null,saveError:false,coverageOverrides:{},reportNextPractice:null,revengeState:null,saves:null,reconciling:false,paperProgress:null,revengeSummary:null,
     markedQuestions:new Set(),showAnswers:false
   };
 
@@ -137,6 +137,53 @@
     if(!state.saves)state.saves=global.KGPracticeSessionSave.create({api:practiceApi()});
     return state.saves;
   }
+  function renderSaveStatus(){
+    const panel=$('practiceSessionUnsaved'),button=$('practiceSaveProgressBtn');if(!panel)return;
+    panel.hidden=!state.active||!state.session||state.reviewing;
+    const saving=['save','complete','abandon'].includes(state.pendingRequestKey);
+    const status=global.KGPracticeSessionSave.describeStatus({total:state.questions.length,saved:Object.keys(state.session?.answers||{}).length,
+      answered:state.draft?.stats?.().answered||0,dirty:state.draft?.isDirty?.(),saving,error:state.saveError,conflict:state.conflict,online:global.navigator?.onLine!==false});
+    panel.dataset.status=status.kind;
+    const label=$('practiceSaveStatusText');if(label)label.textContent=status.text;
+    if(button){button.disabled=!!state.pendingRequestKey||state.conflict||global.navigator?.onLine===false||(!state.draft?.isDirty?.()&&!state.saveError);button.textContent=state.saveError?'重试保存':'保存进度'}
+  }
+  function paperCoverage(release){return Object.hasOwn(state.coverageOverrides,release?.releaseId)?state.coverageOverrides[release.releaseId]:release?.coverage||null}
+  function coverageText(release){
+    if(!hasAuthenticatedUser())return '登录后查看已练进度';
+    const coverage=paperCoverage(release);
+    return coverage?`当前版本：已练 ${coverage.completedCount} / ${coverage.totalCount} 题 · 未练 ${coverage.remainingUnseen} 题`:'覆盖进度暂不可用';
+  }
+  function renderCoverage(){
+    const release=selectedRelease(),summary=$('practiceCoverageSummary');
+    if(summary)summary.textContent=release?coverageText(release)+'。已练不代表掌握；仅统计服务器已保存的有效作答。':'';
+    const retry=$('practiceCoverageRetry');if(retry)retry.hidden=!release||!hasAuthenticatedUser()||!!paperCoverage(release);
+  }
+  async function loadReportNextPractice(){
+    const session=state.session,owner=global.KGAuthCore?.currentUser?.()?.username;
+    state.reportNextPractice=null;
+    if(!session||session.mode==='revenge'||!practiceApi()?.getPaperProgress)return;
+    const release=state.releases.find(row=>row.releaseId===session.releaseId&&paperAccess(row).allowed);
+    if(!release)return;
+    try{
+      const progress=await practiceApi().getPaperProgress(session.paperId,session.releaseId);
+      if(document.body.dataset.practiceView!=='result'||state.session?.id!==session.id||state.active||state.reviewing||global.KGAuthCore?.currentUser?.()?.username!==owner)return;
+      const coverage=progress?.coverage;if(!coverage||coverage.releaseId!==session.releaseId||!coverage.totalCount)return;
+      state.coverageOverrides[session.releaseId]=coverage;
+      state.reportNextPractice={count:Math.min(10,coverage.totalCount),remainingUnseen:coverage.remainingUnseen,paperId:session.paperId,releaseId:session.releaseId};
+      renderFrozenReport({refreshNext:false});
+    }catch(error){/* Keep the frozen report and existing review controls usable. */}
+  }
+  function startNextPractice(){
+    const next=state.reportNextPractice;
+    if(!next||state.pendingRequestKey)return;
+    loadReleases();
+    const release=state.releases.find(row=>row.id===next.paperId&&row.releaseId===next.releaseId);
+    if(!release){showToast('这份试卷版本已更新或下架，请返回大厅重新选择。');return}
+    selectPaper(release.id);state.selectedCount=next.count;state.order='paper';
+    dom.countInputs.forEach(input=>input.checked=Number(input.value)===next.count);
+    dom.orderInputs.forEach(input=>input.checked=input.value==='paper');
+    return startPractice('practice',{fresh:true});
+  }
   function selectionNotice(session){
     const summary=session?.selectionSummary||session?.scoringSnapshot?.selectionSummary;
     if(!summary||session?.mode==='revenge')return '';
@@ -184,9 +231,10 @@
     state.questions=state.questions.map(question=>incoming.has(question.id)?{...question,...incoming.get(question.id)}:question);
   }
   function setConflictVisible(visible){
-    state.conflict=!!visible;if(dom.sessionConflict)dom.sessionConflict.hidden=!visible;
+    state.conflict=!!visible;if(dom.sessionConflict)dom.sessionConflict.hidden=!visible;renderSaveStatus();
   }
   function handleSessionError(error,{allowRetry=false}={}){
+    state.saveError=true;renderSaveStatus();
     if(Number(error?.status)===409){clearTimers();state.locked=true;setConflictVisible(true);showFeedback('进度已在另一页更新','danger');showToast('请加载最新进度后继续做题。');return false}
     if(allowRetry)renderQuestion();
     showFeedback('保存未完成，答案仍保留在页面中，请重试。','danger');return false;
@@ -196,14 +244,14 @@
   // begin/end 可选：开始/继续入口需要额外维护 aria-busy 与焦点恢复。
   async function runClickedRequest({key,button,title,message},operation,begin,end){
     if(state.pendingRequestKey)return {skipped:true};
-    state.pendingRequestKey=key;
+    state.pendingRequestKey=key;renderSaveStatus();
     if(button&&!begin)button.disabled=true;
     if(begin)begin();else global.KGLearningLoading?.show?.({title,message});
     try{return await operation()}
     finally{
       global.KGLearningLoading?.hide?.();
       if(end)end();else if(button)button.disabled=false;
-      state.pendingRequestKey='';
+      state.pendingRequestKey='';renderSaveStatus();
       // 关闭可能恰好发生在末次作答与自动结算之间，恢复满卷草稿时继续结算。
       if(['start','reload'].includes(key)&&state.active&&shouldAutoComplete())void finishPractice();
     }
@@ -214,6 +262,7 @@
     return (state.session?sessionQuestions(state.session):state.questions).map((question,index)=>({questionId:question.id,question:question.raw||question}));
   }
   function createDraft(session){
+    state.saveError=false;
     state.draft=global.KGPracticeDraftState?.create({
       questions:draftQuestions(),
       answers:(session&&typeof session==='object'?session.answers:{})||{},
@@ -256,8 +305,9 @@
     if(dom.answerSheetDrawer&&!dom.answerSheetDrawer.hidden)closeAnswerSheetDrawer(true);
     return true;
   }
-  function renderFrozenReport(){
+  function renderFrozenReport({refreshNext=true}={}){
     if(!state.report||!global.KGPracticeResultReport?.render)return false;
+    if(refreshNext)void loadReportNextPractice();
     const questionNumbers=Object.fromEntries(state.questions.map((question,index)=>[question.id,index+1]));
     const rendered=global.KGPracticeResultReport.render(dom.result,state.report,{questionNumbers,
       experience:state.session?.stats?.experience,paperId:state.session?.paperId,releaseId:state.session?.releaseId,
@@ -269,6 +319,7 @@
       }),
       answers:state.session?.answers||{},
       onReviewAll:state.mode==='practice'?()=>openQuestionReview(state.questions[state.index]?.id||state.questions[0]?.id):null,
+      nextPractice:state.reportNextPractice,onNextPractice:startNextPractice,
       onReviewWrong:reviewWrongQuestion,onAgain:startAgain,onLobby:showLobby});
     if(rendered){
       const copy=selectionNotice(state.session);
@@ -375,6 +426,7 @@
     dom.health.setAttribute('aria-label','剩余血量 '+state.health+' / '+total);
   }
   function renderProgress(){
+    renderSaveStatus();
     const count=state.questions.length,total=Math.max(1,count),current=count?Math.max(1,Math.min(count,state.index+1)):0;
     const label='第 '+current+' / '+count+' 题',value=Math.max(0,Math.min(100,state.index/total*100));
     dom.progressBar.style.width=value+'%';dom.progressShell.setAttribute('aria-valuenow',String(Math.round(value)));dom.progressShell.setAttribute('aria-valuetext',label);
@@ -720,7 +772,7 @@
   }
   function renderMatchingAnswer(question,savedAnswer,readOnly){
     global.KGQuestionMaterials?.bind(dom.options,{question,selectedPairs:savedAnswer?.selectedPairs||state.pendingMatches[question.id]||{},readOnly,
-      reveal:readOnly&&shouldShowExplanation(),onChange:pairs=>{state.pendingMatches[question.id]=pairs;state.draft?.markDirty?.();if(dom.confirmAnswerBtn)dom.confirmAnswerBtn.disabled=!AnswerSet.pairs(question,pairs,true);}});
+      reveal:readOnly&&shouldShowExplanation(),onChange:pairs=>{state.pendingMatches[question.id]=pairs;state.draft?.markDirty?.();renderSaveStatus();if(dom.confirmAnswerBtn)dom.confirmAnswerBtn.disabled=!AnswerSet.pairs(question,pairs,true);}});
   }
   function updateQuestionNav(){
     // 三种模式都可通过底部按钮、滑动和答题卡自由跳题。
@@ -765,7 +817,7 @@
     state.pendingSelections[question.id]=question.options.map(option=>text(option.id)).filter(id=>selected.has(id));
     button.classList.toggle('is-pending',selected.has(optionId));button.setAttribute('aria-pressed',selected.has(optionId)?'true':'false');
     if(dom.confirmAnswerBtn)dom.confirmAnswerBtn.disabled=!selected.size;
-    return true;
+    renderSaveStatus();return true;
   }
   function confirmPendingAnswer(){
     const question=state.verification?.active?state.verification.question:state.questions[state.index];
@@ -840,7 +892,7 @@
     // 挑战/学霸：作答与答题卡回看均不展示解析；
     // 复仇模式保留"答错即见解析与补救"的既有交互。
     if(shouldShowExplanation()&&(state.mode!=='revenge'||!correct))renderPracticeExplanation(question,correct);
-    renderAnswerSheet();updateQuestionNav();
+    renderAnswerSheet();updateQuestionNav();renderSaveStatus();
     // 游戏反馈分支：挑战/学霸用生命与时间驱动，复仇用错题状态推进（全部本地）。
     if(state.mode==='revenge'){
       if(!correct){
@@ -889,7 +941,7 @@
     question.correctAnswer=text(selection?.answer?.correctAnswer||question.correctAnswer);
     const stats=state.draft.stats();
     state.answered=stats.answered;state.correct=Math.max(state.correct,stats.correct);
-    revealOptionResult([],questionCorrectIds(question));renderAnswerSheet();
+    revealOptionResult([],questionCorrectIds(question));renderAnswerSheet();renderSaveStatus();
     state.streak=0;hideStreakPop();state.health=Math.max(0,state.health-1);dom.questionCard.classList.add('is-timeout');
     showFeedback('超时 · -1 ♥','danger');renderHealth();
     if(state.health>0)setScholarSeconds(40);
@@ -916,11 +968,12 @@
     };
   }
 
-  async function saveAndExit(){
+  function saveAndExit(){return saveProgress(true)}
+  async function saveProgress(exitAfterSave=false){
     if(!state.active||!state.session){showToast('当前练习无法保存，请继续作答或放弃。');return false}
     if(state.submitting||state.pendingRequestKey||state.reconciling)return false;
     state.submitting=true;
-    const button=dom.saveExitBtn;
+    const button=exitAfterSave?dom.saveExitBtn:$('practiceSaveProgressBtn');
     try{
       return await runClickedRequest({key:'save',button,title:'正在保存进度',message:'正在保存做题进度…'},async()=>{
         const api=practiceApi(),payload=submissionPayload();
@@ -929,7 +982,7 @@
         createDraft(state.session);
         state.draft.markSaved();
         state.submitting=false;
-        state.active=false;clearTimers();closeExitConfirm();showLobby();return true;
+        if(exitAfterSave){state.active=false;clearTimers();closeExitConfirm();showLobby()}else renderSaveStatus();return true;
       });
     }catch(error){
       handleSessionError(error,{allowRetry:true});return false;
@@ -1044,7 +1097,7 @@
     if(mode==='revenge')return {mode,count:revengePolicy().requestCount,order};
     return {paperId:text(catalog?.paperId||catalog?.id),releaseId:text(catalog?.releaseId),mode,count,order};
   }
-  async function startPractice(mode){
+  async function startPractice(mode,{fresh=false}={}){
     const challenge=mode==='challenge';
     if(state.entryStartingMode)return false;
     if(!hasAuthenticatedUser()){global.KGSharedAuthDialog?.open?.('登录后即可开始做题，并保存你的学习进度。');return false}
@@ -1062,7 +1115,7 @@
       try{
         const api=practiceApi();
         if(hasAuthenticatedUser()&&typeof api?.enterSession==='function'){
-          const input=practiceEntryInput(mode,catalog,count),entered=await api.enterSession(input),session=entered?.session;
+          const input=practiceEntryInput(mode,catalog,count),entered=fresh?{session:await api.startSession(input),resumed:false}:await api.enterSession(input),session=entered?.session;
           if(!session?.id)throw new Error('进入练习未返回会话');
           state.order=input.order;
           return restoreServerSession(session,mode==='revenge'?null:catalog);
@@ -1170,10 +1223,12 @@
     try{
       const paperId=text(release?.paperId||release?.id),releaseKey=text(release?.id),[progress,revenge]=await Promise.all([
         release?api.getPaperProgress(paperId,text(release?.releaseId||release?.id)):Promise.resolve(null),
-        api.getRevengeSummary()
+        api.getRevengeSummary().catch(()=>null)
       ]);
       if(token!==state.resumeLookupToken||releaseKey!==text(selectedRelease()?.id))return;
       state.paperProgress=progress;state.revengeSummary=revenge;
+      if(progress?.coverage?.releaseId===release?.releaseId)state.coverageOverrides[release.releaseId]=progress.coverage;
+      renderPaperLibrary();renderCoverage();
       syncRevengeStats();syncCountOptions();
       ['challenge','scholar'].forEach(mode=>{
         const button=dom.startButtons.find(item=>item.dataset.practiceStart===mode),session=progress?.modes?.[mode];if(!button||!session)return;
@@ -1181,7 +1236,10 @@
       });
       const revengeButton=dom.startButtons.find(item=>item.dataset.practiceStart==='revenge'),revengeSession=revenge?.resumable;
       if(revengeButton&&revengeSession){revengeButton.disabled=false;revengeButton.textContent='继续上次复仇 '+Number(revengeSession.answered||0)+'/'+Number(revengeSession.total||0)}
-    }catch(error){}
+    }catch(error){
+      if(token!==state.resumeLookupToken)return;
+      if(release)state.coverageOverrides[release.releaseId]=null;renderPaperLibrary();renderCoverage();
+    }
   }
   function syncPaperMeta(){
     const release=selectedRelease();
@@ -1193,7 +1251,7 @@
   function vipBadge(){return '<span class="practice-vip-badge"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 6 4.3 4.1L12 4l4.7 6.1L21 6l-2 12H5L3 6Zm4.1 9h9.8l.8-4.8-1.4 1.3L12 6l-4.3 5.5-1.4-1.3.8 4.8Z"/></svg>VIP</span>'}
   function paperCardMarkup(row){
     const access=paperAccess(row),vip=row.accessPolicy?.accessLevel==='member',selected=row.id===state.selectedPaperId,count=Number(row.questionCount||row.totalCount||0);
-    return `<button type="button" class="practice-paper-card ${selected?'is-selected':''} ${!access.allowed?'is-locked':''}" data-paper-id="${escapeHTML(row.id)}" aria-pressed="${selected}">${vip?vipBadge():''}<div class="practice-paper-card-head"><span class="practice-paper-subject">${escapeHTML(row.subject||'综合')}</span>${vip?'':'<span class="practice-paper-free">免费</span>'}</div><h2>${escapeHTML(row.name)}${global.KGPaperPresentation?.isRecentPublication(row)?'<span class="practice-paper-latest" aria-label="三天内发布的最新试卷">最新</span>':''}</h2><p>${escapeHTML(row.description||'已发布练习试卷')}</p><div class="practice-paper-footer"><span>${count} 题 · v${Number(row.version||0)}</span><span class="practice-paper-access">${vip?(access.allowed?'VIP 已解锁':'会员专属'):'直接练习'}</span></div></button>`;
+    return `<button type="button" class="practice-paper-card ${selected?'is-selected':''} ${!access.allowed?'is-locked':''}" data-paper-id="${escapeHTML(row.id)}" aria-pressed="${selected}">${vip?vipBadge():''}<div class="practice-paper-card-head"><span class="practice-paper-subject">${escapeHTML(row.subject||'综合')}</span>${vip?'':'<span class="practice-paper-free">免费</span>'}</div><h2>${escapeHTML(row.name)}${global.KGPaperPresentation?.isRecentPublication(row)?'<span class="practice-paper-latest" aria-label="三天内发布的最新试卷">最新</span>':''}</h2><p>${escapeHTML(row.description||'已发布练习试卷')}</p><p class="practice-paper-coverage">${escapeHTML(coverageText(row))}</p><div class="practice-paper-footer"><span>${count} 题 · v${Number(row.version||0)}</span><span class="practice-paper-access">${vip?(access.allowed?'VIP 已解锁':'会员专属'):'直接练习'}</span></div></button>`;
   }
   function syncSelectedPaperCards(){
     document.querySelectorAll('[data-paper-id]').forEach(button=>{const selected=button.dataset.paperId===state.selectedPaperId;button.classList.toggle('is-selected',selected);button.setAttribute('aria-pressed',String(selected))});
@@ -1202,7 +1260,7 @@
     if(!state.releases.some(row=>row.id===paperId))return;
     state.selectedPaperId=paperId;
     if(dom.paperSelect)dom.paperSelect.value=paperId;
-    syncSelectedPaperCards();syncCountOptions();syncPaperMeta();syncResumableButtons();
+    syncSelectedPaperCards();syncCountOptions();syncPaperMeta();renderCoverage();syncResumableButtons();
     if(closeDrawer)closePaperDrawer();
   }
   function bindPaperCards(container,{closeDrawer=false}={}){
@@ -1237,7 +1295,7 @@
     const revengeStats=getMistakeStats(),revengeAvailable=revengeStats.active>0||Number(revengeStats.unavailable||0)>0;
     dom.empty.hidden=!!releases.length||revengeAvailable;dom.setupCard.hidden=false;dom.modeGrid.hidden=false;
     const library=dom.paperLibrary?.closest('.practice-library');if(library)library.hidden=false;
-    renderPaperLibrary();syncCountOptions();syncPaperMeta();syncRevengeStats();syncResumableButtons();
+    renderPaperLibrary();syncCountOptions();syncPaperMeta();renderCoverage();syncRevengeStats();syncResumableButtons();
   }
   function syncRevengeStats(){
     const stats=getMistakeStats();
@@ -1308,6 +1366,12 @@
   }
   function showLobby(){state.completed=false;state.reviewing=false;clearTimers();setConflictVisible(false);document.body.classList.remove('is-practice-review');if(dom.reviewBackBtn)dom.reviewBackBtn.hidden=true;hideStreakPop();hideRemediation();clearVerification();setDangerVignette(0);delete document.body.dataset.practiceMode;setView('lobby');syncLobby();refreshExperiencePanel()}
   function bind(){
+    $('practiceCoverageRetry')?.addEventListener('click',async event=>{
+      const button=event.currentTarget;button.disabled=true;
+      try{await syncResumableButtons()}finally{button.disabled=false}
+    });
+    $('practiceSaveProgressBtn')?.addEventListener('click',()=>saveProgress());
+    global.addEventListener('online',renderSaveStatus);global.addEventListener('offline',renderSaveStatus);
     dom.paperSelect?.addEventListener('change',()=>selectPaper(dom.paperSelect.value));
     dom.filterButtons.forEach(button=>button.addEventListener('click',()=>{state.libraryFilter=button.dataset.paperFilter||'all';renderPaperLibrary()}));
     dom.libraryMoreBtn?.addEventListener('click',openPaperDrawer);dom.paperDrawerClose?.addEventListener('click',closePaperDrawer);
@@ -1392,7 +1456,7 @@
       },{passive:true});
     }
     document.addEventListener('keydown',event=>{if(event.key!=='Escape')return;if(dom.revengeRuleTrigger?.getAttribute('aria-expanded')==='true'){state.revengeRulePinned=false;setRevengeRuleOpen(false)}else if(!dom.submitConfirm.hidden)closeSubmitConfirm();else if(!dom.exitConfirm.hidden)closeExitConfirm();else if(dom.answerSheetDrawer&&!dom.answerSheetDrawer.hidden)closeAnswerSheetDrawer(true);else if(dom.paperDrawer&&!dom.paperDrawer.hidden)closePaperDrawer();else if(dom.historyDrawer&&!dom.historyDrawer.hidden)closeHistoryDrawer()});
-    global.addEventListener('kg-auth-session-change',()=>{if(!state.active)syncLobby();if(!state.active)refreshExperiencePanel()});
+    global.addEventListener('kg-auth-session-change',()=>{state.coverageOverrides={};state.reportNextPractice=null;state.resumeLookupToken++;if(!state.active)syncLobby();if(!state.active)refreshExperiencePanel()});
     global.addEventListener('kg-subscription-change',()=>{if(!state.active)syncLobby()});
     global.addEventListener('kg-subscription-plan-change',()=>{if(!state.active)syncLobby()});
     global.addEventListener('kg:published-papers-changed',()=>{if(!state.active)syncLobby()});

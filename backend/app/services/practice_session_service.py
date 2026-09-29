@@ -551,7 +551,6 @@ async def paper_progress(
     release_id: str | None = None,
 ) -> dict:
     # releaseId 只描述当前目录版本；旧 release 的未完成会话仍须显示并恢复。
-    _ = release_id
     rows = (
         await db.execute(
             select(
@@ -577,7 +576,10 @@ async def paper_progress(
     for row in rows:
         if latest[row.mode] is None:
             latest[row.mode] = _progress_summary(row, include_release=True)
-    return {"paperId": paper_id, "modes": latest}
+    coverage = None
+    if release_id and await db.scalar(select(PaperRelease.id).where(PaperRelease.id == release_id, PaperRelease.paper_id == paper_id)):
+        coverage = (await practice_coverage_service.coverage_summaries(db, owner, [release_id])).get(release_id)
+    return {"paperId": paper_id, "modes": latest, "coverage": coverage}
 
 
 async def revenge_summary(db: AsyncSession, owner: str) -> dict:

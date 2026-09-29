@@ -123,7 +123,7 @@
       .map(release=>{
         const access=inspectPaperAccess(release);
         const questionCount=release.contentRestricted?number(release.configuredCount||release.totalCount,0):number(release.totalCount,0);
-        return {paperId:release.paperId,id:release.paperId,releaseId:release.releaseId,version:release.version,name:release.name,title:release.title,subject:release.subject,description:release.description,categoryId:release.categoryId,categoryName:release.categoryName,publishedAt:release.publishedAt,totalCount:questionCount,questionCount,enabledModes:[...release.enabledModes],accessPolicy:clone(release.accessPolicy),access:clone(access)};
+        return {paperId:release.paperId,id:release.paperId,releaseId:release.releaseId,version:release.version,name:release.name,title:release.title,subject:release.subject,description:release.description,categoryId:release.categoryId,categoryName:release.categoryName,publishedAt:release.publishedAt,totalCount:questionCount,questionCount,coverage:clone(release.coverage||null),enabledModes:[...release.enabledModes],accessPolicy:clone(release.accessPolicy),access:clone(access)};
       })
       .sort((a,b)=>number(b.publishedAt)-number(a.publishedAt));
   }

@@ -28,6 +28,7 @@
     error: null,
   };
   let readyPromise = null;
+  let catalogEpoch = 0;
 
   function text(value) { return String(value == null ? '' : value); }
   function number(value, fallback) {
@@ -103,6 +104,7 @@
       withdrawnAt: number(row.withdrawnAt, 0),
       totalCount: questionCount,
       configuredCount: questionCount,
+      coverage: row.coverage ? clone(row.coverage) : null,
       contentRestricted: row.contentRestricted === true,
       updatedAt: number(row.updatedAt || row.publishedAt, 0),
       allowedRoles: Array.isArray(row.allowedRoles) ? row.allowedRoles.map(text).filter(Boolean) : [],
@@ -135,7 +137,7 @@
     } catch (error) {}
   }
 
-  async function loadCatalog({ announce = true } = {}) {
+  async function loadCatalog({ announce = true, epoch = catalogEpoch } = {}) {
     const rows = [];
     let page = 1;
     // 目录分页拉全（每页 100 条摘要，总量 KB 级）
@@ -147,6 +149,7 @@
       if (!batch.length || rows.length >= total || page >= 50) break;
       page += 1;
     }
+    if (epoch !== catalogEpoch) return state.catalog;
     const changed = replaceCatalog(rows);
     if (announce && changed) announceChange();
     return state.catalog;
@@ -294,6 +297,7 @@
   }
 
   function invalidate({ keepCatalog = true } = {}) {
+    catalogEpoch += 1;
     state.details.clear();
     state.questions.clear();
     state.questionLoads.clear();
@@ -309,11 +313,13 @@
 
   async function ready({ force = false } = {}) {
     if (!force && readyPromise) return readyPromise;
+    const epoch = catalogEpoch;
     readyPromise = (async () => {
       try {
-        await loadCatalog({ announce: !force });
-        state.error = null;
+        await loadCatalog({ announce: !force, epoch });
+        if (epoch === catalogEpoch) state.error = null;
       } catch (error) {
+        if (epoch !== catalogEpoch) return state.catalog;
         state.error = error;
         // 失败不冻结页面：目录为空时页面呈现“暂无”，可重试
         if (force) throw error;

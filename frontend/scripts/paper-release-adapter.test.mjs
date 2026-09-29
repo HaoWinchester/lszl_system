@@ -432,3 +432,22 @@ test('guest catalog reloads after both login and logout', async () => {
   }
   assert.equal(requests, 3)
 })
+
+test('late catalog response after account change cannot replace the new learner coverage', async () => {
+  const listeners=new Map();let finishOld;
+  const first=new Promise(resolve=>{finishOld=resolve});let calls=0;
+  const row=completed=>({paperId:'p1',releaseId:'r1',name:'Paper',version:1,questionCount:10,
+    coverage:{releaseId:'r1',totalCount:10,completedCount:completed,remainingUnseen:10-completed}});
+  const context={console,Promise,CustomEvent:class {constructor(type){this.type=type}},
+    addEventListener:(type,listener)=>listeners.set(type,listener),dispatchEvent(){},
+    KGDomainApi:{request:()=>++calls===1?first:Promise.resolve({releases:[row(0)],total:1})}};
+  context.window=context;context.globalThis=context;
+  vm.runInNewContext(adapter,context);
+  const old=context.KGPaperReleaseApi.ready();
+  listeners.get('kg:auth-session-changed')({});
+  await context.KGPaperReleaseApi.ready();
+  finishOld({releases:[row(9)],total:1});await old;
+  assert.equal(context.KGPaperReleaseApi.catalog()[0].coverage.completedCount,0);
+  vm.runInNewContext(repository,context);
+  assert.equal(context.KGPublishedPaperRepository.listCatalogEntries()[0].coverage.completedCount,0);
+});

@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.259",
-  "toVersion": "v9.0-p4.1.259",
+  "fromVersion": "v9.0-p4.1.260",
+  "toVersion": "v9.0-p4.1.260",
   "changes": {
     "added": [],
     "changed": [
-      "src/65-question-bank-admin.js",
-      "tests/publication-checklist-browser.py"
+      "src/100-practice-mode.js",
+      "tests/practice-continuity-browser.py"
     ],
     "removed": []
   },

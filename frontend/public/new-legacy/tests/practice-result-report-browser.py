@@ -141,6 +141,21 @@ with sync_playwright() as playwright:
     assert "KGPracticeResultReport.render" in source
     assert 'id="practiceReviewBackBtn"' in html
     assert "src/113-practice-result-report.js" in html
+    page.evaluate("""report=>KGPracticeResultReport.render(document.querySelector('#report'),report,{
+      nextPractice:{count:10,remainingUnseen:3},onNextPractice:()=>window.nextClicked=true,
+      onReviewWrong:id=>window.reviewed=id
+    })""", short)
+    assert "未做 3 题" in page.locator('.practice-report-next').inner_text()
+    assert "复习 7 题" in page.locator('.practice-report-next').inner_text()
+    page.locator('[data-report-next]').click()
+    assert page.evaluate('window.nextClicked') is True
+    page.locator('[data-report-review-wrong]').click()
+    assert page.evaluate('window.reviewed') == short['wrongQuestionIds'][0]
+    page.evaluate("""report=>KGPracticeResultReport.render(document.querySelector('#report'),report,{
+      nextPractice:{count:10,remainingUnseen:0},onNextPractice:()=>{}
+    })""", short)
+    assert "复习" in page.locator('[data-report-next]').inner_text()
+    assert "新题" not in page.locator('[data-report-next]').inner_text()
     browser.close()
 
 print("practice-result-report-browser-ok")

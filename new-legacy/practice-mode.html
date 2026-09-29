@@ -112,6 +112,8 @@
                   <label><input type="radio" name="practiceCount" value="180"/><span>180</span></label>
                 </div>
               </fieldset>
+              <p class="practice-selection-notice" id="practiceCoverageSummary" role="status"></p>
+              <button type="button" class="practice-secondary-btn" id="practiceCoverageRetry" hidden>重试加载进度</button>
               <p class="practice-selection-notice">优先练未做题，不足所选题量时用已做题补足；案例题保留完整。全部做过后进入复习。</p>
               <fieldset class="practice-choice-group">
                 <legend>答题顺序</legend>
@@ -186,7 +188,7 @@
           <div><strong>进度已在另一页更新</strong><span>加载服务端最新进度后可继续作答。</span></div>
           <button type="button" class="practice-primary-btn" id="practiceSessionConflictReload">加载最新进度</button>
         </div>
-        <div class="practice-session-unsaved" id="practiceSessionUnsaved" hidden role="status">进度尚未保存，正在自动重试…</div>
+        <div class="practice-session-unsaved" id="practiceSessionUnsaved" hidden><span id="practiceSaveStatusText" role="status"></span><button type="button" id="practiceSaveProgressBtn" class="practice-secondary-btn">保存进度</button></div>
         <div class="practice-verification-banner" id="practiceVerificationBanner" hidden aria-live="polite">
           <span>KNOWLEDGE CHECK</span>
           <div><strong id="practiceVerificationKnowledge">核心知识点</strong><small id="practiceVerificationMessage">这不是原错题。请用新的题干重新判断。</small></div>

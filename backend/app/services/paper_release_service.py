@@ -16,6 +16,7 @@ from app.models.subscription import Subscription
 from app.models.user import User
 from app.services import (
     paper_service,
+    practice_coverage_service,
     paper_composition_service,
     practice_scoring_service,
     question_answer_service,
@@ -580,9 +581,10 @@ async def catalog(db: AsyncSession, user: User | None, *, page: int, page_size: 
         base.order_by(PaperRelease.published_at.desc(), PaperRelease.id)
         .limit(page_size).offset((page - 1) * page_size)
     )).scalars().all()
+    coverage = await practice_coverage_service.coverage_summaries(db, user.username, [item.id for item in releases]) if user else {}
     return {
         "releases": [
-            catalog_summary(item, user=user, entitled=entitled)
+            {**catalog_summary(item, user=user, entitled=entitled), "coverage": coverage.get(item.id)}
             for item in releases
         ],
         "page": page,
