@@ -154,3 +154,39 @@ def test_ordinary_practice_resume_and_history_are_session_scoped(paper):
     assert by_id[session['id']]['reportAvailable'] is True
     assert by_id[second['id']]['reportAvailable'] is False
     assert c.get(progress_url).json()['modes']['practice']['sessionId'] == second['id']
+
+
+@pytest.mark.parametrize('access_level', ['free', 'member'])
+def test_admin_can_inspect_student_releases_without_changing_learner_access(paper, access_level):
+    from app.db.session import AsyncSessionLocal
+    from app.models.user import User
+    from app.models.paper_release import PaperRelease
+    async def setup():
+        async with AsyncSessionLocal() as db:
+            admin = await db.get(User, paper['other_student'])
+            admin.role = 'admin'
+            release = await db.get(PaperRelease, paper['release'])
+            release.allowed_roles = ['student']
+            release.access_level = access_level
+            await db.commit()
+    asyncio.run(setup())
+    c = login(paper, 'other_student')
+    catalog = c.get('/api/v1/paper-releases/catalog').json()['releases']
+    row = next((row for row in catalog if row['releaseId'] == paper['release']), None)
+    assert row is not None and not row.get('contentRestricted', False)
+    assert c.get(f"/api/v1/paper-releases/{paper['release']}").status_code == 200
+    assert c.get(f"/api/v1/paper-releases/{paper['release']}/questions").status_code == 200
+    assert start(c, paper)['mode'] == 'practice'
+    student = login(paper)
+    response = student.get(f"/api/v1/paper-releases/{paper['release']}/questions")
+    assert response.status_code == (200 if access_level == 'free' else 404)
+    teacher = login(paper, 'teacher')
+    assert teacher.get(f"/api/v1/paper-releases/{paper['release']}/questions").status_code == 404
+    async def withdraw():
+        async with AsyncSessionLocal() as db:
+            release = await db.get(PaperRelease, paper['release'])
+            release.status = 'withdrawn'
+            await db.commit()
+    asyncio.run(withdraw())
+    assert all(row['releaseId'] != paper['release'] for row in c.get('/api/v1/paper-releases/catalog').json()['releases'])
+    assert c.get(f"/api/v1/paper-releases/{paper['release']}/questions").status_code == 404

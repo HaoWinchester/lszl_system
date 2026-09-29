@@ -451,3 +451,22 @@ test('late catalog response after account change cannot replace the new learner 
   vm.runInNewContext(repository,context);
   assert.equal(context.KGPublishedPaperRepository.listCatalogEntries()[0].coverage.completedCount,0);
 });
+
+test('administrator sees student-facing releases while other audience restrictions remain', () => {
+  let role = 'admin'
+  const context = {
+    KGAuthCore: { currentUser: () => ({ username: role, role }) },
+    KGPaperReleaseApi: {
+      catalog: () => [{ id: 'p', paperId: 'p', releaseId: 'r', status: 'published', availability: 'published', totalCount: 1,
+        allowedRoles: ['student'], enabledModes: ['practice_mode'], accessPolicy: { accessLevel: 'free' } }],
+    },
+    addEventListener() {}, console,
+  }
+  context.window = context
+  vm.runInNewContext(repository, context)
+  assert.equal(context.KGPublishedPaperRepository.inspectRelease({paperId:'p',releaseId:'r'}, {mode:'practice_mode'}).ok, true)
+  role = 'teacher'
+  assert.equal(context.KGPublishedPaperRepository.inspectRelease({paperId:'p',releaseId:'r'}, {mode:'practice_mode'}).ok, false)
+  role = 'student'
+  assert.equal(context.KGPublishedPaperRepository.inspectRelease({paperId:'p',releaseId:'r'}, {mode:'practice_mode'}).ok, true)
+})

@@ -38,7 +38,7 @@
     try{return text(global.KGRolePermissions?.currentRole?.()||global.KGRolePermissions?.currentRoleKey?.()||global.KGAuthCore?.currentUser?.()?.role)}catch(error){return ''}
   }
   function paperAllowed(release,mode,respectRole=true){
-    if(respectRole===false)return true;
+    if(respectRole===false||currentRole()==='admin')return true;
     const roleApi=global.KGRolePermissions;
     try{
       if(typeof roleApi?.canAccessPublishedPaper==='function')return !!roleApi.canAccessPublishedPaper(release,mode);

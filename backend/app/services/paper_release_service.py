@@ -333,6 +333,8 @@ async def entitlement_for_request(db: AsyncSession, user: User) -> bool:
 
 
 def can_access_with_entitlement(user: User, release: PaperRelease, entitled: bool) -> bool:
+    if user.role == "admin":
+        return True
     roles = {str(role).strip() for role in (release.allowed_roles or []) if str(role).strip()}
     if roles and user.role not in roles:
         return False
@@ -575,7 +577,10 @@ async def catalog(db: AsyncSession, user: User | None, *, page: int, page_size: 
         func.jsonb_array_length(PaperRelease.allowed_roles) == 0,
         PaperRelease.allowed_roles.contains([user.role if user else "student"]),
     )
-    base = select(PaperRelease).where(PaperRelease.status == ACTIVE_STATUS, role_filter)
+    base = select(PaperRelease).where(PaperRelease.status == ACTIVE_STATUS)
+    # 发布受众约束学员可见范围，管理员仍须能检查发布内容。
+    if user is None or user.role != "admin":
+        base = base.where(role_filter)
     total = int(await db.scalar(select(func.count()).select_from(base.subquery())) or 0)
     releases = (await db.execute(
         base.order_by(PaperRelease.published_at.desc(), PaperRelease.id)

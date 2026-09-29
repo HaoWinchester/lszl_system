@@ -647,7 +647,6 @@ async def start_session(
             or release.paper_id != paper_id
             or release.status != "published"
             or "practice_mode" not in (release.enabled_modes or [])
-            or (release.allowed_roles and user.role not in release.allowed_roles)
             or not await paper_release_service.can_access(db, user, release)
         ):
             raise _error(404, "PRACTICE_RELEASE_NOT_FOUND", "试卷不存在或当前不可练习")
