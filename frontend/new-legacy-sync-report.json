@@ -1,11 +1,12 @@
 {
   "schemaVersion": 1,
   "fromVersion": "v9.0-p4.1.264",
-  "toVersion": "v9.0-p4.1.264",
+  "toVersion": "v9.0-p4.1.265",
   "changes": {
     "added": [],
     "changed": [
-      "tests/assistant-phrases-browser.py"
+      "VERSION",
+      "content-prep-studio/dist/content-prep.html"
     ],
     "removed": []
   },

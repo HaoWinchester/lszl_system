@@ -616,6 +616,13 @@ function versionPageRelease(html, version) {
   return html.replace(/<html\b/i, `<html data-release="${version}"`)
 }
 
+function injectSiteIcon(html, version) {
+  // One site icon for public, authenticated and nested entry pages.
+  const withoutIcon = html.replace(/<link\b(?=[^>]*\brel\s*=\s*(['"])(?:shortcut\s+)?icon\1)[^>]*>\s*/gi, '')
+  const icon = `<link rel="icon" type="image/jpeg" href="/assets/logo.jpg?v=${encodeURIComponent(version)}">`
+  return withoutIcon.replace(/<head(?:\s[^>]*)?>/i, head => `${head}\n${icon}`)
+}
+
 function injectPage(html, page, version) {
   if (page === 'landing.html') {
     return versionPageAssets(versionPageRelease(html, version), version)
@@ -1157,7 +1164,12 @@ function sync({ source, out }) {
     let pageHtml = patchArchitectureCopy(page, readFileSync(path, 'utf8'))
     if (page === 'system-settings.html') pageHtml = patchSystemSettingsAnalyticsHtml(pageHtml)
     if (existsSync(resolve(out, 'styles/membership-ui.css'))) pageHtml = patchMembershipUiLink(pageHtml)
-    writeFileSync(path, injectPage(pageHtml, page, version))
+    writeFileSync(path, injectSiteIcon(injectPage(pageHtml, page, version), version))
+  }
+
+  for (const page of ['content-prep-studio/dist/content-prep.html', 'question-studio/index.html']) {
+    const path = resolve(out, page)
+    if (existsSync(path)) writeFileSync(path, injectSiteIcon(readFileSync(path, 'utf8'), version))
   }
 
   if (existsSync(resolve(source, 'styles/main.css'))) {

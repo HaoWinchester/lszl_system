@@ -864,3 +864,27 @@ test('sync limits the training overlay stylesheet to the training page', (t) => 
   assert.doesNotMatch(readFileSync(resolve(item.output, 'learning-path.html'), 'utf8'), /direct-runtime-fixes\.css/)
   assert.match(readFileSync(resolve(item.output, 'question-training.html'), 'utf8'), /direct-runtime-fixes\.css/)
 })
+
+test('all page entries use the shared versioned logo favicon, including nested pages', () => {
+  const item = fixture()
+  try {
+    write(resolve(item.upstream, 'landing.html'), '<html><head><link rel="icon" href="data:image/svg+xml,old"></head></html>')
+    for (const page of ['content-prep-studio/dist/content-prep.html', 'question-studio/index.html']) {
+      write(resolve(item.upstream, page), '<html><head><title>Nested</title></head></html>')
+    }
+    write(resolve(item.upstream, 'assets/logo.jpg'), 'existing-logo-bytes')
+    write(resolve(item.upstream, 'baidu_verify_test.html'), 'unchanged-verification')
+    const result = runSync(item)
+    assert.equal(result.status, 0, result.stderr)
+    const pages = files(item.output).filter(file => file.endsWith('.html') && (!file.includes('/') || ['content-prep-studio/dist/content-prep.html', 'question-studio/index.html'].includes(file)) && !file.startsWith('baidu_verify_'))
+    for (const page of pages) {
+      const html = readFileSync(resolve(item.output, page), 'utf8')
+      const icons = [...html.matchAll(/<link\b[^>]*\brel="icon"[^>]*>/g)].map(match => match[0])
+      assert.equal(icons.length, 1, page)
+      assert.match(icons[0], /type="image\/jpeg"/, page)
+      assert.match(icons[0], /href="\/assets\/logo\.jpg\?v=v8\.6\.0"/, page)
+    }
+    assert.equal(readFileSync(resolve(item.output, 'assets/logo.jpg'), 'utf8'), 'existing-logo-bytes')
+    assert.equal(readFileSync(resolve(item.output, 'baidu_verify_test.html'), 'utf8'), 'unchanged-verification')
+  } finally { rmSync(item.root, { recursive: true, force: true }) }
+})
