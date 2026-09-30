@@ -542,9 +542,11 @@ def run_matrix() -> None:
 
             # ---- matrix 5: report mistakes == server authoritative regrade ----
             result_text = page.locator(".practice-result-report").inner_text()
-            check_matrix(5, "report header present", "幻谱 PMP 模拟成绩分析报告" in result_text, "")
+            check_matrix(5, "short practice summary header present", "本次练习摘要" in result_text, result_text)
             assert page.locator("#practiceChallengeResult").inner_text() == "挑战失败"
-            check_matrix(5, "report verdict PASS", "模拟考试结果：PASS" in result_text, "")
+            check_matrix(5, "short practice has no simulation verdict", "PASS" not in result_text and "FAIL" not in result_text, result_text)
+            report = context.request.get(f"{base}/api/v1/learning/practice/sessions/{session_id}/report").json()["report"]
+            check_matrix(5, "server identifies short practice without pass verdict", report["reportKind"] == "practice" and report["passed"] is None)
             row = run_async(fetch_session_row(session_id))
             check_matrix(
                 5, "DB answers hold 10 authoritative gradings (server truth only)",

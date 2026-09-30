@@ -4,10 +4,7 @@
   "toVersion": "v9.0-p4.1.266",
   "changes": {
     "added": [],
-    "changed": [
-      "src/103-support-center.js",
-      "styles/file-manager.css"
-    ],
+    "changed": [],
     "removed": []
   },
   "incompatible": []
