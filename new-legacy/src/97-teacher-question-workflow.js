@@ -74,7 +74,7 @@
 
   function insertGuide(){
     const topbar=document.querySelector('.qb-topbar');if(!topbar)return;
-    const guide=document.createElement('section');guide.className='tq-step-guide';guide.id='tqStepGuide';
+    const guide=document.createElement('section');guide.className='tq-step-guide';guide.id='tqStepGuide';guide.setAttribute('aria-label','当前教学内容编辑步骤');
     if(step==='training'){
       guide.innerHTML='<div class="tq-step-guide-copy"><strong>第 2 步：为当前原题配置训练</strong><span>左侧核对当前题目，右侧输入可点击关键词和知识联想入口。没有预设分支时，学员仍可使用现有自由输入卡牌。</span></div><div class="tq-step-guide-actions"><a href="question-bank.html?mode=simple&step=questions">返回题目管理</a><a href="admin-subjects.html" target="_blank" rel="noopener">管理知识树</a><button type="button" id="tqSaveTrainingBtn">保存当前配置</button><a class="primary" href="paper-management.html">下一步：试卷管理</a></div>';
     }else{

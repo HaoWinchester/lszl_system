@@ -152,8 +152,8 @@
       const classes = ["floating-tool-btn", "floating-menu-trigger", tool.className || ""].filter(Boolean).join(" ");
       const children = (tool.children || []).map(renderSubTool).join("");
       return `<div class="floating-tool-menu-shell" id="${escapeHTML(tool.id)}Shell">
-        <button aria-expanded="false" aria-haspopup="menu" aria-label="${escapeHTML(textWithShortcut(tool.ariaLabel || tool.label, tool))}" class="${escapeHTML(classes)}" ${attrsForTool(tool)} type="button">${ICONS[tool.icon] || ""}</button>
-        <div class="floating-submenu" role="menu" aria-label="${escapeHTML(tool.label || "子菜单")}">${children}</div>
+        <button aria-expanded="false" aria-label="${escapeHTML(textWithShortcut(tool.ariaLabel || tool.label, tool))}" class="${escapeHTML(classes)}" ${attrsForTool(tool)} type="button">${ICONS[tool.icon] || ""}</button>
+        <div class="floating-submenu" role="group" aria-label="${escapeHTML(tool.label || "子菜单")}">${children}</div>
       </div>`;
     }
     const classes = ["floating-tool-btn", tool.className || ""].filter(Boolean).join(" ");

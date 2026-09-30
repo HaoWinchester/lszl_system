@@ -126,9 +126,9 @@
       const tab=document.createElement('div');
       tab.className='graph-file-tab'+(file.id===currentId?' is-active':'');tab.dataset.fileId=file.id;
       tab.draggable=true;
-      tab.setAttribute('role','tab');tab.setAttribute('aria-selected',file.id===currentId?'true':'false');tab.tabIndex=file.id===currentId?0:-1;
-      tab.title=file.name;tab.setAttribute('aria-label',`${file.name}${file.id===currentId?'，当前文件':''}。可拖拽调整顺序`);
-      const label=document.createElement('span');label.className='graph-file-tab-title';label.textContent=file.name;
+      tab.setAttribute('role','presentation');
+      tab.title=file.name;
+      const label=document.createElement('span');label.className='graph-file-tab-title';label.textContent=file.name;label.setAttribute('role','button');label.setAttribute('aria-pressed',String(file.id===currentId));label.tabIndex=0;label.setAttribute('aria-label',`${file.name}${file.id===currentId?'，当前文件':''}`);
       const close=document.createElement('button');close.type='button';close.className='graph-file-tab-close';close.dataset.closeFileId=file.id;
       close.draggable=false;close.textContent='×';close.title=`关闭“${file.name}”页签`;close.setAttribute('aria-label',`关闭“${file.name}”页签`);
       tab.append(label,close);frag.appendChild(tab);

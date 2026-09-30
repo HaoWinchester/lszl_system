@@ -2345,7 +2345,7 @@ body[data-role-theme] .floating-tool-btn.primary,body[data-role-theme] button.pr
   text-overflow:ellipsis;
   white-space:nowrap;
   font-size:11px;
-  color:#94a3b8;
+  color:#596579;
 }
 .graph-search-empty{
   padding:18px 10px;
@@ -3368,3 +3368,6 @@ g.is-batch-selected .edge-visible{
 .wechat-account-dialog .wechat-account-error{color:#b91c1c;min-height:20px;margin-bottom:0}
 .wechat-account-dialog .wechat-account-note{font-size:12px}
 .wechat-account-dialog :focus-visible{outline:3px solid #86cfa3;outline-offset:3px}
+
+/* Account role badges use readable text independently of the role accent fill. */
+.auth-status .role-badge{color:#334155}

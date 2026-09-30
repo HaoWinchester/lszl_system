@@ -59,8 +59,8 @@
     const list=visible(),current=active(),previousScroll=host.scrollLeft;
     host.innerHTML=list.map(item=>{
       const id=String(item.id||''),isActive=id===current;
-      return `<div class="qw-workspace-tab ${isActive?'is-active':''}" role="tab" aria-selected="${isActive?'true':'false'}" tabindex="${isActive?'0':'-1'}" draggable="true" data-workspace-id="${esc(id)}" title="${esc(item.title||'未命名画布')} · ${Number(item.nodeCount||0)} 题">
-        <span class="qw-workspace-tab-title">${esc(item.title||'未命名画布')}</span>
+      return `<div class="qw-workspace-tab ${isActive?'is-active':''}" role="presentation" draggable="true" data-workspace-id="${esc(id)}" title="${esc(item.title||'未命名画布')} · ${Number(item.nodeCount||0)} 题">
+        <span class="qw-workspace-tab-title" role="button" aria-pressed="${isActive?'true':'false'}" tabindex="0">${esc(item.title||'未命名画布')}</span>
         <button type="button" class="qw-workspace-tab-close" data-close-workspace-id="${esc(id)}" title="关闭“${esc(item.title||'未命名画布')}”页签" aria-label="关闭“${esc(item.title||'未命名画布')}”页签">×</button>
       </div>`;
     }).join('');
@@ -138,6 +138,10 @@
       if(close){event.stopPropagation();closeWorkspace(close.dataset.closeWorkspaceId);return}
       const tab=event.target.closest?.('[data-workspace-id]');
       if(tab)openWorkspace(tab.dataset.workspaceId);
+    });
+    host?.addEventListener('keydown',event=>{
+      if(!event.target.matches?.('[role=button]')||!['Enter',' '].includes(event.key))return;
+      event.preventDefault();openWorkspace(event.target.closest('[data-workspace-id]').dataset.workspaceId);
     });
     host?.addEventListener('dblclick',event=>{
       const tab=event.target.closest?.('[data-workspace-id]');

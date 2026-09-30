@@ -5,9 +5,8 @@
   "changes": {
     "added": [],
     "changed": [
-      "src/65-question-bank-admin.js",
-      "styles/teacher-daily-workspace.css",
-      "tests/ux-paper-draft.test.js"
+      "src/103-support-center.js",
+      "styles/file-manager.css"
     ],
     "removed": []
   },

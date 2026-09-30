@@ -1907,7 +1907,7 @@
       const active=selected.has(String(record.id));
       record.element?.classList.toggle('is-selected',active);
       record.element?.classList.toggle('show-connectors',active&&selected.size===1&&!state.readonly);
-      record.element?.setAttribute('aria-selected',active?'true':'false');
+      record.element?.setAttribute('aria-description',active?'已选中':'未选中');
     });
     state.viewport?.classList.toggle('has-card-selection',selected.size>0);
     updateNodeCountLabel();
@@ -3188,7 +3188,7 @@
     state.groupElements.forEach((element,id)=>{
       const active=String(id)===next;
       element.classList.toggle('is-active',active);
-      element.setAttribute('aria-selected',active?'true':'false');
+      element.setAttribute('aria-description',active?'已选中':'未选中');
     });
     const group=(state.workspace?.groups||[]).find(item=>String(item.id)===next)||null;
     const memberIds=new Set((group?.nodeIds||[]).map(String));
@@ -3216,7 +3216,7 @@
       const active=String(state.activeGroupId||'')===String(group.id);
       element.className='qw-group-container'+(group.collapsed?' is-collapsed':'')+(active?' is-active':'');
       element.dataset.groupId=String(group.id);
-      element.setAttribute('aria-selected',active?'true':'false');
+      element.setAttribute('aria-description',active?'已选中':'未选中');
       element.style.setProperty('--qw-group-color',String(group.color||'#ede9fe'));
       element.style.left=Number(group.x||0)+'px';
       element.style.top=Number(group.y||0)+'px';
@@ -4475,7 +4475,7 @@
     element.classList.toggle('is-practice-review',!!record.node.practiceForSynthesisId&&!!record.node.practiceAttempted&&!record.node.practiceMastered);
     if(record.node.color)element.style.setProperty('--qw-card-color',String(record.node.color));else element.style.removeProperty('--qw-card-color');
     bindMixedCard(record);
-    const selected=state.selectedNodeIds.has(String(record.id));element.classList.toggle('is-selected',selected);element.setAttribute('aria-selected',selected?'true':'false');
+    const selected=state.selectedNodeIds.has(String(record.id));element.classList.toggle('is-selected',selected);element.setAttribute('aria-description',selected?'已选中':'未选中');
     return true;
   }
   function toggleNodeDisplayMode(nodeId){

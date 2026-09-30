@@ -759,8 +759,8 @@
   box-shadow:none;
 }
 .graph-mode-indicator button:hover{background:rgba(255,255,255,.22)!important}
-.graph-mode-indicator.related{--graph-mode-color:#f97316;background:var(--graph-mode-color)}
-.graph-mode-indicator.flow{--graph-mode-color:#22c55e;background:var(--graph-mode-color)}
+.graph-mode-indicator.related{--graph-mode-color:#9a3412;background:var(--graph-mode-color)}
+.graph-mode-indicator.flow{--graph-mode-color:#166534;background:var(--graph-mode-color)}
 @media(max-width:720px){.graph-mode-indicator{top:0}}
 
 /* 状态提示条使用画布外围状态色与白色文字。 */

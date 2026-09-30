@@ -41,9 +41,9 @@
       <div class="tw-user"><span class="tw-user-badge" id="ccAccount"></span><a href="index.html">返回学员端</a></div>
     </header>
     <section class="tw-workflow" aria-label="内容工作流程"><span class="tw-step done"><b>1</b>录入活动</span><i class="tw-arrow"></i><span class="tw-step active"><b>2</b>检查入库</span><i class="tw-arrow"></i><span class="tw-step"><b>3</b>配置内容</span><i class="tw-arrow"></i><span class="tw-step"><b>4</b>预览发布</span></section>
-    <section class="tw-guide"><div class="tw-guide-copy"><strong>当前步骤：检查内容并维护知识归属</strong><span>在这里管理活动、批量归类和维护知识树。题目确认后，再前往课程与任务安排课程。</span></div><div class="tw-guide-actions"><a href="question-bank.html?mode=simple&amp;step=questions&amp;view=content&amp;entry=paste">返回题目管理</a><a class="primary" href="course-admin.html">前往课程与任务<span data-ui-icon="arrow-right" data-ui-icon-size="16" aria-hidden="true"></span></a></div></section>
+    <section class="tw-guide" aria-label="内容中心使用流程"><div class="tw-guide-copy"><strong>当前步骤：检查内容并维护知识归属</strong><span>在这里管理活动、批量归类和维护知识树。题目确认后，再前往课程与任务安排课程。</span></div><div class="tw-guide-actions"><a href="question-bank.html?mode=simple&amp;step=questions&amp;view=content&amp;entry=paste">返回题目管理</a><a class="primary" href="course-admin.html">前往课程与任务<span data-ui-icon="arrow-right" data-ui-icon-size="16" aria-hidden="true"></span></a></div></section>
 
-    <section class="tw-commandbar">
+    <section class="tw-commandbar" aria-label="内容中心操作入口">
       <div class="tw-command-title"><p>CONTENT CENTER</p><h1>内容中心</h1><span>统一活动库、可视化知识树、作者追踪与课程引用关系</span></div>
       <div class="tw-command-actions cc-actions"><a href="#organization">标签与题集</a><a href="paper-management.html">组卷与测评</a><a href="question-bank.html" target="_blank" rel="noopener">旧题库高级编辑（兼容）</a><button type="button" id="ccImportBtn">导入活动包</button><input id="ccImportFile" type="file" accept=".json,application/json" hidden /><button type="button" id="ccExportBtn">导出当前结果</button></div>
     </section>
@@ -60,7 +60,7 @@
           <div class="cc-panel-actions"><a class="cc-panel-link" href="admin-subjects.html">科目与知识树</a><button type="button" id="ccUndoBtn" title="撤销最近一次知识树操作">↶ 撤销</button><button type="button" id="ccRedoBtn" title="重做">↷ 重做</button><button type="button" id="ccResetTaxonomyBtn" title="恢复内置知识树示例">重置</button></div>
         </div>
         <div class="cc-knowledge-toolbar">
-          <div class="cc-view-tabs" role="tablist" aria-label="知识树视图"><button type="button" class="active" data-tree-view="graph">图谱视图</button><button type="button" data-tree-view="list">目录视图</button></div>
+          <div class="cc-view-tabs" role="group" aria-label="知识树视图"><button type="button" class="active" data-tree-view="graph">图谱视图</button><button type="button" data-tree-view="list">目录视图</button></div>
           <label class="cc-version-picker"><span>知识树版本</span><select id="ccTaxonomyVersion"></select></label>
           <label class="cc-search"><span>搜索</span><input id="ccKnowledgeSearch" placeholder="名称、编号、英文或别名" /></label>
           <label class="cc-question-count-toggle"><input id="ccShowQuestionCounts" type="checkbox" checked /><span>显示题量</span></label>
@@ -77,7 +77,7 @@
             <div class="cc-graph-viewport" id="ccKnowledgeGraphViewport"><div class="cc-graph-scene" id="ccKnowledgeGraph"></div></div>
             <div class="cc-tree" id="ccKnowledgeTree" hidden></div>
           </div>
-          <aside class="cc-inspector" id="ccKnowledgeInspector">
+          <aside class="cc-inspector" id="ccKnowledgeInspector" role="region" aria-label="知识点属性">
             <div class="cc-inspector-empty"><strong>选择一个知识点</strong><span>可以在右侧直接修改名称、编号、别名和状态。</span></div>
           </aside>
         </div>
@@ -116,7 +116,7 @@
         <div class="cc-organize-grid">
           <section><header><div><h3>标签</h3><p>用于高频、易错、版本和教学用途等多维分类。</p></div><button type="button" id="ccNewTagBtn"><span data-ui-icon="plus" data-ui-icon-size="16" aria-hidden="true"></span>新标签</button></header><div id="ccTagList" class="cc-org-list"></div></section>
           <section><header><div><h3>题集与收藏夹</h3><p>人工整理活动，不复制题目正文。</p></div><button type="button" id="ccNewCollectionBtn"><span data-ui-icon="plus" data-ui-icon-size="16" aria-hidden="true"></span>新题集</button></header><div id="ccCollectionList" class="cc-org-list"></div></section>
-          <aside class="cc-org-help"><strong>推荐操作</strong><ol><li>先按知识点、题型和难度筛选活动。</li><li>批量添加标签或加入题集。</li><li>需要测评时，选中活动后“创建试卷”。</li></ol><a href="paper-management.html">前往试卷管理组卷<span data-ui-icon="arrow-right" data-ui-icon-size="16" aria-hidden="true"></span></a></aside>
+          <aside class="cc-org-help" role="region" aria-label="归类说明"><strong>推荐操作</strong><ol><li>先按知识点、题型和难度筛选活动。</li><li>批量添加标签或加入题集。</li><li>需要测评时，选中活动后“创建试卷”。</li></ol><a href="paper-management.html">前往试卷管理组卷<span data-ui-icon="arrow-right" data-ui-icon-size="16" aria-hidden="true"></span></a></aside>
         </div>
       </section>
     </main>

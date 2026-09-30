@@ -902,6 +902,8 @@ def test_practice_revenge_summary_omits_mistakes_and_question_snapshots() -> Non
                 "pending": 0,
                 "needsRemediation": 0,
                 "verificationDue": 0,
+                "verificationWaiting": 0,
+                "nextVerificationAt": None,
                 "mastered": 0,
                 "unavailable": 0,
             }

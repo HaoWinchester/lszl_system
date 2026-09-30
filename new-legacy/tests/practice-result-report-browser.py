@@ -156,6 +156,20 @@ with sync_playwright() as playwright:
     })""", short)
     assert "复习" in page.locator('[data-report-next]').inner_text()
     assert "新题" not in page.locator('[data-report-next]').inner_text()
+    # Both new and historical short reports must not invent mistakes to review.
+    for kind in ["practice", None]:
+        for mode in ["practice", "revenge"]:
+            perfect = {**short, "mode": mode, "wrongQuestionIds": [],
+                       "counts": {"total":10,"answered":10,"correct":10,"wrong":0,"unanswered":0}}
+            if kind:
+                perfect["reportKind"] = kind
+            else:
+                perfect.pop("reportKind", None)
+            page.evaluate("report=>KGPracticeResultReport.render(document.querySelector('#report'),report)", perfect)
+            assert "本次错题" not in page.locator('.practice-report-next').inner_text()
+            assert page.locator('[data-report-review-wrong]').count() == 0
+            if mode == "revenge":
+                assert "待验证或已掌握" in page.locator('.practice-report-next').inner_text()
     browser.close()
 
 print("practice-result-report-browser-ok")

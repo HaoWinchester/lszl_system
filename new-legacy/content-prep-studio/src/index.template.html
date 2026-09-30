@@ -101,27 +101,27 @@
       <div class="data-summary">
         <div class="filebox bundle-box">
           <h3>完整内容准备包 JSON（推荐）</h3>
-          <input type="file" id="fileContentBundle" accept=".json,application/json">
+          <input type="file" id="fileContentBundle" aria-label="导入完整内容准备包 JSON" accept=".json,application/json">
           <p class="muted smalltxt">一次导入：题库 + 原则 + 归纳卡 + 标签配置；也可携带知识树/联想库。</p>
         </div>
         <div class="filebox">
           <h3>知识树 JSON</h3>
-          <input type="file" id="fileTree" accept=".json,application/json">
+          <input type="file" id="fileTree" aria-label="导入知识树 JSON" accept=".json,application/json">
           <p class="muted smalltxt">支持知识树 package：<code>taxonomy.nodes</code></p>
         </div>
         <div class="filebox">
           <h3>科目级联想库 JSON</h3>
-          <input type="file" id="fileRecall" accept=".json,application/json">
+          <input type="file" id="fileRecall" aria-label="导入科目联想库 JSON" accept=".json,application/json">
           <p class="muted smalltxt">同义词/不同翻译请放在同一节点的 <code>aliases</code>。</p>
         </div>
         <div class="filebox">
           <h3>基础题库 JSON</h3>
-          <input type="file" id="fileQuestionBank" accept=".json,application/json">
+          <input type="file" id="fileQuestionBank" aria-label="导入基础题库 JSON" accept=".json,application/json">
           <p class="muted smalltxt">支持 <code>questions[]</code>；也兼容 <code>banks[0]</code></p>
         </div>
         <div class="filebox supplement-box">
           <h3>同批题目补录 / 按 Question ID 合并</h3>
-          <input type="file" id="fileQuestionSupplement" accept=".json,application/json">
+          <input type="file" id="fileQuestionSupplement" aria-label="导入题目补录 JSON" accept=".json,application/json">
           <select id="questionSupplementMode" aria-label="补录合并策略">
             <option value="fill-empty">仅填充空缺（推荐）</option>
             <option value="overwrite">非空补录值覆盖已有</option>
@@ -192,7 +192,7 @@ D反馈EN：...
 A原则：principle-1
 B原则：principle-2"></textarea>
         <div class="toolbar" style="margin-top:8px">
-          <select id="pasteImportMode" style="width:auto"><option value="append">追加到当前题库</option><option value="replace">替换当前题库</option></select>
+          <select id="pasteImportMode" aria-label="粘贴题目导入方式" style="width:auto"><option value="append">追加到当前题库</option><option value="replace">替换当前题库</option></select>
           <button class="btn primary" id="btnParsePastedQuestions">解析并导入</button>
           <span class="muted smalltxt" id="pasteParseResult"></span>
         </div>
@@ -259,8 +259,8 @@ D原则：principle-role-accountability</pre>
       </div>
 
       <div class="data-summary">
-        <div class="filebox"><h3>原则与归纳卡 JSON（可选）</h3><input type="file" id="filePrincipleCardBundle" accept=".json,application/json"><p class="muted smalltxt">支持 kg-principle-card-bundle-v1 / pmp-principle-preset-bundle-v1 两种组合包，也支持旧原则库 JSON、旧归纳卡 JSON 单独迁移。导入采用安全合并：默认保留现有配置，同 ID 改名、同名不同 ID、归纳卡改绑会逐项提示确认，不静默覆盖、不删除已有配置。</p></div>
-        <div class="filebox"><h3>标签配置 JSON（可选）</h3><input type="file" id="fileTagConfig" accept=".json,application/json"><p class="muted smalltxt">兼容主程序标签名称/别名配置。</p></div>
+        <div class="filebox"><h3>原则与归纳卡 JSON（可选）</h3><input type="file" id="filePrincipleCardBundle" aria-label="导入原则与归纳卡 JSON" accept=".json,application/json"><p class="muted smalltxt">支持 kg-principle-card-bundle-v1 / pmp-principle-preset-bundle-v1 两种组合包，也支持旧原则库 JSON、旧归纳卡 JSON 单独迁移。导入采用安全合并：默认保留现有配置，同 ID 改名、同名不同 ID、归纳卡改绑会逐项提示确认，不静默覆盖、不删除已有配置。</p></div>
+        <div class="filebox"><h3>标签配置 JSON（可选）</h3><input type="file" id="fileTagConfig" aria-label="导入标签配置 JSON" accept=".json,application/json"><p class="muted smalltxt">兼容主程序标签名称/别名配置。</p></div>
       </div>
       <div class="data-summary">
         <div class="data-card"><h3>知识树</h3><b id="baseTreeCount">0</b><div class="muted" id="baseTreeName">未加载</div></div>

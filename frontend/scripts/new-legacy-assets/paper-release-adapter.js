@@ -26,6 +26,7 @@
     questionLoads: new Map(), // releaseId + seed + maxCount -> in-flight Promise
     loadedAt: 0,
     error: null,
+    catalogStatus: 'loading',
   };
   let readyPromise = null;
   let catalogEpoch = 0;
@@ -314,15 +315,20 @@
   async function ready({ force = false } = {}) {
     if (!force && readyPromise) return readyPromise;
     const epoch = catalogEpoch;
+    state.catalogStatus = 'loading';
+    announceChange();
     readyPromise = (async () => {
       try {
-        await loadCatalog({ announce: !force, epoch });
-        if (epoch === catalogEpoch) state.error = null;
+        await loadCatalog({ announce: false, epoch });
+        if (epoch === catalogEpoch) { state.error = null; state.catalogStatus = 'ready'; }
       } catch (error) {
         if (epoch !== catalogEpoch) return state.catalog;
         state.error = error;
-        // 失败不冻结页面：目录为空时页面呈现“暂无”，可重试
+        state.catalogStatus = 'error';
+        // Keep the failure distinct from a successfully loaded empty catalog.
         if (force) throw error;
+      } finally {
+        if (epoch === catalogEpoch) announceChange();
       }
       return state.catalog;
     })();
@@ -350,6 +356,7 @@
     fetchQuestions,
     invalidate,
     error: () => state.error,
+    catalogStatus: () => state.catalogStatus,
   });
 
   global.KGPaperReleaseApi = api;

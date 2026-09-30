@@ -12,15 +12,21 @@
   let state = null;
   let readyPromise = null;
 
+  const ACCOUNT_ACTION_LABELS = Object.freeze({login_success:'登录成功',login_failed:'登录失败',logout:'退出登录'});
+  const ENTITY_LABELS = Object.freeze({system:'系统操作',user:'账号',account:'账号',question:'题目',paper:'试卷',bank:'题库',file:'图谱文件',course:'课程'});
   function auditRow(row) {
     const detail = row?.detail && typeof row.detail === 'object' ? row.detail : {};
+    const action = text(row?.action) || 'system';
+    const actionLabel = ACCOUNT_ACTION_LABELS[action] || action;
+    const entityType = text(detail.entityType) || (ACCOUNT_ACTION_LABELS[action] ? 'account' : 'system');
     return {
+      actionLabel, entityTypeLabel: ENTITY_LABELS[entityType] || entityType,
       id: text(row?.id), at: text(row?.at), action: text(row?.action) || 'system',
-      entityType: text(detail.entityType) || 'system',
+      entityType,
       entityId: text(row?.target_username || detail.entityId),
       actor: { id: text(row?.actor), name: text(row?.actor) || '系统' },
       status: /fail|error|denied/i.test(text(row?.action)) ? 'failed' : 'success',
-      summary: text(detail.summary || detail.message) || text(row?.action),
+      summary: text(detail.summary || detail.message) || actionLabel,
       metadata: clone(detail),
     };
   }

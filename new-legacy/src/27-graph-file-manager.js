@@ -455,21 +455,21 @@
   }
   function childFolderCard(folder,{trash=false}={}){
     const card=document.createElement('article'),childFolders=folderChildren(folder.id,{trash}).length,filePool=trash?state.trashFiles:state.activeFiles,childFiles=filePool.filter(file=>file.folderId===folder.id).length;
-    card.className='fm-child-folder-card';card.dataset.childFolderId=folder.id;card.tabIndex=0;card.draggable=!trash;card.setAttribute('role','button');card.setAttribute('aria-label',`${folder.name}，打开文件夹`);
-    card.innerHTML=`<span class="fm-child-folder-icon">${ICONS.folder}</span><div class="fm-child-folder-meta"><strong title="${escapeHTML(folder.name)}">${escapeHTML(folder.name)}</strong><span>子文件夹 ${childFolders} / 文件 ${childFiles}</span></div><button class="fm-child-folder-menu" type="button" data-child-folder-menu="${escapeHTML(folder.id)}" aria-label="${escapeHTML(folder.name)}的更多操作">···</button>`;
+    card.className='fm-child-folder-card';card.dataset.childFolderId=folder.id;card.draggable=!trash;card.setAttribute('aria-label',`${folder.name}，打开文件夹`);
+    card.innerHTML=`<span class="fm-child-folder-icon">${ICONS.folder}</span><div class="fm-child-folder-meta" role="button" tabindex="0" aria-label="${escapeHTML(folder.name)}，打开文件夹"><strong title="${escapeHTML(folder.name)}">${escapeHTML(folder.name)}</strong><span>子文件夹 ${childFolders} / 文件 ${childFiles}</span></div><button class="fm-child-folder-menu" type="button" data-child-folder-menu="${escapeHTML(folder.id)}" aria-label="${escapeHTML(folder.name)}的更多操作">···</button>`;
     return card;
   }
 
   function fileCard(file,currentId){
     const card=document.createElement('article');
     card.className='fm-file-card'+(state.selectedItems.has(itemKey('file',file.id))||state.selectedId===file.id?' is-selected':'');
-    card.dataset.fileId=file.id;card.draggable=state.view!=='trash';card.tabIndex=0;card.setAttribute('role','button');card.setAttribute('aria-label',`${file.name}，双击打开`);
+    card.dataset.fileId=file.id;card.draggable=state.view!=='trash';card.setAttribute('aria-label',`${file.name}，双击打开`);
     const coverBadge=state.view==='trash'?'<span class="fm-trash-badge">回收站</span>':'';
     const currentBadge=state.view!=='trash'&&file.id===currentId?'<span class="fm-current-badge">当前打开</span>':'';
     const organizer=global.KGFileManagerOrganize,tagName=file.tags&&file.tags[0]||'',tagColor=organizer&&organizer.tagColor?organizer.tagColor(tagName):'#64748b';
     const tagButton=state.view!=='trash'?`<button class="fm-card-tag-dot ${tagName?'is-tagged':'is-empty'}" type="button" data-tag-file="${escapeHTML(file.id)}" style="--tag-color:${escapeHTML(tagColor)}" aria-label="${tagName?'标签：'+escapeHTML(tagName)+'，点击更换':'未设置标签，点击添加'}" title="${tagName?escapeHTML(tagName):'添加标签'}"></button>`:'';
     const cover=state.layout==='list'?'':coverPlaceholderHTML(file),coverBlock=state.layout==='list'?'':`<div class="fm-file-cover-shell">${cover}${coverBadge}</div>`;
-    card.innerHTML=`<button class="fm-select-mark" type="button" data-select-kind="file" data-select-id="${escapeHTML(file.id)}" aria-label="选择 ${escapeHTML(file.name)}">✓</button>${coverBlock}${currentBadge}<button class="fm-file-menu-btn" type="button" data-menu-file="${escapeHTML(file.id)}" aria-label="${escapeHTML(file.name)}的更多操作">···</button><div class="fm-file-meta"><div class="fm-file-title-cell"><strong class="fm-file-name" title="${escapeHTML(file.name)}">${escapeHTML(file.name)}</strong>${file.id===currentId&&state.view!=='trash'?'<span class="fm-list-current-badge">当前打开</span>':''}</div><span class="fm-file-date">${formatDate(file.updatedAt)}</span><div class="fm-file-stats"><span><strong>${Number(file.nodeCount)||0}</strong> 节点</span><span><strong>${Number(file.linkCount)||0}</strong> 关系</span><span class="fm-file-size">${formatBytes(file.byteSize)}</span></div>${tagButton}<span class="fm-list-node-count">${Number(file.nodeCount)||0}</span><span class="fm-list-link-count">${Number(file.linkCount)||0}</span><span class="fm-list-size">${formatBytes(file.byteSize)}</span><span class="fm-list-tag-cell">${tagButton}</span></div>`;
+    card.innerHTML=`<button class="fm-select-mark" type="button" data-select-kind="file" data-select-id="${escapeHTML(file.id)}" aria-label="选择 ${escapeHTML(file.name)}">✓</button>${coverBlock}${currentBadge}<button class="fm-file-menu-btn" type="button" data-menu-file="${escapeHTML(file.id)}" aria-label="${escapeHTML(file.name)}的更多操作">···</button><div class="fm-file-meta"><div class="fm-file-title-cell"><span class="fm-file-name" role="button" tabindex="0" aria-label="${escapeHTML(file.name)}，按回车或空格打开" title="${escapeHTML(file.name)}">${escapeHTML(file.name)}</span>${file.id===currentId&&state.view!=='trash'?'<span class="fm-list-current-badge">当前打开</span>':''}</div><span class="fm-file-date">${formatDate(file.updatedAt)}</span><div class="fm-file-stats"><span><strong>${Number(file.nodeCount)||0}</strong> 节点</span><span><strong>${Number(file.linkCount)||0}</strong> 关系</span><span class="fm-file-size">${formatBytes(file.byteSize)}</span></div>${tagButton}<span class="fm-list-node-count">${Number(file.nodeCount)||0}</span><span class="fm-list-link-count">${Number(file.linkCount)||0}</span><span class="fm-list-size">${formatBytes(file.byteSize)}</span><span class="fm-list-tag-cell">${tagButton}</span></div>`;
     return card;
   }
   function renderFiles(){
@@ -723,8 +723,9 @@
   async function finishInlineRename(session,{cancel=false}={}){
     if(!session||session.finishing)return false;session.finishing=true;
     const {card,input,originalName}=session;state.renameSession=null;
-    const name=document.createElement('strong');name.className='fm-file-name';name.title=originalName;name.textContent=originalName;
+    const name=session.nameElement,restoreFocus=document.activeElement===input;
     if(input&&input.isConnected)input.replaceWith(name);card&&card.classList.remove('is-renaming');
+    if(restoreFocus)name.focus();
     if(card)card.setAttribute('aria-label',`${originalName}，双击打开`);
     if(cancel)return true;
     const raw=String(input&&input.value||'').trim();
@@ -734,7 +735,7 @@
     const renamed=await Promise.resolve(isFolder?store.renameFolder(session.id,nextName,{owner:currentOwner(),includeTrash:session.file.status==='trashed',emit:false}):store.renameFile(session.id,nextName,{owner:currentOwner(),includeTrash:session.file.status==='trashed',emit:false}));
     if(!renamed){toast(store.getLastError&&store.getLastError()||'重命名失败。','error');return false}
     const local=(isFolder?[...state.folders,...state.trashFolders]:[...state.activeFiles,...state.trashFiles]).find(item=>item.id===session.id);if(local)Object.assign(local,renamed,{graphData:undefined,learningState:undefined});
-    name.textContent=nextName;name.title=nextName;if(card){card.setAttribute('aria-label',`${nextName}，双击打开`);card.querySelector('[data-menu-file]')?.setAttribute('aria-label',`${nextName}的更多操作`);card.querySelector('[data-select-id]')?.setAttribute('aria-label',`选择 ${nextName}`)}
+    name.textContent=nextName;name.title=nextName;if(name.getAttribute('role')==='button')name.setAttribute('aria-label',`${nextName}，按回车或空格打开`);if(card){card.setAttribute('aria-label',`${nextName}，双击打开`);card.querySelector('[data-menu-file]')?.setAttribute('aria-label',`${nextName}的更多操作`);card.querySelector('[data-select-id]')?.setAttribute('aria-label',`选择 ${nextName}`)}
     if(state.selectedId===session.id){$('fmInfoName').textContent=nextName;$('fmInfoUpdated').textContent=formatDate(renamed.updatedAt)}
     toast(nextName!==raw?`文件已重命名为“${nextName}”。`:'文件已重命名。');return true;
   }
@@ -1087,7 +1088,7 @@
       const menu=event.target.closest('[data-child-folder-menu]');if(menu){event.preventDefault();event.stopPropagation();const folder=[...state.folders,...state.trashFolders].find(item=>item.id===menu.dataset.childFolderMenu);if(folder){selectFolder(folder.id);const rect=menu.getBoundingClientRect();openContextMenu(folder,rect.right,rect.bottom,'folder')}return}
       const card=event.target.closest('[data-child-folder-id]');if(card)openFolder(card.dataset.childFolderId);
     });
-    $('fmChildFolderGrid')?.addEventListener('keydown',event=>{const card=event.target.closest('[data-child-folder-id]');if(card&&(event.key==='Enter'||event.key===' ')){event.preventDefault();openFolder(card.dataset.childFolderId)}});
+    $('fmChildFolderGrid')?.addEventListener('keydown',event=>{const card=event.target.closest('[data-child-folder-id]');if(card&&!event.target.closest('button')&&(event.key==='Enter'||event.key===' ')){event.preventDefault();openFolder(card.dataset.childFolderId)}});
     $('fmChildFolderGrid')?.addEventListener('contextmenu',event=>{const card=event.target.closest('[data-child-folder-id]');if(!card)return;event.preventDefault();const folder=[...state.folders,...state.trashFolders].find(item=>item.id===card.dataset.childFolderId);if(folder){selectFolder(folder.id);openContextMenu(folder,event.clientX,event.clientY,'folder')}});
     $('fmChildFolderGrid')?.addEventListener('dragstart',event=>{
       const card=event.target.closest('[data-child-folder-id]');if(!card||state.view==='trash'||isMobileReadonly()||event.target.closest('[data-child-folder-menu]')){event.preventDefault();return}
@@ -1121,7 +1122,7 @@
         else if(event.key==='Escape'){event.preventDefault();commitInlineRename({cancel:true})}
         return;
       }
-      if(event.target.closest('[data-menu-file]'))return;const card=event.target.closest('.fm-file-card');if(card&&(event.key==='Enter'||event.key===' ')){event.preventDefault();if(state.view!=='trash')openFile(card.dataset.fileId)}
+      if(event.target.closest('button'))return;const card=event.target.closest('.fm-file-card');if(card&&(event.key==='Enter'||event.key===' ')){event.preventDefault();if(state.view!=='trash')openFile(card.dataset.fileId)}
     });
     $('fmFileGrid').addEventListener('focusout',event=>{if(event.target.matches('.fm-file-name-input'))setTimeout(()=>{if(state.renameSession&&state.renameSession.input===event.target&&!event.target.matches(':focus'))commitInlineRename()},0)});
     $('fmFileGrid').addEventListener('dragstart',event=>{const card=event.target.closest('.fm-file-card');if(!card||state.view==='trash'||card.classList.contains('is-renaming')||isMobileReadonly())return;const id=card.dataset.fileId;if(!state.selectedItems.has(itemKey('file',id)))selectFile(id);state.dragPayload=selectedPayload();event.dataTransfer.effectAllowed='move';event.dataTransfer.setData('text/plain',JSON.stringify(state.dragPayload));requestAnimationFrame(()=>card.classList.add('is-dragging'))});

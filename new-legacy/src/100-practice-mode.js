@@ -1234,7 +1234,7 @@
     dom.startButtons.forEach(button=>{
       const revenge=button.dataset.practiceStart==='revenge',revengeStats=getMistakeStats(),revengeAvailable=revengeStats.active>0,revengeUnavailable=Number(revengeStats.unavailable||0)>0;
       if(!hasAuthenticatedUser()){button.disabled=false;button.classList.remove('is-upgrade');button.textContent='登录后'+(revenge?'开始复仇':button.dataset.practiceStart==='practice'?'开始短练':button.dataset.practiceStart==='challenge'?'开始挑战':'进入学霸模式');return}
-      button.disabled=revenge?!revengeAvailable&&!revengeUnavailable:(!release||!firstEnabled);
+      button.disabled=revenge?!revengeAvailable&&!revengeUnavailable:(catalogStatus()!=='ready'||!release||!firstEnabled);
       button.classList.toggle('is-upgrade',!revenge&&!!release&&!access.allowed);
       button.textContent=revenge?(revengeAvailable?`开始复仇（${revengeEntry.automatic?'全部 ':''}${revengeEntry.requestCount} 题）`:revengeUnavailable?'检查错题内容':'暂无错题'):( !release?(button.dataset.defaultLabel||button.textContent):(!access.allowed?'开通会员':button.dataset.defaultLabel||button.textContent));
     });
@@ -1272,9 +1272,10 @@
       if(release)state.coverageOverrides[release.releaseId]=null;renderPaperLibrary();renderCoverage();
     }
   }
+  function catalogStatus(){return global.KGPaperReleaseApi?.catalogStatus?.()||'ready'}
   function syncPaperMeta(){
     const release=selectedRelease();
-    if(!release){dom.selectedPaperName.textContent='请选择试卷';dom.paperMeta.textContent='暂无可用发布试卷。';return}
+    if(!release){dom.selectedPaperName.textContent='请选择试卷';dom.paperMeta.textContent=catalogStatus()==='loading'?'正在读取已发布试卷…':catalogStatus()==='error'?'试卷读取失败，请重试。':'暂无可用发布试卷。';return}
     const access=paperAccess(release),count=Number(release.questionCount||release.totalCount||0);
     dom.selectedPaperName.textContent=release.name;
     dom.paperMeta.textContent=release.subject+' · v'+release.version+' · 可练习 '+count+' 题 · '+(release.accessPolicy?.accessLevel==='member'?(access.allowed?'VIP 已解锁':'VIP 会员专属'):'免费');
@@ -1311,11 +1312,13 @@
     }
     if(dom.libraryClear)dom.libraryClear.hidden=!state.librarySearch&&!state.librarySubject&&state.libraryFilter==='all';
     dom.filterButtons.forEach(button=>button.classList.toggle('is-active',button.dataset.paperFilter===state.libraryFilter));
-    const empty='<div class="practice-paper-empty">没有找到匹配的试卷，试试其他关键词或清除筛选。</div>';
+    const status=catalogStatus();
+    const empty='<div class="practice-paper-empty" role="status">'+(status==='loading'?'正在读取已发布试卷…':status==='error'?'试卷读取失败，请检查网络。<button type="button" data-retry-paper-catalog>重新读取试卷</button>':state.releases.length?'没有找到匹配的试卷，试试其他关键词或清除筛选。':'暂无已发布试卷。教师发布试卷后即可在这里开始练习。')+'</div>';
     if(dom.paperLibrary){dom.paperLibrary.innerHTML=rows.length?rows.map(paperCardMarkup).join(''):empty;bindPaperCards(dom.paperLibrary)}
     if(dom.paperDrawerLibrary){dom.paperDrawerLibrary.innerHTML=rows.length?rows.map(paperCardMarkup).join(''):empty;bindPaperCards(dom.paperDrawerLibrary,{closeDrawer:true})}
-    if(dom.librarySummary)dom.librarySummary.textContent=rows.length?`${rows.length} 份可选试卷 · 横向滚动查看更多`:'当前筛选下暂无试卷';
-    if(dom.paperDrawerSummary)dom.paperDrawerSummary.textContent=rows.length?`共 ${rows.length} 份已发布试卷`:'当前筛选下暂无试卷';
+    for(const root of [dom.paperLibrary,dom.paperDrawerLibrary])root?.querySelector('[data-retry-paper-catalog]')?.addEventListener('click',()=>{void global.KGPaperReleaseApi.reload().catch(()=>{});});
+    if(dom.librarySummary)dom.librarySummary.textContent=status==='loading'?'正在读取试卷…':status==='error'?'试卷读取失败':rows.length?`${rows.length} 份可选试卷 · 横向滚动查看更多`:'当前筛选下暂无试卷';
+    if(dom.paperDrawerSummary)dom.paperDrawerSummary.textContent=status==='loading'?'正在读取试卷…':status==='error'?'试卷读取失败':rows.length?`共 ${rows.length} 份已发布试卷`:'当前筛选下暂无试卷';
   }
   function syncLobby(){
     // 练习模式不依赖题库目录，试卷数据已包含题目快照
@@ -1335,7 +1338,7 @@
     else if(!releases.some(row=>row.id===state.selectedPaperId))state.selectedPaperId=releases.find(row=>paperAccess(row).allowed)?.id||releases[0]?.id||'';
     if(dom.paperSelect){dom.paperSelect.innerHTML=releases.map(row=>'<option value="'+escapeHTML(row.id)+'">'+escapeHTML(row.name)+'</option>').join('');dom.paperSelect.value=state.selectedPaperId}
     const revengeStats=getMistakeStats(),revengeAvailable=revengeStats.active>0||Number(revengeStats.unavailable||0)>0;
-    dom.empty.hidden=!!releases.length||revengeAvailable;dom.setupCard.hidden=false;dom.modeGrid.hidden=false;
+    dom.empty.hidden=catalogStatus()!=='ready'||!!releases.length||revengeAvailable;dom.setupCard.hidden=false;dom.modeGrid.hidden=false;
     const library=dom.paperLibrary?.closest('.practice-library');if(library)library.hidden=false;
     renderPaperLibrary();syncCountOptions();syncPaperMeta();renderCoverage();syncRevengeStats();syncResumableButtons();
   }
@@ -1345,9 +1348,12 @@
     if(dom.revengeActiveCount)dom.revengeActiveCount.textContent=String(stats.active||0);
     if(dom.revengePendingCount)dom.revengePendingCount.textContent=String(stats.pending||0);
     if(dom.revengeRemediationCount)dom.revengeRemediationCount.textContent=String(stats.needsRemediation||0);
-    if(dom.revengeVerificationCount)dom.revengeVerificationCount.textContent=String(stats.verificationDue||0);
+    if(dom.revengeVerificationCount){
+      dom.revengeVerificationCount.textContent=String(Number(stats.verificationDue||0)+Number(stats.verificationWaiting||0));
+      dom.revengeVerificationCount.title=`已到期 ${Number(stats.verificationDue||0)} 题 · 等待验证 ${Number(stats.verificationWaiting||0)} 题`;
+    }
     if(dom.revengeMasteredCount)dom.revengeMasteredCount.textContent=String(stats.mastered||0);
-    if(dom.revengeCountSummary)dom.revengeCountSummary.textContent=!policy.total?'当前暂无可复仇错题':policy.automatic?`本次自动进入全部 ${policy.total} 题`:`共 ${policy.total} 题可复仇，请选择本次题量`;
+    if(dom.revengeCountSummary)dom.revengeCountSummary.textContent=!policy.total?(stats.verificationWaiting?`有 ${stats.verificationWaiting} 题等待延时验证${stats.nextVerificationAt?'，最早可验证：'+new Date(stats.nextVerificationAt).toLocaleString('zh-CN'):''}`:'当前暂无可复仇错题'):policy.automatic?`本次自动进入全部 ${policy.total} 题`:`共 ${policy.total} 题可复仇，请选择本次题量`;
     if(dom.revengeCountOptions){
       dom.revengeCountOptions.hidden=policy.automatic||!policy.total;
       if(dom.revengeCountOptionList)dom.revengeCountOptionList.innerHTML=policy.options.map(option=>`<label><input type="radio" name="practiceRevengeCount" value="${option.value}" ${option.value===policy.selectedCount?'checked':''} ${option.disabled?'disabled':''}/><span>${escapeHTML(option.label)}</span></label>`).join('');
@@ -1562,7 +1568,7 @@
     dom.startButtons.forEach(button=>button.dataset.defaultLabel=button.textContent);bind();
     state.retiredNavigation=readRetiredModeNavigation();
     // P4.5.38：不阻塞等待 catalog ready，先显示 UI，数据异步加载（性能优化）
-    const catalogPromise=global.KGQuestionCatalogAdapter?.ready||Promise.resolve();
+    const catalogPromise=global.KGPaperReleaseApi?.ready?.()||Promise.resolve();
     catalogPromise.then(()=>{state.catalogAvailable=true;syncLobby()}).catch(error=>{state.catalogAvailable=false;console.warn('题目目录加载失败',error);syncLobby()});
     syncLobby();showRetiredModeNotice();
     refreshExperiencePanel();

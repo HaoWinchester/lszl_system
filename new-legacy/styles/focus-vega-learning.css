@@ -85,7 +85,7 @@
     min-height:36px;
     height:36px;
     border-radius:7px;
-    color:#71717a;
+    color:#52525b;
     font-size:var(--ui-text-control);
     font-weight:var(--ui-weight-medium);
   }
@@ -271,7 +271,7 @@
     min-height:36px;
     height:36px;
     border-radius:6px;
-    color:#71717a;
+    color:#52525b;
   }
 
   body[data-ui-skin="focus-vega"].guided-node-page .question-language-switch button.is-active,
@@ -288,7 +288,7 @@
   }
 
   body[data-ui-skin="focus-vega"].guided-node-page .gln-question-head span{
-    color:#6d5dfc;
+    color:#5743cc;
     font-weight:var(--ui-weight-semibold)!important;
     letter-spacing:.04em;
   }
@@ -300,7 +300,7 @@
   }
 
   body[data-ui-skin="focus-vega"].guided-node-page .gln-question-head p{
-    color:#71717a;
+    color:#52525b;
     font-size:var(--ui-text-control)!important;
     line-height:var(--ui-leading-body);
   }
@@ -388,7 +388,7 @@
   }
 
   body[data-ui-skin="focus-vega"].guided-placement-page .glp-heading span{
-    color:#6d5dfc;
+    color:#5743cc;
     font-weight:var(--ui-weight-semibold)!important;
     letter-spacing:.04em;
   }
@@ -417,7 +417,7 @@
     min-height:36px;
     height:36px;
     border-radius:6px;
-    color:#71717a;
+    color:#52525b;
   }
 
   body[data-ui-skin="focus-vega"].guided-placement-page .question-language-switch button.is-active,
@@ -435,7 +435,7 @@
 
   body[data-ui-skin="focus-vega"].guided-placement-page .glp-intro-eyebrow,
   body[data-ui-skin="focus-vega"].guided-placement-page .glp-question-head>span{
-    color:#6d5dfc;
+    color:#5743cc;
     font-weight:var(--ui-weight-semibold)!important;
     letter-spacing:.04em;
   }
@@ -447,7 +447,7 @@
   }
 
   body[data-ui-skin="focus-vega"].guided-placement-page .glp-intro>p{
-    color:#71717a;
+    color:#52525b;
     font-size:var(--ui-text-body)!important;
     line-height:var(--ui-leading-body);
   }
@@ -459,7 +459,7 @@
   }
 
   body[data-ui-skin="focus-vega"].guided-placement-page .glp-intro-facts span{
-    color:#71717a;
+    color:#52525b;
     font-weight:var(--ui-weight-regular)!important;
   }
 
@@ -522,7 +522,7 @@
   body[data-ui-skin="focus-vega"].question-training-page .lp-context,
   body[data-ui-skin="focus-vega"].question-workspace-page .qw-brand span,
   body[data-ui-skin="focus-vega"].knowledge-recall-page .kr-brand p{
-    color:#71717a!important;
+    color:#52525b!important;
     font-size:var(--ui-text-meta)!important;
     font-weight:var(--ui-weight-regular)!important;
     letter-spacing:0;
@@ -576,7 +576,7 @@
     border-radius:6px!important;
     background:transparent!important;
     box-shadow:none!important;
-    color:#71717a!important;
+    color:#52525b!important;
     font-size:var(--ui-text-control)!important;
     font-weight:var(--ui-weight-medium)!important;
   }

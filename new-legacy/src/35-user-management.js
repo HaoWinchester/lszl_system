@@ -215,13 +215,13 @@
       const subBadges=sub&&sub.planId&&sub.planId!=='free'
         ?`<b class="um-pill plan ${sub.paid?'paid':'unpaid'}" title="当前套餐：${escapeHTML(sub.planName||sub.planId)} · ${sub.paid?'已付款':'未在线付款（兑换码/人工开通）'}${sub.expiresAt?' · 至 '+fmtTime(Date.parse(sub.expiresAt)):''}">${escapeHTML(subShort)}</b>`
         :'';
-      return `<div class="um-user-item compact ${username===state.selected?'active':''} ${checked?'selected':''}" data-user="${escapeHTML(username)}" role="button" tabindex="0" title="@${escapeHTML(username)} · ${escapeHTML(role)} · ${subject} · ${stats.questions} 题" aria-label="选择用户 ${escapeHTML(username)}，${escapeHTML(role)}，${status}">
+      return `<div class="um-user-item compact ${username===state.selected?'active':''} ${checked?'selected':''}" data-user="${escapeHTML(username)}" title="@${escapeHTML(username)} · ${escapeHTML(role)} · ${subject} · ${stats.questions} 题">
         <label class="um-user-check" title="加入批量选择">
-          <input class="um-user-checkbox" data-select-user="${escapeHTML(username)}" type="checkbox" ${checked?'checked':''}/>
+          <input class="um-user-checkbox" data-select-user="${escapeHTML(username)}" aria-label="批量选择用户 ${title}（${escapeHTML(username)}）" type="checkbox" ${checked?'checked':''}/>
           <span></span>
         </label>
         <span class="um-user-order">${order}</span>
-        <div class="um-user-main">
+        <div class="um-user-main" role="button" tabindex="0" aria-label="查看用户 ${title}（${escapeHTML(username)}），${escapeHTML(role)}，${status}">
           <div class="um-user-title">
             <strong>${title}</strong>
             <span class="um-pill ${escapeHTML(u.status)}">${status}</span>
@@ -599,6 +599,7 @@
       renderUserList();
     });
     $('umUserList').addEventListener('keydown',e=>{
+      if(!e.target.closest('.um-user-main'))return;
       const item=e.target.closest('.um-user-item');if(!item)return;
       if(e.key==='Enter'||e.key===' '){e.preventDefault();state.selected=item.dataset.user;render()}
     });

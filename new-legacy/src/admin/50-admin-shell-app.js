@@ -38,7 +38,7 @@
     const el=byId('adminRecentAudit');
     if(!Services.permissions.can('viewAudit')){el.innerHTML='<div class="admin-empty">当前角色不显示审计详情。</div>';return}
     const rows=summary.audit.slice(0,6);
-    el.innerHTML=rows.length?rows.map(item=>`<article class="${item.status==='failed'?'failed':''}"><i></i><div><strong>${escapeHtml(item.summary||item.action)}</strong><span>${escapeHtml(item.actor?.name||'未知用户')} · ${escapeHtml(item.entityType)}</span></div><time>${formatTime(item.at)}</time></article>`).join(''):'<div class="admin-empty">还没有操作记录。</div>';
+    el.innerHTML=rows.length?rows.map(item=>`<article class="${item.status==='failed'?'failed':''}"><i></i><div><strong>${escapeHtml(item.summary||item.action)}</strong><span>${escapeHtml(item.actor?.name||'未知用户')} · ${escapeHtml(item.entityTypeLabel||item.entityType)}</span></div><time>${formatTime(item.at)}</time></article>`).join(''):'<div class="admin-empty">还没有操作记录。</div>';
   }
   async function init(){UI.init(Services);if(!ensureAccess())return;try{const summary=await DomainSummary.ready();renderMetrics(summary);renderAttention(summary);renderAudit(summary)}catch(error){const main=document.querySelector('.admin-main');if(main)main.innerHTML=`<section class="admin-panel admin-empty"><h1>管理数据加载失败</h1><p>${escapeHtml(error?.message||error)}。请刷新页面重试。</p></section>`}}
   document.readyState==='loading'?document.addEventListener('DOMContentLoaded',()=>{void init()}):void init();

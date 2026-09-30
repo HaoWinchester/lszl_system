@@ -7,7 +7,7 @@
     'question-bank.html':'question_bank','knowledge-recall.html':'recall',
     'question-workspace.html':'induction','practice-mode.html':'practice',
   }
-  let snapshot=null, generation=0, queue=[], busy=false, hidden=false
+  let snapshot=null, generation=0, queue=[], busy=false, inFlight=null, hidden=false
   const uuid=()=>global.crypto.randomUUID()
   const identity=()=>snapshot?.authenticated ? String(snapshot.loginSessionId||'') : ''
   function pageFeature(){
@@ -23,6 +23,19 @@
   }
   function foreground(){return !hidden && global.document.visibilityState==='visible' && global.document.hasFocus()}
   function sync(){clock.select(pageFeature(),identity());clock.visibility(foreground())}
+  function sendInterval(entry){
+    const {identity:loginSessionId,...body}=entry;
+    return global.fetch(ENDPOINT,{method:'POST',credentials:'include',keepalive:true,
+      headers:{'content-type':'application/json'},body:JSON.stringify({...body,loginSessionId})});
+  }
+  function flushOnExit(){
+    // The browser may terminate this document before an in-flight promise settles.
+    // Send each queued tail now; any later retry keeps its eventId (server deduplicates).
+    for(const entry of queue){
+      if(entry===inFlight || entry.identity!==identity() || Date.now()-Date.parse(entry.endedAt)>600000)continue;
+      void sendInterval(entry).catch(()=>{});
+    }
+  }
   async function drain(){
     if(busy)return
     busy=true
@@ -30,10 +43,8 @@
       while(queue.length){
         const entry=queue[0]
         if(entry.identity!==identity() || Date.now()-Date.parse(entry.endedAt)>600000){queue.shift();continue}
-        const {identity:loginSessionId,...body}=entry
         let response
-        try{response=await global.fetch(ENDPOINT,{method:'POST',credentials:'include',keepalive:true,
-          headers:{'content-type':'application/json'},body:JSON.stringify({...body,loginSessionId})})}
+        try{inFlight=entry;response=await sendInterval(entry)}
         catch(_){break}
         if(entry.identity!==identity())continue
         if(response.status>=500 || response.status===429)break
@@ -44,7 +55,7 @@
           break
         }
       }
-    }finally{busy=false}
+    }finally{inFlight=null;busy=false}
   }
   const clock=global.KGUsageClock?.create({now:()=>Date.now(),uuid,emit:entry=>{
     queue.push(entry);if(queue.length>64)queue.shift();void drain()
@@ -73,7 +84,7 @@
     global.document.addEventListener('visibilitychange',()=>{sync();void drain()})
     global.addEventListener('blur',()=>{clock.visibility(false);void drain()})
     global.addEventListener('focus',()=>{sync();void drain()})
-    global.addEventListener('pagehide',()=>{hidden=true;clock.visibility(false);void drain()})
+    global.addEventListener('pagehide',()=>{hidden=true;clock.visibility(false);flushOnExit();void drain()})
     global.addEventListener('pageshow',()=>{hidden=false;sync();void drain()})
     global.addEventListener('kg-auth-session-change',()=>{void loadSession()})
     global.addEventListener('online',()=>{void drain()})

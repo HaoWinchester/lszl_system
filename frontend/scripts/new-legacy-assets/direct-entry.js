@@ -67,6 +67,7 @@
   global.addEventListener('kg:auth-session-changed', (event) => {
     if (event?.detail?.authenticated) {
       requestCurrentUser({ force: true }).then(async () => {
+        consumeLoginRequest();
         if (event.detail.authenticationAction === 'register') await global.KGWechatLogin?.promptBindingAfterRegister?.()
         showLearningEntryChooser()
       })
@@ -88,7 +89,20 @@
     if (button) button.hidden = true
   }
 
-  function openRequestedSurface() {
+  function consumeLoginRequest() {
+    const params = new URLSearchParams(global.location.search || '');
+    if (params.get('auth') !== 'login' || currentRole() === 'guest') return;
+    params.delete('auth');
+    const query = params.toString();
+    global.history.replaceState(global.history.state, '', global.location.pathname + (query ? '?' + query : '') + global.location.hash);
+  }
+
+  let requestedSurfaceOpened = false;
+  async function openRequestedSurface() {
+    if (requestedSurfaceOpened) return;
+    requestedSurfaceOpened = true;
+    await initialUser;
+    consumeLoginRequest();
     const params = new URLSearchParams(global.location.search || '')
     if (params.get('auth') === 'login' && currentRole() === 'guest' && typeof global.authOpen === 'function') {
       global.authOpen('请登录后继续使用。')
@@ -108,7 +122,7 @@
     waitForInitialLearningEntry: () => initialLearningEntry,
   })
 
-  requestCurrentUser().then(decorateMemberEntry)
+  const initialUser = requestCurrentUser().then(decorateMemberEntry)
   if (document.readyState === 'loading') {
     global.addEventListener('DOMContentLoaded', openRequestedSurface, { once: true })
   } else {

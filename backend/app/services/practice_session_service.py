@@ -609,6 +609,8 @@ async def revenge_summary(db: AsyncSession, owner: str) -> dict:
             "pending": int(pool_stats.get("pending") or 0),
             "needsRemediation": int(pool_stats.get("needsRemediation") or 0),
             "verificationDue": int(pool_stats.get("verificationDue") or 0),
+            "verificationWaiting": int(pool_stats.get("verificationWaiting") or 0),
+            "nextVerificationAt": revenge_pool.get("nextVerificationAt"),
             "mastered": int(pool_stats.get("mastered") or 0),
             "unavailable": int(revenge_pool.get("unavailableCount") or 0),
         },
@@ -1832,6 +1834,14 @@ async def _build_report(db: AsyncSession, session: PracticeSession) -> dict:
         if session.mode == "revenge" and session.release_id is None
         else release.name if release is not None else "PMP 模拟练习"
     )
+    if wrong_question_ids:
+        next_step = "优先复盘本次错题及对应知识点"
+    elif total > answered_count:
+        next_step = "先回看本次未答题目和解析，再练习未做过的题目"
+    elif session.mode == "revenge":
+        next_step = "返回错题区查看待验证或已掌握状态，按到期提示继续巩固"
+    else:
+        next_step = "继续练习未做过的题目，扩大知识覆盖"
     return {
         "sessionId": session.id,
         "paperId": session.paper_id,
@@ -1865,7 +1875,7 @@ async def _build_report(db: AsyncSession, session: PracticeSession) -> dict:
         "examDate": now_utc().date().isoformat(),
         "reportNumber": session.id,
         "recommendations": [
-            "优先复盘本次错题及对应知识点",
+            next_step,
             "根据领域表现安排下一轮针对性练习" if is_simulation else "扩大题目覆盖后再判断各领域的整体表现",
         ],
         "pageNumber": "1 / 1",

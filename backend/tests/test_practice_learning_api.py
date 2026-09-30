@@ -602,6 +602,11 @@ def test_practice_answer_uses_server_truth_delays_mastery_and_reactivates_mistak
     assert overview.json()["stats"]["verificationWaiting"] == 1
     assert overview.json()["stats"]["mastered"] == 0
 
+    summary = client.get("/api/v1/learning/practice/revenge/summary").json()["stats"]
+    assert summary["verificationWaiting"] == 1
+    assert summary["verificationDue"] == 0
+    assert summary["nextVerificationAt"] == right.json()["mistake"]["nextReviewAt"]
+
     # Re-answering before the 24-hour review point cannot master the mistake.
     too_early = client.post(
         "/api/v1/learning/practice/answers",
@@ -625,6 +630,10 @@ def test_practice_answer_uses_server_truth_delays_mastery_and_reactivates_mistak
             await db.commit()
 
     asyncio.run(make_review_due())
+    summary = client.get("/api/v1/learning/practice/revenge/summary").json()["stats"]
+    assert summary["verificationWaiting"] == 0
+    assert summary["verificationDue"] == 1
+    assert summary["nextVerificationAt"] is None
     mastered = client.post(
         "/api/v1/learning/practice/answers",
         json={**base, "selectedAnswer": "A"},

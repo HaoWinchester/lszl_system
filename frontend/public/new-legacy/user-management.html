@@ -56,10 +56,10 @@
       </div>
     </header>
 
-    <section class="um-summary" id="umSummary"></section>
+    <section class="um-summary" id="umSummary" aria-label="账号概况"></section>
 
     <main class="um-layout">
-      <aside class="um-left-card">
+      <aside class="um-left-card" role="region" aria-label="账号列表">
         <div class="um-card-head">
           <div>
             <h2>用户列表</h2>
@@ -105,20 +105,20 @@
           </label>
           <strong id="umSelectedCount">已选 0 人</strong>
           <div class="um-batch-grid">
-            <select id="umBatchRoleSelect" title="批量设置角色">
+            <select id="umBatchRoleSelect" aria-label="批量设置角色" title="批量设置角色">
               <option value="KEEP">角色不变</option>
               <option value="admin">设为管理员</option>
               <option value="teacher">设为教师/教研</option>
               <option value="student">设为学员</option>
               <option value="viewer">设为游客</option>
             </select>
-            <select id="umBatchStatusSelect" title="批量设置状态">
+            <select id="umBatchStatusSelect" aria-label="批量设置状态" title="批量设置状态">
               <option value="KEEP">状态不变</option>
               <option value="active">设为正常</option>
               <option value="paused">设为暂停</option>
               <option value="archived">设为已归档</option>
             </select>
-            <select id="umBatchSubjectSelect" title="批量设置主要科目">
+            <select id="umBatchSubjectSelect" aria-label="批量设置主要科目" title="批量设置主要科目">
               <option value="KEEP">科目不变</option>
               <option value="PMP">PMP</option>
               <option value="CSPM">CSPM</option>

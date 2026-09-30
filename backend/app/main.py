@@ -11,7 +11,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy import text
-from starlette.middleware.sessions import SessionMiddleware
+from app.core.session import SessionMiddleware
 
 from app.api.v1.router import api_router
 from app.core.config import settings

@@ -49,6 +49,8 @@ with sync_playwright() as p:
     assert page.locator('#qwMistakesCount').inner_text()=='1'
     page.locator('#qwPersonalCardsBtn').click();assert page.locator('#qwPersonalCardsDrawer').is_visible()
     assert page.locator('#qwPersonalCardsList [data-card-id]').count()==1
+    assert not page.locator('#qwPersonalCardsError').is_visible()
+    assert page.locator('#qwPersonalCardsError').evaluate('e=>getComputedStyle(e).display')=='none'
     page.locator('[data-card-action="edit"]').click();assert page.locator('#qwPersonalCardEditor').is_visible()
     page.locator('#qwPersonalCardEditorCancel').click();assert not page.locator('#qwPersonalCardEditor').is_visible()
     page.locator('[data-card-action="insert"]').click();page.wait_for_timeout(20);assert page.evaluate("window._inserted") == ['psc_1']

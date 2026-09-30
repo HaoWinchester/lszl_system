@@ -262,6 +262,7 @@
       toast=document.createElement("div");
       toast.id="subscriptionLimitToast";
       toast.className="subscription-limit-toast";
+      toast.setAttribute("role","status");
       document.body.appendChild(toast);
     }
     toast.textContent=text;

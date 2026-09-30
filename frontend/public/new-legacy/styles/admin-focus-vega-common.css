@@ -132,7 +132,7 @@ body[data-admin-skin="focus-vega"] .admin-permission-list article{
 }
 body[data-admin-skin="focus-vega"] .admin-attention-list a:hover,
 body[data-admin-skin="focus-vega"] .admin-unmapped-list article:hover{background:#fafafa}
-body[data-admin-skin="focus-vega"] .admin-attention-list a b{border-radius:var(--admin-radius-control);background:var(--admin-secondary);color:#71717a}
+body[data-admin-skin="focus-vega"] .admin-attention-list a b{border-radius:var(--admin-radius-control);background:var(--admin-secondary);color:#52525b}
 body[data-admin-skin="focus-vega"] .admin-attention-list a.needs-attention b{background:#fff7ed;color:var(--admin-warning)}
 body[data-admin-skin="focus-vega"] .admin-audit-list article,
 body[data-admin-skin="focus-vega"] .admin-release-list article{border-color:#f0f0f2}

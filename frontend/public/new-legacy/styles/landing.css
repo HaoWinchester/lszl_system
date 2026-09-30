@@ -6,11 +6,11 @@
   --landing-paper: #f4f0e6;
   --landing-paper-warm: #fbf8f0;
   --landing-surface: #fffdf7;
-  --landing-accent: #e76238;
+  --landing-accent: #b74725;
   --landing-accent-deep: #c94c27;
   --landing-gold: #f3c45e;
   --landing-mint: #d7e4d8;
-  --landing-muted: #64746e;
+  --landing-muted: #53635c;
   --landing-border: rgba(21, 60, 52, 0.15);
   --landing-shadow: 0 24px 70px rgba(18, 57, 49, 0.11);
   --landing-serif: "Songti SC", "STSong", "SimSun", serif;
@@ -228,7 +228,7 @@
 .landing-product-browser-bar span:first-child { background: #e77955; }
 .landing-product-browser-bar span:nth-child(2) { background: #edc568; }
 .landing-product-browser-bar span:nth-child(3) { background: #80ae86; }
-.landing-product-browser-bar b { margin-left: 10px; color: #77847f; font-size: 9px; letter-spacing: 0.08em; }
+.landing-product-browser-bar b { margin-left: 10px; color: #596a61; font-size: 9px; letter-spacing: 0.08em; }
 .landing-product-media { position: relative; overflow: hidden; background: #eef1ee; aspect-ratio: 16 / 10; }
 .landing-product-media img { width: 100%; height: 100%; object-fit: cover; object-position: top center; }
 .landing-image-fallback { position: absolute; inset: 0; display: none; padding: 40px; place-content: center; text-align: center; background: radial-gradient(circle at center, #fffdf7, #e8eee9); }

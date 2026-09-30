@@ -105,7 +105,7 @@
   }
   function onKeydown(event){
     trapDialogFocus(event);
-    if(event.key==='Escape'){const dialog=$('engagementDialogBackdrop');if(dialog&&!dialog.hidden)closeDialog();else closePopover({focus:true});return}
+    if(event.key==='Escape'){const dialog=$('engagementDialogBackdrop');if(dialog&&!dialog.hidden)closeDialog();else if(popover&&!popover.hidden)closePopover({focus:true});return}
     if(!popover||popover.hidden)return;const items=[...popover.querySelectorAll('[role="menuitem"]')];const index=items.indexOf(document.activeElement);if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();const step=event.key==='ArrowDown'?1:-1;items[(Math.max(index,0)+step+items.length)%items.length]?.focus()}
   }
   function init(){

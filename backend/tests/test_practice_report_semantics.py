@@ -11,13 +11,13 @@ class FakeDb:
         return SimpleNamespace(name="PMP 练习卷")
 
 
-def report_for(count, total, *, mode="practice", domains=None):
+def report_for(count, total, *, mode="practice", domains=None, all_correct=False, answered_count=None):
     domains = domains or ["people"] * count
     session = SimpleNamespace(
         id="ps-report", paper_id="paper", release_id="release", owner_id="student",
         mode=mode, question_order=[{"questionId": f"q{index}", "domain": domain, "score": 1}
                                    for index, domain in enumerate(domains)],
-        answers={"q0": {"correct": True}, "q1": {"correct": False}},
+        answers=({f"q{index}": {"correct": True} for index in range(count if answered_count is None else answered_count)} if all_correct else {"q0": {"correct": True}, "q1": {"correct": False}}),
         stats={"durationMs": 30000},
         scoring_snapshot={"passPercent": 60, "domainWeights": {"people": 42, "process": 50,
                          "business-environment": 8}, "selectionSummary": {"totalCount": total}},
@@ -61,3 +61,18 @@ def test_full_paper_does_not_grade_unsampled_domain():
 
 def test_revenge_mode_remains_practice_even_with_large_frozen_count():
     assert report_for(60, 60, mode="revenge")["reportKind"] == "practice"
+
+def test_perfect_practice_and_revenge_do_not_recommend_nonexistent_mistakes():
+    for mode in ("practice", "revenge", "challenge"):
+        report = report_for(10, 60, mode=mode, all_correct=True)
+        assert report["counts"]["wrong"] == 0
+        assert all("本次错题" not in item for item in report["recommendations"])
+        if mode == "revenge":
+            assert "待验证或已掌握" in report["recommendations"][0]
+
+
+def test_unfinished_revenge_without_wrong_answers_recommends_unanswered_items():
+    report = report_for(10, 10, mode="revenge", all_correct=True, answered_count=2)
+    assert report["counts"]["wrong"] == 0
+    assert report["counts"]["unanswered"] == 8
+    assert "未答题目" in report["recommendations"][0]

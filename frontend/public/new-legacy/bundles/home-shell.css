@@ -2346,7 +2346,7 @@ body[data-role-theme] .floating-tool-btn.primary,body[data-role-theme] button.pr
   text-overflow:ellipsis;
   white-space:nowrap;
   font-size:11px;
-  color:#94a3b8;
+  color:#596579;
 }
 .graph-search-empty{
   padding:18px 10px;
@@ -3369,6 +3369,9 @@ g.is-batch-selected .edge-visible{
 .wechat-account-dialog .wechat-account-error{color:#b91c1c;min-height:20px;margin-bottom:0}
 .wechat-account-dialog .wechat-account-note{font-size:12px}
 .wechat-account-dialog :focus-visible{outline:3px solid #86cfa3;outline-offset:3px}
+
+/* Account role badges use readable text independently of the role accent fill. */
+.auth-status .role-badge{color:#334155}
 
 /* kg:wechat-login-custom */
 .wechat-login-section{margin-top:14px;border-top:1px dashed #cbd5e1;padding-top:14px}
@@ -8977,8 +8980,8 @@ body.qw-selection-toolbar-motion .uc-selection-bounds,.stage.graph-card-dragging
   box-shadow:none;
 }
 .graph-mode-indicator button:hover{background:rgba(255,255,255,.22)!important}
-.graph-mode-indicator.related{--graph-mode-color:#f97316;background:var(--graph-mode-color)}
-.graph-mode-indicator.flow{--graph-mode-color:#22c55e;background:var(--graph-mode-color)}
+.graph-mode-indicator.related{--graph-mode-color:#9a3412;background:var(--graph-mode-color)}
+.graph-mode-indicator.flow{--graph-mode-color:#166534;background:var(--graph-mode-color)}
 @media(max-width:720px){.graph-mode-indicator{top:0}}
 
 /* 状态提示条使用画布外围状态色与白色文字。 */

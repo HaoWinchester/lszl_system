@@ -1174,6 +1174,11 @@ def build_global_revenge_pool(
         "candidates": candidates,
         "stats": stats,
         "unavailableCount": unavailable_count,
+        "nextVerificationAt": _iso(min(
+            (row.next_review_at for row, _ in representatives
+             if _revenge_status_rank(row, current_time) == 3 and row.next_review_at),
+            default=None,
+        )),
     }
 
 

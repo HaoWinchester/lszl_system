@@ -52,7 +52,7 @@
 
       <div class="qw-workspace-tabbar" id="qwWorkspaceTabbar" aria-label="多题画布页签栏">
         <a class="qw-workspace-home" id="qwWorkspaceListBtn" href="file-manager.html?type=workspace" title="进入文件管理" aria-label="进入文件管理，查看多题画布"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"></rect><path d="M8 9h8M8 13h8M8 17h5"></path></svg></a>
-        <div class="qw-workspace-tabs" id="qwWorkspaceTabs" role="tablist" aria-label="已打开的多题画布"></div>
+        <div class="qw-workspace-tabs" id="qwWorkspaceTabs" role="group" aria-label="已打开的多题画布"></div>
         <button class="qw-workspace-add" id="qwCreateWorkspaceBtn" type="button" title="新建画布" aria-label="新建画布"><span data-ui-icon="plus" data-ui-icon-size="18" aria-hidden="true"></span></button>
       </div>
 
@@ -277,7 +277,7 @@
             <button type="button" id="qwQuestionSelectionClear" disabled>清空选择</button>
           </div>
         </div>
-        <div class="qw-question-list lp-question-library-list" id="qwQuestionList" role="list"></div>
+        <div class="qw-question-list lp-question-library-list" id="qwQuestionList" role="region" aria-label="可选择的试卷题目"></div>
       </aside>
 
       <section class="qw-viewport" id="qwCanvasViewport" tabindex="0" aria-label="多题归纳画布">
