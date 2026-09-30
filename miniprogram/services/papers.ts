@@ -36,15 +36,17 @@ function normalizePaper(raw: any): PaperSummary {
   };
 }
 
-export async function listPublishedPapers(page = 1, pageSize = 30): Promise<{
+export async function listPublishedPapers(page = 1, pageSize = 30, filters: { search?: string; subject?: string; access?: string } = {}): Promise<{
   items: PaperSummary[];
   total: number;
+  subjects: string[];
 }> {
-  const payload = await request<{ releases?: unknown[]; total?: number }>({
-    path: `/api/v1/paper-releases/catalog?page=${page}&pageSize=${pageSize}`,
+  const payload = await request<{ releases?: unknown[]; total?: number; subjects?: string[] }>({
+    path: `/api/v1/paper-releases/catalog?page=${page}&pageSize=${pageSize}&search=${encodeURIComponent(filters.search || '')}&subject=${encodeURIComponent(filters.subject || '')}&access=${encodeURIComponent(filters.access || 'all')}`,
   });
   return {
     items: (Array.isArray(payload.releases) ? payload.releases : []).map(normalizePaper),
     total: Number(payload.total || 0),
+    subjects: Array.isArray(payload.subjects) ? payload.subjects.map(String) : [],
   };
 }

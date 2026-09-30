@@ -1,12 +1,13 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.264",
-  "toVersion": "v9.0-p4.1.265",
+  "fromVersion": "v9.0-p4.1.266",
+  "toVersion": "v9.0-p4.1.266",
   "changes": {
     "added": [],
     "changed": [
-      "VERSION",
-      "content-prep-studio/dist/content-prep.html"
+      "src/65-question-bank-admin.js",
+      "styles/teacher-daily-workspace.css",
+      "tests/ux-paper-draft.test.js"
     ],
     "removed": []
   },

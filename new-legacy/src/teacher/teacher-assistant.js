@@ -127,7 +127,7 @@
       $('assistant').setAttribute('aria-busy', String(busy));
       ['new-session', 'session-history'].forEach(id => { $(id).disabled = disabled; });
       ['delete-session', 'refresh-session'].forEach(id => { $(id).disabled = disabled || !s; });
-      ['assistant-files', 'attach-files', 'assistant-message', 'send-message'].forEach(id => { $(id).disabled = disabled || !s || !activated || running; });
+      ['assistant-files', 'attach-files', 'upload-materials', 'assistant-message', 'send-message'].forEach(id => { $(id).disabled = disabled || !s || !activated || running; });
       $('execute-plan').textContent = s?.plan?.settings?.publish ? '确认执行并发布' : '确认保存草稿';
       $('execute-plan').disabled = disabled || !s?.plan?.items?.length || running || Boolean(s.plan.blockers?.length) || s.plan.items.some(item => item.blockers?.length || item.questions?.some(question => question.blockers?.length)) || Boolean(s.receipt?.revision === s.revision && s.job?.status === 'succeeded');
       $('confirm-source-review').hidden = !s?.plan?.items?.some(item => item.questions?.some(question => question.metadata?.needsReview || question.needsReview));
@@ -158,7 +158,7 @@
       $('welcome').hidden = Boolean(s?.messages?.length); $('files-details').hidden = !s?.uploads?.length;
       $('conversation-result').replaceChildren();
       if (!s) { $('job-status').textContent = '请选择或新建会话。'; controls(); return; }
-      for (const message of s.messages || []) { const el = text($('messages'), 'article', '', 'ta-message ' + (message.role === 'user' ? 'user' : 'assistant')); text(el, 'strong', message.role === 'user' ? '你' : '教学助手'); text(el, 'div', message.content); }
+      for (const message of s.messages || []) { const el = text($('messages'), 'article', '', 'ta-message ' + (message.role === 'user' ? 'user' : 'assistant')); text(el, 'strong', message.role === 'user' ? '你' : '文件整理助手'); text(el, 'div', message.content); }
       for (const upload of s.uploads || []) {
         const el = text($('uploads'), 'article', '', 'ta-file'); text(el, 'strong', upload.name); text(el, 'span', ' · ' + Math.ceil((upload.size || 0) / 1024) + ' KiB · ' + ({ ready: '已识别', uploaded: '待识别', failed: '识别失败', expired: '已过期，请重传' }[upload.status] || upload.status || '等待处理'));
         if (upload.pageCount != null) text(el, 'span', ' · ' + upload.pageCount + ' 页');
@@ -368,9 +368,17 @@
       catch (error) { showError(error); }
       finally { busy = false; render(); schedule(); }
     }
-    function clearDraft() { pendingFiles = []; $('assistant-message').value = ''; $('assistant-files').value = ''; tools = []; renderPending(); }
+    const draftGuard = global.KGUnsavedGuard.create({
+      read: () => ({ text: $('assistant-message').value, files: pendingFiles.map(entry => ({name: entry.file.name, size: entry.file.size, lastModified: entry.file.lastModified})) }),
+      title: '还有尚未发送的内容', message: '输入的文字和待发送附件尚未提交。继续编辑可保留它们；放弃后再继续。不会自动上传文件或发送消息。',
+      discardLabel: '放弃未发送内容', discard: () => clearDraft(), onError: showError
+    });
+    function clearDraft() { pendingFiles = []; $('assistant-message').value = ''; $('assistant-files').value = ''; tools = []; renderPending(); draftGuard.markClean(); }
+    async function leaveDraft(fn) { if (busy || !authorized) return; if (await draftGuard.confirmLeave()) return fn(); $('session-history').value = client.session?.id || ''; }
+
     function switchSession(id) {
-      action(async () => { epoch++; disconnect(); sourceViews.clear(); await activate(id); clearDraft(); panel(false); if (global.innerWidth <= 760) sidebar(false); }, true);
+      if (id === client.session?.id) return;
+      return leaveDraft(() => action(async () => { epoch++; disconnect(); sourceViews.clear(); await activate(id); clearDraft(); panel(false); if (global.innerWidth <= 760) sidebar(false); }, true));
     }
     function reconcilePending() {
       const uploads = (client.session?.uploads || []).filter(upload => upload.status !== 'expired');
@@ -399,10 +407,10 @@
       catch (error) { showError(error); }
       $('assistant-files').value = '';
     }
-    $('new-session').onclick = () => action(async () => { epoch++; disconnect(); sourceViews.clear(); const s = await client.create(); await activate(s.id); clearDraft(); panel(false); if (global.innerWidth <= 760) sidebar(false); }, true);
+    $('new-session').onclick = () => leaveDraft(() => action(async () => { epoch++; disconnect(); sourceViews.clear(); const s = await client.create(); await activate(s.id); clearDraft(); panel(false); if (global.innerWidth <= 760) sidebar(false); }, true));
     $('session-history').onchange = () => { if ($('session-history').value) switchSession($('session-history').value); };
-    $('delete-session').onclick = () => { if (global.confirm('删除本会话及私人原文件？已发布内容不会撤回。')) action(async () => { epoch++; disconnect(); sourceViews.clear(); await client.remove(); clearDraft(); activated = false; panel(false); }, true); };
-    $('attach-files').onclick = () => $('assistant-files').click();
+    $('delete-session').onclick = () => leaveDraft(() => { if (global.confirm('删除本会话及私人原文件？已发布内容不会撤回。')) action(async () => { epoch++; disconnect(); sourceViews.clear(); await client.remove(); clearDraft(); activated = false; panel(false); }, true); });
+    $('attach-files').onclick = $('upload-materials').onclick = () => $('assistant-files').click();
     $('assistant-files').onchange = () => addFiles($('assistant-files').files);
     $('assistant-message').onpaste = event => { const files = Array.from(event.clipboardData?.files || []); if (files.length) { event.preventDefault(); addFiles(files); } };
     $('assistant').ondragover = event => { if (Array.from(event.dataTransfer?.types || []).includes('Files')) { event.preventDefault(); $('assistant').classList.add('ta-dragging'); } };
@@ -460,6 +468,7 @@
       const value = input.value ? input.value + '\n\n' + content : content;
       if (value.length > input.maxLength) { showError(new Error('加入话语后超出消息长度，请先精简输入。')); return; }
       input.value = value; input.focus();
+      $('phrase-fill-status').textContent = '已填入输入框，可修改后发送。尚未上传文件或发送消息。';
     }
     phrases = global.KGAssistantPhrases?.init(doc, client.request, usePhrase);
     scroller.onscroll = () => { nearBottom = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 100; $('jump-bottom').hidden = nearBottom; };

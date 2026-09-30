@@ -116,3 +116,32 @@ body[data-teacher-daily] .tq-step-guide-actions .primary{background:var(--teache
   body[data-teacher-daily] .tq-step-guide-actions :where(a,button){white-space:normal;line-height:1.35;padding:8px;font-size:12px;border-radius:8px;box-shadow:none}
   body[data-teacher-daily].qb-simple-mode :where(.qb-card,.qb-management-section,.qb-library-pane){border-radius:10px!important;box-shadow:none}
 }
+
+/* Keep the selected paper and its save actions together while editing. */
+body[data-teacher-daily] .pm-page-head{position:sticky;top:64px;z-index:25;display:grid;grid-template-columns:minmax(180px,1fr) minmax(180px,1fr) auto;gap:14px;background:var(--tw-bg);padding:12px 0;margin-bottom:14px}
+.pm-current-paper{display:grid;gap:4px;min-width:0;font-size:13px}.pm-current-paper strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pm-current-paper span{color:var(--teacher-muted)}
+.wb-task-starts{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}.wb-task-starts a{padding:10px 12px;border:1px solid var(--teacher-border);border-radius:8px;background:#fff;font-size:13px;color:var(--teacher-primary);font-weight:600;text-decoration:none}
+.tw-teaching-tools{position:relative}.tw-teaching-tools summary{cursor:pointer;list-style:none;white-space:nowrap;font-size:13px;min-height:38px;display:flex;align-items:center}.tw-teaching-tools summary::after{content:'⌄';margin-left:6px}.tw-teaching-tools[aria-current="true"] summary{color:var(--teacher-primary);font-weight:700}.tw-teaching-tools>div{position:absolute;right:0;top:calc(100% + 8px);z-index:80;display:grid;gap:4px;min-width:180px;padding:8px;border:1px solid var(--teacher-border,#e4e4e7);border-radius:10px;background:white}.tw-teaching-tools:not([open])>div{display:none}.tw-teaching-tools a{padding:10px;color:#3f3f46;text-decoration:none;font-size:13px}.tw-teaching-tools a[aria-current="page"]{color:var(--teacher-primary,#6d5dfc);background:#f1efff}
+.tw-location{display:flex;gap:10px;align-items:center;padding:8px 20px;font-size:12px;color:#52525b;background:#fff;border-bottom:1px solid var(--teacher-border,#e4e4e7)}.tw-location a{color:inherit}.tw-location span{font-weight:600}
+@media(min-width:1181px){
+ body[data-teacher-daily] .pm-app{padding-right:84px}
+ body[data-teacher-daily] .pm-paper-workspace{grid-template-columns:320px minmax(0,1fr);align-items:start}
+ body[data-teacher-daily] .pm-paper-list-section{grid-column:1;grid-row:1/4;position:sticky;top:158px;padding:12px;max-height:calc(100vh - 180px);overflow:auto}
+ body[data-teacher-daily] .pm-editor-section,body[data-teacher-daily] .pm-quota-section,body[data-teacher-daily] .pm-question-workbench{grid-column:2;min-width:0}
+ body[data-teacher-daily] .pm-paper-library-head{display:grid;gap:10px}.pm-paper-library-head h2{font-size:16px}
+ body[data-teacher-daily] .pm-paper-library-head .qb-inline-actions{flex-wrap:wrap;justify-content:flex-start;gap:6px}
+ body[data-teacher-daily] .pm-paper-library-head p{display:none}
+ body[data-teacher-daily] .pm-paper-library-layout{display:flex;flex-direction:column;height:auto!important;min-height:0;gap:10px}
+ body[data-teacher-daily] .pm-paper-library-layout+.kg-resizable-handle{display:none}
+ body[data-teacher-daily] .pm-paper-category-panel{max-height:160px;overflow:auto}
+ body[data-teacher-daily] .pm-paper-catalog{overflow:visible;padding:0;border:0}
+ body[data-teacher-daily] .pm-paper-catalog-toolbar{grid-template-columns:minmax(0,1fr) 110px}.pm-paper-catalog-toolbar .pm-page-check{grid-column:1/-1}
+ body[data-teacher-daily] .pm-paper-list{grid-template-columns:1fr;max-height:none;overflow:visible}
+ body[data-teacher-daily] .pm-paper-list-bulk{flex-direction:column;align-items:stretch}.pm-paper-list-bulk .qb-inline-actions{flex-wrap:wrap}
+ body[data-teacher-daily] .pm-mode-fieldset{display:flex;flex-wrap:wrap}.pm-mode-fieldset small{flex-basis:100%}
+ body[data-teacher-daily] .pm-question-workbench{height:clamp(450px,62vh,680px);min-height:450px}
+ body[data-teacher-daily] .pm-picker-filters{grid-template-columns:1fr 1fr}.pm-picker-filters .pm-page-check{grid-column:1/-1}
+}
+@media(max-width:1200px){body[data-teacher-daily] .pm-page-head{top:104px}}
+@media(max-width:1180px){body[data-teacher-daily] .pm-page-head{grid-template-columns:1fr auto}body[data-teacher-daily] .pm-page-head>div:first-child{display:none}.pm-current-paper{grid-column:1}}
+@media(max-width:760px){body[data-teacher-daily] .pm-page-head{top:0;grid-template-columns:1fr;gap:10px}.pm-current-paper{grid-column:auto}body[data-teacher-daily] .pm-primary-actions{grid-column:1}.tw-location{padding:8px 12px}}

@@ -19,16 +19,17 @@
   <link rel="stylesheet" href="styles/focus-vega-typography.css" />
   <link rel="stylesheet" href="styles/focus-vega-teacher.css" />
   <link rel="stylesheet" href="styles/close-button.css"/>
+<link rel="stylesheet" href="styles/teacher-daily-workspace.css" />
 </head>
-<body data-ui-skin="focus-vega">
+<body data-ui-skin="focus-vega" data-teacher-daily="true">
   <div class="cc-app">
     <header class="tw-topbar">
-      <a class="tw-brand" href="teacher-workbench.html"><span class="tw-brand-mark">KG</span><span class="tw-brand-copy"><strong>教师内容工作台</strong><small>内容生产与发布</small></span></a>
-      <nav class="tw-tabs" aria-label="工作模块"><a href="teacher-workbench.html">工作台</a><a href="question-bank.html?mode=simple&amp;step=questions&amp;view=content&amp;entry=paste">题目管理</a><a class="active" href="content-center.html">内容中心</a><a href="course-admin.html">配置中心</a></nav>
+      <a class="tw-brand" href="teacher-workbench.html"><span class="tw-brand-mark">KG</span><span class="tw-brand-copy"><strong>教师工作台</strong><small>内容生产与发布</small></span></a>
+      <nav class="tw-tabs" aria-label="工作模块"><a href="teacher-workbench.html">工作台</a><a href="question-bank.html?mode=simple&amp;step=questions&amp;view=content&amp;entry=paste">题目管理</a><a class="active" href="content-center.html">内容中心</a><a href="course-admin.html">课程与任务</a></nav>
       <div class="tw-user"><span class="tw-user-badge" id="ccAccount"></span><a href="index.html">返回学员端</a></div>
     </header>
     <section class="tw-workflow" aria-label="内容工作流程"><span class="tw-step done"><b>1</b>录入活动</span><i class="tw-arrow"></i><span class="tw-step active"><b>2</b>检查入库</span><i class="tw-arrow"></i><span class="tw-step"><b>3</b>配置内容</span><i class="tw-arrow"></i><span class="tw-step"><b>4</b>预览发布</span></section>
-    <section class="tw-guide"><div class="tw-guide-copy"><strong>当前步骤：检查内容并维护知识归属</strong><span>在这里管理活动、批量归类和维护知识树。题目确认后，再前往配置中心安排课程。</span></div><div class="tw-guide-actions"><a href="question-bank.html?mode=simple&amp;step=questions&amp;view=content&amp;entry=paste">返回题目管理</a><a class="primary" href="course-admin.html">前往配置中心<span data-ui-icon="arrow-right" data-ui-icon-size="16" aria-hidden="true"></span></a></div></section>
+    <section class="tw-guide"><div class="tw-guide-copy"><strong>当前步骤：检查内容并维护知识归属</strong><span>在这里管理活动、批量归类和维护知识树。题目确认后，再前往课程与任务安排课程。</span></div><div class="tw-guide-actions"><a href="question-bank.html?mode=simple&amp;step=questions&amp;view=content&amp;entry=paste">返回题目管理</a><a class="primary" href="course-admin.html">前往课程与任务<span data-ui-icon="arrow-right" data-ui-icon-size="16" aria-hidden="true"></span></a></div></section>
 
     <section class="tw-commandbar">
       <div class="tw-command-title"><p>CONTENT CENTER</p><h1>内容中心</h1><span>统一活动库、可视化知识树、作者追踪与课程引用关系</span></div>
@@ -79,7 +80,7 @@
 
       <section class="cc-library-panel" data-workspace-panel="activity-library" data-workspace-title="统一活动库" data-workspace-controls-target=".cc-library-head">
         <div class="cc-library-head">
-          <div><p class="cc-kicker">ACTIVITY LIBRARY</p><h2>统一活动库</h2><span>内容中心负责检查和管理；配置中心只引用活动 ID，不复制活动正文。</span></div>
+          <div><p class="cc-kicker">ACTIVITY LIBRARY</p><h2>统一活动库</h2><span>在内容中心检查和整理活动，再将它们加入课程或试卷。</span></div>
           <div class="cc-head-stats" id="ccHeadStats"></div>
         </div>
         <div class="cc-toolbar">
@@ -103,7 +104,7 @@
         <div class="cc-organize-grid">
           <section><header><div><h3>标签</h3><p>用于高频、易错、版本和教学用途等多维分类。</p></div><button type="button" id="ccNewTagBtn"><span data-ui-icon="plus" data-ui-icon-size="16" aria-hidden="true"></span>新标签</button></header><div id="ccTagList" class="cc-org-list"></div></section>
           <section><header><div><h3>题集与收藏夹</h3><p>人工整理活动，不复制题目正文。</p></div><button type="button" id="ccNewCollectionBtn"><span data-ui-icon="plus" data-ui-icon-size="16" aria-hidden="true"></span>新题集</button></header><div id="ccCollectionList" class="cc-org-list"></div></section>
-          <aside class="cc-org-help"><strong>推荐操作</strong><ol><li>先按知识点、题型和难度筛选活动。</li><li>批量添加标签或加入题集。</li><li>需要测评时，选中活动后“创建试卷”。</li></ol><a href="paper-management.html">前往配置中心组卷<span data-ui-icon="arrow-right" data-ui-icon-size="16" aria-hidden="true"></span></a></aside>
+          <aside class="cc-org-help"><strong>推荐操作</strong><ol><li>先按知识点、题型和难度筛选活动。</li><li>批量添加标签或加入题集。</li><li>需要测评时，选中活动后“创建试卷”。</li></ol><a href="paper-management.html">前往试卷管理组卷<span data-ui-icon="arrow-right" data-ui-icon-size="16" aria-hidden="true"></span></a></aside>
         </div>
       </section>
     </main>
@@ -133,5 +134,6 @@
   <div class="cc-toast" id="ccToast" role="status" aria-live="polite"></div>
   <script src="src/59c-active-learning-mode-policy.js"></script>
   <script src="src/28-app-storage.js"></script><script src="src/29-auth-core.js"></script><script src="src/86-activity-schema-v1.js"></script><script src="src/87-guided-learning-data.js"></script><script src="src/91-learning-content-core.js"></script><script src="src/93-content-organization-core.js"></script><script src="src/admin/00-admin-core.js"></script><script src="src/admin/10-content-repository.js"></script><script src="src/admin/11-local-content-repository.js"></script><script src="src/admin/20-admin-permission-service.js"></script><script src="src/admin/21-admin-audit-service.js"></script><script src="src/admin/22-admin-transaction-service.js"></script><script src="src/admin/30-reference-index-service.js"></script><script src="src/admin/31-subject-service.js"></script><script src="src/admin/32-taxonomy-service.js"></script><script src="src/admin/33-activity-service.js"></script><script src="src/admin/34-course-service.js"></script><script src="src/admin/35-release-service.js"></script><script src="src/admin/42-teaching-content-server-gateway.js"></script><script src="src/admin/40-admin-service-registry.js"></script><script src="src/admin/41-learning-content-compat.js"></script><script src="src/91-knowledge-tree-index.js"></script><script src="src/97-knowledge-question-stats.js"></script><script src="src/91-content-center-app.js"></script><script src="src/93-content-organization-app.js"></script><script src="src/92-workspace-panel-manager.js"></script><script src="src/99-embedded-workspace.js"></script><script src="src/109-focus-vega-ui-icons.js"></script>
+<script src="src/teacher/shared/workspace-shell.js"></script>
 </body>
 </html>

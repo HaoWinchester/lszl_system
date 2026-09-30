@@ -12,16 +12,10 @@ import { openMembershipOffer } from '../../domain/membership-navigation';
 
 const CATALOG_PAGE_SIZE = 20;
 
-function filteredPapers(items: PaperSummary[], subject: string, access: string, search: string): PaperSummary[] {
-  return items.filter(item =>
-    (!search.trim() || `${item.title} ${item.subject} ${item.description || ''}`.toLowerCase().includes(search.trim().toLowerCase()))
-    && (subject === '全部科目' || item.subject === subject)
-    && (access === 'all' || item.accessLevel === access),
-  );
-}
-
 Component(withPrimaryPanel('papers', withAppearance(withAppShare({
   fetching: false,
+  catalogRequest: 0,
+  catalogQuery: '',
   data: {
     statusBarHeight: 24,
     loading: true,
@@ -60,12 +54,12 @@ Component(withPrimaryPanel('papers', withAppearance(withAppShare({
     const options = consumePaperOptions();
     if (options) {
       this.setData({ quick: options.quick === true, ...(options.access ? { access: options.access, search: '', subject: '全部科目' } : {}) });
-      this.applyFilters();
+      if (options.access) return this.loadPapers();
     }
     if (pageRefreshMode(this.data.lastLoadedAt) !== 'skip') return this.loadPapers();
   },
 
-  onSearch(event: any) { this.setData({ search: String(event.detail.value || '') }); this.applyFilters(); },
+  onSearch(event: any) { this.setData({ search: String(event.detail.value || '') }); return this.loadPapers(); },
   onMode(event: any) {
     const mode = event.currentTarget.dataset.mode;
     if (mode === 'revenge') { navigation.navigateTo({ url: '/pages/revenge/index' }); return; }
@@ -76,58 +70,68 @@ Component(withPrimaryPanel('papers', withAppearance(withAppShare({
     this.loadPapers().finally(() => wx.stopPullDownRefresh());
   },
 
+  catalogFilters() {
+    return { search: this.data.search.trim(), subject: this.data.subject === '全部科目' ? '' : this.data.subject, access: this.data.access };
+  },
+
   async loadPapers() {
-    if (this.fetching) return;
+    const filters = this.catalogFilters();
+    const query = JSON.stringify(filters);
+    const changed = query !== this.catalogQuery;
+    if (this.fetching && !changed) return;
+    const request = ++this.catalogRequest;
+    this.catalogQuery = query;
     this.fetching = true;
-    this.setData({ loading: this.data.lastLoadedAt === 0, error: '', refreshError: '' });
+    this.setData({ loading: changed || this.data.lastLoadedAt === 0, error: '', refreshError: '', loadingMore: false, moreError: '',
+      ...(changed ? { papers: [], filtered: [], page: 0, total: 0, hasMore: false, lastLoadedAt: 0 } : {}) });
     try {
-      const { items, total = items.length } = await listPublishedPapers(1, CATALOG_PAGE_SIZE);
-      const subjects = ['全部科目', ...Array.from(new Set(items.map(item => item.subject)))];
-      this.setData({ papers: items, subjects, loading: false, lastLoadedAt: Date.now(), refreshError: '', page: 1, total, hasMore: items.length < total, moreError: '' });
-      this.applyFilters();
+      const { items, total = items.length, subjects = [] } = await listPublishedPapers(1, CATALOG_PAGE_SIZE, filters);
+      if (request !== this.catalogRequest) return;
+      this.setData({ papers: items, filtered: items, subjects: ['全部科目', ...subjects], loading: false,
+        lastLoadedAt: Date.now(), refreshError: '', page: 1, total, hasMore: items.length < total, moreError: '' });
     } catch (error) {
+      if (request !== this.catalogRequest) return;
       if (this.data.lastLoadedAt) this.setData({ loading: false, refreshError: messageOf(error) });
       else this.setData({ loading: false, error: messageOf(error), filtered: [] });
     } finally {
-      this.fetching = false;
+      if (request === this.catalogRequest) this.fetching = false;
     }
   },
 
   async loadMore() {
     if (this.fetching || this.data.refreshError || !this.data.hasMore) return;
+    const request = ++this.catalogRequest;
     this.fetching = true;
     this.setData({ loadingMore: true, moreError: '' });
     try {
       const next = this.data.page + 1;
-      const { items, total } = await listPublishedPapers(next, CATALOG_PAGE_SIZE);
+      const { items, total } = await listPublishedPapers(next, CATALOG_PAGE_SIZE, this.catalogFilters());
+      if (request !== this.catalogRequest) return;
       const papers = [...new Map([...this.data.papers, ...items].map(item => [item.releaseId, item])).values()];
-      this.setData({ papers, total, page: next, hasMore: items.length > 0 && next * CATALOG_PAGE_SIZE < total,
-        subjects: ['全部科目', ...Array.from(new Set(papers.map(item => item.subject)))] });
-      this.applyFilters();
+      this.setData({ papers, filtered: papers, total, page: next, hasMore: items.length > 0 && next * CATALOG_PAGE_SIZE < total });
     } catch (error) {
-      this.setData({ moreError: messageOf(error) });
+      if (request === this.catalogRequest) this.setData({ moreError: messageOf(error) });
     } finally {
-      this.fetching = false;
-      this.setData({ loadingMore: false });
+      if (request === this.catalogRequest) {
+        this.fetching = false;
+        this.setData({ loadingMore: false });
+      }
     }
   },
 
+  onUnload() { this.catalogRequest += 1; },
   onReachBottom() { this.loadMore(); },
-
-  applyFilters() {
-    this.setData({
-      filtered: filteredPapers(this.data.papers, this.data.subject, this.data.access, this.data.search),
-    });
+  clearFilters() {
+    this.setData({ search: '', subject: '全部科目', access: 'all' });
+    return this.loadPapers();
   },
-
   onSubject(event: any) {
     this.setData({ subject: event.currentTarget.dataset.subject });
-    this.applyFilters();
+    return this.loadPapers();
   },
-
   onAccess(event: any) {
     this.setData({ access: event.currentTarget.dataset.access });
-    this.applyFilters();
+    return this.loadPapers();
   },
 
   async onSelectPaper(event: any) {

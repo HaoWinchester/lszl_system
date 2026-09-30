@@ -1,7 +1,7 @@
 <view class="page-shell papers-page" style="{{appearanceStyle}}padding-top: {{statusBarHeight}}px">
   <view class="nav-bar"><text class="nav-title">练习</text></view>
   <view class="catalog-heading"><text class="page-title">找到今天的练习</text><text class="catalog-copy">循序积累，练出自己的节奏。</text></view>
-  <input class="field catalog-search" value="{{search}}" bindinput="onSearch" placeholder="搜索试卷名称或科目" aria-label="搜索试卷名称或科目" confirm-type="search" />
+  <input class="field catalog-search" value="{{search}}" bindinput="onSearch" placeholder="搜索试卷名称、描述或科目" aria-label="搜索试卷名称、描述或科目" confirm-type="search" />
   <view wx:if="{{quick}}" class="quick-notice"><text class="quick-title">先练 5 题</text><text>选一份试卷，即可按普通模式顺序开始；不足 5 题则练全卷。</text><button class="text-action" bindtap="onFullPractice">自行设置题量和模式</button></view>
   <view class="mode-selector" role="tablist"><button wx:for="{{modes}}" wx:key="id" class="catalog-mode {{mode === item.id ? 'active' : ''}}" data-mode="{{item.id}}" bindtap="onMode" role="tab" aria-selected="{{mode === item.id}}">{{item.title}}</button></view>
   <scroll-view class="filters" scroll-x enhanced show-scrollbar="false">
@@ -13,17 +13,18 @@
     <button class="access-filter {{access === 'member' ? 'is-active' : ''}}" data-access="member" bindtap="onAccess">会员试卷</button>
   </view>
 
+  <button wx:if="{{search || subject !== '全部科目' || access !== 'all'}}" class="text-action" bindtap="clearFilters">清除筛选</button>
   <view wx:if="{{refreshError}}" class="inline-notice" role="alert"><text>更新失败，当前为上次试卷：{{refreshError}}</text><button class="inline-retry" bindtap="loadPapers">重试更新</button></view>
   <view wx:if="{{loading}}" class="paper-loading">
     <view wx:for="{{skeletonRows}}" wx:key="*this" class="paper-skeleton"><view class="paper-skeleton-line is-short"></view><view class="paper-skeleton-line"></view><view class="paper-skeleton-line is-medium"></view></view>
   </view>
   <empty-state wx:elif="{{error}}" title="试卷没有载入" body="{{error}}" action-text="重新加载" bind:action="loadPapers" />
-  <empty-state wx:elif="{{filtered.length === 0}}" title="{{hasMore ? '已载入的试卷中暂无匹配' : '这里还没有试卷'}}" body="{{hasMore ? '可以继续加载后面的试卷，或切换筛选。' : '换一个科目或访问范围看看。'}}" />
+  <empty-state wx:elif="{{filtered.length === 0}}" title="没有找到匹配的试卷" body="试试其他关键词，或清除筛选查看全部试卷。" action-text="清除筛选" bind:action="clearFilters" />
   <view wx:else class="paper-list">
     <paper-list-item wx:for="{{filtered}}" wx:key="releaseId" item="{{item}}" bind:select="onSelectPaper" />
   </view>
   <view wx:if="{{!loading && !error && hasMore}}" class="catalog-more">
-    <text class="section-copy">已载入 {{papers.length}} / {{total}} 份，筛选当前已载入的试卷</text>
+    <text class="section-copy">匹配 {{total}} 份 · 已载入 {{papers.length}} 份</text>
     <text wx:if="{{moreError}}" class="error-copy">{{moreError}}</text>
     <button class="quiet-button" loading="{{loadingMore}}" disabled="{{loadingMore || refreshError}}" bindtap="loadMore">{{moreError ? '重新加载更多' : '加载更多试卷'}}</button>
   </view>

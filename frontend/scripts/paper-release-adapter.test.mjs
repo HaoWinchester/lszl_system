@@ -470,3 +470,20 @@ test('administrator sees student-facing releases while other audience restrictio
   role = 'student'
   assert.equal(context.KGPublishedPaperRepository.inspectRelease({paperId:'p',releaseId:'r'}, {mode:'practice_mode'}).ok, true)
 })
+
+test('published catalog reads beyond page 50 instead of silently truncating search inventory', async () => {
+  const context = {
+    console, Promise,
+    CustomEvent: class { constructor(type) { this.type = type } },
+    addEventListener() {}, dispatchEvent() {},
+    KGDomainApi: { async request({path}) {
+      const page = Number(new URL(path, 'https://local.test').searchParams.get('page'));
+      return { releases: [{releaseId:`r${page}`,paperId:`p${page}`,name:`paper ${page}`,status:'published'}], total:51 };
+    } },
+  };
+  context.window = context;
+  vm.runInNewContext(adapter, context);
+  await context.KGPaperReleaseApi.ready();
+  assert.equal(context.KGPaperReleaseApi.catalog().length,51);
+  assert.equal(context.KGPaperReleaseApi.catalog().at(-1).releaseId,'r51');
+});

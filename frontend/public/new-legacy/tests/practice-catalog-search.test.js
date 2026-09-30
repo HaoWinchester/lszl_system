@@ -1,0 +1,10 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {filterCatalog}=require('../src/100-practice-mode.js');
+const rows=Array.from({length:25},(_,i)=>({id:`p${i}`,name:`试卷 ${i}`,description:i===21?'Agile & leadership':'',subject:i===21?'ACP':'PMP',accessPolicy:{accessLevel:i===21?'member':'free'}}));
+assert.deepEqual(filterCatalog(rows,{search:' agile ',subject:'ACP',access:'member'}).map(x=>x.id),['p21']);
+assert.equal(filterCatalog(rows,{search:'PMP'}).length,24);
+assert.equal(filterCatalog(rows,{search:'21',access:'free'}).length,0);
+assert.equal(filterCatalog(rows,{}).length,25);
+assert.equal(rows.length,25,'search must not remove selected papers from the catalog');
+console.log('practice-catalog-search-ok');

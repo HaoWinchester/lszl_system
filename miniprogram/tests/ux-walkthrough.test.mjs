@@ -6,9 +6,9 @@ import {assignPair,pairLabel} from '../domain/pc-practice.ts';
 test('free catalog route clears previous member search and carries quick intent only once',async()=>{
  const routing=await loadModule('domain/navigation.ts',{wx:{reLaunch(){},showToast(){}}},['openPaperCatalog','consumePaperMode','consumePaperOptions']);
  routing.openPaperCatalog('normal',{access:'free',quick:true});
- const {page,navigation}=await loadPage('papers',{...routing,selectPrimaryTab(){}});
+ const {page,navigation}=await loadPage('papers',{...routing,selectPrimaryTab(){},listPublishedPapers:async(page,size,filters)=>{assert.equal(filters.access,'free');return {items:[{title:'free',subject:'PMP',accessLevel:'free'}],total:1,subjects:['PMP']};}});
  page.setData({lastLoadedAt:Date.now(),search:'old',subject:'old',access:'member',mode:'scholar',papers:[{title:'free',subject:'PMP',accessLevel:'free'},{title:'member',subject:'PMP',accessLevel:'member'}]});
- page.onShow();assert.deepEqual([page.data.search,page.data.subject,page.data.access,page.data.mode,page.data.quick],['','全部科目','free','normal',true]);assert.equal(page.data.filtered.length,1);
+ await page.onShow();assert.deepEqual([page.data.search,page.data.subject,page.data.access,page.data.mode,page.data.quick],['','全部科目','free','normal',true]);assert.equal(page.data.filtered.length,1);
  assert.equal(routing.consumePaperOptions(),null);
  await page.onSelectPaper({detail:{item:{paperId:'p',releaseId:'r',title:'free',questionCount:20}}});
  assert.equal(new URL('https://test'+navigation.at(-1).url).searchParams.get('quick'),'1');

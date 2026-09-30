@@ -1,6 +1,6 @@
 <view class="page-shell practice-page" style="{{appearanceStyle}}padding-top: {{statusBarHeight}}px">
   <view class="practice-nav">
-    <button class="exit" bindtap="onExit" disabled="{{busy}}" aria-label="{{policy.allowPause ? '暂停并退出' : '交卷并退出'}}"><ui-icon name="close" /></button>
+    <button class="exit" bindtap="onExit" disabled="{{busy}}" aria-label="退出练习"><ui-icon name="close" /></button>
     <view class="progress-copy"><text class="progress-mode">{{modeTitle}}</text><text>{{currentIndex + 1}} / {{session.questions.length}}</text><text wx:if="{{policy.showTimer}}" class="timer {{timerUrgent ? 'urgent' : ''}}">{{timerLabel}}</text></view>
   </view>
   <view class="progress-track"><view class="progress-value {{policy.accent}}" style="width: {{progressPercent}}%"></view></view>
@@ -24,6 +24,7 @@
 
   <button wx:if="{{!loading && !loadError && currentQuestion.type === 'matching' && !submitted && !showAnswers}}" class="primary-button" disabled="{{busy || !matchingComplete}}" bindtap="onConfirmMatching">确认配对答案</button>
   <view wx:if="{{writeError && !loading && !loadError}}" class="write-error"><text class="write-error-copy">{{writeError}}</text><button class="write-error-action" bindtap="retryWrites">重试同步</button></view>
+  <button wx:if="{{!loading && !loadError && !navigationTarget}}" class="quiet-button end-session" disabled="{{busy}}" bindtap="onEnd">结束本次练习</button>
   <view wx:if="{{!loading && !loadError && !navigationTarget}}" class="answer-actions">
     <button class="sheet-entry {{busy ? 'is-disabled' : ''}}" bindtap="onOpenSheet" disabled="{{busy}}" aria-label="打开答题卡"><ui-icon name="sheet" size="28" /><text>答题卡</text></button>
     <button class="previous {{currentIndex === 0 || busy ? 'is-disabled' : ''}}" disabled="{{currentIndex === 0 || busy}}" bindtap="onPrevious">上一题</button>

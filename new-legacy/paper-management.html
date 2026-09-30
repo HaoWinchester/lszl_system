@@ -45,6 +45,7 @@
       <h1 class="kg-module-title">试卷管理 <button class="kg-module-help-trigger" type="button" data-module-help="paper-management" aria-label="查看试卷管理帮助" title="查看帮助">?</button></h1>
       <p>从正式题库手动选择题目组成试卷；发布版本可供学员在独立做题模式中选择。</p>
     </div>
+    <div class="pm-current-paper" aria-live="polite"><strong id="pmCurrentPaperTitle">请选择试卷</strong><span id="qbPaperSaveState" role="status">已保存</span></div>
     <div class="qb-inline-actions pm-primary-actions">
       <button id="qbAddPaperBtn" type="button"><span data-ui-icon="plus" data-ui-icon-size="16" aria-hidden="true"></span>新试卷</button>
       <button id="qbSavePaperBtn" type="button">保存试卷</button>
@@ -317,6 +318,7 @@
 <script defer src="src/118-question-materials.js"></script>
 <script defer src="src/119-question-rich-editor.js"></script>
 <script defer src="src/teacher/shared/difficulty-service.js"></script>
+<script src="src/shared/unsaved-guard.js"></script>
 <script defer src="src/65-question-bank-admin.js"></script>
 <script defer src="src/admin/module-help-content.js"></script>
 <script defer src="src/admin/module-help-controller.js"></script>

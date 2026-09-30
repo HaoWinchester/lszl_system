@@ -516,19 +516,11 @@ Page(withAppearance(withAppShare({
       return;
     }
     this.confirming = true;
-    const decision = await showDialog({ title: '退出练习', content: '保存退出会保留进度，下次继续；完成或结束本次练习后，错题才会加入复习。', confirmText: '保存退出', cancelText: '结束练习' });
-    this.confirming = false;
-    if (decision.dismissed) return;
-    if (!decision.confirm) {
-      const abandon = await showDialog({ title: '结束本次练习？', content: '结束后不能继续本次练习；已答题会按 PC 规则结算。', confirmText: '结束练习', cancelText: '继续做题' });
-      if (!abandon.confirm) return;
-      this.setData({ busy: true });
-      try {
-        await this.syncCoordinator.enqueueWrite({ sessionId: this.data.session.id, key: `abandon:${this.data.session.id}:${this.syncRevision}`, action: 'abandon', payload: { answers: this.run?.submission() || {}, runtimeState: this.modeRuntimeState() } });
-        clearLocalDraft(getCurrentUser()?.username || '', this.data.session.id);
-        this.leavePractice();
-      } catch (error) { await this.handleWriteError(error); }
-      return;
+    try {
+      const decision = await showDialog({ title: '退出练习', content: '保存退出会保留进度，下次继续；完成或结束本次练习后，错题才会加入复习。', confirmText: '保存退出', cancelText: '继续做题' });
+      if (!decision.confirm || decision.dismissed) return;
+    } finally {
+      this.confirming = false;
     }
     this.setData({ busy: true });
     try {
@@ -547,6 +539,35 @@ Page(withAppearance(withAppShare({
       return;
     }
     this.leavePractice();
+  },
+
+  async onEnd() {
+    if (this.data.busy || this.confirming || this.leaving || this.data.loading || this.data.loadError) return;
+    if (this.syncCoordinator.pendingCount()) {
+      this.setData({ writeError: '还有提交未同步，请先重试同步再结束。' });
+      return;
+    }
+    this.confirming = true;
+    try {
+      const decision = await showDialog({ title: '结束本次练习？', content: '结束后不能继续本次练习；已提交的答案会结算，错题会加入复习。尚未提交的选择不会计入成绩。', confirmText: '结束练习', cancelText: '继续做题' });
+      if (!decision.confirm || decision.dismissed) return;
+    } finally {
+      this.confirming = false;
+    }
+    this.setData({ busy: true });
+    try {
+      await this.syncCoordinator.enqueueWrite({
+        sessionId: this.data.session.id,
+        key: `abandon:${this.data.session.id}:${this.syncRevision}`,
+        action: 'abandon',
+        payload: { answers: this.run?.submission() || {}, runtimeState: this.modeRuntimeState() },
+      });
+      clearLocalDraft(getCurrentUser()?.username || '', this.data.session.id);
+      this.leavePractice();
+    } catch (error) {
+      this.saveDraft();
+      await this.handleWriteError(error);
+    }
   },
 
   leavePractice() {

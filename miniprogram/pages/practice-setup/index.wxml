@@ -12,7 +12,11 @@
   </view>
 
   <text wx:if="{{error}}" class="error-copy" role="alert">{{error}}</text>
-  <button class="primary-button start-button" loading="{{starting}}" disabled="{{starting}}" bindtap="start">{{existingSessionId ? '继续练习' : '开始练习'}}</button>
+  <view wx:if="{{existingSessionId}}" class="resume-notice" role="status">
+    <text class="line-title">已有未完成练习</text>
+    <text class="line-copy">继续练习会沿用上次的题目和设置，不应用下方设置。若要更换题目或设置，请明确重新开始。</text>
+    <button class="quiet-button restart-button" disabled="{{starting}}" bindtap="onRestartExisting">放弃上次并重新开始</button>
+  </view>
   <view class="setting-section">
     <text class="setting-label">题量</text>
     <view class="choice-row">
@@ -44,6 +48,12 @@
   </view>
 
 
-  <button wx:if="{{existingSessionId}}" class="quiet-button start-button" disabled="{{starting}}" bindtap="onRestartExisting">放弃上次并重新开始</button>
+  <view class="setup-action-dock">
+    <view class="setup-summary" role="status">
+      <text class="summary-selection">{{existingSessionId ? '重新开始将使用：' : ''}}<text wx:for="{{modes}}" wx:key="id" wx:if="{{mode === item.id}}">{{item.title}}</text> · {{count}} 题 · {{order === 'random' ? '随机出题' : '顺序出题'}}</text>
+      <text class="summary-priority">未做题优先 · 不足时补已做题 · 案例题保留完整</text>
+    </view>
+    <button class="primary-button start-button" loading="{{starting}}" disabled="{{starting}}" bindtap="start">{{existingSessionId ? '继续上次练习' : '开始练习'}}</button>
+  </view>
 </view>
 <app-dialog id="app-dialog" style="{{appearanceStyle}}" />

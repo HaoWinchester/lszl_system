@@ -1,4 +1,4 @@
-.setup-page { padding-bottom: calc(var(--space-6) + env(safe-area-inset-bottom)); }
+.setup-page { padding-bottom: calc(320rpx + env(safe-area-inset-bottom)); }
 .back { display: flex; align-items: center; justify-content: center; width: 72rpx; height: 72rpx; border-radius: 50%; background: transparent; }
 .back::after, .choice::after, .line-option::after, .mode-option::after { border: 0; }
 .back-icon { width: 20rpx; height: 20rpx; border-bottom: 3rpx solid var(--ink); border-left: 3rpx solid var(--ink); transform: rotate(45deg); }
@@ -21,8 +21,15 @@
 .mode-mark { width: 8rpx; height: 64rpx; margin-right: var(--space-3); border-radius: 4rpx; background: var(--ink); }
 .mode-mark.clay { background: var(--clay); }
 .mode-mark.gold { background: var(--gold); }
-.start-button { --button-width: 100%; width: 100%; margin-top: var(--space-6); }
+.start-button { --button-width: 100%; width: 100%; margin-top: var(--space-3); }
 .mode-option { gap: var(--space-3); }
 .mode-text { min-width: 0; }
 
 .setting-section { margin-top: 24rpx; padding: 28rpx; border-radius: 32rpx; background: var(--surface); }.option-list, .mode-list { border-top: 0; }.line-option:last-child, .mode-option:last-child { border-bottom: 0; }
+
+.resume-notice { display: flex; flex-direction: column; margin-top: var(--space-4); padding: var(--space-3); border: 2rpx solid var(--line); border-radius: 24rpx; background: var(--surface); }
+.restart-button { --button-width: 100%; width: 100%; margin-top: var(--space-2); min-height: var(--touch-min); }
+.setup-action-dock { position: fixed; z-index: 10; right: 0; bottom: 0; left: 0; padding: var(--space-3) var(--page-gutter) calc(var(--space-3) + env(safe-area-inset-bottom)); border-top: 2rpx solid var(--line); background: var(--surface); }
+.setup-summary { display: flex; flex-direction: column; gap: var(--space-1); }
+.summary-selection { color: var(--ink); font-size: var(--font-meta); font-weight: 600; line-height: 1.45; }
+.summary-priority { color: var(--muted); font-size: var(--font-meta); line-height: 1.45; }

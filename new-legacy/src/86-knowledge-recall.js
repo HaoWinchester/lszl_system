@@ -1340,6 +1340,15 @@
   }
   function updateQuestionNavigator(){
     const context=questionContext(),position=context.total&&context.index>=0?context.index+1:0;
+    const empty=String(question?.id||'')==='unavailable';
+    const notice=$('krUnavailableState'),manage=$('krUnavailableManage');
+    const role=window.KGAuthCore?.currentUser?.()?.role;
+    const teacher=['admin','teacher'].includes(role);
+    document.body.classList.toggle('kr-has-no-question',empty);
+    if(notice)notice.hidden=!empty;
+    if(manage)manage.hidden=!teacher;
+    const copy=$('krUnavailableCopy');
+    if(copy)copy.textContent=teacher?'当前没有可用题目。请检查试卷是否发布，并勾选“深度回忆”学习模式。':'老师尚未开放可用题目，可以先进行普通练习。';
     const count=$('krQuestionCount'),positionEl=$('krQuestionPosition');
     if(count)count.textContent=context.total?`${position}/${context.total}`:'0/0';
     if(positionEl)positionEl.textContent=context.total?`题目 ${position} / ${context.total}`:'暂无题目';

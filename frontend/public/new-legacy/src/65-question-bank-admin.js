@@ -673,14 +673,21 @@
     const payload=paperMetadataPayload(paper);delete payload.revision;payload.questions=(paper.questions||[]).map((ref,index)=>({bankId:String(ref.bankId||''),questionId:String(ref.questionId||''),order:index+1,score:Number(ref.score||1)}));return payload;
   }
   function paperQuestionPayload(paper){return {revision:paper.revision,questions:(paper.questions||[]).map((ref,index)=>({bankId:String(ref.bankId||''),questionId:String(ref.questionId||''),order:index+1,score:Number(ref.score||1)}))}}
-  function replacePaperState(paper){
-    const normalized=normalizePaper(paper),index=state.papers.findIndex(item=>item.id===normalized.id);if(index>=0)state.papers[index]=normalized;else state.papers.push(normalized);state.selectedPaperId=normalized.id;state.paperDetailReady=true;state.paperDetailLoading=false;state.paperDetailError='';return normalized;
+  function replacePaperState(paper,{select=true}={}){
+    const normalized=normalizePaper(paper),index=state.papers.findIndex(item=>item.id===normalized.id);if(index>=0)state.papers[index]=normalized;else state.papers.push(normalized);
+    if(select){state.selectedPaperId=normalized.id;state.paperDetailReady=true;state.paperDetailLoading=false;state.paperDetailError=''}
+    return normalized;
   }
   function paperApiMessage(error,fallback='试卷操作失败。'){
     if(error?.status===409)return String(error?.message||'数据已变更，已为你重新加载，请重试。');
     return String(error?.message||fallback);
   }
   function applyPaperManagementSnapshot(snapshot={}){
+    if(paperDraftDirty()&&String(snapshot.selectedPaperId||'')!==state.selectedPaperId){
+      const selected=state.papers.find(paper=>paper.id===state.selectedPaperId);
+      snapshot={...snapshot,selectedPaperId:state.selectedPaperId,selectedPaper:selected,paperLoading:false,paperError:''};
+      if(selected&&!(snapshot.papers||[]).some(paper=>paper.id===selected.id))snapshot.papers=[...(snapshot.papers||[]),selected];
+    }
     const summaries=Array.isArray(snapshot.papers)?snapshot.papers:[];
     const detail=snapshot.selectedPaper&&String(snapshot.selectedPaper.id||'')===String(snapshot.selectedPaperId||'')?snapshot.selectedPaper:null;
     state.papers=summaries.map((summary,index)=>normalizePaper(detail&&String(summary.id)===String(detail.id)?{...summary,...detail}:summary,index));
@@ -688,6 +695,7 @@
     if(document.body?.dataset?.paperManagementPage==='true'){
       state.banks=ensureGlobalTeacherNumbers((snapshot.banks||[]).map((bank,index)=>normalizeBank({...bank,questions:[]},index)));
     }
+    if(state.selectedPaperId!==String(snapshot.selectedPaperId||''))paperSelectionGeneration++;
     state.selectedPaperId=String(snapshot.selectedPaperId||'');
     state.paperDetailReady=!state.selectedPaperId||!!detail;
     state.paperDetailLoading=!!snapshot.paperLoading;
@@ -725,7 +733,8 @@
       }else if(!active||queuedReload===null||options.replaceQueuedPreferred!==false)queuedReload={preferredId:normalized,selectionIntent:'',generation:++generation};
       return active||start();
     };
-    return Object.freeze({request});
+    const cancelPending=()=>{generation++;queuedReload=null;selectionIntent=''};
+    return Object.freeze({request,cancelPending});
   }
   function createPaperReloadRunner(options={}){
     const getLoader=typeof options.getPaperDataLoader==='function'?options.getPaperDataLoader:()=>options.paperDataLoader;
@@ -744,6 +753,7 @@
       return clone(readCurrentSnapshot());
     };
   }
+  let paperSelectionGeneration=0;
   const paperReloadCoordinator=createPaperReloadCoordinator(createPaperReloadRunner({
     getPaperDataLoader:()=>paperDataLoader,
     paperApi:PaperDraftApi,
@@ -751,19 +761,30 @@
     readCurrentSnapshot:()=>({papers:state.papers,categories:state.paperCategories,selectedPaperId:state.selectedPaperId,selectedPaper:state.papers.find(item=>item.id===state.selectedPaperId)||null}),
     applySnapshot:applyPaperManagementSnapshot,
   }));
+  async function selectPaperDraft(id,options={}){
+    paperSelectionGeneration++;
+    // A save announces a background refresh before its promise resolves. A
+    // subsequent user selection supersedes that older refresh's preferred ID.
+    paperReloadCoordinator.cancelPending();
+    if(paperDataLoader)return paperDataLoader.selectPaper(id,options);
+    const detail=await PaperDraftApi.detail(id);state.selectedPaperId=id;replacePaperState(detail);renderPaperManager();return detail;
+  }
   async function reloadPaperDrafts(options={}){
     if(!PaperDraftApi)throw new Error('试卷草稿 API 未加载。');
     return paperReloadCoordinator.request(String(options.selectedId||state.selectedPaperId||''),{replaceQueuedPreferred:options.replaceQueuedPreferred});
   }
   async function persistPaperMetadata(paper,options={}){
+    const selectedId=state.selectedPaperId,generation=paperSelectionGeneration;
     try{
       const saved=options.create?await PaperDraftApi.create(paperCreatePayload(paper)):await PaperDraftApi.update(paper.id,paperMetadataPayload(paper));
-      const normalized=replacePaperState(saved);if(!options.silent)toast('试卷已保存。');return normalized;
-    }catch(error){if(error?.status===409)await reloadPaperDrafts({selectedId:paper?.id}).catch(()=>{});toast(paperApiMessage(error,'保存试卷失败。'));return null}
+      const stillSelected=generation===paperSelectionGeneration&&selectedId===state.selectedPaperId&&(options.create||String(paper.id)===selectedId);
+      const normalized=replacePaperState(saved,{select:stillSelected});if(stillSelected&&options.formSnapshot)reconcileSavedPaperForm(options.formSnapshot);if(!options.silent)toast('试卷已保存。');return normalized;
+    }catch(error){toast(error?.status===409?'试卷已被更新，当前输入已保留。请复制需要保留的内容后刷新，再重新保存。':paperApiMessage(error,'保存试卷失败。'));return null}
   }
   async function persistPaperQuestions(paper,options={}){
-    try{const saved=await PaperDraftApi.replaceQuestions(paper.id,paperQuestionPayload(paper));const normalized=replacePaperState(saved);if(!options.silent)toast('试卷题目已保存。');return normalized}
-    catch(error){if(error?.status===409)await reloadPaperDrafts({selectedId:paper?.id}).catch(()=>{});toast(paperApiMessage(error,'保存试卷题目失败。'));return null}
+    const generation=paperSelectionGeneration,isCurrent=()=>generation===paperSelectionGeneration&&state.selectedPaperId===String(paper.id);
+    try{const saved=await PaperDraftApi.replaceQuestions(paper.id,paperQuestionPayload(paper));const normalized=replacePaperState(saved,{select:isCurrent()});if(!options.silent)toast('试卷题目已保存。');return normalized}
+    catch(error){if(error?.status===409&&isCurrent())await reloadPaperDrafts({selectedId:paper?.id}).catch(()=>{});toast(paperApiMessage(error,'保存试卷题目失败。'));return null}
   }
   function paperCategoryName(categoryId){
     if(!categoryId)return '未分类';
@@ -1505,11 +1526,11 @@
     if(!PaperDataLoaderFactory?.create){showApiStartupError('试卷管理按需加载服务未加载。');return}
     try{await window.KGTeachingContentApi?.ready?.()}catch(error){showApiStartupError('原则与归纳卡加载失败：'+(error.message||error));return}
     paperDataLoader=PaperDataLoaderFactory.create({paperApi:PaperDraftApi,catalogApi:Catalog,onChange:applyPaperManagementSnapshot});
-    try{await paperDataLoader.initialize({preferredPaperId:state.selectedPaperId})}catch(error){showApiStartupError('试卷管理数据加载失败：'+(error.message||error));return}
+    try{await paperDataLoader.initialize({preferredPaperId:new URLSearchParams(location.search).get('paper')||state.selectedPaperId})}catch(error){showApiStartupError('试卷管理数据加载失败：'+(error.message||error));return}
     const on=(id,event,handler)=>$(id)?.addEventListener(event,handler);
     on('qbAddPaperBtn','click',addPaper);on('qbSavePaperBtn','click',savePaperForm);on('qbBuildPaperBtn','click',buildCurrentPaper);on('qbPublishPaperBtn','click',togglePublishPaper);on('qbWithdrawPaperBtn','click',withdrawCurrentPaper);on('qbArchivePaperBtn','click',archiveCurrentPaper);on('qbUnarchivePaperBtn','click',unarchiveCurrentPaper);on('qbDeletePaperBtn','click',deleteCurrentPaper);on('qbExportPaperBtn','click',exportCurrentPaper);on('qbAutoQuotaBtn','click',autoDistributeQuota);on('qbClearQuotaBtn','click',clearPaperQuota);
     on('qbAddPaperCategoryBtn','click',addPaperCategory);on('qbPaperListSearch','input',event=>applyPaperCatalogFilter({search:String(event.currentTarget.value||'')}));on('qbPaperStatusFilter','change',event=>applyPaperCatalogFilter({status:String(event.currentTarget.value||'ALL')}));on('qbPaperListSelectPage','change',toggleSelectPaperPage);on('qbPaperBulkMoveCategoryBtn','click',moveSelectedPapersToCategory);on('qbPaperBulkArchiveBtn','click',archiveSelectedPapers);on('qbPaperBulkDeleteDraftBtn','click',deleteSelectedPaperDrafts);
-    on('paperSubjectInput','change',async()=>{await savePaperForm({silent:true,skipRender:true});state.paperCandidateBankId='';state.paperCandidatePage=1;state.selectedPaperCandidateKeys=new Set();renderPaperManager();loadPaperCandidatePage().catch(()=>{})});
+    on('paperSubjectInput','change',async()=>{if(!(await savePaperForm({silent:true,skipRender:true})))return;state.paperCandidateBankId='';state.paperCandidatePage=1;state.selectedPaperCandidateKeys=new Set();renderPaperManager();loadPaperCandidatePage().catch(()=>{})});
     on('paperCategoryInput','change',()=>savePaperForm({silent:true}));
     document.querySelectorAll('[data-paper-mode]').forEach(input=>input.addEventListener('change',()=>{if(currentPaper())savePaperForm({silent:true})}));
     document.querySelectorAll('[data-paper-supplement-mode]').forEach(input=>input.addEventListener('change',handlePaperSupplementModeChange));
@@ -3093,14 +3114,52 @@
     window.open(url.href,'_blank','noopener');
   }
 
+  let paperUnsavedGuard=null;
+  const paperDraftSelector='#paperNameInput,#paperSubjectInput,#paperTypeInput,#paperTotalInput,#paperCategoryInput,#paperAccessLevelInput,#paperDescriptionInput,[data-paper-mode],[data-paper-supplement-mode],#qbPaperDomainQuotaList input,#qbPaperPrincipleQuotaList input';
+  function paperDraftInputs(){return Array.from(document.querySelectorAll(paperDraftSelector)).map((input,index)=>{
+    const row=input.closest?.('[data-domain],[data-principle-id]');
+    const id=input.id||(row?.dataset.domain?'domain:'+row.dataset.domain:row?.dataset.principleId?'principle:'+row.dataset.principleId:input.dataset.paperMode?'mode:'+input.dataset.paperMode:input.type==='radio'?'supplement:'+input.value:'field:'+index);
+    return {id,input};
+  })}
+  function readPaperDraft(){return paperDraftInputs().map(({id,input})=>({id,type:input.type,value:input.value,checked:input.checked}))}
+  function reconcileSavedPaperForm(submitted){
+    // Saved derived values (e.g. allocated quotas) must reach the DOM even when
+    // another field was typed during the request. Rebase only those newer edits.
+    const before=new Map(submitted.map(field=>[field.id,field]));
+    const pending=readPaperDraft().filter(field=>JSON.stringify(field)!==JSON.stringify(before.get(field.id)));
+    paperUnsavedGuard?.markClean();
+    fillPaperForm();renderPaperQuotaList();
+    paperUnsavedGuard?.markClean();
+    const inputs=new Map(paperDraftInputs().map(({id,input})=>[id,input]));
+    for(const field of pending){const input=inputs.get(field.id);if(input){input.value=field.value;input.checked=field.checked}}
+    updatePaperSaveState();
+  }
+  function paperDraftDirty(){return !!paperUnsavedGuard?.isDirty()}
+  function updatePaperSaveState(){
+    const title=$('pmCurrentPaperTitle'),status=$('qbPaperSaveState');
+    if(title)title.textContent=currentPaper()?.name||'请选择试卷';
+    if(status)status.textContent=paperDraftDirty()?'有未保存的修改':currentPaper()?'已保存':'请选择试卷';
+  }
+  async function confirmPaperLeave(){return !paperUnsavedGuard||await paperUnsavedGuard.confirmLeave()}
+  function initPaperUnsavedGuard(){
+    if(paperUnsavedGuard||!window.KGUnsavedGuard||!$('paperNameInput'))return;
+    paperUnsavedGuard=window.KGUnsavedGuard.create({read:readPaperDraft,save:()=>savePaperForm(),
+      title:'试卷有尚未保存的修改',message:'保存后再继续，或放弃本次修改。选择继续编辑会留在当前试卷。',
+      discard:()=>{paperUnsavedGuard.markClean();renderPaperManager()},onError:error=>toast(error.message||'保存失败，请重试。')});
+    for(const event of ['input','change'])document.addEventListener(event,event=>{if(event.target.matches?.(paperDraftSelector))updatePaperSaveState()});
+  }
   function renderPaperManager(){
+    const keepDraft=paperDraftDirty();
     renderPaperCategoryList();
     renderPaperList();
     fillPaperForm();
-    renderPaperQuotaList();
+    if(!keepDraft)renderPaperQuotaList();
     renderPaperCandidateList();
     renderPaperQuestionList();
     refreshPaperPreviewAnchor();
+    initPaperUnsavedGuard();
+    if(!keepDraft)paperUnsavedGuard?.markClean();
+    updatePaperSaveState();
   }
   function renderPaperCategoryList(){
     const wrap=$('qbPaperCategoryList'),summary=$('qbPaperCategorySummary');if(!wrap)return;
@@ -3123,16 +3182,19 @@
     if(!rows.length){list.innerHTML='<div class="qb-empty">当前分类或筛选下没有试卷。可新建试卷，或切换到“全部试卷”。</div>';if(pager)pager.hidden=true;return}
     list.innerHTML=pageRows.map((paper,index)=>{const integrity=paperIntegrity(paper),statusLabel=paperStatusLabel(paper),statusKey=paperStatusKey(paper),checked=state.selectedPaperIds.has(paper.id);return `<article class="qb-list-item paper ${paper.id===state.selectedPaperId?'active':''} ${checked?'selected':''}" data-paper-id="${escapeHTML(paper.id)}" tabindex="0"><label class="pm-paper-list-check"><input type="checkbox" data-paper-list-check="${escapeHTML(paper.id)}" ${checked?'checked':''}/><span class="sr-only">选择试卷 ${escapeHTML(paper.name)}</span></label><span class="qb-paper-order">${start+index+1}</span><span class="qb-paper-text"><strong>${escapeHTML(paper.name)}</strong><small>${escapeHTML(paper.subject)} · ${paper.accessPolicy?.accessLevel==='member'?'VIP':'免费'} · ${escapeHTML(paperCategoryName(paper.categoryId))} · 已组 ${integrity.configuredCount}/目标 ${integrity.targetCount} 题</small></span><span class="qb-paper-state ${statusKey}">${escapeHTML(statusLabel)}</span></article>`}).join('');
     list.querySelectorAll('[data-paper-list-check]').forEach(input=>input.addEventListener('change',event=>{event.stopPropagation();const id=String(input.dataset.paperListCheck||'');if(input.checked)state.selectedPaperIds.add(id);else state.selectedPaperIds.delete(id);renderPaperList()}));
-    list.querySelectorAll('[data-paper-id]').forEach(row=>{const select=async()=>{const id=String(row.dataset.paperId||'');if(id===state.selectedPaperId&&state.paperDetailReady)return;closePaperQuestionPreview();state.selectedPaperQuestionKeys=new Set();state.selectedPaperCandidateKeys=new Set();try{if(paperDataLoader)await paperDataLoader.selectPaper(id,{forceReload:!!state.paperDetailError});else{const detail=await PaperDraftApi.detail(id);state.selectedPaperId=id;replacePaperState(detail);renderPaperManager()}state.paperCandidateBankId='';state.paperCandidatePage=1;loadPaperCandidatePage().catch(()=>{})}catch(error){toast(paperApiMessage(error,'试卷详情加载失败，请重试。'))}};row.addEventListener('click',event=>{if(event.target.closest('input,label,button,select,a'))return;select()});row.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();select()}})});
+    list.querySelectorAll('[data-paper-id]').forEach(row=>{const select=async()=>{const id=String(row.dataset.paperId||'');if(id===state.selectedPaperId&&state.paperDetailReady)return;if(!(await confirmPaperLeave()))return;closePaperQuestionPreview();state.selectedPaperQuestionKeys=new Set();state.selectedPaperCandidateKeys=new Set();try{await selectPaperDraft(id,{forceReload:!!state.paperDetailError});state.paperCandidateBankId='';state.paperCandidatePage=1;loadPaperCandidatePage().catch(()=>{})}catch(error){toast(paperApiMessage(error,'试卷详情加载失败，请重试。'))}};row.addEventListener('click',event=>{if(event.target.closest('input,label,button,select,a'))return;select()});row.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();select()}})});
     if(pager){pager.hidden=pages<=1;pager.innerHTML=pages<=1?'':`<button type="button" data-paper-list-page="${state.paperListPage-1}" ${state.paperListPage<=1?'disabled':''}>上一页</button><span>${state.paperListPage} / ${pages} · ${rows.length} 张</span><button type="button" data-paper-list-page="${state.paperListPage+1}" ${state.paperListPage>=pages?'disabled':''}>下一页</button>`;pager.querySelectorAll('[data-paper-list-page]').forEach(btn=>btn.addEventListener('click',()=>{state.paperListPage=Number(btn.dataset.paperListPage||1);state.selectedPaperIds=new Set();renderPaperList()}))}
   }
-  function applyPaperCatalogFilter(next={}){
+  async function applyPaperCatalogFilter(next={}){
+    if(!(await confirmPaperLeave())){renderPaperList();return false}
+    paperSelectionGeneration++;paperReloadCoordinator.cancelPending();
     if(Object.prototype.hasOwnProperty.call(next,'category'))state.paperCategoryFilter=String(next.category||'ALL');
     if(Object.prototype.hasOwnProperty.call(next,'status'))state.paperListStatus=String(next.status||'ALL');
     if(Object.prototype.hasOwnProperty.call(next,'search'))state.paperListSearch=String(next.search||'');
-    const previousId=state.selectedPaperId;state.paperListPage=1;state.selectedPaperIds=new Set();closePaperQuestionPreview();ensureSelectedPaperVisible();renderPaperManager();if(state.selectedPaperId&&state.selectedPaperId!==previousId)paperDataLoader?.selectPaper(state.selectedPaperId).catch(error=>toast(paperApiMessage(error,'试卷详情加载失败，请重试。')));
+    const previousId=state.selectedPaperId;state.paperListPage=1;state.selectedPaperIds=new Set();closePaperQuestionPreview();ensureSelectedPaperVisible();renderPaperManager();if(state.selectedPaperId&&state.selectedPaperId!==previousId)selectPaperDraft(state.selectedPaperId).catch(error=>toast(paperApiMessage(error,'试卷详情加载失败，请重试。')));
   }
   async function addPaperCategory(){
+    if(!(await confirmPaperLeave()))return;
     const name=String(prompt('请输入试卷分类名称：','')||'').trim();if(!name)return;
     try{const category=normalizePaperCategory(await PaperDraftApi.createCategory({name,orderIndex:state.paperCategories.length}));state.paperCategories.push(category);state.paperCategoryFilter=category.id;state.paperListPage=1;state.selectedPaperId='';state.selectedPaperIds=new Set();closePaperQuestionPreview();renderPaperManager();toast(`已创建分类“${name}”。`)}catch(error){toast(paperApiMessage(error,'创建分类失败。'))}
   }
@@ -3148,11 +3210,13 @@
   }
   function toggleSelectPaperPage(event){state.selectedPaperIds=event.currentTarget.checked?new Set(state.currentPaperPageIds):new Set();renderPaperList()}
   async function moveSelectedPapersToCategory(){
+    if(!(await confirmPaperLeave()))return;
     if(!state.selectedPaperIds.size)return;const categoryId=$('qbPaperBulkCategorySelect')?.value||'',categoryName=paperCategoryName(categoryId),selected=state.papers.filter(paper=>state.selectedPaperIds.has(paper.id)),failed=[];
     for(const paper of selected){try{replacePaperState(await PaperDraftApi.update(paper.id,{revision:paper.revision,categoryId:categoryId||null}))}catch(error){failed.push(paper.name)}}
     await reloadPaperDrafts({selectedId:state.selectedPaperId}).catch(()=>{});state.selectedPaperIds=new Set();ensureSelectedPaperVisible();renderPaperManager();toast(failed.length?`已移动 ${selected.length-failed.length} 张，${failed.length} 张失败，请刷新后重试。`:`已将 ${selected.length} 张试卷移动到“${categoryName}”。`)
   }
   async function archiveSelectedPapers(){
+    if(!(await confirmPaperLeave()))return;
     const selected=state.papers.filter(paper=>state.selectedPaperIds.has(paper.id)&&!isPaperArchived(paper));
     if(!selected.length)return toast('选中的试卷均已归档。');
     if(!confirm(`确定归档选中的 ${selected.length} 张试卷吗？
@@ -3164,6 +3228,7 @@
     await reloadPaperDrafts().catch(()=>{});state.selectedPaperIds=new Set();ensureSelectedPaperVisible();renderPaperManager();toast(`已归档 ${archived} 张试卷${failed.length?`，${failed.length} 张失败已跳过`:''}。`);
   }
   async function deleteSelectedPaperDrafts(){
+    if(!(await confirmPaperLeave()))return;
     const selected=state.papers.filter(paper=>state.selectedPaperIds.has(paper.id)),deletable=selected.filter(paper=>paperStatusKey(paper)==='draft'&&!hasPaperReleaseHistory(paper)),protectedCount=selected.length-deletable.length;if(!deletable.length)return toast('选中项中没有可删除的未发布草稿；有发布历史或已归档试卷受到保护。');if(!confirm(`即将删除 ${deletable.length} 张草稿${protectedCount?`，另有 ${protectedCount} 张受保护试卷会跳过`:''}。
 
 只删除试卷配置，不会删除题库原题。`))return;let removed=0;for(const paper of deletable){try{await PaperDraftApi.remove(paper.id,{revision:paper.revision,reason:'bulk_delete_draft'});removed+=1}catch(error){console.warn('删除试卷草稿失败',paper.id,error)}}state.selectedPaperIds=new Set();await reloadPaperDrafts().catch(()=>{});ensureSelectedPaperVisible();renderPaperManager();toast(`已删除 ${removed} 张草稿${removed<deletable.length?`，${deletable.length-removed} 张失败`:''}${protectedCount?`，跳过 ${protectedCount} 张受保护试卷`:''}。`)
@@ -3193,6 +3258,7 @@
     return feedback.shortages.map(item=>`<span class="qb-badge warn">${feedback.mode==='principle'?'原则':'领域'}“${escapeHTML(paperQuotaBucketLabel(feedback.mode,item.bucketId))}”短缺 ${Number(item.missing||0)} 题（目标 ${Number(item.requested||0)}，已满足 ${Number(item.existing||0)+Number(item.added||0)}）</span>`).join('');
   }
   function fillPaperForm(){
+    if(paperDraftDirty())return;
     const paper = currentPaper();
     const subjectSelect = $('paperSubjectInput');
     if(subjectSelect){
@@ -3266,14 +3332,16 @@
     return paper;
   }
   async function savePaperForm(options={}){
+    const formSnapshot=readPaperDraft();
     let paper = currentPaper();
     const isNew=!paper;
     if(!paper) paper=createPaperObject(state.subjectFilter === 'ALL' ? 'PMP' : state.subjectFilter);
     const draft=readPaperFormInto(clone(paper));
     if(!draft)return false;
-    const saved=await persistPaperMetadata(draft,{create:isNew,silent:options.silent});
+    const saved=await persistPaperMetadata(draft,{create:isNew,silent:options.silent,formSnapshot});
     if(saved)state.paperQuotaFeedback=null;
     if(saved&&!options.skipRender) renderPaperManager();
+    updatePaperSaveState();
     return !!saved;
   }
   function createPaperObject(subject='PMP'){
@@ -3296,10 +3364,11 @@
     });
   }
   async function addPaper(){
+    if(!(await confirmPaperLeave()))return;
     const subject = state.subjectFilter === 'ALL' ? (currentBank()?.subject || 'PMP') : state.subjectFilter;
     const paper = createPaperObject(subject);
     state.paperListPage=1;state.selectedPaperIds=new Set();
-    const saved=await persistPaperMetadata(paper,{create:true,silent:true});if(!saved)return null;
+    const saved=await persistPaperMetadata(paper,{create:true,silent:true,formSnapshot:readPaperDraft()});if(!saved)return null;
     if(document.body?.dataset?.paperManagementPage!=='true')handleLayoutNav('papers');
     renderPaperManager();
     toast('已新建试卷。');
@@ -3416,6 +3485,7 @@
   async function autoDistributeQuota(){
     let paper = currentPaper();
     if(!paper){paper=await addPaper();}
+    const formSnapshot=readPaperDraft();
     paper=readPaperFormInto(clone(paper));if(!paper)return;
     try{await loadPaperQuotaCandidates(paper.subject)}catch(error){return toast(`题库题目加载失败：${error.message||error}`)}
     const mode=paper.supplementMode==='principle'?'principle':'domain',wantedType=paper.paperType||'standard';
@@ -3441,24 +3511,24 @@
       if(i > stats.length * 400) break;
     }
     if(mode==='principle')paper.principleQuotas=quotas;else paper.domainQuotas=quotas;state.paperQuotaFeedback=null;
-    if(!(await persistPaperMetadata(paper,{silent:true})))return;
+    if(!(await persistPaperMetadata(paper,{silent:true,formSnapshot})))return;
     renderPaperManager();
     toast(`已按当前可用题量自动分配${mode==='principle'?'原则':'领域'}配额。`);
   }
   async function clearPaperQuota(){
-    const current = currentPaper(),paper=clone(current);
+    const formSnapshot=readPaperDraft(),paper=readPaperFormInto(clone(currentPaper()));
     if(!paper) return;
     if(paper.supplementMode==='principle')paper.principleQuotas={};else paper.domainQuotas={};state.paperQuotaFeedback=null;
-    if(!(await persistPaperMetadata(paper,{silent:true})))return;
+    if(!(await persistPaperMetadata(paper,{silent:true,formSnapshot})))return;
     renderPaperManager();
   }
   async function buildCurrentPaper(){
-    let paper=currentPaper();if(!paper)paper=await addPaper();paper=readPaperFormInto(clone(paper));if(!paper)return false;
+    let paper=currentPaper();if(!paper)paper=await addPaper();const formSnapshot=readPaperDraft();paper=readPaperFormInto(clone(paper));if(!paper)return false;
     try{
       await loadPaperQuotaCandidates(paper.subject);
       const result=supplementPaperDraft(paper,paperCandidates(paper.subject),Math.random);Object.assign(paper,result.paper);
       state.paperQuotaFeedback={paperId:paper.id,mode:paper.supplementMode,shortages:result.shortages};
-      const metadataSaved=await persistPaperMetadata(paper,{silent:true});if(!metadataSaved)return false;paper.revision=metadataSaved.revision;paper.questions=result.paper.questions;const questionsSaved=await persistPaperQuestions(paper,{silent:true});if(!questionsSaved)return false;renderPaperManager();
+      const metadataSaved=await persistPaperMetadata(paper,{silent:true,formSnapshot});if(!metadataSaved)return false;paper.revision=metadataSaved.revision;paper.questions=result.paper.questions;const questionsSaved=await persistPaperQuestions(paper,{silent:true});if(!questionsSaved)return false;renderPaperManager();
       const added=result.addedQuestionIds.length,missing=result.shortages.reduce((sum,item)=>sum+Number(item.missing||0),0);
       toast(missing?`已补充 ${added} 道题，仍短缺 ${missing} 道；可保存当前试卷后继续调整。`:`已按${paper.supplementMode==='principle'?'原则':'领域'}配额补充 ${added} 道题。`);
       return result;
@@ -3498,6 +3568,7 @@
     setCurrentPaper(null);await reloadPaperDrafts({selectedId:paper.id}).catch(()=>{});renderPaperManager();toast(`已取消发布；历史 v${paper.publishedVersion} 已保留。`);
   }
   async function archiveCurrentPaper(){
+    if(!(await confirmPaperLeave()))return;
     const paper=currentPaper();if(!paper)return;if(isPaperArchived(paper))return toast('当前试卷已经归档。');
     if(!confirm(`确定归档试卷“${paper.name}”吗？
 
@@ -3525,6 +3596,7 @@
     if(await persistPaperQuestions(paper,{silent:true}))renderPaperManager();
   }
   async function deleteCurrentPaper(){
+    if(!(await confirmPaperLeave()))return;
     const paper = currentPaper();
     if(!paper) return;
     if(paperStatusKey(paper)!=='draft'||hasPaperReleaseHistory(paper))return toast('只有从未发布的草稿可以删除；有发布历史或已归档试卷受到保护。');

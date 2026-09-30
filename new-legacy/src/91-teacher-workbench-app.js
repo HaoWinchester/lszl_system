@@ -59,14 +59,20 @@
     setText('wbTrainingCardState',pending?`${pending} 道待配置`:'训练配置已检查');
     setText('wbPaperCardState',activePapers.length?`${activePapers.length} 张试卷`:'创建第一张试卷');
 
-    if(!questions.length){
-      setNext('先录入第一道完整原题','从题干、A/B/C/D 选项、正确答案和解析开始。其他训练内容都可以从这道原题继续配置。','开始录题','question-bank.html?mode=simple&step=questions');
-    }else if(pending){
-      setNext('为原题补充训练配置',`当前有 ${pending} 道题还没有关键词或知识联想入口。完成后即可用于完整版深度回忆。`,'配置训练','question-bank.html?mode=simple&step=training');
+    const latestDraft=paperDrafts.slice().sort((a,b)=>{
+      const stamp=value=>typeof value==='number'?value:(Date.parse(value)||0);
+      return stamp(b.updatedAt)-stamp(a.updatedAt);
+    })[0];
+    if(latestDraft){
+      setNext('继续检查草稿并发布',`最近草稿“${latestDraft.name||latestDraft.title||'未命名试卷'}”。核对题目与学习模式后，即可发布练习。`,'继续这份草稿','paper-management.html?paper='+encodeURIComponent(latestDraft.id));
+    }else if(!questions.length){
+      setNext('先导入或录入题目','上传一份试卷整理题干、选项、答案和解析，也可以手动录题。','上传资料','teacher-assistant.html');
     }else if(!activePapers.length){
-      setNext('创建第一张学习试卷','题目和训练配置已经具备基础条件。下一步从题库选题、调整顺序并发布到做题模式。','创建试卷','paper-management.html');
+      setNext('创建第一张学习试卷','从题库选题、调整顺序并发布练习。普通刷题无需先配置全部深度回忆内容。','创建试卷','paper-management.html');
+    }else if(pending){
+      setNext('准备深度回忆内容',`已有 ${publishedPapers.length} 张发布试卷。若要开放深度回忆，可为 ${pending} 道题补充关键词与知识联想；普通刷题可继续使用。`,'配置深度回忆','question-bank.html?mode=simple&step=training');
     }else{
-      setNext('继续检查试卷并发布',`当前有 ${paperDrafts.length} 张未发布草稿、${publishedPapers.length} 张已发布试卷。可继续选题、调整顺序或发布新版本。`,'打开试卷管理','paper-management.html');
+      setNext('查看发布情况',`当前有 ${publishedPapers.length} 张已发布试卷，可核对学员可见内容或准备下一份练习。`,'打开试卷管理','paper-management.html');
     }
   }
   async function init(){

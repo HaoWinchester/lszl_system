@@ -570,7 +570,10 @@ def catalog_summary(release: PaperRelease, *, user: User | None, entitled: bool)
     return payload
 
 
-async def catalog(db: AsyncSession, user: User | None, *, page: int, page_size: int) -> dict:
+async def catalog(
+    db: AsyncSession, user: User | None, *, page: int, page_size: int,
+    search: str = "", subject: str = "", access: str = "all",
+) -> dict:
     entitled = await entitlement_for_request(db, user) if user else False
     # allowed_roles 为空数组表示不限制角色（与 can_access_with_entitlement 语义一致）
     role_filter = or_(
@@ -581,6 +584,23 @@ async def catalog(db: AsyncSession, user: User | None, *, page: int, page_size: 
     # 发布受众约束学员可见范围，管理员仍须能检查发布内容。
     if user is None or user.role != "admin":
         base = base.where(role_filter)
+    # Facets come from the whole permitted catalog, never the current page or search.
+    subjects = list((await db.execute(
+        base.with_only_columns(PaperRelease.subject).distinct().order_by(PaperRelease.subject)
+    )).scalars().all())
+    if search.strip():
+        needle = search.strip()
+        base = base.where(or_(
+            PaperRelease.name.icontains(needle, autoescape=True),
+            PaperRelease.description.icontains(needle, autoescape=True),
+            PaperRelease.subject.icontains(needle, autoescape=True),
+        ))
+    if subject.strip():
+        base = base.where(PaperRelease.subject == subject.strip())
+    if access == "member":
+        base = base.where(PaperRelease.access_level.in_(MEMBER_ACCESS_LEVELS))
+    elif access == "free":
+        base = base.where(PaperRelease.access_level.not_in(MEMBER_ACCESS_LEVELS))
     total = int(await db.scalar(select(func.count()).select_from(base.subquery())) or 0)
     releases = (await db.execute(
         base.order_by(PaperRelease.published_at.desc(), PaperRelease.id)
@@ -592,6 +612,7 @@ async def catalog(db: AsyncSession, user: User | None, *, page: int, page_size: 
             {**catalog_summary(item, user=user, entitled=entitled), "coverage": coverage.get(item.id)}
             for item in releases
         ],
+        "subjects": subjects,
         "page": page,
         "pageSize": page_size,
         "total": total,

@@ -34,3 +34,5 @@
 .write-error-action { display: flex; align-items: center; justify-content: center; }
 
 .reading-surface { margin-top: 24rpx; padding: 0 24rpx; border-radius: 32rpx; background: var(--surface); }.progress-track { height: 8rpx; border-radius: 8rpx; }.answer-actions { background: var(--surface); border-radius: 28rpx 28rpx 0 0; }.previous, .submit { border-radius: 24rpx; }
+
+.end-session { margin-top: var(--space-5); min-height: var(--touch-min); color: var(--muted); font-size: var(--font-meta); }

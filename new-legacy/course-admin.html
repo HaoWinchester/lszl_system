@@ -15,8 +15,9 @@
 <link rel="stylesheet" href="styles/focus-vega-teacher.css"/>
 <script>if(new URLSearchParams(location.search).get('view')==='papers')location.replace('paper-management.html');</script>
   <link rel="stylesheet" href="styles/close-button.css"/>
+<link rel="stylesheet" href="styles/teacher-daily-workspace.css" />
 </head>
-<body class="teacher-admin-shell" data-admin-context="courses" data-ui-skin="focus-vega">
+<body class="teacher-admin-shell" data-admin-context="courses" data-teacher-daily="true" data-ui-skin="focus-vega">
 <nav class="admin-context-nav" aria-label="管理后台一级导航">
   <a data-admin-nav="overview" href="admin-console.html">总览</a>
   <a data-admin-nav="subjects" href="admin-subjects.html">科目与知识树</a>
@@ -28,6 +29,11 @@
   <a data-admin-nav="operations" href="admin-operations.html">操作记录</a>
   <a data-admin-nav="settings" href="admin-settings.html">系统设置</a>
 </nav>
+  <header class="tw-topbar ca-shell-topbar">
+    <a class="tw-brand" href="teacher-workbench.html"><span class="tw-brand-mark">KG</span><span class="tw-brand-copy"><strong>教师工作台</strong></span></a>
+    <nav class="tw-tabs" aria-label="教师主要工作"></nav>
+    <div class="tw-user"><a href="index.html">返回学员端</a></div>
+  </header>
   <div class="ca-app">
     <section class="tw-commandbar">
       <div class="tw-command-title"><p>COURSES &amp; TASKS</p><h1>课程与任务</h1><span>独立维护课程结构、学习任务与发布内容；不属于教师工作台三步流程。</span></div>
@@ -158,5 +164,6 @@
 <script src="src/admin/48-admin-context-nav.js"></script>
 <script src="src/109-focus-vega-ui-icons.js"></script>
 <script defer src="src/39-global-shortcuts.js"></script>
+<script src="src/teacher/shared/workspace-shell.js"></script>
 </body>
 </html>

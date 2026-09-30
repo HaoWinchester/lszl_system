@@ -146,7 +146,7 @@
       const batch = Array.isArray(payload.releases) ? payload.releases : [];
       rows.push(...batch);
       const total = number(payload.total, rows.length);
-      if (!batch.length || rows.length >= total || page >= 50) break;
+      if (!batch.length || rows.length >= total) break;
       page += 1;
     }
     if (epoch !== catalogEpoch) return state.catalog;

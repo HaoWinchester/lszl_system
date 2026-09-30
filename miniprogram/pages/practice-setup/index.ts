@@ -88,7 +88,7 @@ Page(withAppearance(withAppShare({
     }
     const decision = await showDialog({
       title: '已有未完成练习',
-      content: '继续上次进度，或返回设置。若要重新开始，可在设置页明确放弃上次练习。',
+      content: '继续练习会沿用上次的题目和设置，不应用本页新设置。若要按当前设置重新开始，请返回设置页明确放弃上次练习。',
       confirmText: '继续练习',
       cancelText: '返回设置',
     });

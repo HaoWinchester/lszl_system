@@ -453,3 +453,11 @@ body.practice-mode-page:not([data-practice-view="lobby"]) .practice-exp-fab{disp
 .practice-history-attempt p{margin:6px 0 0;color:var(--practice-muted);font-size:12px;line-height:1.6;overflow-wrap:anywhere}
 .practice-history-attempt .practice-history-actions{flex-shrink:0}
 @media(max-width:600px){.practice-history-attempt{align-items:flex-start;flex-direction:column}.practice-history-group header{align-items:flex-start}.practice-history-group header>button{flex-shrink:0}}
+
+/* Catalog filters remain separate from the selected practice configuration. */
+.practice-catalog-search { display:flex; align-items:flex-end; gap:12px; padding:0 4px 16px; flex-wrap:wrap; }
+.practice-catalog-search label { display:grid; gap:6px; font-size:13px; color:var(--text-secondary,#667085); }
+.practice-catalog-search label:first-child { flex:1; min-width:200px; }
+.practice-catalog-search input,.practice-catalog-search select { min-height:42px; width:100%; box-sizing:border-box; padding:8px 12px; border:1px solid var(--border-color,#d8dfdc); border-radius:10px; background:var(--bg-card,#fff); color:var(--text-primary,#172d25); font:inherit; }
+.practice-catalog-search input:focus-visible,.practice-catalog-search select:focus-visible { outline:2px solid #3b775d; outline-offset:2px; }
+.practice-mode-card .practice-mode-purpose { margin:6px 0; font-weight:600; color:var(--text-primary,#254d3b); }

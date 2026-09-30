@@ -95,9 +95,14 @@ async def release_catalog(
     db: DB,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, alias="pageSize", ge=1, le=200),
+    search: str = Query(default="", max_length=200),
+    subject: str = Query(default="", max_length=32),
+    access: str = Query(default="all", pattern="^(all|free|member)$"),
 ):
     user = await optional_current_user(request, db)
-    return await paper_release_service.catalog(db, user, page=page, page_size=page_size)
+    return await paper_release_service.catalog(
+        db, user, page=page, page_size=page_size, search=search, subject=subject, access=access
+    )
 
 
 @router.get("/management-catalog")

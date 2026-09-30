@@ -400,3 +400,87 @@ test('matching partial pair saves as pending, resumes, and confirms only when co
  assert.deepEqual(page.run.submission().q1.selectedPairs,{l1:'r2',l2:'r1'});
  assert.deepEqual(page.modeRuntimeState().pendingMatches,{});page.stopModeTimer();
 });
+
+for (const mode of ['practice', 'challenge', 'scholar', 'revenge']) {
+  test(`${mode}: exit cancel immediately continues with pending input and no writes`, async () => {
+    const dialogs = [];
+    const { page, navigation } = await practice({ getSession: async () => session(mode) }, {
+      showModal: async options => { dialogs.push(options); return { confirm: false, cancel: true }; },
+    });
+    await page.loadSession();
+    page.onAnswerChange({ detail: { optionId: 'B' } });
+    let writes = 0;
+    page.syncCoordinator.enqueueWrite = async () => { writes++; return session(mode); };
+    await page.onExit();
+    assert.equal(dialogs.length, 1, 'continue must not open an end-session confirmation');
+    assert.equal(dialogs[0].cancelText, '继续做题');
+    assert.equal(dialogs[0].confirmText, '保存退出');
+    assert.deepEqual(page.data.selectedIds, ['B']);
+    assert.equal(page.run.stats().answered, 0);
+    assert.equal(writes, 0);
+    assert.equal(navigation.length, 0);
+    assert.equal(page.confirming, false);
+    assert.equal(page.data.busy, false);
+  });
+}
+
+test('explicit end keeps one confirmation across repeated end and exit taps, then settles once', async () => {
+  const { createDialogController } = await import('../domain/dialog.ts');
+  let view, opens = 0;
+  const dialog = createDialogController(value => { view = value; if (value.visible) opens++; });
+  const { page, navigation } = await practice({ showDialog: options => dialog.open(options) });
+  await page.loadSession();
+  page.onAnswerChange({ detail: { optionId: 'B' } });
+  await page.onNext();
+  const jobs = [];
+  page.syncCoordinator.enqueueWrite = async job => { jobs.push(job); return { ...session(), status: 'abandoned' }; };
+  const cancelled = page.onEnd();
+  await page.onEnd(); await page.onExit();
+  assert.equal(opens, 1);
+  assert.equal(page.confirming, true);
+  dialog.settle(view.id, false); await cancelled;
+  assert.equal(jobs.length, 0); assert.equal(navigation.length, 0);
+  assert.equal(page.confirming, false);
+  const confirmed = page.onEnd();
+  await page.onEnd(); await page.onExit();
+  assert.equal(opens, 2);
+  dialog.settle(view.id, true); await confirmed;
+  assert.equal(jobs.length, 1); assert.equal(jobs[0].action, 'abandon');
+  assert.deepEqual(jobs[0].payload.answers.q1.selectedAnswerIds, ['B']);
+  assert.equal(navigation.length, 1);
+});
+
+test('dismissed explicit end and a pending failed write cannot discard answers', async () => {
+  const { page, navigation } = await practice({ showDialog: async () => ({ dismissed: true }) });
+  await page.loadSession();
+  page.onAnswerChange({ detail: { optionId: 'B' } });
+  await page.onEnd();
+  assert.equal(page.confirming, false);
+  page.syncCoordinator.pendingCount = () => 1;
+  await page.onEnd();
+  assert.match(page.data.writeError, /重试同步/);
+  assert.deepEqual(page.data.selectedIds, ['B']);
+  assert.equal(navigation.length, 0);
+});
+
+test('end failure preserves answers and retries the same queued termination without another confirmation', async () => {
+  let unavailable = true;
+  const requests = [];
+  const { page, navigation } = await practice({ abandonSession: async (_id, input) => {
+    requests.push(input);
+    if (unavailable) throw Object.assign(new Error('网络不可用'), { statusCode: 0 });
+    return { ...session(), revision: 4, status: 'abandoned' };
+  } });
+  page.syncCoordinator = createSyncCoordinator(job => page.executeSyncJob(job));
+  await page.loadSession();
+  page.onAnswerChange({ detail: { optionId: 'B' } });
+  await page.onEnd();
+  assert.equal(page.data.busy, false); assert.equal(navigation.length, 0);
+  assert.deepEqual(page.data.selectedIds, ['B']);
+  unavailable = false;
+  await page.retryWrites();
+  assert.equal(navigation.length, 1);
+  assert.equal(requests.length, 2);
+  assert.equal(requests[0].requestId, requests[1].requestId);
+  assert.deepEqual(requests[1].runtimeState.pendingSelections.q1, ['B']);
+});
