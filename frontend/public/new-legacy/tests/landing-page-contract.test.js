@@ -48,7 +48,7 @@ for (const [key, label, image] of products) {
 assert.equal([...html.matchAll(/data-faq-trigger/g)].length, 4, '首版必须提供四个 FAQ');
 assert.equal([...html.matchAll(/aria-controls="faqAnswer/g)].length, 4, '每个 FAQ 触发器必须关联答案区域');
 assert.match(html, /没有整理过知识图谱，可以直接开始吗/);
-assert.match(html, /幻谱适合哪个阶段的学员/);
+assert.match(html, /本平台适合哪个阶段的学员/);
 assert.match(html, /需要安装软件吗/);
 assert.match(html, /我的学习内容会自动保存吗/);
 

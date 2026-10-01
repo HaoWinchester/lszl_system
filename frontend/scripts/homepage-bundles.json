@@ -37,6 +37,7 @@
       ],
       "styles": [
         "styles/main.css",
+        "styles/custom-cursor.css",
         "styles/global-shortcuts.css",
         "styles/subscription.css",
         "styles/user-center.css",

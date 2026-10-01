@@ -174,11 +174,29 @@
 .q-danmaku-item { top:calc(12% + var(--q-danmaku-lane,0) * 17%); pointer-events:auto; cursor:pointer; box-shadow:0 2px 8px #28375018; font:inherit; font-size:13px; }
 .q-danmaku-item:nth-child(2n) { margin-top:0; }
 .q-danmaku-item:is(:hover,:focus-visible,.is-paused) { animation-play-state:paused; outline:2px solid #8ab4f8; }
-.q-comments-drawer { position:fixed; top:80px; right:16px; bottom:24px; width:min(440px,calc(100vw - 32px)); z-index:240; overflow:auto; background:#f7f9fc; border:1px solid #ccd6e5; border-radius:16px; box-shadow:0 8px 35px #142d4f30; overscroll-behavior:contain; }
+/* 讨论抽屉：桌面端与移动端统一为页面底部弹层（类短视频评论区）。 */
+.q-comments-drawer { position:fixed; left:0; right:0; top:auto; bottom:0; width:auto; max-height:min(560px,72vh); z-index:240; overflow:auto; background:#f7f9fc; border:1px solid #ccd6e5; border-bottom:0; border-radius:18px 18px 0 0; box-shadow:0 -8px 35px #142d4f30; overscroll-behavior:contain; padding-bottom:env(safe-area-inset-bottom); }
 .q-comments-drawer .q-comments { border:0; margin:0; }
 .q-comments-drawer .q-comment { flex-wrap:wrap; }
 .q-comments-drawer .q-comment-actions { flex-wrap:wrap; }
 .q-comments-drawer button { cursor:pointer; }
+/* 标记区「评论」按钮直开时的不可见宿主：只承载折叠条 DOM，不展示。 */
+.q-comments-standalone-host { display:none; }
+
+/* 弹幕互动面板（参考短视频）：深色圆角浮层 + 点赞/回复/不喜欢/更多。 */
+.q-danmaku-pop { position:fixed; z-index:250; width:250px; padding:12px 14px 10px; background:#1f2430; color:#fff; border-radius:16px; box-shadow:0 10px 30px #0b1220aa; pointer-events:auto; }
+.q-danmaku-pop::before { content:''; position:absolute; top:-5px; left:50%; width:12px; height:12px; transform:translateX(-50%) rotate(45deg); background:#1f2430; border-radius:2px; }
+.q-danmaku-pop-text { display:flex; gap:10px; align-items:baseline; justify-content:space-between; margin:0 0 10px; color:#fff; font-size:13px; line-height:1.5; }
+.q-danmaku-pop-like { flex-shrink:0; color:#ff8f4d; font-size:12px; font-weight:700; white-space:nowrap; }
+.q-danmaku-pop-like.is-liked { color:#ff4d2e; }
+.q-danmaku-pop-actions { display:flex; align-items:stretch; justify-content:space-between; gap:4px; }
+.q-danmaku-pop-actions button { flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; padding:4px 2px; border:0; border-radius:10px; background:transparent; color:#cfd6e4; font-size:11px; cursor:pointer; }
+.q-danmaku-pop-actions button:hover { background:#2c3342; color:#fff; }
+.q-danmaku-pop-actions button.is-liked { color:#ff4d2e; }
+.q-danmaku-pop-icon { font-size:15px; line-height:1; font-style:normal; }
+.q-danmaku-pop-extra { display:flex; gap:8px; margin-top:8px; padding-top:8px; border-top:1px solid #39414f; }
+.q-danmaku-pop-extra[hidden] { display:none; }
+.q-danmaku-pop-extra button { flex:1; padding:6px 8px; border:0; border-radius:9px; background:#2c3342; color:#e6ebf5; font-size:12px; cursor:pointer; }
 .q-comment-actions button,.q-comments.is-collapsed>button { border:1px solid #d9e1ed; border-radius:8px; background:white; color:#425776; padding:5px 8px; }
 .q-comment-actions [aria-pressed=true] { background:#eaf2ff; color:#2f6bd8; }
 .q-comment-parent { display:block; color:#75849a; margin-top:6px; }

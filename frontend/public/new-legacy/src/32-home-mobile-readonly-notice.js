@@ -17,7 +17,7 @@
     notice.setAttribute('role','dialog');
     notice.setAttribute('aria-modal','false');
     notice.setAttribute('aria-labelledby','homeMobileReadonlyNoticeTitle');
-    notice.innerHTML='<span class="home-mobile-readonly-icon" aria-hidden="true">⌾</span><div><strong id="homeMobileReadonlyNoticeTitle">移动端查看模式</strong><p>幻谱移动端目前仅支持查看模式，如需编辑请使用 PC 端。</p></div><button type="button" data-home-mobile-readonly-confirm>确定</button>';
+    notice.innerHTML='<span class="home-mobile-readonly-icon" aria-hidden="true">⌾</span><div><strong id="homeMobileReadonlyNoticeTitle">移动端查看模式</strong><p>移动端目前仅支持查看模式，如需编辑请使用 PC 端。</p></div><button type="button" data-home-mobile-readonly-confirm>确定</button>';
     document.body.appendChild(notice);
     requestAnimationFrame(()=>{
       document.body.classList.add('home-mobile-readonly-notice-open');

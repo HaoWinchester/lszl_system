@@ -3,8 +3,12 @@
   "fromVersion": "v9.0-p4.1.266",
   "toVersion": "v9.0-p4.1.266",
   "changes": {
-    "added": [],
-    "changed": [],
+    "added": [
+      "tests/practice-side-nav-comments-browser.py"
+    ],
+    "changed": [
+      "src/28-device-preferences.js"
+    ],
     "removed": []
   },
   "incompatible": []

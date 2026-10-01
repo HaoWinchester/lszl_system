@@ -62,11 +62,19 @@ with sync_playwright() as p:
         page.wait_for_timeout(50)
         assert page.locator('.q-danmaku').count()==0
         page.locator('#panel [data-qc-action="danmaku-toggle"]').click()
+        # 点击弹幕先弹短视频式互动面板，「回复」才展开讨论抽屉并定位到对应留言。
         page.locator('.q-danmaku-item').first.dispatch_event('click')
         assert page.locator('.q-danmaku-item.is-paused').count()==1
-        assert page.locator('.q-comments-drawer').count()==1
+        page.wait_for_selector('[data-danmaku-pop]')
+        assert '短评论' in page.locator('[data-danmaku-pop]').inner_text()
+        page.locator('[data-qc-pop-action="like"]').click()
+        page.wait_for_function("document.querySelector('[data-qc-pop-action=\"like\"]')?.getAttribute('aria-pressed')==='true'")
+        page.locator('[data-qc-pop-action="reply"]').click()
+        page.wait_for_selector('.q-comments-drawer')
+        assert page.locator('[data-qc-reply]').count()==1
         page.locator('[data-qc-action="collapse"]').click()
         assert page.locator('.q-danmaku-item.is-paused').count()==0
+        assert page.locator('[data-danmaku-pop]').count()==0
         page.locator('#panel [data-qc-action="favorites"]').click()
         page.wait_for_selector('.q-comments-drawer [data-qc-action="return"]')
         page.evaluate("KGQuestionComments.teardown(document.querySelector('#panel'));KGQuestionComments.mountPanel({panel:document.querySelector('#panel'),questionId:'q2'})")

@@ -25,7 +25,7 @@ def main() -> None:
         page.on("response", lambda response: failed_responses.append(f"{response.status} {response.url}") if response.status >= 400 else None)
         response = page.goto(f"{BASE}/", wait_until="networkidle")
         assert response and response.status == 200
-        assert page.title() == "幻谱｜PMP 知识图谱学习平台"
+        assert page.title() == "知识图谱备考平台｜刷题 · 错题归纳 · 主动回忆"
         assert "__KG_DIRECT_BOOTSTRAP__" not in page.content()
 
         page.locator('[data-product-tab="workspace"]').click()

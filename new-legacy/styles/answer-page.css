@@ -130,3 +130,21 @@ body.practice-mode-page[data-practice-view="game"] :is(button,a,select,summary):
   body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-explanation-toggle{font-size:var(--ui-text-meta)}
 }
 @media(prefers-reduced-motion:reduce){body.practice-mode-page[data-practice-view="game"] *{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
+
+/* 标记区工具组：标记 / 评论 / 弹幕开关（窄屏允许换行，避免横向溢出） */
+body.practice-mode-page[data-practice-view="game"] .practice-question-meta{flex-wrap:wrap}
+body.practice-mode-page[data-practice-view="game"] .practice-question-tools{display:flex;align-items:center;gap:4px;flex-shrink:0;min-height:40px;flex-wrap:wrap}
+body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-danmaku-toggle[aria-pressed="true"]{color:#235bdf}
+
+/* 左侧导航收起/展开（移动端导航为横向静态条，不提供收起） */
+@media(min-width:601px){
+  body.practice-mode-page[data-practice-view="game"] .practice-side-nav{transition:transform .24s ease}
+  body.practice-mode-page[data-practice-view="game"] .practice-side-toggle{position:absolute;left:136px;top:50%;transform:translateY(-50%);z-index:30;width:24px;height:56px;padding:0;border:1px solid #edf2fb;border-left:0;border-radius:0 10px 10px 0;background:#ffffffd9;color:#5b6b8c;font-size:16px;line-height:1;cursor:pointer;transition:left .24s ease}
+  body.practice-mode-page[data-practice-view="game"] .practice-side-toggle:hover{color:#1f4fd1;background:#f0f4ff}
+  body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-game.practice-side-collapsed{padding-left:28px}
+  body.practice-mode-page[data-practice-view="game"] .practice-side-collapsed .practice-side-nav{transform:translateX(-100%);pointer-events:none;visibility:hidden}
+  body.practice-mode-page[data-practice-view="game"] .practice-side-collapsed .practice-side-toggle{left:4px}
+}
+@media(max-width:600px){
+  body.practice-mode-page .practice-side-toggle{display:none}
+}

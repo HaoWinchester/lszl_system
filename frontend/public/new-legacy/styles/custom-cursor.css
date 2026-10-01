@@ -1,0 +1,8 @@
+/* 特色自定义光标：知识图谱 / 多题归纳 / 深度回忆 三个画布页共用。
+   白底蓝边箭头 + 琥珀色星点；按钮（pointer）与拖拽态（grab/grabbing）等
+   交互反馈仍由各页原有 cursor 规则接管，仅在空白区域显示特色光标。 */
+body.knowledge-graph-page,
+body.question-workspace-page,
+body.knowledge-recall-page{
+  cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 26 26'%3E%3Cpath d='M4 2l15.5 8.9-7.1 1.9-3.1 6.8z' fill='%23ffffff' stroke='%231d4ed8' stroke-width='1.4' stroke-linejoin='round'/%3E%3Cpath d='M20.5 16.5l1.1 2.4 2.4 1.1-2.4 1.1-1.1 2.4-1.1-2.4-2.4-1.1 2.4-1.1z' fill='%23f59e0b'/%3E%3C/svg%3E") 4 2,default;
+}

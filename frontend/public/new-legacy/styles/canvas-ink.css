@@ -29,8 +29,14 @@
 @media(max-width:700px){.knowledge-recall-page .canvas-ink-toolbar,.question-workspace-page .canvas-ink-toolbar{bottom:96px}}
 
 .canvas-ink-toolbar[hidden]{display:none!important}
-.canvas-ink-toolbar.canvas-ink-popover{position:fixed;bottom:auto!important;transform:none;z-index:110}
-.canvas-ink-popover .canvas-ink-options{top:calc(100% + 8px);bottom:auto;left:auto;right:0;transform:none}
+/* Popover mode (trigger button present): always docked at the bottom center of the viewport. */
+.canvas-ink-toolbar.canvas-ink-popover{position:fixed;left:50%;bottom:22px;top:auto;transform:translateX(-50%);z-index:110}
+.knowledge-recall-page .canvas-ink-toolbar.canvas-ink-popover,.question-workspace-page .canvas-ink-toolbar.canvas-ink-popover{bottom:64px}
+.canvas-ink-popover .canvas-ink-options{top:auto;bottom:calc(100% + 8px);left:50%;right:auto;transform:translateX(-50%)}
+@media(max-width:700px){
+  .canvas-ink-toolbar.canvas-ink-popover{bottom:78px}
+  .knowledge-recall-page .canvas-ink-toolbar.canvas-ink-popover,.question-workspace-page .canvas-ink-toolbar.canvas-ink-popover{bottom:96px}
+}
 .canvas-ink-entry-icon{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 
 /* Keep control hit targets and their SVG children clickable while drawing/panning. */

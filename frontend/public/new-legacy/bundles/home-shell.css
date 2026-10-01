@@ -3381,6 +3381,15 @@ g.is-batch-selected .edge-visible{
 .wechat-login-title{display:flex;align-items:center;gap:10px;margin-bottom:12px}.wechat-icon{width:34px;height:34px;border-radius:12px;display:grid;place-items:center;background:#22c55e;color:#fff;font-weight:1000;box-shadow:0 8px 18px rgba(34,197,94,.24)}.wechat-login-title strong{display:block;color:#14532d}.wechat-login-title small{display:block;margin-top:2px;color:#64748b;font-size:12px;line-height:1.4}
 .wechat-login-hint{margin:0 0 10px;color:#64748b;font-size:13px;line-height:1.6}
 #authModal.wechat-login-mode .auth-body>label,#authModal.wechat-login-mode .auth-msg,#authModal.wechat-login-mode .auth-actions,#authModal.wechat-login-mode .auth-note{display:none}
+/* style: styles/custom-cursor.css */
+/* 特色自定义光标：知识图谱 / 多题归纳 / 深度回忆 三个画布页共用。
+   白底蓝边箭头 + 琥珀色星点；按钮（pointer）与拖拽态（grab/grabbing）等
+   交互反馈仍由各页原有 cursor 规则接管，仅在空白区域显示特色光标。 */
+body.knowledge-graph-page,
+body.question-workspace-page,
+body.knowledge-recall-page{
+  cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 26 26'%3E%3Cpath d='M4 2l15.5 8.9-7.1 1.9-3.1 6.8z' fill='%23ffffff' stroke='%231d4ed8' stroke-width='1.4' stroke-linejoin='round'/%3E%3Cpath d='M20.5 16.5l1.1 2.4 2.4 1.1-2.4 1.1-1.1 2.4-1.1-2.4-2.4-1.1 2.4-1.1z' fill='%23f59e0b'/%3E%3C/svg%3E") 4 2,default;
+}
 /* style: styles/global-shortcuts.css */
 /*
  * 全局快捷悬浮栏。
@@ -8210,8 +8219,14 @@ body.qw-selection-toolbar-motion .uc-selection-bounds,.stage.graph-card-dragging
 @media(max-width:700px){.knowledge-recall-page .canvas-ink-toolbar,.question-workspace-page .canvas-ink-toolbar{bottom:96px}}
 
 .canvas-ink-toolbar[hidden]{display:none!important}
-.canvas-ink-toolbar.canvas-ink-popover{position:fixed;bottom:auto!important;transform:none;z-index:110}
-.canvas-ink-popover .canvas-ink-options{top:calc(100% + 8px);bottom:auto;left:auto;right:0;transform:none}
+/* Popover mode (trigger button present): always docked at the bottom center of the viewport. */
+.canvas-ink-toolbar.canvas-ink-popover{position:fixed;left:50%;bottom:22px;top:auto;transform:translateX(-50%);z-index:110}
+.knowledge-recall-page .canvas-ink-toolbar.canvas-ink-popover,.question-workspace-page .canvas-ink-toolbar.canvas-ink-popover{bottom:64px}
+.canvas-ink-popover .canvas-ink-options{top:auto;bottom:calc(100% + 8px);left:50%;right:auto;transform:translateX(-50%)}
+@media(max-width:700px){
+  .canvas-ink-toolbar.canvas-ink-popover{bottom:78px}
+  .knowledge-recall-page .canvas-ink-toolbar.canvas-ink-popover,.question-workspace-page .canvas-ink-toolbar.canvas-ink-popover{bottom:96px}
+}
 .canvas-ink-entry-icon{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 
 /* Keep control hit targets and their SVG children clickable while drawing/panning. */

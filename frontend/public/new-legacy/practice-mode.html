@@ -178,13 +178,14 @@
       </section>
 
       <section class="practice-game" id="practiceGame" hidden aria-live="polite">
-        <nav class="practice-side-nav" aria-label="答题导航">
+        <nav class="practice-side-nav" id="practiceSideNav" aria-label="答题导航">
           <button type="button" class="practice-side-item is-active" data-practice-action="question" aria-label="回到当前题目"><span data-kg-icon="file-text" data-kg-icon-size="28" aria-hidden="true"></span><span>答题</span></button>
           <button type="button" class="practice-side-item" data-practice-action="sheet" aria-controls="practiceAnswerSheetDrawer"><span data-kg-icon="layout-grid" data-kg-icon-size="28" aria-hidden="true"></span><span>答题卡</span></button>
           <button type="button" class="practice-side-item" data-practice-action="marked" aria-controls="practiceAnswerSheetDrawer" title="查看本次练习标记的题目"><span data-kg-icon="star" data-kg-icon-size="28" aria-hidden="true"></span><span>标记</span></button>
           <button type="button" class="practice-side-item practice-exit-btn" id="practiceExitBtn" aria-label="退出本次练习" title="退出本次练习"><span data-kg-icon="log-out" data-kg-icon-size="28" aria-hidden="true"></span><span>退出</span></button>
           <p class="practice-side-note">坚持<br/>是通往优秀<br/>最短的路</p>
         </nav>
+        <button type="button" class="practice-side-toggle" id="practiceSideToggle" aria-expanded="true" aria-controls="practiceSideNav" title="收起导航栏">‹</button>
         <header class="practice-game-topbar">
           <button type="button" class="practice-review-back" id="practiceReviewBackBtn" hidden>← 返回成绩单</button>
           <div class="practice-progress">
@@ -224,7 +225,9 @@
           </aside>
           <div class="practice-answer-panel">
           <div class="practice-question-meta"><span class="practice-question-type" id="practiceQuestionType">单选题</span>
-          <button type="button" class="practice-mark-toggle" id="practiceMarkToggle" aria-pressed="false" hidden>标记本题</button></div>
+          <div class="practice-question-tools"><button type="button" class="practice-mark-toggle" id="practiceMarkToggle" aria-pressed="false" hidden>标记本题</button>
+          <button type="button" class="practice-mark-toggle practice-comment-toggle" id="practiceCommentBtn" hidden>评论</button>
+          <button type="button" class="practice-mark-toggle practice-danmaku-toggle" id="practiceDanmakuToggle" aria-pressed="true" hidden>弹幕开</button></div></div>
           <div class="practice-question-stem" id="practiceQuestionStem"></div>
           <div class="practice-previous-wrong-answer" id="practicePreviousWrongAnswer" hidden></div>
           <div class="practice-options" id="practiceOptions"></div>

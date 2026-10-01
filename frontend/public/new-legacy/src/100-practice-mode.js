@@ -665,6 +665,24 @@
   }
   // 显示答案是会话内状态（runtimeState.showAnswers），不是跨卷全局偏好。
   function showAnswersEnabled(){return state.mode==='practice'&&!state.reviewing&&state.showAnswers===true}
+  function currentPracticeQuestion(){
+    return state.verification?.active?state.verification.question:state.questions[state.index];
+  }
+  function renderPracticeTools(question){
+    const visible=!!(state.active&&question&&!state.reviewing);
+    const comment=$('practiceCommentBtn');
+    if(comment){
+      comment.hidden=!visible;
+      comment.textContent='评论';
+    }
+    const danmaku=$('practiceDanmakuToggle');
+    if(danmaku){
+      const on=global.KGQuestionComments?.danmakuEnabled()!==false;
+      danmaku.hidden=!visible;
+      danmaku.textContent=on?'弹幕开':'弹幕关';
+      danmaku.setAttribute('aria-pressed',on?'true':'false');
+    }
+  }
   function renderQuestionMark(question){
     const button=$('practiceMarkToggle');if(!button)return;
     const marked=!!(question&&state.markedQuestions.has(text(question.id)));
@@ -672,9 +690,10 @@
     button.textContent=marked?'取消标记':'标记本题';
     button.classList.toggle('is-marked',marked);
     button.setAttribute('aria-pressed',marked?'true':'false');
+    renderPracticeTools(question);
   }
   function toggleQuestionMark(){
-    const question=state.verification?.active?state.verification.question:state.questions[state.index];
+    const question=currentPracticeQuestion();
     if(!question||!state.active||state.reviewing)return false;
     const id=text(question.id);
     if(state.markedQuestions.has(id))state.markedQuestions.delete(id);else state.markedQuestions.add(id);
@@ -1477,6 +1496,26 @@
     // 显示答案开关（会话态，随保存落库）；标记按钮只改本地状态与答题卡。
     $('practiceShowAnswers')?.addEventListener('change',event=>{state.showAnswers=event.target.checked===true;renderQuestion()});
     $('practiceMarkToggle')?.addEventListener('click',()=>toggleQuestionMark());
+    // 标记区工具：评论直开底部讨论抽屉；弹幕开关切换本机偏好并同步按钮文案。
+    $('practiceCommentBtn')?.addEventListener('click',()=>{
+      const question=currentPracticeQuestion();
+      if(question&&state.active)global.KGQuestionComments?.openPanel({questionId:text(question.id)});
+    });
+    $('practiceDanmakuToggle')?.addEventListener('click',()=>{
+      const next=!(global.KGQuestionComments?.danmakuEnabled()!==false);
+      global.KGQuestionComments?.setDanmakuEnabled(next);
+      renderPracticeTools(currentPracticeQuestion());
+    });
+    // 左侧导航栏收起/展开：桌面端滑出屏幕左侧，保留展开把手。
+    const sideToggle=$('practiceSideToggle'),sideNav=$('practiceSideNav'),gameShell=$('practiceGame');
+    sideToggle?.addEventListener('click',()=>{
+      if(!gameShell)return;
+      const collapsed=gameShell.classList.toggle('practice-side-collapsed');
+      sideToggle.setAttribute('aria-expanded',String(!collapsed));
+      sideToggle.textContent=collapsed?'»':'‹';
+      sideToggle.title=collapsed?'展开导航栏':'收起导航栏';
+      if(sideNav)sideNav.setAttribute('aria-hidden',collapsed?'true':'false');
+    });
     dom.showPreviousWrong?.addEventListener('change',()=>{
       state.showPreviousWrong=dom.showPreviousWrong.checked;
       renderPreviousWrongAnswer(state.verification?.active?state.verification.question:state.questions[state.index]);
