@@ -85,20 +85,29 @@
     return `<div class="q-danmaku" aria-label="本题弹幕"><div class="q-danmaku-track">${items.map((comment, index) => `<button type="button" class="q-danmaku-item" data-danmaku-comment-id="${escapeHTML(comment.id)}" style="--q-danmaku-lane:${index % 4};--q-danmaku-delay:-${(index * (DANMAKU_DURATION_SECONDS / items.length)).toFixed(2)}s">${escapeHTML(comment.content)}</button>`).join('')}</div></div>`
   }
 
+  function avatarMarkup(author) {
+    const chars = [...text(author).trim() || '访']
+    const initial = (chars[0] || '访').toUpperCase()
+    let hue = 0
+    for (const char of chars) hue = (hue * 31 + char.codePointAt(0)) % 360
+    return `<span class="q-comment-avatar" style="--avatar-hue:${hue}" aria-hidden="true">${escapeHTML(initial)}</span>`
+  }
+
   function commentItemMarkup(comment) {
     return `<li class="q-comment" data-comment-id="${escapeHTML(comment.id)}">
+      ${avatarMarkup(comment.author)}
       <div class="q-comment-main">
         <span class="q-comment-author">${escapeHTML(comment.author)}</span>
         <span class="q-comment-time">${escapeHTML(formatTime(comment.createdAt))}</span>
         ${comment.parentId ? `<small class="q-comment-parent">回复：${escapeHTML(comment.parentContent || "原留言")}</small>` : ''}
         <p class="q-comment-content">${escapeHTML(comment.content)}</p>
-      </div>
-      <div class="q-comment-actions">
-        <button type="button" class="q-comment-like${comment.myLike ? ' is-liked' : ''}" data-qc-action="toggle-like" aria-pressed="${comment.myLike ? 'true' : 'false'}" aria-label="点赞">👍 <span data-qc-like-count>${Number(comment.likeCount) || 0}</span></button>
-        <button type="button" data-qc-action="toggle-favorite" aria-pressed="${!!comment.myFavorite}">${comment.myFavorite ? '已收藏' : '收藏'}</button>
-        <button type="button" data-qc-action="reply">回复</button>
-        ${comment.questionTitle ? `<button type="button" data-qc-action="return">返回题目：${escapeHTML(comment.questionTitle)}</button>` : ''}
-        ${comment.canDelete ? `<button type="button" class="q-comment-delete" data-qc-action="delete" aria-label="删除留言">删除</button>` : ''}
+        <div class="q-comment-actions">
+          <button type="button" data-qc-action="reply">回复</button>
+          <button type="button" data-qc-action="toggle-favorite" aria-pressed="${!!comment.myFavorite}">${comment.myFavorite ? '已收藏' : '收藏'}</button>
+          <button type="button" class="q-comment-like${comment.myLike ? ' is-liked' : ''}" data-qc-action="toggle-like" aria-pressed="${comment.myLike ? 'true' : 'false'}" aria-label="点赞">❤ <span data-qc-like-count>${Number(comment.likeCount) || 0}</span></button>
+          ${comment.questionTitle ? `<button type="button" data-qc-action="return">返回题目：${escapeHTML(comment.questionTitle)}</button>` : ''}
+          ${comment.canDelete ? `<button type="button" class="q-comment-delete" data-qc-action="delete" aria-label="删除留言">删除</button>` : ''}
+        </div>
       </div>
     </li>`
   }
@@ -108,7 +117,7 @@
       return `<div class="q-composer"><button type="button" class="q-composer-login" data-qc-action="login">登录后参与讨论</button></div>`
     }
     return `<div class="q-composer">
-      <textarea class="q-composer-input" rows="2" maxlength="${MAX_CONTENT}" placeholder="说说你对这道题的看法或疑问…"></textarea>
+      <textarea class="q-composer-input" rows="2" maxlength="${MAX_CONTENT}" placeholder="留下你的精彩评论吧"></textarea>
       <div class="q-composer-foot"><span class="q-composer-count" data-qc-count>0/${MAX_CONTENT}</span><button type="button" class="q-composer-send" data-qc-action="send" disabled>发布</button></div>
     </div>`
   }
@@ -138,7 +147,7 @@
     if (state.expanded === false) return collapsedMarkup(state)
     return `<section class="q-comments" data-qc-block aria-label="题目讨论">
 <div class="q-drawer-handle" data-qc-handle aria-label="拖动讨论抽屉"></div>
-      <div class="q-comments-head"><span>${state.favoritesMode ? '我的收藏' : '题目讨论'}</span><span class="q-comments-count" data-qc-total>${shown.length ? `${shown.length} 条` : ''}</span>${state.collapsible ? '<button type="button" class="q-comments-collapse" data-qc-action="collapse">收起</button>' : ''}</div>
+      <div class="q-comments-head"><span class="q-comments-title">${state.favoritesMode ? '我的收藏' : '全部评论'}<i class="q-comments-count" data-qc-total>${shown.length ? `(${shown.length})` : ''}</i></span>${state.collapsible ? '<button type="button" class="q-comments-collapse" data-qc-action="collapse" aria-label="关闭评论面板">✕</button>' : ''}</div>
       ${state.toastMessage ? `<div class="q-comments-toast" data-qc-toast role="status">${escapeHTML(state.toastMessage)}</div>` : ''}
       ${state.error ? `<div class="q-comments-error" role="status">留言加载失败 <button type="button" data-qc-action="retry">重试</button></div>` : ''}
       <ul class="q-comment-list" data-qc-list>${listMarkup(state)}</ul>

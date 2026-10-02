@@ -174,55 +174,67 @@
 .q-danmaku-item { top:calc(12% + var(--q-danmaku-lane,0) * 17%); pointer-events:auto; cursor:pointer; box-shadow:0 2px 8px #28375018; font:inherit; font-size:13px; }
 .q-danmaku-item:nth-child(2n) { margin-top:0; }
 .q-danmaku-item:is(:hover,:focus-visible,.is-paused) { animation-play-state:paused; outline:2px solid #8ab4f8; }
-/* 讨论抽屉：桌面端与移动端统一为页面底部弹层（类短视频评论区）。 */
+/* 讨论抽屉：桌面端为右侧整高深色面板（参考抖音网页版评论区），移动端为底部弹层。 */
 .q-comments-drawer {
-  position:fixed; left:0; right:0; top:auto; bottom:0; width:auto;
-  max-height:min(620px,74vh); z-index:240;
+  position:fixed; left:auto; right:0; top:0; bottom:0; width:min(430px,100vw);
+  z-index:240;
   display:flex; flex-direction:column;
-  background:#fff; border:1px solid #e6ebf5; border-bottom:0;
-  border-radius:22px 22px 0 0;
-  box-shadow:0 -14px 48px #142d4f2e;
+  background:#16181f; color:#e8eaf0;
+  border-left:1px solid #262b38; border-bottom:0; border-radius:0;
+  box-shadow:-16px 0 48px #05070daa;
   overscroll-behavior:contain;
-  padding-bottom:env(safe-area-inset-bottom);
-  animation:q-drawer-rise .26s cubic-bezier(.2,.8,.25,1);
+  animation:q-drawer-slide .24s cubic-bezier(.2,.8,.25,1);
 }
+@keyframes q-drawer-slide { from { transform:translateX(40px); opacity:.35; } to { transform:translateX(0); opacity:1; } }
 @keyframes q-drawer-rise { from { transform:translateY(24px); opacity:.4; } to { transform:translateY(0); opacity:1; } }
 @media(prefers-reduced-motion:reduce){ .q-comments-drawer { animation:none; } }
-.q-comments-drawer .q-drawer-handle { width:44px; height:5px; flex-shrink:0; margin:10px auto 2px; border-radius:8px; background:#d4dce9; touch-action:none; cursor:ns-resize; }
-.q-comments-drawer .q-comments { flex:1; min-height:0; display:flex; flex-direction:column; border:0; margin:0; padding:0 20px; background:#fff; border-radius:0; }
+.q-comments-drawer .q-drawer-handle { display:none; }
+.q-comments-drawer .q-comments { flex:1; min-height:0; display:flex; flex-direction:column; border:0; margin:0; padding:0 18px; background:transparent; border-radius:0; font-size:14px; color:#e8eaf0; }
 .q-comments-drawer .q-comments-head {
   position:sticky; top:0; z-index:2;
-  display:flex; align-items:center; gap:10px;
-  padding:12px 2px 10px; margin:0; background:#fff;
-  border-bottom:1px solid #eef2f8; font-weight:800;
+  display:flex; align-items:center; gap:8px;
+  padding:16px 2px 12px; margin:0; background:#16181f;
+  border-bottom:1px solid #232838; font-weight:400;
 }
-.q-comments-drawer .q-comments-head>span:first-child { font-size:16px; color:#182234; }
-.q-comments-drawer .q-comments-count { flex-shrink:0; padding:2px 10px; border-radius:999px; background:#f1f4fa; color:#7c8aa2; font-size:12px; font-weight:600; }
-.q-comments-drawer .q-comments-collapse { margin-left:auto; padding:6px 16px; border:0; border-radius:999px; background:#f1f4fa; color:#5a6a85; font-size:12px; font-weight:700; cursor:pointer; transition:background .15s ease,color .15s ease; }
-.q-comments-drawer .q-comments-collapse:hover { background:#e6ecf7; color:#1f4fd1; }
-.q-comments-drawer .q-comment-list { flex:1; min-height:120px; overflow:auto; overscroll-behavior:contain; list-style:none; margin:0; padding:2px 2px 12px; scrollbar-width:thin; scrollbar-color:#d8e0ee transparent; }
-.q-comments-drawer .q-comment { align-items:flex-start; gap:12px; padding:13px 2px; border-top:1px solid #f2f5fa; }
-.q-comments-drawer .q-comment-author { font-size:13px; font-weight:750; color:#25324a; }
-.q-comments-drawer .q-comment-time { font-size:11px; color:#98a4b8; }
-.q-comments-drawer .q-comment-content { margin:5px 0 0; font-size:14px; line-height:1.65; color:#2c3850; }
-.q-comments-drawer .q-comment-actions { flex-direction:column; align-items:flex-end; gap:6px; padding-top:2px; }
-.q-comments-drawer .q-comment-actions button { border:0; border-radius:999px; background:#f3f6fb; padding:5px 12px; color:#5d6d88; font-size:12px; cursor:pointer; transition:background .15s ease; white-space:nowrap; }
-.q-comments-drawer .q-comment-actions button:hover { background:#e8eef8; color:#1f4fd1; }
-.q-comments-drawer .q-comment-like.is-liked { background:#ffefe9; color:#e2432b; }
-.q-comments-drawer .q-comment-delete:hover { background:#fdeceb; color:#c13253; }
-.q-comments-drawer .q-comments-empty { padding:26px 0 18px; text-align:center; color:#98a4b8; font-size:13px; }
-.q-comments-drawer .q-composer { flex-shrink:0; margin:0; padding:12px 2px 14px; background:#fff; border-top:1px solid #eef2f8; }
-.q-comments-drawer .q-composer-input { resize:none; min-height:46px; max-height:130px; padding:11px 16px; border:1px solid #dfe6f2; border-radius:16px; background:#f6f8fc; font-size:14px; line-height:1.5; color:#25324a; }
-.q-comments-drawer .q-composer-input:focus { outline:2px solid #9db9ff; outline-offset:1px; background:#fff; border-color:#8ab4f8; }
+.q-comments-drawer .q-comments-head>span:first-child { display:flex; align-items:baseline; gap:6px; font-size:16px; font-weight:700; color:#f0f2f6; }
+.q-comments-drawer .q-comments-count { color:#6d7382; font-size:13px; font-weight:500; font-style:normal; }
+.q-comments-drawer .q-comments-collapse { margin-left:auto; display:grid; place-items:center; width:32px; height:32px; padding:0; border:0; border-radius:50%; background:transparent; color:#8a90a0; font-size:15px; cursor:pointer; transition:background .15s ease,color .15s ease; }
+.q-comments-drawer .q-comments-collapse:hover { background:#232838; color:#fff; }
+.q-comments-drawer .q-comment-list { flex:1; min-height:0; overflow:auto; overscroll-behavior:contain; list-style:none; margin:0; padding:4px 2px 14px; scrollbar-width:thin; scrollbar-color:#2c3140 transparent; }
+.q-comments-drawer .q-comment { align-items:flex-start; gap:10px; padding:12px 2px; border-top:0; }
+.q-comments-drawer .q-comment-author { font-size:12.5px; font-weight:500; color:#8a91a2; }
+.q-comments-drawer .q-comment-time { font-size:11px; color:#5d6373; }
+.q-comments-drawer .q-comment-content { margin:4px 0 0; font-size:14px; line-height:1.65; color:#eef0f5; }
+.q-comments-drawer .q-comment-actions { flex-direction:row; flex-wrap:wrap; align-items:center; gap:16px; padding:7px 0 2px; }
+.q-comments-drawer .q-comment-actions button { border:0; border-radius:0; background:transparent; padding:0; color:#78808f; font-size:12px; cursor:pointer; transition:color .15s ease; white-space:nowrap; }
+.q-comments-drawer .q-comment-actions button:hover { background:transparent; color:#e8eaf0; }
+.q-comments-drawer .q-comment-like.is-liked { background:transparent; color:#ff4d6a; }
+.q-comments-drawer .q-comment-delete:hover { background:transparent; color:#ff6b6b; }
+.q-comments-drawer .q-comments-empty { padding:32px 0 22px; text-align:center; color:#6d7382; font-size:13px; }
+.q-comments-drawer .q-comments-error { margin:10px 0; color:#e0a15e; font-size:12px; }
+.q-comments-drawer .q-comments-error button { border:0; background:none; color:#6ea8ff; text-decoration:underline; }
+.q-comments-drawer [data-qc-action="more"] { display:block; width:100%; margin:2px 0 10px; padding:9px; border:0; border-radius:10px; background:#1f2330; color:#9fb4d8; font-size:12.5px; cursor:pointer; }
+.q-comments-drawer [data-qc-action="more"]:hover { background:#262b3a; color:#c8d6ef; }
+.q-comments-drawer [data-qc-reply] { margin:8px 0 0; padding:8px 12px; border-radius:10px; background:#1f2330; color:#aeb6c6; font-size:12px; }
+.q-comments-drawer [data-qc-reply] button { border:0; background:transparent; color:#6ea8ff; cursor:pointer; }
+.q-comments-drawer .q-comments-toast { margin:8px 0; padding:7px 12px; background:#2a2415; border:1px solid #4a3d1c; border-radius:8px; color:#ffd9a0; font-size:12px; }
+.q-comments-drawer .q-comment-thread { margin-left:44px; border-left:2px solid #232838; padding-left:12px; }
+.q-comments-drawer .q-comment-thread>button,
+.q-comments-drawer [data-qc-action="toggle-replies"] { display:inline-flex; align-items:center; gap:5px; margin:4px 0 8px; padding:0; border:0; background:transparent; color:#6d7382; font-size:12px; cursor:pointer; }
+.q-comments-drawer [data-qc-action="toggle-replies"]:hover { color:#aeb6c6; }
+.q-comments-drawer .q-composer { flex-shrink:0; margin:0; padding:12px 2px calc(14px + env(safe-area-inset-bottom)); background:#16181f; border-top:1px solid #232838; }
+.q-comments-drawer .q-composer-input { resize:none; min-height:46px; max-height:130px; padding:11px 14px; border:1px solid transparent; border-radius:12px; background:#222633; font-size:14px; line-height:1.5; color:#eef0f5; }
+.q-comments-drawer .q-composer-input::placeholder { color:#5d6373; }
+.q-comments-drawer .q-composer-input:focus { outline:none; background:#262b3a; border-color:#39415a; }
 .q-comments-drawer .q-composer-foot { margin-top:8px; }
-.q-comments-drawer .q-composer-send { padding:8px 22px; border:0; border-radius:999px; background:linear-gradient(135deg,#4879ff,#5850ff); color:#fff; font-size:13px; font-weight:750; cursor:pointer; box-shadow:0 6px 16px #3769ff33; transition:filter .15s ease; }
-.q-comments-drawer .q-composer-send:hover:not(:disabled) { filter:brightness(1.06); }
-.q-comments-drawer .q-composer-send:disabled { background:#c6d2e4; box-shadow:none; cursor:not-allowed; }
-.q-comments-drawer .q-composer-login { padding:12px; border:1px dashed #b9c4d6; border-radius:14px; background:#f8fafd; color:#4a5b83; font-size:13px; cursor:pointer; }
-.q-comments-drawer .q-composer-login:hover { background:#eef3fb; }
-.q-comments-drawer .q-comments-error { margin:10px 0; }
-.q-comments-drawer [data-qc-reply] { margin:8px 0; padding:8px 12px; border-radius:10px; background:#f1f4fa; color:#425776; font-size:12px; }
-.q-comments-drawer .q-comments-toast { margin:8px 0; }
+.q-comments-drawer .q-composer-count { color:#5d6373; font-size:11px; }
+.q-comments-drawer .q-composer-send { padding:8px 22px; border:0; border-radius:999px; background:linear-gradient(135deg,#4879ff,#5850ff); color:#fff; font-size:13px; font-weight:700; cursor:pointer; transition:filter .15s ease; }
+.q-comments-drawer .q-composer-send:hover:not(:disabled) { filter:brightness(1.08); }
+.q-comments-drawer .q-composer-send:disabled { background:#262b3a; color:#5d6373; cursor:not-allowed; }
+.q-comments-drawer .q-composer-login { padding:12px; border:1px dashed #333a4c; border-radius:12px; background:#1f2330; color:#aeb6c6; font-size:13px; cursor:pointer; }
+.q-comments-drawer .q-composer-login:hover { background:#262b3a; }
+/* 评论头像：取昵称首字符 + 由昵称决定的色相 */
+.q-comment-avatar { display:grid; place-items:center; width:34px; height:34px; flex-shrink:0; border-radius:50%; background:hsl(var(--avatar-hue,210) 42% 44%); color:#fff; font-size:14px; font-weight:700; user-select:none; }
 /* 标记区「评论」按钮直开时的不可见宿主：只承载折叠条 DOM，不展示。 */
 .q-comments-standalone-host { display:none; }
 
@@ -247,9 +259,10 @@
 .q-comments-toggle { flex:1; min-width:140px; }
 .q-drawer-handle { width:48px; height:5px; margin:0 auto 12px; border-radius:8px; background:#9eacbf; touch-action:none; cursor:ns-resize; }
 @media(max-width:700px) {
-  .q-comments-drawer { top:auto; left:0; right:0; bottom:0; width:auto; height:55vh; max-height:85vh; border-radius:22px 22px 0 0; padding-bottom:env(safe-area-inset-bottom); }
+  .q-comments-drawer { left:0; right:0; top:auto; bottom:0; width:auto; height:62vh; max-height:88vh; border-left:0; border-radius:18px 18px 0 0; box-shadow:0 -14px 48px #05070daa; padding-bottom:env(safe-area-inset-bottom); animation:q-drawer-rise .24s cubic-bezier(.2,.8,.25,1); }
+  .q-comments-drawer .q-drawer-handle { display:block; width:44px; height:5px; flex-shrink:0; margin:10px auto 2px; border-radius:8px; background:#333a4c; touch-action:none; cursor:ns-resize; }
   .q-danmaku { inset:64px 0 175px; }
-  .q-comment-actions button { min-height:36px; }
+  .q-comment-actions button { min-height:32px; }
 }
 @media(prefers-reduced-motion:reduce) {
   .q-danmaku { height:auto; max-height:25vh; inset:80px 12px auto; overflow:auto; padding:0; }

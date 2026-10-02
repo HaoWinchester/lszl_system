@@ -3382,32 +3382,23 @@ g.is-batch-selected .edge-visible{
 .wechat-login-hint{margin:0 0 10px;color:#64748b;font-size:13px;line-height:1.6}
 #authModal.wechat-login-mode .auth-body>label,#authModal.wechat-login-mode .auth-msg,#authModal.wechat-login-mode .auth-actions,#authModal.wechat-login-mode .auth-note{display:none}
 /* style: styles/custom-cursor.css */
-/* 特色自定义光标：知识图谱 / 多题归纳 / 深度回忆 三个画布页共用。
-   白底蓝边箭头 + 琥珀色星点。
-   注意：画布容器（.stage/.qw-viewport/.kr-viewport）铺满整个视口且自带
-   cursor:grab/default，会盖住 body 级光标——所以这里必须提到容器层；
-   拖拽/平移等交互态在其后显式恢复，保证操作反馈不被吃掉。 */
-body.knowledge-graph-page,
-body.question-workspace-page,
-body.knowledge-recall-page{
+/* 特色自定义光标：知识图谱 / 多题归纳 / 深度回忆 三页全局生效。
+   采用「body 定义 + 后代全部 inherit」的继承链方案：页面里任何自带
+   cursor 的容器（.stage/.qw-viewport/.kr-viewport/节点卡片等）都会被
+   统一成特色光标，避免逐个元素打补丁漏掉。交互惯例在链后显式恢复：
+   按钮链接 pointer、文本输入 text、平移拖拽 grabbing、缩放手柄保留。 */
+:is(body.knowledge-graph-page,body.question-workspace-page,body.knowledge-recall-page){
   --kg-cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 26 26'%3E%3Cpath d='M4 2l15.5 8.9-7.1 1.9-3.1 6.8z' fill='%23ffffff' stroke='%231d4ed8' stroke-width='1.4' stroke-linejoin='round'/%3E%3Cpath d='M20.5 16.5l1.1 2.4 2.4 1.1-2.4 1.1-1.1 2.4-1.1-2.4-2.4-1.1 2.4-1.1z' fill='%23f59e0b'/%3E%3C/svg%3E") 4 2;
   cursor:var(--kg-cursor),default;
 }
-/* 知识图谱：画布区域与知识卡片 */
-body.knowledge-graph-page .stage{cursor:var(--kg-cursor),grab}
-body.knowledge-graph-page .stage.panning{cursor:grabbing}
-body.knowledge-graph-page .knowledge-card{cursor:var(--kg-cursor),grab}
-body.knowledge-graph-page .knowledge-card.dragging{cursor:grabbing}
-body.knowledge-graph-page .edge-hit{cursor:pointer}
-/* 多题归纳：画布视口（平移/拖拽态保持原有 grab/grabbing） */
-body.question-workspace-page .qw-viewport{cursor:var(--kg-cursor),default}
-body.question-workspace-page .qw-viewport.pointer-pan-mode,
-body.question-workspace-page .qw-viewport.pointer-temp-pan-mode{cursor:grab}
-body.question-workspace-page .qw-viewport.is-panning{cursor:grabbing}
-/* 深度回忆：回忆画布视口与节点 */
-body.knowledge-recall-page .kr-viewport{cursor:var(--kg-cursor),grab}
-body.knowledge-recall-page .kr-viewport.dragging{cursor:grabbing}
-body.knowledge-recall-page .kr-node{cursor:var(--kg-cursor),grab}
+:is(body.knowledge-graph-page,body.question-workspace-page,body.knowledge-recall-page) *{cursor:inherit}
+/* 恢复交互惯例（后写覆盖同优先级的继承） */
+:is(body.knowledge-graph-page,body.question-workspace-page,body.knowledge-recall-page) :is(button,a,[role="button"],summary,label,select,input[type="range"],input[type="color"],input[type="checkbox"],input[type="radio"]){cursor:pointer}
+:is(body.knowledge-graph-page,body.question-workspace-page,body.knowledge-recall-page) :is(input:not([type]),input[type="text"],input[type="search"],input[type="number"],input[type="password"],input[type="email"],textarea){cursor:text}
+:is(body.knowledge-graph-page,body.question-workspace-page,body.knowledge-recall-page) :disabled{cursor:not-allowed}
+/* 平移/拖拽进行中的系统反馈优先于特色光标 */
+:is(body.knowledge-graph-page,body.question-workspace-page,body.knowledge-recall-page) :is(.panning,.is-panning,.dragging,.canvas-ink-panning){cursor:grabbing!important}
+/* 绘画模式维持十字线（canvas-ink.css 自带 !important，双保险） */
 /* style: styles/global-shortcuts.css */
 /*
  * 全局快捷悬浮栏。
