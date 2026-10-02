@@ -1,13 +1,19 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.266",
-  "toVersion": "v9.0-p4.1.266",
+  "fromVersion": "v9.0-p4.1.267",
+  "toVersion": "v9.0-p4.1.268",
   "changes": {
-    "added": [
-      "tests/practice-side-nav-comments-browser.py"
-    ],
+    "added": [],
     "changed": [
-      "src/28-device-preferences.js"
+      "VERSION",
+      "assets/icons/lucide-learning.svg",
+      "practice-mode.html",
+      "src/100-practice-mode.js",
+      "src/107-learning-ui-icons.js",
+      "styles/answer-page.css",
+      "styles/canvas-ink.css",
+      "styles/custom-cursor.css",
+      "styles/question-comments.css"
     ],
     "removed": []
   },

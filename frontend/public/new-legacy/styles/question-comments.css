@@ -175,11 +175,54 @@
 .q-danmaku-item:nth-child(2n) { margin-top:0; }
 .q-danmaku-item:is(:hover,:focus-visible,.is-paused) { animation-play-state:paused; outline:2px solid #8ab4f8; }
 /* 讨论抽屉：桌面端与移动端统一为页面底部弹层（类短视频评论区）。 */
-.q-comments-drawer { position:fixed; left:0; right:0; top:auto; bottom:0; width:auto; max-height:min(560px,72vh); z-index:240; overflow:auto; background:#f7f9fc; border:1px solid #ccd6e5; border-bottom:0; border-radius:18px 18px 0 0; box-shadow:0 -8px 35px #142d4f30; overscroll-behavior:contain; padding-bottom:env(safe-area-inset-bottom); }
-.q-comments-drawer .q-comments { border:0; margin:0; }
-.q-comments-drawer .q-comment { flex-wrap:wrap; }
-.q-comments-drawer .q-comment-actions { flex-wrap:wrap; }
-.q-comments-drawer button { cursor:pointer; }
+.q-comments-drawer {
+  position:fixed; left:0; right:0; top:auto; bottom:0; width:auto;
+  max-height:min(620px,74vh); z-index:240;
+  display:flex; flex-direction:column;
+  background:#fff; border:1px solid #e6ebf5; border-bottom:0;
+  border-radius:22px 22px 0 0;
+  box-shadow:0 -14px 48px #142d4f2e;
+  overscroll-behavior:contain;
+  padding-bottom:env(safe-area-inset-bottom);
+  animation:q-drawer-rise .26s cubic-bezier(.2,.8,.25,1);
+}
+@keyframes q-drawer-rise { from { transform:translateY(24px); opacity:.4; } to { transform:translateY(0); opacity:1; } }
+@media(prefers-reduced-motion:reduce){ .q-comments-drawer { animation:none; } }
+.q-comments-drawer .q-drawer-handle { width:44px; height:5px; flex-shrink:0; margin:10px auto 2px; border-radius:8px; background:#d4dce9; touch-action:none; cursor:ns-resize; }
+.q-comments-drawer .q-comments { flex:1; min-height:0; display:flex; flex-direction:column; border:0; margin:0; padding:0 20px; background:#fff; border-radius:0; }
+.q-comments-drawer .q-comments-head {
+  position:sticky; top:0; z-index:2;
+  display:flex; align-items:center; gap:10px;
+  padding:12px 2px 10px; margin:0; background:#fff;
+  border-bottom:1px solid #eef2f8; font-weight:800;
+}
+.q-comments-drawer .q-comments-head>span:first-child { font-size:16px; color:#182234; }
+.q-comments-drawer .q-comments-count { flex-shrink:0; padding:2px 10px; border-radius:999px; background:#f1f4fa; color:#7c8aa2; font-size:12px; font-weight:600; }
+.q-comments-drawer .q-comments-collapse { margin-left:auto; padding:6px 16px; border:0; border-radius:999px; background:#f1f4fa; color:#5a6a85; font-size:12px; font-weight:700; cursor:pointer; transition:background .15s ease,color .15s ease; }
+.q-comments-drawer .q-comments-collapse:hover { background:#e6ecf7; color:#1f4fd1; }
+.q-comments-drawer .q-comment-list { flex:1; min-height:120px; overflow:auto; overscroll-behavior:contain; list-style:none; margin:0; padding:2px 2px 12px; scrollbar-width:thin; scrollbar-color:#d8e0ee transparent; }
+.q-comments-drawer .q-comment { align-items:flex-start; gap:12px; padding:13px 2px; border-top:1px solid #f2f5fa; }
+.q-comments-drawer .q-comment-author { font-size:13px; font-weight:750; color:#25324a; }
+.q-comments-drawer .q-comment-time { font-size:11px; color:#98a4b8; }
+.q-comments-drawer .q-comment-content { margin:5px 0 0; font-size:14px; line-height:1.65; color:#2c3850; }
+.q-comments-drawer .q-comment-actions { flex-direction:column; align-items:flex-end; gap:6px; padding-top:2px; }
+.q-comments-drawer .q-comment-actions button { border:0; border-radius:999px; background:#f3f6fb; padding:5px 12px; color:#5d6d88; font-size:12px; cursor:pointer; transition:background .15s ease; white-space:nowrap; }
+.q-comments-drawer .q-comment-actions button:hover { background:#e8eef8; color:#1f4fd1; }
+.q-comments-drawer .q-comment-like.is-liked { background:#ffefe9; color:#e2432b; }
+.q-comments-drawer .q-comment-delete:hover { background:#fdeceb; color:#c13253; }
+.q-comments-drawer .q-comments-empty { padding:26px 0 18px; text-align:center; color:#98a4b8; font-size:13px; }
+.q-comments-drawer .q-composer { flex-shrink:0; margin:0; padding:12px 2px 14px; background:#fff; border-top:1px solid #eef2f8; }
+.q-comments-drawer .q-composer-input { resize:none; min-height:46px; max-height:130px; padding:11px 16px; border:1px solid #dfe6f2; border-radius:16px; background:#f6f8fc; font-size:14px; line-height:1.5; color:#25324a; }
+.q-comments-drawer .q-composer-input:focus { outline:2px solid #9db9ff; outline-offset:1px; background:#fff; border-color:#8ab4f8; }
+.q-comments-drawer .q-composer-foot { margin-top:8px; }
+.q-comments-drawer .q-composer-send { padding:8px 22px; border:0; border-radius:999px; background:linear-gradient(135deg,#4879ff,#5850ff); color:#fff; font-size:13px; font-weight:750; cursor:pointer; box-shadow:0 6px 16px #3769ff33; transition:filter .15s ease; }
+.q-comments-drawer .q-composer-send:hover:not(:disabled) { filter:brightness(1.06); }
+.q-comments-drawer .q-composer-send:disabled { background:#c6d2e4; box-shadow:none; cursor:not-allowed; }
+.q-comments-drawer .q-composer-login { padding:12px; border:1px dashed #b9c4d6; border-radius:14px; background:#f8fafd; color:#4a5b83; font-size:13px; cursor:pointer; }
+.q-comments-drawer .q-composer-login:hover { background:#eef3fb; }
+.q-comments-drawer .q-comments-error { margin:10px 0; }
+.q-comments-drawer [data-qc-reply] { margin:8px 0; padding:8px 12px; border-radius:10px; background:#f1f4fa; color:#425776; font-size:12px; }
+.q-comments-drawer .q-comments-toast { margin:8px 0; }
 /* 标记区「评论」按钮直开时的不可见宿主：只承载折叠条 DOM，不展示。 */
 .q-comments-standalone-host { display:none; }
 
@@ -204,7 +247,7 @@
 .q-comments-toggle { flex:1; min-width:140px; }
 .q-drawer-handle { width:48px; height:5px; margin:0 auto 12px; border-radius:8px; background:#9eacbf; touch-action:none; cursor:ns-resize; }
 @media(max-width:700px) {
-  .q-comments-drawer { top:auto; left:0; right:0; bottom:0; width:auto; height:55vh; max-height:85vh; border-radius:18px 18px 0 0; padding-bottom:env(safe-area-inset-bottom); }
+  .q-comments-drawer { top:auto; left:0; right:0; bottom:0; width:auto; height:55vh; max-height:85vh; border-radius:22px 22px 0 0; padding-bottom:env(safe-area-inset-bottom); }
   .q-danmaku { inset:64px 0 175px; }
   .q-comment-actions button { min-height:36px; }
 }

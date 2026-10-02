@@ -5,6 +5,8 @@
 .canvas-ink-toolbar{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);z-index:65;color:#1e293b;background:rgba(255,255,255,.98);border:1px solid #dbe2ea;border-radius:14px;padding:6px;box-shadow:0 5px 22px #0f172a17;font:13px/1.4 system-ui,sans-serif;cursor:default!important}
 .canvas-ink-toolbar *{box-sizing:border-box;cursor:auto!important}
 .canvas-ink-tools{display:flex;align-items:center;gap:4px}
+/* 选择工具保留在内部状态（Esc 退出绘画），不在工具条中展示 */
+.canvas-ink-toolbar button[data-ink-tool="select"]{display:none}
 .canvas-ink-toolbar button{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;min-width:0;padding:7px;border:0;border-radius:8px;background:transparent;color:inherit;font:20px/1 system-ui;cursor:pointer!important;box-shadow:none}
 .canvas-ink-toolbar button:hover{background:#f1f5f9}
 .canvas-ink-toolbar button[aria-pressed=true]{background:#e8efff;color:#1d4ed8;box-shadow:inset 0 0 0 1px #b8ccff}

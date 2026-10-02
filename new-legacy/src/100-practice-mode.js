@@ -671,15 +671,13 @@
   function renderPracticeTools(question){
     const visible=!!(state.active&&question&&!state.reviewing);
     const comment=$('practiceCommentBtn');
-    if(comment){
-      comment.hidden=!visible;
-      comment.textContent='评论';
-    }
+    if(comment)comment.hidden=!visible;
     const danmaku=$('practiceDanmakuToggle');
     if(danmaku){
       const on=global.KGQuestionComments?.danmakuEnabled()!==false;
       danmaku.hidden=!visible;
-      danmaku.textContent=on?'弹幕开':'弹幕关';
+      const label=danmaku.querySelector('[data-practice-danmaku-label]');
+      if(label)label.textContent=on?'弹幕开':'弹幕关';
       danmaku.setAttribute('aria-pressed',on?'true':'false');
     }
   }

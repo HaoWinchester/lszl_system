@@ -3383,13 +3383,31 @@ g.is-batch-selected .edge-visible{
 #authModal.wechat-login-mode .auth-body>label,#authModal.wechat-login-mode .auth-msg,#authModal.wechat-login-mode .auth-actions,#authModal.wechat-login-mode .auth-note{display:none}
 /* style: styles/custom-cursor.css */
 /* 特色自定义光标：知识图谱 / 多题归纳 / 深度回忆 三个画布页共用。
-   白底蓝边箭头 + 琥珀色星点；按钮（pointer）与拖拽态（grab/grabbing）等
-   交互反馈仍由各页原有 cursor 规则接管，仅在空白区域显示特色光标。 */
+   白底蓝边箭头 + 琥珀色星点。
+   注意：画布容器（.stage/.qw-viewport/.kr-viewport）铺满整个视口且自带
+   cursor:grab/default，会盖住 body 级光标——所以这里必须提到容器层；
+   拖拽/平移等交互态在其后显式恢复，保证操作反馈不被吃掉。 */
 body.knowledge-graph-page,
 body.question-workspace-page,
 body.knowledge-recall-page{
-  cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 26 26'%3E%3Cpath d='M4 2l15.5 8.9-7.1 1.9-3.1 6.8z' fill='%23ffffff' stroke='%231d4ed8' stroke-width='1.4' stroke-linejoin='round'/%3E%3Cpath d='M20.5 16.5l1.1 2.4 2.4 1.1-2.4 1.1-1.1 2.4-1.1-2.4-2.4-1.1 2.4-1.1z' fill='%23f59e0b'/%3E%3C/svg%3E") 4 2,default;
+  --kg-cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 26 26'%3E%3Cpath d='M4 2l15.5 8.9-7.1 1.9-3.1 6.8z' fill='%23ffffff' stroke='%231d4ed8' stroke-width='1.4' stroke-linejoin='round'/%3E%3Cpath d='M20.5 16.5l1.1 2.4 2.4 1.1-2.4 1.1-1.1 2.4-1.1-2.4-2.4-1.1 2.4-1.1z' fill='%23f59e0b'/%3E%3C/svg%3E") 4 2;
+  cursor:var(--kg-cursor),default;
 }
+/* 知识图谱：画布区域与知识卡片 */
+body.knowledge-graph-page .stage{cursor:var(--kg-cursor),grab}
+body.knowledge-graph-page .stage.panning{cursor:grabbing}
+body.knowledge-graph-page .knowledge-card{cursor:var(--kg-cursor),grab}
+body.knowledge-graph-page .knowledge-card.dragging{cursor:grabbing}
+body.knowledge-graph-page .edge-hit{cursor:pointer}
+/* 多题归纳：画布视口（平移/拖拽态保持原有 grab/grabbing） */
+body.question-workspace-page .qw-viewport{cursor:var(--kg-cursor),default}
+body.question-workspace-page .qw-viewport.pointer-pan-mode,
+body.question-workspace-page .qw-viewport.pointer-temp-pan-mode{cursor:grab}
+body.question-workspace-page .qw-viewport.is-panning{cursor:grabbing}
+/* 深度回忆：回忆画布视口与节点 */
+body.knowledge-recall-page .kr-viewport{cursor:var(--kg-cursor),grab}
+body.knowledge-recall-page .kr-viewport.dragging{cursor:grabbing}
+body.knowledge-recall-page .kr-node{cursor:var(--kg-cursor),grab}
 /* style: styles/global-shortcuts.css */
 /*
  * 全局快捷悬浮栏。
@@ -8195,6 +8213,8 @@ body.qw-selection-toolbar-motion .uc-selection-bounds,.stage.graph-card-dragging
 .canvas-ink-toolbar{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);z-index:65;color:#1e293b;background:rgba(255,255,255,.98);border:1px solid #dbe2ea;border-radius:14px;padding:6px;box-shadow:0 5px 22px #0f172a17;font:13px/1.4 system-ui,sans-serif;cursor:default!important}
 .canvas-ink-toolbar *{box-sizing:border-box;cursor:auto!important}
 .canvas-ink-tools{display:flex;align-items:center;gap:4px}
+/* 选择工具保留在内部状态（Esc 退出绘画），不在工具条中展示 */
+.canvas-ink-toolbar button[data-ink-tool="select"]{display:none}
 .canvas-ink-toolbar button{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;min-width:0;padding:7px;border:0;border-radius:8px;background:transparent;color:inherit;font:20px/1 system-ui;cursor:pointer!important;box-shadow:none}
 .canvas-ink-toolbar button:hover{background:#f1f5f9}
 .canvas-ink-toolbar button[aria-pressed=true]{background:#e8efff;color:#1d4ed8;box-shadow:inset 0 0 0 1px #b8ccff}
