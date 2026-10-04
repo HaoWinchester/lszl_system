@@ -17,6 +17,7 @@
   let relationshipInflight = null
   let activeSubjectId = ''
   let activeGeneration = 0
+  const libraryIncluded = new Map()
 
   function selectedSubject(value) {
     if (clean(value)) return canonicalInput(value)
@@ -51,6 +52,7 @@
     aliases.set(requested, canonical)
     snapshots.set(requested, clone(normalized))
     snapshots.set(canonical, clone(normalized))
+    libraryIncluded.set(canonical, (normalized.recallLibrary?.nodes || []).length > 0)
     if (generation !== null && generation === activeGeneration) {
       activeSubjectId = canonical
       publish('kg:teaching-content-ready', { subjectId: canonical, contentRevision: normalized.contentRevision })
@@ -58,8 +60,22 @@
     return clone(normalized)
   }
 
-  async function fetchSnapshot(subject) {
-    return API.request({ path: `/api/v1/content-prep/shared-content?subjectId=${encodeURIComponent(subject)}` })
+  // 按需加载：联想库占 shared-content 85%+，默认排除，联想库消费方显式 include。
+  async function fetchSnapshot(subject, includeRecallLibrary = false) {
+    const include = includeRecallLibrary ? '' : '&exclude=recallLibrary'
+    return API.request({ path: `/api/v1/content-prep/shared-content?subjectId=${encodeURIComponent(subject)}${include}` })
+  }
+
+  // 题目引用索引体量很大（数 MB），同一页面多个模块共用一份，失败可重试。
+  let referenceSnapshotInflight = null
+  function fetchReferenceSnapshot() {
+    if (!referenceSnapshotInflight) {
+      referenceSnapshotInflight = API.request({ path: '/api/v1/questions/reference-snapshot' }).catch(error => {
+        referenceSnapshotInflight = null
+        throw error
+      })
+    }
+    return referenceSnapshotInflight
   }
 
   async function fetchRelationships(force = false) {
@@ -69,7 +85,7 @@
         API.request({ path: '/api/v1/course-management/drafts' }),
         API.request({ path: '/api/v1/course-management/releases' }),
         API.request({ path: '/api/v1/course-management/tasks' }),
-        API.request({ path: '/api/v1/questions/reference-snapshot' }),
+        fetchReferenceSnapshot(),
       ]).then(([draftResult, releaseResult, taskResult, referenceResult]) => {
         const courseDrafts = (draftResult?.drafts || []).map(row => ({
           ...clone(row.structure || {}), id: row.id, name: row.name,
@@ -100,7 +116,8 @@
     const generation = activate ? ++activeGeneration : null
     const requestedKey = snapshotKey(requested)
     if (activate) activeSubjectId = requestedKey
-    if (!options.force && snapshots.has(requestedKey)) {
+    const cachedIsFull = libraryIncluded.get(requestedKey) === true
+    if (!options.force && snapshots.has(requestedKey) && (options.includeRecallLibrary !== true || cachedIsFull)) {
       const cached = storeSnapshot(snapshots.get(requestedKey), requested, generation)
       const relationships = options.relationships === true
         ? await fetchRelationships(options.force === true)
@@ -109,7 +126,7 @@
     }
     let pending = inflight.get(requested)
     if (!pending || options.force) {
-      pending = fetchSnapshot(requested)
+      pending = fetchSnapshot(requested, options.includeRecallLibrary === true)
       inflight.set(requested, pending)
       pending.finally(() => { if (inflight.get(requested) === pending) inflight.delete(requested) }).catch(() => {})
     }
@@ -281,6 +298,7 @@
 
   global.KGTeachingContentApi = Object.freeze({
     bootstrap, ready: bootstrap, snapshot, readResource, stageResource,
+    referenceSnapshot: fetchReferenceSnapshot,
     saveRecallLibrary, listPrinciples,
     savePrinciple, deletePrinciple, importActivities,
     saveSubjects: value => saveCatalogResource('subjects', value),
