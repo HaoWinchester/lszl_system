@@ -23,8 +23,21 @@
   let nodeDrag=null,suppressNodeClickUntil=0;
   let recallAdapter=null,recallSession=null,keywordsRevealed=false;
   // 联想库按内容哈希缓存：服务端对已缓存哈希只回传 contentHash 不带 payload（按需加载）。
+  // 内存缓存 + sessionStorage 跨页缓存（同科目库约 900KB，避免每次进页全量重拉）。
   const libraryCache=new Map();
+  const LIBRARY_STORE_KEY='kg_recall_library_cache_v1';
   let lastLibraryHash='';
+  try{
+    const stored=JSON.parse(window.sessionStorage?.getItem(LIBRARY_STORE_KEY)||'null');
+    if(stored?.hash&&stored?.payload&&Array.isArray(stored.payload.nodes)){
+      libraryCache.set(stored.hash,stored.payload);lastLibraryHash=stored.hash;
+    }
+  }catch(_){}
+  function persistLibrary(hash,payload){
+    try{
+      window.sessionStorage?.setItem(LIBRARY_STORE_KEY,JSON.stringify({hash,payload}));
+    }catch(_){/* 容量超限等情况忽略，仅失去跨页缓存 */}
+  }
   const destroyingNodeIds=new Set();
   let questionBrowser={bankId:'',filter:'all',loading:false};
   let authRecoveryPromise=null;
@@ -305,6 +318,8 @@
     if(library?.payload&&library?.contentHash){
       if(libraryCache.size>3)libraryCache.clear();
       libraryCache.set(library.contentHash,cloneValue(library.payload));
+      // 只持久化正式库（历史回看库是旧版本，不能覆盖跨页缓存）。
+      if(!history)persistLibrary(library.contentHash,library.payload);
     }
     lastLibraryHash=library?.contentHash||'';
     window.KGRecallAssociationLibrary?.setSessionLibrary?.(libraryPayload||{},library?.contentHash||'');

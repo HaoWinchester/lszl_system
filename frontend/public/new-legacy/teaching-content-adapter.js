@@ -62,6 +62,18 @@
     return API.request({ path: `/api/v1/content-prep/shared-content?subjectId=${encodeURIComponent(subject)}` })
   }
 
+  // 题目引用索引体量很大（数 MB），同一页面多个模块共用一份，失败可重试。
+  let referenceSnapshotInflight = null
+  function fetchReferenceSnapshot() {
+    if (!referenceSnapshotInflight) {
+      referenceSnapshotInflight = API.request({ path: '/api/v1/questions/reference-snapshot' }).catch(error => {
+        referenceSnapshotInflight = null
+        throw error
+      })
+    }
+    return referenceSnapshotInflight
+  }
+
   async function fetchRelationships(force = false) {
     if (relationshipSnapshot && !force) return clone(relationshipSnapshot)
     if (!relationshipInflight || force) {
@@ -69,7 +81,7 @@
         API.request({ path: '/api/v1/course-management/drafts' }),
         API.request({ path: '/api/v1/course-management/releases' }),
         API.request({ path: '/api/v1/course-management/tasks' }),
-        API.request({ path: '/api/v1/questions/reference-snapshot' }),
+        fetchReferenceSnapshot(),
       ]).then(([draftResult, releaseResult, taskResult, referenceResult]) => {
         const courseDrafts = (draftResult?.drafts || []).map(row => ({
           ...clone(row.structure || {}), id: row.id, name: row.name,
@@ -281,6 +293,7 @@
 
   global.KGTeachingContentApi = Object.freeze({
     bootstrap, ready: bootstrap, snapshot, readResource, stageResource,
+    referenceSnapshot: fetchReferenceSnapshot,
     saveRecallLibrary, listPrinciples,
     savePrinciple, deletePrinciple, importActivities,
     saveSubjects: value => saveCatalogResource('subjects', value),

@@ -2671,6 +2671,11 @@
     },
     {
       "path": "frontend/scripts/new-legacy-contract.json",
+      "token": "kg_recall_library_cache_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "frontend/scripts/new-legacy-contract.json",
       "token": "kg_question_danmaku_hidden_v1__",
       "ordinal": 1
     },
@@ -3631,6 +3636,11 @@
     },
     {
       "path": "new-legacy/src/86-knowledge-recall.js",
+      "token": "kg_recall_library_cache_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "new-legacy/src/86-knowledge-recall.js",
       "token": "kg_exam_paper_release_history_v1",
       "ordinal": 1
     },
@@ -4294,6 +4304,16 @@
     {
       "path": "new-legacy/src/86-knowledge-recall.js",
       "token": "krScopedPreferenceKey(KR_ANALYSIS_SECTION_KEY)",
+      "ordinal": 2
+    },
+    {
+      "path": "new-legacy/src/86-knowledge-recall.js",
+      "token": "LIBRARY_STORE_KEY",
+      "ordinal": 1
+    },
+    {
+      "path": "new-legacy/src/86-knowledge-recall.js",
+      "token": "LIBRARY_STORE_KEY",
       "ordinal": 2
     },
     {

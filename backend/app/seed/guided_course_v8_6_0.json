@@ -5701,7 +5701,7 @@
     }
   ],
   "activitySchemaVersion": 1,
-  "contentHash": "sha256:da3eb66c6e625138493b00426d315a557d792d243bf835541e8f4216d77f7332",
+  "contentHash": "sha256:91c5b3779b850e3c3150375993e2bdd60b80f7656bb0aee7ac33bd211596d67d",
   "course": {
     "activitySchemaVersion": 1,
     "assessmentLanguage": "zh",
@@ -9410,5 +9410,5 @@
     ],
     "valid": true
   },
-  "version": "v9.0-p4.1.275"
+  "version": "v9.0-p4.1.278"
 }
