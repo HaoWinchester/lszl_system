@@ -159,7 +159,8 @@
     const labels={idle:'已载入',loading:'正在载入',pending:'尚未保存',saving:'正在保存',saved:'已保存',failed:'尚未保存',conflict:'保存冲突'};
     if(progressSaveTimer&&value.saveState==='saved')value.saveState='pending';
     status.dataset.state=value.saveState||'idle';text.textContent=labels[value.saveState]||'已载入';
-    if(retry)retry.hidden=!['failed'].includes(value.saveState);
+    // 保存冲突（409）与失败同样提供「重试保存」自救入口，避免用户无法解除死锁。
+    if(retry)retry.hidden=!['failed','conflict'].includes(value.saveState);
   }
   function applyRandomHighlight(){
     const palette=HIGHLIGHT_PALETTES[Math.floor(Math.random()*HIGHLIGHT_PALETTES.length)]||HIGHLIGHT_PALETTES[0];

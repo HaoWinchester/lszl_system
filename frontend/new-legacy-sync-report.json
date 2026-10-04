@@ -1,14 +1,14 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.281",
-  "toVersion": "v9.0-p4.1.282",
+  "fromVersion": "v9.0-p4.1.282",
+  "toVersion": "v9.0-p4.1.283",
   "changes": {
     "added": [],
     "changed": [
       "VERSION",
       "content-prep-studio/dist/content-prep.html",
-      "src/65-question-bank-admin.js",
-      "tests/system-account-api-cutover.test.js"
+      "src/86-knowledge-recall.js",
+      "tests/v90-p353-question-bank-workspace-browser.py"
     ],
     "removed": []
   },
