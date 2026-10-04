@@ -87,12 +87,13 @@ def main():
             sys.stderr.write(log.read())
             raise
         finally:
-            server.terminate()
-            try:
-                server.wait(timeout=30)
-            except subprocess.TimeoutExpired:
-                server.kill()
-                server.wait()
+            if server is not None:
+                server.terminate()
+                try:
+                    server.wait(timeout=30)
+                except subprocess.TimeoutExpired:
+                    server.kill()
+                    server.wait()
 
 
 if __name__ == '__main__':
