@@ -58,8 +58,9 @@
     return clone(normalized)
   }
 
-  async function fetchSnapshot(subject) {
-    return API.request({ path: `/api/v1/content-prep/shared-content?subjectId=${encodeURIComponent(subject)}` })
+  async function fetchSnapshot(subject, excludeRecallLibrary = false) {
+    const exclude = excludeRecallLibrary ? '&exclude=recallLibrary' : ''
+    return API.request({ path: `/api/v1/content-prep/shared-content?subjectId=${encodeURIComponent(subject)}${exclude}` })
   }
 
   // 题目引用索引体量很大（数 MB），同一页面多个模块共用一份，失败可重试。
@@ -121,7 +122,7 @@
     }
     let pending = inflight.get(requested)
     if (!pending || options.force) {
-      pending = fetchSnapshot(requested)
+      pending = fetchSnapshot(requested, options.excludeRecallLibrary === true)
       inflight.set(requested, pending)
       pending.finally(() => { if (inflight.get(requested) === pending) inflight.delete(requested) }).catch(() => {})
     }
