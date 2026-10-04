@@ -1,14 +1,12 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.283",
-  "toVersion": "v9.0-p4.1.284",
+  "fromVersion": "v9.0-p4.1.284",
+  "toVersion": "v9.0-p4.1.285",
   "changes": {
     "added": [],
     "changed": [
       "VERSION",
-      "src/100-practice-mode.js",
-      "src/34-role-permissions.js",
-      "src/65-question-bank-admin.js"
+      "content-prep-studio/dist/content-prep.html"
     ],
     "removed": []
   },
