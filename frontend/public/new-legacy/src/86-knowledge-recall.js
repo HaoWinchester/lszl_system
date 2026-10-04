@@ -1459,7 +1459,7 @@
       const previousAdapter=recallAdapter,previousQuestion=question;
       questionSessionToken+=1;cancelProgressSave();
       const savePromise=shouldSave?writeProgressNow({allowTransition:true}):Promise.resolve(true);
-      const result=await window.KGRecallQuestionSource?.activate?.(bankId,questionId);if(!result?.valid){await savePromise;notifyRecallLimit((result?.errors||['题目切换失败。']).join('；'));return false}
+      const result=await window.KGRecallQuestionSource?.prepareActivation?.(bankId,questionId);if(!result?.valid){await savePromise;notifyRecallLimit((result?.errors||['题目切换失败。']).join('；'));return false}
       const selected=result.question;questionBrowser.bankId=String(result.collection?.id||result.bank?.id||bankId||selected.sourceCollectionId||'');
       // 显式注入已解析题目：会话加载走「已解析上下文」分支，不再依赖 URL 中的 questionId
       //（URL 同步已移到提交阶段，失败路径不更新地址）。
@@ -1468,6 +1468,7 @@
       try{[prepared]=await Promise.all([loadDatabaseSessionData(selected.id),savePromise])}catch(error){loadError=error}
       if(!await savePromise){restoreRecallContext(previousAdapter,previousQuestion);notifyRecallLimit('当前题目尚未保存，请重试保存后再切换。');return false}
       if(loadError||!prepared){restoreRecallContext(previousAdapter,previousQuestion);notifyRecallLimit(loadError?.message||'题目载入失败。');return false}
+      const committed=window.KGRecallQuestionSource?.commitActivation?.(result,{clearTransient:false});if(!committed?.valid){restoreRecallContext(previousAdapter,previousQuestion);notifyRecallLimit((committed?.errors||['题目切换失败。']).join('；'));return false}
       // URL 同步属于提交阶段：切换确认成功后才更新地址栏，失败路径保持原题地址。
       const routeContext=window.KGLearningRouteContext?.normalize?.({paperId:selected.sourcePaperId,releaseId:selected.sourceReleaseId,bankId:selected.sourceBankId,questionId:selected.id,mode:'deep_recall',returnUrl:window.KGLearningRouteContext?.parse?.({mode:'deep_recall'})?.returnUrl||'index.html'})||{};
       window.KGLearningRouteContext?.replace?.(routeContext,{target:'knowledge-recall.html'});
