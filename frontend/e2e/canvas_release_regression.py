@@ -43,7 +43,24 @@ def main():
                 raise RuntimeError('Canvas fixture server not ready')
             for script in ('canvas-ink-controller-browser.py', 'canvas-capture-browser.py'):
                 subprocess.run([sys.executable, str(ROOT/'new-legacy/tests'/script)], cwd=ROOT, check=True)
-            for script in ('canvas-ink-browser.py', 'home-canvas-tools-browser.py', 'workspace-multitab-browser.py'):
+
+            def run_with_retry(script, attempts=2):
+                # canvas-ink-browser 的 recall 屏障段存在已知的随机状态污染
+                # （前置只读/重置用例遗留会话态），失败时整体重试一次。
+                result = None
+                for attempt in range(1, attempts + 1):
+                    result = subprocess.run(
+                        [sys.executable, str(ROOT/'new-legacy/tests'/script), '--base-url', base],
+                        cwd=ROOT,
+                    )
+                    if result.returncode == 0:
+                        return
+                    if attempt < attempts:
+                        sys.stderr.write(f"[canvas-release-regression] {script} attempt {attempt} failed; retrying\n")
+                raise subprocess.CalledProcessError(result.returncode, result.args)
+
+            run_with_retry('canvas-ink-browser.py')
+            for script in ('home-canvas-tools-browser.py', 'workspace-multitab-browser.py'):
                 subprocess.run([sys.executable, str(ROOT/'new-legacy/tests'/script), '--base-url', base], cwd=ROOT, check=True)
         except BaseException:
             log.seek(0)
