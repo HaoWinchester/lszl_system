@@ -22,6 +22,9 @@
   let associationRuntime={subject:'',library:null,nodeCache:new Map(),resolveCache:new Map()};
   let nodeDrag=null,suppressNodeClickUntil=0;
   let recallAdapter=null,recallSession=null,keywordsRevealed=false;
+  // 联想库按内容哈希缓存：服务端对已缓存哈希只回传 contentHash 不带 payload（按需加载）。
+  const libraryCache=new Map();
+  let lastLibraryHash='';
   const destroyingNodeIds=new Set();
   let questionBrowser={bankId:'',filter:'all',loading:false};
   let authRecoveryPromise=null;
@@ -297,7 +300,14 @@
       question=sessionQuestion(session.historyQuestion);
     }else question=sessionQuestion(session.currentQuestion);
     const library=history?session.library:(session.currentLibrary||session.library);
-    window.KGRecallAssociationLibrary?.setSessionLibrary?.(library?.payload||{},library?.contentHash||'');
+    let libraryPayload=library?.payload;
+    if(!libraryPayload&&library?.contentHash&&libraryCache.has(library.contentHash))libraryPayload=cloneValue(libraryCache.get(library.contentHash));
+    if(library?.payload&&library?.contentHash){
+      if(libraryCache.size>3)libraryCache.clear();
+      libraryCache.set(library.contentHash,cloneValue(library.payload));
+    }
+    lastLibraryHash=library?.contentHash||'';
+    window.KGRecallAssociationLibrary?.setSessionLibrary?.(libraryPayload||{},library?.contentHash||'');
     resetAssociationRuntime();
     rootMap=buildRootMap(question);keywordMatchers=buildKeywordMatchers(rootMap);keywordsRevealed=false;
     loadProgress(session.progress||{});
@@ -341,7 +351,7 @@
     const releaseId=(question&&question.sourceReleaseId)
       ||(window.KGRecallQuestionSource?.list?.()||[]).flatMap(collection=>collection.questions).find(item=>String(item.id)===String(id))?.releaseId
       ||'';
-    recallAdapter=window.KGDeepRecallServerAdapter?.create?.({questionId:id,releaseId});
+    recallAdapter=window.KGDeepRecallServerAdapter?.create?.({questionId:id,releaseId,libraryHash:lastLibraryHash});
     if(!recallAdapter)throw new Error('深度回忆服务器适配器加载失败。');
     recallAdapter.subscribe(renderSaveState);renderSaveState({saveState:'loading'});
     const session=await recallAdapter.loadSession();

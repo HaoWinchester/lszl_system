@@ -61,9 +61,11 @@
     };
   }
 
-  function create({questionId,releaseId,fetchImpl}={}){
+  function create({questionId,releaseId,fetchImpl,libraryHash}={}){
     const id=String(questionId||'').trim();
     const releaseQuery=String(releaseId||'').trim()?`?releaseId=${encodeURIComponent(String(releaseId).trim())}`:'';
+    // 客户端已缓存的联想库版本：服务端据此决定是否重复下发 payload（按需加载）。
+    let cachedLibraryHash=String(libraryHash||'').trim();
     if(!id)throw new TypeError('questionId 不能为空');
     const request=fetchImpl||global.fetch;
     if(typeof request!=='function')throw new TypeError('当前环境缺少 fetch');
@@ -99,7 +101,10 @@
     async function loadSession(){
       update({saveState:'loading',error:null});
       try{
-        const session=await send(`/api/v1/recall/session/${questionPath(id)}${releaseQuery}`);
+        const libraryQuery=cachedLibraryHash
+          ?`${releaseQuery?'&':'?'}libraryHash=${encodeURIComponent(cachedLibraryHash)}`:'';
+        const session=await send(`/api/v1/recall/session/${questionPath(id)}${releaseQuery}${libraryQuery}`);
+        cachedLibraryHash=String(session.currentLibrary?.contentHash||session.library?.contentHash||'');
         const graph=graphFromSession(session);
         update({
           session:clone(session),

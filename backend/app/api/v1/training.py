@@ -101,8 +101,11 @@ async def recall_session(
     user: CurrentUser,
     _: QuestionRateLimited = None,
     release_id: str = Query("", alias="releaseId", max_length=64),
+    library_hash: str = Query("", alias="libraryHash", max_length=128),
 ):
-    return await deep_recall_service.get_session(db, user, question_id, release_id=release_id)
+    return await deep_recall_service.get_session(
+        db, user, question_id, release_id=release_id, library_hash=library_hash
+    )
 
 
 @router.post("/recall/progress/{question_id}/reset")

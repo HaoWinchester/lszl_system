@@ -224,12 +224,17 @@ async def _node_limit(db: AsyncSession, user: User) -> int | None:
     return FREE_STUDENT_NODE_LIMIT
 
 
-def _library_payload(snapshot: RecallLibrarySnapshot) -> dict[str, Any]:
+def _library_payload(
+    snapshot: RecallLibrarySnapshot, *, include_payload: bool = True
+) -> dict[str, Any]:
     return {
         "subject": snapshot.subject,
         "contentHash": snapshot.content_hash,
         "sourceRevision": snapshot.source_revision,
-        "payload": snapshot.payload or {"schemaVersion": 1, "nodes": [], "edges": []},
+        # 客户端已缓存相同 contentHash 时省略 payload（按需加载，避免每题重复下发联想库）。
+        "payload": (
+            snapshot.payload or {"schemaVersion": 1, "nodes": [], "edges": []}
+        ) if include_payload else None,
         "updatedAt": _iso(snapshot.created_at),
     }
 
@@ -274,6 +279,7 @@ async def get_session(
     question_id: str,
     *,
     release_id: str = "",
+    library_hash: str = "",
 ) -> dict[str, Any]:
     if not can(user.role, "useDeepRecall"):
         raise _error(403, "deep_recall_permission_denied", "当前账号无权使用深度回忆")
@@ -326,14 +332,27 @@ async def get_session(
         if progress
         else _empty_progress(read_only=permissions["readOnly"])
     )
+    # 联想库按需下发：客户端已持有相同 contentHash 时不再重复传输 payload；
+    # 正常情况下 bound_library 与 currentLibrary 是同一份快照，currentLibrary 置 None 避免双倍体积。
+    bound_is_current = bound_library is library_snapshot
     return {
         "questionId": question_id,
         "bankId": question.bank_id,
         "versionState": "mismatch" if mismatch else "current",
         "currentQuestion": question_snapshot.payload,
         "historyQuestion": history_question.payload if history_question else None,
-        "library": _library_payload(bound_library),
-        "currentLibrary": _library_payload(library_snapshot),
+        "library": _library_payload(
+            bound_library,
+            include_payload=not library_hash
+            or library_hash != bound_library.content_hash,
+        ),
+        "currentLibrary": None
+        if bound_is_current
+        else _library_payload(
+            library_snapshot,
+            include_payload=not library_hash
+            or library_hash != library_snapshot.content_hash,
+        ),
         "progress": graph,
         "progressRevision": int(progress.revision or 0) if progress else 0,
         "permissions": permissions,
