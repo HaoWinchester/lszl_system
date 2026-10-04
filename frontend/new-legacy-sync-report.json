@@ -1,10 +1,13 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.269",
-  "toVersion": "v9.0-p4.1.269",
+  "fromVersion": "v9.0-p4.1.270",
+  "toVersion": "v9.0-p4.1.271",
   "changes": {
     "added": [],
-    "changed": [],
+    "changed": [
+      "VERSION",
+      "src/86-knowledge-recall.js"
+    ],
     "removed": []
   },
   "incompatible": []

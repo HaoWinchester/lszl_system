@@ -322,7 +322,8 @@
       };
     });
   }
-  async function loadDatabaseSession(questionId=''){
+  /* 拉取新题会话数据（不改主状态）；提交（applyServerSession）由调用方在合适的时机执行。 */
+  async function loadDatabaseSessionData(questionId=''){
     let id=String(questionId||requestedQuestionId()).trim();
     const hasResolvedContext=id&&String(question?.id||question?.sourceQuestionId||'')===id&&String(question?.sourceReleaseId||'');
     if(!id||!hasResolvedContext){
@@ -347,9 +348,18 @@
     if(session.versionState==='mismatch')window.KGLearningLoading?.hide?.();
     const choice=session.versionState==='mismatch'?await chooseVersion(session):'current';
     const latest=recallAdapter.getState().session||session;
-    applyServerSession(latest,{history:choice==='history'});
+    return {latest,history:choice==='history'};
+  }
+  /* 失败回退：丢弃已拉取的新题上下文，恢复旧题的保存绑定。 */
+  function restoreRecallContext(previousAdapter,previousQuestion){
+    recallAdapter=previousAdapter;question=previousQuestion;
+    renderSaveState(previousAdapter?.getState?.()||{saveState:'current'});
+  }
+  async function loadDatabaseSession(questionId=''){
+    const prepared=await loadDatabaseSessionData(questionId);
+    applyServerSession(prepared.latest,{history:prepared.history});
     renderSaveState(recallAdapter.getState());
-    return latest;
+    return prepared.latest;
   }
   function progressPayload(){
     return {nodes:state.nodes,edges:state.edges,strokes:state.strokes,customNodes:state.customNodes,activeKeywords:state.activeKeywords,choiceOffsets:state.choiceOffsets,metrics:state.metrics,graphSchemaVersion:3,transform:{x:Number(state.transform.x)||0,y:Number(state.transform.y)||0,scale:Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,Number(state.transform.scale)||1))},optionState:{selected:String(krOptionState.selected||''),persistent:String(krOptionState.persistent||'')}};
@@ -1410,19 +1420,30 @@
     if(recallTransitionBusy)return false;
     const shouldSave=!isRecallReadonly()&&recallAdapter;
     setRecallTransitionBusy(true);
+    // 过渡期给出加载反馈（随机鼓励语），避免"点了没反应"的冻结感。
+    window.KGLearningLoading?.show?.({title:'正在切换题目'});
     try{
-      if(shouldSave&&!await writeProgressNow({allowTransition:true})){notifyRecallLimit('当前题目尚未保存，请重试保存后再切换。');return false}
+      // 保存上一题进度与新题会话「拉取」并行执行，切换等待从串行之和降为最慢一段；
+      // 两段都成功后才提交（重置画布 + applyServerSession + 渲染）。
+      // 任一失败则完整还原旧题上下文（保存失败不切换的语义不变）。
+      const previousAdapter=recallAdapter,previousQuestion=question;
       questionSessionToken+=1;cancelProgressSave();
-      const result=await window.KGRecallQuestionSource?.activate?.(bankId,questionId);if(!result?.valid){notifyRecallLimit((result?.errors||['题目切换失败。']).join('；'));return false}
+      const savePromise=shouldSave?writeProgressNow({allowTransition:true}):Promise.resolve(true);
+      const result=await window.KGRecallQuestionSource?.activate?.(bankId,questionId);if(!result?.valid){await savePromise;notifyRecallLimit((result?.errors||['题目切换失败。']).join('；'));return false}
       const selected=result.question;questionBrowser.bankId=String(result.collection?.id||result.bank?.id||bankId||selected.sourceCollectionId||'');
       const routeContext=window.KGLearningRouteContext?.normalize?.({paperId:selected.sourcePaperId,releaseId:selected.sourceReleaseId,bankId:selected.sourceBankId,questionId:selected.id,mode:'deep_recall',returnUrl:window.KGLearningRouteContext?.parse?.({mode:'deep_recall'})?.returnUrl||'index.html'})||{};
       window.KGLearningRouteContext?.replace?.(routeContext,{target:'knowledge-recall.html'});
+      let prepared=null,loadError=null;
+      try{[prepared]=await Promise.all([loadDatabaseSessionData(selected.id),savePromise])}catch(error){loadError=error}
+      if(!await savePromise){restoreRecallContext(previousAdapter,previousQuestion);notifyRecallLimit('当前题目尚未保存，请重试保存后再切换。');return false}
+      if(loadError||!prepared){restoreRecallContext(previousAdapter,previousQuestion);notifyRecallLimit(loadError?.message||'题目载入失败。');return false}
       destroyingNodeIds.clear();inkController?.reset();setRecallReadonly(true);
       state={nodes:[],edges:[],strokes:[],lastNewEdgeId:'',lastNewNodeId:'',activeNodeId:null,activeKeywords:[],transform:{x:0,y:0,scale:1},customNodes:{},choiceOffsets:{},metrics:{keywordClicks:0,choiceClicks:0,nodeOpens:0,sessionStartedAt:Date.now()}};
-      try{await loadDatabaseSession(selected.id)}catch(error){notifyRecallLimit(error?.message||'题目载入失败。');return false}
+      applyServerSession(prepared.latest,{history:prepared.history});
+      renderSaveState(recallAdapter.getState());
       closeGuide();closeNodeSearch();closeQuestionDrawer();renderAll();setTimeout(()=>{centerOn(0,0,true);playQuestionCardEntry()},30);enforceRecallPermission();return true;
     }catch(error){notifyRecallLimit(error?.message||'题目切换失败。');return false}
-    finally{setRecallTransitionBusy(false)}
+    finally{setRecallTransitionBusy(false);window.KGLearningLoading?.hide?.()}
   }
   function bindQuestionDrawer(){
     $('krQuestionListBtn')?.addEventListener('click',openQuestionDrawer);

@@ -8,17 +8,26 @@ const read=name=>fs.readFileSync(path.join(__dirname,'../src',name),'utf8');
 function section(source,start,end){return source.slice(source.indexOf('  '+start),source.indexOf('  '+end))}
 function deferred(){let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no});return {promise,resolve,reject}}
 function recall(){
-  const pending=deferred(),notices=[];let activations=0;
-  const context={recallTransitionBusy:false,recallAdapter:{},inkController:{cancel(){},reset(){}},questionSessionToken:0,
+  const pending=deferred(),notices=[];let activations=0;let loaded=0;
+  const adapter={state:{saveState:'current'},isPrev:true};
+  const context={recallTransitionBusy:false,recallAdapter:adapter,inkController:{cancel(){},reset(){}},questionSessionToken:0,
+    question:{id:'current',sourceReleaseId:'r1'},questionBrowser:{},
+    destroyingNodeIds:{clear(){}},
     isRecallReadonly:()=>context.recallTransitionBusy,
     setRecallTransitionBusy:value=>{context.recallTransitionBusy=value},
+    setRecallReadonly(){},
     flushProgress:()=>pending.promise,writeProgressNow:()=>pending.promise,cancelProgressSave(){},
     notifyRecallLimit:message=>notices.push(message),
-    window:{KGRecallQuestionSource:{activate:async()=>{activations++;return {valid:false,errors:['not found']}}}}
+    loadDatabaseSessionData:async()=>{loaded++;return {latest:{progress:{}},history:false}},
+    restoreRecallContext(previousAdapter){context.recallAdapter=previousAdapter},
+    applyServerSession(){},renderSaveState(){},
+    closeGuide(){},closeNodeSearch(){},closeQuestionDrawer(){},renderAll(){},playQuestionCardEntry(){},centerOn(){},enforceRecallPermission(){},
+    Date,
+    window:{KGRecallQuestionSource:{activate:async()=>{activations++;return {valid:true,question:{id:'next',sourceCollectionId:'c1',sourcePaperId:null,sourceReleaseId:'r1',sourceBankId:'b1'}}}}}
   };
   vm.createContext(context);
   vm.runInContext(section(read('86-knowledge-recall.js'),'async function switchQuestion(bankId,questionId){','function bindQuestionDrawer(){'),context);
-  return {context,pending,notices,activations:()=>activations};
+  return {context,pending,notices,activations:()=>activations,loaded:()=>loaded};
 }
 test('recall freezes editing before delayed save and rejects overlapping navigation',async()=>{
   const s=recall(),first=s.context.switchQuestion('bank','next');
@@ -30,7 +39,10 @@ test('recall freezes editing before delayed save and rejects overlapping navigat
 test('recall failed save keeps original session and restores editing',async()=>{
   const s=recall(),first=s.context.switchQuestion('bank','next');
   s.pending.resolve(false);assert.equal(await first,false);
-  assert.equal(s.activations(),0);assert.equal(s.context.isRecallReadonly(),false);
+  // 保存失败：中止切换、完整回滚到旧题上下文（adapter 引用不变、未提交新会话）。
+  assert.equal(s.context.isRecallReadonly(),false);
+  assert.equal(s.context.recallAdapter.isPrev,true);
+  assert.equal(s.loaded(),1);
   assert.match(s.notices[0],/尚未保存/);
 });
 test('recall transition flush bypasses only temporary lock, never session permission',async()=>{
