@@ -17,6 +17,7 @@
   let relationshipInflight = null
   let activeSubjectId = ''
   let activeGeneration = 0
+  const libraryIncluded = new Map()
 
   function selectedSubject(value) {
     if (clean(value)) return canonicalInput(value)
@@ -51,6 +52,7 @@
     aliases.set(requested, canonical)
     snapshots.set(requested, clone(normalized))
     snapshots.set(canonical, clone(normalized))
+    libraryIncluded.set(canonical, (normalized.recallLibrary?.nodes || []).length > 0)
     if (generation !== null && generation === activeGeneration) {
       activeSubjectId = canonical
       publish('kg:teaching-content-ready', { subjectId: canonical, contentRevision: normalized.contentRevision })
@@ -58,9 +60,10 @@
     return clone(normalized)
   }
 
-  async function fetchSnapshot(subject, excludeRecallLibrary = false) {
-    const exclude = excludeRecallLibrary ? '&exclude=recallLibrary' : ''
-    return API.request({ path: `/api/v1/content-prep/shared-content?subjectId=${encodeURIComponent(subject)}${exclude}` })
+  // 按需加载：联想库占 shared-content 85%+，默认排除，联想库消费方显式 include。
+  async function fetchSnapshot(subject, includeRecallLibrary = false) {
+    const include = includeRecallLibrary ? '' : '&exclude=recallLibrary'
+    return API.request({ path: `/api/v1/content-prep/shared-content?subjectId=${encodeURIComponent(subject)}${include}` })
   }
 
   // 题目引用索引体量很大（数 MB），同一页面多个模块共用一份，失败可重试。
@@ -113,7 +116,8 @@
     const generation = activate ? ++activeGeneration : null
     const requestedKey = snapshotKey(requested)
     if (activate) activeSubjectId = requestedKey
-    if (!options.force && snapshots.has(requestedKey)) {
+    const cachedIsFull = libraryIncluded.get(requestedKey) === true
+    if (!options.force && snapshots.has(requestedKey) && (options.includeRecallLibrary !== true || cachedIsFull)) {
       const cached = storeSnapshot(snapshots.get(requestedKey), requested, generation)
       const relationships = options.relationships === true
         ? await fetchRelationships(options.force === true)
@@ -122,7 +126,7 @@
     }
     let pending = inflight.get(requested)
     if (!pending || options.force) {
-      pending = fetchSnapshot(requested, options.excludeRecallLibrary === true)
+      pending = fetchSnapshot(requested, options.includeRecallLibrary === true)
       inflight.set(requested, pending)
       pending.finally(() => { if (inflight.get(requested) === pending) inflight.delete(requested) }).catch(() => {})
     }

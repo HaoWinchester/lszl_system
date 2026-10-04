@@ -90,7 +90,7 @@
   async function handleSubjectChange(){
     const next=currentSubject();
     if(next.code===loadedSubjectCode)return;
-    try{await global.KGTeachingContentApi?.ready?.(next.id||next.code);loadCurrent()}
+    try{await global.KGTeachingContentApi?.ready?.(next.id||next.code,{includeRecallLibrary:true});loadCurrent()}
     catch(error){report('联想库切换失败',error?.message||'请检查网络后重试。','error')}
   }
   function bind(){
@@ -104,7 +104,7 @@
   async function init(){
     if(!$('ccRecallLibraryPanel'))return;
     const subject=currentSubject();
-    try{await global.KGTeachingContentApi?.ready?.(subject.id||subject.code)}
+    try{await global.KGTeachingContentApi?.ready?.(subject.id||subject.code,{includeRecallLibrary:true})}
     catch(error){report('联想库加载失败',error?.message||'请检查网络后重试。','error');toast('联想库加载失败，未使用本地数据回退。');return}
     bind();loadCurrent();
   }

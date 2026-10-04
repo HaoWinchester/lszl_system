@@ -79,6 +79,21 @@ async def relational_question_reference_counts(
     }
 
 
+def _reference_metadata(metadata) -> dict:
+    """引用检查只消费 knowledge 归属（知识树/主知识点），投影掉其余内容。"""
+
+    knowledge = metadata.get("knowledge") if isinstance(metadata, dict) else None
+    if not isinstance(knowledge, dict):
+        return {}
+    return {
+        "knowledge": {
+            key: knowledge[key]
+            for key in ("taxonomyId", "primaryNodeId")
+            if key in knowledge
+        }
+    }
+
+
 async def complete_relational_reference_snapshot(
     db: AsyncSession,
     *,
@@ -115,7 +130,8 @@ async def complete_relational_reference_snapshot(
                 "bankId": question.bank_id,
                 "title": question.title,
                 "teacherNumber": question.teacher_number,
-                "metadata": question.content_metadata or {},
+                # 引用检查只消费 knowledge 归属，投影掉其余 metadata（按需加载）。
+                "metadata": _reference_metadata(question.content_metadata),
             }
         )
 

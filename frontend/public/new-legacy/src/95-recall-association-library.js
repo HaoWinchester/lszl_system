@@ -315,13 +315,13 @@
 
   /* 深度回忆会话使用服务端快照；管理端发布统一走关系型联想库 API。 */
   async function readServer(subjectId='PMP'){
-    const data=await global.KGTeachingContentApi.bootstrap(clean(subjectId)||'PMP');
+    const data=await global.KGTeachingContentApi.bootstrap(clean(subjectId)||'PMP',{includeRecallLibrary:true});
     const library=data?.recallLibrary;
     return library&&typeof library==='object'?{...normalizeLibrary(library),id:clean(library.id),subjectId:clean(library.subjectId),version:Number(library.version)||1,status:clean(library.status)||'published',contentRevision:Number(data?.contentRevision)||0}:null;
   }
   async function writeServer(subjectId='PMP',library={}){
     const subject=clean(subjectId)||'PMP';
-    const current=await global.KGTeachingContentApi.bootstrap(subject);
+    const current=await global.KGTeachingContentApi.bootstrap(subject,{includeRecallLibrary:true});
     const revision=Number(current?.contentRevision)||0;
     const identity=current?.recallLibrary&&typeof current.recallLibrary==='object'?current.recallLibrary:{};
     const recallLibrary={...normalizeLibrary(library),id:clean(identity.id),subjectId:clean(identity.subjectId)||subject,version:Number(identity.version)||1,status:clean(identity.status)||'published'};

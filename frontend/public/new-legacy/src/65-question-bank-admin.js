@@ -1482,11 +1482,11 @@
     if(!Catalog){showApiStartupError('题目目录 API 未加载。');return}
     if(!PaperDraftApi){showApiStartupError('试卷草稿 API 未加载。');return}
     try{await Catalog.ready}catch(error){showApiStartupError('题目目录加载失败：'+(error.message||error));return}
-    try{await window.KGTeachingContentApi?.ready?.()}catch(error){showApiStartupError('原则与联想库加载失败：'+(error.message||error));return}
+    try{await window.KGTeachingContentApi?.ready?.(undefined,{includeRecallLibrary:true})}catch(error){showApiStartupError('原则与联想库加载失败：'+(error.message||error));return}
     initStaticControls();
     initLibraryWorkspaceControls();
     state.banks = loadBanks();
-    try{await window.KGTeachingContentApi?.ready?.(state.banks[0]?.subject||'PMP')}catch(error){showApiStartupError('当前科目教学内容加载失败：'+(error.message||error));return}
+    try{await window.KGTeachingContentApi?.ready?.(state.banks[0]?.subject||'PMP',{includeRecallLibrary:true})}catch(error){showApiStartupError('当前科目教学内容加载失败：'+(error.message||error));return}
     state.papers = [];
     try{await reloadPaperDrafts()}catch(error){showApiStartupError('试卷引用目录加载失败：'+(error.message||error));return}
     state.selectedBankId = state.banks[0]?.id || '';
