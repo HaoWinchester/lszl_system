@@ -18,6 +18,7 @@ function recall(){
     setRecallReadonly(){},
     flushProgress:()=>pending.promise,writeProgressNow:()=>pending.promise,cancelProgressSave(){},
     notifyRecallLimit:message=>notices.push(message),
+    sessionQuestion:q=>q,
     loadDatabaseSessionData:async()=>{loaded++;return {latest:{progress:{}},history:false}},
     restoreRecallContext(previousAdapter){context.recallAdapter=previousAdapter},
     applyServerSession(){},renderSaveState(){},

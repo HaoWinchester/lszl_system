@@ -1,14 +1,12 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.271",
-  "toVersion": "v9.0-p4.1.272",
+  "fromVersion": "v9.0-p4.1.274",
+  "toVersion": "v9.0-p4.1.275",
   "changes": {
     "added": [],
     "changed": [
       "VERSION",
-      "content-prep-studio/dist/content-prep.html",
-      "src/86-knowledge-recall.js",
-      "src/99-deep-recall-server-adapter.js"
+      "src/86-knowledge-recall.js"
     ],
     "removed": []
   },
