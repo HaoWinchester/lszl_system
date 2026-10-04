@@ -349,5 +349,10 @@
     decoratePermissionElements();
     const status=document.getElementById('authStatus');
     if(status)renderStatus(status);
+    // 登录/退出后同步刷新账号状态按钮（此前仅在首次渲染时更新，退出后残留旧身份文案）。
+    document.addEventListener('kg-auth-session-change',()=>{
+      const current=document.getElementById('authStatus');
+      if(current)renderStatus(current);
+    });
   });
 })();

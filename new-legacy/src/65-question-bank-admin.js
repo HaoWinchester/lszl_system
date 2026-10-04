@@ -2195,7 +2195,7 @@
             <span class="subject-dot" style="--dot:${escapeHTML(meta.color)}"></span>
             <span>
               <strong>${escapeHTML(b.name)}</strong>
-              <small>${escapeHTML(b.subject)} · ${b.questions.length} 题 · ${escapeHTML(b.version || '1.0')} · ${b.visibility==='published'?'学员可见':'仅教师'}</small>
+              <small>${escapeHTML(b.subject)} · ${(b.questions.length||Number(b.questionCount||0))} 题 · ${escapeHTML(b.version || '1.0')} · ${b.visibility==='published'?'学员可见':'仅教师'}</small>
             </span>
           </button>
           <div class="qb-bank-row-actions">

@@ -1143,7 +1143,7 @@
     if(state.entryStartingMode)return false;
     if(!hasAuthenticatedUser()){global.KGSharedAuthDialog?.open?.('登录后即可开始做题，并保存你的学习进度。');return false}
     const catalog=selectedRelease(),count=Number(state.selectedCount);
-    if(mode!=='revenge'&&!catalog){syncLobby();return false}
+    if(mode!=='revenge'&&!catalog){showToast('请先选择一份试卷，再开始练习。');syncLobby();return false}
     const access=catalog?paperAccess(catalog):{allowed:true,accessLevel:'free'};
     if(mode!=='revenge'&&!access.allowed)return openMembership(access);
     let restoreFocus=false;
@@ -1157,7 +1157,7 @@
         const api=practiceApi();
         if(hasAuthenticatedUser()&&typeof api?.enterSession==='function'){
           const input=practiceEntryInput(mode,catalog,count),entered=fresh?{session:await createFreshSession(input),resumed:false}:await api.enterSession(input),session=entered?.session;
-          if(fresh&&!session)return false;
+          if(fresh&&!session){showToast(mode==='revenge'?'当前没有可复仇的错题，先去做题积累错题吧。':'没有可开始的新一轮练习。');return false}
           if(!session?.id)throw new Error('进入练习未返回会话');
           state.order=input.order;
           return restoreServerSession(session,mode==='revenge'?null:catalog);
