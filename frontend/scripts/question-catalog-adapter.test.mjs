@@ -114,7 +114,8 @@ test('managed remote catalog refresh stays summary-only and invalidates bank pag
 test('page mode selects summary-only or full managed bootstrap with cookies', async () => {
   const cases = [
     { mode: 'managed', paperManagement: true, expectedUrl: '/api/v1/question-catalog/bootstrap?mode=managed' },
-    { mode: 'managed', paperManagement: false, expectedUrl: '/api/v1/question-catalog/bootstrap?mode=managed&include_questions=true' },
+    // 按需加载：managed 页面也不再内嵌全量题目，题库管理页按当前题库分页拉取。
+    { mode: 'managed', paperManagement: false, expectedUrl: '/api/v1/question-catalog/bootstrap?mode=managed' },
     { mode: 'learning', paperManagement: false, expectedUrl: '/api/v1/question-catalog/bootstrap?mode=learning' },
   ]
   for (const { mode, paperManagement, expectedUrl } of cases) {

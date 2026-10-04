@@ -17,7 +17,9 @@ def add_files(page,files,kind):
         (page.add_style_tag if kind=='css' else page.add_script_tag)(content=content)
 
 with sync_playwright() as p:
-    browser=p.chromium.launch(headless=True,executable_path='/usr/bin/chromium',args=ARGS)
+    launch_args={"headless":True,"args":ARGS}
+    if Path('/usr/bin/chromium').exists():launch_args["executable_path"]='/usr/bin/chromium'
+    browser=p.chromium.launch(**launch_args)
     page=browser.new_page(viewport={'width':1600,'height':1000});page.set_default_timeout(10000)
     errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
     attrs,body=body_html('question-bank.html')

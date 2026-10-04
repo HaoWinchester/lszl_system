@@ -204,8 +204,9 @@
   async function refreshAfterCommit(payload) {
     const revision = payload?.contentRevision
     try {
-      // 题库管理页仍依赖全量题目；试卷管理页通过分页接口按需加载。
-      await reload({ source: 'local-commit', includeQuestions: mode === 'managed' && !summaryOnly })
+      // 按需加载：bootstrap 不再内嵌全量题目；题库管理页按当前题库
+      // 通过 loadBankQuestions 分页拉取（见 65-question-bank-admin）。
+      await reload({ source: 'local-commit', includeQuestions: false })
     } catch (error) {}
     if (Number.isSafeInteger(revision) && revision > catalog.contentRevision) {
       reloadRemoteRevision({ revision, source: 'local-commit-retry' })
@@ -336,7 +337,7 @@
     })
   }
 
-  const ready = reload({ source: 'bootstrap', includeQuestions: mode === 'managed' && !summaryOnly })
+  const ready = reload({ source: 'bootstrap', includeQuestions: false })
   ready.catch(() => {})
   let remoteReloadTarget = 0
   let remoteReloadPromise = null
@@ -365,7 +366,7 @@
         while (!remoteRetryStopped && remoteReloadTarget > catalog.contentRevision) {
           const previousRevision = catalog.contentRevision
           try {
-            await reload({ source: 'remote', includeQuestions: mode === 'managed' && !summaryOnly })
+            await reload({ source: 'remote', includeQuestions: false })
             if (remoteRetryStopped) return
             failures = 0
           } catch (error) {

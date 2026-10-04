@@ -204,6 +204,7 @@ test('system adapter hydrates immutable UI stores from domain APIs and keeps pri
     setTimeout,
     clearTimeout,
     __KG_DIRECT_BOOTSTRAP__: { authenticated: true, authUser: { username: 'admin', role: 'admin' } },
+    location: { protocol: 'http:', pathname: '/admin-console.html' },
     KGDomainApi: {
       async request(options) {
         calls.push(options)
@@ -282,6 +283,7 @@ test('subscription order and redeem-code mutations reload authoritative API stat
     Promise,
     URLSearchParams,
     __KG_DIRECT_BOOTSTRAP__: { authenticated: true, authUser: { username: 'admin', role: 'admin' } },
+    location: { protocol: 'http:', pathname: '/admin-console.html' },
     KGDomainApi: {
       async request(options) {
         calls.push(options)
@@ -393,6 +395,7 @@ test('initial system hydration rejects with a retry that replaces failed default
     Date,
     Promise,
     __KG_DIRECT_BOOTSTRAP__: { authenticated: true, authUser: { username: 'admin', role: 'admin' } },
+    location: { protocol: 'http:', pathname: '/admin-console.html' },
     KGDomainApi: {
       async request({ path }) {
         if (path === '/api/v1/subscriptions/plans') {
