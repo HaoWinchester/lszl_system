@@ -67,19 +67,21 @@
       <button type="button" class="practice-exp-fab" id="practiceExpFab" hidden aria-expanded="false" aria-controls="practiceExpPanel" aria-label="展开做题经验面板">XP</button>
       <section class="practice-lobby" id="practiceLobby" aria-labelledby="practiceLobbyTitle">
         <header class="practice-lobby-head">
-          <div>
+          <div class="practice-lobby-head-title">
             <span>PRACTICE SPACE</span>
             <h1 id="practiceLobbyTitle">选择练习模式</h1>
             <p>先选一份试卷，再进入适合你的练习方式。</p>
           </div>
-          <button type="button" class="practice-utility-btn" id="practiceHistoryOpenBtn" aria-haspopup="dialog" aria-controls="practiceHistoryDrawer">
-            <span data-kg-icon="history" data-kg-icon-size="18" aria-hidden="true"></span>
-            <span>学习记录</span><em id="practiceHistoryCount" hidden>0</em>
-          </button>
-          <button type="button" class="practice-utility-btn" id="practiceFavoritesOpenBtn" aria-haspopup="dialog" aria-controls="practiceFavoritesDrawer">
-            <span data-kg-icon="star" data-kg-icon-size="18" aria-hidden="true"></span>
-            <span>我的收藏</span>
-          </button>
+          <div class="practice-lobby-head-actions">
+            <button type="button" class="practice-utility-btn" id="practiceHistoryOpenBtn" aria-haspopup="dialog" aria-controls="practiceHistoryDrawer">
+              <span data-kg-icon="history" data-kg-icon-size="18" aria-hidden="true"></span>
+              <span>学习记录</span><em id="practiceHistoryCount" hidden>0</em>
+            </button>
+            <button type="button" class="practice-utility-btn" id="practiceFavoritesOpenBtn" aria-haspopup="dialog" aria-controls="practiceFavoritesDrawer">
+              <span data-kg-icon="star" data-kg-icon-size="18" aria-hidden="true"></span>
+              <span>我的收藏</span>
+            </button>
+          </div>
         </header>
         <p class="practice-feedback" id="practiceRetiredModeNotice" role="status" hidden></p>
 

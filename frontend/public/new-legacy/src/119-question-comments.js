@@ -552,18 +552,19 @@
   }
 
   /* 练习页标记区「评论」按钮：做题中直接从底部打开讨论抽屉。
-   * 挂载点是不可见宿主（纯 CSS 隐藏，不触发 MutationObserver 清理），
-   * 弹幕层保持抑制，避免做题时被弹幕剧透。 */
+   * 挂载点是不可见宿主（纯 CSS 隐藏，不触发 MutationObserver 清理）。
+   * 与 mountDanmaku 共用每题同一实例（source='danmaku'）；做题中弹幕层保持抑制，
+   * 避免被弹幕剧透；解析可见后由 mountDanmaku 解除抑制。 */
   function openPanel({ questionId }) {
     const id = text(questionId)
     if (!id) return null
-    let instance = [...instances].find(row => row.questionId === id && row.source === 'standalone')
+    let instance = [...instances].find(row => row.questionId === id && row.source === 'danmaku')
     if (!instance) {
       const host = document.createElement('div')
       host.className = 'q-comments-standalone-host'
       host.setAttribute('aria-hidden', 'true')
       document.body.appendChild(host)
-      instance = ensureInstance(host, '__kgQuestionComments', id, 'standalone')
+      instance = ensureInstance(host, '__kgQuestionComments', id, 'danmaku')
       instance.state.overlaySuppressed = true
       attach(instance, host)
       instance.state.expanded = true
@@ -577,6 +578,32 @@
       else renderInto(instance)
     }
     return instance
+  }
+
+  /* 练习页：解析可见时只挂弹幕层，不渲染讨论折叠条（讨论入口收敛在侧栏「评论」）。
+   * 与 openPanel 共用每题同一实例；解除做题期的弹幕抑制，由 reload/renderOverlay 驱动视口弹幕。 */
+  function mountDanmaku({ questionId }) {
+    const id = text(questionId)
+    if (!id) return null
+    let instance = [...instances].find(row => row.questionId === id && row.source === 'danmaku')
+    if (!instance) {
+      const host = document.createElement('div')
+      host.className = 'q-comments-standalone-host'
+      host.setAttribute('aria-hidden', 'true')
+      document.body.appendChild(host)
+      instance = ensureInstance(host, '__kgQuestionComments', id, 'danmaku')
+      attach(instance, host)
+    }
+    instance.state.overlaySuppressed = false
+    activate(instance)
+    if (!instance.state.loaded) reload(instance)
+    return instance
+  }
+  /* 按来源清理实例（练习页换题/隐藏解析时清掉上一题的弹幕层）。 */
+  function teardownSource(source) {
+    for (const instance of [...instances]) {
+      if (instance.source === source) teardown(instance)
+    }
   }
 
   /* 标记区「弹幕」开关：与讨论折叠条上的开关共用同一份本机偏好。 */
@@ -714,6 +741,6 @@
   lifecycle.observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['hidden']})
   global.addEventListener('kg-auth-session-change',()=>teardown())
   global.addEventListener('pagehide',()=>teardown())
-  global.KGQuestionComments = Object.freeze({ mountPanel, mountCard, mountCards, openPanel, pickDanmaku, danmakuEnabled, setDanmakuEnabled, teardown })
+  global.KGQuestionComments = Object.freeze({ mountPanel, mountCard, mountCards, openPanel, mountDanmaku, teardownSource, pickDanmaku, danmakuEnabled, setDanmakuEnabled, teardown })
 })(window)
 

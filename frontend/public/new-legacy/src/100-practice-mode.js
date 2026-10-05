@@ -748,7 +748,11 @@
       actions.innerHTML='<button type="button" class="practice-secondary-btn" data-question-feedback>解析有误或缺失？反馈此题</button>';
       actions.querySelector('[data-question-feedback]')?.addEventListener('click',()=>global.KGSupportCenter?.openQuestionFeedback({questionId:text(question.id),paperId:question.sourcePaperId||state.session?.paperId,releaseId:question.sourceReleaseId||state.session?.releaseId,sessionId:state.session?.id}));
     }
-    // 解析面板不再内嵌评论区（弹幕/收藏/讨论）；讨论入口统一收敛到左侧导航「评论」按钮。
+    // 解析面板不再内嵌评论区；只挂弹幕层（讨论入口统一收敛到左侧导航「评论」按钮）。
+    if(!neutral){
+      global.KGQuestionComments?.teardownSource?.('danmaku');
+      global.KGQuestionComments?.mountDanmaku?.({questionId:text(question.id)});
+    }
     panel.hidden=false;
     panel.scrollIntoView({behavior:'smooth',block:'nearest'});
   }
@@ -777,7 +781,7 @@
     const savedAnswer=state.draft?.answer?.(question.id)||state.session?.answers?.[question.id]||null;
     const practiceAnswered=savedAnswer?{selected:answerSelectedIds(savedAnswer),correct:savedAnswer.correct===true}:null;
     state.locked=false;dom.feedback.hidden=true;hideRemediation();dom.questionCard.classList.remove('is-timeout');
-    if($('practiceExplanationPanel')){$('practiceExplanationPanel').hidden=true;}
+    if($('practiceExplanationPanel')){$('practiceExplanationPanel').hidden=true;global.KGQuestionComments?.teardownSource?.('danmaku');}
     const view=questionLanguageView(question);
     if(view){
       dom.questionStem.innerHTML=escapeHTML(languageText(view.stem))+englishLine(view.stem);
