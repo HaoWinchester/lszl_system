@@ -52,13 +52,15 @@ test('user center uses the supplied profile-dialog structure while retaining pro
 })
 
 test('narrow learning headers preserve readable, single-line navigation', () => {
-  const training = source('new-legacy/styles/question-training.css')
   const workspace = source('new-legacy/styles/question-workspace.css')
   const shell = source('new-legacy/styles/learning-practice-shell.css')
+  const workspacePage = source('new-legacy/styles/question-workspace-page.css')
+  const recallPage = source('new-legacy/styles/knowledge-recall-page.css')
 
-  assert.match(training, /\.qt-brand h1\{white-space:nowrap/)
-  assert.match(shell, /@media\(max-width:760px\)\{[\s\S]*?grid-template-columns:1fr auto/)
+  // v9.0 拆分：shell 只保留跨页共享规则，窄屏顶栏网格随页面专属文件断言
   assert.match(shell, /\.lp-top-actions \.account-menu-trigger\{display:inline-flex!important\}/)
+  assert.match(workspacePage, /@media\(max-width:760px\)\{[\s\S]*?grid-template-columns:1fr auto/)
+  assert.match(recallPage, /@media\(max-width:760px\)\{[\s\S]*?grid-template-columns:1fr auto/)
   assert.match(workspace, /\.question-workspace-page \.qw-top-actions \.account-menu-trigger\{/)
   assert.match(workspace, /\.qw-question-drawer>header>div\{min-width:0;flex:1\}/)
   assert.match(workspace, /\.qw-question-drawer>header button\{flex:0 0 42px;/)
@@ -67,11 +69,27 @@ test('narrow learning headers preserve readable, single-line navigation', () => 
 test('status labels avoid duplicate role text and keyword punctuation stays attached', () => {
   const roles = source('new-legacy/src/34-role-permissions.js')
   const learningData = source('new-legacy/src/87-guided-learning-data.js')
-  const learningStyles = source('new-legacy/styles/guided-learning-node.css')
 
   assert.match(roles, /const showRoleBadge=roleLabel\(role\)!==label/)
   assert.match(learningData, /\{text:'两周迭代，',target:true\}/)
-  assert.match(learningStyles, /\.gln-activity\.gln-keyword-activity\{min-height:300px\}/)
+})
+
+test('learning shell is split per page and loads no retired qt training rules', () => {
+  const shell = source('new-legacy/styles/learning-practice-shell.css')
+  const workspacePage = source('new-legacy/styles/question-workspace-page.css')
+  const recallPage = source('new-legacy/styles/knowledge-recall-page.css')
+  const workspaceMarkup = source('new-legacy/question-workspace.html')
+  const recallMarkup = source('new-legacy/knowledge-recall.html')
+
+  // 共享文件不再包含页面专属前缀与已停用的 qt 规则（按行首选择器锚定，忽略头注释说明文字）
+  assert.doesNotMatch(shell, /^\.question-workspace-page |^\.knowledge-recall-page |^\.question-training-page |question-training\.css/m)
+  // 页面专属文件只包含各自页面（或本页渲染的 kr-/qw- 类）前缀
+  assert.doesNotMatch(workspacePage, /^\.knowledge-recall-page |^\.question-training-page |question-training\.css/m)
+  assert.doesNotMatch(recallPage, /^\.question-workspace-page |^\.question-training-page |question-training\.css/m)
+  // 页面按需加载：shell 核心之后紧跟各自的页面文件
+  assert.match(workspaceMarkup, /learning-practice-shell\.css"\/>\s*<link rel="stylesheet" href="styles\/question-workspace-page\.css/)
+  assert.match(recallMarkup, /learning-practice-shell\.css"\/>\s*<link rel="stylesheet" href="styles\/knowledge-recall-page\.css/)
+  assert.doesNotMatch(workspaceMarkup, /question-training\.css/)
 })
 
 test('active standalone learning headers use one account menu instead of a detached logout button', () => {
@@ -88,13 +106,10 @@ test('active standalone learning headers use one account menu instead of a detac
 test('shared controls center their own content and document the only start-aligned exceptions', () => {
   const main = source('new-legacy/styles/main.css')
   const account = source('new-legacy/styles/account-menu.css')
-  const learning = source('new-legacy/styles/guided-learning-path.css')
   const audit = source('frontend/e2e/ui_geometry_audit.py')
 
   assert.match(main, /\.floating-subtool-btn\{[\s\S]*?justify-content:center;[\s\S]*?text-align:center;/)
   assert.match(account, /\.account-menu-trigger\{[\s\S]*?justify-content:center;[\s\S]*?text-align:center;/)
-  assert.match(learning, /\.gl-stage-path-tools button\{display:grid;place-items:center/)
-  assert.doesNotMatch(learning, /writing-mode:vertical-rl/)
   assert.match(audit, /\[data-geometry-align='start'\]/)
   assert.match(audit, /\.qt-teacher-menu-panel \.qt-nav-btn/)
 })

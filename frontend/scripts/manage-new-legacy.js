@@ -363,7 +363,7 @@ function candidateSiteGate(activeRoot, candidateRoot, version) {
   }
   const missing = CRITICAL_SITE_FILES.filter((path) => !existsSync(resolve(candidateSite, path)))
   if (missing.length) throw new Error(`候选 site 缺少关键文件：${missing.join(', ')}`)
-  const candidateFiles = walk(candidateSite).length
+  const candidateFiles = walk(candidateSite)
   const current = currentManifest(activeRoot)
   let activeFiles = 0
   if (current?.site) {
@@ -371,9 +371,19 @@ function candidateSiteGate(activeRoot, candidateRoot, version) {
     if (!existsSync(activeSite) || !statSync(activeSite).isDirectory()) {
       throw new Error(`当前 active site 不可用：${current.site}`)
     }
-    activeFiles = walk(activeSite).length
-    if (candidateFiles < activeFiles) {
-      throw new Error(`候选 site 文件数 ${candidateFiles} 少于当前 active site ${activeFiles}`)
+    const activePaths = walk(activeSite)
+    activeFiles = activePaths.length
+    if (candidateFiles.length < activeFiles) {
+      // 防回退守卫：文件数净减少只允许发生在显式登记的删除清单内，
+      // 未登记的文件消失仍然视为内容回退，拒绝发布。
+      const candidateSet = new Set(candidateFiles)
+      const removed = activePaths.filter((path) => !candidateSet.has(path))
+      const allowlist = readJson(resolve(scriptsDir, 'new-legacy-removals.json'))
+      const allowed = new Set(allowlist?.removedFiles ?? [])
+      const unexplained = removed.filter((path) => !allowed.has(path))
+      if (unexplained.length) {
+        throw new Error(`候选 site 缺少未登记删除的文件（需登记到 frontend/scripts/new-legacy-removals.json）：${unexplained.slice(0, 8).join(', ')}${unexplained.length > 8 ? ` 等 ${unexplained.length} 个` : ''}`)
+      }
     }
   }
   for (const file of ['terms-of-service.html', 'privacy-policy.html']) {

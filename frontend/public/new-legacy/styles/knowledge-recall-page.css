@@ -1,0 +1,87 @@
+/* 深度回忆页（knowledge-recall.html）专属 shell 规则。
+ * v9.0 自 learning-practice-shell.css 按需拆分：仅保留 .knowledge-recall-page 前缀规则，
+ * 在本页于 shell 核心之后加载，层叠顺序与拆分前一致。
+ * 已随 qt 训练页停用移除的 .question-training-page 规则不再保留。
+ */
+/* 顶栏（自共享复合规则解组） */
+.knowledge-recall-page .kr-topbar.lp-topbar{position:relative;top:auto;z-index:500;display:grid;grid-template-columns:minmax(180px,auto) minmax(0,1fr) auto;align-items:center;gap:14px;width:100%;height:var(--lp-shell-height);min-height:var(--lp-shell-height);box-sizing:border-box;padding:0 16px;border-bottom:1px solid var(--lp-shell-border);background:var(--lp-shell-bg)!important;color:var(--lp-shell-ink)!important;box-shadow:0 8px 24px rgba(15,23,42,.06);backdrop-filter:blur(16px)}
+.knowledge-recall-page .lp-brand h1{margin:0!important;color:var(--lp-shell-ink)!important;font-size:18px!important;line-height:1.15!important;font-weight:900!important;white-space:nowrap}
+.knowledge-recall-page .kr-tools.lp-top-actions{grid-column:3;display:flex;align-items:center;justify-content:flex-end;flex-wrap:nowrap!important;gap:8px;min-width:0}
+/* Scene themes stay inside the recall canvas; shared shell stays platform UI. */
+.knowledge-recall-page .kr-topbar.lp-topbar,.knowledge-recall-page .kr-topbar.lp-topbar *{--kr-control-ink:#475569;--kr-muted:#526176}.knowledge-recall-page .kr-topbar.lp-topbar .kr-back{width:36px;height:36px;border:1px solid #dbe1eb;border-radius:50%;background:#fff!important;color:#475569!important;box-shadow:none!important}.knowledge-recall-page .kr-topbar.lp-topbar .kr-session-stats{color:#64748b!important}.knowledge-recall-page .kr-topbar.lp-topbar .kr-session-stats span{background:#f8fafc!important;color:#64748b!important;border-color:#e2e8f0!important}.knowledge-recall-page .kr-topbar.lp-topbar .kr-session-stats strong{color:#334155!important}.knowledge-recall-page .kr-topbar.lp-topbar .auth-status{color:#64748b!important}.knowledge-recall-page .kr-topbar.lp-topbar .kr-language-control small{display:none!important}.knowledge-recall-page .kr-topbar.lp-topbar .kr-language-switch{border:0;background:transparent;padding:0}.knowledge-recall-page .kr-topbar.lp-topbar .kr-language-switch button{height:28px;padding:0 9px;border:0;border-radius:8px;background:transparent;color:#526176;box-shadow:none}.knowledge-recall-page .kr-topbar.lp-topbar .kr-language-switch button[aria-pressed="true"],.knowledge-recall-page .kr-topbar.lp-topbar .kr-language-switch button.is-active{background:#fff;color:#5145cd;box-shadow:0 1px 5px rgba(15,23,42,.09)}
+/* 题库抽屉（自共享复合规则解组） */
+.knowledge-recall-page .kr-question-drawer{top:14px!important;bottom:14px!important;left:12px!important;width:min(440px,calc(100% - 24px))!important;border:1px solid rgba(100,116,139,.18)!important;border-radius:18px!important;background:rgba(255,255,255,.985)!important;box-shadow:0 22px 70px rgba(15,23,42,.20)!important;backdrop-filter:blur(18px)}
+.knowledge-recall-page .kr-question-drawer{z-index:430}
+/* 画布左上角题库入口（kr-* 类仅本页渲染，随本页加载） */
+.kr-canvas-overlay-left{position:absolute;top:14px;left:14px;z-index:18;display:flex;align-items:center;gap:8px}
+.kr-question-library-trigger{display:inline-flex;align-items:center;gap:7px;height:38px;padding:0 12px;border:1px solid rgba(100,116,139,.22);border-radius:11px;background:rgba(255,255,255,.94);color:#475569;font-size:13px;font-weight:850;box-shadow:0 8px 24px rgba(15,23,42,.10);backdrop-filter:blur(10px);cursor:pointer}
+.kr-question-library-trigger strong{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 5px;border-radius:999px;background:#f1f5f9;color:#526176;font-size:10px}
+.knowledge-recall-page .kr-drawer-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:16px!important;border-bottom:1px solid #edf0f5!important;background:#fff}
+.knowledge-recall-page .kr-drawer-head h2{margin:0 0 4px!important;font-size:18px!important;line-height:1.2}
+.knowledge-recall-page .kr-drawer-head p{margin:0!important;color:#718096!important;font-size:11px!important;line-height:1.45}
+.knowledge-recall-page .kr-drawer-head button{width:34px!important;height:34px!important;border:1px solid #e2e8f0!important;border-radius:10px!important;background:#f8fafc!important;color:#64748b!important;box-shadow:none!important}
+.knowledge-recall-page .kr-drawer-tools{display:grid;gap:8px;padding:11px 12px!important;border-bottom:1px solid #edf0f5!important;background:#fbfcfe}
+.knowledge-recall-page .kr-question-list{padding:10px!important}
+@media(max-width:980px){.knowledge-recall-page .kr-topbar.lp-topbar{grid-template-columns:minmax(170px,auto) minmax(0,1fr) auto;gap:8px;padding-inline:10px}}
+@media(max-width:760px){.knowledge-recall-page .kr-topbar.lp-topbar{height:auto;min-height:64px;grid-template-columns:1fr auto;grid-template-rows:auto auto;padding-block:8px}.knowledge-recall-page .kr-tools.lp-top-actions{grid-column:2;grid-row:1}.knowledge-recall-page .kr-session-stats{display:none!important}}
+
+/* v8.6.2 P2.2.1 — restore mobile question-library drawers after desktop shared-shell overrides */
+@media (max-width:1100px) and (pointer:coarse), (max-width:760px){
+  .knowledge-recall-page .kr-question-drawer{
+    top:auto!important;right:0!important;bottom:0!important;left:0!important;width:100%!important;max-width:none!important;
+    height:min(76dvh,680px)!important;border-radius:20px 20px 0 0!important;transform:translateY(105%)!important;
+  }
+  .knowledge-recall-page .kr-question-drawer.open{transform:translateY(0)!important}
+}
+@media (max-width:560px){
+  .knowledge-recall-page .kr-question-drawer{height:100dvh!important;border-radius:0!important}
+}
+
+/* v8.6.2 P2.2.3 — unified lightweight question-library panel */
+.knowledge-recall-page .kr-question-drawer.lp-question-library-compact{
+  position:fixed!important;top:76px!important;right:auto!important;bottom:auto!important;left:12px!important;
+  z-index:520!important;display:grid!important;grid-template-rows:auto minmax(0,1fr)!important;
+  width:min(360px,calc(100vw - 24px))!important;height:min(68vh,560px)!important;min-height:260px!important;
+  overflow:hidden!important;border:1px solid rgba(100,116,139,.18)!important;border-radius:12px!important;
+  background:#fff!important;box-shadow:0 10px 30px rgba(15,23,42,.10)!important;backdrop-filter:none!important;
+  transform:translateX(calc(-100% - 20px))!important;visibility:hidden!important;
+  transition:none!important;
+}
+.knowledge-recall-page .kr-question-drawer.lp-question-library-compact.open{
+  transform:translateX(0)!important;visibility:visible!important;transition:none!important;
+}
+.knowledge-recall-page .kr-drawer-backdrop{
+  background:transparent!important;backdrop-filter:none!important;
+}
+
+/* Deep recall rows */
+.knowledge-recall-page .lp-question-library-list .kr-question-item{
+  display:grid!important;grid-template-columns:20px minmax(0,1fr) auto!important;align-items:center!important;gap:5px!important;
+  width:100%!important;min-height:34px!important;margin:0!important;padding:4px 2px!important;border:0!important;border-bottom:1px solid #f0f2f5!important;
+  border-radius:0!important;background:transparent!important;box-shadow:none!important;color:#334155!important;
+}
+.knowledge-recall-page .lp-question-library-list .kr-question-item:hover{background:#fafbfc!important}
+.knowledge-recall-page .lp-question-library-list .kr-question-item.active{background:transparent!important;border-left:2px solid #6d5dfc!important;padding-left:0!important}
+.knowledge-recall-page .lp-question-library-list .kr-question-index{display:block!important;width:20px!important;height:auto!important;background:transparent!important;border-radius:0!important;color:#94a3b8!important;font-size:9px!important;text-align:center!important}
+.knowledge-recall-page .lp-question-library-list .kr-question-copy{display:block!important;min-width:0!important}
+.knowledge-recall-page .lp-question-library-list .kr-question-copy strong{display:block!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;font-size:10px!important;line-height:1.35!important;color:#334155!important}
+.knowledge-recall-page .lp-question-library-list .kr-question-copy small{display:none!important}
+.knowledge-recall-page .lp-question-library-list .kr-question-item em{padding:0!important;border:0!important;border-radius:0!important;background:transparent!important;font-size:9px!important;font-style:normal!important;font-weight:750!important;color:#94a3b8!important}
+.knowledge-recall-page .lp-question-library-list .kr-question-item em.explored{background:transparent!important;color:#15803d!important}
+
+.knowledge-recall-page .kr-question-empty{margin:8px 2px!important;padding:10px 4px!important;border:0!important;border-radius:0!important;background:transparent!important;color:#94a3b8!important;font-size:10px!important;text-align:center!important}
+
+@media (max-width:760px), (pointer:coarse) and (max-width:1100px){
+  .knowledge-recall-page .kr-question-drawer.lp-question-library-compact{
+    top:auto!important;right:0!important;bottom:0!important;left:0!important;width:100%!important;height:min(62dvh,520px)!important;min-height:250px!important;
+    border-radius:12px 12px 0 0!important;transform:translateY(105%)!important;
+  }
+  .knowledge-recall-page .kr-question-drawer.lp-question-library-compact.open{transform:translateY(0)!important}
+}
+
+/* v8.6.2 P2.2.4 — unified left slide animation */
+.knowledge-recall-page .kr-question-drawer.lp-question-library-compact{transform:translateX(calc(-100% - 20px))!important;visibility:hidden!important;transition:transform .18s ease,visibility 0s linear .18s!important;will-change:transform!important}
+.knowledge-recall-page .kr-question-drawer.lp-question-library-compact.open{transform:translateX(0)!important;visibility:visible!important;transition:transform .18s ease,visibility 0s!important}
+@media (max-width:760px), (pointer:coarse) and (max-width:1100px){
+.knowledge-recall-page .kr-question-drawer.lp-question-library-compact{top:64px!important;right:auto!important;bottom:auto!important;left:0!important;width:min(360px,calc(100vw - 8px))!important;height:min(68dvh,520px)!important;min-height:250px!important;border-radius:0 12px 12px 0!important;transform:translateX(calc(-100% - 8px))!important;transition:transform .18s ease,visibility 0s linear .18s!important}
+.knowledge-recall-page .kr-question-drawer.lp-question-library-compact.open{transform:translateX(0)!important;transition:transform .18s ease,visibility 0s!important}}

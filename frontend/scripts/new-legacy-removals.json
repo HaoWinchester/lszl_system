@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "reason": "v9.0 CSS 按需拆分与死文件清理：qt 训练页/guided 桩页样式已无活页面引用；补丁链按原层叠顺序合并",
+  "removedFiles": [
+    "styles/question-training.css",
+    "styles/question-training-p2220.css",
+    "styles/question-training-p2221.css",
+    "styles/guided-learning-node.css",
+    "styles/guided-learning-path.css",
+    "styles/guided-learning-placement-test.css",
+    "styles/knowledge-recall-p2223.css",
+    "styles/knowledge-recall-p2224.css",
+    "styles/knowledge-recall-p2225.css",
+    "styles/knowledge-recall-p4322.css",
+    "styles/knowledge-recall-p4517.css",
+    "styles/knowledge-recall-p4519.css",
+    "styles/knowledge-recall-p4520.css",
+    "styles/knowledge-recall-p4529.css",
+    "styles/knowledge-recall-p4530.css",
+    "styles/knowledge-recall-p4532.css",
+    "styles/knowledge-recall-p4533.css",
+    "styles/knowledge-recall-p4537.css",
+    "styles/question-workspace-p2218.css",
+    "styles/question-workspace-p2219.css",
+    "styles/question-workspace-p4534.css",
+    "styles/question-workspace-p4535.css"
+  ]
+}

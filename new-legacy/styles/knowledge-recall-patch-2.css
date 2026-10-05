@@ -1,3 +1,8 @@
+/* knowledge-recall 补丁链·第二段（v9.0 合并）
+ * 由以下按序合并（p4529 与间隔文件选择器零重叠，可安全并入本段）：
+ * knowledge-recall-p4529.css / p4530 / p4532 / p4533 / p4537
+ */
+
 /* V9.0-P4.5.29 · database sessions and learner-safe keyword reveal. */
 .knowledge-recall-page .kr-reveal-keywords-btn{
   min-height:36px;padding:0 14px;border:1px solid var(--kr-border,#cbd5e1);border-radius:10px;
@@ -44,3 +49,72 @@
   cursor:pointer;
 }
 /* P4.5.30：选项改用 qw-card-option-key 字母按钮判定，旧整行 cursor 规则随之移除。 */
+/* V9.0-P4.5.30 · 深度回忆选项与解析对齐多题画布（question-workspace）。 */
+/* 选项/解析样式单一来源：question-workspace.css（qw-card-options / qw-analysis-panel 系列）。
+   本补丁只为 kr 页补齐 qw 作用域内的字号变量，并对 kr 题目卡（780px，比 qw 卡宽）做少量尺寸适配。 */
+.knowledge-recall-page{
+  --qw-font-xxs:11px;
+  --qw-font-xs:12px;
+  --qw-font-sm:13px;
+  --qw-font-md:15px;
+  --qw-font-lg:18px;
+  --qw-font-xl:22px;
+}
+.knowledge-recall-page .qw-card-options{gap:8px;margin-top:10px}
+.knowledge-recall-page .qw-card-option{padding:9px 10px}
+.knowledge-recall-page .qw-card-actions.qw-card-learning-actions{margin-top:10px}
+@media (max-width:760px){
+  .knowledge-recall-page .qw-card-option{padding:7px 8px}
+}
+/* V9.0-P4.5.32 · 题目卡体验打磨：序号徽标、入场动画、解析按钮右下、面板视口感知。 */
+/* 选项作答选中视觉已在 question-workspace.css 中移除（闪烁后恢复原色，两页共用）。 */
+
+/* 题目序号徽标：显示本试卷内顺序（第 n / 共 N 题）。
+   注意使用专属类名 kr-question-order-badge——kr-question-index 是题目库抽屉
+   列表项的既有类名（固定 28×28 格子），复用会被其全局规则压扁。 */
+.knowledge-recall-page .kr-question-order-badge{
+  position:relative;
+  display:inline-flex;
+  align-items:baseline;
+  gap:2px;
+  margin:0 0 8px;
+  padding:4px 10px;
+  border-radius:999px;
+  background:color-mix(in srgb,var(--kr-primary) 12%,transparent);
+  border:1px solid color-mix(in srgb,var(--kr-primary) 26%,transparent);
+  color:var(--kr-primary-dark,var(--kr-title));
+  font-weight:850;
+  line-height:1;
+}
+.knowledge-recall-page .kr-question-order-badge b{font-size:15px}
+.knowledge-recall-page .kr-question-order-badge small{font-size:11px;opacity:.72;font-weight:760}
+
+/* 题目卡入场动画：从左上滑入，缓出缓停（ease-out-expo 类曲线） */
+@keyframes krCardSlideIn{
+  from{opacity:0;transform:translate(-50%,-50%) translate(-46vw,-46vh) scale(.92)}
+  to{opacity:1;transform:translate(-50%,-50%)}
+}
+.knowledge-recall-page .kr-question-card.kr-card-enter{animation:krCardSlideIn .62s cubic-bezier(.22,1,.36,1) both}
+@media (prefers-reduced-motion:reduce){
+  .knowledge-recall-page .kr-question-card.kr-card-enter{animation:none}
+}
+
+/* 解析按钮贴题目卡右下角 */
+.knowledge-recall-page .qw-card-actions.qw-card-learning-actions{justify-content:flex-end}
+/* V9.0-P4.5.33 · 解析面板勾选交互与序号徽标微调。 */
+
+/* 题目序号徽标：圆角矩形底纹，完整覆盖"n / N"数字信息 */
+.knowledge-recall-page .kr-question-order-badge{
+  border-radius:9px;
+  padding:5px 12px;
+  gap:3px;
+}
+.knowledge-recall-page .kr-question-order-badge b{font-size:14px}
+.knowledge-recall-page .kr-question-order-badge small{font-size:11px;opacity:.72;font-weight:760}
+/* V9.0-P4.5.37 · 深度回忆保存体验优化。 */
+
+/* 右上角保存状态提醒默认隐藏（保存已不阻塞交互，无需常驻提示）；
+   仅失败/冲突时显示，保留"重试"入口不丢失败感知。 */
+.knowledge-recall-page .kr-save-status{display:none}
+.knowledge-recall-page .kr-save-status[data-state="failed"],
+.knowledge-recall-page .kr-save-status[data-state="conflict"]{display:inline-flex}

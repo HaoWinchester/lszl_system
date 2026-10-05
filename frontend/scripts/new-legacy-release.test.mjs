@@ -453,11 +453,13 @@ test('candidate with fewer site files is rejected before promotion', () => {
   const result = run(root, 'update', next)
 
   assert.notEqual(result.status, 0)
-  assert.match(result.stderr, /候选 site 文件数.*当前 active site/)
+  // v9.0 起未登记的文件消失需指向 new-legacy-removals.json，README.md 未登记仍拒绝
+  assert.match(result.stderr, /缺少未登记删除的文件/)
+  assert.match(result.stderr, /README\.md/)
   assert.equal(readFileSync(resolve(root, 'current.json'), 'utf8'), before)
   const report = readJson(resolve(root, nextVersion, 'validation.json'))
   assert.equal(report.passed, false)
-  assert.match(report.error, /候选 site 文件数/)
+  assert.match(report.error, /缺少未登记删除的文件/)
 })
 
 test('candidate missing a critical content page is rejected before promotion', () => {
