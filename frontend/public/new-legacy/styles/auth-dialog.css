@@ -16,6 +16,9 @@
   touch-action:none;
 }
 .modal-backdrop.auth-backdrop.show{display:flex}
+.modal-backdrop.auth-backdrop.show #authModal .modal.auth-modal{animation:auth-modal-in .32s cubic-bezier(.22,.75,.24,1) both}
+@keyframes auth-modal-in{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion: reduce){.modal-backdrop.auth-backdrop.show #authModal .modal.auth-modal{animation:none}}
 #authModal .modal.auth-modal{
   width:min(430px,calc(100vw - 28px));
   max-height:calc(100vh - 42px);
@@ -52,6 +55,7 @@
   font-size:15px;
   outline:none;
   box-sizing:border-box;
+  transition:border-color .18s ease,box-shadow .18s ease;
 }
 #authModal .auth-body input:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.12)}
 #authModal .auth-msg{min-height:20px;color:#dc2626;font-size:13px;line-height:1.45;margin:2px 0 10px}

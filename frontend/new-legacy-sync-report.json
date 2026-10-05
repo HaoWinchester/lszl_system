@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.292",
+  "fromVersion": "v9.0-p4.1.293",
   "toVersion": "v9.0-p4.1.293",
   "changes": {
     "added": [],
     "changed": [
-      "VERSION",
-      "content-prep-studio/dist/content-prep.html"
+      "styles/auth-dialog.css",
+      "styles/main.css"
     ],
     "removed": []
   },

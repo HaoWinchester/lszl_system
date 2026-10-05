@@ -159,6 +159,26 @@
     revealItems.forEach((item) => observer.observe(item));
   }
 
+  // Scrollspy：滚动时高亮导航中当前所在的区块
+  const navLinks = Array.from(nav ? nav.querySelectorAll('a[href^="#"]') : []);
+  const sectionById = new Map();
+  navLinks.forEach((link) => {
+    const target = link.hash && document.getElementById(link.hash.slice(1));
+    if (target) sectionById.set(target, link);
+  });
+  if (navLinks.length && sectionById.size && 'IntersectionObserver' in window) {
+    const setCurrentLink = (active) => {
+      navLinks.forEach((link) => link.classList.toggle('is-current', link === active));
+    };
+    const sectionObserver = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        setCurrentLink(sectionById.get(entry.target));
+      });
+    }, { rootMargin: '-38% 0px -55% 0px', threshold: 0 });
+    sectionById.forEach((_, section) => sectionObserver.observe(section));
+  }
+
   window.addEventListener('resize', () => {
     if (window.innerWidth > 900) setMenu(false);
   });
