@@ -49,7 +49,12 @@ with sync_playwright() as playwright:
             body = dict(COMMENTS[0]); body.update({"likeCount": 3, "myLike": True})
             route.fulfill(status=200, content_type="application/json", body=__import__("json").dumps({"comment": body}))
         elif url.endswith("/comments") and method == "POST":
-            body = {"id": "c9", "questionId": "q1", "content": __import__("json").loads(route.request.post_data)["content"],
+            content = __import__("json").loads(route.request.post_data)["content"]
+            if "傻逼" in content:
+                # 后端敏感词拦截：400 + 明确提示，前端在发布区内联显示
+                route.fulfill(status=400, content_type="application/json", body='{"detail":"留言包含不允许的内容，请修改后发布"}')
+                return
+            body = {"id": "c9", "questionId": "q1", "content": content,
                     "likeCount": 0, "createdAt": "2026-09-12T11:00:00+08:00", "author": "stu", "isMine": True,
                     "myLike": False, "danmakuEligible": True, "canDelete": True}
             route.fulfill(status=201, content_type="application/json", body=__import__("json").dumps({"comment": body}))
@@ -87,6 +92,13 @@ with sync_playwright() as playwright:
     page.locator(".q-comments-drawer [data-qc-action='send']").click()
     page.wait_for_selector('[data-comment-id="c9"]')
     assert "原来B对在生产环节" in page.locator('[data-comment-id="c9"]').inner_text()
+
+    # 敏感词发布被拦截：发布区内联显示后端提示，留言不插入列表
+    page.fill(".q-comments-drawer .q-composer-input", "这题出得真傻逼")
+    page.locator(".q-comments-drawer [data-qc-action='send']").click()
+    page.wait_for_selector('.q-comments-drawer .q-composer-error')
+    assert "留言包含不允许的内容" in page.locator('.q-comments-drawer .q-composer-error').inner_text()
+    assert page.locator('[data-comment-id="c9"]').count() == 1  # 之前那条仍在，敏感词留言未插入
 
     # 删除自己的留言
     page.locator('[data-comment-id="c3"] [data-qc-action="delete"]').click()

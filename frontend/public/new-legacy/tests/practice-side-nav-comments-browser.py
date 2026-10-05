@@ -26,6 +26,7 @@ SCRIPTS = [
     "src/118-revenge-entry-policy.js",
     "src/118-question-materials.js",
     "src/119-question-comments.js",
+    "src/120-question-favorites.js",
     "src/100-practice-mode.js",
     "src/practice/practice-answer-page.js",
 ]
@@ -53,6 +54,17 @@ with sync_playwright() as playwright:
                 content_type="application/json",
                 body=json.dumps({"comments": [dict(id="c1", questionId="q1", content="这题解析很清楚", author="学员", likeCount=2, danmakuEligible=True, myLike=False, myFavorite=False)], "nextCursor": None}),
             ),
+        )
+        # 题目收藏 stub：toggle 返回切换后的状态；status 全部未收藏。
+        favorite_state = {"favorited": False}
+        page.route(
+            "**/api/v1/question-favorites/status*",
+            lambda r: r.fulfill(content_type="application/json", body=json.dumps({"status": {}})),
+        )
+        page.route(
+            "**/api/v1/question-favorites/*/toggle",
+            lambda r: (favorite_state.update(favorited=not favorite_state["favorited"]),
+                       r.fulfill(content_type="application/json", body=json.dumps({"questionId": "q1", "favorited": favorite_state["favorited"]}))),
         )
         attrs, body = body_html()
         # localStorage 需要真实 origin（set_content 为不透明源会禁用存储），走路由页面。
@@ -105,8 +117,8 @@ with sync_playwright() as playwright:
         page.wait_for_timeout(250)
         assert page.evaluate('KGPracticeMode.snapshot().mode') == 'practice'
 
-        # 标记区三个工具同显隐
-        for selector in ['#practiceMarkToggle', '#practiceCommentBtn', '#practiceDanmakuToggle']:
+        # 标记区工具同显隐（侧栏「标记」已换成「收藏」）
+        for selector in ['#practiceMarkToggle', '#practiceCommentBtn', '#practiceDanmakuToggle', '#practiceFavoriteBtn']:
             assert page.locator(selector).is_visible(), selector
         assert page.locator('#practiceDanmakuToggle').inner_text() == '弹幕开'
 
@@ -125,6 +137,21 @@ with sync_playwright() as playwright:
         assert page.locator('.q-comments-drawer .q-comment[data-comment-id="c1"]').count() == 1
         page.locator('[data-qc-action="collapse"]').click()
         assert page.locator('.q-comments-drawer').count() == 0
+
+        # 侧栏「收藏」按钮：toggle 切换高亮（题目收藏存后端，异步响应后同步按钮态）
+        assert page.locator('#practiceFavoriteBtn').get_attribute('aria-pressed') == 'false'
+        page.locator('#practiceFavoriteBtn').click()
+        page.wait_for_function("document.getElementById('practiceFavoriteBtn').getAttribute('aria-pressed')==='true'")
+        page.locator('#practiceFavoriteBtn').click()
+        page.wait_for_function("document.getElementById('practiceFavoriteBtn').getAttribute('aria-pressed')==='false'")
+
+        # 答题后：解析面板只保留答案与解析，不再内嵌弹幕/收藏/讨论评论区
+        page.evaluate("window.KGActivitySchemaV1.getPracticeAutoExplain=()=>true")
+        page.locator('#practiceOptions .practice-option[data-option-id="B"]').click()
+        page.wait_for_timeout(200)
+        assert page.locator('#practiceExplanationPanel').is_visible()
+        assert page.locator('#practiceExplanationPanel .q-comments').count() == 0
+        assert page.locator('#practiceExplanationPanel .q-danmaku').count() == 0
 
         if viewport['width'] > 600:
             # 左侧导航收起：滑出屏幕左侧（visibility/transform 生效），把手状态同步

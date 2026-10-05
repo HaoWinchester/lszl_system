@@ -1,13 +1,16 @@
-/* 单题留言 + 弹幕（119-question-comments.js）。配色跟随练习页现有蓝灰体系。 */
+/* 单题留言 + 弹幕（119-question-comments.js）。
+ * 配色对齐做题页 focus-vega 皮肤：白卡片、zinc 中性色、紫色主色（--learn-*，带回退值）。
+ * 只改视觉属性，不改任何结构选择器（JS markup 与成绩单报告页依赖）。 */
 
 .q-comments {
   margin: 10px 0 2px;
-  padding: 10px 12px 12px;
-  background: #f7f9fc;
-  border: 1px solid #e3e8f0;
-  border-radius: 10px;
+  padding: 12px 14px 14px;
+  background: var(--learn-card, #fff);
+  border: 1px solid var(--learn-border, #e4e4e7);
+  border-radius: var(--learn-radius-panel, 10px);
+  box-shadow: 0 1px 2px rgb(24 24 27 / .05);
   font-size: 13px;
-  color: #3d4757;
+  color: var(--learn-card-foreground, #3f3f46);
 }
 .q-comments-head {
   display: flex;
@@ -15,9 +18,9 @@
   justify-content: space-between;
   margin-bottom: 6px;
   font-weight: 600;
-  color: #33415c;
+  color: var(--learn-foreground, #27272a);
 }
-.q-comments-count { font-size: 12px; font-weight: 400; color: #8a94a6; }
+.q-comments-count { font-size: 12px; font-weight: 400; color: var(--learn-muted-foreground, #71717a); }
 
 /* 弹幕条：解析区内嵌横向滚动层 */
 .q-danmaku {
@@ -25,8 +28,8 @@
   height: 40px;
   margin-bottom: 8px;
   overflow: hidden;
-  background: linear-gradient(180deg, rgba(138, 180, 248, 0.14), rgba(138, 180, 248, 0.03));
-  border-radius: 8px;
+  background: linear-gradient(180deg, rgb(109 93 252 / .07), rgb(109 93 252 / .02));
+  border-radius: var(--learn-radius-control, 8px);
 }
 .q-danmaku-track { position: relative; height: 100%; }
 .q-danmaku-item {
@@ -36,11 +39,11 @@
   transform: translateY(-50%);
   white-space: nowrap;
   padding: 3px 10px;
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid #e3e7ee;
+  background: rgb(255 255 255 / .95);
+  border: 1px solid var(--learn-border, #e4e4e7);
   border-radius: 999px;
   font-size: 12px;
-  color: #44506a;
+  color: var(--learn-card-foreground, #3f3f46);
   animation: q-danmaku-scroll 18s linear infinite;
   animation-delay: var(--q-danmaku-delay, 0s);
   will-change: transform;
@@ -65,29 +68,29 @@
   justify-content: space-between;
   gap: 10px;
   padding: 7px 0;
-  border-top: 1px dashed #e8ecf3;
+  border-top: 1px dashed var(--learn-border, #e4e4e7);
 }
 .q-comment:first-child { border-top: 0; }
 .q-comment-main { min-width: 0; flex: 1; }
-.q-comment-author { font-weight: 600; color: #4a5b83; margin-right: 6px; }
-.q-comment-time { font-size: 11px; color: #9aa3b2; }
+.q-comment-author { font-weight: 600; color: var(--learn-accent-foreground, #4c3fd1); margin-right: 6px; }
+.q-comment-time { font-size: 11px; color: var(--learn-muted-foreground, #a1a1aa); }
 .q-comment-content { margin: 3px 0 0; word-break: break-word; white-space: pre-wrap; }
 .q-comment-actions { display: flex; gap: 6px; flex-shrink: 0; }
 .q-comment-like,
 .q-comment-delete {
-  border: 1px solid #e0e6ef;
-  background: #fff;
+  border: 1px solid var(--learn-border, #e4e4e7);
+  background: var(--learn-card, #fff);
   border-radius: 999px;
   padding: 2px 10px;
   font-size: 12px;
-  color: #6b7688;
+  color: var(--learn-muted-foreground, #71717a);
   cursor: pointer;
 }
-.q-comment-like.is-liked { background: #eaf2ff; border-color: #b9d2fb; color: #2f6bd8; }
-.q-comment-delete:hover { color: #c0392b; border-color: #eab7b0; }
-.q-comments-empty { margin: 4px 0; font-size: 12px; color: #9aa3b2; }
-.q-comments-error { margin: 4px 0; font-size: 12px; color: #b3541e; }
-.q-comments-error button { border: 0; background: none; color: #2f6bd8; cursor: pointer; text-decoration: underline; }
+.q-comment-like.is-liked { background: var(--learn-accent, #f1efff); border-color: #cdc4fb; color: var(--learn-accent-foreground, #4c3fd1); }
+.q-comment-delete:hover { color: var(--learn-destructive, #dc2626); border-color: #fecaca; }
+.q-comments-empty { margin: 4px 0; font-size: 12px; color: var(--learn-muted-foreground, #a1a1aa); }
+.q-comments-error { margin: 4px 0; font-size: 12px; color: var(--learn-warning, #b45309); }
+.q-comments-error button { border: 0; background: none; color: var(--learn-accent-foreground, #4c3fd1); cursor: pointer; text-decoration: underline; }
 
 /* 发送框 */
 .q-composer { margin-top: 8px; }
@@ -97,72 +100,75 @@
   resize: vertical;
   min-height: 44px;
   padding: 8px 10px;
-  border: 1px solid #dfe5ee;
-  border-radius: 8px;
+  border: 1px solid var(--learn-input, #e4e4e7);
+  border-radius: var(--learn-radius-control, 8px);
   font: inherit;
-  color: #333;
-  background: #fff;
+  color: var(--learn-foreground, #27272a);
+  background: var(--learn-card, #fff);
 }
-.q-composer-input:focus { outline: 2px solid #b9d2fb; border-color: #8ab4f8; }
+.q-composer-input:focus { outline: 2px solid var(--learn-ring, #6d5dfc); outline-offset: 1px; border-color: var(--learn-ring, #6d5dfc); }
+.q-composer-error { margin: 6px 0 0; font-size: 12px; color: var(--learn-destructive, #dc2626); }
 .q-composer-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; }
-.q-composer-count { font-size: 11px; color: #9aa3b2; }
+.q-composer-count { font-size: 11px; color: var(--learn-muted-foreground, #a1a1aa); }
 .q-composer-send {
   border: 0;
-  background: #3f7ad6;
-  color: #fff;
+  background: var(--learn-primary, #6d5dfc);
+  color: var(--learn-primary-foreground, #fff);
   border-radius: 999px;
   padding: 4px 16px;
   font-size: 12px;
   cursor: pointer;
 }
-.q-composer-send:disabled { background: #c6d2e4; cursor: not-allowed; }
+.q-composer-send:hover:not(:disabled) { filter: brightness(1.06); }
+.q-composer-send:disabled { background: var(--learn-secondary, #f4f4f5); color: var(--learn-muted-foreground, #a1a1aa); cursor: not-allowed; }
 .q-composer-login {
   width: 100%;
-  border: 1px dashed #b9c4d6;
-  background: #fff;
-  color: #4a5b83;
-  border-radius: 8px;
+  border: 1px dashed #c4c4cf;
+  background: var(--learn-card, #fff);
+  color: var(--learn-accent-foreground, #4c3fd1);
+  border-radius: var(--learn-radius-control, 8px);
   padding: 8px;
   font-size: 12px;
   cursor: pointer;
 }
+.q-composer-login:hover { background: var(--learn-accent, #f1efff); }
 
 .q-comments-toast {
   margin-top: 8px;
   padding: 5px 10px;
-  background: #fdf1e3;
-  border: 1px solid #f2d3ac;
+  background: #fdf6ec;
+  border: 1px solid #f0e0c0;
   border-radius: 6px;
   font-size: 12px;
-  color: #9a5b13;
+  color: var(--learn-warning, #9a5b13);
 }
 .q-comments-toast[hidden] { display: none; }
 
 /* 报告页折叠条：默认只显示入口，展开才拉取留言 */
-.q-comments.is-collapsed { padding: 0; background: transparent; border: 0; }
+.q-comments.is-collapsed { padding: 0; background: transparent; border: 0; box-shadow: none; }
 .q-comments-toggle {
   width: 100%;
   display: flex;
   align-items: center;
   gap: 6px;
-  border: 1px dashed #c9d4e5;
-  background: #f7f9fc;
-  border-radius: 8px;
+  border: 1px dashed #d4d4dc;
+  background: var(--learn-secondary, #f4f4f5);
+  border-radius: var(--learn-radius-control, 8px);
   padding: 7px 12px;
   font-size: 12px;
-  color: #4a5b83;
+  color: var(--learn-secondary-foreground, #3f3f46);
   cursor: pointer;
   text-align: left;
 }
-.q-comments-toggle:hover { background: #eef3fb; border-color: #8ab4f8; }
+.q-comments-toggle:hover { background: var(--learn-accent, #f1efff); border-color: var(--learn-ring, #6d5dfc); }
 .q-comments-collapse {
   border: 0;
   background: none;
   font-size: 11px;
-  color: #8a94a6;
+  color: var(--learn-muted-foreground, #71717a);
   cursor: pointer;
 }
-.q-comments-collapse:hover { color: #2f6bd8; }
+.q-comments-collapse:hover { color: var(--learn-accent-foreground, #4c3fd1); }
 
 /* 报告页题卡内嵌时收窄外边距 */
 .practice-review-card .q-comments { margin: 10px 0 0; }
@@ -171,17 +177,17 @@
 /* Viewport overlay owns only its moving targets; blank space passes through. */
 .q-danmaku { position:fixed; inset:72px 0 145px; height:auto; margin:0; z-index:180; pointer-events:none; background:none; border-radius:0; }
 .q-danmaku-track { pointer-events:none; }
-.q-danmaku-item { top:calc(12% + var(--q-danmaku-lane,0) * 17%); pointer-events:auto; cursor:pointer; box-shadow:0 2px 8px #28375018; font:inherit; font-size:13px; }
+.q-danmaku-item { top:calc(12% + var(--q-danmaku-lane,0) * 17%); pointer-events:auto; cursor:pointer; box-shadow:0 2px 8px rgb(24 24 27 / .09); font:inherit; font-size:13px; }
 .q-danmaku-item:nth-child(2n) { margin-top:0; }
-.q-danmaku-item:is(:hover,:focus-visible,.is-paused) { animation-play-state:paused; outline:2px solid #8ab4f8; }
-/* 讨论抽屉：桌面端为右侧整高深色面板（参考抖音网页版评论区），移动端为底部弹层。 */
+.q-danmaku-item:is(:hover,:focus-visible,.is-paused) { animation-play-state:paused; outline:2px solid var(--learn-ring, #6d5dfc); }
+/* 讨论抽屉：桌面端为右侧整高浅色面板（与做题页卡片体系一致），移动端为底部弹层。 */
 .q-comments-drawer {
   position:fixed; left:auto; right:0; top:0; bottom:0; width:min(430px,100vw);
   z-index:240;
   display:flex; flex-direction:column;
-  background:#16181f; color:#e8eaf0;
-  border-left:1px solid #262b38; border-bottom:0; border-radius:0;
-  box-shadow:-16px 0 48px #05070daa;
+  background:var(--learn-card, #fff); color:var(--learn-foreground, #27272a);
+  border-left:1px solid var(--learn-border, #e4e4e7); border-bottom:0; border-radius:0;
+  box-shadow:-16px 0 48px rgb(24 24 27 / .18);
   overscroll-behavior:contain;
   animation:q-drawer-slide .24s cubic-bezier(.2,.8,.25,1);
 }
@@ -189,78 +195,79 @@
 @keyframes q-drawer-rise { from { transform:translateY(24px); opacity:.4; } to { transform:translateY(0); opacity:1; } }
 @media(prefers-reduced-motion:reduce){ .q-comments-drawer { animation:none; } }
 .q-comments-drawer .q-drawer-handle { display:none; }
-.q-comments-drawer .q-comments { flex:1; min-height:0; display:flex; flex-direction:column; border:0; margin:0; padding:0 18px; background:transparent; border-radius:0; font-size:14px; color:#e8eaf0; }
+.q-comments-drawer .q-comments { flex:1; min-height:0; display:flex; flex-direction:column; border:0; margin:0; padding:0 18px; background:transparent; border-radius:0; box-shadow:none; font-size:14px; color:var(--learn-foreground, #27272a); }
 .q-comments-drawer .q-comments-head {
   position:sticky; top:0; z-index:2;
   display:flex; align-items:center; gap:8px;
-  padding:16px 2px 12px; margin:0; background:#16181f;
-  border-bottom:1px solid #232838; font-weight:400;
+  padding:16px 2px 12px; margin:0; background:var(--learn-card, #fff);
+  border-bottom:1px solid var(--learn-border, #e4e4e7); font-weight:400;
 }
-.q-comments-drawer .q-comments-head>span:first-child { display:flex; align-items:baseline; gap:6px; font-size:16px; font-weight:700; color:#f0f2f6; }
-.q-comments-drawer .q-comments-count { color:#6d7382; font-size:13px; font-weight:500; font-style:normal; }
-.q-comments-drawer .q-comments-collapse { margin-left:auto; display:grid; place-items:center; width:32px; height:32px; padding:0; border:0; border-radius:50%; background:transparent; color:#8a90a0; font-size:15px; cursor:pointer; transition:background .15s ease,color .15s ease; }
-.q-comments-drawer .q-comments-collapse:hover { background:#232838; color:#fff; }
-.q-comments-drawer .q-comment-list { flex:1; min-height:0; overflow:auto; overscroll-behavior:contain; list-style:none; margin:0; padding:4px 2px 14px; scrollbar-width:thin; scrollbar-color:#2c3140 transparent; }
+.q-comments-drawer .q-comments-head>span:first-child { display:flex; align-items:baseline; gap:6px; font-size:16px; font-weight:700; color:var(--learn-foreground, #18181b); }
+.q-comments-drawer .q-comments-count { color:var(--learn-muted-foreground, #71717a); font-size:13px; font-weight:500; font-style:normal; }
+.q-comments-drawer .q-comments-collapse { margin-left:auto; display:grid; place-items:center; width:32px; height:32px; padding:0; border:0; border-radius:50%; background:transparent; color:var(--learn-muted-foreground, #71717a); font-size:15px; cursor:pointer; transition:background .15s ease,color .15s ease; }
+.q-comments-drawer .q-comments-collapse:hover { background:var(--learn-secondary, #f4f4f5); color:var(--learn-foreground, #18181b); }
+.q-comments-drawer .q-comment-list { flex:1; min-height:0; overflow:auto; overscroll-behavior:contain; list-style:none; margin:0; padding:4px 2px 14px; scrollbar-width:thin; scrollbar-color:#d4d4dc transparent; }
 .q-comments-drawer .q-comment { align-items:flex-start; gap:10px; padding:12px 2px; border-top:0; }
-.q-comments-drawer .q-comment-author { font-size:12.5px; font-weight:500; color:#8a91a2; }
-.q-comments-drawer .q-comment-time { font-size:11px; color:#5d6373; }
-.q-comments-drawer .q-comment-content { margin:4px 0 0; font-size:14px; line-height:1.65; color:#eef0f5; }
+.q-comments-drawer .q-comment-author { font-size:12.5px; font-weight:600; color:var(--learn-accent-foreground, #4c3fd1); }
+.q-comments-drawer .q-comment-time { font-size:11px; color:var(--learn-muted-foreground, #a1a1aa); }
+.q-comments-drawer .q-comment-content { margin:4px 0 0; font-size:14px; line-height:1.65; color:var(--learn-foreground, #27272a); }
 .q-comments-drawer .q-comment-actions { flex-direction:row; flex-wrap:wrap; align-items:center; gap:16px; padding:7px 0 2px; }
-.q-comments-drawer .q-comment-actions button { border:0; border-radius:0; background:transparent; padding:0; color:#78808f; font-size:12px; cursor:pointer; transition:color .15s ease; white-space:nowrap; }
-.q-comments-drawer .q-comment-actions button:hover { background:transparent; color:#e8eaf0; }
-.q-comments-drawer .q-comment-like.is-liked { background:transparent; color:#ff4d6a; }
-.q-comments-drawer .q-comment-delete:hover { background:transparent; color:#ff6b6b; }
-.q-comments-drawer .q-comments-empty { padding:32px 0 22px; text-align:center; color:#6d7382; font-size:13px; }
-.q-comments-drawer .q-comments-error { margin:10px 0; color:#e0a15e; font-size:12px; }
-.q-comments-drawer .q-comments-error button { border:0; background:none; color:#6ea8ff; text-decoration:underline; }
-.q-comments-drawer [data-qc-action="more"] { display:block; width:100%; margin:2px 0 10px; padding:9px; border:0; border-radius:10px; background:#1f2330; color:#9fb4d8; font-size:12.5px; cursor:pointer; }
-.q-comments-drawer [data-qc-action="more"]:hover { background:#262b3a; color:#c8d6ef; }
-.q-comments-drawer [data-qc-reply] { margin:8px 0 0; padding:8px 12px; border-radius:10px; background:#1f2330; color:#aeb6c6; font-size:12px; }
-.q-comments-drawer [data-qc-reply] button { border:0; background:transparent; color:#6ea8ff; cursor:pointer; }
-.q-comments-drawer .q-comments-toast { margin:8px 0; padding:7px 12px; background:#2a2415; border:1px solid #4a3d1c; border-radius:8px; color:#ffd9a0; font-size:12px; }
-.q-comments-drawer .q-comment-thread { margin-left:44px; border-left:2px solid #232838; padding-left:12px; }
+.q-comments-drawer .q-comment-actions button { border:0; border-radius:0; background:transparent; padding:0; color:var(--learn-muted-foreground, #71717a); font-size:12px; cursor:pointer; transition:color .15s ease; white-space:nowrap; }
+.q-comments-drawer .q-comment-actions button:hover { background:transparent; color:var(--learn-accent-foreground, #4c3fd1); }
+.q-comments-drawer .q-comment-like.is-liked { background:transparent; color:#e11d48; }
+.q-comments-drawer .q-comment-delete:hover { background:transparent; color:var(--learn-destructive, #dc2626); }
+.q-comments-drawer .q-comments-empty { padding:32px 0 22px; text-align:center; color:var(--learn-muted-foreground, #71717a); font-size:13px; }
+.q-comments-drawer .q-comments-error { margin:10px 0; color:var(--learn-warning, #b45309); font-size:12px; }
+.q-comments-drawer .q-comments-error button { border:0; background:none; color:var(--learn-accent-foreground, #4c3fd1); text-decoration:underline; }
+.q-comments-drawer [data-qc-action="more"] { display:block; width:100%; margin:2px 0 10px; padding:9px; border:1px solid var(--learn-border, #e4e4e7); border-radius:10px; background:var(--learn-secondary, #f4f4f5); color:var(--learn-secondary-foreground, #3f3f46); font-size:12.5px; cursor:pointer; }
+.q-comments-drawer [data-qc-action="more"]:hover { background:var(--learn-accent, #f1efff); border-color:var(--learn-ring, #6d5dfc); color:var(--learn-accent-foreground, #4c3fd1); }
+.q-comments-drawer [data-qc-reply] { margin:8px 0 0; padding:8px 12px; border-radius:10px; background:var(--learn-secondary, #f4f4f5); color:var(--learn-muted-foreground, #52525b); font-size:12px; }
+.q-comments-drawer [data-qc-reply] button { border:0; background:transparent; color:var(--learn-accent-foreground, #4c3fd1); cursor:pointer; }
+.q-comments-drawer .q-comments-toast { margin:8px 0; padding:7px 12px; background:#fdf6ec; border:1px solid #f0e0c0; border-radius:8px; color:var(--learn-warning, #9a5b13); font-size:12px; }
+.q-comments-drawer .q-comment-thread { margin-left:44px; border-left:2px solid var(--learn-border, #e4e4e7); padding-left:12px; }
 .q-comments-drawer .q-comment-thread>button,
-.q-comments-drawer [data-qc-action="toggle-replies"] { display:inline-flex; align-items:center; gap:5px; margin:4px 0 8px; padding:0; border:0; background:transparent; color:#6d7382; font-size:12px; cursor:pointer; }
-.q-comments-drawer [data-qc-action="toggle-replies"]:hover { color:#aeb6c6; }
-.q-comments-drawer .q-composer { flex-shrink:0; margin:0; padding:12px 2px calc(14px + env(safe-area-inset-bottom)); background:#16181f; border-top:1px solid #232838; }
-.q-comments-drawer .q-composer-input { resize:none; min-height:46px; max-height:130px; padding:11px 14px; border:1px solid transparent; border-radius:12px; background:#222633; font-size:14px; line-height:1.5; color:#eef0f5; }
-.q-comments-drawer .q-composer-input::placeholder { color:#5d6373; }
-.q-comments-drawer .q-composer-input:focus { outline:none; background:#262b3a; border-color:#39415a; }
+.q-comments-drawer [data-qc-action="toggle-replies"] { display:inline-flex; align-items:center; gap:5px; margin:4px 0 8px; padding:0; border:0; background:transparent; color:var(--learn-muted-foreground, #71717a); font-size:12px; cursor:pointer; }
+.q-comments-drawer [data-qc-action="toggle-replies"]:hover { color:var(--learn-accent-foreground, #4c3fd1); }
+.q-comments-drawer .q-composer { flex-shrink:0; margin:0; padding:12px 2px calc(14px + env(safe-area-inset-bottom)); background:var(--learn-card, #fff); border-top:1px solid var(--learn-border, #e4e4e7); }
+.q-comments-drawer .q-composer-input { resize:none; min-height:46px; max-height:130px; padding:11px 14px; border:1px solid var(--learn-input, #e4e4e7); border-radius:12px; background:var(--learn-background, #fafafa); font-size:14px; line-height:1.5; color:var(--learn-foreground, #27272a); }
+.q-comments-drawer .q-composer-input::placeholder { color:var(--learn-muted-foreground, #a1a1aa); }
+.q-comments-drawer .q-composer-input:focus { outline:2px solid var(--learn-ring, #6d5dfc); outline-offset:1px; background:var(--learn-card, #fff); border-color:var(--learn-ring, #6d5dfc); }
 .q-comments-drawer .q-composer-foot { margin-top:8px; }
-.q-comments-drawer .q-composer-count { color:#5d6373; font-size:11px; }
-.q-comments-drawer .q-composer-send { padding:8px 22px; border:0; border-radius:999px; background:linear-gradient(135deg,#4879ff,#5850ff); color:#fff; font-size:13px; font-weight:700; cursor:pointer; transition:filter .15s ease; }
+.q-comments-drawer .q-composer-count { color:var(--learn-muted-foreground, #a1a1aa); font-size:11px; }
+.q-comments-drawer .q-composer-send { padding:8px 22px; border:0; border-radius:999px; background:var(--learn-primary, #6d5dfc); color:var(--learn-primary-foreground, #fff); font-size:13px; font-weight:700; cursor:pointer; transition:filter .15s ease; }
 .q-comments-drawer .q-composer-send:hover:not(:disabled) { filter:brightness(1.08); }
-.q-comments-drawer .q-composer-send:disabled { background:#262b3a; color:#5d6373; cursor:not-allowed; }
-.q-comments-drawer .q-composer-login { padding:12px; border:1px dashed #333a4c; border-radius:12px; background:#1f2330; color:#aeb6c6; font-size:13px; cursor:pointer; }
-.q-comments-drawer .q-composer-login:hover { background:#262b3a; }
+.q-comments-drawer .q-composer-send:disabled { background:var(--learn-secondary, #f4f4f5); color:var(--learn-muted-foreground, #a1a1aa); cursor:not-allowed; }
+.q-comments-drawer .q-composer-login { padding:12px; border:1px dashed #c4c4cf; border-radius:12px; background:var(--learn-secondary, #f4f4f5); color:var(--learn-accent-foreground, #4c3fd1); font-size:13px; cursor:pointer; }
+.q-comments-drawer .q-composer-login:hover { background:var(--learn-accent, #f1efff); }
 /* 评论头像：取昵称首字符 + 由昵称决定的色相 */
 .q-comment-avatar { display:grid; place-items:center; width:34px; height:34px; flex-shrink:0; border-radius:50%; background:hsl(var(--avatar-hue,210) 42% 44%); color:#fff; font-size:14px; font-weight:700; user-select:none; }
 /* 标记区「评论」按钮直开时的不可见宿主：只承载折叠条 DOM，不展示。 */
 .q-comments-standalone-host { display:none; }
 
-/* 弹幕互动面板（参考短视频）：深色圆角浮层 + 点赞/回复/不喜欢/更多。 */
-.q-danmaku-pop { position:fixed; z-index:250; width:250px; padding:12px 14px 10px; background:#1f2430; color:#fff; border-radius:16px; box-shadow:0 10px 30px #0b1220aa; pointer-events:auto; }
-.q-danmaku-pop::before { content:''; position:absolute; top:-5px; left:50%; width:12px; height:12px; transform:translateX(-50%) rotate(45deg); background:#1f2430; border-radius:2px; }
-.q-danmaku-pop-text { display:flex; gap:10px; align-items:baseline; justify-content:space-between; margin:0 0 10px; color:#fff; font-size:13px; line-height:1.5; }
-.q-danmaku-pop-like { flex-shrink:0; color:#ff8f4d; font-size:12px; font-weight:700; white-space:nowrap; }
-.q-danmaku-pop-like.is-liked { color:#ff4d2e; }
+/* 弹幕互动面板：白底圆角浮层 + 点赞/回复/不喜欢/更多，与做题页浮层体系一致。 */
+.q-danmaku-pop { position:fixed; z-index:250; width:250px; padding:12px 14px 10px; background:var(--learn-card, #fff); color:var(--learn-foreground, #27272a); border:1px solid var(--learn-border, #e4e4e7); border-radius:16px; box-shadow:var(--learn-shadow-float, 0 4px 12px rgb(24 24 27 / .08)), 0 10px 30px rgb(24 24 27 / .1); pointer-events:auto; }
+.q-danmaku-pop::before { content:''; position:absolute; top:-5px; left:50%; width:12px; height:12px; transform:translateX(-50%) rotate(45deg); background:var(--learn-card, #fff); border-left:1px solid var(--learn-border, #e4e4e7); border-top:1px solid var(--learn-border, #e4e4e7); border-radius:2px; }
+.q-danmaku-pop-text { display:flex; gap:10px; align-items:baseline; justify-content:space-between; margin:0 0 10px; color:var(--learn-foreground, #27272a); font-size:13px; line-height:1.5; }
+.q-danmaku-pop-like { flex-shrink:0; color:#e11d48; font-size:12px; font-weight:700; white-space:nowrap; }
+.q-danmaku-pop-like.is-liked { color:#e11d48; }
 .q-danmaku-pop-actions { display:flex; align-items:stretch; justify-content:space-between; gap:4px; }
-.q-danmaku-pop-actions button { flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; padding:4px 2px; border:0; border-radius:10px; background:transparent; color:#cfd6e4; font-size:11px; cursor:pointer; }
-.q-danmaku-pop-actions button:hover { background:#2c3342; color:#fff; }
-.q-danmaku-pop-actions button.is-liked { color:#ff4d2e; }
+.q-danmaku-pop-actions button { flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; padding:4px 2px; border:0; border-radius:10px; background:transparent; color:var(--learn-muted-foreground, #52525b); font-size:11px; cursor:pointer; }
+.q-danmaku-pop-actions button:hover { background:var(--learn-secondary, #f4f4f5); color:var(--learn-foreground, #18181b); }
+.q-danmaku-pop-actions button.is-liked { color:#e11d48; }
 .q-danmaku-pop-icon { font-size:15px; line-height:1; font-style:normal; }
-.q-danmaku-pop-extra { display:flex; gap:8px; margin-top:8px; padding-top:8px; border-top:1px solid #39414f; }
+.q-danmaku-pop-extra { display:flex; gap:8px; margin-top:8px; padding-top:8px; border-top:1px solid var(--learn-border, #e4e4e7); }
 .q-danmaku-pop-extra[hidden] { display:none; }
-.q-danmaku-pop-extra button { flex:1; padding:6px 8px; border:0; border-radius:9px; background:#2c3342; color:#e6ebf5; font-size:12px; cursor:pointer; }
-.q-comment-actions button,.q-comments.is-collapsed>button { border:1px solid #d9e1ed; border-radius:8px; background:white; color:#425776; padding:5px 8px; }
-.q-comment-actions [aria-pressed=true] { background:#eaf2ff; color:#2f6bd8; }
-.q-comment-parent { display:block; color:#75849a; margin-top:6px; }
+.q-danmaku-pop-extra button { flex:1; padding:6px 8px; border:0; border-radius:9px; background:var(--learn-secondary, #f4f4f5); color:var(--learn-secondary-foreground, #3f3f46); font-size:12px; cursor:pointer; }
+.q-danmaku-pop-extra button:hover { background:var(--learn-accent, #f1efff); color:var(--learn-accent-foreground, #4c3fd1); }
+.q-comment-actions button,.q-comments.is-collapsed>button { border:1px solid var(--learn-border, #e4e4e7); border-radius:8px; background:var(--learn-card, #fff); color:var(--learn-secondary-foreground, #3f3f46); padding:5px 8px; }
+.q-comment-actions [aria-pressed=true] { background:var(--learn-accent, #f1efff); color:var(--learn-accent-foreground, #4c3fd1); }
+.q-comment-parent { display:block; color:var(--learn-muted-foreground, #71717a); margin-top:6px; }
 .q-comments.is-collapsed { display:flex; flex-wrap:wrap; gap:6px; }
 .q-comments-toggle { flex:1; min-width:140px; }
-.q-drawer-handle { width:48px; height:5px; margin:0 auto 12px; border-radius:8px; background:#9eacbf; touch-action:none; cursor:ns-resize; }
+.q-drawer-handle { width:48px; height:5px; margin:0 auto 12px; border-radius:8px; background:#d4d4dc; touch-action:none; cursor:ns-resize; }
 @media(max-width:700px) {
-  .q-comments-drawer { left:0; right:0; top:auto; bottom:0; width:auto; height:62vh; max-height:88vh; border-left:0; border-radius:18px 18px 0 0; box-shadow:0 -14px 48px #05070daa; padding-bottom:env(safe-area-inset-bottom); animation:q-drawer-rise .24s cubic-bezier(.2,.8,.25,1); }
-  .q-comments-drawer .q-drawer-handle { display:block; width:44px; height:5px; flex-shrink:0; margin:10px auto 2px; border-radius:8px; background:#333a4c; touch-action:none; cursor:ns-resize; }
+  .q-comments-drawer { left:0; right:0; top:auto; bottom:0; width:auto; height:62vh; max-height:88vh; border-left:0; border-radius:18px 18px 0 0; box-shadow:0 -14px 48px rgb(24 24 27 / .18); padding-bottom:env(safe-area-inset-bottom); animation:q-drawer-rise .24s cubic-bezier(.2,.8,.25,1); }
+  .q-comments-drawer .q-drawer-handle { display:block; width:44px; height:5px; flex-shrink:0; margin:10px auto 2px; border-radius:8px; background:#d4d4dc; touch-action:none; cursor:ns-resize; }
   .q-danmaku { inset:64px 0 175px; }
   .q-comment-actions button { min-height:32px; }
 }
@@ -268,8 +275,8 @@
   .q-danmaku { height:auto; max-height:25vh; inset:80px 12px auto; overflow:auto; padding:0; }
   .q-danmaku-item { position:static; display:inline-block; }
 }
-.q-favorite-question { position:fixed; inset:70px 20px 30px; z-index:200; overflow:auto; padding:24px; background:white; border:1px solid #ccd6e5; border-radius:14px; box-shadow:0 8px 35px #142d4f30; }
-.q-comment-thread { list-style:none; margin:0 0 8px 12px; border-left:2px solid #dbe5f2; padding-left:12px; }
+.q-favorite-question { position:fixed; inset:70px 20px 30px; z-index:200; overflow:auto; padding:24px; background:var(--learn-card, #fff); border:1px solid var(--learn-border, #e4e4e7); border-radius:14px; box-shadow:var(--learn-shadow-float, 0 4px 12px rgb(24 24 27 / .08)); }
+.q-comment-thread { list-style:none; margin:0 0 8px 12px; border-left:2px solid var(--learn-border, #e4e4e7); padding-left:12px; }
 .q-comment-thread ul { list-style:none; padding:0; }
 @media(max-width:700px) and (prefers-reduced-motion:reduce) {
   /* Keep stationary comments below mobile navigation and score controls. */
