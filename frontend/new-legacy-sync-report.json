@@ -1,13 +1,12 @@
 {
   "schemaVersion": 1,
   "fromVersion": "v9.0-p4.1.291",
-  "toVersion": "v9.0-p4.1.291",
+  "toVersion": "v9.0-p4.1.292",
   "changes": {
     "added": [],
     "changed": [
-      "src/119-question-comments.js",
-      "styles/question-comments.css",
-      "tests/question-discussion-drawer-browser.py"
+      "VERSION",
+      "content-prep-studio/dist/content-prep.html"
     ],
     "removed": []
   },
