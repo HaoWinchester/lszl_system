@@ -1,15 +1,12 @@
 {
   "schemaVersion": 1,
   "fromVersion": "v9.0-p4.1.290",
-  "toVersion": "v9.0-p4.1.290",
+  "toVersion": "v9.0-p4.1.291",
   "changes": {
     "added": [],
     "changed": [
-      "assets/icons/lucide-learning.svg",
-      "practice-mode.html",
-      "src/100-practice-mode.js",
-      "src/119-question-comments.js",
-      "styles/practice-mode.css"
+      "VERSION",
+      "content-prep-studio/dist/content-prep.html"
     ],
     "removed": []
   },

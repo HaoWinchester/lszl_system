@@ -152,6 +152,8 @@ with sync_playwright() as playwright:
         assert page.locator('#practiceExplanationPanel').is_visible()
         assert page.locator('#practiceExplanationPanel .q-comments').count() == 0
         assert page.locator('#practiceExplanationPanel .q-danmaku').count() == 0
+        # 弹幕层仍要在解析可见时播放（mountDanmaku 挂到视口层，不依赖内嵌面板）
+        page.wait_for_selector('body > .q-danmaku .q-danmaku-item')
 
         if viewport['width'] > 600:
             # 左侧导航收起：滑出屏幕左侧（visibility/transform 生效），把手状态同步
