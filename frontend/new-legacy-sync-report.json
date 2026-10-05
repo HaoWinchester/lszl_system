@@ -5,8 +5,7 @@
   "changes": {
     "added": [],
     "changed": [
-      "styles/auth-dialog.css",
-      "styles/main.css"
+      "styles/landing.css"
     ],
     "removed": []
   },
