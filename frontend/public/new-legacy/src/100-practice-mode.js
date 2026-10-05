@@ -390,8 +390,10 @@
     if(state.feedbackTimer)global.clearTimeout(state.feedbackTimer);state.feedbackTimer=0;
     if(state.popTimer)global.clearTimeout(state.popTimer);state.popTimer=0;
   }
+  function retriggerViewAnimation(el,cls){if(!el)return;el.classList.remove(cls);void el.offsetWidth;el.classList.add(cls)}
   function setView(name){
     dom.lobby.hidden=name!=='lobby';dom.game.hidden=name!=='game';dom.checkpoint.hidden=name!=='checkpoint';dom.result.hidden=name!=='result';
+    if(name==='game')retriggerViewAnimation(dom.game,'is-entering');
     document.body.dataset.practiceView=name;
     if(name==='game')renderSelectionNotice();
     if(name!=='game'){setDangerVignette(false);if(dom.questionNav)dom.questionNav.hidden=true}
@@ -835,6 +837,7 @@
       if(position){current.open=position.open;current.querySelector('.qm-case-body').scrollTop=position.scroll;}
       dom.questionCard.classList.toggle('qm-case-layout',!materialPanel.hidden);
     }
+    retriggerViewAnimation(dom.questionCard,'is-switching');
     const typeLabel=$('practiceQuestionType');
     if(typeLabel)typeLabel.textContent=question.type==='matching'?'配对题':question.type==='multiple_choice'?'多选题':'单选题';
     if(question.type==='matching')renderMatchingAnswer(question,savedAnswer,!!savedAnswer||(state.mode==='practice'&&showAnswersEnabled()));
