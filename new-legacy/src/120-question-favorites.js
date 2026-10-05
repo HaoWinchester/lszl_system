@@ -41,6 +41,9 @@
 
   function remember(questionId, favorited) { cache.set(text(questionId), !!favorited) }
 
+  // 题目收藏总数缓存（侧栏角标，全站维度）：本人 toggle 后失效，由宿主刷新。
+  const countCache = new Map()
+
   /* 批量查询收藏状态：只查缓存里没有的 ID，练习开始时预热一批。 */
   async function status(questionIds) {
     const ids = [...new Set((questionIds || []).map(text).filter(Boolean))].filter(id => !cache.has(id))
@@ -63,8 +66,28 @@
     const id = text(questionId)
     const payload = await request(encodeURIComponent(id) + '/toggle', { method: 'POST' })
     remember(id, payload.favorited)
+    countCache.delete(id)
     return { questionId: id, favorited: !!payload.favorited }
   }
+
+  /* 批量题目收藏总数（侧栏角标用）：只查缓存没有的 ID，后端对可见题目补零。 */
+  async function counts(questionIds) {
+    const ids = [...new Set((questionIds || []).map(text).filter(Boolean))].filter(id => !countCache.has(id))
+    if (ids.length) {
+      try {
+        const payload = await request('counts?ids=' + encodeURIComponent(ids.join(',')))
+        Object.entries(payload.counts || {}).forEach(([id, count]) => countCache.set(text(id), Number(count) || 0))
+        ids.forEach(id => { if (!countCache.has(id)) countCache.set(id, 0) })
+      } catch (error) {
+        if (text(error.message) === 'UNAUTHENTICATED') return {}
+      }
+    }
+    const result = {}
+    ;(questionIds || []).map(text).filter(Boolean).forEach(id => { result[id] = countCache.get(id) || 0 })
+    return result
+  }
+  /* 单题收藏总数（角标）；与旧的全局 count()（本机收藏条数）同名会互相覆盖，故单独命名。 */
+  function questionCount(questionId) { return countCache.get(text(questionId)) }
 
   function count() { return [...cache.values()].filter(Boolean).length }
 
@@ -102,7 +125,7 @@
     return { total: items.length }
   }
 
-  document.addEventListener('kg-auth-session-change', () => cache.clear())
+  document.addEventListener('kg-auth-session-change', () => { cache.clear(); countCache.clear() })
 
-  global.KGQuestionFavorites = Object.freeze({ status, isFavorited, toggle, count, renderList, fetchList })
+  global.KGQuestionFavorites = Object.freeze({ status, isFavorited, toggle, count, questionCount, counts, renderList, fetchList })
 })(window);

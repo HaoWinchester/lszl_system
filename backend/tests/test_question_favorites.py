@@ -182,3 +182,33 @@ def test_favorite_requires_question_access() -> None:
             assert all(item["questionId"] != ids["private_question"] for item in listed)
     finally:
         _cleanup(ids)
+
+
+def test_favorite_counts_batch() -> None:
+    """收藏总数角标：全站维度计数、跨用户聚合、无权题目不返回。"""
+    ids = _ids()
+    asyncio.run(_seed(ids))
+    try:
+        with TestClient(app) as client:
+            _login(client, ids["student"])
+            client.post(f"/api/v1/question-favorites/{ids['question']}/toggle")
+        with TestClient(app) as other_client:
+            _login(other_client, ids["other"])
+            other_client.post(f"/api/v1/question-favorites/{ids['question']}/toggle")
+
+            async def seed_private_favorite() -> None:
+                async with AsyncSessionLocal() as db:
+                    db.add(QuestionFavorite(question_id=ids["private_question"], owner_id=ids["other"]))
+                    await db.commit()
+
+            asyncio.run(seed_private_favorite())
+            counts = other_client.get(
+                f"/api/v1/question-favorites/counts?ids={ids['question']},{ids['other_question']},{ids['private_question']}"
+            )
+            assert counts.status_code == 200
+            data = counts.json()["counts"]
+            assert data[ids["question"]] == 2
+            assert data[ids["other_question"]] == 0
+            assert ids["private_question"] not in data
+    finally:
+        _cleanup(ids)

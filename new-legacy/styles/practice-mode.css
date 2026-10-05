@@ -480,3 +480,6 @@ body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice
   .practice-lobby-head{flex-direction:column;align-items:stretch;gap:12px}
   .practice-lobby-head-actions{justify-content:flex-end}
 }
+/* 侧栏评论/收藏角标：显示当前题的留言数与收藏总数。 */
+.practice-side-badge{min-width:17px;height:16px;padding:0 5px;display:inline-grid;place-items:center;border-radius:999px;background:#f1efff;color:#4c3fd1;font-size:10px;font-style:normal;font-weight:800;line-height:1}
+.practice-side-badge[hidden]{display:none!important}

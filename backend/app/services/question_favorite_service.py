@@ -2,7 +2,7 @@
 import base64
 import json
 from datetime import datetime
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert
 from app.models.question import Question
 from app.models.question_favorite import QuestionFavorite
@@ -46,6 +46,20 @@ async def favorite_status(db, user, question_ids):
     if not ids: return {}
     favorited = set((await db.execute(select(QuestionFavorite.question_id).where(QuestionFavorite.owner_id == user.username, QuestionFavorite.question_id.in_(ids)))).scalars())
     return {i: i in favorited for i in ids}
+
+async def question_favorite_counts(db, viewer, question_ids):
+    """批量题目收藏总数（全站维度，侧栏角标用）；无权访问的题目不返回。"""
+    ids = [i for i in (_clean(item) for item in question_ids) if i][:200]
+    accessible = []
+    for identifier in ids:
+        try:
+            await require_question_access(db, viewer, identifier)
+            accessible.append(identifier)
+        except (QuestionCommentPermissionError, QuestionCommentNotFoundError):
+            pass
+    if not accessible: return {}
+    rows = dict((await db.execute(select(QuestionFavorite.question_id, func.count()).where(QuestionFavorite.question_id.in_(accessible)).group_by(QuestionFavorite.question_id))).all())
+    return {identifier: int(rows.get(identifier, 0)) for identifier in accessible}
 
 def _serialize(question, created_at):
     return {

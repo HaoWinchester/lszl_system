@@ -681,6 +681,8 @@
       danmaku.setAttribute('aria-pressed',on?'true':'false');
     }
     renderFavoriteButton(question);
+    renderSideCounts();
+    void refreshSideCounts();
   }
   // 侧栏「收藏」：高亮当前题收藏态；状态由 KGQuestionFavorites 内存缓存驱动。
   function renderFavoriteButton(question){
@@ -691,6 +693,33 @@
     button.classList.toggle('is-favorited',favorited);
     button.setAttribute('aria-pressed',favorited?'true':'false');
     button.title=favorited?'取消收藏本题':'收藏本题';
+  }
+  // 侧栏角标：当前题的留言数与收藏总数；缓存未命中的 ID 异步补拉。
+  function renderSideCounts(){
+    const question=currentPracticeQuestion(),id=text(question?.id);
+    const commentBadge=$('practiceCommentCount'),favoriteBadge=$('practiceFavoriteCount');
+    const visible=visibleFavoriteButton();
+    if(commentBadge){
+      const count=global.KGQuestionComments?.commentCount?.(id);
+      commentBadge.hidden=!(visible&&Number.isInteger(count)&&count>0);
+      if(!commentBadge.hidden)commentBadge.textContent=String(count);
+    }
+    if(favoriteBadge){
+      const count=global.KGQuestionFavorites?.questionCount?.(id);
+      favoriteBadge.hidden=!(visible&&Number.isInteger(count)&&count>0);
+      if(!favoriteBadge.hidden)favoriteBadge.textContent=String(count);
+    }
+  }
+  let sideCountsPending=false;
+  async function refreshSideCounts(){
+    if(sideCountsPending)return;
+    const id=text(currentPracticeQuestion()?.id);
+    if(!id||!global.KGQuestionComments&&!global.KGQuestionFavorites)return;
+    sideCountsPending=true;
+    try{
+      if(global.KGQuestionComments)await global.KGQuestionComments.commentCounts([id]).catch(()=>{});
+      if(global.KGQuestionFavorites)await global.KGQuestionFavorites.counts([id]).catch(()=>{});
+    }finally{sideCountsPending=false;renderSideCounts()}
   }
   function visibleFavoriteButton(){
     const question=currentPracticeQuestion();
@@ -708,6 +737,7 @@
       return false;
     }
     renderFavoriteButton(question);
+    void refreshSideCounts();
     return true;
   }
   function renderQuestionMark(question){
@@ -1622,6 +1652,12 @@
     // 三态语言切换即时重渲染当前题（作答与判题不受影响）
     global.addEventListener('kg:question-language-mode',()=>{if(state.active)try{renderQuestion()}catch(error){}});
     global.addEventListener('kg-practice-mistakes-change',()=>{if(!state.active)syncLobby()});
+    // 留言发布/删除后：角标失效重拉（119 已失效自身缓存）。
+    document.addEventListener('kg:question-comment-counts-changed',event=>{
+      const qid=text(event.detail?.questionId);
+      if(!qid||qid!==text(currentPracticeQuestion()?.id))return;
+      void refreshSideCounts();
+    });
     global.addEventListener('pagehide',()=>{
       if(!state.session||!hasAuthenticatedUser())return;
       saveCoordinator().flushForPageHide({sessionId:state.session.id,

@@ -9,6 +9,8 @@
 ;(function (global) {
   const instances = new Set()
   let active = null
+  // 题目留言数缓存（侧栏角标）：发布/删除时失效并广播。
+  const countCache = new Map()
   const preferenceKey = () => 'kg_question_discussion_danmaku_v1__' + encodeURIComponent(currentUser()?.username || 'guest')
   function enabled() { try { return global.KGDevicePreferences?.getString(preferenceKey(), 'on') !== 'off' } catch (_) { return true } }
   function remember(value) { try { global.KGDevicePreferences?.setString(preferenceKey(), value ? 'on' : 'off') } catch (_) {} }
@@ -53,7 +55,9 @@
   function request(path, options = {}) {
     // 按段编码：questionId/commentId 安全转义，保留路径分隔符。
     const [pathname, query] = path.split('?')
-    const url = (pathname.startsWith('@favorites') ? '/api/v1/question-comments/favorites' : API_ROOT + pathname.split('/').map(encodeURIComponent).join('/')) + (query ? '?' + query : '')
+    const url = (pathname.startsWith('@favorites') ? '/api/v1/question-comments/favorites'
+      : pathname.startsWith('@counts') ? '/api/v1/question-comments/counts'
+      : API_ROOT + pathname.split('/').map(encodeURIComponent).join('/')) + (query ? '?' + query : '')
     return fetch(url, {
       credentials: 'include',
       headers: options.body ? { 'Content-Type': 'application/json' } : undefined,
@@ -505,6 +509,7 @@
       }
       renderInto(instance)
       renderOverlay(instance)
+      notifyCommentCountChanged(instance.questionId)
     } catch (error) {
       if (text(error.message) !== 'UNAUTHENTICATED') {
         button.disabled = false
@@ -537,10 +542,36 @@
       instance.state.comments = instance.state.comments.filter(comment => comment.id !== commentId)
       instance.state.danmaku = pickDanmaku(instance.state.comments)
       renderInto(instance)
+      notifyCommentCountChanged(instance.questionId)
     } catch (error) {
       if (text(error.message) !== 'UNAUTHENTICATED') showToast(instance, '删除失败，请稍后重试')
     } finally { instance.pending.delete(commentId) }
   }
+
+  /* 题目留言数变化（发布/删除）：失效缓存并广播，宿主页据此刷新角标。 */
+  function notifyCommentCountChanged(questionId) {
+    if (!text(questionId)) return
+    countCache.delete(text(questionId))
+    document.dispatchEvent(new CustomEvent('kg:question-comment-counts-changed', { detail: { questionId: text(questionId) } }))
+  }
+
+  /* 批量题目留言数（侧栏角标用）：只查缓存没有的 ID，未返回的记 0。 */
+  async function commentCounts(questionIds) {
+    const ids = [...new Set((questionIds || []).map(text).filter(Boolean))].filter(id => !countCache.has(id))
+    if (ids.length) {
+      try {
+        const payload = await request('@counts?ids=' + encodeURIComponent(ids.join(',')))
+        Object.entries(payload.counts || {}).forEach(([id, count]) => countCache.set(text(id), Number(count) || 0))
+        ids.forEach(id => { if (!countCache.has(id)) countCache.set(id, 0) })
+      } catch (error) {
+        if (text(error.message) === 'UNAUTHENTICATED') return {}
+      }
+    }
+    const result = {}
+    ;(questionIds || []).map(text).filter(Boolean).forEach(id => { result[id] = countCache.get(id) || 0 })
+    return result
+  }
+  function commentCount(questionId) { return countCache.get(text(questionId)) }
 
   function showToast(instance, message) {
     if(instance.disposed)return
@@ -806,8 +837,8 @@
     }
   })
   lifecycle.observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['hidden']})
-  global.addEventListener('kg-auth-session-change',()=>teardown())
+  global.addEventListener('kg-auth-session-change',()=>{countCache.clear();teardown()})
   global.addEventListener('pagehide',()=>teardown())
-  global.KGQuestionComments = Object.freeze({ mountPanel, mountCard, mountCards, openPanel, mountDanmaku, teardownSource, pickDanmaku, danmakuEnabled, setDanmakuEnabled, teardown })
+  global.KGQuestionComments = Object.freeze({ mountPanel, mountCard, mountCards, openPanel, mountDanmaku, teardownSource, pickDanmaku, danmakuEnabled, setDanmakuEnabled, teardown, commentCounts, commentCount })
 })(window)
 

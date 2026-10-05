@@ -62,6 +62,14 @@ with sync_playwright() as playwright:
             lambda r: r.fulfill(content_type="application/json", body=json.dumps({"status": {}})),
         )
         page.route(
+            "**/api/v1/question-favorites/counts*",
+            lambda r: r.fulfill(content_type="application/json", body=json.dumps({"counts": {"q1": 3}})),
+        )
+        page.route(
+            "**/api/v1/question-comments/counts*",
+            lambda r: r.fulfill(content_type="application/json", body=json.dumps({"counts": {"q1": 7}})),
+        )
+        page.route(
             "**/api/v1/question-favorites/*/toggle",
             lambda r: (favorite_state.update(favorited=not favorite_state["favorited"]),
                        r.fulfill(content_type="application/json", body=json.dumps({"questionId": "q1", "favorited": favorite_state["favorited"]}))),
@@ -144,6 +152,12 @@ with sync_playwright() as playwright:
         page.wait_for_function("document.getElementById('practiceFavoriteBtn').getAttribute('aria-pressed')==='true'")
         page.locator('#practiceFavoriteBtn').click()
         page.wait_for_function("document.getElementById('practiceFavoriteBtn').getAttribute('aria-pressed')==='false'")
+
+        # 侧栏角标：当前题的评论数与收藏数
+        page.wait_for_function("document.getElementById('practiceCommentCount').textContent==='7'")
+        assert page.locator('#practiceCommentCount').is_visible()
+        page.wait_for_function("document.getElementById('practiceFavoriteCount').textContent==='3'")
+        assert page.locator('#practiceFavoriteCount').is_visible()
 
         # 答题后：解析面板只保留答案与解析，不再内嵌弹幕/收藏/讨论评论区
         page.evaluate("window.KGActivitySchemaV1.getPracticeAutoExplain=()=>true")

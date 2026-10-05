@@ -38,6 +38,12 @@ async def favorite_status(db: DB, user: CurrentUser, ids: Annotated[str, Query(m
     return {"status": await service.favorite_status(db, user, ids.split(","))}
 
 
+@router.get("/counts")
+async def favorite_counts(db: DB, user: CurrentUser, ids: Annotated[str, Query(max_length=4000)]):
+    """批量题目收藏总数：练习页侧栏收藏角标用。"""
+    return {"counts": await service.question_favorite_counts(db, user, ids.split(","))}
+
+
 @router.put("/{question_id}")
 async def favorite_question(question_id: str, db: DB, user: CurrentUser):
     try:
