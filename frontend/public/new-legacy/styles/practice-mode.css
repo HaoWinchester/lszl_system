@@ -483,3 +483,23 @@ body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice
 /* 侧栏评论/收藏角标：显示当前题的留言数与收藏总数。 */
 .practice-side-badge{min-width:17px;height:16px;padding:0 5px;display:inline-grid;place-items:center;border-radius:999px;background:#f1efff;color:#4c3fd1;font-size:10px;font-style:normal;font-weight:800;line-height:1}
 .practice-side-badge[hidden]{display:none!important}
+
+/* ===== v9.0 获奖级视觉打磨层（仅增量，不改既有选择器行为） ===== */
+/* 入场编排：模式卡与试卷卡依次升起 */
+@keyframes practiceRise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+.practice-mode-grid .practice-mode-card,.practice-paper-grid .practice-paper-card{animation:practiceRise .6s cubic-bezier(.22,.75,.24,1) both}
+.practice-mode-grid .practice-mode-card:nth-child(2){animation-delay:.08s}
+.practice-paper-grid .practice-paper-card:nth-child(2){animation-delay:.05s}
+.practice-paper-grid .practice-paper-card:nth-child(3){animation-delay:.1s}
+.practice-paper-grid .practice-paper-card:nth-child(4){animation-delay:.15s}
+.practice-paper-grid .practice-paper-card:nth-child(5){animation-delay:.2s}
+.practice-paper-grid .practice-paper-card:nth-child(6){animation-delay:.25s}
+.practice-paper-grid .practice-paper-card:nth-child(7){animation-delay:.3s}
+.practice-paper-grid .practice-paper-card:nth-child(8){animation-delay:.35s}
+.practice-paper-grid .practice-paper-card:nth-child(9){animation-delay:.4s}
+/* 键盘焦点可见性 */
+.practice-start-btn:focus-visible,.practice-start-btn:focus-visible,.practice-exit-btn:focus-visible,.practice-paper-card:focus-visible,.practice-utility-btn:focus-visible,.practice-more-btn:focus-visible{outline:3px solid rgba(124,58,237,.35);outline-offset:2px}
+/* 按压反馈 */
+.practice-start-btn:active:not(:disabled),.practice-exit-btn:active,.practice-paper-card:active{transform:translateY(1px) scale(.99)}
+/* 试卷卡 hover 阴影更有层次 */
+.practice-paper-card:hover{box-shadow:0 14px 30px rgba(31,41,55,.09),0 0 0 1px rgba(31,41,55,.03)}
