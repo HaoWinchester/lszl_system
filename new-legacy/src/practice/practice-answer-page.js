@@ -13,9 +13,9 @@
         stem.focus({preventScroll: true});
         stem.scrollIntoView({behavior: 'smooth', block: 'center'});
       }
-      if (action === 'sheet' || action === 'marked') {
+      if (action === 'sheet') {
         document.getElementById('practiceAnswerSheetMobileBtn').click();
-        document.querySelector('[data-answer-filter="' + (action === 'marked' ? 'marked' : 'all') + '"]')?.click();
+        document.querySelector('[data-answer-filter="all"]')?.click();
       }
     });
   }

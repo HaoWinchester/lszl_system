@@ -9,6 +9,7 @@ const root = path.resolve(__dirname, '..');
 const source = fs.readFileSync(path.join(root, 'src/100-practice-mode.js'), 'utf8');
 const context = {
   window: {},
+  global: {}, // restoreServerSession 内的收藏状态预热引用了模块级 global（沙箱内保持空对象即可跳过）
   state: { order: 'paper' },
   dom: { timer: {}, timeRow: {}, health: {} },
   document: { body: { dataset: {} } },

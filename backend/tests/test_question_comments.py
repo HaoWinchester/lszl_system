@@ -390,3 +390,47 @@ def test_discussion_denies_private_question_and_hidden_reply():
             assert client.get('/api/v1/question-comments/counts?ids='+ids['question']).json()['counts']=={}
     finally:
         _cleanup(ids)
+
+
+SENSITIVE_HINT = '留言包含不允许的内容，请修改后发布'
+
+
+def test_comment_rejects_sensitive_words() -> None:
+    """敏感词（脏话/反国家等）一律 400 拦截，归一化变体也无法绕过，且不落库。"""
+    ids = _ids()
+    asyncio.run(_seed(ids))
+    try:
+        with TestClient(app) as client:
+            _login(client, ids["student"])
+            url = _comments_url(ids)
+            # 直接命中与变体：全角、夹符号、大小写
+            for content in (
+                "傻逼题目",
+                "这个老师是个白痴",
+                "傻　逼",           # 全角空格分隔
+                "傻.逼",            # 标点分隔
+                "FUCK this question",
+                "Bitch",
+                "打倒共产党",
+                "分裂国家万岁",
+            ):
+                response = client.post(url, json={"content": content})
+                assert response.status_code == 400, (content, response.text)
+                assert response.json()["detail"] == SENSITIVE_HINT
+
+            # 回复同样拦截
+            parent = client.post(url, json={"content": "正常父留言"}).json()["comment"]
+            reply = client.post(
+                url, json={"content": "你是白痴吧", "parentId": parent["id"]}
+            )
+            assert reply.status_code == 400
+
+            # 命中的留言不落库
+            listed = client.get(url).json()["comments"]
+            assert [c["content"] for c in listed] == ["正常父留言"]
+
+            # 正常留言不受影响
+            ok = client.post(url, json={"content": "这题解析讲得很清楚"})
+            assert ok.status_code == 201
+    finally:
+        _cleanup(ids)

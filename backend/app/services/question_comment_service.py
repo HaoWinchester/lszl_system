@@ -8,6 +8,7 @@ from sqlalchemy.dialects.postgresql import insert
 from app.models.question import Question, QuestionBank
 from app.models.question_comment import HIDDEN, QuestionComment, QuestionCommentLike, QuestionCommentFavorite
 from app.models.user import User
+from app.core.sensitive_words import SENSITIVE_HINT, contains_sensitive
 MAX_CONTENT_LENGTH = 200
 MAX_LIST_SIZE = 50
 DANMAKU_MAX_LENGTH = 30
@@ -15,6 +16,8 @@ MANAGER_ROLES = ('admin', 'teacher')
 class QuestionCommentNotFoundError(ValueError): pass
 class QuestionCommentPermissionError(ValueError): pass
 class QuestionCommentValidationError(ValueError): pass
+class SensitiveContentError(ValueError):
+    def __init__(self): super().__init__(SENSITIVE_HINT)
 
 def _clean(value): return str(value or '').strip()
 
@@ -92,6 +95,7 @@ async def create_comment(db,user,question_id,content,parent_id=None):
     text=_clean(content)
     if not text: raise QuestionCommentValidationError('留言内容不能为空')
     if len(text)>MAX_CONTENT_LENGTH: raise QuestionCommentValidationError('留言内容不能超过 200 字')
+    if contains_sensitive(text): raise SensitiveContentError()
     await require_question_access(db,user,question_id)
     if parent_id:
         parent=await get_comment(db,_clean(parent_id),question_id)

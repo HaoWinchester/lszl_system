@@ -265,11 +265,14 @@ with sync_playwright() as playwright:
 
     assert_mark_layout(page)
     # Reference design controls use the real question navigation and marked set.
-    page.locator('[data-practice-action="marked"]').click()
+    # 侧栏「标记」入口已换成「收藏」；标记筛选统一走答题卡抽屉内的过滤器。
+    page.locator('[data-practice-action="sheet"]').click()
+    page.locator('[data-answer-filter="marked"]').click()
     assert page.locator('.practice-answer-filter-empty').is_visible()
     page.locator('#practiceAnswerSheetDrawerClose').click()
     page.locator('#practiceMarkToggle').click()
-    page.locator('[data-practice-action="marked"]').click()
+    page.locator('[data-practice-action="sheet"]').click()
+    page.locator('[data-answer-filter="marked"]').click()
     assert page.locator('#practiceAnswerSheet [data-question-id]').count() == 1
     assert 'is-marked' in page.locator('#practiceAnswerSheet [data-question-id]').get_attribute('class')
     page.locator('[data-answer-filter="all"]').click()

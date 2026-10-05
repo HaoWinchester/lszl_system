@@ -112,12 +112,13 @@
     </li>`
   }
 
-  function composerMarkup(user) {
-    if (!user) {
+  function composerMarkup(state) {
+    if (!state.user) {
       return `<div class="q-composer"><button type="button" class="q-composer-login" data-qc-action="login">登录后参与讨论</button></div>`
     }
     return `<div class="q-composer">
       <textarea class="q-composer-input" rows="2" maxlength="${MAX_CONTENT}" placeholder="留下你的精彩评论吧"></textarea>
+      ${state.sendError ? `<p class="q-composer-error" role="alert">${escapeHTML(state.sendError)}</p>` : ''}
       <div class="q-composer-foot"><span class="q-composer-count" data-qc-count>0/${MAX_CONTENT}</span><button type="button" class="q-composer-send" data-qc-action="send" disabled>发布</button></div>
     </div>`
   }
@@ -154,7 +155,7 @@
       ${shown.length ? '' : (state.error ? '' : `<p class="q-comments-empty">${state.favoritesMode ? '还没有收藏。' : '还没有留言，来聊聊这道题吧。'}</p>`)}
       ${state.nextCursor ? '<button type="button" data-qc-action="more">加载更多</button>' : ''}
       ${state.replyId ? `<div data-qc-reply>正在回复 <button type="button" data-qc-action="cancel-reply">取消回复</button></div>` : ''}
-      ${state.favoritesMode ? '<button type="button" data-qc-action="discussion">回到本题讨论</button>' : composerMarkup(state.user)}
+      ${state.favoritesMode ? '<button type="button" data-qc-action="discussion">回到本题讨论</button>' : composerMarkup(state)}
     </section>`
   }
 
@@ -421,6 +422,7 @@
     instance.pending.add('send')
     const button = instance.drawer.querySelector('[data-qc-action="send"]')
     button.disabled = true
+    instance.state.sendError = ''
     try {
       const payload = await request(`${instance.questionId}/comments`, {
         method: 'POST',
@@ -428,6 +430,7 @@
       })
       if (instance.disposed) return
       instance.state.draft = ''
+      instance.state.sendError = ''
       composer.value = ''
       if(instance.state.replyId)instance.state.expandedReplies.add(instance.state.replyId)
       instance.state.replyId = null
@@ -440,7 +443,9 @@
     } catch (error) {
       if (text(error.message) !== 'UNAUTHENTICATED') {
         button.disabled = false
-        showToast(instance, text(error.message) === 'REQUEST_FAILED' ? '发布失败，请稍后重试' : text(error.message))
+        // 发布区内联提示后端拦截原因（如敏感词），toast 同步提醒。
+        instance.state.sendError = text(error.message) === 'REQUEST_FAILED' ? '发布失败，请稍后重试' : text(error.message)
+        showToast(instance, instance.state.sendError)
       }
     } finally { instance.pending.delete('send'); if(!instance.disposed) renderInto(instance) }
   }

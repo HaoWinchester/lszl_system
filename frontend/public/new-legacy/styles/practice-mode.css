@@ -461,3 +461,18 @@ body.practice-mode-page:not([data-practice-view="lobby"]) .practice-exp-fab{disp
 .practice-catalog-search input,.practice-catalog-search select { min-height:42px; width:100%; box-sizing:border-box; padding:8px 12px; border:1px solid var(--border-color,#d8dfdc); border-radius:10px; background:var(--bg-card,#fff); color:var(--text-primary,#172d25); font:inherit; }
 .practice-catalog-search input:focus-visible,.practice-catalog-search select:focus-visible { outline:2px solid #3b775d; outline-offset:2px; }
 .practice-mode-card .practice-mode-purpose { margin:6px 0; font-weight:600; color:var(--text-primary,#254d3b); }
+
+/* 我的收藏：侧栏按钮高亮 + 大厅收藏抽屉卡片（120-question-favorites.js）。 */
+body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-side-item.is-favorited{background:#f1efff;color:#4c3fd1;font-weight:650}
+.practice-favorites-list{display:grid;gap:12px}
+.practice-favorite-card{padding:14px 16px;background:#fff;border:1px solid var(--practice-border,var(--learn-border,#e4e4e7));border-radius:var(--learn-radius-panel,10px);box-shadow:0 1px 2px rgb(24 24 27 / .05)}
+.practice-favorite-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.practice-favorite-type{padding:2px 9px;border-radius:999px;background:var(--learn-accent,#f1efff);color:var(--learn-accent-foreground,#4c3fd1);font-size:11px;font-weight:700}
+.practice-favorite-card-head time{color:var(--practice-muted,var(--learn-muted-foreground,#71717a));font-size:11px}
+.practice-favorite-stem{margin:0;font-size:13px;line-height:1.65;color:var(--practice-text,var(--learn-foreground,#27272a));word-break:break-word}
+.practice-favorite-analysis{margin-top:10px;padding:10px 12px;border-radius:var(--learn-radius-control,8px);background:var(--learn-secondary,#f4f4f5)}
+.practice-favorite-analysis strong{display:block;margin-bottom:4px;font-size:11px;letter-spacing:.08em;color:var(--learn-accent-foreground,#4c3fd1)}
+.practice-favorite-analysis p{margin:0;font-size:12.5px;line-height:1.6;color:var(--practice-text,var(--learn-foreground,#3f3f46));word-break:break-word;white-space:pre-wrap}
+.practice-favorite-card-foot{display:flex;justify-content:flex-end;margin-top:10px}
+.practice-favorite-card-foot button{padding:4px 12px;border:1px solid var(--practice-border,var(--learn-border,#e4e4e7));border-radius:999px;background:#fff;color:var(--practice-muted,var(--learn-muted-foreground,#71717a));font-size:12px;cursor:pointer}
+.practice-favorite-card-foot button:hover{color:var(--practice-danger,var(--learn-destructive,#dc2626));border-color:#fecdd3}

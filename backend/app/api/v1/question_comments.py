@@ -21,6 +21,8 @@ def _raise(error: ValueError) -> None:
         raise HTTPException(status_code=404, detail=str(error)) from error
     if isinstance(error, service.QuestionCommentPermissionError):
         raise HTTPException(status_code=403, detail=str(error)) from error
+    if isinstance(error, service.SensitiveContentError):
+        raise HTTPException(status_code=400, detail=str(error)) from error
     raise HTTPException(status_code=422, detail=str(error)) from error
 
 

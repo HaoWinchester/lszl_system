@@ -26,7 +26,8 @@ from app.models.question import (
     QuestionBank,
     QuestionCleanupAudit,
 )
-from app.models.question_comment import QuestionComment, QuestionCommentLike
+from app.models.question_comment import QuestionComment, QuestionCommentFavorite, QuestionCommentLike
+from app.models.question_favorite import QuestionFavorite
 from app.models.recall_acceptance import ContentPrepRecallAcceptance
 from app.models.runtime_migration import RuntimeMigrationItem, RuntimeMigrationRun
 from app.models.runtime_state import RuntimeState
@@ -79,6 +80,8 @@ __all__ = [
     "Question",
     "QuestionComment",
     "QuestionCommentLike",
+    "QuestionCommentFavorite",
+    "QuestionFavorite",
     "Principle",
     "SynthesisPreset",
     "QuestionTagConfig",
