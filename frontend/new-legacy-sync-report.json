@@ -1,19 +1,12 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.287",
-  "toVersion": "v9.0-p4.1.287",
+  "fromVersion": "v9.0-p4.1.288",
+  "toVersion": "v9.0-p4.1.289",
   "changes": {
-    "added": [
-      "tests/practice-favorites-browser.py"
-    ],
+    "added": [],
     "changed": [
-      "src/119-question-comments.js",
-      "src/120-question-favorites.js",
-      "styles/question-comments.css",
-      "tests/practice-mark-show-answers-browser.py",
-      "tests/practice-seeded-shuffle.test.js",
-      "tests/practice-side-nav-comments-browser.py",
-      "tests/question-comments-browser.py"
+      "VERSION",
+      "content-prep-studio/dist/content-prep.html"
     ],
     "removed": []
   },
