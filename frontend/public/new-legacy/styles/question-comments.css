@@ -211,11 +211,12 @@
 .q-comments-drawer .q-comment-author { font-size:12.5px; font-weight:600; color:var(--learn-accent-foreground, #4c3fd1); }
 .q-comments-drawer .q-comment-time { font-size:11px; color:var(--learn-muted-foreground, #a1a1aa); }
 .q-comments-drawer .q-comment-content { margin:4px 0 0; font-size:14px; line-height:1.65; color:var(--learn-foreground, #27272a); }
-.q-comments-drawer .q-comment-actions { flex-direction:row; flex-wrap:wrap; align-items:center; gap:16px; padding:7px 0 2px; }
-.q-comments-drawer .q-comment-actions button { border:0; border-radius:0; background:transparent; padding:0; color:var(--learn-muted-foreground, #71717a); font-size:12px; cursor:pointer; transition:color .15s ease; white-space:nowrap; }
-.q-comments-drawer .q-comment-actions button:hover { background:transparent; color:var(--learn-accent-foreground, #4c3fd1); }
-.q-comments-drawer .q-comment-like.is-liked { background:transparent; color:#e11d48; }
-.q-comments-drawer .q-comment-delete:hover { background:transparent; color:var(--learn-destructive, #dc2626); }
+.q-comments-drawer .q-comment-actions { flex-direction:row; flex-wrap:wrap; align-items:center; gap:8px; padding:8px 0 2px; }
+.q-comments-drawer .q-comment-actions button { display:inline-flex; align-items:center; gap:4px; padding:3px 11px; border:1px solid var(--learn-border, #e4e4e7); border-radius:999px; background:var(--learn-card, #fff); color:var(--learn-muted-foreground, #71717a); font-size:12px; line-height:1.6; cursor:pointer; transition:color .15s ease, border-color .15s ease, background .15s ease; white-space:nowrap; }
+.q-comments-drawer .q-comment-actions button:hover { background:var(--learn-accent, #f1efff); border-color:var(--learn-ring, #6d5dfc); color:var(--learn-accent-foreground, #4c3fd1); }
+.q-comments-drawer .q-comment-actions button[aria-pressed="true"] { background:var(--learn-accent, #f1efff); border-color:var(--learn-ring, #6d5dfc); color:var(--learn-accent-foreground, #4c3fd1); }
+.q-comments-drawer .q-comment-like.is-liked { background:#fff1f2; border-color:#fecdd3; color:#e11d48; }
+.q-comments-drawer .q-comment-delete:hover { background:#fef2f2; border-color:#fecaca; color:var(--learn-destructive, #dc2626); }
 .q-comments-drawer .q-comments-empty { padding:32px 0 22px; text-align:center; color:var(--learn-muted-foreground, #71717a); font-size:13px; }
 .q-comments-drawer .q-comments-error { margin:10px 0; color:var(--learn-warning, #b45309); font-size:12px; }
 .q-comments-drawer .q-comments-error button { border:0; background:none; color:var(--learn-accent-foreground, #4c3fd1); text-decoration:underline; }
@@ -248,8 +249,8 @@
 .q-danmaku-pop { position:fixed; z-index:250; width:250px; padding:12px 14px 10px; background:var(--learn-card, #fff); color:var(--learn-foreground, #27272a); border:1px solid var(--learn-border, #e4e4e7); border-radius:16px; box-shadow:var(--learn-shadow-float, 0 4px 12px rgb(24 24 27 / .08)), 0 10px 30px rgb(24 24 27 / .1); pointer-events:auto; }
 .q-danmaku-pop::before { content:''; position:absolute; top:-5px; left:50%; width:12px; height:12px; transform:translateX(-50%) rotate(45deg); background:var(--learn-card, #fff); border-left:1px solid var(--learn-border, #e4e4e7); border-top:1px solid var(--learn-border, #e4e4e7); border-radius:2px; }
 .q-danmaku-pop-text { display:flex; gap:10px; align-items:baseline; justify-content:space-between; margin:0 0 10px; color:var(--learn-foreground, #27272a); font-size:13px; line-height:1.5; }
-.q-danmaku-pop-like { flex-shrink:0; color:#e11d48; font-size:12px; font-weight:700; white-space:nowrap; }
-.q-danmaku-pop-like.is-liked { color:#e11d48; }
+.q-danmaku-like { display:inline-block; margin-left:6px; color:#e11d48; font-size:11px; font-weight:700; white-space:nowrap; }
+.q-danmaku-like.is-liked { color:#e11d48; }
 .q-danmaku-pop-actions { display:flex; align-items:stretch; justify-content:space-between; gap:4px; }
 .q-danmaku-pop-actions button { flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; padding:4px 2px; border:0; border-radius:10px; background:transparent; color:var(--learn-muted-foreground, #52525b); font-size:11px; cursor:pointer; }
 .q-danmaku-pop-actions button:hover { background:var(--learn-secondary, #f4f4f5); color:var(--learn-foreground, #18181b); }

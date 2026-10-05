@@ -12,7 +12,7 @@ with sync_playwright() as p:
         def api(r):
             if r.request.method=='GET': r.fulfill(json={'comments':comments[:1] if '/favorites' in r.request.url else comments,'nextCursor':None})
             else:
-                c=dict(comments[0]);c.update(myLike=True,myFavorite=True)
+                c=dict(comments[0]);c.update(myLike=True,myFavorite=True,likeCount=1)
                 r.fulfill(json={'comment':c})
         page.route('**/api/**',api)
         page.goto('http://localhost/harness')
@@ -75,6 +75,19 @@ with sync_playwright() as p:
         page.locator('[data-qc-action="collapse"]').click()
         assert page.locator('.q-danmaku-item.is-paused').count()==0
         assert page.locator('[data-danmaku-pop]').count()==0
+        # 点击弹幕以外位置：互动面板关闭且弹幕恢复运动
+        page.locator('.q-danmaku-item').first.dispatch_event('click')
+        page.wait_for_selector('[data-danmaku-pop]')
+        page.locator('#panel').dispatch_event('pointerdown')
+        assert page.locator('[data-danmaku-pop]').count()==0
+        assert page.locator('.q-danmaku-item.is-paused').count()==0
+        # 点过赞的弹幕：红心计数追加在弹幕尾部
+        assert page.locator('.q-danmaku-item .q-danmaku-like').count()>=1
+        # 打开评论区后点击非评论区：评论区收起
+        page.locator('#panel [data-qc-action="expand"]').click()
+        page.wait_for_selector('.q-comments-drawer')
+        page.locator('#panel').dispatch_event('pointerdown')
+        page.wait_for_function("document.querySelectorAll('.q-comments-drawer').length===0")
         page.locator('#panel [data-qc-action="favorites"]').click()
         page.wait_for_selector('.q-comments-drawer [data-qc-action="return"]')
         page.evaluate("KGQuestionComments.teardown(document.querySelector('#panel'));KGQuestionComments.mountPanel({panel:document.querySelector('#panel'),questionId:'q2'})")
