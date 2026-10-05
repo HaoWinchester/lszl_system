@@ -5655,7 +5655,8 @@
     state.initializing=true;
     const canReadTeachingContent=global.KGRolePermissions?.can?.('accessQuestionBank')!==false;
     if(canReadTeachingContent){
-      try{await global.KGTeachingContentApi?.ready?.()}
+      // 按需加载：qw 只消费原则/归纳预设，排除占响应 85%+ 的联想库。
+      try{await global.KGTeachingContentApi?.ready?.(undefined,{excludeRecallLibrary:true})}
       catch(error){document.body.dataset.teachingContentUnavailable='true';console.warn('原则与归纳卡加载失败，继续加载已发布试卷。',error)}
     }
     try{await (global.KGCanvasWorkspaceAdapter?.ready||Promise.resolve())}catch(error){

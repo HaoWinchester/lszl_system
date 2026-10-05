@@ -665,6 +665,51 @@
   }
   // 显示答案是会话内状态（runtimeState.showAnswers），不是跨卷全局偏好。
   function showAnswersEnabled(){return state.mode==='practice'&&!state.reviewing&&state.showAnswers===true}
+  function currentPracticeQuestion(){
+    return state.verification?.active?state.verification.question:state.questions[state.index];
+  }
+  function renderPracticeTools(question){
+    const visible=!!(state.active&&question&&!state.reviewing);
+    const comment=$('practiceCommentBtn');
+    if(comment)comment.hidden=!visible;
+    const danmaku=$('practiceDanmakuToggle');
+    if(danmaku){
+      const on=global.KGQuestionComments?.danmakuEnabled()!==false;
+      danmaku.hidden=!visible;
+      const label=danmaku.querySelector('[data-practice-danmaku-label]');
+      if(label)label.textContent=on?'弹幕开':'弹幕关';
+      danmaku.setAttribute('aria-pressed',on?'true':'false');
+    }
+    renderFavoriteButton(question);
+  }
+  // 侧栏「收藏」：高亮当前题收藏态；状态由 KGQuestionFavorites 内存缓存驱动。
+  function renderFavoriteButton(question){
+    const button=dom.favoriteBtn;if(!button)return;
+    const id=text(question?.id);
+    const favorited=id?!!global.KGQuestionFavorites?.isFavorited(id):false;
+    button.hidden=!visibleFavoriteButton();
+    button.classList.toggle('is-favorited',favorited);
+    button.setAttribute('aria-pressed',favorited?'true':'false');
+    button.title=favorited?'取消收藏本题':'收藏本题';
+  }
+  function visibleFavoriteButton(){
+    const question=currentPracticeQuestion();
+    return !!(state.active&&question&&!state.reviewing);
+  }
+  async function toggleCurrentQuestionFavorite(){
+    const question=currentPracticeQuestion();
+    if(!question||!state.active||state.reviewing)return false;
+    try{
+      const result=await global.KGQuestionFavorites?.toggle(text(question.id));
+      if(!result)return false;
+      showToast(result.favorited?'已收藏本题':'已取消收藏');
+    }catch(error){
+      showToast(text(error.message)==='UNAUTHENTICATED'?'登录后才能收藏题目':(error.message||'收藏操作失败，请稍后重试。'));
+      return false;
+    }
+    renderFavoriteButton(question);
+    return true;
+  }
   function renderQuestionMark(question){
     const button=$('practiceMarkToggle');if(!button)return;
     const marked=!!(question&&state.markedQuestions.has(text(question.id)));
@@ -672,9 +717,10 @@
     button.textContent=marked?'取消标记':'标记本题';
     button.classList.toggle('is-marked',marked);
     button.setAttribute('aria-pressed',marked?'true':'false');
+    renderPracticeTools(question);
   }
   function toggleQuestionMark(){
-    const question=state.verification?.active?state.verification.question:state.questions[state.index];
+    const question=currentPracticeQuestion();
     if(!question||!state.active||state.reviewing)return false;
     const id=text(question.id);
     if(state.markedQuestions.has(id))state.markedQuestions.delete(id);else state.markedQuestions.add(id);
@@ -702,7 +748,11 @@
       actions.innerHTML='<button type="button" class="practice-secondary-btn" data-question-feedback>解析有误或缺失？反馈此题</button>';
       actions.querySelector('[data-question-feedback]')?.addEventListener('click',()=>global.KGSupportCenter?.openQuestionFeedback({questionId:text(question.id),paperId:question.sourcePaperId||state.session?.paperId,releaseId:question.sourceReleaseId||state.session?.releaseId,sessionId:state.session?.id}));
     }
-    if(!neutral)global.KGQuestionComments?.mountPanel({panel,questionId:text(question.id)});
+    // 解析面板不再内嵌评论区；只挂弹幕层（讨论入口统一收敛到左侧导航「评论」按钮）。
+    if(!neutral){
+      global.KGQuestionComments?.teardownSource?.('danmaku');
+      global.KGQuestionComments?.mountDanmaku?.({questionId:text(question.id)});
+    }
     panel.hidden=false;
     panel.scrollIntoView({behavior:'smooth',block:'nearest'});
   }
@@ -731,7 +781,7 @@
     const savedAnswer=state.draft?.answer?.(question.id)||state.session?.answers?.[question.id]||null;
     const practiceAnswered=savedAnswer?{selected:answerSelectedIds(savedAnswer),correct:savedAnswer.correct===true}:null;
     state.locked=false;dom.feedback.hidden=true;hideRemediation();dom.questionCard.classList.remove('is-timeout');
-    if($('practiceExplanationPanel')){global.KGQuestionComments?.teardown($('practiceExplanationPanel'));$('practiceExplanationPanel').hidden=true;}
+    if($('practiceExplanationPanel')){$('practiceExplanationPanel').hidden=true;global.KGQuestionComments?.teardownSource?.('danmaku');}
     const view=questionLanguageView(question);
     if(view){
       dom.questionStem.innerHTML=escapeHTML(languageText(view.stem))+englishLine(view.stem);
@@ -1083,6 +1133,11 @@
   function restoreServerSession(session,catalog){
     state.saves=null;$('practiceSettlementRetry').hidden=true;
     state.session=normalizedSession(session);state.report=null;state.reviewing=false;state.mode=state.session.mode;state.showPreviousWrong=true;state.questions=sessionQuestions(state.session);
+    // 预热本批题目的收藏状态，供侧栏按钮即时高亮；完成后刷新一次按钮。
+    if(global.KGQuestionFavorites&&state.questions.length){
+      const ids=state.questions.map(question=>text(question.id));
+      global.KGQuestionFavorites.status(ids).then(()=>renderFavoriteButton(currentPracticeQuestion())).catch(()=>{});
+    }
     createDraft(state.session);
     const runtime=state.session.runtimeState||{},stats=state.session.stats||{};
     state.pendingSelections=clone(runtime.pendingSelections||{});state.pendingMatches=clone(runtime.pendingMatches||{});
@@ -1126,7 +1181,7 @@
     if(state.entryStartingMode)return false;
     if(!hasAuthenticatedUser()){global.KGSharedAuthDialog?.open?.('登录后即可开始做题，并保存你的学习进度。');return false}
     const catalog=selectedRelease(),count=Number(state.selectedCount);
-    if(mode!=='revenge'&&!catalog){syncLobby();return false}
+    if(mode!=='revenge'&&!catalog){showToast('请先选择一份试卷，再开始练习。');syncLobby();return false}
     const access=catalog?paperAccess(catalog):{allowed:true,accessLevel:'free'};
     if(mode!=='revenge'&&!access.allowed)return openMembership(access);
     let restoreFocus=false;
@@ -1140,7 +1195,7 @@
         const api=practiceApi();
         if(hasAuthenticatedUser()&&typeof api?.enterSession==='function'){
           const input=practiceEntryInput(mode,catalog,count),entered=fresh?{session:await createFreshSession(input),resumed:false}:await api.enterSession(input),session=entered?.session;
-          if(fresh&&!session)return false;
+          if(fresh&&!session){showToast(mode==='revenge'?'当前没有可复仇的错题，先去做题积累错题吧。':'没有可开始的新一轮练习。');return false}
           if(!session?.id)throw new Error('进入练习未返回会话');
           state.order=input.order;
           return restoreServerSession(session,mode==='revenge'?null:catalog);
@@ -1198,6 +1253,26 @@
   function closePaperDrawer(){setDrawerOpen(dom.paperDrawer,false);dom.libraryMoreBtn?.focus?.()}
   function openHistoryDrawer(){setDrawerOpen(dom.historyDrawer,true,dom.historyCloseBtn);renderHistory()}
   function closeHistoryDrawer(){setDrawerOpen(dom.historyDrawer,false);dom.historyOpenBtn?.focus?.()}
+  // 我的收藏：与学习记录同一套抽屉开关体系（遮罩点击 / Escape / body 锁滚动）。
+  function openFavoritesDrawer(){setDrawerOpen(dom.favoritesDrawer,true,dom.favoritesCloseBtn);renderFavorites()}
+  function closeFavoritesDrawer(){setDrawerOpen(dom.favoritesDrawer,false);dom.favoritesOpenBtn?.focus?.()}
+  async function renderFavorites(){
+    const favorites=global.KGQuestionFavorites;
+    if(!favorites||!hasAuthenticatedUser()){
+      if(dom.favoritesList)dom.favoritesList.innerHTML='';if(dom.favoritesEmpty)dom.favoritesEmpty.hidden=false;
+      if(dom.favoritesSummary)dom.favoritesSummary.textContent='登录后可查看你收藏的题目';return;
+    }
+    try{
+      const {total}=await favorites.renderList(dom.favoritesList,dom.favoritesEmpty,dom.favoritesSummary);
+      if(dom.favoritesEmpty)dom.favoritesEmpty.textContent='在练习中点击左侧“收藏”，题目就会保存在这里。';
+      if(!total&&dom.favoritesSummary)dom.favoritesSummary.textContent='还没有收藏的题目';
+    }catch(error){
+      if(text(error.message)==='UNAUTHENTICATED')return;
+      if(dom.favoritesList)dom.favoritesList.innerHTML='';if(dom.favoritesEmpty)dom.favoritesEmpty.hidden=false;
+      if(dom.favoritesEmpty)dom.favoritesEmpty.textContent='收藏暂时无法读取，请稍后重试。';
+      if(dom.favoritesSummary)dom.favoritesSummary.textContent='收藏读取失败';
+    }
+  }
   function openAnswerSheetDrawer(){renderAnswerSheet();setDrawerOpen(dom.answerSheetDrawer,true,dom.answerSheetDrawerClose);dom.answerSheetMobileBtn?.setAttribute('aria-expanded','true')}
   function closeAnswerSheetDrawer(focusEntry=false){
     setDrawerOpen(dom.answerSheetDrawer,false);
@@ -1427,6 +1502,16 @@
     dom.libraryClear?.addEventListener('click',()=>{state.librarySearch='';state.librarySubject='';state.libraryFilter='all';if(dom.librarySearch)dom.librarySearch.value='';renderPaperLibrary()});
     dom.libraryMoreBtn?.addEventListener('click',openPaperDrawer);dom.paperDrawerClose?.addEventListener('click',closePaperDrawer);
     dom.historyOpenBtn?.addEventListener('click',openHistoryDrawer);dom.historyCloseBtn?.addEventListener('click',closeHistoryDrawer);dom.clearHistoryBtn?.addEventListener('click',clearHistory);
+    dom.favoritesOpenBtn?.addEventListener('click',openFavoritesDrawer);dom.favoritesCloseBtn?.addEventListener('click',closeFavoritesDrawer);
+    dom.favoritesDrawer?.addEventListener('click',event=>{if(event.target===dom.favoritesDrawer)closeFavoritesDrawer()});
+    dom.favoritesList?.addEventListener('click',async event=>{
+      const button=event.target.closest('[data-favorite-remove]');if(!button)return;
+      try{
+        await global.KGQuestionFavorites?.toggle(button.dataset.favoriteRemove);
+        showToast('已取消收藏');
+        await renderFavorites();
+      }catch(error){showToast(text(error.message)==='UNAUTHENTICATED'?'请先登录':(error.message||'操作失败，请稍后重试。'))}
+    });
     // 经验面板：窄屏 FAB 展开/收起；窗口尺寸变化时重算显示模式
     const expFab=$('practiceExpFab');
     expFab?.addEventListener('click',()=>{
@@ -1477,6 +1562,28 @@
     // 显示答案开关（会话态，随保存落库）；标记按钮只改本地状态与答题卡。
     $('practiceShowAnswers')?.addEventListener('change',event=>{state.showAnswers=event.target.checked===true;renderQuestion()});
     $('practiceMarkToggle')?.addEventListener('click',()=>toggleQuestionMark());
+    // 标记区工具：评论直开底部讨论抽屉；弹幕开关切换本机偏好并同步按钮文案。
+    $('practiceCommentBtn')?.addEventListener('click',()=>{
+      const question=currentPracticeQuestion();
+      if(question&&state.active)global.KGQuestionComments?.openPanel({questionId:text(question.id)});
+    });
+    $('practiceDanmakuToggle')?.addEventListener('click',()=>{
+      const next=!(global.KGQuestionComments?.danmakuEnabled()!==false);
+      global.KGQuestionComments?.setDanmakuEnabled(next);
+      renderPracticeTools(currentPracticeQuestion());
+    });
+    // 侧栏「收藏」按钮：切换当前题收藏（题目收藏存后端，跨设备可见）。
+    $('practiceFavoriteBtn')?.addEventListener('click',()=>{void toggleCurrentQuestionFavorite()});
+    // 左侧导航栏收起/展开：桌面端滑出屏幕左侧，保留展开把手。
+    const sideToggle=$('practiceSideToggle'),sideNav=$('practiceSideNav'),gameShell=$('practiceGame');
+    sideToggle?.addEventListener('click',()=>{
+      if(!gameShell)return;
+      const collapsed=gameShell.classList.toggle('practice-side-collapsed');
+      sideToggle.setAttribute('aria-expanded',String(!collapsed));
+      sideToggle.textContent=collapsed?'»':'‹';
+      sideToggle.title=collapsed?'展开导航栏':'收起导航栏';
+      if(sideNav)sideNav.setAttribute('aria-hidden',collapsed?'true':'false');
+    });
     dom.showPreviousWrong?.addEventListener('change',()=>{
       state.showPreviousWrong=dom.showPreviousWrong.checked;
       renderPreviousWrongAnswer(state.verification?.active?state.verification.question:state.questions[state.index]);
@@ -1507,7 +1614,7 @@
         if(Math.abs(dx)>48&&Math.abs(dx)>Math.abs(dy)*1.4)switchQuestion(dx<0?1:-1);
       },{passive:true});
     }
-    document.addEventListener('keydown',event=>{if(event.key!=='Escape')return;if(dom.revengeRuleTrigger?.getAttribute('aria-expanded')==='true'){state.revengeRulePinned=false;setRevengeRuleOpen(false)}else if(!dom.submitConfirm.hidden)closeSubmitConfirm();else if(!dom.exitConfirm.hidden)closeExitConfirm();else if(dom.answerSheetDrawer&&!dom.answerSheetDrawer.hidden)closeAnswerSheetDrawer(true);else if(dom.paperDrawer&&!dom.paperDrawer.hidden)closePaperDrawer();else if(dom.historyDrawer&&!dom.historyDrawer.hidden)closeHistoryDrawer()});
+    document.addEventListener('keydown',event=>{if(event.key!=='Escape')return;if(dom.revengeRuleTrigger?.getAttribute('aria-expanded')==='true'){state.revengeRulePinned=false;setRevengeRuleOpen(false)}else if(!dom.submitConfirm.hidden)closeSubmitConfirm();else if(!dom.exitConfirm.hidden)closeExitConfirm();else if(dom.answerSheetDrawer&&!dom.answerSheetDrawer.hidden)closeAnswerSheetDrawer(true);else if(dom.paperDrawer&&!dom.paperDrawer.hidden)closePaperDrawer();else if(dom.historyDrawer&&!dom.historyDrawer.hidden)closeHistoryDrawer();else if(dom.favoritesDrawer&&!dom.favoritesDrawer.hidden)closeFavoritesDrawer()});
     global.addEventListener('kg-auth-session-change',()=>{state.paperProgress=null;state.revengeSummary=null;state.coverageOverrides={};state.reportNextPractice=null;state.resumeLookupToken++;if(!state.active)syncLobby();if(!state.active)refreshExperiencePanel()});
     global.addEventListener('kg-subscription-change',()=>{if(!state.active)syncLobby()});
     global.addEventListener('kg-subscription-plan-change',()=>{if(!state.active)syncLobby()});
@@ -1554,7 +1661,7 @@
       lobby:$('practiceLobby'),game:$('practiceGame'),checkpoint:$('practiceCheckpoint'),result:$('practiceResult'),paperSelect:$('practicePaperSelect'),librarySearch:$('practiceLibrarySearch'),librarySubject:$('practiceLibrarySubject'),libraryClear:$('practiceLibraryClear'),paperMeta:$('practicePaperMeta'),retiredNotice:$('practiceRetiredModeNotice'),selectedPaperName:$('practiceSelectedPaperName'),paperLibrary:$('practicePaperLibrary'),paperDrawerLibrary:$('practicePaperDrawerLibrary'),filterButtons:[...document.querySelectorAll('[data-paper-filter]')],librarySummary:$('practiceLibrarySummary'),paperDrawerSummary:$('practicePaperDrawerSummary'),libraryMoreBtn:$('practiceLibraryMoreBtn'),paperDrawer:$('practicePaperDrawer'),paperDrawerClose:$('practicePaperDrawerClose'),toast:$('practiceToast'),
       setupCard:document.querySelector('.practice-setup-card'),modeGrid:document.querySelector('.practice-mode-grid'),empty:$('practiceEmpty'),countInputs:[...document.querySelectorAll('[name="practiceCount"]')],orderInputs:[...document.querySelectorAll('[name="practiceOrder"]')],startButtons:[...document.querySelectorAll('[data-practice-start]')],revengeActiveCount:$('practiceRevengeActiveCount'),revengePendingCount:$('practiceRevengePendingCount'),revengeRemediationCount:$('practiceRevengeRemediationCount'),revengeVerificationCount:$('practiceRevengeVerificationCount'),revengeMasteredCount:$('practiceRevengeMasteredCount'),revengeCountSummary:$('practiceRevengeCountSummary'),revengeCountOptions:$('practiceRevengeCountOptions'),revengeCountOptionList:$('practiceRevengeCountOptionList'),revengeRuleShell:$('practiceRevengeRuleShell'),revengeRuleTrigger:$('practiceRevengeRuleTrigger'),revengeRuleTooltip:$('practiceRevengeRuleTooltip'),
       progressShell:$('practiceProgressShell'),progressBar:$('practiceProgressBar'),questionProgress:$('practiceQuestionProgress'),health:$('practiceHealth'),timer:$('practiceTimer'),timeRow:$('practiceTimeRow'),timeRail:$('practiceTimeRail'),timeBar:$('practiceTimeBar'),timerMs:$('practiceTimerMs'),dangerVignette:$('practiceDangerVignette'),streakPop:$('practiceStreakPop'),feedback:$('practiceFeedback'),sessionConflict:$('practiceSessionConflict'),sessionConflictReload:$('practiceSessionConflictReload'),verificationBanner:$('practiceVerificationBanner'),verificationKnowledge:$('practiceVerificationKnowledge'),verificationMessage:$('practiceVerificationMessage'),questionCard:$('practiceQuestionCard'),questionStem:$('practiceQuestionStem'),previousWrongAnswer:$('practicePreviousWrongAnswer'),previousWrongToggle:$('practicePreviousWrongToggle'),showPreviousWrong:$('practiceShowPreviousWrong'),options:$('practiceOptions'),confirmAnswerBtn:$('practiceConfirmAnswerBtn'),questionNav:$('practiceQuestionNav'),prevBtn:$('practicePrevBtn'),nextBtn:$('practiceNextBtn'),questionPos:$('practiceQuestionPos'),remediationPanel:$('practiceRemediationPanel'),remediationKnowledge:$('practiceRemediationKnowledge'),remediationMessage:$('practiceRemediationMessage'),remediationReviewBtn:$('practiceRemediationReviewBtn'),remediationContinueBtn:$('practiceRemediationContinueBtn'),remediationExplanation:$('practiceRemediationExplanation'),
-      exitBtn:$('practiceExitBtn'),reviewBackBtn:$('practiceReviewBackBtn'),exitConfirm:$('practiceExitConfirm'),exitCancel:$('practiceExitCancel'),exitConfirmBtn:$('practiceExitConfirmBtn'),saveExitBtn:$('practiceSaveExitBtn'),abandonBtn:$('practiceAbandonBtn'),answerSheetRoot:$('practiceAnswerSheet'),answerSheetMobileBtn:$('practiceAnswerSheetMobileBtn'),answerSheetMobileCount:document.querySelector('#practiceAnswerSheetMobileBtn span'),answerSheetDrawer:$('practiceAnswerSheetDrawer'),answerSheetDrawerClose:$('practiceAnswerSheetDrawerClose'),submitConfirm:$('practiceSubmitConfirm'),submitMessage:$('practiceSubmitMessage'),submitReturnBtn:$('practiceSubmitReturnBtn'),submitAnywayBtn:$('practiceSubmitAnywayBtn'),checkpointStreak:$('practiceCheckpointStreak'),checkpointExperience:$('practiceCheckpointExperience'),checkpointDuration:$('practiceCheckpointDuration'),checkpointContinue:$('practiceCheckpointContinue'),resultAccuracy:$('practiceResultAccuracy'),resultDuration:$('practiceResultDuration'),resultExperience:$('practiceResultExperience'),challengeOutcome:$('practiceChallengeOutcome'),challengeResult:$('practiceChallengeResult'),challengeDetail:$('practiceChallengeDetail'),failBackdrop:$('practiceFailBackdrop'),failLobbyBtn:$('practiceFailLobbyBtn'),failContinueBtn:$('practiceFailContinueBtn'),againBtn:$('practiceAgainBtn'),lobbyBtn:$('practiceLobbyBtn'),historyOpenBtn:$('practiceHistoryOpenBtn'),historyCount:$('practiceHistoryCount'),historyDrawer:$('practiceHistoryDrawer'),historyCloseBtn:$('practiceHistoryCloseBtn'),historySummary:$('practiceHistorySummary'),historyList:$('practiceHistoryList'),historyEmpty:$('practiceHistoryEmpty'),clearHistoryBtn:$('practiceClearHistoryBtn')
+      exitBtn:$('practiceExitBtn'),reviewBackBtn:$('practiceReviewBackBtn'),exitConfirm:$('practiceExitConfirm'),exitCancel:$('practiceExitCancel'),exitConfirmBtn:$('practiceExitConfirmBtn'),saveExitBtn:$('practiceSaveExitBtn'),abandonBtn:$('practiceAbandonBtn'),answerSheetRoot:$('practiceAnswerSheet'),answerSheetMobileBtn:$('practiceAnswerSheetMobileBtn'),answerSheetMobileCount:document.querySelector('#practiceAnswerSheetMobileBtn span'),answerSheetDrawer:$('practiceAnswerSheetDrawer'),answerSheetDrawerClose:$('practiceAnswerSheetDrawerClose'),submitConfirm:$('practiceSubmitConfirm'),submitMessage:$('practiceSubmitMessage'),submitReturnBtn:$('practiceSubmitReturnBtn'),submitAnywayBtn:$('practiceSubmitAnywayBtn'),checkpointStreak:$('practiceCheckpointStreak'),checkpointExperience:$('practiceCheckpointExperience'),checkpointDuration:$('practiceCheckpointDuration'),checkpointContinue:$('practiceCheckpointContinue'),resultAccuracy:$('practiceResultAccuracy'),resultDuration:$('practiceResultDuration'),resultExperience:$('practiceResultExperience'),challengeOutcome:$('practiceChallengeOutcome'),challengeResult:$('practiceChallengeResult'),challengeDetail:$('practiceChallengeDetail'),failBackdrop:$('practiceFailBackdrop'),failLobbyBtn:$('practiceFailLobbyBtn'),failContinueBtn:$('practiceFailContinueBtn'),againBtn:$('practiceAgainBtn'),lobbyBtn:$('practiceLobbyBtn'),historyOpenBtn:$('practiceHistoryOpenBtn'),historyCount:$('practiceHistoryCount'),historyDrawer:$('practiceHistoryDrawer'),historyCloseBtn:$('practiceHistoryCloseBtn'),historySummary:$('practiceHistorySummary'),historyList:$('practiceHistoryList'),historyEmpty:$('practiceHistoryEmpty'),clearHistoryBtn:$('practiceClearHistoryBtn'),favoritesOpenBtn:$('practiceFavoritesOpenBtn'),favoritesDrawer:$('practiceFavoritesDrawer'),favoritesCloseBtn:$('practiceFavoritesCloseBtn'),favoritesSummary:$('practiceFavoritesSummary'),favoritesList:$('practiceFavoritesList'),favoritesEmpty:$('practiceFavoritesEmpty'),favoriteBtn:$('practiceFavoriteBtn')
     });
   }
   function snapshot(){return {sessionId:text(state.session?.id),revision:Number(state.session?.revision||0),status:text(state.session?.status),mode:state.mode,index:state.index,health:state.health,streak:state.streak,experience:state.experience,correct:state.correct,answered:state.answered,remainingSeconds:state.mode==='scholar'?remainingSeconds():null,active:state.active,reviewing:state.reviewing,view:document.body.dataset.practiceView||'',questionCount:state.questions.length}}

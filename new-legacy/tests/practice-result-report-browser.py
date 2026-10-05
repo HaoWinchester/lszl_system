@@ -44,7 +44,7 @@ with sync_playwright() as playwright:
         report,
     )
     assert page.locator('.practice-report-logo[src="/assets/logo.jpg"]').count() == 1
-    assert "幻谱 PMP 模拟成绩分析报告" in page.locator("#report").inner_text()
+    assert "PMP 模拟成绩分析报告" in page.locator("#report").inner_text()
     assert "模拟考试结果：PASS" in page.locator("#report").inner_text()
     assert "76.67" in page.locator(".practice-report-score").inner_text()
     assert page.locator(".practice-report-band-segment").count() == 4

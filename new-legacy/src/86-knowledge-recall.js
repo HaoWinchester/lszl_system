@@ -22,6 +22,22 @@
   let associationRuntime={subject:'',library:null,nodeCache:new Map(),resolveCache:new Map()};
   let nodeDrag=null,suppressNodeClickUntil=0;
   let recallAdapter=null,recallSession=null,keywordsRevealed=false;
+  // 联想库按内容哈希缓存：服务端对已缓存哈希只回传 contentHash 不带 payload（按需加载）。
+  // 内存缓存 + sessionStorage 跨页缓存（同科目库约 900KB，避免每次进页全量重拉）。
+  const libraryCache=new Map();
+  const LIBRARY_STORE_KEY='kg_recall_library_cache_v1';
+  let lastLibraryHash='';
+  try{
+    const stored=JSON.parse(window.sessionStorage?.getItem(LIBRARY_STORE_KEY)||'null');
+    if(stored?.hash&&stored?.payload&&Array.isArray(stored.payload.nodes)){
+      libraryCache.set(stored.hash,stored.payload);lastLibraryHash=stored.hash;
+    }
+  }catch(_){}
+  function persistLibrary(hash,payload){
+    try{
+      window.sessionStorage?.setItem(LIBRARY_STORE_KEY,JSON.stringify({hash,payload}));
+    }catch(_){/* 容量超限等情况忽略，仅失去跨页缓存 */}
+  }
   const destroyingNodeIds=new Set();
   let questionBrowser={bankId:'',filter:'all',loading:false};
   let authRecoveryPromise=null;
@@ -143,7 +159,8 @@
     const labels={idle:'已载入',loading:'正在载入',pending:'尚未保存',saving:'正在保存',saved:'已保存',failed:'尚未保存',conflict:'保存冲突'};
     if(progressSaveTimer&&value.saveState==='saved')value.saveState='pending';
     status.dataset.state=value.saveState||'idle';text.textContent=labels[value.saveState]||'已载入';
-    if(retry)retry.hidden=!['failed'].includes(value.saveState);
+    // 保存冲突（409）与失败同样提供「重试保存」自救入口，避免用户无法解除死锁。
+    if(retry)retry.hidden=!['failed','conflict'].includes(value.saveState);
   }
   function applyRandomHighlight(){
     const palette=HIGHLIGHT_PALETTES[Math.floor(Math.random()*HIGHLIGHT_PALETTES.length)]||HIGHLIGHT_PALETTES[0];
@@ -297,7 +314,16 @@
       question=sessionQuestion(session.historyQuestion);
     }else question=sessionQuestion(session.currentQuestion);
     const library=history?session.library:(session.currentLibrary||session.library);
-    window.KGRecallAssociationLibrary?.setSessionLibrary?.(library?.payload||{},library?.contentHash||'');
+    let libraryPayload=library?.payload;
+    if(!libraryPayload&&library?.contentHash&&libraryCache.has(library.contentHash))libraryPayload=cloneValue(libraryCache.get(library.contentHash));
+    if(library?.payload&&library?.contentHash){
+      if(libraryCache.size>3)libraryCache.clear();
+      libraryCache.set(library.contentHash,cloneValue(library.payload));
+      // 只持久化正式库（历史回看库是旧版本，不能覆盖跨页缓存）。
+      if(!history)persistLibrary(library.contentHash,library.payload);
+    }
+    lastLibraryHash=library?.contentHash||'';
+    window.KGRecallAssociationLibrary?.setSessionLibrary?.(libraryPayload||{},library?.contentHash||'');
     resetAssociationRuntime();
     rootMap=buildRootMap(question);keywordMatchers=buildKeywordMatchers(rootMap);keywordsRevealed=false;
     loadProgress(session.progress||{});
@@ -322,7 +348,8 @@
       };
     });
   }
-  async function loadDatabaseSession(questionId=''){
+  /* 拉取新题会话数据（不改主状态）；提交（applyServerSession）由调用方在合适的时机执行。 */
+  async function loadDatabaseSessionData(questionId=''){
     let id=String(questionId||requestedQuestionId()).trim();
     const hasResolvedContext=id&&String(question?.id||question?.sourceQuestionId||'')===id&&String(question?.sourceReleaseId||'');
     if(!id||!hasResolvedContext){
@@ -340,16 +367,25 @@
     const releaseId=(question&&question.sourceReleaseId)
       ||(window.KGRecallQuestionSource?.list?.()||[]).flatMap(collection=>collection.questions).find(item=>String(item.id)===String(id))?.releaseId
       ||'';
-    recallAdapter=window.KGDeepRecallServerAdapter?.create?.({questionId:id,releaseId});
+    recallAdapter=window.KGDeepRecallServerAdapter?.create?.({questionId:id,releaseId,libraryHash:lastLibraryHash});
     if(!recallAdapter)throw new Error('深度回忆服务器适配器加载失败。');
     recallAdapter.subscribe(renderSaveState);renderSaveState({saveState:'loading'});
     const session=await recallAdapter.loadSession();
     if(session.versionState==='mismatch')window.KGLearningLoading?.hide?.();
     const choice=session.versionState==='mismatch'?await chooseVersion(session):'current';
     const latest=recallAdapter.getState().session||session;
-    applyServerSession(latest,{history:choice==='history'});
+    return {latest,history:choice==='history'};
+  }
+  /* 失败回退：丢弃已拉取的新题上下文，恢复旧题的保存绑定。 */
+  function restoreRecallContext(previousAdapter,previousQuestion){
+    recallAdapter=previousAdapter;question=previousQuestion;
+    renderSaveState(previousAdapter?.getState?.()||{saveState:'current'});
+  }
+  async function loadDatabaseSession(questionId=''){
+    const prepared=await loadDatabaseSessionData(questionId);
+    applyServerSession(prepared.latest,{history:prepared.history});
     renderSaveState(recallAdapter.getState());
-    return latest;
+    return prepared.latest;
   }
   function progressPayload(){
     return {nodes:state.nodes,edges:state.edges,strokes:state.strokes,customNodes:state.customNodes,activeKeywords:state.activeKeywords,choiceOffsets:state.choiceOffsets,metrics:state.metrics,graphSchemaVersion:3,transform:{x:Number(state.transform.x)||0,y:Number(state.transform.y)||0,scale:Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,Number(state.transform.scale)||1))},optionState:{selected:String(krOptionState.selected||''),persistent:String(krOptionState.persistent||'')}};
@@ -1410,19 +1446,35 @@
     if(recallTransitionBusy)return false;
     const shouldSave=!isRecallReadonly()&&recallAdapter;
     setRecallTransitionBusy(true);
+    // 过渡期给出加载反馈（随机鼓励语），避免"点了没反应"的冻结感。
+    window.KGLearningLoading?.show?.({title:'正在切换题目'});
     try{
-      if(shouldSave&&!await writeProgressNow({allowTransition:true})){notifyRecallLimit('当前题目尚未保存，请重试保存后再切换。');return false}
+      // 保存上一题进度与新题会话「拉取」并行执行，切换等待从串行之和降为最慢一段；
+      // 两段都成功后才提交（重置画布 + applyServerSession + 渲染）。
+      // 任一失败则完整还原旧题上下文（保存失败不切换的语义不变）。
+      const previousAdapter=recallAdapter,previousQuestion=question;
       questionSessionToken+=1;cancelProgressSave();
-      const result=await window.KGRecallQuestionSource?.activate?.(bankId,questionId);if(!result?.valid){notifyRecallLimit((result?.errors||['题目切换失败。']).join('；'));return false}
+      const savePromise=shouldSave?writeProgressNow({allowTransition:true}):Promise.resolve(true);
+      const result=await window.KGRecallQuestionSource?.prepareActivation?.(bankId,questionId);if(!result?.valid){await savePromise;notifyRecallLimit((result?.errors||['题目切换失败。']).join('；'));return false}
       const selected=result.question;questionBrowser.bankId=String(result.collection?.id||result.bank?.id||bankId||selected.sourceCollectionId||'');
+      // 显式注入已解析题目：会话加载走「已解析上下文」分支，不再依赖 URL 中的 questionId
+      //（URL 同步已移到提交阶段，失败路径不更新地址）。
+      question=sessionQuestion(selected);
+      let prepared=null,loadError=null;
+      try{[prepared]=await Promise.all([loadDatabaseSessionData(selected.id),savePromise])}catch(error){loadError=error}
+      if(!await savePromise){restoreRecallContext(previousAdapter,previousQuestion);notifyRecallLimit('当前题目尚未保存，请重试保存后再切换。');return false}
+      if(loadError||!prepared){restoreRecallContext(previousAdapter,previousQuestion);notifyRecallLimit(loadError?.message||'题目载入失败。');return false}
+      const committed=window.KGRecallQuestionSource?.commitActivation?.(result,{clearTransient:false});if(!committed?.valid){restoreRecallContext(previousAdapter,previousQuestion);notifyRecallLimit((committed?.errors||['题目切换失败。']).join('；'));return false}
+      // URL 同步属于提交阶段：切换确认成功后才更新地址栏，失败路径保持原题地址。
       const routeContext=window.KGLearningRouteContext?.normalize?.({paperId:selected.sourcePaperId,releaseId:selected.sourceReleaseId,bankId:selected.sourceBankId,questionId:selected.id,mode:'deep_recall',returnUrl:window.KGLearningRouteContext?.parse?.({mode:'deep_recall'})?.returnUrl||'index.html'})||{};
       window.KGLearningRouteContext?.replace?.(routeContext,{target:'knowledge-recall.html'});
       destroyingNodeIds.clear();inkController?.reset();setRecallReadonly(true);
       state={nodes:[],edges:[],strokes:[],lastNewEdgeId:'',lastNewNodeId:'',activeNodeId:null,activeKeywords:[],transform:{x:0,y:0,scale:1},customNodes:{},choiceOffsets:{},metrics:{keywordClicks:0,choiceClicks:0,nodeOpens:0,sessionStartedAt:Date.now()}};
-      try{await loadDatabaseSession(selected.id)}catch(error){notifyRecallLimit(error?.message||'题目载入失败。');return false}
+      applyServerSession(prepared.latest,{history:prepared.history});
+      renderSaveState(recallAdapter.getState());
       closeGuide();closeNodeSearch();closeQuestionDrawer();renderAll();setTimeout(()=>{centerOn(0,0,true);playQuestionCardEntry()},30);enforceRecallPermission();return true;
     }catch(error){notifyRecallLimit(error?.message||'题目切换失败。');return false}
-    finally{setRecallTransitionBusy(false)}
+    finally{setRecallTransitionBusy(false);window.KGLearningLoading?.hide?.()}
   }
   function bindQuestionDrawer(){
     $('krQuestionListBtn')?.addEventListener('click',openQuestionDrawer);

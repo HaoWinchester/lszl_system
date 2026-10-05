@@ -1201,10 +1201,18 @@ async def _shared_content_snapshot(
 
 
 async def read_shared_content(
-    db: AsyncSession, subject_id: str, viewer_username: str | None = None
+    db: AsyncSession,
+    subject_id: str,
+    viewer_username: str | None = None,
+    *,
+    exclude_recall_library: bool = False,
 ) -> dict[str, Any]:
     await teaching_content_revision_service.acquire_read_lock(db)
-    return await _shared_content_snapshot(db, subject_id, viewer_username)
+    snapshot = await _shared_content_snapshot(db, subject_id, viewer_username)
+    if exclude_recall_library:
+        # 按需加载：联想库占该响应 85%+，不需要它的页面（如多题归纳画布）可排除。
+        snapshot["recallLibrary"] = {"schemaVersion": 1, "nodes": [], "edges": []}
+    return snapshot
 
 
 async def apply_auxiliary_assets(

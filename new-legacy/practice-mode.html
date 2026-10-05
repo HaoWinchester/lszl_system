@@ -67,15 +67,21 @@
       <button type="button" class="practice-exp-fab" id="practiceExpFab" hidden aria-expanded="false" aria-controls="practiceExpPanel" aria-label="展开做题经验面板">XP</button>
       <section class="practice-lobby" id="practiceLobby" aria-labelledby="practiceLobbyTitle">
         <header class="practice-lobby-head">
-          <div>
+          <div class="practice-lobby-head-title">
             <span>PRACTICE SPACE</span>
             <h1 id="practiceLobbyTitle">选择练习模式</h1>
             <p>先选一份试卷，再进入适合你的练习方式。</p>
           </div>
-          <button type="button" class="practice-utility-btn" id="practiceHistoryOpenBtn" aria-haspopup="dialog" aria-controls="practiceHistoryDrawer">
-            <span data-kg-icon="history" data-kg-icon-size="18" aria-hidden="true"></span>
-            <span>学习记录</span><em id="practiceHistoryCount" hidden>0</em>
-          </button>
+          <div class="practice-lobby-head-actions">
+            <button type="button" class="practice-utility-btn" id="practiceHistoryOpenBtn" aria-haspopup="dialog" aria-controls="practiceHistoryDrawer">
+              <span data-kg-icon="history" data-kg-icon-size="18" aria-hidden="true"></span>
+              <span>学习记录</span><em id="practiceHistoryCount" hidden>0</em>
+            </button>
+            <button type="button" class="practice-utility-btn" id="practiceFavoritesOpenBtn" aria-haspopup="dialog" aria-controls="practiceFavoritesDrawer">
+              <span data-kg-icon="star" data-kg-icon-size="18" aria-hidden="true"></span>
+              <span>我的收藏</span>
+            </button>
+          </div>
         </header>
         <p class="practice-feedback" id="practiceRetiredModeNotice" role="status" hidden></p>
 
@@ -167,13 +173,16 @@
       </section>
 
       <section class="practice-game" id="practiceGame" hidden aria-live="polite">
-        <nav class="practice-side-nav" aria-label="答题导航">
+        <nav class="practice-side-nav" id="practiceSideNav" aria-label="答题导航">
           <button type="button" class="practice-side-item is-active" data-practice-action="question" aria-label="回到当前题目"><span data-kg-icon="file-text" data-kg-icon-size="28" aria-hidden="true"></span><span>答题</span></button>
           <button type="button" class="practice-side-item" data-practice-action="sheet" aria-controls="practiceAnswerSheetDrawer"><span data-kg-icon="layout-grid" data-kg-icon-size="28" aria-hidden="true"></span><span>答题卡</span></button>
-          <button type="button" class="practice-side-item" data-practice-action="marked" aria-controls="practiceAnswerSheetDrawer" title="查看本次练习标记的题目"><span data-kg-icon="star" data-kg-icon-size="28" aria-hidden="true"></span><span>标记</span></button>
+          <button type="button" class="practice-side-item practice-side-comment" id="practiceCommentBtn" title="查看本题评论并参与讨论"><span data-kg-icon="message-circle-more" data-kg-icon-size="28" aria-hidden="true"></span><span>评论</span></button>
+          <button type="button" class="practice-side-item practice-side-danmaku practice-danmaku-toggle" id="practiceDanmakuToggle" aria-pressed="true" title="开关本题弹幕"><span data-kg-icon="zap" data-kg-icon-size="28" aria-hidden="true"></span><span data-practice-danmaku-label>弹幕开</span></button>
+          <button type="button" class="practice-side-item" id="practiceFavoriteBtn" aria-pressed="false" title="收藏本题"><span data-kg-icon="star" data-kg-icon-size="28" aria-hidden="true"></span><span>收藏</span></button>
           <button type="button" class="practice-side-item practice-exit-btn" id="practiceExitBtn" aria-label="退出本次练习" title="退出本次练习"><span data-kg-icon="log-out" data-kg-icon-size="28" aria-hidden="true"></span><span>退出</span></button>
           <p class="practice-side-note">坚持<br/>是通往优秀<br/>最短的路</p>
         </nav>
+        <button type="button" class="practice-side-toggle" id="practiceSideToggle" aria-expanded="true" aria-controls="practiceSideNav" title="收起导航栏">‹</button>
         <header class="practice-game-topbar">
           <button type="button" class="practice-review-back" id="practiceReviewBackBtn" hidden>← 返回成绩单</button>
           <div class="practice-progress">
@@ -318,6 +327,17 @@
     </aside>
   </div>
 
+  <div class="practice-drawer-backdrop" id="practiceFavoritesDrawer" hidden aria-hidden="true">
+    <aside class="practice-drawer practice-favorites-drawer" role="dialog" aria-modal="true" aria-labelledby="practiceFavoritesTitle">
+      <header class="practice-drawer-head">
+        <div><span>MY FAVORITES</span><h2 id="practiceFavoritesTitle">我的收藏</h2><p>收藏的题目与解析都在这里，随时回看</p></div>
+        <button type="button" class="practice-drawer-close" id="practiceFavoritesCloseBtn" aria-label="关闭我的收藏">×</button>
+      </header>
+      <div class="practice-drawer-toolbar practice-favorites-toolbar"><span id="practiceFavoritesSummary">正在读取收藏…</span></div>
+      <div class="practice-drawer-body"><div id="practiceFavoritesList" class="practice-favorites-list"></div><div class="practice-history-empty" id="practiceFavoritesEmpty" hidden>在练习中点击左侧“收藏”，题目就会保存在这里。</div></div>
+    </aside>
+  </div>
+
   <div class="practice-drawer-backdrop practice-answer-sheet-drawer" id="practiceAnswerSheetDrawer" hidden aria-hidden="true">
     <section class="practice-drawer practice-answer-sheet-drawer-panel" role="dialog" aria-modal="true" aria-labelledby="practiceAnswerSheetDrawerTitle">
       <header class="practice-drawer-head">
@@ -379,6 +399,7 @@
   <script defer src="src/112-practice-answer-sheet.js"></script>
   <script defer src="src/113-practice-result-report.js"></script>
   <script defer src="src/119-question-comments.js"></script>
+  <script defer src="src/120-question-favorites.js"></script>
   <script defer src="src/117-question-answer-set.js"></script>
 <script defer src="src/118-question-materials.js"></script>
   <script defer src="src/114-practice-draft-state.js"></script>

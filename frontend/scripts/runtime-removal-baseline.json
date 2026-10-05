@@ -626,6 +626,11 @@
     },
     {
       "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_question_danmaku_hidden_v1__",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
       "token": "kg_question_language_mode_v1",
       "ordinal": 1
     },
@@ -2666,6 +2671,16 @@
     },
     {
       "path": "frontend/scripts/new-legacy-contract.json",
+      "token": "kg_recall_library_cache_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "frontend/scripts/new-legacy-contract.json",
+      "token": "kg_question_danmaku_hidden_v1__",
+      "ordinal": 1
+    },
+    {
+      "path": "frontend/scripts/new-legacy-contract.json",
       "token": "kg_question_language_mode_v1",
       "ordinal": 1
     },
@@ -3246,6 +3261,11 @@
     },
     {
       "path": "new-legacy/src/119-question-comments.js",
+      "token": "kg_question_danmaku_hidden_v1__",
+      "ordinal": 1
+    },
+    {
+      "path": "new-legacy/src/119-question-comments.js",
       "token": "kg_question_discussion_danmaku_v1__",
       "ordinal": 1
     },
@@ -3612,6 +3632,11 @@
     {
       "path": "new-legacy/src/86-knowledge-recall.js",
       "token": "kg_deep_recall_theme_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "new-legacy/src/86-knowledge-recall.js",
+      "token": "kg_recall_library_cache_v1",
       "ordinal": 1
     },
     {
@@ -4279,6 +4304,16 @@
     {
       "path": "new-legacy/src/86-knowledge-recall.js",
       "token": "krScopedPreferenceKey(KR_ANALYSIS_SECTION_KEY)",
+      "ordinal": 2
+    },
+    {
+      "path": "new-legacy/src/86-knowledge-recall.js",
+      "token": "LIBRARY_STORE_KEY",
+      "ordinal": 1
+    },
+    {
+      "path": "new-legacy/src/86-knowledge-recall.js",
+      "token": "LIBRARY_STORE_KEY",
       "ordinal": 2
     },
     {

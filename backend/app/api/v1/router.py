@@ -16,6 +16,7 @@ from app.api.v1 import (
     practice_growth,
     question_catalog,
     question_comments,
+    question_favorites,
     question_materials,
     questions,
     subscriptions,
@@ -35,6 +36,7 @@ api_router.include_router(files.router)
 api_router.include_router(questions.router)
 api_router.include_router(question_comments.router)
 api_router.include_router(question_comments.counts_router)
+api_router.include_router(question_favorites.router)
 api_router.include_router(papers.router)
 api_router.include_router(paper_releases.router)
 api_router.include_router(question_catalog.router)

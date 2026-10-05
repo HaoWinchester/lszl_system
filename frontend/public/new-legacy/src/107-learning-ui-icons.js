@@ -1,11 +1,13 @@
 'use strict';
 (function(global){
-  const names=Object.freeze(['arrow-left','chevron-down','circle-help','circle-user-round','diamond','heart','library','log-in','log-out','palette','plus','sparkles','timer','x','zap','chevron-left','chevron-right','file-text','layout-grid','star','settings','history','rotate-ccw']);
+  const names=Object.freeze(['arrow-left','chevron-down','circle-help','circle-user-round','diamond','heart','library','log-in','log-out','message-circle','message-circle-more','palette','plus','sparkles','timer','x','zap','chevron-left','chevron-right','file-text','layout-grid','star','settings','history','rotate-ccw']);
   const allowed=new Set(names);
   const fallback='circle-help';
   const warned=new Set();
   const script=global.document&&global.document.currentScript;
-  const sprite=script&&script.src?new URL('../assets/icons/lucide-learning.svg',script.src).href:'assets/icons/lucide-learning.svg';
+  // sprite 与脚本共用同一 ?v= 版本参数：发布换版本时同步失效浏览器缓存，防止旧 sprite 缺新 symbol 导致图标空白。
+  const spriteVersion=script&&script.src.includes('?')?'?'+script.src.split('?')[1]:'';
+  const sprite=script&&script.src?new URL('../assets/icons/lucide-learning.svg',script.src).href+spriteVersion:'assets/icons/lucide-learning.svg';
   const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
   const normalizeSize=value=>[16,18,20].includes(Number(value))?Number(value):18;
   function isDevelopment(){

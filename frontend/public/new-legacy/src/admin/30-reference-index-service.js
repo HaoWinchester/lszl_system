@@ -1,14 +1,23 @@
 'use strict';
 (function(global){
   const Core=global.KGAdminCore;
+  // 引用索引体量大（数 MB），同页多个模块共享一次请求，失败可重试。
+  let referenceSnapshotInflight=null;
   async function loadReferenceSnapshot(){
-    const api=global.KGDomainApi;if(!api?.request)throw new Error('内容引用 API 未加载，请刷新后重试。');
-    const snapshot=await api.request({path:'/api/v1/questions/reference-snapshot'});
-    return {
-      banks:Array.isArray(snapshot?.banks)?snapshot.banks:[],
-      papers:Array.isArray(snapshot?.papers)?snapshot.papers:[],
-      releases:Array.isArray(snapshot?.releases)?snapshot.releases:[],
-    };
+    if(referenceSnapshotInflight)return referenceSnapshotInflight;
+    referenceSnapshotInflight=(async()=>{
+      // 与 teaching-content 适配器共享同一份请求（数 MB，避免同页重复拉取）。
+      const shared=global.KGTeachingContentApi?.referenceSnapshot?.();
+      if(shared)return await shared;
+      const api=global.KGDomainApi;if(!api?.request)throw new Error('内容引用 API 未加载，请刷新后重试。');
+      const snapshot=await api.request({path:'/api/v1/questions/reference-snapshot'});
+      return {
+        banks:Array.isArray(snapshot?.banks)?snapshot.banks:[],
+        papers:Array.isArray(snapshot?.papers)?snapshot.papers:[],
+        releases:Array.isArray(snapshot?.releases)?snapshot.releases:[],
+      };
+    })().catch(error=>{referenceSnapshotInflight=null;throw error});
+    return referenceSnapshotInflight;
   }
   function permanentDeleteAuthority(references){return references?.permanentDeleteCheck?.()||{valid:false,errors:['内容引用权威校验不可用，永久删除已暂停。']}}
   class ReferenceIndexService{

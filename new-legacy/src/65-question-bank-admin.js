@@ -1235,6 +1235,34 @@
     console.warn('题目目录 API 未加载，请刷新页面后重试。');
     return [];
   }
+  /* 按需加载：bootstrap 不再内嵌全量题目（此前单次响应可达 20MB+）。
+   * 当前题库的题目通过分页接口拉取；其余题库在切换到时再加载。
+   * 加载完成前列表为空属预期，填充后重新渲染并恢复选中/深链。 */
+  let ensureBankQuestionsSeq=0;
+  async function ensureCurrentBankQuestions(force=false){
+    const bank=currentBank();
+    if(!bank)return;
+    const bankId=String(bank.id);
+    const seq=++ensureBankQuestionsSeq;
+    try{
+      const loaded=await Catalog.loadBankQuestions(bankId,{pageSize:200,forceReload:force===true});
+      if(seq!==ensureBankQuestionsSeq)return;
+      const target=state.banks.find(item=>String(item.id)===bankId);
+      if(!target)return;
+      target.questions=ensureTeacherNumbers(Array.isArray(loaded)?loaded.map((q,i)=>normalizeQuestion({...q,subject:q.subject||target.subject},i)):[],target.subject);
+      if(String(state.selectedBankId)!==bankId)return;
+      // 题目就绪后恢复编辑器深链（?bankId=&questionId=），未命中则为无操作。
+      applyQuestionEditorDeepLink();
+      if(!state.selectedQuestionId||!target.questions.some(question=>question.id===state.selectedQuestionId)){
+        state.selectedQuestionId=target.questions.find(question=>questionMatchesLifecycle(question))?.id||'';
+      }
+      if(CatalogEditor)await CatalogEditor.open(currentQuestion());
+    }catch(error){
+      if(seq===ensureBankQuestionsSeq)toast('题目列表加载失败，请重试。');
+    }finally{
+      if(seq===ensureBankQuestionsSeq){render();CatalogEditor?.applyReadonlyState(CatalogEditor.status().readonly)}
+    }
+  }
   function saveBanks(nextBanks=state.banks, options={}){
     state.banks = ensureGlobalTeacherNumbers((nextBanks || []).map(normalizeBank));
     state.dirty = true;
@@ -1253,6 +1281,7 @@
     state.catalogPendingClueTouched=false;
     state.catalogPendingConceptTouched=false;
     state.catalogPendingFloatingClueTouched=false;
+    if(bank)void ensureCurrentBankQuestions(true);
     return bank||null;
   }
   function isCatalogEditorField(target){
@@ -1417,6 +1446,7 @@
     if(CatalogEditor)await CatalogEditor.open(currentQuestion());
     render();
     CatalogEditor?.applyReadonlyState(CatalogEditor.status().readonly);
+    void ensureCurrentBankQuestions();
   }
   async function selectQuestion(questionId){
     const bank = currentBank();
@@ -1482,21 +1512,25 @@
     if(!Catalog){showApiStartupError('题目目录 API 未加载。');return}
     if(!PaperDraftApi){showApiStartupError('试卷草稿 API 未加载。');return}
     try{await Catalog.ready}catch(error){showApiStartupError('题目目录加载失败：'+(error.message||error));return}
-    try{await window.KGTeachingContentApi?.ready?.()}catch(error){showApiStartupError('原则与联想库加载失败：'+(error.message||error));return}
+    try{await window.KGTeachingContentApi?.ready?.(undefined,{includeRecallLibrary:true})}catch(error){showApiStartupError('原则与联想库加载失败：'+(error.message||error));return}
     initStaticControls();
     initLibraryWorkspaceControls();
     state.banks = loadBanks();
-    try{await window.KGTeachingContentApi?.ready?.(state.banks[0]?.subject||'PMP')}catch(error){showApiStartupError('当前科目教学内容加载失败：'+(error.message||error));return}
+    try{await window.KGTeachingContentApi?.ready?.(state.banks[0]?.subject||'PMP',{includeRecallLibrary:true})}catch(error){showApiStartupError('当前科目教学内容加载失败：'+(error.message||error));return}
     state.papers = [];
     try{await reloadPaperDrafts()}catch(error){showApiStartupError('试卷引用目录加载失败：'+(error.message||error));return}
     state.selectedBankId = state.banks[0]?.id || '';
-    state.selectedQuestionId = state.banks[0]?.questions.find(question=>!isQuestionDeleted(question))?.id || '';
+    // 深链题库先切库（题目列表加载完成后由 ensure 恢复具体题目选中）。
+    try{
+      const deepBankId=new URLSearchParams(location.search||'').get('bankId')||'';
+      if(deepBankId&&state.banks.some(item=>String(item.id)===deepBankId))state.selectedBankId=deepBankId;
+    }catch(_){}
     if(isTrainingConfigurationStep()&&state.banks[0]?.subject)state.subjectFilter=state.banks[0].subject;
-    applyQuestionEditorDeepLink();
     if(CatalogEditor)await CatalogEditor.open(currentQuestion());
     render();
     CatalogEditor?.applyReadonlyState(CatalogEditor.status().readonly);
     catalogUiReady=true;
+    void ensureCurrentBankQuestions();
   }
 
   async function initPaperManagementPage(){
@@ -2161,7 +2195,7 @@
             <span class="subject-dot" style="--dot:${escapeHTML(meta.color)}"></span>
             <span>
               <strong>${escapeHTML(b.name)}</strong>
-              <small>${escapeHTML(b.subject)} · ${b.questions.length} 题 · ${escapeHTML(b.version || '1.0')} · ${b.visibility==='published'?'学员可见':'仅教师'}</small>
+              <small>${escapeHTML(b.subject)} · ${(b.questions.length||Number(b.questionCount||0))} 题 · ${escapeHTML(b.version || '1.0')} · ${b.visibility==='published'?'学员可见':'仅教师'}</small>
             </span>
           </button>
           <div class="qb-bank-row-actions">
@@ -3808,7 +3842,7 @@
     const previousBanks=clone(state.banks);
     try{
       const saved=await CatalogEditor.save({...draft,id:q.id,bankId:bank.id,revision:q.revision,creatorId:q.creatorId},{bankId:bank.id,baseRevision:q.revision,creatorId:q.creatorId});
-      if(draft.materialEdit)await Catalog.reload({includeQuestions:true});
+      if(draft.materialEdit)await Catalog.reload({includeQuestions:false});
       reloadBanksFromCatalog(bank.id,saved?.id||q.id);
       if(!options.silent){
       const track=(globalThis.KGFeatureAnalytics&&globalThis.KGFeatureAnalytics.track)||function(){};

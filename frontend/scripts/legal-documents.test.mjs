@@ -9,5 +9,5 @@ export const refundParagraph = '退款说明：会员费用按下列规则支持
 test('PC terms retain the published refund thresholds and manual application procedure', () => {
   const html = readFileSync(new URL('../../new-legacy/terms-of-service.html', import.meta.url), 'utf8');
   assert.ok(html.includes(refundParagraph), 'Published refund rules must not disappear');
-  assert.match(html, /版本 1\.1｜生效日期：2026 年 9 月 12 日/);
+  assert.match(html, /版本 1\.2｜生效日期：2026 年 10 月 2 日/);
 });

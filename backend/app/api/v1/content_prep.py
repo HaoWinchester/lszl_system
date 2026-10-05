@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -337,10 +337,20 @@ async def clear_recall_acceptance_records(
 
 
 @router.get("/shared-content")
-async def get_shared_content(subjectId: str, db: DB, actor: PrepEditor):
+async def get_shared_content(
+    subjectId: str,
+    db: DB,
+    actor: PrepEditor,
+    exclude: str = Query("", description="逗号分隔的排除段，如 recallLibrary"),
+):
     try:
         return await content_prep_shared_service.read_shared_content(
-            db, subjectId, actor.username
+            db,
+            subjectId,
+            actor.username,
+            exclude_recall_library="recallLibrary" in {
+                part.strip() for part in exclude.split(",") if part.strip()
+            },
         )
     except ValueError as error:
         _raise_shared_error(error)

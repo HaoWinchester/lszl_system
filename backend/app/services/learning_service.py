@@ -255,6 +255,25 @@ def _question_snapshot_from_payload(snapshot: dict) -> dict:
     }
 
 
+def _question_snapshot_summary(snapshot) -> dict:
+    """overview 列表用的轻量题目摘要：列表只做展示与搜索，完整题目按需另行获取。"""
+
+    if not isinstance(snapshot, dict):
+        return {}
+    stem = snapshot.get("stem")
+    if not isinstance(stem, str):
+        stem = ""
+    tags = snapshot.get("tags")
+    return {
+        "id": snapshot.get("id") or "",
+        "title": snapshot.get("title") or "",
+        "type": snapshot.get("type") or "",
+        "stem": stem[:160],
+        "tags": list(tags) if isinstance(tags, list) else [],
+        "options": [],
+    }
+
+
 def redact_practice_question(value):
     """Return a learner-safe question payload before server grading."""
 
@@ -1247,19 +1266,26 @@ async def practice_overview(db: AsyncSession, owner: str) -> dict:
     ).scalars().all()
     stats = _practice_stats(rows, now_utc())
     revenge_pool = build_global_revenge_pool(list(rows))
+    # 按需加载：overview 列表只携带轻量摘要（展示+搜索），
+    # 完整题目由复仇作答等既有接口按 mistakeId 提供。
     public_candidates = [
         {
             **candidate,
-            "questionSnapshot": redact_practice_question(
+            "questionSnapshot": _question_snapshot_summary(
                 candidate.get("questionSnapshot") or {}
             ),
         }
         for candidate in revenge_pool["candidates"]
     ]
+    mistakes_public = []
+    for row in rows:
+        item = _practice_mistake_to_dict(row, reveal_answer=False)
+        item["questionSnapshot"] = _question_snapshot_summary(
+            item.get("questionSnapshot") or {}
+        )
+        mistakes_public.append(item)
     return {
-        "mistakes": [
-            _practice_mistake_to_dict(row, reveal_answer=False) for row in rows
-        ],
+        "mistakes": mistakes_public,
         "stats": stats,
         "revengeStats": {
             **revenge_pool["stats"],

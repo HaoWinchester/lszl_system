@@ -12,6 +12,17 @@
   const preferenceKey = () => 'kg_question_discussion_danmaku_v1__' + encodeURIComponent(currentUser()?.username || 'guest')
   function enabled() { try { return global.KGDevicePreferences?.getString(preferenceKey(), 'on') !== 'off' } catch (_) { return true } }
   function remember(value) { try { global.KGDevicePreferences?.setString(preferenceKey(), value ? 'on' : 'off') } catch (_) {} }
+  // 「不喜欢」的弹幕只在本机隐藏（按留言 ID 记录），不影响其他用户。
+  const hiddenDanmakuKey = () => 'kg_question_danmaku_hidden_v1__' + encodeURIComponent(currentUser()?.username || 'guest')
+  function hiddenDanmaku() {
+    try { return new Set((global.KGDevicePreferences?.getString(hiddenDanmakuKey(), '') || '').split(',').filter(Boolean)) } catch (_) { return new Set() }
+  }
+  function hideDanmakuItem(commentId) {
+    try {
+      const ids = hiddenDanmaku(); ids.add(commentId)
+      global.KGDevicePreferences?.setString(hiddenDanmakuKey(), [...ids].slice(-200).join(','))
+    } catch (_) {}
+  }
   const API_ROOT = '/api/v1/questions/'
   const MAX_CONTENT = 200
   const DANMAKU_LIMIT = 8
@@ -59,9 +70,10 @@
     })
   }
 
-  /* 弹幕取材：他人短留言优先，最多 8 条。 */
+  /* 弹幕取材：他人短留言优先，最多 8 条；本机点过「不喜欢」的不再出现。 */
   function pickDanmaku(comments) {
-    const eligible = comments.filter(comment => comment.danmakuEligible)
+    const hidden = hiddenDanmaku()
+    const eligible = comments.filter(comment => comment.danmakuEligible && !hidden.has(comment.id))
     const mine = currentUser()?.username
     const others = eligible.filter(comment => !comment.isMine)
     const own = eligible.filter(comment => comment.isMine)
@@ -70,33 +82,50 @@
 
   function danmakuMarkup(items) {
     if (!items.length) return ''
-    return `<div class="q-danmaku" aria-label="本题弹幕"><div class="q-danmaku-track">${items.map((comment, index) => `<button type="button" class="q-danmaku-item" data-danmaku-comment-id="${escapeHTML(comment.id)}" style="--q-danmaku-lane:${index % 4};--q-danmaku-delay:-${(index * (DANMAKU_DURATION_SECONDS / items.length)).toFixed(2)}s">${escapeHTML(comment.content)}</button>`).join('')}</div></div>`
+    return `<div class="q-danmaku" aria-label="本题弹幕"><div class="q-danmaku-track">${items.map((comment, index) => `<button type="button" class="q-danmaku-item" data-danmaku-comment-id="${escapeHTML(comment.id)}" style="--q-danmaku-lane:${index % 4};--q-danmaku-delay:-${(index * (DANMAKU_DURATION_SECONDS / items.length)).toFixed(2)}s">${escapeHTML(comment.content)}${danmakuLikeTail(comment)}</button>`).join('')}</div></div>`
+  }
+
+  /* 点过赞的弹幕：红心计数追加在弹幕尾部，随弹幕一起滚动。 */
+  function danmakuLikeTail(comment) {
+    const count = Number(comment.likeCount) || 0
+    if (!count) return ''
+    return `<span class="q-danmaku-like${comment.myLike ? ' is-liked' : ''}" aria-label="${count} 个赞">❤ ${count}</span>`
+  }
+
+  function avatarMarkup(author) {
+    const chars = [...text(author).trim() || '访']
+    const initial = (chars[0] || '访').toUpperCase()
+    let hue = 0
+    for (const char of chars) hue = (hue * 31 + char.codePointAt(0)) % 360
+    return `<span class="q-comment-avatar" style="--avatar-hue:${hue}" aria-hidden="true">${escapeHTML(initial)}</span>`
   }
 
   function commentItemMarkup(comment) {
     return `<li class="q-comment" data-comment-id="${escapeHTML(comment.id)}">
+      ${avatarMarkup(comment.author)}
       <div class="q-comment-main">
         <span class="q-comment-author">${escapeHTML(comment.author)}</span>
         <span class="q-comment-time">${escapeHTML(formatTime(comment.createdAt))}</span>
         ${comment.parentId ? `<small class="q-comment-parent">回复：${escapeHTML(comment.parentContent || "原留言")}</small>` : ''}
         <p class="q-comment-content">${escapeHTML(comment.content)}</p>
-      </div>
-      <div class="q-comment-actions">
-        <button type="button" class="q-comment-like${comment.myLike ? ' is-liked' : ''}" data-qc-action="toggle-like" aria-pressed="${comment.myLike ? 'true' : 'false'}" aria-label="点赞">👍 <span data-qc-like-count>${Number(comment.likeCount) || 0}</span></button>
-        <button type="button" data-qc-action="toggle-favorite" aria-pressed="${!!comment.myFavorite}">${comment.myFavorite ? '已收藏' : '收藏'}</button>
-        <button type="button" data-qc-action="reply">回复</button>
-        ${comment.questionTitle ? `<button type="button" data-qc-action="return">返回题目：${escapeHTML(comment.questionTitle)}</button>` : ''}
-        ${comment.canDelete ? `<button type="button" class="q-comment-delete" data-qc-action="delete" aria-label="删除留言">删除</button>` : ''}
+        <div class="q-comment-actions">
+          <button type="button" data-qc-action="reply">回复</button>
+          <button type="button" data-qc-action="toggle-favorite" aria-pressed="${!!comment.myFavorite}">${comment.myFavorite ? '已收藏' : '收藏'}</button>
+          <button type="button" class="q-comment-like${comment.myLike ? ' is-liked' : ''}" data-qc-action="toggle-like" aria-pressed="${comment.myLike ? 'true' : 'false'}" aria-label="点赞">❤ <span data-qc-like-count>${Number(comment.likeCount) || 0}</span></button>
+          ${comment.questionTitle ? `<button type="button" data-qc-action="return">返回题目：${escapeHTML(comment.questionTitle)}</button>` : ''}
+          ${comment.canDelete ? `<button type="button" class="q-comment-delete" data-qc-action="delete" aria-label="删除留言">删除</button>` : ''}
+        </div>
       </div>
     </li>`
   }
 
-  function composerMarkup(user) {
-    if (!user) {
+  function composerMarkup(state) {
+    if (!state.user) {
       return `<div class="q-composer"><button type="button" class="q-composer-login" data-qc-action="login">登录后参与讨论</button></div>`
     }
     return `<div class="q-composer">
-      <textarea class="q-composer-input" rows="2" maxlength="${MAX_CONTENT}" placeholder="说说你对这道题的看法或疑问…"></textarea>
+      <textarea class="q-composer-input" rows="2" maxlength="${MAX_CONTENT}" placeholder="留下你的精彩评论吧"></textarea>
+      ${state.sendError ? `<p class="q-composer-error" role="alert">${escapeHTML(state.sendError)}</p>` : ''}
       <div class="q-composer-foot"><span class="q-composer-count" data-qc-count>0/${MAX_CONTENT}</span><button type="button" class="q-composer-send" data-qc-action="send" disabled>发布</button></div>
     </div>`
   }
@@ -113,12 +142,28 @@
 
   function listMarkup(state) {
     if (state.favoritesMode) return state.favorites.map(commentItemMarkup).join('')
+    // 层级只有两级：顶级留言 + 其全部后代回复（回复的回复也平铺在第二级，不继续嵌套）。
     const ids=new Set(state.comments.map(comment=>comment.id))
-    const render = comment => {
-      const replies=state.comments.filter(row=>row.parentId===comment.id)
-      return commentItemMarkup(comment)+(replies.length ? `<li class="q-comment-thread" data-comment-id="${escapeHTML(comment.id)}"><button type="button" data-qc-action="toggle-replies" aria-expanded="${state.expandedReplies.has(comment.id)}">${replies.length} 条回复</button>${state.expandedReplies.has(comment.id)?`<ul>${replies.map(render).join('')}</ul>`:''}</li>`:'')
+    const byParent=new Map()
+    for (const comment of state.comments) {
+      const key=text(comment.parentId||'')
+      if(!byParent.has(key))byParent.set(key,[])
+      byParent.get(key).push(comment)
     }
-    return state.comments.filter(comment=>!comment.parentId || !ids.has(comment.parentId)).map(render).join('')
+    const collectReplies=id=>{
+      const out=[]
+      const queue=[id]
+      while(queue.length){
+        for(const child of byParent.get(queue.shift())||[]){out.push(child);queue.push(child.id)}
+      }
+      return out
+    }
+    return state.comments
+      .filter(comment=>!comment.parentId || !ids.has(comment.parentId))
+      .map(comment=>{
+        const replies=collectReplies(comment.id)
+        return commentItemMarkup(comment)+(replies.length ? `<li class="q-comment-thread" data-comment-id="${escapeHTML(comment.id)}"><button type="button" data-qc-action="toggle-replies" aria-expanded="${state.expandedReplies.has(comment.id)}">${replies.length} 条回复</button>${state.expandedReplies.has(comment.id)?`<ul>${replies.map(commentItemMarkup).join('')}</ul>`:''}</li>`:'')
+      }).join('')
   }
 
   function blockMarkup(state) {
@@ -126,14 +171,14 @@
     if (state.expanded === false) return collapsedMarkup(state)
     return `<section class="q-comments" data-qc-block aria-label="题目讨论">
 <div class="q-drawer-handle" data-qc-handle aria-label="拖动讨论抽屉"></div>
-      <div class="q-comments-head"><span>${state.favoritesMode ? '我的收藏' : '题目讨论'}</span><span class="q-comments-count" data-qc-total>${shown.length ? `${shown.length} 条` : ''}</span>${state.collapsible ? '<button type="button" class="q-comments-collapse" data-qc-action="collapse">收起</button>' : ''}</div>
+      <div class="q-comments-head"><span class="q-comments-title">${state.favoritesMode ? '我的收藏' : '全部评论'}<i class="q-comments-count" data-qc-total>${shown.length ? `(${shown.length})` : ''}</i></span>${state.collapsible ? '<button type="button" class="q-comments-collapse" data-qc-action="collapse" aria-label="关闭评论面板">✕</button>' : ''}</div>
       ${state.toastMessage ? `<div class="q-comments-toast" data-qc-toast role="status">${escapeHTML(state.toastMessage)}</div>` : ''}
       ${state.error ? `<div class="q-comments-error" role="status">留言加载失败 <button type="button" data-qc-action="retry">重试</button></div>` : ''}
       <ul class="q-comment-list" data-qc-list>${listMarkup(state)}</ul>
       ${shown.length ? '' : (state.error ? '' : `<p class="q-comments-empty">${state.favoritesMode ? '还没有收藏。' : '还没有留言，来聊聊这道题吧。'}</p>`)}
       ${state.nextCursor ? '<button type="button" data-qc-action="more">加载更多</button>' : ''}
       ${state.replyId ? `<div data-qc-reply>正在回复 <button type="button" data-qc-action="cancel-reply">取消回复</button></div>` : ''}
-      ${state.favoritesMode ? '<button type="button" data-qc-action="discussion">回到本题讨论</button>' : composerMarkup(state.user)}
+      ${state.favoritesMode ? '<button type="button" data-qc-action="discussion">回到本题讨论</button>' : composerMarkup(state)}
     </section>`
   }
 
@@ -153,7 +198,7 @@
   function renderOverlay(instance) {
     instance.overlay?.remove()
     instance.overlay = null
-    if (active !== instance || instance.disposed || !enabled()) return
+    if (active !== instance || instance.disposed || !enabled() || instance.state.overlaySuppressed) return
     const holder = document.createElement('div')
     holder.innerHTML = danmakuMarkup(instance.state.danmaku)
     const overlay = holder.firstElementChild
@@ -162,15 +207,136 @@
     instance.overlay = overlay
     overlay.addEventListener('click', event => {
       const item = event.target.closest('[data-danmaku-comment-id]')
-      if (!item) return
-      item.classList.toggle('is-paused')
-      instance.state.expanded = true
-      instance.state.favoritesMode = false
-      instance.state.nextCursor = instance.state.commentsCursor
-      instance.returnFocus = instance.root.querySelector('[data-qc-action="expand"]')
-      renderInto(instance)
-      instance.drawer?.querySelector(`[data-comment-id="${CSS.escape(item.dataset.danmakuCommentId)}"]`)?.scrollIntoView({block:'nearest'})
+      if (item) { showDanmakuPop(instance, item); return }
+      if (!event.target.closest('[data-danmaku-pop]')) closeDanmakuPop(instance)
     })
+  }
+
+  /* 点击弹幕：弹出短视频式互动面板（点赞 / 回复 / 不喜欢 / 更多），不直接展开抽屉。 */
+  function findComment(instance, commentId) {
+    return instance.state.comments.find(comment => comment.id === commentId) || null
+  }
+
+  function danmakuPopMarkup(comment) {
+    return `<div class="q-danmaku-pop" data-danmaku-pop role="menu" aria-label="弹幕互动">
+      <p class="q-danmaku-pop-text">${escapeHTML(comment.content)}${danmakuLikeTail(comment)}</p>
+      <div class="q-danmaku-pop-actions">
+        <button type="button" data-qc-pop-action="like" class="${comment.myLike ? 'is-liked' : ''}" aria-pressed="${!!comment.myLike}"><span class="q-danmaku-pop-icon" aria-hidden="true">❤</span><span>${Number(comment.likeCount) || 0}</span></button>
+        <button type="button" data-qc-pop-action="reply"><span class="q-danmaku-pop-icon" aria-hidden="true">💬</span><span>回复</span></button>
+        <button type="button" data-qc-pop-action="dislike"><span class="q-danmaku-pop-icon" aria-hidden="true">✕</span><span>不喜欢</span></button>
+        <button type="button" data-qc-pop-action="more"><span class="q-danmaku-pop-icon" aria-hidden="true">⋯</span><span>更多</span></button>
+      </div>
+      <div class="q-danmaku-pop-extra" data-qc-pop-extra hidden>
+        <button type="button" data-qc-pop-action="favorite" aria-pressed="${!!comment.myFavorite}">${comment.myFavorite ? '已收藏' : '收藏'}</button>
+        <button type="button" data-qc-pop-action="copy">复制内容</button>
+      </div>
+    </div>`
+  }
+
+  function showDanmakuPop(instance, item) {
+    const comment = findComment(instance, item.dataset.danmakuCommentId)
+    if (!comment) return
+    closeDanmakuPop(instance)
+    item.classList.add('is-paused')
+    const pop = document.createElement('div')
+    pop.innerHTML = danmakuPopMarkup(comment)
+    const panel = pop.firstElementChild
+    panel.dataset.danmakuPopFor = comment.id
+    instance.overlay.appendChild(panel)
+    // 定位：优先悬浮在弹幕上方，空间不足时放到下方，并夹在视口内。
+    const rect = item.getBoundingClientRect()
+    const width = panel.offsetWidth, height = panel.offsetHeight
+    let left = rect.left + rect.width / 2 - width / 2
+    left = Math.max(8, Math.min(global.innerWidth - width - 8, left))
+    let top = rect.top - height - 10
+    if (top < 8) top = Math.min(global.innerHeight - height - 8, rect.bottom + 10)
+    panel.style.left = left + 'px'
+    panel.style.top = top + 'px'
+    bindDanmakuPop(instance, item, panel)
+    // 点击弹幕与互动面板以外的任意位置：关闭面板并恢复弹幕运动。
+    instance.popOutsideClose = event => {
+      if (event.target.closest('[data-danmaku-pop]') || event.target.closest('[data-danmaku-comment-id]')) return
+      closeDanmakuPop(instance)
+    }
+    document.addEventListener('pointerdown', instance.popOutsideClose, true)
+  }
+
+  function refreshDanmakuPop(instance, item) {
+    const panel = instance.overlay?.querySelector('[data-danmaku-pop]')
+    if (!panel) return
+    const comment = findComment(instance, panel.dataset.danmakuPopFor)
+    if (!comment) { closeDanmakuPop(instance); return }
+    const replacement = document.createElement('div')
+    replacement.innerHTML = danmakuPopMarkup(comment)
+    const next = replacement.firstElementChild
+    next.dataset.danmakuPopFor = comment.id
+    next.style.left = panel.style.left
+    next.style.top = panel.style.top
+    panel.replaceWith(next)
+    bindDanmakuPop(instance, item, next)
+  }
+
+  function bindDanmakuPop(instance, item, panel) {
+    panel.addEventListener('click', async event => {
+      const action = event.target.closest('[data-qc-pop-action]')?.dataset.qcPopAction
+      if (!action) return
+      const commentId = panel.dataset.danmakuPopFor
+      const latest = findComment(instance, commentId)
+      if (!latest) { closeDanmakuPop(instance); return }
+      if (action === 'like') {
+        await toggleLike(instance, commentId)
+        // 红心追加在弹幕尾部：同步弹幕数据后重挂弹幕层，再弹出的面板保持暂停。
+        const updated = findComment(instance, commentId)
+        if (updated) instance.state.danmaku = instance.state.danmaku.map(row => row.id === commentId ? updated : row)
+        renderOverlay(instance)
+        const nextItem = instance.overlay?.querySelector(`[data-danmaku-comment-id="${CSS.escape(commentId)}"]`)
+        if (nextItem) showDanmakuPop(instance, nextItem)
+        else closeDanmakuPop(instance)
+      }
+      else if (action === 'favorite') { await toggleFavorite(instance, commentId); refreshDanmakuPop(instance, item) }
+      else if (action === 'reply') { openReplyFromDanmaku(instance, item, commentId) }
+      else if (action === 'dislike') {
+        hideDanmakuItem(commentId)
+        instance.state.danmaku = instance.state.danmaku.filter(row => row.id !== commentId)
+        closeDanmakuPop(instance)
+        renderOverlay(instance)
+      }
+      else if (action === 'more') {
+        const extra = panel.querySelector('[data-qc-pop-extra]')
+        if (extra) extra.hidden = !extra.hidden
+      }
+      else if (action === 'copy') {
+        try { await global.navigator.clipboard.writeText(latest.content); showToast(instance, '已复制弹幕内容') }
+        catch (_) { showToast(instance, '复制失败，请手动选择内容') }
+      }
+    })
+  }
+
+  function closeDanmakuPop(instance) {
+    instance.overlay?.querySelectorAll('.q-danmaku-pop').forEach(node => node.remove())
+    // 关面板即恢复运动：清掉暂停标记与焦点暂停态。
+    instance.overlay?.querySelectorAll('.q-danmaku-item.is-paused').forEach(node => {
+      node.classList.remove('is-paused')
+      if (node === document.activeElement) node.blur()
+    })
+    if (instance.popOutsideClose) {
+      document.removeEventListener('pointerdown', instance.popOutsideClose, true)
+      instance.popOutsideClose = null
+    }
+  }
+
+  /* 从弹幕面板点「回复」：暂停该弹幕并展开底部讨论抽屉，定位到对应留言。 */
+  function openReplyFromDanmaku(instance, item, commentId) {
+    closeDanmakuPop(instance)
+    item.classList.add('is-paused')
+    instance.state.expanded = true
+    instance.state.favoritesMode = false
+    instance.state.replyId = commentId
+    instance.state.nextCursor = instance.state.commentsCursor
+    instance.returnFocus = instance.root.querySelector('[data-qc-action="expand"]')
+    renderInto(instance)
+    instance.drawer?.querySelector(`[data-comment-id="${CSS.escape(commentId)}"]`)?.scrollIntoView({block:'nearest'})
+    instance.drawer?.querySelector('.q-composer-input')?.focus()
   }
 
   function renderInto(instance) {
@@ -181,6 +347,7 @@
     root.innerHTML = collapsedMarkup({...state, expanded:false})
     root.querySelector('[data-qc-action="expand"]')?.setAttribute('aria-expanded', String(state.expanded))
     if (!state.expanded) {
+      detachDrawerListeners(instance)
       instance.drawer?.remove()
       instance.drawer = null
       return
@@ -197,6 +364,14 @@
       instance.drawer.addEventListener('keydown', event => {
         if (event.key === 'Escape') closeDrawer(instance)
       })
+      // 点击评论区以外的任意位置：收起评论区。
+      instance.outsideDrawerClose = event => {
+        if (instance.disposed || !instance.drawer) return
+        if (instance.drawer.contains(event.target)) return
+        if (event.target.closest('[data-danmaku-pop]')) return
+        closeDrawer(instance)
+      }
+      document.addEventListener('pointerdown', instance.outsideDrawerClose, true)
     }
     instance.drawer.innerHTML = blockMarkup({...state, collapsible:true})
     const composer = instance.drawer.querySelector('.q-composer-input')
@@ -219,9 +394,19 @@
     })
   }
 
+  /* 收起抽屉时移除点击外部关闭监听，并恢复被暂停的弹幕。 */
+  function detachDrawerListeners(instance) {
+    if (instance.outsideDrawerClose) {
+      document.removeEventListener('pointerdown', instance.outsideDrawerClose, true)
+      instance.outsideDrawerClose = null
+    }
+    instance.overlay?.querySelectorAll('.q-danmaku-item.is-paused').forEach(item => item.classList.remove('is-paused'))
+  }
+
   function closeDrawer(instance) {
     instance.state.expanded = false
-    instance.overlay?.querySelectorAll('.is-paused').forEach(item=>item.classList.remove('is-paused'))
+    closeDanmakuPop(instance)
+    detachDrawerListeners(instance)
     renderInto(instance)
     const action = instance.returnFocus?.dataset.qcAction || 'expand'
     instance.root.querySelector(`[data-qc-action="${action}"]`)?.focus()
@@ -302,6 +487,7 @@
     instance.pending.add('send')
     const button = instance.drawer.querySelector('[data-qc-action="send"]')
     button.disabled = true
+    instance.state.sendError = ''
     try {
       const payload = await request(`${instance.questionId}/comments`, {
         method: 'POST',
@@ -309,6 +495,7 @@
       })
       if (instance.disposed) return
       instance.state.draft = ''
+      instance.state.sendError = ''
       composer.value = ''
       if(instance.state.replyId)instance.state.expandedReplies.add(instance.state.replyId)
       instance.state.replyId = null
@@ -321,7 +508,9 @@
     } catch (error) {
       if (text(error.message) !== 'UNAUTHENTICATED') {
         button.disabled = false
-        showToast(instance, text(error.message) === 'REQUEST_FAILED' ? '发布失败，请稍后重试' : text(error.message))
+        // 发布区内联提示后端拦截原因（如敏感词），toast 同步提醒。
+        instance.state.sendError = text(error.message) === 'REQUEST_FAILED' ? '发布失败，请稍后重试' : text(error.message)
+        showToast(instance, instance.state.sendError)
       }
     } finally { instance.pending.delete('send'); if(!instance.disposed) renderInto(instance) }
   }
@@ -393,6 +582,7 @@
           // 报告页默认折叠成“查看本题讨论（N 条）”，展开才拉取留言；练习页解析面板始终展开。
           expanded: false,
           collapsible: source === 'report',
+          overlaySuppressed: false,
           count: 0,
           loaded: false,
         },
@@ -425,6 +615,72 @@
     reload(instance)
     return instance
   }
+
+  /* 练习页标记区「评论」按钮：做题中直接从底部打开讨论抽屉。
+   * 挂载点是不可见宿主（纯 CSS 隐藏，不触发 MutationObserver 清理）。
+   * 与 mountDanmaku 共用每题同一实例（source='danmaku'）；做题中弹幕层保持抑制，
+   * 避免被弹幕剧透；解析可见后由 mountDanmaku 解除抑制。 */
+  function openPanel({ questionId }) {
+    const id = text(questionId)
+    if (!id) return null
+    let instance = [...instances].find(row => row.questionId === id && row.source === 'danmaku')
+    if (!instance) {
+      const host = document.createElement('div')
+      host.className = 'q-comments-standalone-host'
+      host.setAttribute('aria-hidden', 'true')
+      document.body.appendChild(host)
+      instance = ensureInstance(host, '__kgQuestionComments', id, 'danmaku')
+      instance.state.overlaySuppressed = true
+      attach(instance, host)
+      instance.state.expanded = true
+      reload(instance)
+    } else {
+      activate(instance)
+      instance.state.expanded = true
+      instance.state.favoritesMode = false
+      instance.state.nextCursor = instance.state.commentsCursor
+      if (!instance.state.loaded) reload(instance)
+      else renderInto(instance)
+    }
+    return instance
+  }
+
+  /* 练习页：解析可见时只挂弹幕层，不渲染讨论折叠条（讨论入口收敛在侧栏「评论」）。
+   * 与 openPanel 共用每题同一实例；解除做题期的弹幕抑制，由 reload/renderOverlay 驱动视口弹幕。 */
+  function mountDanmaku({ questionId }) {
+    const id = text(questionId)
+    if (!id) return null
+    let instance = [...instances].find(row => row.questionId === id && row.source === 'danmaku')
+    if (!instance) {
+      const host = document.createElement('div')
+      host.className = 'q-comments-standalone-host'
+      host.setAttribute('aria-hidden', 'true')
+      document.body.appendChild(host)
+      instance = ensureInstance(host, '__kgQuestionComments', id, 'danmaku')
+      attach(instance, host)
+    }
+    instance.state.overlaySuppressed = false
+    activate(instance)
+    if (!instance.state.loaded) reload(instance)
+    return instance
+  }
+  /* 按来源清理实例（练习页换题/隐藏解析时清掉上一题的弹幕层）。 */
+  function teardownSource(source) {
+    for (const instance of [...instances]) {
+      if (instance.source === source) teardown(instance)
+    }
+  }
+
+  /* 标记区「弹幕」开关：与讨论折叠条上的开关共用同一份本机偏好。 */
+  function setDanmakuEnabled(value) {
+    remember(!!value)
+    for (const instance of instances) {
+      if (instance.disposed) continue
+      renderInto(instance)
+      renderOverlay(instance)
+    }
+  }
+  function danmakuEnabled() { return enabled() }
 
   /* 报告页题卡：默认折叠条（点击展开），展开后才拉取留言。 */
   function mountCard({ card, questionId, commentCount }) {
@@ -531,6 +787,8 @@
     const selected=target ? [target.__kgQuestionComments || target] : [...instances]
     for(const instance of selected) {
       instance.disposed=true
+      detachDrawerListeners(instance)
+      if(instance.popOutsideClose){document.removeEventListener('pointerdown',instance.popOutsideClose,true);instance.popOutsideClose=null}
       instance.overlay?.remove()
       instance.drawer?.remove()
       instance.root?.remove()
@@ -550,6 +808,6 @@
   lifecycle.observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['hidden']})
   global.addEventListener('kg-auth-session-change',()=>teardown())
   global.addEventListener('pagehide',()=>teardown())
-  global.KGQuestionComments = Object.freeze({ mountPanel, mountCard, mountCards, pickDanmaku, teardown })
+  global.KGQuestionComments = Object.freeze({ mountPanel, mountCard, mountCards, openPanel, mountDanmaku, teardownSource, pickDanmaku, danmakuEnabled, setDanmakuEnabled, teardown })
 })(window)
 

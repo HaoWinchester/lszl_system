@@ -182,7 +182,12 @@
     }
     await Promise.all([refreshRoleThemes(), refreshSubscription()])
     if (userProfile.role === 'admin') {
-      await Promise.all([refreshAdminSettings(), refreshAdminLogs(), refreshOrders(), refreshRedeemCodes()])
+      // 按需加载：管理日志/订单/兑换码仅管理页消费（约 50KB+），不在其他页面预取。
+      if (/\/(admin-console|admin-settings|admin-operations|user-management|feedback-management|message-management|system-settings)\.html/.test(global.location?.pathname || '')) {
+        await Promise.all([refreshAdminSettings(), refreshAdminLogs(), refreshOrders(), refreshRedeemCodes()])
+      } else {
+        await refreshAdminSettings()
+      }
     }
     return userProfile
   }

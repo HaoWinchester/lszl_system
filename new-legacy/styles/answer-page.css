@@ -104,7 +104,7 @@ body.practice-mode-page[data-practice-view="game"] :is(button,a,select,summary):
   body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-mode-switch{display:none}
   body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-main{width:100%;padding:0 0 10px}
   body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-game{padding:0 10px 16px;border-radius:18px}
-  body.practice-mode-page[data-practice-view="game"] .practice-side-nav{position:static;width:100%;flex-direction:row;justify-content:space-around;padding:8px 0;gap:4px;background:transparent;border:0}
+  body.practice-mode-page[data-practice-view="game"] .practice-side-nav{position:static;width:100%;flex-direction:row;justify-content:space-around;flex-wrap:wrap;padding:8px 0;gap:4px;background:transparent;border:0}
   body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-side-item{flex-direction:row;min-height:44px;width:auto;padding:6px 10px;font-size:var(--ui-text-meta);gap:6px;border-radius:9px}.practice-side-item svg{width:18px;height:18px}.practice-side-note{display:none}
   body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-game-topbar{gap:8px;margin:8px 0 16px;min-height:40px}
   body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-progress-shell{height:7px}
@@ -130,3 +130,19 @@ body.practice-mode-page[data-practice-view="game"] :is(button,a,select,summary):
   body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-explanation-toggle{font-size:var(--ui-text-meta)}
 }
 @media(prefers-reduced-motion:reduce){body.practice-mode-page[data-practice-view="game"] *{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
+
+/* 左侧导航：评论 / 弹幕开关（与标记同为侧栏条目，弹幕开启时高亮） */
+body.practice-mode-page[data-practice-view="game"] .practice-side-danmaku[aria-pressed="true"]{color:#1f4fd1;background:#eaf0ff;font-weight:650}
+
+/* 左侧导航收起/展开（移动端导航为横向静态条，不提供收起） */
+@media(min-width:601px){
+  body.practice-mode-page[data-practice-view="game"] .practice-side-nav{transition:transform .24s ease}
+  body.practice-mode-page[data-practice-view="game"] .practice-side-toggle{position:absolute;left:136px;top:50%;transform:translateY(-50%);z-index:30;width:24px;height:56px;padding:0;border:1px solid #edf2fb;border-left:0;border-radius:0 10px 10px 0;background:#ffffffd9;color:#5b6b8c;font-size:16px;line-height:1;cursor:pointer;transition:left .24s ease}
+  body.practice-mode-page[data-practice-view="game"] .practice-side-toggle:hover{color:#1f4fd1;background:#f0f4ff}
+  body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-game.practice-side-collapsed{padding-left:28px}
+  body.practice-mode-page[data-practice-view="game"] .practice-side-collapsed .practice-side-nav{transform:translateX(-100%);pointer-events:none;visibility:hidden}
+  body.practice-mode-page[data-practice-view="game"] .practice-side-collapsed .practice-side-toggle{left:4px}
+}
+@media(max-width:600px){
+  body.practice-mode-page .practice-side-toggle{display:none}
+}

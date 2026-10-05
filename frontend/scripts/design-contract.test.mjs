@@ -106,7 +106,7 @@ test('practice mode ships one resumable answer sheet and a nonofficial Huanpu PM
   assert.doesNotMatch(style, /padding-right:324px/)
   assert.match(style, /\.practice-answer-sheet-mobile-btn\{display:inline-flex/)
   assert.match(report, /src="\/assets\/logo\.jpg"/)
-  assert.match(report, /幻谱 PMP 模拟成绩分析报告/)
+  assert.match(report, /PMP 模拟成绩分析报告/)
   assert.match(report, /不代表 PMI 官方考试成绩/)
   for (const weight of ['people', 'process', 'business-environment']) assert.match(report, new RegExp(weight))
 })

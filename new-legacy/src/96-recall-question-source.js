@@ -136,7 +136,7 @@
     return null;
   }
   async function findAny(questionId,options={}){return findPublished({...options,questionId})}
-  async function activate(collectionIdentifier,questionId,options={}){
+  async function prepareActivation(collectionIdentifier,questionId,options={}){
     if(!cache.list.length)await rebuild();
     const collection=resolveCollection(collectionIdentifier);
     const input=typeof collectionIdentifier==='object'?collectionIdentifier:{collectionId:collectionIdentifier,paperId:collection?.paperId||'',releaseId:collection?.releaseId||'',questionId,bankId:options.bankId||'',mode:MODE};
@@ -147,13 +147,19 @@
     question.sourceCollectionId=found.collection.id;question.sourcePaperId=found.collection.paperId;question.sourceReleaseId=found.collection.releaseId;question.sourceQuestionId=text(question.id);
     const userId=global.KGRecallStorage?.currentUserId?.()||global.KGAuthCore?.currentUsername?.()||global.__KG_DIRECT_BOOTSTRAP__?.username||'guest';
     const payload={question,savedAt:Date.now(),source:'published-paper-deep-recall',sourceCollectionId:found.collection.id,sourcePaperId:found.collection.paperId,sourceReleaseId:found.collection.releaseId,sourceBankId:text(question.sourceBankId),sourceQuestionId:text(question.id),learningContext:clone(context),userId};
+    return {valid:true,...found,question,payload,context,resolution:result||found.resolution||null};
+  }
+  function commitActivation(activation,options={}){
+    if(!activation?.valid)return activation||{valid:false,code:'INVALID_ACTIVATION',errors:['题目切换失败。']};
     try{
+      const {payload,context}=activation,userId=payload?.userId||'guest';
       const storage=global.KGRecallStorage;if(storage?.writeCurrent){if(!storage.writeCurrent(payload))throw new Error('本地存储写入失败')}else global.localStorage?.setItem(LEGACY_CURRENT_KEY,JSON.stringify(payload));
-      global.KGLearningProgress?.activate?.(context,{mode:MODE,clearTransient:true,userId});
+      global.KGLearningProgress?.activate?.(context,{mode:MODE,clearTransient:options.clearTransient!==false,userId});
       global.KGLearningRouteContext?.remember?.(context);
-      return {valid:true,...found,question,payload,context,resolution:result||found.resolution||null};
+      return activation;
     }catch(error){return {valid:false,code:'ACTIVATION_FAILED',errors:['切换题目失败：'+error.message]}}
   }
+  async function activate(collectionIdentifier,questionId,options={}){return commitActivation(await prepareActivation(collectionIdentifier,questionId,options),options)}
 
   if(isRecallPage()){
     catalogReady.then(()=>{catalogLoaded=true;invalidate()},()=>{catalogLoaded=false;invalidate()});
@@ -163,7 +169,7 @@
     }catch(error){}
   }
 
-  const api=Object.freeze({ready:catalogReady,banks,list,find,findPublished,findAny,activate,invalidate,rebuild,loadCollection,emptyQuestion});
+  const api=Object.freeze({ready:catalogReady,banks,list,find,findPublished,findAny,prepareActivation,commitActivation,activate,invalidate,rebuild,loadCollection,emptyQuestion});
   global.KGRecallQuestionSource=api;
   if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);
