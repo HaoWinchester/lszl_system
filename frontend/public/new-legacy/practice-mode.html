@@ -344,10 +344,21 @@
         <div><span>MY FAVORITES</span><h2 id="practiceFavoritesTitle">我的收藏</h2><p>收藏的题目与解析都在这里，随时回看</p></div>
         <button type="button" class="practice-drawer-close" id="practiceFavoritesCloseBtn" aria-label="关闭我的收藏">×</button>
       </header>
-      <div class="practice-drawer-toolbar practice-favorites-toolbar"><span id="practiceFavoritesSummary">正在读取收藏…</span></div>
-      <div class="practice-drawer-body"><div id="practiceFavoritesList" class="practice-favorites-list"></div><div class="practice-history-empty" id="practiceFavoritesEmpty" hidden>在练习中点击左侧“收藏”，题目就会保存在这里。</div></div>
+      <div class="practice-drawer-toolbar practice-favorites-toolbar">
+        <label class="practice-favorites-search" for="practiceFavoritesSearch">搜索收藏题目
+          <input id="practiceFavoritesSearch" type="search" placeholder="搜索题干、解析关键词" autocomplete="off"/>
+        </label>
+        <span id="practiceFavoritesSummary">正在读取收藏…</span>
+      </div>
+      <div class="practice-drawer-body">
+        <div id="practiceFavoritesList" class="practice-favorites-list"></div>
+        <div class="practice-history-empty" id="practiceFavoritesEmpty" hidden>在练习中点击左侧“收藏”，题目就会保存在这里。</div>
+        <button type="button" class="practice-favorites-more" id="practiceFavoritesMore" hidden>加载更多</button>
+      </div>
     </aside>
   </div>
+
+  <div class="practice-favorite-detail-backdrop" id="practiceFavoriteDetail" hidden aria-hidden="true"></div>
 
   <div class="practice-drawer-backdrop practice-answer-sheet-drawer" id="practiceAnswerSheetDrawer" hidden aria-hidden="true">
     <section class="practice-drawer practice-answer-sheet-drawer-panel" role="dialog" aria-modal="true" aria-labelledby="practiceAnswerSheetDrawerTitle">

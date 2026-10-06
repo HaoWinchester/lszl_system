@@ -1296,9 +1296,10 @@
       if(dom.favoritesSummary)dom.favoritesSummary.textContent='登录后可查看你收藏的题目';return;
     }
     try{
-      const {total}=await favorites.renderList(dom.favoritesList,dom.favoritesEmpty,dom.favoritesSummary);
-      if(dom.favoritesEmpty)dom.favoritesEmpty.textContent='在练习中点击左侧“收藏”，题目就会保存在这里。';
-      if(!total&&dom.favoritesSummary)dom.favoritesSummary.textContent='还没有收藏的题目';
+      // 搜索/分页/详情由模块托管；搜索词在抽屉会话内保留，重开抽屉不丢
+      await favorites.renderList(dom.favoritesList,dom.favoritesEmpty,dom.favoritesSummary,{
+        searchInput:$('practiceFavoritesSearch'),moreBtn:$('practiceFavoritesMore'),detail:$('practiceFavoriteDetail'),onToast:showToast,
+      });
     }catch(error){
       if(text(error.message)==='UNAUTHENTICATED')return;
       if(dom.favoritesList)dom.favoritesList.innerHTML='';if(dom.favoritesEmpty)dom.favoritesEmpty.hidden=false;

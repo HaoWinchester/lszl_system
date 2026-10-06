@@ -2,9 +2,9 @@
 import base64
 import json
 from datetime import datetime
-from sqlalchemy import delete, func, select
+from sqlalchemy import String, cast, delete, func, or_, select
 from sqlalchemy.dialects.postgresql import insert
-from app.models.question import Question
+from app.models.question import Question, QuestionBank
 from app.models.question_favorite import QuestionFavorite
 from app.services.question_comment_service import (
     QuestionCommentNotFoundError,
@@ -61,18 +61,41 @@ async def question_favorite_counts(db, viewer, question_ids):
     rows = dict((await db.execute(select(QuestionFavorite.question_id, func.count()).where(QuestionFavorite.question_id.in_(accessible)).group_by(QuestionFavorite.question_id))).all())
     return {identifier: int(rows.get(identifier, 0)) for identifier in accessible}
 
-def _serialize(question, created_at):
+def _serialize(question, created_at, bank=None):
     return {
         'questionId': question.id,
         'stemText': _stem_text(question),
         'analysis': (question.analysis or '').strip(),
         'type': question.type,
         'favoritedAt': created_at.isoformat() if isinstance(created_at, datetime) else created_at,
+        'source': {
+            'bankName': (bank.name if bank is not None else '') or '',
+            'subject': _clean(question.subject) or _clean(bank.subject if bank is not None else ''),
+            'difficulty': _clean(question.difficulty),
+        },
     }
 
-async def list_favorites(db, viewer, cursor=None, limit=MAX_LIST_SIZE):
-    """收藏列表：按收藏时间倒序，逐题过访问校验（无权项跳过）。"""
-    query = select(QuestionFavorite, Question).join(Question, Question.id == QuestionFavorite.question_id).where(QuestionFavorite.owner_id == viewer.username)
+def _search_pattern(raw):
+    text = _clean(raw)
+    if not text:
+        return None
+    return '%' + text.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_') + '%'
+
+async def list_favorites(db, viewer, cursor=None, limit=MAX_LIST_SIZE, search=None):
+    """收藏列表：按收藏时间倒序，逐题过访问校验（无权项跳过）；search 匹配标题/题干/解析。"""
+    query = (
+        select(QuestionFavorite, Question, QuestionBank)
+        .join(Question, Question.id == QuestionFavorite.question_id)
+        .join(QuestionBank, QuestionBank.id == Question.bank_id)
+        .where(QuestionFavorite.owner_id == viewer.username)
+    )
+    pattern = _search_pattern(search)
+    if pattern:
+        query = query.where(or_(
+            Question.title.ilike(pattern, escape='\\'),
+            cast(Question.stem_parts, String).ilike(pattern, escape='\\'),
+            Question.analysis.ilike(pattern, escape='\\'),
+        ))
     if cursor:
         try:
             stamp, identifier = json.loads(base64.urlsafe_b64decode(cursor + '=' * (-len(cursor) % 4)))
@@ -87,10 +110,46 @@ async def list_favorites(db, viewer, cursor=None, limit=MAX_LIST_SIZE):
         next_cursor = base64.urlsafe_b64encode(json.dumps([last[0].created_at.isoformat(), last[0].question_id]).encode()).decode().rstrip('=')
     rows = rows[:limit]
     items = []
-    for favorite, question in rows:
+    for favorite, question, bank in rows:
         try:
             await require_question_access(db, viewer, question.id)
         except (QuestionCommentPermissionError, QuestionCommentNotFoundError):
             continue
-        items.append(_serialize(question, favorite.created_at))
+        items.append(_serialize(question, favorite.created_at, bank))
     return {'favorites': items, 'nextCursor': next_cursor}
+
+async def favorite_detail(db, viewer, question_id):
+    """收藏题目详情：完整题干/选项（含正确项）/解析/来源，供收藏抽屉查看。"""
+    question = await db.get(Question, _clean(question_id))
+    if question is None:
+        raise QuestionCommentNotFoundError('题目不存在')
+    await require_question_access(db, viewer, question.id)
+    favorite = await db.get(QuestionFavorite, {'question_id': question.id, 'owner_id': viewer.username})
+    bank = await db.get(QuestionBank, question.bank_id)
+    return {
+        'questionId': question.id,
+        'title': question.title,
+        'stemParts': question.stem_parts or [],
+        'type': question.type,
+        'options': [
+            {
+                'id': option.get('id'),
+                'text': option.get('text'),
+                'correct': bool(option.get('correct')),
+            }
+            for option in (question.options or [])
+            if isinstance(option, dict)
+        ],
+        'correctAnswer': question.correct_answer,
+        'correctAnswerIds': question.correct_answer_ids or [],
+        'analysis': (question.analysis or '').strip(),
+        'clues': question.clues or [],
+        'concepts': question.concepts or [],
+        'source': {
+            'bankName': (bank.name if bank is not None else '') or '',
+            'subject': _clean(question.subject) or _clean(bank.subject if bank is not None else ''),
+            'difficulty': _clean(question.difficulty),
+        },
+        'favorited': favorite is not None,
+        'favoritedAt': favorite.created_at.isoformat() if favorite is not None and isinstance(favorite.created_at, datetime) else None,
+    }

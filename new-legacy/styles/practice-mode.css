@@ -562,3 +562,70 @@ body.practice-mode-page:not([data-practice-view="game"]) .practice-main{
 .practice-paper-card:hover .practice-paper-access{color:var(--practice-accent)}
 /* 修复：focus-vega 皮肤对 disabled 控件的整体降透明会让原生 radio 半显在 pill 角落 */
 .practice-choice-group input{opacity:0!important}
+
+/* —— v9.0 按钮对齐修复：setup 卡动作簇与模式卡 CTA 统一基线/底边 —— */
+/* setup 卡：行内元素统一顶对齐，动作簇改为满宽纵向栈 */
+.practice-setup-card{align-items:start}
+.practice-setup-card .practice-entry-actions{display:flex;flex-direction:column;gap:10px;margin-top:0}
+.practice-setup-card .practice-entry-actions .practice-start-btn,
+.practice-setup-card .practice-entry-actions .practice-secondary-btn{width:100%}
+.practice-setup-card .practice-selection-notice{margin:0}
+/* 模式卡：内容区伸展，动作簇钉在卡片底边，次按钮满宽与主按钮同宽 */
+.practice-mode-card{grid-template-rows:auto minmax(0,1fr) auto auto;row-gap:0}
+.practice-mode-card>.practice-mode-icon{grid-row:1;grid-column:1}
+.practice-mode-card>div{grid-row:1;grid-column:2;align-self:start}
+.practice-mode-card .practice-start-btn{grid-row:3;grid-column:1/-1;align-self:end;margin-top:14px}
+.practice-mode-card .practice-secondary-btn{grid-row:4;grid-column:1/-1;width:100%;margin-top:10px}
+
+/* —— 我的收藏升级：搜索 / 来源 / 详情弹层 / 分页 —— */
+.practice-favorites-toolbar{display:grid;gap:9px}
+.practice-favorites-search{display:grid;gap:5px;color:#526176;font-size:11px;font-weight:800}
+.practice-favorites-search input{min-height:38px;padding:8px 12px;border:1px solid #d8dfec;border-radius:10px;background:#fff;color:var(--practice-text);font:inherit;font-weight:600;transition:border-color .18s ease,box-shadow .18s ease}
+.practice-favorites-search input:hover{border-color:#b9c2d0}
+.practice-favorites-search input:focus{border-color:var(--practice-accent);box-shadow:0 0 0 3px rgba(109,40,217,.13);outline:none}
+.practice-favorites-toolbar>span{font-size:12px;color:#718096;font-variant-numeric:tabular-nums}
+.practice-favorites-more{width:100%;min-height:42px;margin-top:4px;border:1px solid #d7dde6;border-radius:12px;background:#fff;color:#475569;font-weight:750;cursor:pointer;transition:border-color .18s ease,color .18s ease,background .18s ease}
+.practice-favorites-more:hover:not(:disabled){border-color:#b9c2d0;color:var(--practice-text);background:#fafbfd}
+.practice-favorites-more:disabled{opacity:.6;cursor:default}
+.practice-favorite-card{cursor:pointer;transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}
+.practice-favorite-card:hover{transform:translateY(-2px);box-shadow:0 12px 26px rgba(31,41,55,.1);border-color:#c8cfdc}
+.practice-favorite-source{margin:9px 0 0;color:#718096;font-size:11px;font-weight:700}
+.practice-favorite-source span{display:inline-block;margin-right:6px;padding:1px 7px;border-radius:6px;background:#f1f3f7;color:#596579;font-size:10px;font-weight:800}
+.practice-favorite-card-foot{display:flex;gap:8px;align-items:center;justify-content:flex-end}
+.practice-favorite-card-foot button{border:0;border-radius:9px;padding:7px 11px;font-size:12px;font-weight:750;cursor:pointer;transition:filter .15s ease,background .15s ease,color .15s ease}
+.practice-favorite-card-foot .practice-favorite-detail-btn{background:#f1efff;color:#4c3fd1}
+.practice-favorite-card-foot .practice-favorite-detail-btn:hover{filter:brightness(1.05)}
+.practice-favorite-card-foot [data-favorite-remove]{background:#fff1f2;color:#be123c}
+.practice-favorite-card-foot [data-favorite-remove]:hover{filter:brightness(1.03)}
+/* 详情弹层 */
+.practice-favorite-detail-backdrop{position:fixed;inset:0;z-index:120;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(15,23,42,.4);backdrop-filter:blur(3px);animation:practiceBackdropIn .18s ease}
+.practice-favorite-detail-backdrop[hidden]{display:none}
+.practice-favorite-detail-dialog{width:min(720px,100%);max-height:min(84dvh,760px);display:flex;flex-direction:column;background:#fff;border-radius:22px;box-shadow:0 30px 90px rgba(15,23,42,.3);overflow:hidden;animation:practiceDrawerIn .24s cubic-bezier(.2,.8,.2,1)}
+.practice-favorite-detail-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:20px 22px 15px;border-bottom:1px solid #edf0f5}
+.practice-favorite-detail-meta{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 7px;color:#718096;font-size:11px;font-weight:700}
+.practice-favorite-detail-head h3{margin:0;font-size:19px;letter-spacing:-.01em}
+.practice-favorite-detail-close{width:34px;height:34px;flex:0 0 34px;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc;color:#64748b;font-size:22px;line-height:1;cursor:pointer;transition:color .15s ease,border-color .15s ease}
+.practice-favorite-detail-close:hover{color:var(--practice-danger);border-color:#fecdd3}
+.practice-favorite-detail-body{flex:1 1 auto;overflow:auto;padding:18px 22px;display:grid;gap:15px;align-content:start}
+.practice-favorite-detail-stem p{margin:0 0 8px;font-size:15px;line-height:1.75;font-weight:650;color:var(--practice-text)}
+.practice-favorite-detail-options{display:grid;gap:9px;margin:0;padding:0;list-style:none}
+.practice-favorite-detail-options li{position:relative;display:grid;grid-template-columns:26px minmax(0,1fr);gap:9px;align-items:start;padding:12px 14px;border:1px solid #dfe4ec;border-radius:13px;background:#fff;font-size:14px;line-height:1.6}
+.practice-favorite-detail-options li.is-correct{border-color:#86d7a0;background:#ecfdf3}
+.practice-favorite-detail-options li.is-correct em{position:absolute;right:12px;top:12px;padding:2px 8px;border-radius:999px;background:#dcfce7;color:#166534;font-size:10px;font-weight:850;font-style:normal}
+.practice-favorite-detail-key{width:25px;height:25px;border-radius:8px;background:#f1f4f8;color:#526071;display:grid;place-items:center;font-weight:800;font-size:12px}
+.practice-favorite-detail-options li.is-correct .practice-favorite-detail-key{background:#bbf7d0;color:#166534}
+.practice-favorite-detail-tags{display:flex;flex-wrap:wrap;gap:6px;align-items:center;color:#718096;font-size:12px}
+.practice-favorite-detail-tags strong{margin-right:4px;color:#526176;font-size:12px}
+.practice-favorite-detail-tags span{padding:3px 9px;border-radius:999px;background:#f5f3ff;color:#5b4dd1;font-size:11px;font-weight:750}
+.practice-favorite-detail-foot{display:flex;gap:10px;justify-content:flex-end;padding:14px 22px;border-top:1px solid #edf0f5;background:#fbfcfe}
+.practice-favorite-detail-foot button{min-width:120px;height:40px;border:0;border-radius:12px;padding:0 18px;font-weight:750;cursor:pointer;transition:filter .15s ease,transform .12s ease}
+.practice-favorite-detail-foot button:active{transform:translateY(1px) scale(.99)}
+.practice-favorite-detail-remove{background:#fff1f2;color:#be123c}
+.practice-favorite-detail-done{background:var(--practice-text);color:#fff}
+.practice-favorite-detail-foot button:hover{filter:brightness(1.06)}
+@media (prefers-reduced-motion:reduce){.practice-favorite-detail-backdrop,.practice-favorite-detail-dialog{animation:none}}
+/* 窄屏：详情弹层全屏化 */
+@media (max-width:600px){
+  .practice-favorite-detail-backdrop{padding:0;align-items:flex-end}
+  .practice-favorite-detail-dialog{width:100%;max-height:92dvh;border-radius:22px 22px 0 0}
+}

@@ -5,7 +5,7 @@
   "changes": {
     "added": [],
     "changed": [
-      "styles/practice-mode.css"
+      "src/120-question-favorites.js"
     ],
     "removed": []
   },

@@ -212,3 +212,48 @@ def test_favorite_counts_batch() -> None:
             assert ids["private_question"] not in data
     finally:
         _cleanup(ids)
+
+
+def test_favorite_list_search_source_and_detail() -> None:
+    """收藏列表来源字段、search 过滤与详情端点（选项/正确项/解析）。"""
+    ids = _ids()
+    asyncio.run(_seed(ids))
+    try:
+        with TestClient(app) as client:
+            _login(client, ids["student"])
+            client.post(f"/api/v1/question-favorites/{ids['question']}/toggle")
+            client.post(f"/api/v1/question-favorites/{ids['other_question']}/toggle")
+
+            # 来源：题库名 + 学科（题库默认 PMP）
+            listed = client.get("/api/v1/question-favorites").json()["favorites"]
+            assert len(listed) == 2
+            item = next(entry for entry in listed if entry["questionId"] == ids["question"])
+            assert item["source"]["bankName"] == "收藏测试题库"
+            assert item["source"]["subject"] == "PMP"
+
+            # search：匹配题干文本；另一题不含该词被过滤
+            matched = client.get("/api/v1/question-favorites", params={"search": "正确选项"}).json()["favorites"]
+            assert [entry["questionId"] for entry in matched] == [ids["question"]]
+            assert client.get(
+                "/api/v1/question-favorites", params={"search": "绝不存在的关键词xyz"}
+            ).json()["favorites"] == []
+
+            # 详情：完整题干/选项/解析/来源；未收藏题目不返回 favoritedAt
+            detail = client.get(
+                "/api/v1/question-favorites/detail", params={"question_id": ids["question"]}
+            )
+            assert detail.status_code == 200, detail.text
+            data = detail.json()
+            assert data["questionId"] == ids["question"]
+            assert data["stemParts"][0]["text"] == "以下哪个是正确选项？"
+            assert data["analysis"] == "A 是正确答案，因为……"
+            assert data["source"]["bankName"] == "收藏测试题库"
+            assert data["favorited"] is True and data["favoritedAt"]
+            assert data["options"] == []  # 种子题未带选项，不伪造字段
+
+            # 不存在的题目 → 404
+            assert client.get(
+                "/api/v1/question-favorites/detail", params={"question_id": "missing-id"}
+            ).status_code == 404
+    finally:
+        _cleanup(ids)

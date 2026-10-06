@@ -24,10 +24,19 @@ def _raise(error: ValueError) -> None:
 
 
 @router.get("")
-async def list_favorites(db: DB, user: CurrentUser, cursor: str | None = Query(default=None, max_length=512), limit: int = Query(default=50, ge=1, le=50)):
-    """收藏列表：题目题干 + 解析，供大厅“我的收藏”抽屉展示。"""
+async def list_favorites(db: DB, user: CurrentUser, cursor: str | None = Query(default=None, max_length=512), limit: int = Query(default=50, ge=1, le=50), search: str | None = Query(default=None, max_length=100)):
+    """收藏列表：题目题干 + 解析 + 来源，支持搜索与游标分页。"""
     try:
-        return await service.list_favorites(db, user, cursor, limit)
+        return await service.list_favorites(db, user, cursor, limit, search)
+    except ValueError as error:
+        _raise(error)
+
+
+@router.get("/detail")
+async def favorite_detail_by_query(db: DB, user: CurrentUser, question_id: Annotated[str, Query(max_length=64)]):
+    """收藏题目详情（query 形式，避免与 /{question_id} 路径歧义）。"""
+    try:
+        return await service.favorite_detail(db, user, question_id)
     except ValueError as error:
         _raise(error)
 
