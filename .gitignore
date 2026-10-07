@@ -28,3 +28,4 @@ miniprogram/project.private.config.json
 
 /backend/.env.teacher-assistant.local
 /var/
+output/

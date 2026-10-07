@@ -223,7 +223,11 @@
         for (const [key, label] of Object.entries(labels)) { text(settings, 'dt', label); const value = plan.settings?.[key]; text(settings, 'dd', Array.isArray(value) ? value.map(v => translated[v] || v).join('、') : translated[value] || value || '待确定'); }
         (plan.blockers || []).forEach(value => issue($('plan-preview'), value, 'ta-blocker'));
         for (const item of plan.items || []) {
-          const el = text($('plan-preview'), 'article', '', 'ta-item'); text(el, 'h3', item.name || item.id); text(el, 'p', (item.kind === 'principles' ? '原则与归纳卡' : '题库') + ' · ' + (item.questions?.length || item.principles?.length || item.principleBundle?.principles?.length || 0) + ' 项');
+          const el = text($('plan-preview'), 'article', '', 'ta-item'); text(el, 'h3', item.name || item.id); const KIND_LABELS = { principles: '原则与归纳卡', recall_library: '联想库', questions: '题库' };
+          const itemCount = item.kind === 'recall_library'
+            ? (item.librarySummary || ((item.recallLibrary?.nodes?.length || 0) + ' 个知识点'))
+            : ((item.questions?.length || item.principles?.length || item.principleBundle?.principles?.length || 0) + ' 项');
+          text(el, 'p', (KIND_LABELS[item.kind] || '题库') + ' · ' + itemCount);
           const upload = (s.uploads || []).find(u => u.id === item.source?.uploadId); text(el, 'p', '来源：' + (upload?.name || item.source?.uploadId || '未定位') + ' · ' + (item.source?.location || '待核对'));
           if (upload && upload.status !== 'expired') link(el, '对照原件', upload.downloadUrl || BASE + '/uploads/' + encodeURIComponent(upload.id) + '/file');
           (item.warnings || []).forEach(v => issue(el, v, 'ta-warning')); (item.blockers || []).forEach(v => issue(el, v, 'ta-blocker'));

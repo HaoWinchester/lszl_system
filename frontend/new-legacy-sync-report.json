@@ -4,9 +4,7 @@
   "toVersion": "v9.0-p4.1.294",
   "changes": {
     "added": [],
-    "changed": [
-      "src/120-question-favorites.js"
-    ],
+    "changed": [],
     "removed": []
   },
   "incompatible": []

@@ -570,12 +570,16 @@ body.practice-mode-page:not([data-practice-view="game"]) .practice-main{
 .practice-setup-card .practice-entry-actions .practice-start-btn,
 .practice-setup-card .practice-entry-actions .practice-secondary-btn{width:100%}
 .practice-setup-card .practice-selection-notice{margin:0}
-/* 模式卡：内容区伸展，动作簇钉在卡片底边，次按钮满宽与主按钮同宽 */
-.practice-mode-card{grid-template-rows:auto minmax(0,1fr) auto auto;row-gap:0}
-.practice-mode-card>.practice-mode-icon{grid-row:1;grid-column:1}
-.practice-mode-card>div{grid-row:1;grid-column:2;align-self:start}
-.practice-mode-card .practice-start-btn{grid-row:3;grid-column:1/-1;align-self:end;margin-top:14px}
-.practice-mode-card .practice-secondary-btn{grid-row:4;grid-column:1/-1;width:100%;margin-top:10px}
+/* 模式卡（挑战/学者，结构简单）：内容区伸展，动作簇钉在卡片底边，次按钮满宽与主按钮同宽 */
+.practice-standard-modes .practice-mode-card{grid-template-rows:auto minmax(0,1fr) auto auto;row-gap:0}
+.practice-standard-modes .practice-mode-card>.practice-mode-icon{grid-row:1;grid-column:1}
+.practice-standard-modes .practice-mode-card>div{grid-row:1;grid-column:2;align-self:start}
+.practice-standard-modes .practice-mode-card .practice-start-btn{grid-row:3;grid-column:1/-1;align-self:end;margin-top:14px}
+.practice-standard-modes .practice-mode-card .practice-secondary-btn{grid-row:4;grid-column:1/-1;width:100%;margin-top:10px}
+/* 复仇卡：子块多且自带 1/-1 列定义，保留原生行流，仅伸展尾部内容行并钉底 CTA */
+.practice-mode-card.revenge{grid-template-rows:auto auto auto minmax(0,1fr) auto auto}
+.practice-mode-card.revenge .practice-start-btn{align-self:end;margin-top:14px}
+.practice-mode-card.revenge .practice-secondary-btn{width:100%;margin-top:10px}
 
 /* —— 我的收藏升级：搜索 / 来源 / 详情弹层 / 分页 —— */
 .practice-favorites-toolbar{display:grid;gap:9px}

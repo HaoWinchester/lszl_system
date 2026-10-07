@@ -821,3 +821,52 @@ async def test_restore_multiple_choice_promotes_same_paper_to_mixed(initial_publ
             old_rows = (await database.execute(select(PaperReleaseQuestion).where(PaperReleaseQuestion.release_id == old_release))).scalars().all()
             assert len(old_rows) == 1
             assert old_rows[0].snapshot['type'] == 'single_choice'
+
+
+@pytest.mark.anyio
+async def test_recall_library_plan_requires_subject_id(db):
+    """联想库 JSON 缺 subjectId 时生成计划项并带 blocker，不误判为题库。"""
+    source = {'id': 'upload-recall', 'name': 'library.json', 'extracted': {'kind': 'json', 'data': {'schemaVersion': 1, 'nodes': [{'id': 'n1', 'title': '关键路径法'}], 'edges': [{'from': 'n1', 'to': 'n1'}]}, 'warnings': [], 'sections': []}}
+    plan = await build_plan(db, ACTOR, [source], {}, session_id='s')
+    assert len(plan['items']) == 1
+    item = plan['items'][0]
+    assert item['kind'] == 'recall_library'
+    assert item['recallLibrary']['nodes'][0]['id'] == 'n1'
+    assert any('subjectId' in blocker for blocker in item['blockers'])
+
+
+@pytest.mark.anyio
+async def test_recall_library_import_end_to_end():
+    """联想库 JSON 走助手管线：识别 → 导入为正式联想库新版本。"""
+    from uuid import uuid4
+    from app.db.session import AsyncSessionLocal
+    from app.models.user import User
+    from app.models.teacher_assistant import TeacherAssistantSession
+    from app.models.teaching_content import ContentSubject, RecallAssociationLibrary
+    from sqlalchemy import select
+    suffix = uuid4().hex[:12]
+    library = {'schemaVersion': 1, 'subjectId': 'recall-subject-' + suffix, 'nodes': [{'id': 'n1', 'title': '关键路径法'}, {'id': 'n2', 'title': '总浮动时间'}], 'edges': [{'from': 'n1', 'to': 'n2'}]}
+    uploaded = {'id': 'recall-upload', 'name': '联想库.json', 'extracted': {'kind': 'json', 'data': library, 'warnings': [], 'sections': []}}
+    async with AsyncSessionLocal() as database:
+        actor = User(username='ta-recall-' + suffix, password_hash='test', role='teacher', status='active')
+        database.add(actor)
+        database.add(ContentSubject(id=library['subjectId'], code='recall-' + suffix, name='测试学科'))
+        await database.commit()
+        session = TeacherAssistantSession(id='tas-recall-' + suffix, owner_id=actor.username, revision=1)
+        session.plan = await build_plan(database, actor, [uploaded], {}, session_id=session.id)
+        item = session.plan['items'][0]
+        assert item['kind'] == 'recall_library' and not item['blockers']
+        database.add(session)
+        await database.commit()
+        receipt = await execute_plan(database, actor, session, 1)
+        assert receipt['status'] == 'succeeded', receipt
+        saved = (await database.execute(select(RecallAssociationLibrary).where(RecallAssociationLibrary.subject_id == library['subjectId']))).scalars().all()
+        assert len(saved) == 1 and saved[0].version == 1 and len(saved[0].nodes) == 2
+        entry = receipt['items'][0]
+        assert entry['status'] == 'succeeded'
+        # 已成功项重放为安全 no-op（回执幂等），不产生重复版本
+        session.receipt = receipt
+        replay = await execute_plan(database, actor, session, 1)
+        assert replay['status'] == 'succeeded'
+        versions = (await database.execute(select(RecallAssociationLibrary.version).where(RecallAssociationLibrary.subject_id == library['subjectId']))).scalars().all()
+        assert sorted(versions) == [1]

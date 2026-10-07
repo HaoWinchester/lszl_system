@@ -22,9 +22,10 @@ from app.models.content_prep import Principle
 from app.models.question import ExamPaper, Question, QuestionBank
 from app.models.paper_release import PaperRelease, PaperReleaseQuestion
 from app.models.teacher_assistant import TeacherAssistantSession
+from app.models.teaching_content import ContentSubject, RecallAssociationLibrary
 from app.schemas.paper import PaperImportPreflightRequest, PaperImportRequest, PaperUpdateRequest, PaperQuestionReplaceRequest
 from app.schemas.question_catalog import QuestionBankImportRequest, QuestionPayload, QuestionBankImportQuestionPayload
-from app.services import content_prep_shared_service, paper_import_service, paper_release_service, question_answer_service, question_content_service, question_service, teaching_content_projection_service, question_material_service, idempotency_service, paper_service, teaching_content_revision_service
+from app.services import content_prep_shared_service, paper_import_service, paper_release_service, question_answer_service, question_content_service, question_service, teaching_content_projection_service, question_material_service, idempotency_service, paper_service, teaching_content_revision_service, teaching_content_service
 
 
 def _error(status, code, message):
@@ -104,6 +105,11 @@ def _banks(data):
 
 def _principle_bundle(data):
     return isinstance(data, dict) and (data.get("format") in {"kg-principle-card-bundle-v1", "pmp-principle-preset-bundle-v1"} or (("principles" in data or "principleRepository" in data) and any(key in data for key in ("synthesisPresets", "presets", "synthesisPresetRepository"))))
+
+
+def _recall_library(data):
+    """联想库 JSON：与内容中心导入一致的 nodes/edges 结构（edges 可省略）。"""
+    return isinstance(data, dict) and isinstance(data.get("nodes"), list) and bool(data["nodes"]) and isinstance(data.get("edges", []), list)
 
 
 async def _reference_blockers(db, questions, incoming_principle_ids=None):
@@ -430,6 +436,24 @@ async def build_plan(db, actor, sources: list[dict], model_result: dict, *, sess
             resolutions = [{'conflictId': key, 'resolution': approved[key]} for key in sorted(approved)]
             items.append({'id': item_id, 'name': source['name'], 'kind': 'principles', 'questions': [], 'principleBundle': deepcopy(principle_bundle), 'mergePreview': preview, 'principleResolutions': resolutions, 'source': {'uploadId': upload_id, 'location': '文件'}, 'warnings': extracted.get('warnings', []), 'blockers': item_blockers})
             continue
+        recall_library = extracted.get('data') if extracted['kind'] == 'json' and _recall_library(extracted.get('data')) else None
+        if recall_library:
+            item_id = upload_id + ':recall-library'
+            node_count = len(recall_library.get('nodes') or [])
+            edge_count = len(recall_library.get('edges') or [])
+            subject_id = str(recall_library.get('subjectId') or '').strip()
+            item_blockers = []
+            if not subject_id:
+                item_blockers.append('联想库文件缺少顶层 subjectId，无法确定目标学科；请补全后重新上传。')
+            elif not await db.get(ContentSubject, subject_id):
+                subjects = (await db.execute(select(ContentSubject.id).order_by(ContentSubject.id).limit(8))).scalars()
+                item_blockers.append(f'目标学科 {subject_id} 不存在；可用学科：{", ".join(subjects) or "（无）"}。')
+            if node_count > 2000:
+                item_blockers.append('联想库超过 2000 个知识点，请拆分文件。')
+            items.append({'id': item_id, 'name': source['name'], 'kind': 'recall_library', 'questions': [],
+                'recallLibrary': {'subjectId': subject_id, 'nodes': deepcopy(recall_library.get('nodes') or []), 'edges': deepcopy(recall_library.get('edges') or []), 'metadata': deepcopy(recall_library.get('metadata') or recall_library.get('contentMetadata') or {})},
+                'librarySummary': f'{node_count} 个知识点 · {edge_count} 条关系', 'source': {'uploadId': upload_id, 'location': 'JSON 联想库'}, 'warnings': extracted.get('warnings', []), 'blockers': item_blockers})
+            continue
         if not raw_banks and extracted['kind'] != 'json':
             raw_banks = [{'id': upload_id, 'name': source['name'], 'questions': deepcopy(model_item.get('questions') or [])}]
         if not raw_banks:
@@ -654,6 +678,31 @@ async def execute_plan(db, actor, session, revision, *, before_step=None) -> dic
                 await guard()
                 result = await content_prep_shared_service.apply_principle_merge(db, actor, content_revision=preview['contentRevision'], bundle=item['principleBundle'], resolutions=resolutions)
                 entry.update(status='succeeded', result={'contentRevision': result['contentRevision'], 'summary': result['summary']})
+                for error_key in ('error', 'errorStatus', 'errorCode'):
+                    entry.pop(error_key, None)
+                await _checkpoint(db, session, receipt)
+                continue
+            if item['kind'] == 'recall_library':
+                library = item['recallLibrary']
+                subject_id = str(library.get('subjectId') or '').strip()
+                if not subject_id:
+                    raise _error(422, 'RECALL_SUBJECT_REQUIRED', '联想库缺少目标学科，无法导入。')
+                if await db.get(ContentSubject, subject_id) is None:
+                    raise _error(422, 'RECALL_SUBJECT_NOT_FOUND', f'目标学科 {subject_id} 不存在，请在联想库文件中修正 subjectId 后重新预览。')
+                current = await teaching_content_revision_service.current(db)
+                latest_version = next(iter((await db.execute(
+                    select(RecallAssociationLibrary.version)
+                    .where(RecallAssociationLibrary.subject_id == subject_id)
+                    .order_by(RecallAssociationLibrary.version.desc()).limit(1)
+                )).scalars()), 0)
+                version = int(library.get('version') or (int(latest_version) + 1))
+                await guard()
+                result = await teaching_content_service.upsert_recall_library(
+                    db, subject_id=subject_id, content_revision=int(current['revision']), version=version,
+                    nodes=library.get('nodes') or [], edges=library.get('edges') or [],
+                    metadata=library.get('metadata') or {}, actor=actor.username,
+                )
+                entry.update(status='succeeded', result={'contentRevision': result['contentRevision'], 'summary': item.get('librarySummary') or '联想库已保存'})
                 for error_key in ('error', 'errorStatus', 'errorCode'):
                     entry.pop(error_key, None)
                 await _checkpoint(db, session, receipt)
