@@ -5,7 +5,7 @@
   "changes": {
     "added": [],
     "changed": [
-      "src/86-knowledge-recall.js"
+      "styles/knowledge-recall-patch-2.css"
     ],
     "removed": []
   },

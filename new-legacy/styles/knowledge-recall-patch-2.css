@@ -24,14 +24,6 @@
 .knowledge-recall-page .kr-save-status[data-state="failed"],
 .knowledge-recall-page .kr-save-status[data-state="conflict"]{color:#b42318}
 .knowledge-recall-page .kr-save-status button{border:0;background:transparent;color:inherit;text-decoration:underline;cursor:pointer;font:inherit}
-.knowledge-recall-page .kr-version-choice{position:fixed;inset:0;z-index:6000;display:grid;place-items:center;padding:20px;background:rgba(15,23,42,.42)}
-.knowledge-recall-page .kr-version-choice[hidden]{display:none}
-.knowledge-recall-page .kr-version-choice-card{width:min(460px,100%);padding:24px;border:1px solid #dbe3ef;border-radius:16px;background:#fff;color:#0f172a;box-shadow:0 24px 60px rgba(15,23,42,.18)}
-.knowledge-recall-page .kr-version-choice-card h2{margin:0 0 10px;font-size:20px}
-.knowledge-recall-page .kr-version-choice-card p{margin:0;color:#475569;line-height:1.65}
-.knowledge-recall-page .kr-version-choice-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
-.knowledge-recall-page .kr-version-choice-actions button{min-height:38px;padding:0 14px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;color:#0f172a;font-weight:700;cursor:pointer}
-.knowledge-recall-page #krResetToCurrentBtn{border-color:#2563eb;background:#2563eb;color:#fff}
 @media (max-width:760px){.knowledge-recall-page .kr-save-status{display:none}.knowledge-recall-page .kr-reveal-keywords-btn{padding:0 10px}}
 /* 未揭示（undiscovered）关键词：可点击但外观与普通文字一致，hover 不提示，点击命中才点亮。 */
 .knowledge-recall-page .kr-keyword-token.undiscovered{

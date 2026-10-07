@@ -334,40 +334,16 @@
     setRecallReadonly(!recallSession.permissions?.canWrite);
     const reveal=$('krRevealKeywordsBtn');if(reveal){reveal.disabled=!recallSession.permissions?.canReveal;reveal.textContent='揭示关键词'}
   }
-  /* 版本选择弹窗：事件委托到弹窗容器（一次性绑定），节点被任何代码替换也不丢响应；
-   * Escape/点击遮罩按安全默认（查看旧图）处理，杜绝「看得见点不着」的卡死。 */
-  let versionChoiceResolver=null;
-  function settleVersionChoice(choice){
-    const modal=$('krVersionChoice');
-    if(modal)modal.hidden=true;
-    const resolver=versionChoiceResolver;versionChoiceResolver=null;
-    if(resolver)resolver(choice);
-  }
-  async function handleVersionReset(resetButton){
-    if(!confirm('确定清除旧图和笔迹，并按当前题目版本重新开始吗？此操作不会修改正式联想库。'))return;
-    resetButton.disabled=true;
-    try{await recallAdapter.resetToCurrent();settleVersionChoice('current')}
-    catch(error){notifyRecallLimit(error?.message||'重置失败，请稍后重试。');resetButton.disabled=false}
-  }
-  function bindVersionChoice(){
-    const modal=$('krVersionChoice');
-    if(!modal||modal.dataset.krChoiceBound)return;
-    modal.dataset.krChoiceBound='1';
-    modal.addEventListener('click',event=>{
-      if(event.target===modal||event.target.closest('#krViewHistoryBtn')){settleVersionChoice('history');return}
-      const resetButton=event.target.closest('#krResetToCurrentBtn');
-      if(resetButton)void handleVersionReset(resetButton);
-    });
-    document.addEventListener('keydown',event=>{
-      if(event.key==='Escape'&&versionChoiceResolver)settleVersionChoice('history');
-    });
-  }
-  function chooseVersion(session){
-    const modal=$('krVersionChoice'),historyButton=$('krViewHistoryBtn'),resetButton=$('krResetToCurrentBtn');
-    if(!modal||!historyButton||!resetButton)return Promise.resolve('history');
-    bindVersionChoice();
-    modal.hidden=false;
-    return new Promise(resolve=>{versionChoiceResolver=resolve});
+  /* 题目更新后不再区分旧版/新版：检测到版本不一致时静默采用新版本
+   * （调用既有 resetToCurrent 清掉旧图与笔迹，联想库随新题快照走）。 */
+  async function adoptCurrentVersion(){
+    try{
+      await recallAdapter.resetToCurrent();
+      return recallAdapter.getState().session||null;
+    }catch(error){
+      notifyRecallLimit(error?.message||'新版本载入失败，请稍后重试。');
+      return null;
+    }
   }
   /* 拉取新题会话数据（不改主状态）；提交（applyServerSession）由调用方在合适的时机执行。 */
   async function loadDatabaseSessionData(questionId=''){
@@ -391,11 +367,14 @@
     recallAdapter=window.KGDeepRecallServerAdapter?.create?.({questionId:id,releaseId,libraryHash:lastLibraryHash});
     if(!recallAdapter)throw new Error('深度回忆服务器适配器加载失败。');
     recallAdapter.subscribe(renderSaveState);renderSaveState({saveState:'loading'});
-    const session=await recallAdapter.loadSession();
-    if(session.versionState==='mismatch')window.KGLearningLoading?.hide?.();
-    const choice=session.versionState==='mismatch'?await chooseVersion(session):'current';
+    let session=await recallAdapter.loadSession();
+    if(session.versionState==='mismatch'){
+      window.KGLearningLoading?.hide?.();
+      const adopted=await adoptCurrentVersion();
+      if(adopted)session=adopted;
+    }
     const latest=recallAdapter.getState().session||session;
-    return {latest,history:choice==='history'};
+    return {latest,history:false};
   }
   /* 失败回退：丢弃已拉取的新题上下文，恢复旧题的保存绑定。 */
   function restoreRecallContext(previousAdapter,previousQuestion){
@@ -1657,7 +1636,6 @@
       notifyRecallLimit('深度回忆图模型加载失败，请刷新页面后重试。');
       return;
     }
-    bindVersionChoice();
     window.KGLearningLoading?.show?.({title:'正在加载试卷',message:'正在读取试题…'});
     try{
       const params=new URLSearchParams(location.search||'');
