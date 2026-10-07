@@ -4,7 +4,9 @@
   "toVersion": "v9.0-p4.1.294",
   "changes": {
     "added": [],
-    "changed": [],
+    "changed": [
+      "src/86-knowledge-recall.js"
+    ],
     "removed": []
   },
   "incompatible": []
