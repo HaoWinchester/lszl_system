@@ -621,12 +621,12 @@
     },
     {
       "path": "backend/app/services/runtime_retirement_service.py",
-      "token": "kg_question_discussion_danmaku_v1__",
+      "token": "kg_question_danmaku_hidden_v1__",
       "ordinal": 1
     },
     {
       "path": "backend/app/services/runtime_retirement_service.py",
-      "token": "kg_question_danmaku_hidden_v1__",
+      "token": "kg_question_discussion_danmaku_v1__",
       "ordinal": 1
     },
     {
@@ -2666,17 +2666,12 @@
     },
     {
       "path": "frontend/scripts/new-legacy-contract.json",
-      "token": "kg_question_discussion_danmaku_v1__",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-contract.json",
-      "token": "kg_recall_library_cache_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-contract.json",
       "token": "kg_question_danmaku_hidden_v1__",
+      "ordinal": 1
+    },
+    {
+      "path": "frontend/scripts/new-legacy-contract.json",
+      "token": "kg_question_discussion_danmaku_v1__",
       "ordinal": 1
     },
     {
@@ -2727,6 +2722,11 @@
     {
       "path": "frontend/scripts/new-legacy-contract.json",
       "token": "kg_recall_association_management_v1__subject__",
+      "ordinal": 1
+    },
+    {
+      "path": "frontend/scripts/new-legacy-contract.json",
+      "token": "kg_recall_library_cache_v1",
       "ordinal": 1
     },
     {
@@ -3636,11 +3636,6 @@
     },
     {
       "path": "new-legacy/src/86-knowledge-recall.js",
-      "token": "kg_recall_library_cache_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/86-knowledge-recall.js",
       "token": "kg_exam_paper_release_history_v1",
       "ordinal": 1
     },
@@ -3657,6 +3652,11 @@
     {
       "path": "new-legacy/src/86-knowledge-recall.js",
       "token": "kg_recall_association_library_v1__",
+      "ordinal": 1
+    },
+    {
+      "path": "new-legacy/src/86-knowledge-recall.js",
+      "token": "kg_recall_library_cache_v1",
       "ordinal": 1
     },
     {
@@ -3772,6 +3772,16 @@
     {
       "path": "new-legacy/src/canvas/85-canvas-appearance-controller.js",
       "token": "kg_canvas_view_preferences_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "new-legacy/src/canvas/97-learning-theme.js",
+      "token": "kg_deep_recall_theme_platform_migrated_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "new-legacy/src/canvas/97-learning-theme.js",
+      "token": "kg_deep_recall_theme_v1",
       "ordinal": 1
     },
     {
@@ -4273,27 +4283,12 @@
     },
     {
       "path": "new-legacy/src/86-knowledge-recall.js",
-      "token": "THEME_KEY",
+      "token": "LIBRARY_STORE_KEY",
       "ordinal": 1
     },
     {
       "path": "new-legacy/src/86-knowledge-recall.js",
-      "token": "THEME_KEY",
-      "ordinal": 2
-    },
-    {
-      "path": "new-legacy/src/86-knowledge-recall.js",
-      "token": "THEME_KEY",
-      "ordinal": 3
-    },
-    {
-      "path": "new-legacy/src/86-knowledge-recall.js",
-      "token": "THEME_MIGRATION_KEY",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/86-knowledge-recall.js",
-      "token": "THEME_MIGRATION_KEY",
+      "token": "LIBRARY_STORE_KEY",
       "ordinal": 2
     },
     {
@@ -4304,16 +4299,6 @@
     {
       "path": "new-legacy/src/86-knowledge-recall.js",
       "token": "krScopedPreferenceKey(KR_ANALYSIS_SECTION_KEY)",
-      "ordinal": 2
-    },
-    {
-      "path": "new-legacy/src/86-knowledge-recall.js",
-      "token": "LIBRARY_STORE_KEY",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/86-knowledge-recall.js",
-      "token": "LIBRARY_STORE_KEY",
       "ordinal": 2
     },
     {
@@ -4429,6 +4414,16 @@
     {
       "path": "new-legacy/src/canvas/85-canvas-appearance-controller.js",
       "token": "STORAGE_KEY",
+      "ordinal": 2
+    },
+    {
+      "path": "new-legacy/src/canvas/97-learning-theme.js",
+      "token": "key",
+      "ordinal": 1
+    },
+    {
+      "path": "new-legacy/src/canvas/97-learning-theme.js",
+      "token": "key",
       "ordinal": 2
     },
     {

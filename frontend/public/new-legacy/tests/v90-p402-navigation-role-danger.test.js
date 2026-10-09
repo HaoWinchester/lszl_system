@@ -10,7 +10,8 @@ for(const file of ['index.html','question-workspace.html','knowledge-recall.html
   const source=read(file);
   assert(!source.includes("location.replace('practice-mode.html"),`${file} still redirects to practice`);
 }
-assert(read('index.html').includes('data-destination="practice-mode.html" data-learning-entry-choice="知识巩固"'));
+/* 知识巩固暂不开放：大厅入口以 hidden 保留（页面与直链仍可用），恢复开放时移除 hidden 即可。 */
+assert(read('index.html').includes('<button hidden class="learning-entry-card entry-practice" data-destination="practice-mode.html" data-learning-entry-choice="知识巩固"'));
 assert(read('practice-mode.html').includes('href="index.html">自由</a>'));
 assert(shortcuts.includes('label:"多题画布"'));
 assert(!shortcuts.includes('allowWhenNoAdmin:true'));

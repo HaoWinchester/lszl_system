@@ -3924,7 +3924,8 @@
     const previousId=state.workspaceId,session=state.workspaceSession,shouldSave=!state.readonly;
     if(state.inlineEdit?.finish)state.inlineEdit.finish(true);
     state.workspaceTransition=true;
-    state.ink?.cancel();state.ink?.setTool('select');
+    // 切换画布只取消进行中的笔迹，保留当前画笔工具状态。
+    state.ink?.cancel();
     state.gesture=null;state.kernel?.cards?.cancelDrag?.();state.kernel?.selection?.cancel?.();
     updateReadonly();
     return (async()=>{
@@ -3945,7 +3946,7 @@
   }
   function activateWorkspace(workspaceId,options={}){
     workspaceId=String(workspaceId||'');
-    state.ink?.cancel();state.ink?.setTool('select');
+    state.ink?.cancel();
     state.sessionHighlights.clear();
     closeAnalysisPanel();
     clearOptionTransientState();
@@ -5708,6 +5709,18 @@
     const workspace=store()?.ensure?.({workspaceId:requested,activate:true});
     state.workspaceId=workspace?.id||requested;
     initUnifiedCanvasRuntime();
+    // 主题与深度回忆共用同一存储（kg_deep_recall_theme_v1），任一页切换双向同步。
+    const themeController=global.KGLearningTheme?.create?.({roots:()=>[document.body]});
+    themeController?.init();
+    const themeSelect=byId('qwThemeSelect');
+    if(themeSelect){
+      themeSelect.value=themeController?themeController.saved():'platform';
+      themeSelect.addEventListener('change',()=>{if(themeController)themeController.apply(themeSelect.value);themeSelect.blur()});
+      global.addEventListener('kg:deep-recall-theme-change',event=>{
+        const next=String(event.detail?.theme||'platform');
+        if(themeSelect.value!==next)themeSelect.value=next;
+      });
+    }
     state.ink=global.KGCanvasInk?.create?.({
       trigger:byId('qwInkBtn'),viewport:state.viewport,world:state.world,history:state.kernel.history,
       getViewport:()=>({x:state.panX,y:state.panY,scale:state.zoom}),
@@ -5718,7 +5731,13 @@
         try{state.workspace=store().write({...state.workspace,strokes},{reason:'canvas-ink'})}finally{state.suppressStoreEvent=false}
         global.KGMultiQuestionWorkspaceFilebar?.render?.(state.workspace);
       },
-      onError:notify,onDrawMode:()=>{setPointerMode('edit');clearCardSelection();clearEdgeSelection();setActiveGroup('')}
+      onError:notify,onDrawMode:()=>{setPointerMode('edit');clearCardSelection();clearEdgeSelection();setActiveGroup('')},
+      onLongPressEraser:()=>{
+        if(state.readonly||!state.workspace)return;
+        if(!(state.workspace.strokes||[]).length){notify('当前画布没有可清除的笔迹。');return}
+        if(!global.confirm('确认清空整套试卷画布上的全部笔迹？清空后可按 Ctrl/Command+Z 撤销。'))return;
+        if(!state.ink?.clearAll('清空整套试卷笔迹'))notify('清空笔迹失败，请重试。');
+      }
     });
     global.KGWorkspaceInk=state.ink;
     global.KGCanvasCapture?.bind(byId('qwCaptureBtn'),state.viewport,{filename:()=>state.workspace?.title||'多题归纳',onError:notify});

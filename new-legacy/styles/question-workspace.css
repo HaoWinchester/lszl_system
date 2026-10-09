@@ -239,9 +239,10 @@ html,body{
   box-shadow:0 18px 50px rgba(31,41,65,.13);
   transition:border-color .16s ease,box-shadow .16s ease,opacity .16s ease;
 }
+/* 与知识图谱 detail-panel hover-preview 同语言：主色淡边框 + 主色柔光投影 */
 .qw-question-card:hover{
-  border-color:rgba(217,119,6,.5);
-  box-shadow:0 24px 64px rgba(31,41,65,.17);
+  border-color:rgba(109,93,252,.38);
+  box-shadow:0 18px 52px rgba(109,93,252,.18);
 }
 .qw-question-card.is-dragging{
   opacity:.82;

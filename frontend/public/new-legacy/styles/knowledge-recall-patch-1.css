@@ -436,13 +436,7 @@
 .knowledge-recall-page .kr-scene-swatch::after{
   content:"";position:absolute;right:3px;bottom:3px;width:7px;height:7px;border-radius:50%;background:var(--kr-scene-c);box-shadow:0 0 0 1px rgba(15,23,42,.10);
 }
-.knowledge-recall-page [data-kr-theme="platform"]{--kr-scene-a:#eef4ff;--kr-scene-b:#6d5dfc;--kr-scene-c:#fff}
-.knowledge-recall-page [data-kr-theme="parchment"]{--kr-scene-a:#f8ead2;--kr-scene-b:#b7791f;--kr-scene-c:#fffaf0}
-.knowledge-recall-page [data-kr-theme="aurora"]{--kr-scene-a:#d9f99d;--kr-scene-b:#10b981;--kr-scene-c:#ecfdf5}
-.knowledge-recall-page [data-kr-theme="neon"]{--kr-scene-a:#111827;--kr-scene-b:#7c3aed;--kr-scene-c:#22d3ee}
-.knowledge-recall-page [data-kr-theme="sakura"]{--kr-scene-a:#ffe4e6;--kr-scene-b:#ec4899;--kr-scene-c:#fff7f9}
-.knowledge-recall-page [data-kr-theme="ocean"]{--kr-scene-a:#dbeafe;--kr-scene-b:#0ea5e9;--kr-scene-c:#cffafe}
-.knowledge-recall-page [data-kr-theme="latte"]{--kr-scene-a:#fef3c7;--kr-scene-b:#c08457;--kr-scene-c:#fffaf4}
+/* --kr-scene-* 场景色块已迁至 learning-theme.css（深度回忆与多题归纳共享）。 */
 
 /* Hover stays visually still, while pointer-down/click feedback remains unmistakable. */
 .knowledge-recall-page .kr-node button{

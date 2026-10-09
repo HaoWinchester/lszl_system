@@ -7,8 +7,6 @@
   const RecallStorage=window.KGRecallStorage||{};
   const GraphModel=window.KGRecallGraphModel||{};
   const DeepRecallFlow=window.KGDeepRecallFlowModel||{};
-  const THEME_KEY='kg_deep_recall_theme_v1';
-  const THEME_MIGRATION_KEY='kg_deep_recall_theme_platform_migrated_v1';
   const DATA=window.KNOWLEDGE_RECALL_MAP||{roots:{},nodes:{}};
   const Store=window.KGAppStorage||{};
   const fallbackQuestion={id:'unavailable',title:'暂无可用题目',stemParts:[{text:'当前没有可用于深度回忆的已发布试卷。'}],options:[],clues:[],concepts:[],tags:[],sourceCollectionId:'',sourceBankId:'',sourceQuestionId:'unavailable',sourcePaperId:'',sourceReleaseId:''};
@@ -42,7 +40,9 @@
   let questionBrowser={bankId:'',filter:'all',loading:false};
   let authRecoveryPromise=null;
   let guideDragging=false,guideDragStart=null,guideStart=null;
-  const THEMES=new Set(['platform','parchment','aurora','neon','sakura','ocean','latte']);
+  // 主题读写统一走共享控制器（与多题归纳共用 kg_deep_recall_theme_v1）。
+  const themeController=window.KGLearningTheme?.create?.({roots:()=>[$('krApp'),$('krViewport')]});
+  const THEMES=themeController?.THEMES||new Set(['platform']);
   const BUTTON_ZOOM_LEVELS=[.01,.02,.03,.05,.10,.15,.20,.33,.50,.75,1,1.25,1.50,2,2.50,3,4];
   const WHEEL_ZOOM_LEVELS=[.01,.02,.03,.04,.05,.07,.09,.11,.13,.17,.21,.26,.33,.41,.51,.64,.80,1,1.20,1.44,1.73,2.07,2.49,2.99,3.58,4];
   const MIN_ZOOM=.01,MAX_ZOOM=4;
@@ -167,16 +167,7 @@
     Object.entries(palette).forEach(([name,value])=>document.documentElement.style.setProperty(name,value));
   }
   function savedTheme(){
-    try{
-      const raw=Store.readString?Store.readString(THEME_KEY,''):localStorage.getItem(THEME_KEY);
-      const migrated=(Store.readString?Store.readString(THEME_MIGRATION_KEY,''):localStorage.getItem(THEME_MIGRATION_KEY))==='1';
-      if(!migrated && (!raw || raw==='parchment')){
-        if(Store.writeString){Store.writeString(THEME_MIGRATION_KEY,'1');Store.writeString(THEME_KEY,'platform')}
-        else{localStorage.setItem(THEME_MIGRATION_KEY,'1');localStorage.setItem(THEME_KEY,'platform')}
-        return 'platform';
-      }
-      return THEMES.has(raw)?raw:'platform';
-    }catch(e){return 'platform'}
+    return themeController?.saved()||'platform';
   }
   function syncThemeControls(theme){
     const select=$('krThemeSelect');if(select&&select.value!==theme)select.value=theme;
@@ -187,14 +178,9 @@
     });
   }
   function applyTheme(theme){
-    const next=THEMES.has(theme)?theme:'platform';
-    const scene=$('krViewport'),app=$('krApp');
-    if(scene)scene.dataset.theme=next;
-    if(app)app.dataset.theme=next;
-    document.body.dataset.krTheme=next;
+    const next=themeController?themeController.apply(theme):(THEMES.has(theme)?theme:'platform');
     syncThemeControls(next);
-    try{if(Store.writeString)Store.writeString(THEME_KEY,next);else localStorage.setItem(THEME_KEY,next)}catch(e){}
-    window.dispatchEvent(new CustomEvent('kg:deep-recall-theme-change',{detail:{theme:next}}));
+    return next;
   }
   function bindThemeSelect(){
     const select=$('krThemeSelect'),menu=$('krSceneMenu');
@@ -326,8 +312,11 @@
     window.KGRecallAssociationLibrary?.setSessionLibrary?.(libraryPayload||{},library?.contentHash||'');
     resetAssociationRuntime();
     rootMap=buildRootMap(question);keywordMatchers=buildKeywordMatchers(rootMap);keywordsRevealed=false;
+    // 先清空选项状态防跨题继承（新题无进度时不会残留上一题的选择）；
+    // 同题恢复进度时 loadProgress 会用该题保存的 optionState 覆盖回来。
+    krOptionState={selected:'',persistent:''};
     loadProgress(session.progress||{});
-    // 切换题目后：关闭解析面板并复位选项瞬时状态（选中/常绿已由 loadProgress 恢复）。
+    // 切换题目后：关闭解析面板并复位选项瞬时状态（选中/常绿由上方重置或 loadProgress 恢复）。
     clearTimeout(krOptionClickTimer);clearTimeout(krOptionFlashTimer);
     krAnalysisOpen=false;krAnalysisOffset={x:0,y:0};setKrAnalysisButtonState(false);if(analysisLayer)analysisLayer.innerHTML='';
     RecallStorage.markExplored?.(question,recallQuestionBankId(),Boolean(state.nodes.length||state.activeKeywords.length));
@@ -419,7 +408,7 @@
       raw=raw||recallAdapter?.getState?.().graph||null;
       if(raw&&Array.isArray(raw.nodes)&&Array.isArray(raw.edges)){
         state.strokes=window.KGCanvasInk?.normalize?.(raw.strokes)||cloneValue(raw.strokes||[]);
-        inkController?.reset();
+        inkController?.reset({keepTool:true});
         state.nodes=raw.nodes;state.edges=raw.edges;state.customNodes=raw.customNodes&&typeof raw.customNodes==='object'?raw.customNodes:{};state.activeKeywords=Array.isArray(raw.activeKeywords)?raw.activeKeywords:[];state.choiceOffsets=raw.choiceOffsets&&typeof raw.choiceOffsets==='object'?raw.choiceOffsets:{};state.metrics=raw.metrics&&typeof raw.metrics==='object'?{keywordClicks:Number(raw.metrics.keywordClicks)||0,choiceClicks:Number(raw.metrics.choiceClicks)||0,nodeOpens:Number(raw.metrics.nodeOpens)||0,sessionStartedAt:Date.now()}:{keywordClicks:0,choiceClicks:0,nodeOpens:0,sessionStartedAt:Date.now()};
         if(raw.optionState&&typeof raw.optionState==='object')krOptionState={selected:String(raw.optionState.selected||''),persistent:String(raw.optionState.persistent||'')};
         // P4.5.32 进入页面不再恢复上次保存的画布平移/缩放：跨窗口尺寸或上次聚焦后视图会偏在一边，
@@ -1472,7 +1461,7 @@
       // URL 同步属于提交阶段：切换确认成功后才更新地址栏，失败路径保持原题地址。
       const routeContext=window.KGLearningRouteContext?.normalize?.({paperId:selected.sourcePaperId,releaseId:selected.sourceReleaseId,bankId:selected.sourceBankId,questionId:selected.id,mode:'deep_recall',returnUrl:window.KGLearningRouteContext?.parse?.({mode:'deep_recall'})?.returnUrl||'index.html'})||{};
       window.KGLearningRouteContext?.replace?.(routeContext,{target:'knowledge-recall.html'});
-      destroyingNodeIds.clear();inkController?.reset();setRecallReadonly(true);
+      destroyingNodeIds.clear();inkController?.reset({keepTool:true});setRecallReadonly(true);
       state={nodes:[],edges:[],strokes:[],lastNewEdgeId:'',lastNewNodeId:'',activeNodeId:null,activeKeywords:[],transform:{x:0,y:0,scale:1},customNodes:{},choiceOffsets:{},metrics:{keywordClicks:0,choiceClicks:0,nodeOpens:0,sessionStartedAt:Date.now()}};
       applyServerSession(prepared.latest,{history:prepared.history});
       renderSaveState(recallAdapter.getState());
@@ -1655,12 +1644,17 @@
     if(isTeacherDraftPreview()){
       const back=$('krBackBtn');if(back){back.title='退出深度回忆预览';back.setAttribute('aria-label','退出深度回忆预览');back.addEventListener('click',event=>{event.preventDefault();cleanupTeacherDraftPreview();try{window.close()}catch(error){};if(!window.closed)location.href='training-config.html?section=recall'},{once:true})}
     }
-    window.KGLearningProgress?.registerAdapter?.('deep_recall',{flush:flushProgress,clearTransient:()=>{cancelProgressSave();destroyingNodeIds.clear();state.nodes=[];state.edges=[];state.strokes=[];inkController?.reset();state.customNodes={};state.activeKeywords=[];state.choiceOffsets={};state.activeNodeId=null;state.lastNewEdgeId='';state.lastNewNodeId='';}});
+    window.KGLearningProgress?.registerAdapter?.('deep_recall',{flush:flushProgress,clearTransient:()=>{cancelProgressSave();destroyingNodeIds.clear();state.nodes=[];state.edges=[];state.strokes=[];inkController?.reset({keepTool:true});state.customNodes={};state.activeKeywords=[];state.choiceOffsets={};state.activeNodeId=null;state.lastNewEdgeId='';state.lastNewNodeId='';}});
     inkController=window.KGCanvasInk?.create?.({
       trigger:$('krInkBtn'),viewport,world,getViewport:()=>state.transform,getStrokes:()=>state.strokes,
       setStrokes:strokes=>{state.strokes=strokes;saveProgress()},
       isReadonly:()=>isRecallReadonly()||isTeacherDraftPreview(),onError:notifyRecallLimit,
-      onDrawMode:()=>{closeGuide();closeNodeSearch()}
+      onDrawMode:()=>{closeGuide();closeNodeSearch()},
+      onLongPressEraser:()=>{
+        if(isRecallReadonly()||isTeacherDraftPreview()||!(state.strokes||[]).length){notifyRecallLimit(state.strokes?.length?'当前画布只读，无法清除笔迹。':'当前画布没有可清除的笔迹。');return}
+        if(!window.confirm('确认清空整套试卷画布上的全部笔迹？清空后可按 Ctrl/Command+Z 撤销。'))return;
+        if(!inkController?.clearAll('清空整套试卷笔迹'))notifyRecallLimit('清空笔迹失败，请重试。');
+      }
     });
     window.KGRecallInk=inkController;
     window.KGCanvasCapture?.bind($('krCaptureBtn'),viewport,{filename:'深度回忆',onError:notifyRecallLimit});

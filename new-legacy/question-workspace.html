@@ -27,6 +27,7 @@
   <link rel="stylesheet" href="styles/close-button.css"/>
 <link rel="stylesheet" href="styles/question-materials.css"/>
 <link rel="stylesheet" href="styles/canvas-ink.css"/>
+<link rel="stylesheet" href="styles/learning-theme.css"/>
 </head>
 <body class="question-workspace-page" data-ui-skin="focus-vega">
   <div class="qw-app">
@@ -160,6 +161,15 @@
         <button type="button" id="qwCaptureBtn" class="qw-pointer-mode" aria-label="截取当前画布" title="截取当前画布并下载 PNG" data-canvas-ui="true"></button>
         <button type="button" id="qwPointerModeBtn" class="qw-pointer-mode" title="选择/手型（V）" aria-label="选择/手型（V）"></button>
         <button type="button" id="qwFontScaleBtn" class="qw-font-scale" title="调整多题页面文字大小" aria-label="调整多题页面文字大小">Aa</button>
+        <select id="qwThemeSelect" class="qw-theme-select" aria-label="画布主题" title="画布主题（与深度回忆同步）">
+          <option value="platform">平台默认</option>
+          <option value="parchment">羊皮纸</option>
+          <option value="aurora">极光绿</option>
+          <option value="neon">暗夜霓虹</option>
+          <option value="sakura">樱花粉</option>
+          <option value="ocean">海盐蓝</option>
+          <option value="latte">奶油拿铁</option>
+        </select>
         <span class="qw-overlay-divider" aria-hidden="true"></span>
         <button type="button" id="qwResetViewBtn" title="恢复默认视图">重置视图</button>
       </div>
@@ -424,6 +434,7 @@
   <script defer src="src/graph/shared-color-picker-v2.js"></script>
   <script defer src="src/graph/context-menu-controller.js"></script>
   <script defer src="src/canvas/94-canvas-ink.js"></script>
+<script defer src="src/canvas/97-learning-theme.js"></script>
 <script defer src="src/canvas/96-canvas-capture.js"></script>
 <script defer src="src/65-canvas-workspace-store.js"></script>
   <script defer src="src/canvas/78-canvas-policy.js"></script>

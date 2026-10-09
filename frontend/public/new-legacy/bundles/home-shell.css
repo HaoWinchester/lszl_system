@@ -8209,7 +8209,7 @@ body.qw-selection-toolbar-motion .uc-selection-bounds,.stage.graph-card-dragging
 }
 /* style: styles/canvas-ink.css */
 .canvas-ink-layer{position:absolute;left:0;top:0;width:1px;height:1px;overflow:visible;pointer-events:none;z-index:50}
-.canvas-ink-drawing,.canvas-ink-drawing *{cursor:crosshair!important}
+/* 绘图光标由 94-canvas-ink.js 按当前工具（画笔/荧光笔/文字/橡皮擦）动态注入 */
 .canvas-ink-drawing{touch-action:none}
 .canvas-ink-drawing.canvas-ink-panning,.canvas-ink-drawing.canvas-ink-panning *{cursor:grab!important}
 .canvas-ink-toolbar{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);z-index:65;color:#1e293b;background:rgba(255,255,255,.98);border:1px solid #dbe2ea;border-radius:14px;padding:6px;box-shadow:0 5px 22px #0f172a17;font:13px/1.4 system-ui,sans-serif;cursor:default!important}
@@ -8250,6 +8250,15 @@ body.qw-selection-toolbar-motion .uc-selection-bounds,.stage.graph-card-dragging
   .knowledge-recall-page .canvas-ink-toolbar.canvas-ink-popover,.question-workspace-page .canvas-ink-toolbar.canvas-ink-popover{bottom:96px}
 }
 .canvas-ink-entry-icon{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+/* 文字工具的画布内输入框 */
+.canvas-ink-text-editor{position:fixed;z-index:130;min-width:140px;max-width:520px;padding:4px 8px;border:1.5px dashed #2563eb;border-radius:8px;background:rgba(255,255,255,.94);color:#111827;resize:none;outline:none;box-shadow:0 8px 28px #0f172a26;font-family:system-ui,-apple-system,sans-serif;line-height:1.35;overflow:hidden;white-space:pre}
+.canvas-ink-text-editor::placeholder{color:#94a3b8}
+
+/* 橡皮擦长按 3 秒进度指示 */
+.canvas-ink-toolbar button[data-ink-tool="eraser"]{position:relative;overflow:hidden}
+.canvas-ink-toolbar button[data-ink-tool="eraser"].canvas-ink-holding::after{content:'';position:absolute;left:0;right:0;bottom:0;height:3px;background:#ef4444;transform-origin:left;animation:canvas-ink-hold-progress 3s linear forwards}
+@keyframes canvas-ink-hold-progress{from{transform:scaleX(0)}to{transform:scaleX(1)}}
 
 /* Keep control hit targets and their SVG children clickable while drawing/panning. */
 .canvas-ink-toolbar button:not(:disabled),.canvas-ink-toolbar input:not(:disabled),.canvas-ink-entry:not(:disabled){cursor:pointer!important}
