@@ -212,7 +212,7 @@
       editor.value=existing?existing.text:'';
       editor.style.left=(rect.left+view.x+world[0]*scale)+'px';
       editor.style.top=(rect.top+view.y+world[1]*scale)+'px';
-      editor.style.fontSize=(existing?existing.stroke.width:prefs.text.width)*scale+'px';
+      editor.style.fontSize=(existing?existing.width:prefs.text.width)*scale+'px';
       editor.style.color=prefs.text.color;
       doc.body.append(editor);
       textSession={editor,existing,world};
