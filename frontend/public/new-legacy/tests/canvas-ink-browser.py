@@ -90,6 +90,7 @@ def check_page(context,base,kind):
     stroke_count(page,0)
     before=page.locator(card).bounding_box()
     tool.locator('[data-ink-tool=pen]').click()
+    tool.locator('[data-ink-tool=pen]').dblclick()
     tool.locator('[data-ink-color="#ef4444"]').click()
     tool.get_by_label('笔迹粗细',exact=True).fill('7')
     draw(page,card)
@@ -101,6 +102,7 @@ def check_page(context,base,kind):
     after=page.locator(card).bounding_box()
     assert abs(before['x']-after['x'])<1 and abs(before['y']-after['y'])<1,'Drawing moved card'
     tool.locator('[data-ink-tool=highlighter]').click()
+    tool.locator('[data-ink-tool=highlighter]').dblclick()
     tool.locator('[data-ink-color="#22c55e"]').click()
     tool.get_by_label('笔迹粗细',exact=True).fill('24')
     draw(page,card,30)
@@ -108,6 +110,7 @@ def check_page(context,base,kind):
     expect(page.locator('.canvas-ink-layer path').nth(1)).to_have_attribute('opacity','0.3')
     expect(page.locator('.canvas-ink-layer path').nth(1)).to_have_attribute('stroke-width','24')
     tool.locator('[data-ink-tool=pen]').click()
+    tool.locator('[data-ink-tool=pen]').dblclick()
     expect(tool.get_by_label('笔迹粗细',exact=True)).to_have_value('7')
     expect(tool.locator('[data-ink-color="#ef4444"]')).to_have_attribute('aria-pressed','true')
     record(kind+': pen/highlighter, independent color/width, draw over card without dragging')
