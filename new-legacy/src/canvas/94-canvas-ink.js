@@ -100,9 +100,11 @@
     const CURSOR_HOTSPOT={pen:'3 24',highlighter:'4 24',eraser:'5 22',text:'13 12'};
     doc.head.append(cursorStyle);
     function updateCursor(){
-      if(destroyed||!TOOLS[tool]){cursorStyle.textContent='';return}
-      const art=cursorArt(tool,prefs[tool].color);
-      cursorStyle.textContent=`.canvas-ink-drawing:not(.canvas-ink-panning)[data-ink-tool='${tool}']{cursor:url("data:image/svg+xml,${encodeURIComponent(art)}") ${CURSOR_HOTSPOT[tool]}, crosshair!important}.canvas-ink-drawing:not(.canvas-ink-panning)[data-ink-tool='${tool}'] *{cursor:inherit!important}`;
+      // eraser 无色板偏好但也需要专属光标（固定配色）；select 恢复默认光标。
+      if(destroyed||tool==='select'||!CURSOR_HOTSPOT[tool]){cursorStyle.textContent='';return}
+      const art=cursorArt(tool,TOOLS[tool]?prefs[tool].color:'#1e293b');
+      // :not(#kg-cursor-anchor) 抬高特异性到 (1,3,1)，压过 custom-cursor.css 的 crosshair (1,2,1)!important
+      cursorStyle.textContent=`.canvas-ink-drawing:not(#kg-cursor-anchor):not(.canvas-ink-panning)[data-ink-tool='${tool}']{cursor:url("data:image/svg+xml,${encodeURIComponent(art)}") ${CURSOR_HOTSPOT[tool]}, crosshair!important}.canvas-ink-drawing:not(#kg-cursor-anchor):not(.canvas-ink-panning)[data-ink-tool='${tool}'] *{cursor:inherit!important}`;
     }
     function refreshControls(){
       if(destroyed)return;
@@ -193,8 +195,8 @@
       if(!commit)return;
       try{
         if(session.existing){
-          if(!value)change(getStrokes().filter(item=>item.id!==session.existing.stroke.id),'删除文字');
-          else if(value!==session.existing.stroke.text)change(getStrokes().map(item=>item.id===session.existing.stroke.id?{...item,text:value,color:prefs.text.color,width:prefs.text.width}:item),'编辑文字');
+          if(!value)change(getStrokes().filter(item=>item.id!==session.existing.id),'删除文字');
+          else if(value!==session.existing.text)change(getStrokes().map(item=>item.id===session.existing.id?{...item,text:value,color:prefs.text.color,width:prefs.text.width}:item),'编辑文字');
         }else if(value){
           change([...getStrokes(),{id:'ink-'+Date.now().toString(36)+'-'+(++sequence)+'-'+Math.random().toString(36).slice(2,8),tool:'text',color:prefs.text.color,width:prefs.text.width,points:[session.world],text:value}],'添加文字');
         }
@@ -203,10 +205,11 @@
     function openTextEditor(clientX,clientY,existing){
       closeTextEditor(false);
       const view=options.getViewport(),rect=viewport.getBoundingClientRect(),scale=view.scale||view.zoom||1;
-      const world=existing?existing.stroke.points[0]:point({clientX,clientY},rect,view);
+      // existing 为命中的文字笔迹（裸 stroke），点击空白时为 null
+      const world=existing?existing.points[0]:point({clientX,clientY},rect,view);
       const editor=doc.createElement('textarea');
       editor.className='canvas-ink-text-editor';editor.rows=1;editor.placeholder='输入文字，回车确认';
-      editor.value=existing?existing.stroke.text:'';
+      editor.value=existing?existing.text:'';
       editor.style.left=(rect.left+view.x+world[0]*scale)+'px';
       editor.style.top=(rect.top+view.y+world[1]*scale)+'px';
       editor.style.fontSize=(existing?existing.stroke.width:prefs.text.width)*scale+'px';
