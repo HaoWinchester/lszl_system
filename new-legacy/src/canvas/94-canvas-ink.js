@@ -165,9 +165,10 @@
     // 单击只切换工具（Boardmix 式）；双击绘图工具才展开颜色和粗细设置。
     toolbar.querySelectorAll('[data-ink-tool]').forEach(btn=>btn.addEventListener('click',()=>{const next=btn.dataset.inkTool;if(TOOLS[next])settingsOpen=false;setTool(next)}));
     toolbar.querySelectorAll('[data-ink-tool]').forEach(btn=>btn.addEventListener('dblclick',event=>{
-      stop(event);
       const next=btn.dataset.inkTool;
+      // 非绘图工具（橡皮擦）放行事件给后续 dblclick 处理器（双击清空当前画布）。
       if(!TOOLS[next]||tool!==next)return;
+      stop(event);
       settingsOpen=true;refreshControls();positionToolbar();
     }));
     toolbar.querySelector('[data-ink-tool=eraser]').addEventListener('dblclick',event=>{

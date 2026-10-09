@@ -22,10 +22,13 @@ with sync_playwright() as pw:
     page.locator('#launch').click()
     expect(page.locator('.canvas-ink-toolbar')).to_be_visible()
     pen=page.get_by_role('button',name='画笔',exact=True)
+    # Boardmix 式交互：单击只切换工具，双击绘图工具才展开颜色和粗细设置。
     pen.click()
+    expect(page.locator('.canvas-ink-options')).to_be_hidden()
+    pen.dblclick()
     expect(page.locator('.canvas-ink-options')).to_be_visible()
     pen.click();expect(page.locator('.canvas-ink-options')).to_be_hidden()
-    pen.click();expect(page.locator('.canvas-ink-options')).to_be_visible()
+    pen.dblclick();expect(page.locator('.canvas-ink-options')).to_be_visible()
     page.locator('#outside').click();expect(page.locator('.canvas-ink-options')).to_be_hidden()
     assert page.evaluate('ink.tool')=='pen'
     page.evaluate('''() => {
@@ -49,6 +52,7 @@ with sync_playwright() as pw:
     assert page.evaluate('cardClicks')==0 and page.evaluate('panStarts')==0
     assert page.locator('.canvas-ink-layer path').get_attribute('stroke-width')=='3'
     page.get_by_role('button',name='荧光笔',exact=True).click()
+    page.get_by_role('button',name='荧光笔',exact=True).dblclick()
     page.get_by_role('button',name='红色',exact=True).click()
     page.get_by_role('slider',name='笔迹粗细').fill('24')
     page.mouse.move(148,220);page.mouse.down();page.mouse.move(230,220,steps=6);page.mouse.up()
@@ -75,6 +79,9 @@ with sync_playwright() as pw:
     page.evaluate("document.querySelector('#view').dispatchEvent(new PointerEvent('pointercancel',{pointerId:1,bubbles:true}))")
     page.mouse.up();assert page.evaluate('strokes.length')==2
     page.keyboard.press('Escape');page.wait_for_timeout(450);page.locator('#card').click();assert page.evaluate('cardClicks')==1
+    # 文字工具存在且可选中；选中后注入按工具区分的自定义光标（压过 custom-cursor.css 的 crosshair）。
+    page.get_by_role('button',name='文字',exact=True).click();assert page.evaluate('ink.tool')=='text'
+    assert page.evaluate("() => [...document.head.querySelectorAll('style')].some(el => el.textContent.includes(`[data-ink-tool='text']{cursor:url(\"data:image/svg+xml`))")
     pen.click();page.keyboard.down('Space');page.mouse.click(600,300);page.keyboard.up('Space');assert page.evaluate('panStarts')>=1
     page.evaluate('locked=true;ink.render()');expect(pen).to_be_disabled();assert page.evaluate('ink.tool')=='select'
     page.evaluate('locked=false;strokes=[];ink.reset()');expect(page.get_by_role('button',name='撤销笔迹',exact=True)).to_be_disabled()
@@ -87,7 +94,7 @@ with sync_playwright() as pw:
     page.locator('#launch').evaluate("el=>el.style.zIndex='200'")
     page.evaluate('ink.setOpen(false)')
     expect(page.locator('.canvas-ink-toolbar')).to_be_hidden();assert page.evaluate('ink.tool')=='select'
-    page.locator('#launch').click();pen.click()
+    page.locator('#launch').click();pen.click();pen.dblclick()
     panel=page.locator('.canvas-ink-options');expect(panel).to_be_visible()
     box=panel.bounding_box();assert box['x']>=0 and box['y']>=0 and box['x']+box['width']<=360 and box['y']+box['height']<=420,box
     assert errors==[],errors
