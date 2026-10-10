@@ -3,6 +3,7 @@
 (function(global){
   let activeFiles=[],trashFiles=[],activeFolders=[],trashFolders=[],tags=[],currentId='',sessionEpoch=0,refreshSerial=0,lastError='',catalogLoaded=false,catalogPromise=null,fileIndexLoaded=false,fileIndexPromise=null;
   const contentCache=new Map();
+  let reorderPending=null,orderSerial=0,savedOrder=new Map();
   function clone(value){return value==null?value:JSON.parse(JSON.stringify(value))}
   function api(){return global.KGGraphFileApi||null}
   function active(){return !!(api()&&api().isRemote&&api().isRemote())}
@@ -19,6 +20,16 @@
       createdAt:timestamp(raw.createdAt),updatedAt:timestamp(raw.updatedAt),lastOpenedAt:timestamp(raw.lastOpenedAt),deletedAt:timestamp(raw.deletedAt),
     };
   }
+  function mergeFileIndex(files,startedOrderSerial){
+    const next=(Array.isArray(files)?files:[]).map(normalizeFile).filter(file=>file&&file.owner===currentOwner());
+    // A list read can predate a completed reorder. Keep its fresh metadata and
+    // membership, replacing only stale order values from the saved response.
+    if(startedOrderSerial!==orderSerial){
+      next.forEach(file=>{if(savedOrder.has(String(file.id)))file.order=savedOrder.get(String(file.id))});
+      next.sort((a,b)=>a.order-b.order);
+    }
+    activeFiles=next;
+  }
   function normalizeFolder(raw){
     if(!raw||typeof raw!=='object')return null;
     return{
@@ -28,7 +39,7 @@
   }
   function rememberError(error){lastError=String(error&&error.message||error||'图谱文件服务请求失败');return false}
   function getLastError(){return lastError}
-  function clearSession(){sessionEpoch+=1;refreshSerial+=1;activeFiles=[];trashFiles=[];activeFolders=[];trashFolders=[];tags=[];currentId='';lastError='';catalogLoaded=false;catalogPromise=null;fileIndexLoaded=false;fileIndexPromise=null;contentCache.clear()}
+  function clearSession(){reorderPending=null;savedOrder=new Map();sessionEpoch+=1;refreshSerial+=1;activeFiles=[];trashFiles=[];activeFolders=[];trashFolders=[];tags=[];currentId='';lastError='';catalogLoaded=false;catalogPromise=null;fileIndexLoaded=false;fileIndexPromise=null;contentCache.clear()}
   function seedCurrent(file){
     if(!file){currentId='';return null}
     const normalized=normalizeFile(file);
@@ -37,18 +48,20 @@
     const hydrated={...normalized,graphData:clone(file.graphData),learningState:clone(file.learningState)||{}};
     contentCache.set(currentId,hydrated);
     const meta={...normalized};delete meta.graphData;delete meta.learningState;
-    activeFiles=[meta,...activeFiles.filter(item=>String(item.id)!==currentId)];
+    const existing=activeFiles.findIndex(item=>String(item.id)===currentId);
+    if(existing>=0)activeFiles[existing]={...meta,order:activeFiles[existing].order};
+    else activeFiles=[...activeFiles,meta].sort((a,b)=>a.order-b.order);
     return clone(hydrated);
   }
   async function refresh(){
     if(!active()){clearSession();return false}
-    const epoch=sessionEpoch,serial=++refreshSerial,transport=api();
+    const epoch=sessionEpoch,owner=currentOwner(),serial=++refreshSerial,startedOrderSerial=orderSerial,transport=api();
     try{
       const [activePayload,trashPayload,folderPayload,trashFolderPayload,tagPayload,currentPayload]=await Promise.all([
-        transport.listFiles('active'),transport.listFiles('trashed'),transport.listFolders('active'),transport.listFolders('trashed'),transport.listTags(),transport.getCurrent(),
+        transport.listFiles('active',{sort:'order'}),transport.listFiles('trashed'),transport.listFolders('active'),transport.listFolders('trashed'),transport.listTags(),transport.getCurrent(),
       ]);
-      if(epoch!==sessionEpoch||serial!==refreshSerial||!active())return false;
-      activeFiles=(Array.isArray(activePayload.files)?activePayload.files:[]).map(normalizeFile).filter(Boolean);
+      if(epoch!==sessionEpoch||owner!==currentOwner()||serial!==refreshSerial||!active())return false;
+      mergeFileIndex(activePayload.files,startedOrderSerial);
       trashFiles=(Array.isArray(trashPayload.files)?trashPayload.files:[]).map(normalizeFile).filter(Boolean);
       activeFolders=(Array.isArray(folderPayload.folders)?folderPayload.folders:[]).map(normalizeFolder).filter(Boolean);
       trashFolders=(Array.isArray(trashFolderPayload.folders)?trashFolderPayload.folders:[]).map(normalizeFolder).filter(Boolean);
@@ -67,13 +80,13 @@
     if(fileIndexLoaded)return Promise.resolve(true);
     if(fileIndexPromise)return fileIndexPromise;
     if(!active())return Promise.resolve(false);
-    const epoch=sessionEpoch,owner=currentOwner(),serial=refreshSerial,transport=api();
+    const epoch=sessionEpoch,owner=currentOwner(),serial=refreshSerial,startedOrderSerial=orderSerial,transport=api();
     const pending=(async()=>{
       try{
-        const payload=await transport.listFiles('active');
+        const payload=await transport.listFiles('active',{sort:'order'});
         if(epoch!==sessionEpoch||owner!==currentOwner()||!active())return false;
         if(serial!==refreshSerial)return fileIndexLoaded;
-        activeFiles=(Array.isArray(payload.files)?payload.files:[]).map(normalizeFile).filter(file=>file&&file.owner===owner);
+        mergeFileIndex(payload.files,startedOrderSerial);
         fileIndexLoaded=true;lastError='';return true;
       }catch(error){
         if(epoch===sessionEpoch&&owner===currentOwner())rememberError(error);
@@ -98,6 +111,20 @@
   async function getFile(id,owner=currentOwner(),options={}){const cached=contentCache.get(id);if(cached&&cached.owner===owner)return clone(cached);if(!getFileMeta(id,owner,{includeTrash:options.includeTrash===true}))return null;try{const payload=await api().get(id),file={...normalizeFile(payload.meta),graphData:clone(payload.graphData),learningState:clone(payload.learningState)||{}};contentCache.set(id,file);return clone(file)}catch(error){return rememberError(error)}}
   async function saveFile(id,graphData,options={}){try{const current=getFileMeta(id,currentOwner(),{includeTrash:false});if(!current)return null;const payload=await api().save(id,{graphData,learningState:options.learningState,expectedRevision:current.revision});await refresh();const file=normalizeFile(payload.file);if(file)contentCache.set(id,{...file,graphData:clone(graphData),learningState:clone(options.learningState)||{}});return clone(file)}catch(error){return rememberError(error)}}
   async function patchFile(id,patch){try{const payload=await api().patchFile(id,patch);await refresh();return normalizeFile(payload.file)}catch(error){return rememberError(error)}}
+  async function reorderFiles(orderedIds){
+    if(!active()||reorderPending)return false;
+    const epoch=sessionEpoch,owner=currentOwner(),transport=api(),pending={};
+    const sameSession=()=>epoch===sessionEpoch&&owner===currentOwner()&&active();
+    reorderPending=pending;
+    try{
+      const payload=await transport.reorderFiles(orderedIds);
+      if(!sameSession())return false;
+      savedOrder=new Map(payload.fileIds.map((id,index)=>[String(id),(index+1)*1000]));orderSerial+=1;
+      activeFiles=activeFiles.map(file=>savedOrder.has(String(file.id))?{...file,order:savedOrder.get(String(file.id))}:file).sort((a,b)=>a.order-b.order);
+      lastError='';return listFiles();
+    }catch(error){if(sameSession())rememberError(error);return false}
+    finally{if(reorderPending===pending)reorderPending=null}
+  }
   function renameFile(id,name){return patchFile(id,{name})}
   function moveFile(id,folderId){return patchFile(id,{folderId:folderId||null})}
   function setFileFavorite(id,favorite){return patchFile(id,{favorite:favorite===true})}
@@ -121,5 +148,5 @@
   function verifyIntegrity(){return{ok:true,checked:activeFiles.length+trashFiles.length,missing:[]}}
   function refreshFilePreviews(){return 0}
   function purgeExpiredTrash(){return 0}
-  global.KGGraphFileRemoteStore={active,currentOwner,initialize,ensureCatalog,ensureFileIndex,seedCurrent,refresh,clearSession,listFiles,getFileMeta,getFile,getCurrentFileMeta,createFile,openFile,saveFile,renameFile,deleteFile,restoreFile,emptyTrash,purgeExpiredTrash,duplicateFile,setFileTags,getFileTags,setFileFavorite,listTags,createTag,updateTag,deleteTag,listFolders,getFolder,createFolder,renameFolder,moveFile,moveFolder,trashFolder,restoreFolder,deleteFolderPermanently,setCurrentFileId,getCurrentFileId,getLastError,estimateStorage,verifyIntegrity,refreshFilePreviews};
+  global.KGGraphFileRemoteStore={active,currentOwner,initialize,ensureCatalog,ensureFileIndex,seedCurrent,refresh,clearSession,listFiles,getFileMeta,getFile,getCurrentFileMeta,createFile,openFile,saveFile,reorderFiles,renameFile,deleteFile,restoreFile,emptyTrash,purgeExpiredTrash,duplicateFile,setFileTags,getFileTags,setFileFavorite,listTags,createTag,updateTag,deleteTag,listFolders,getFolder,createFolder,renameFolder,moveFile,moveFolder,trashFolder,restoreFolder,deleteFolderPermanently,setCurrentFileId,getCurrentFileId,getLastError,estimateStorage,verifyIntegrity,refreshFilePreviews};
 })(window);

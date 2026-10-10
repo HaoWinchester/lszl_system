@@ -4,6 +4,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
+from pydantic import BaseModel, Field, StrictStr, field_validator
 
 from app.core.import_guard import import_submission_guard, file_import_submission_guard
 from app.core.auth import CurrentUser
@@ -53,6 +54,25 @@ async def create_file(body: dict, db: DB, user: CurrentUser):
 
 
 # ---------- 固定路径（须在 {id} 之前）----------
+class FileOrderInput(BaseModel):
+    fileIds: list[StrictStr] = Field(min_length=1)
+
+    @field_validator("fileIds")
+    @classmethod
+    def unique_file_ids(cls, values: list[str]) -> list[str]:
+        if any(not value or len(value) > 64 for value in values) or len(set(values)) != len(values):
+            raise ValueError("文件 ID 必须有效且不重复")
+        return values
+
+
+@router.put("/order")
+async def reorder_files(body: FileOrderInput, db: DB, user: CurrentUser):
+    ids = await file_service.reorder_files(db, user.username, body.fileIds)
+    if ids is None:
+        raise _nf()
+    return {"fileIds": ids}
+
+
 @router.get("/current")
 async def get_current(db: DB, user: CurrentUser):
     return {"fileId": await file_service.get_current(db, user.username)}

@@ -33,6 +33,7 @@
     deleteFilePermanent:id=>request(idPath(id)+'/permanent',{method:'DELETE'}),
     duplicateFile:(id,name)=>request(idPath(id)+'/duplicate',{method:'POST',body:{name}}),
     emptyTrash:()=>request('/files/trash/empty',{method:'POST'}),
+    reorderFiles:fileIds=>request('/files/order',{method:'PUT',body:{fileIds}}),
     getCurrent:()=>request('/files/current'),
     setCurrent:id=>request('/files/current',{method:'PUT',body:{fileId:id||null}}),
     listFolders:(status='active')=>request('/files/folders'+query({status})),

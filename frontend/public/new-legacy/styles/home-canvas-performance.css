@@ -149,3 +149,39 @@
   box-shadow:none!important;
   filter:none!important;
 }
+
+/* 重点聚焦是独立显示状态，优先于统一背景、心流/大图透明度和上面的无阴影策略。
+   只覆盖呈现，不回写用户画布偏好或节点样式；退出后由原有规则恢复。
+   使用静态轮廓/光晕，拖拽与大图模式也不需要逐帧播放阴影动画。 */
+#stage.focus-mode{
+  background-color:color-mix(in srgb,var(--uc-canvas-bg,#f7f8fc) 20%,#000)!important;
+  --uc-canvas-pattern-ink:rgba(255,255,255,.045)!important;
+  --uc-canvas-pattern-major-ink:rgba(255,255,255,.065)!important;
+}
+#stage.focus-mode .knowledge-card:not(.focus-card){
+  filter:grayscale(1) brightness(.58)!important;
+  opacity:.58!important;
+}
+#stage.focus-mode .knowledge-card.focus-card{
+  filter:none!important;
+  opacity:1!important;
+  animation:none!important;
+  outline:2px solid #facc15!important;
+  outline-offset:2px!important;
+  box-shadow:0 0 12px rgba(250,204,21,.55),0 0 28px rgba(250,204,21,.28)!important;
+  z-index:8;
+}
+#stage.focus-mode .graph-text-element,
+#stage.focus-mode .canvas-ink-layer,
+#stage.focus-mode .edge-layer{opacity:.35!important}
+#stage.focus-mode .help-card{opacity:.18}
+/* 三角形的边界由 clip-path 绘制，光晕跟随实际形状而非矩形包围盒。 */
+#stage.focus-mode .knowledge-card.focus-card.card-style-triangle{
+  outline:none!important;
+  box-shadow:none!important;
+  filter:drop-shadow(0 0 2px #facc15) drop-shadow(0 0 9px rgba(250,204,21,.55))!important;
+}
+#stage.focus-mode .knowledge-card.focus-card.card-style-triangle .card-body{
+  background:#facc15!important;
+  padding:max(2px,var(--node-border-width,1px));
+}

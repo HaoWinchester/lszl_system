@@ -7,7 +7,7 @@
 import hashlib
 import json
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import case, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import now_utc, uid
@@ -113,6 +113,7 @@ def folder_to_dict(folder: Folder) -> dict:
 
 
 SORT_MAP = {
+    "order": GraphFile.order_index.asc(),
     "updated": GraphFile.updated_at.desc(),
     "created": GraphFile.created_at.desc(),
     "name": GraphFile.name.asc(),
@@ -143,7 +144,7 @@ async def list_files(
     total = int((await db.execute(select(func.count()).select_from(q.subquery()))).scalar() or 0)
 
     order = SORT_MAP.get(sort, SORT_MAP["updated"])
-    q = q.order_by(order).offset((page - 1) * page_size).limit(page_size)
+    q = q.order_by(order, GraphFile.updated_at.desc(), GraphFile.id.asc()).offset((page - 1) * page_size).limit(page_size)
     files = (await db.execute(q)).scalars().all()
 
     # 一次性查标签
@@ -157,6 +158,28 @@ async def list_files(
             tag_map[ft.file_id] = t
 
     return [file_meta(f, tag_map.get(f.id)) for f in files], total
+
+
+async def reorder_files(db: AsyncSession, owner: str, ordered_ids: list[str]) -> list[str] | None:
+    # Lock in a stable order, validate the complete request before any write.
+    files = (await db.execute(select(GraphFile).where(
+        GraphFile.owner_id == owner, GraphFile.status == ACTIVE,
+    ).order_by(GraphFile.id).with_for_update())).scalars().all()
+    existing = {file.id for file in files}
+    if not set(ordered_ids).issubset(existing):
+        return None
+    files = sorted(files, key=lambda file: (file.order_index, -file.updated_at.timestamp(), file.id))
+    requested = set(ordered_ids)
+    final_ids = [*ordered_ids, *(file.id for file in files if file.id not in requested)]
+    # Only index order changes: preserve content revision, edit time and current file.
+    await db.execute(update(GraphFile).where(
+        GraphFile.owner_id == owner, GraphFile.status == ACTIVE, GraphFile.id.in_(final_ids),
+    ).values(
+        order_index=case({file_id: (index + 1) * 1000 for index, file_id in enumerate(final_ids)}, value=GraphFile.id),
+        updated_at=GraphFile.updated_at,
+    ).execution_options(synchronize_session=False))
+    await db.commit()
+    return final_ids
 
 
 async def get_meta(

@@ -54,11 +54,6 @@ button.active-toggle{background:#0f172a;color:#fff;box-shadow:0 8px 22px rgba(15
 .brand h1{font-size:16px;margin:0;white-space:nowrap;line-height:1.1}.brand span{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:230px}
 .toolbar .spacer{flex:1}.toolbar .hint{color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:570px}
 .stage{position:relative;flex:1;overflow:hidden;cursor:grab;background-image:radial-gradient(circle at 1px 1px,rgba(15,23,42,.12) 1px,transparent 0);background-size:28px 28px;background-color:#f7f8fc;touch-action:none;user-select:none}
-.stage.focus-mode{background-color:#111827;background-image:radial-gradient(circle at 1px 1px,rgba(255,255,255,.10) 1px,transparent 0)}
-.stage.focus-mode .help-card{opacity:.18}
-.stage.focus-mode .knowledge-card{filter:grayscale(1) brightness(.58);opacity:.58}
-.stage.focus-mode .knowledge-card.focus-card{filter:none;opacity:1;animation:focusGlow 2.4s ease-in-out infinite;z-index:8}
-.stage.focus-mode .knowledge-card.focus-card .node-title{color:#0f172a}
 .stage.focus-mode .edge-visible{stroke:#64748b;opacity:.28;filter:none}
 .stage.focus-mode .edge-hit.selected+.edge-visible{stroke:#93c5fd;opacity:.9}
 .stage.focus-mode .edge-label{fill:#94a3b8;opacity:.45}
@@ -66,14 +61,8 @@ button.active-toggle{background:#0f172a;color:#fff;box-shadow:0 8px 22px rgba(15
 .stage.focus-mode .edge-visible.focus-important-edge{stroke:var(--edge-color,var(--line))!important;opacity:.95!important;stroke-width:4.5;filter:none}
 .stage.focus-mode .edge-hit.selected+.edge-visible.focus-important-edge{stroke:var(--edge-color,var(--line))!important;opacity:1!important;stroke-width:6}
 .stage.focus-mode .edge-label.focus-important-label{fill:#f8fafc;opacity:.95;stroke:#111827;stroke-width:4px}
-@keyframes focusGlow{0%,100%{box-shadow:0 18px 46px rgba(37,99,235,.26),0 0 0 3px rgba(37,99,235,.86),0 0 16px rgba(250,204,21,.45)}50%{box-shadow:0 22px 58px rgba(37,99,235,.34),0 0 0 4px rgba(250,204,21,.95),0 0 34px rgba(250,204,21,.95)}}
-/* 重点聚焦模式轻量性能修复：拖拽、平移、缩放时临时关闭高成本滤镜和发光动画，减少整图重绘。 */
+/* 重点聚焦视觉由 home-canvas-performance.css 统一管理，避免性能模式互相覆盖。 */
 .stage.is-interacting .knowledge-card{transition:none!important}
-.stage.focus-mode.is-interacting .knowledge-card{filter:none!important}
-.stage.focus-mode.is-interacting .knowledge-card.focus-card{animation:none!important}
-.stage.focus-mode.is-interacting .knowledge-card:hover,
-.stage.focus-mode.is-interacting .knowledge-card.dragging,
-.stage.focus-mode.is-interacting .knowledge-card.group-dragging{box-shadow:0 10px 26px rgba(15,23,42,.12),0 0 0 1px rgba(15,23,42,.08)!important}
 .stage.is-interacting .edge-hit{pointer-events:none!important}
 .stage.focus-mode.is-interacting .edge-label{display:none!important}
 
@@ -2172,15 +2161,6 @@ body[data-role-theme] .floating-tool-btn.primary,body[data-role-theme] button.pr
 .stage.large-graph-mode .knowledge-card:hover{
   transform:none!important;
   box-shadow:0 2px 7px rgba(15,23,42,.13),0 0 0 1px rgba(15,23,42,.10)!important;
-}
-.stage.large-graph-mode.focus-mode .knowledge-card{
-  filter:none!important;
-  opacity:.78;
-}
-.stage.large-graph-mode.focus-mode .knowledge-card.focus-card{
-  animation:none!important;
-  opacity:1;
-  box-shadow:0 3px 10px rgba(37,99,235,.16),0 0 0 2px rgba(37,99,235,.58)!important;
 }
 .stage.large-graph-mode .edge-visible{
   filter:none!important;
@@ -9252,6 +9232,42 @@ body.qw-selection-toolbar-motion .uc-selection-bounds,.stage.graph-card-dragging
 .stage.large-graph-mode .knowledge-card.multi-selected::before{
   box-shadow:none!important;
   filter:none!important;
+}
+
+/* 重点聚焦是独立显示状态，优先于统一背景、心流/大图透明度和上面的无阴影策略。
+   只覆盖呈现，不回写用户画布偏好或节点样式；退出后由原有规则恢复。
+   使用静态轮廓/光晕，拖拽与大图模式也不需要逐帧播放阴影动画。 */
+#stage.focus-mode{
+  background-color:color-mix(in srgb,var(--uc-canvas-bg,#f7f8fc) 20%,#000)!important;
+  --uc-canvas-pattern-ink:rgba(255,255,255,.045)!important;
+  --uc-canvas-pattern-major-ink:rgba(255,255,255,.065)!important;
+}
+#stage.focus-mode .knowledge-card:not(.focus-card){
+  filter:grayscale(1) brightness(.58)!important;
+  opacity:.58!important;
+}
+#stage.focus-mode .knowledge-card.focus-card{
+  filter:none!important;
+  opacity:1!important;
+  animation:none!important;
+  outline:2px solid #facc15!important;
+  outline-offset:2px!important;
+  box-shadow:0 0 12px rgba(250,204,21,.55),0 0 28px rgba(250,204,21,.28)!important;
+  z-index:8;
+}
+#stage.focus-mode .graph-text-element,
+#stage.focus-mode .canvas-ink-layer,
+#stage.focus-mode .edge-layer{opacity:.35!important}
+#stage.focus-mode .help-card{opacity:.18}
+/* 三角形的边界由 clip-path 绘制，光晕跟随实际形状而非矩形包围盒。 */
+#stage.focus-mode .knowledge-card.focus-card.card-style-triangle{
+  outline:none!important;
+  box-shadow:none!important;
+  filter:drop-shadow(0 0 2px #facc15) drop-shadow(0 0 9px rgba(250,204,21,.55))!important;
+}
+#stage.focus-mode .knowledge-card.focus-card.card-style-triangle .card-body{
+  background:#facc15!important;
+  padding:max(2px,var(--node-border-width,1px));
 }
 /* style: styles/home-selection-p4326.css */
 /* V9.0-P4.3.26 — homepage selection parity and lightweight edge dragging. */

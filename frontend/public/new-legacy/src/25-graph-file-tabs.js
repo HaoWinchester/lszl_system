@@ -206,8 +206,11 @@
       tabs.forEach((tab,index)=>{if(index>=start&&index<sourceIndex)tab.classList.add('drag-shift-right')});
     }
   }
-  function reorderVisibleTabs(dragId,targetId,side){
-    const store=global.KGGraphFileStore;if(!store||typeof store.reorderFiles!=='function'||!dragId)return false;
+  let reordering=null;
+  async function reorderVisibleTabs(dragId,targetId,side){
+    const store=fileStore();if(!store||typeof store.reorderFiles!=='function'||!dragId)return false;
+    const ownerKey=owner();
+    if(reordering&&reordering.store===store&&reordering.owner===ownerKey)return false;
     const ids=visibleFiles().map(file=>String(file.id)),from=ids.indexOf(String(dragId));
     if(from<0)return false;
     ids.splice(from,1);
@@ -219,12 +222,20 @@
     }else{
       ids.push(String(dragId));
     }
-    const result=store.reorderFiles(ids);
-    if(!result){if(typeof global.showStatus==='function')global.showStatus(store.getLastError&&store.getLastError()||'页签排序保存失败。');return false}
-    renderTabs({scrollActive:false});
-    if(typeof global.showStatus==='function')global.showStatus('已调整图谱页签顺序。');
-    return true;
+    const pending={store,owner:ownerKey};reordering=pending;
+    try{
+      const result=await Promise.resolve(store.reorderFiles(ids));
+      if(fileStore()!==store||owner()!==ownerKey)return false;
+      renderTabs({scrollActive:false});
+      if(!result){if(typeof global.showStatus==='function')global.showStatus(store.getLastError&&store.getLastError()||'页签排序保存失败。');return false}
+      if(typeof global.showStatus==='function')global.showStatus('已调整图谱页签顺序。');
+      return true;
+    }catch(error){
+      if(fileStore()===store&&owner()===ownerKey){renderTabs({scrollActive:false});if(typeof global.showStatus==='function')global.showStatus(error.message||'页签排序保存失败。')}
+      return false;
+    }finally{if(reordering===pending)reordering=null}
   }
+
   async function closeFileNow(id){
     const store=fileStore();if(!store||!id)return false;
     const files=visibleFiles(),index=files.findIndex(file=>String(file.id)===String(id));
@@ -329,8 +340,7 @@
         event.preventDefault();
         const tab=event.target.closest('.graph-file-tab'),targetId=tab&&tabs.contains(tab)?String(tab.dataset.fileId||''):'',side=tab?tabInsertSide(tab,event.clientX):'after';
         const dragId=tabDrag.id;
-        const moved=targetId!==dragId&&reorderVisibleTabs(dragId,targetId,side);
-        if(moved)tabs.dataset.dragSuppress='1';
+        if(targetId!==dragId){tabs.dataset.dragSuppress='1';void reorderVisibleTabs(dragId,targetId,side)}
         tabDrag=null;
         endTabDrag(tabs);
       });
