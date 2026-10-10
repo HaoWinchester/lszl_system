@@ -143,8 +143,8 @@
       </div>
 
       <div class="qw-overlay qw-layout-toolbar qw-layout-toolbar-global" id="qwLayoutToolbar" aria-label="画布历史与全局整理">
-        <button type="button" id="qwUndoBtn" title="撤销（Ctrl/Command+Z）" disabled>↶</button>
-        <button type="button" id="qwRedoBtn" title="重做（Ctrl/Command+Shift+Z）" disabled>↷</button>
+        <button type="button" id="qwUndoBtn" aria-label="撤销" title="撤销（Ctrl/Command+Z）" disabled>↶ 撤销</button>
+        <button type="button" id="qwRedoBtn" aria-label="重做" title="重做（Ctrl/Command+Shift+Z）" disabled>↷ 重做</button>
         <span class="qw-overlay-divider" aria-hidden="true"></span>
         <button type="button" id="qwNewSynthesisBtn" class="qw-structure-primary" title="新增原则、套路、陷阱或笔记卡">＋归纳卡</button>
         <label class="qw-smart-picker" for="qwSmartArrangeSelect">
@@ -157,7 +157,7 @@
       </div>
 
       <div class="qw-overlay qw-overlay-right" aria-label="多题画布工具">
-        <button type="button" id="qwInkBtn" class="qw-pointer-mode" aria-label="画笔工具" title="画笔工具" aria-expanded="false" data-canvas-ui="true"></button>
+        <button type="button" id="qwInkBtn" class="qw-pointer-mode qw-ink-launcher" aria-label="画笔与文字工具" title="画笔、荧光笔、橡皮与文字" aria-expanded="false" data-canvas-ui="true"></button>
         <button type="button" id="qwCaptureBtn" class="qw-pointer-mode" aria-label="截取当前画布" title="截取当前画布并下载 PNG" data-canvas-ui="true"></button>
         <button type="button" id="qwPointerModeBtn" class="qw-pointer-mode" title="选择/手型（V）" aria-label="选择/手型（V）"></button>
         <button type="button" id="qwFontScaleBtn" class="qw-font-scale" title="调整多题页面文字大小" aria-label="调整多题页面文字大小">Aa</button>

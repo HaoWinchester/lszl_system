@@ -2838,8 +2838,9 @@
   function updateHistoryUI(){
     const history=state.kernel?.history?.getState?.()||{};
     const undo=byId('qwUndoBtn'),redo=byId('qwRedoBtn');
-    if(undo){undo.disabled=state.readonly||!history.canUndo;undo.title=history.canUndo?'撤销：'+history.undoLabel+'（Ctrl/Command+Z）':'暂无可撤销的布局操作'}
-    if(redo){redo.disabled=state.readonly||!history.canRedo;redo.title=history.canRedo?'重做：'+history.redoLabel+'（Ctrl/Command+Shift+Z）':'暂无可重做的布局操作'}
+    if(undo){undo.disabled=state.readonly||!history.canUndo;undo.title=history.canUndo?'撤销：'+history.undoLabel+'（Ctrl/Command+Z）':'暂无可撤销的画布操作'}
+    if(redo){redo.disabled=state.readonly||!history.canRedo;redo.title=history.canRedo?'重做：'+history.redoLabel+'（Ctrl/Command+Shift+Z）':'暂无可重做的画布操作'}
+    state.ink?.refreshControls?.();
     return history;
   }
   function updateLayoutToolbar(){
@@ -5723,7 +5724,7 @@
       });
     }
     state.ink=global.KGCanvasInk?.create?.({
-      trigger:byId('qwInkBtn'),viewport:state.viewport,world:state.world,history:state.kernel.history,
+      trigger:byId('qwInkBtn'),viewport:state.viewport,world:state.world,history:state.kernel.history,showHistory:true,
       getViewport:()=>({x:state.panX,y:state.panY,scale:state.zoom}),
       getStrokes:()=>state.workspace?.strokes||[],isReadonly:()=>state.readonly||!state.workspace,
       setStrokes:strokes=>{

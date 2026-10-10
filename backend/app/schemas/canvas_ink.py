@@ -28,7 +28,7 @@ def validate_strokes(value: Any) -> list[dict]:
     ids = set()
     total_points = 0
     for stroke in value:
-        if not isinstance(stroke, dict) or set(stroke) not in (_FIELDS, _TEXT_FIELDS):
+        if not isinstance(stroke, dict) or set(stroke) not in (_FIELDS, _TEXT_FIELDS, _TEXT_FIELDS | {"bold"}):
             raise ValueError("笔迹必须包含 id、tool、color、width、points 且不能有额外字段")
         stroke_id = stroke["id"]
         if not isinstance(stroke_id, str) or not stroke_id.strip() or len(stroke_id) > 100:
@@ -39,6 +39,8 @@ def validate_strokes(value: Any) -> list[dict]:
         tool = stroke["tool"]
         if tool not in _TOOL_WIDTH_RANGE:
             raise ValueError("笔迹工具必须是 pen、highlighter 或 text")
+        if "bold" in stroke and (tool != "text" or type(stroke["bold"]) is not bool):
+            raise ValueError("文字加粗必须是布尔值")
         color = stroke["color"]
         if not isinstance(color, str) or not _COLOR.fullmatch(color):
             raise ValueError("笔迹颜色必须是六位十六进制颜色")

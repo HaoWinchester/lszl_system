@@ -32,3 +32,8 @@ test('SVG single points draw dots and curves preserve endpoints',()=>{
  assert.match(ink.path([[0,0],[10,10],[20,0]]),/^M 0 0 Q/);
  assert.match(ink.path([[0,0],[10,10],[20,0]]),/20 0$/);
 });
+test('multiline bold text survives normalization and rejects malformed style',()=>{
+ const text={...stroke,tool:'text',width:24,text:'第一行\n第二行',bold:true};
+ assert.equal(window.KGCanvasInk.normalize([text])[0].bold,true);
+ assert.throws(()=>window.KGCanvasInk.normalize([{...text,bold:'true'}]));
+});

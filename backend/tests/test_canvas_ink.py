@@ -83,3 +83,11 @@ def test_resource_limits_and_inclusive_numeric_boundaries():
     for tool, width in [("pen", 1), ("pen", 24), ("highlighter", 4), ("highlighter", 48)]:
         ink = [stroke(tool=tool, width=width, points=[[-10000000, 10000000]])]
         assert validate_strokes(ink) == ink
+
+
+def test_multiline_bold_text_round_trip_and_invalid_style():
+    from app.schemas.canvas_ink import validate_strokes
+    text = stroke(tool="text", width=24, text="第一行\n第二行", bold=True)
+    assert validate_strokes([text]) == [text]
+    with pytest.raises(ValueError):
+        validate_strokes([{**text, "bold": "true"}])

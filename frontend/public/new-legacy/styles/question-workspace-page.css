@@ -90,3 +90,11 @@
 
 /* v8.6.2 P2.2.12 — legacy selector retired. */
 .question-workspace-page .qw-workspace-switcher{display:none!important}
+
+/* Keep drawing and shared canvas history discoverable in the editing workspace. */
+.question-workspace-page .qw-overlay-right .qw-ink-launcher{display:flex;align-items:center;gap:6px;padding:0 9px;white-space:nowrap}
+.question-workspace-page .qw-ink-launcher::after{content:"画笔·文字"}
+.question-workspace-page .qw-layout-toolbar-global{max-width:min(500px,calc(100% - 500px))!important}
+@media(max-width:1220px){
+  .question-workspace-page .qw-layout-toolbar-global{top:58px;left:12px;right:auto;transform:none;max-width:calc(100% - 24px)!important}
+}

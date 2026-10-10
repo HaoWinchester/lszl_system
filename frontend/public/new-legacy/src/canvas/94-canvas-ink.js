@@ -15,14 +15,16 @@
       ids.add(stroke.id);
       if(typeof stroke.color!=='string'||!/^#[0-9a-f]{6}$/i.test(stroke.color))throw new Error('笔迹颜色无效');
       if(typeof stroke.width!=='number'||!Number.isFinite(stroke.width)||stroke.width<tool.min||stroke.width>tool.max)throw new Error('笔迹粗细无效');
+      if(stroke.bold!==undefined&&stroke.tool!=='text')throw new Error('加粗只适用于文字');
       if(!Array.isArray(stroke.points)||!stroke.points.length||stroke.points.length>LIMITS.points||(total+=stroke.points.length)>LIMITS.total)throw new Error('笔迹点数超出限制，请清理部分笔迹');
       const points=stroke.points.map(p=>{
         if(!Array.isArray(p)||p.length!==2||p.some(n=>typeof n!=='number'||!Number.isFinite(n)||Math.abs(n)>LIMITS.coordinate))throw new Error('笔迹坐标无效');
         return [...p];
       });
       if(stroke.tool==='text'){
+        if(stroke.bold!==undefined&&typeof stroke.bold!=='boolean')throw new Error('文字加粗格式无效');
         if(typeof stroke.text!=='string'||!stroke.text.trim()||stroke.text.length>TEXT_LIMIT)throw new Error('文字内容无效');
-        return {id:stroke.id,tool:stroke.tool,color:stroke.color,width:stroke.width,points,text:stroke.text};
+        return {id:stroke.id,tool:stroke.tool,color:stroke.color,width:stroke.width,points,text:stroke.text,...(stroke.bold===undefined?{}:{bold:stroke.bold})};
       }
       return {id:stroke.id,tool:stroke.tool,color:stroke.color,width:stroke.width,points};
     });
@@ -50,6 +52,7 @@
     const prefs={pen:{...TOOLS.pen},highlighter:{...TOOLS.highlighter},text:{...TOOLS.text}};
     let opened=!options.trigger,settingsOpen=false,tool='select',active=null,frame=0,space=false,destroyed=false,suppressClickUntil=0,sequence=0;
     const listeners=[];
+    let selectedTextId=null,textDrag=null;
     const readonly=()=>!!options.isReadonly?.();
     const report=error=>options.onError?.(error?.message||String(error));
     const history=options.history||global.KGCanvasHistoryController?.create({onChange:refreshControls});
@@ -86,7 +89,10 @@
       el.setAttribute('font-family','system-ui,-apple-system,sans-serif');
       el.setAttribute('dominant-baseline','hanging');
       el.setAttribute('opacity',TOOLS.text.opacity);el.dataset.strokeId=stroke.id;
-      el.textContent=stroke.text;
+      el.setAttribute('font-weight',stroke.bold?'700':'400');
+      el.setAttribute('xml:space','preserve');
+      stroke.text.split('\n').forEach((line,index)=>{const span=doc.createElementNS(ns,'tspan');span.setAttribute('x',stroke.points[0][0]);span.setAttribute('y',stroke.points[0][1]+index*stroke.width*1.35);span.textContent=line||'\u00a0';el.append(span)});
+      el.classList.toggle('canvas-ink-text-selected',stroke.id===selectedTextId);
       return el;
     }
     // 工具光标：画笔/荧光笔/橡皮擦各显示对应形状，颜色跟随当前色板。
@@ -116,8 +122,11 @@
       for(const action of ['undo','redo']){const btn=toolbar.querySelector('[data-ink-action='+action+']');btn.hidden=!(ownHistory||options.showHistory);btn.disabled=locked||!state[action==='undo'?'canUndo':'canRedo']}
       toolbar.hidden=!opened;
       const launch=trigger();if(launch){if(!launch.querySelector('svg'))launch.innerHTML=penIcon;launch.classList.add('canvas-ink-entry');launch.setAttribute('aria-expanded',String(opened));launch.disabled=locked;const tip=locked?'当前画布只读，无法使用画笔':opened?'收起画笔工具并退出绘画':'展开画笔工具，在画布上书写或标注';if(launch.hasAttribute('data-tooltip')){launch.dataset.tooltip=tip;launch.removeAttribute('title')}else launch.title=tip;launch.querySelector('svg')?.style.setProperty('color',prefs[TOOLS[tool]?tool:'pen'].color)}
-      for(const name of Object.keys(prefs)){const btn=toolbar.querySelector('button[data-ink-tool='+name+']');btn.querySelector('svg')?.style.setProperty('color',prefs[name].color);btn.title=(name==='pen'?'画笔：拖动绘制笔迹':name==='highlighter'?'荧光笔：拖动高亮标注':'文字：点击画布插入文字，点击已有文字可编辑')+'；单击切换工具，双击调整颜色和粗细'}
+      for(const name of Object.keys(prefs)){const btn=toolbar.querySelector('button[data-ink-tool='+name+']');btn.querySelector('svg')?.style.setProperty('color',prefs[name].color);btn.title=(name==='pen'?'画笔：拖动绘制笔迹':name==='highlighter'?'荧光笔：拖动高亮标注':'文字：点击空白插入，单击选择并拖动文字，双击编辑')+(name==='text'?'；单击显示颜色、字号与加粗':'；单击切换工具，双击调整颜色和粗细')}
       panel.hidden=!settingsOpen||!TOOLS[tool];
+      toolbar.querySelector('[data-ink-bold]').hidden=tool!=='text';toolbar.querySelector('[data-ink-bold]').disabled=locked;toolbar.querySelector('[data-ink-bold]').setAttribute('aria-pressed',String(!!prefs.text.bold));
+      panel.querySelectorAll('input,button').forEach(input=>input.disabled=locked);range.setAttribute('aria-label',tool==='text'?'文字字号':'笔迹粗细');
+      toolbar.querySelector('.canvas-ink-width').firstChild.textContent=tool==='text'?'字号 ':'粗细 ';
       const eraserBtn=toolbar.querySelector('button[data-ink-tool=eraser]');
       if(eraserBtn)eraserBtn.title='橡皮擦：单击擦除一笔；双击此按钮清空当前题全部笔迹，可撤销'+(typeof options.onLongPressEraser==='function'?'；长按 3 秒清空整套试卷笔迹（需确认）':'');
       toolbar.querySelector('.canvas-ink-preview').style.display=tool==='text'?'none':'';
@@ -145,27 +154,39 @@
       if(options.change){options.change(after,label);render()}else{apply(after);history?.push({label,undo:()=>apply(before),redo:()=>apply(after)})}refreshControls();
     }
     function cancel(){
+      if(textDrag){const id=textDrag.pointerId;textDrag=null;try{if(viewport.hasPointerCapture(id))viewport.releasePointerCapture(id)}catch(_){};render()}
       if(frame){global.cancelAnimationFrame(frame);frame=0}
       if(!active)return;
       const id=active.pointerId;active.el.remove();active=null;
       try{if(viewport.hasPointerCapture(id))viewport.releasePointerCapture(id)}catch(_){}
     }
     function setTool(value){
-      cancel();if(!TOOLS[value])settingsOpen=false;tool=(TOOLS[value]||value==='eraser')&&!readonly()?value:'select';
+      cancel();if(value!==tool)closeTextEditor(false);if(value!=='text'&&value!=='select')selectedTextId=null;if(!TOOLS[value])settingsOpen=false;tool=(TOOLS[value]||value==='eraser')&&!readonly()?value:'select';
       viewport.classList.toggle('canvas-ink-drawing',tool!=='select');viewport.dataset.inkTool=tool;
       if(tool!=='select')options.onDrawMode?.();
+      render();
       refreshControls();
     }
+    const bold=doc.createElement('button');bold.type='button';bold.dataset.inkBold='true';bold.textContent='B';bold.setAttribute('aria-label','文字加粗');panel.insertBefore(bold,toolbar.querySelector('.canvas-ink-preview'));
+    function updateTextStyle(patch){
+      if(readonly())return;
+      Object.assign(prefs.text,tool==='text'?patch:{});
+      const selected=getStrokes().find(item=>item.id===selectedTextId&&item.tool==='text');
+      if(selected&&tool==='text'&&!textSession){try{change(getStrokes().map(item=>item.id===selected.id?{...item,...patch}:item),'文字格式')}catch(error){report(error)}}
+      if(textSession){Object.assign(textSession.style,patch);textSession.editor.style.color=textSession.style.color;textSession.editor.style.fontWeight=textSession.style.bold?'700':'400';textSession.editor.style.fontSize=textSession.style.width*(options.getViewport().scale||options.getViewport().zoom||1)+'px';textSession.editor.dispatchEvent(new global.Event('input'))}
+      refreshControls();
+    }
+    bold.addEventListener('click',()=>updateTextStyle({bold:!prefs.text.bold}));
     const palette=toolbar.querySelector('.canvas-ink-colors');
     for(const [color,name] of [['#2563eb','蓝色'],['#111827','黑色'],['#ef4444','红色'],['#facc15','黄色'],['#22c55e','绿色'],['#a855f7','紫色']]){
       const btn=doc.createElement('button');btn.type='button';btn.dataset.inkColor=color;btn.style.setProperty('--ink-color',color);btn.setAttribute('aria-label',name);btn.title=name;palette.append(btn);
-      btn.addEventListener('click',()=>{if(prefs[tool]){prefs[tool].color=color;refreshControls()}});
+      btn.addEventListener('click',()=>{if(prefs[tool]){prefs[tool].color=color;if(tool==='text')updateTextStyle({color});else refreshControls()}});
     }
     const color=doc.createElement('input');color.type='color';color.setAttribute('aria-label','自定义笔迹颜色');color.title='自定义颜色';palette.append(color);
-    color.addEventListener('input',()=>{if(prefs[tool]){prefs[tool].color=color.value;refreshControls()}});
-    range.addEventListener('input',()=>{if(prefs[tool]){prefs[tool].width=Number(range.value);refreshControls()}});
-    // 单击只切换工具（Boardmix 式）；双击绘图工具才展开颜色和粗细设置。
-    toolbar.querySelectorAll('[data-ink-tool]').forEach(btn=>btn.addEventListener('click',()=>{const next=btn.dataset.inkTool;if(TOOLS[next])settingsOpen=false;setTool(next)}));
+    color.addEventListener('input',()=>{if(prefs[tool]){prefs[tool].color=color.value;if(tool==='text')updateTextStyle({color:color.value});else refreshControls()}});
+    range.addEventListener('input',()=>{if(prefs[tool]){prefs[tool].width=Number(range.value);if(tool==='text')updateTextStyle({width:Number(range.value)});else refreshControls()}});
+    // 文字格式单击可见；画笔与荧光笔仍双击打开设置。
+    toolbar.querySelectorAll('[data-ink-tool]').forEach(btn=>btn.addEventListener('click',()=>{const next=btn.dataset.inkTool;if(TOOLS[next])settingsOpen=next==='text';setTool(next)}));
     toolbar.querySelectorAll('[data-ink-tool]').forEach(btn=>btn.addEventListener('dblclick',event=>{
       const next=btn.dataset.inkTool;
       // 非绘图工具（橡皮擦）放行事件给后续 dblclick 处理器（双击清空当前画布）。
@@ -177,7 +198,7 @@
       stop(event);if(readonly())return;cancel();try{if(getStrokes().length)change([],'清空笔迹')}catch(error){report(error)}
     });
     listen(doc,'click',event=>{const launch=trigger();if(launch&&(event.target===launch||launch.contains(event.target))){setOpen(!opened)}});
-    listen(global,'pointerdown',event=>{if(settingsOpen&&!toolbar.contains(event.target)){settingsOpen=false;refreshControls()}},true);
+    listen(global,'pointerdown',event=>{if(settingsOpen&&tool!=='text'&&!toolbar.contains(event.target)){settingsOpen=false;refreshControls()}},true);
     toolbar.querySelectorAll('[data-ink-action]').forEach(btn=>btn.addEventListener('click',()=>{
       if(readonly())return;cancel();
       try{
@@ -188,45 +209,42 @@
     }));
     listen(toolbar,'pointerdown',event=>event.stopPropagation());
     listen(toolbar,'wheel',event=>event.stopPropagation());
-    // 文字工具：点击画布插入文字，点击已有文字进入编辑；回车确认、Esc 取消。
+    // 文字工具：单击选择，拖动移动，双击编辑；Enter 换行，Ctrl/⌘+Enter 保存。
     let textSession=null;
     function closeTextEditor(commit){
       const session=textSession;if(!session)return;
-      textSession=null;
-      const value=session.editor.value.trim().slice(0,TEXT_LIMIT);
-      session.editor.remove();
-      if(!commit)return;
-      try{
-        if(session.existing){
-          if(!value)change(getStrokes().filter(item=>item.id!==session.existing.id),'删除文字');
-          else if(value!==session.existing.text)change(getStrokes().map(item=>item.id===session.existing.id?{...item,text:value,color:prefs.text.color,width:prefs.text.width}:item),'编辑文字');
-        }else if(value){
-          change([...getStrokes(),{id:'ink-'+Date.now().toString(36)+'-'+(++sequence)+'-'+Math.random().toString(36).slice(2,8),tool:'text',color:prefs.text.color,width:prefs.text.width,points:[session.world],text:value}],'添加文字');
-        }
-      }catch(error){report(error)}
+      if(commit){
+        const value=session.editor.value.slice(0,TEXT_LIMIT);
+        try{
+          if(session.existing){
+            if(!value.trim())change(getStrokes().filter(item=>item.id!==session.existing.id),'删除文字');
+            else if(value!==session.existing.text||Object.keys(session.style).some(key=>session.style[key]!==(key==='bold'?!!session.existing.bold:session.existing[key])))change(getStrokes().map(item=>item.id===session.existing.id?{...item,text:value,...session.style}:item),'编辑文字');
+          }else if(value.trim())change([...getStrokes(),{id:'ink-'+Date.now().toString(36)+'-'+(++sequence)+'-'+Math.random().toString(36).slice(2,8),tool:'text',...session.style,points:[session.world],text:value}],'添加文字');
+        }catch(error){report(error);session.editor.focus();return}
+      }
+      textSession=null;session.editor.remove();session.actions.remove();
     }
     function openTextEditor(clientX,clientY,existing){
       closeTextEditor(false);
       const view=options.getViewport(),rect=viewport.getBoundingClientRect(),scale=view.scale||view.zoom||1;
-      // existing 为命中的文字笔迹（裸 stroke），点击空白时为 null
       const world=existing?existing.points[0]:point({clientX,clientY},rect,view);
+      const style={color:existing?existing.color:prefs.text.color,width:existing?existing.width:prefs.text.width,bold:!!(existing?existing.bold:prefs.text.bold)};
       const editor=doc.createElement('textarea');
-      editor.className='canvas-ink-text-editor';editor.rows=1;editor.placeholder='输入文字，回车确认';
+      editor.className='canvas-ink-text-editor';editor.rows=Math.max(2,(existing?.text||'').split('\n').length);editor.maxLength=TEXT_LIMIT;editor.placeholder='Enter 换行 · Ctrl/⌘+Enter 保存 · Esc 取消';editor.setAttribute('aria-label','画布文字内容');
       editor.value=existing?existing.text:'';
-      editor.style.left=(rect.left+view.x+world[0]*scale)+'px';
-      editor.style.top=(rect.top+view.y+world[1]*scale)+'px';
-      editor.style.fontSize=(existing?existing.width:prefs.text.width)*scale+'px';
-      editor.style.color=prefs.text.color;
-      doc.body.append(editor);
-      textSession={editor,existing,world};
+      editor.style.left=(rect.left+view.x+world[0]*scale)+'px';editor.style.top=(rect.top+view.y+world[1]*scale)+'px';
+      editor.style.fontSize=style.width*scale+'px';editor.style.color=style.color;editor.style.fontWeight=style.bold?'700':'400';
+      const actions=doc.createElement('div');actions.className='canvas-ink-text-actions';actions.dataset.canvasUi='true';actions.style.left=editor.style.left;
+      actions.innerHTML='<button type="button" aria-label="保存画布文字">保存</button><button type="button" aria-label="取消画布文字">取消</button>';
+      doc.body.append(editor,actions);textSession={editor,actions,existing,world,style};
+      const resize=()=>{editor.style.height='auto';editor.style.height=editor.scrollHeight+'px';actions.style.top=(parseFloat(editor.style.top)+editor.offsetHeight+4)+'px'};
+      actions.querySelectorAll('button').forEach((button,index)=>button.addEventListener('click',()=>closeTextEditor(index===0)));
       editor.addEventListener('keydown',event=>{
-        event.stopPropagation();
-        if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();closeTextEditor(true)}
+        event.stopPropagation();if(event.isComposing||event.keyCode===229)return;
+        if(event.key==='Enter'&&(event.ctrlKey||event.metaKey)){event.preventDefault();closeTextEditor(true)}
         else if(event.key==='Escape'){event.preventDefault();closeTextEditor(false)}
       });
-      editor.addEventListener('input',()=>{editor.style.height='auto';editor.style.height=editor.scrollHeight+'px'});
-      editor.addEventListener('blur',()=>closeTextEditor(true));
-      editor.focus();
+      editor.addEventListener('input',resize);editor.focus();resize();
     }
     function hitTextStroke(location,padding){
       for(const el of [...layer.querySelectorAll('[data-stroke-id]')].reverse()){
@@ -249,9 +267,13 @@
       points.push(next);
     }
     listen(global,'pointerdown',event=>{
-      if(destroyed||active||tool==='select'||space||readonly()||event.button!==0||event.isPrimary===false||!inside(event.target))return;
+      if(destroyed||active||textDrag||space||readonly()||event.button!==0||event.isPrimary===false||!inside(event.target))return;
+      const view=options.getViewport(),location=point(event,viewport.getBoundingClientRect(),view);
+      const textHit=(tool==='select'||tool==='text')?hitTextStroke(location,4/(view.scale||view.zoom||1)):null;
+      if(tool==='select'&&!textHit){selectedTextId=null;render();return}
       stop(event);
       try{
+        if(textHit){closeTextEditor(false);selectedTextId=textHit.id;Object.assign(prefs.text,{color:textHit.color,width:textHit.width,bold:!!textHit.bold});textDrag={pointerId:event.pointerId,start:location,original:normalize([textHit])[0],moved:false};render();viewport.setPointerCapture(event.pointerId);return}
         if(tool==='eraser'){
           const view=options.getViewport(),location=point(event,viewport.getBoundingClientRect(),view);
           const target=new global.DOMPoint(...location),padding=16/(view.scale||view.zoom||1);
@@ -274,7 +296,7 @@
         }
         if(tool==='text'){
           const view=options.getViewport(),location=point(event,viewport.getBoundingClientRect(),view);
-          openTextEditor(event.clientX,event.clientY,hitTextStroke(location,16/(view.scale||view.zoom||1)));
+          selectedTextId=null;openTextEditor(event.clientX,event.clientY,null);
           suppressClickUntil=Date.now()+400;return;
         }
         const strokes=normalize(getStrokes()),remaining=LIMITS.total-strokes.reduce((sum,s)=>sum+s.points.length,0);
@@ -285,6 +307,12 @@
       }catch(error){cancel();report(error)}
     },true);
     listen(global,'pointermove',event=>{
+      if(textDrag&&event.pointerId===textDrag.pointerId){
+        stop(event);if(readonly()){cancel();return}
+        const current=point(event,viewport.getBoundingClientRect(),options.getViewport()),dx=current[0]-textDrag.start[0],dy=current[1]-textDrag.start[1],scale=options.getViewport().scale||options.getViewport().zoom||1;
+        if(Math.hypot(dx,dy)*scale>=3)textDrag.moved=true;
+        if(textDrag.moved){textDrag.next={...textDrag.original,points:textDrag.original.points.map(([x,y])=>[x+dx,y+dy])};const el=[...layer.querySelectorAll('[data-stroke-id]')].find(item=>item.dataset.strokeId===textDrag.original.id);if(el)el.replaceWith(makeEl(textDrag.next))}return;
+      }
       if(!active||event.pointerId!==active.pointerId)return;stop(event);
       if(readonly()){cancel();return}
       const samples=event.getCoalescedEvents?.()||[];
@@ -292,12 +320,14 @@
       if(!frame)frame=global.requestAnimationFrame(()=>{frame=0;if(active)active.el.setAttribute('d',path(active.stroke.points))});
     },true);
     listen(global,'pointerup',event=>{
+      if(textDrag&&event.pointerId===textDrag.pointerId){stop(event);const drag=textDrag;cancel();suppressClickUntil=Date.now()+400;if(drag.moved&&drag.next)try{change(getStrokes().map(item=>item.id===drag.original.id?drag.next:item),'移动文字')}catch(error){render();report(error)}return}
       if(!active||event.pointerId!==active.pointerId)return;stop(event);addPoint(event);
       const {stroke,limited}=active;cancel();suppressClickUntil=Date.now()+400;
       try{if(stroke.points.length)change([...getStrokes(),stroke],stroke.tool==='pen'?'画笔':'荧光笔');if(limited)report(new Error('此笔已达长度上限，请抬笔后继续绘制'))}catch(error){render();report(error)}
     },true);
-    listen(global,'pointercancel',event=>{if(active&&event.pointerId===active.pointerId){cancel();stop(event)}},true);
-    listen(viewport,'lostpointercapture',event=>{if(active&&event.pointerId===active.pointerId)cancel()});
+    listen(global,'pointercancel',event=>{if((active&&event.pointerId===active.pointerId)||(textDrag&&event.pointerId===textDrag.pointerId)){cancel();stop(event)}},true);
+    listen(viewport,'lostpointercapture',event=>{if((active&&event.pointerId===active.pointerId)||(textDrag&&event.pointerId===textDrag.pointerId))cancel()});
+    listen(global,'dblclick',event=>{if(readonly()||space||!inside(event.target)||(tool!=='select'&&tool!=='text'))return;const view=options.getViewport(),hit=hitTextStroke(point(event,viewport.getBoundingClientRect(),view),4/(view.scale||view.zoom||1));if(hit){stop(event);selectedTextId=hit.id;openTextEditor(event.clientX,event.clientY,hit)}},true);
     listen(global,'click',event=>{if(inside(event.target)&&(Date.now()<suppressClickUntil||(tool!=='select'&&!space)))stop(event)},true);
     listen(global,'keydown',event=>{
       if(event.target?.closest?.('input,textarea,select,[contenteditable="true"],[contenteditable=""]'))return;
@@ -310,7 +340,7 @@
     listen(doc,'scroll',()=>{cancel();positionToolbar()},true);
     listen(global,'blur',()=>{cancel();space=false;viewport.classList.remove('canvas-ink-panning')});
     // Cancel instead of mixing coordinate systems if zoom changes mid-stroke.
-    listen(global,'wheel',event=>{if(active&&viewport.contains(event.target))cancel()},true);
+    listen(global,'wheel',event=>{if((active||textDrag)&&viewport.contains(event.target))cancel()},true);
     // 画笔状态下右击画布退出绘画，回到选择模式（右键拖动平移不受影响）。
     listen(doc,'contextmenu',event=>{
       if(destroyed||tool==='select'||space)return;
@@ -333,7 +363,7 @@
     listen(global,'pointercancel',stopEraserHold);
     listen(eraserHoldBtn,'pointerleave',stopEraserHold);
     function reset(options){
-      cancel();settingsOpen=false;
+      cancel();closeTextEditor(false);selectedTextId=null;settingsOpen=false;
       if(!options?.keepTool)setTool('select');else refreshControls();
       if(ownHistory)history?.clear();render();
     }

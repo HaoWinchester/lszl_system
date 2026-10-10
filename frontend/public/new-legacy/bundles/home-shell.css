@@ -8264,6 +8264,11 @@ body.qw-selection-toolbar-motion .uc-selection-bounds,.stage.graph-card-dragging
 .canvas-ink-toolbar button:not(:disabled),.canvas-ink-toolbar input:not(:disabled),.canvas-ink-entry:not(:disabled){cursor:pointer!important}
 .canvas-ink-toolbar button:disabled,.canvas-ink-entry:disabled{cursor:default!important}
 .canvas-ink-toolbar button[type] *,.canvas-ink-entry[type] *{cursor:inherit!important}
+
+.canvas-ink-text-selected{filter:drop-shadow(0 0 2px #2563eb);outline:none}
+.canvas-ink-text-actions{position:fixed;z-index:131;display:flex;gap:6px;background:white;padding:4px;border:1px solid #cbd5e1;border-radius:6px}
+.canvas-ink-text-actions button{padding:5px 12px;border:1px solid #cbd5e1;background:white;border-radius:4px;cursor:pointer}
+.canvas-ink-toolbar [data-ink-bold]{margin-top:8px;font-weight:700}
 /* style: styles/home-graph-components.css */
 /* 新版图谱功能组件兼容层：只承载新增图元、工具条与交互态，不覆盖当前项目的页面壳层。 */
 .knowledge-card .node-title{justify-content:var(--node-title-justify,center);text-align:var(--node-text-align,center)}

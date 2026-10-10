@@ -579,7 +579,7 @@ body.practice-mode-page:not([data-practice-view="game"]) .practice-main{
 /* 复仇卡：子块多且自带 1/-1 列定义，保留原生行流，仅伸展尾部内容行并钉底 CTA */
 .practice-mode-card.revenge{grid-template-rows:auto auto auto minmax(0,1fr) auto auto}
 .practice-mode-card.revenge .practice-start-btn{align-self:end;margin-top:14px}
-.practice-mode-card.revenge .practice-secondary-btn{width:100%;margin-top:10px}
+.practice-mode-card.revenge .practice-secondary-btn{grid-column:1/-1;width:100%;margin-top:10px}
 
 /* —— 我的收藏升级：搜索 / 来源 / 详情弹层 / 分页 —— */
 .practice-favorites-toolbar{display:grid;gap:9px}
