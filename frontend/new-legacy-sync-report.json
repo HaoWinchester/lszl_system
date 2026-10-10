@@ -4,10 +4,7 @@
   "toVersion": "v9.0-p4.1.306",
   "changes": {
     "added": [],
-    "changed": [
-      "src/canvas/94-canvas-ink.js",
-      "tests/canvas-ink-controller-browser.py"
-    ],
+    "changed": [],
     "removed": []
   },
   "incompatible": []
