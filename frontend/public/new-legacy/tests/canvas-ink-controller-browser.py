@@ -83,7 +83,12 @@ with sync_playwright() as pw:
     page.get_by_role('button',name='文字',exact=True).click();assert page.evaluate('ink.tool')=='text'
     assert page.evaluate("() => [...document.head.querySelectorAll('style')].some(el => el.textContent.includes(`[data-ink-tool='text']{cursor:url(\"data:image/svg+xml`))")
     pen.click();page.keyboard.down('Space');page.mouse.click(600,300);page.keyboard.up('Space');assert page.evaluate('panStarts')>=1
-    page.evaluate('locked=true;ink.render()');expect(pen).to_be_disabled();assert page.evaluate('ink.tool')=='select'
+    # 只读时工具选择保留（按钮 disabled + 无自定义光标），解锁后原工具与光标自动恢复。
+    page.evaluate('locked=true;ink.render()');expect(pen).to_be_disabled()
+    assert page.evaluate('ink.tool')=='pen'
+    assert not page.evaluate('''() => [...document.head.querySelectorAll('style')].some(el => el.textContent.includes('cursor:url("data:image/svg+xml'))''')
+    page.evaluate('locked=false;ink.render()');expect(pen).to_be_enabled();assert page.evaluate('ink.tool')=='pen'
+    assert page.evaluate('''() => [...document.head.querySelectorAll('style')].some(el => el.textContent.includes('cursor:url("data:image/svg+xml'))''')
     page.evaluate('locked=false;strokes=[];ink.reset()');expect(page.get_by_role('button',name='撤销笔迹',exact=True)).to_be_disabled()
     # Actual touch pointer lifecycle through DOM Pointer Events, including cancellation.
     pen.click()
