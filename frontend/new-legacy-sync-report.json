@@ -1,13 +1,12 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.303",
-  "toVersion": "v9.0-p4.1.304",
+  "fromVersion": "v9.0-p4.1.304",
+  "toVersion": "v9.0-p4.1.305",
   "changes": {
-    "added": [
-      "tests/canvas-text-persistence-browser.py"
-    ],
+    "added": [],
     "changed": [
-      "VERSION"
+      "VERSION",
+      "content-prep-studio/dist/content-prep.html"
     ],
     "removed": []
   },
