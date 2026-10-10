@@ -1,0 +1,48 @@
+{
+  "version": "v9.0-p4.1.303",
+  "health": {
+    "status": "ok",
+    "db": "ok",
+    "time": "2026-10-10T02:58:18.337426+00:00",
+    "db_time": "2026-10-10T02:58:18.334370+00:00"
+  },
+  "assetChecks": [
+    {
+      "file": "src/118-question-materials.js",
+      "matchesRelease": true
+    },
+    {
+      "file": "src/120-question-favorites.js",
+      "matchesRelease": true
+    },
+    {
+      "file": "src/30-shared-auth-dialog.js",
+      "matchesRelease": true
+    },
+    {
+      "file": "src/77-multi-question-workspace.js",
+      "matchesRelease": true
+    },
+    {
+      "file": "src/86-knowledge-recall.js",
+      "matchesRelease": true
+    },
+    {
+      "file": "src/canvas/97-learning-theme.js",
+      "matchesRelease": true
+    },
+    {
+      "file": "styles/admin-focus-vega-common.css",
+      "matchesRelease": true
+    },
+    {
+      "file": "styles/admin-focus-vega-users.css",
+      "matchesRelease": true
+    },
+    {
+      "file": "styles/question-materials.css",
+      "matchesRelease": true
+    }
+  ],
+  "siteFiles": 1038
+}

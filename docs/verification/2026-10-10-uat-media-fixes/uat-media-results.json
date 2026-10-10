@@ -1,0 +1,20 @@
+[
+  {
+    "page": "knowledge-recall",
+    "imageLoaded": true,
+    "rightColumn": true,
+    "narrowStack": true,
+    "zoomEscape": true,
+    "pageErrors": [],
+    "sourceOverride": false
+  },
+  {
+    "page": "question-workspace",
+    "imageLoaded": true,
+    "rightColumn": true,
+    "narrowStack": true,
+    "zoomEscape": true,
+    "pageErrors": [],
+    "sourceOverride": false
+  }
+]

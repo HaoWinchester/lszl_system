@@ -1,0 +1,178 @@
+[
+  {
+    "time": "2026-10-10T11:00:20.580710+08:00",
+    "route": "/",
+    "step": "landing-login-navigation",
+    "state": {
+      "authOpen": true,
+      "hasAuthModal": true,
+      "label": "访客只读，打开账号菜单",
+      "text": "访客只读"
+    }
+  },
+  {
+    "time": "2026-10-10T11:00:20.949540+08:00",
+    "route": "/",
+    "step": "open-login",
+    "state": {
+      "authOpen": true,
+      "hasAuthModal": true,
+      "label": "访客只读，打开账号菜单",
+      "text": "访客只读"
+    }
+  },
+  {
+    "time": "2026-10-10T11:00:22.313098+08:00",
+    "route": "/",
+    "step": "login",
+    "state": {
+      "authOpen": false,
+      "hasAuthModal": true,
+      "label": "管理员，打开账号菜单",
+      "text": "管理员"
+    }
+  },
+  {
+    "time": "2026-10-10T11:00:24.059807+08:00",
+    "route": "/",
+    "step": "logout",
+    "state": {
+      "authOpen": false,
+      "hasAuthModal": true,
+      "label": "访客只读，打开账号菜单",
+      "text": "访客"
+    }
+  },
+  {
+    "time": "2026-10-10T11:00:26.742248+08:00",
+    "route": "/login",
+    "step": "open-login",
+    "state": {
+      "authOpen": true,
+      "hasAuthModal": true,
+      "label": "访客只读，打开账号菜单",
+      "text": "访客只读"
+    }
+  },
+  {
+    "time": "2026-10-10T11:00:28.130995+08:00",
+    "route": "/login",
+    "step": "login",
+    "state": {
+      "authOpen": false,
+      "hasAuthModal": true,
+      "label": "管理员，打开账号菜单",
+      "text": "管理员"
+    }
+  },
+  {
+    "time": "2026-10-10T11:00:29.979939+08:00",
+    "route": "/login",
+    "step": "logout",
+    "state": {
+      "authOpen": false,
+      "hasAuthModal": true,
+      "label": "访客只读，打开账号菜单",
+      "text": "访客"
+    }
+  },
+  {
+    "time": "2026-10-10T11:00:33.130053+08:00",
+    "route": "/practice-mode.html",
+    "step": "open-login",
+    "state": {
+      "authOpen": true,
+      "hasAuthModal": true,
+      "label": "访客只读，打开账号菜单",
+      "text": "访客只读"
+    }
+  },
+  {
+    "time": "2026-10-10T11:00:34.488403+08:00",
+    "route": "/practice-mode.html",
+    "step": "login",
+    "state": {
+      "authOpen": false,
+      "hasAuthModal": true,
+      "label": "管理员，打开账号菜单",
+      "text": "管理员"
+    }
+  },
+  {
+    "time": "2026-10-10T11:00:36.278063+08:00",
+    "route": "/practice-mode.html",
+    "step": "logout",
+    "state": {
+      "authOpen": false,
+      "hasAuthModal": true,
+      "label": "访客只读，打开账号菜单",
+      "text": "访客"
+    }
+  },
+  {
+    "time": "2026-10-10T11:00:39.294434+08:00",
+    "route": "/knowledge-recall.html",
+    "step": "open-login",
+    "state": {
+      "authOpen": true,
+      "hasAuthModal": true,
+      "label": "访客只读模式",
+      "text": "访客只读"
+    }
+  },
+  {
+    "time": "2026-10-10T11:00:40.696907+08:00",
+    "route": "/knowledge-recall.html",
+    "step": "login",
+    "state": {
+      "authOpen": false,
+      "hasAuthModal": true,
+      "label": "管理员，打开账号菜单",
+      "text": "管理员"
+    }
+  },
+  {
+    "time": "2026-10-10T11:00:42.336497+08:00",
+    "route": "/knowledge-recall.html",
+    "step": "logout",
+    "state": {
+      "authOpen": false,
+      "hasAuthModal": true,
+      "label": "访客只读，打开账号菜单",
+      "text": "访客只读"
+    }
+  },
+  {
+    "time": "2026-10-10T11:00:45.297320+08:00",
+    "route": "/question-workspace.html",
+    "step": "open-login",
+    "state": {
+      "authOpen": true,
+      "hasAuthModal": true,
+      "label": "访客只读，打开账号菜单",
+      "text": "访客只读"
+    }
+  },
+  {
+    "time": "2026-10-10T11:00:46.786323+08:00",
+    "route": "/question-workspace.html",
+    "step": "login",
+    "state": {
+      "authOpen": false,
+      "hasAuthModal": true,
+      "label": "管理员，打开账号菜单",
+      "text": "管理员"
+    }
+  },
+  {
+    "time": "2026-10-10T11:00:48.496993+08:00",
+    "route": "/question-workspace.html",
+    "step": "logout",
+    "state": {
+      "authOpen": false,
+      "hasAuthModal": true,
+      "label": "访客只读，打开账号菜单",
+      "text": "访客只读"
+    }
+  }
+]

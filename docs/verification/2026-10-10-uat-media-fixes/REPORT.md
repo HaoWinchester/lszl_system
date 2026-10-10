@@ -25,4 +25,33 @@
 - 混合题行为 Node 测试：7 项通过。旧 deep-recall-qw-option-analysis.test.js 引用 HEAD 已不存在的 knowledge-recall-p4529.css，不能运行；未把此旧静态测试算作通过。
 - 文件数量：active 1034 → 候选同步产物 1038，新增 4 个回归脚本；关键页面均保留。
 
-本地浏览器原始证据：`artifacts/uat-media-fixes/`（截图与日志未入 Git）。发布结果、后端全量结果及在线复测将在完成后补齐。
+本地浏览器原始证据：`artifacts/uat-media-fixes/`（截图与日志未入 Git）。在线复测与发布结果在下方记录。
+
+## 正式发布门禁
+
+- 候选版本：v9.0-p4.1.303，源代码提交 f3e51ece（仅合入 uat）。
+- `deploy/update-uat.sh` full 门禁：全部通过，总耗时 946 秒。
+- 后端全量：969 passed；3 条现有依赖弃用警告。
+- 前端契约：312 passed；Python 契约 9 项及部署脚本检查通过。
+- 首页、内容准备、做题、画布、跨模块、学习资产浏览器门禁全部通过。
+- 视觉回归：practice/free 桌面与手机 4 项均为 0.000% 差异。
+- main 基准：7a24be322c4c560cc340ba1fdc4423d19a63df89，未合入此次更改。
+
+## 部署与真实 UAT 复测
+
+2026-10-10 11:01（北京时间）：https://uat.aihuanpu.com 已运行 **v9.0-p4.1.303**。部署脚本退出 0，公网/API/数据库健康、教师助手及转换服务就绪。active release 1038 文件；9 个本次修改的线上 JS/CSS 与候选 release 的 SHA-256 一致。
+
+- 两张画布：使用真实已发布含图试卷，**未覆盖任何线上代码/API**；图片 GET 200、真实解码、题干/选项左侧与图片右侧同框、窄卡片上下布局、放大/Escape 全部通过，页面脚本错误 0。
+- 收藏详情：真实收藏含图题，图片解码与放大通过，Escape 只关闭放大图，详情和抽屉仍打开；临时收藏已还原。
+- 管理页：两页面 × 390/768/1440，单列/双列和页面横向溢出检查均通过；已查看实际截图。
+- 主题：两张真实 UAT 标签页双向切换、根节点、选择器与 aria 状态同步通过，测试后还原平台默认。
+- 认证：Playwright 布局/主题/认证 13 条记录全部通过；agent-browser 遍历首页登录链接、/login、做题模式、深度回忆、多题归纳，16 条打开/登录/退出记录全部通过。首页为登录链接导航，非弹窗宿主页。
+- 结果文件与本报告同目录；截图保留在本地 `artifacts/uat-media-fixes/`。
+
+### 题图实测截图
+
+- [深度回忆右侧题图](../../../artifacts/uat-media-fixes/uat-knowledge-recall-1440.png)
+- [多题归纳右侧题图](../../../artifacts/uat-media-fixes/uat-question-workspace-1440.png)
+- [收藏详情题图](../../../artifacts/uat-media-fixes/uat-favorites-media-1440.png)
+
+**结论：本次五项修复及题图需求开发回归通过，已部署 UAT，等待用户本人业务验收。未合入或推送 main，功能分支保留。**

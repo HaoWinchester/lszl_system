@@ -1,0 +1,245 @@
+[
+  {
+    "time": "2026-10-10T10:59:06.148011+08:00",
+    "case": "login",
+    "ok": true,
+    "state": {
+      "text": "管理员",
+      "label": "管理员，打开账号菜单"
+    }
+  },
+  {
+    "time": "2026-10-10T10:59:15.533210+08:00",
+    "case": "layout /admin-subjects.html 390",
+    "ok": true,
+    "layout": {
+      "width": 390,
+      "scrollWidth": 390,
+      "bodyWidth": 390
+    },
+    "left": {
+      "x": 24,
+      "y": -792.015625,
+      "width": 342,
+      "height": 618.046875
+    },
+    "detail": {
+      "x": 24,
+      "y": -157.96875,
+      "width": 342,
+      "height": 3498.109375
+    },
+    "screenshot": "admin-subjects-390.png"
+  },
+  {
+    "time": "2026-10-10T10:59:15.890116+08:00",
+    "case": "layout /admin-subjects.html 768",
+    "ok": true,
+    "layout": {
+      "width": 768,
+      "scrollWidth": 768,
+      "bodyWidth": 768
+    },
+    "left": {
+      "x": 24,
+      "y": -815.109375,
+      "width": 720,
+      "height": 334.828125
+    },
+    "detail": {
+      "x": 24,
+      "y": -464.28125,
+      "width": 720,
+      "height": 2807.921875
+    },
+    "screenshot": "admin-subjects-768.png"
+  },
+  {
+    "time": "2026-10-10T10:59:16.288388+08:00",
+    "case": "layout /admin-subjects.html 1440",
+    "ok": true,
+    "layout": {
+      "width": 1440,
+      "scrollWidth": 1440,
+      "bodyWidth": 1440
+    },
+    "left": {
+      "x": 24,
+      "y": 120,
+      "width": 240,
+      "height": 609.9375
+    },
+    "detail": {
+      "x": 280,
+      "y": -876,
+      "width": 1136,
+      "height": 2607.40625
+    },
+    "screenshot": "admin-subjects-1440.png"
+  },
+  {
+    "time": "2026-10-10T10:59:18.047671+08:00",
+    "case": "layout /user-management.html 390",
+    "ok": true,
+    "layout": {
+      "width": 390,
+      "scrollWidth": 390,
+      "bodyWidth": 390
+    },
+    "left": {
+      "x": 24,
+      "y": 817.34375,
+      "width": 342,
+      "height": 1712.796875
+    },
+    "detail": {
+      "x": 24,
+      "y": 2544.140625,
+      "width": 342,
+      "height": 2032.609375
+    },
+    "screenshot": "user-management-390.png"
+  },
+  {
+    "time": "2026-10-10T10:59:18.461021+08:00",
+    "case": "layout /user-management.html 768",
+    "ok": true,
+    "layout": {
+      "width": 768,
+      "scrollWidth": 768,
+      "bodyWidth": 768
+    },
+    "left": {
+      "x": 24,
+      "y": 752.265625,
+      "width": 720,
+      "height": 1712.796875
+    },
+    "detail": {
+      "x": 24,
+      "y": 2479.0625,
+      "width": 720,
+      "height": 1986.421875
+    },
+    "screenshot": "user-management-768.png"
+  },
+  {
+    "time": "2026-10-10T10:59:18.821477+08:00",
+    "case": "layout /user-management.html 1440",
+    "ok": true,
+    "layout": {
+      "width": 1440,
+      "scrollWidth": 1440,
+      "bodyWidth": 1440
+    },
+    "left": {
+      "x": 24,
+      "y": 335.34375,
+      "width": 340.5,
+      "height": 825.671875
+    },
+    "detail": {
+      "x": 374.5,
+      "y": 335.34375,
+      "width": 691,
+      "height": 986.703125
+    },
+    "screenshot": "user-management-1440.png"
+  },
+  {
+    "time": "2026-10-10T10:59:24.991071+08:00",
+    "case": "theme recall to workspace",
+    "ok": true,
+    "recall": {
+      "body": "ocean",
+      "workspace": null,
+      "app": "ocean",
+      "viewport": "ocean",
+      "select": "ocean",
+      "checked": [
+        "ocean"
+      ]
+    },
+    "workspace": {
+      "body": "ocean",
+      "workspace": "ocean",
+      "app": null,
+      "viewport": null,
+      "select": "ocean",
+      "checked": []
+    }
+  },
+  {
+    "time": "2026-10-10T10:59:25.217370+08:00",
+    "case": "theme workspace to recall",
+    "ok": true,
+    "recall": {
+      "body": "latte",
+      "workspace": null,
+      "app": "latte",
+      "viewport": "latte",
+      "select": "latte",
+      "checked": [
+        "latte"
+      ]
+    },
+    "workspace": {
+      "body": "latte",
+      "workspace": "latte",
+      "app": null,
+      "viewport": null,
+      "select": "latte",
+      "checked": []
+    }
+  },
+  {
+    "time": "2026-10-10T10:59:25.404955+08:00",
+    "case": "theme restore platform",
+    "ok": true,
+    "recall": {
+      "body": "platform",
+      "workspace": null,
+      "app": "platform",
+      "viewport": "platform",
+      "select": "platform",
+      "checked": [
+        "platform"
+      ]
+    },
+    "workspace": {
+      "body": "platform",
+      "workspace": "platform",
+      "app": null,
+      "viewport": null,
+      "select": "platform",
+      "checked": []
+    }
+  },
+  {
+    "time": "2026-10-10T10:59:27.669982+08:00",
+    "case": "practice initial session aria",
+    "ok": true,
+    "state": {
+      "text": "管理员",
+      "label": "管理员，打开账号菜单"
+    }
+  },
+  {
+    "time": "2026-10-10T10:59:27.949458+08:00",
+    "case": "practice logout aria",
+    "ok": true,
+    "state": {
+      "text": "访客",
+      "label": "访客只读，打开账号菜单"
+    }
+  },
+  {
+    "time": "2026-10-10T10:59:29.802375+08:00",
+    "case": "practice login aria",
+    "ok": true,
+    "state": {
+      "text": "管理员",
+      "label": "管理员，打开账号菜单"
+    }
+  }
+]
