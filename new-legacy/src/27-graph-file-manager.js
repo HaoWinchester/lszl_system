@@ -1070,7 +1070,7 @@
     $('fmFavoriteTagConfirm')?.addEventListener('click',createFavoriteTag);
     $('fmFavoriteTagName')?.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();createFavoriteTag()}else if(event.key==='Escape'){event.preventDefault();setFavoriteTagCreateOpen(false)}});
     $('fmSidebarCollapseBtn')?.addEventListener('click',()=>applySidebarCollapsed(!state.sidebarCollapsed));
-    $('fmSearchInput').addEventListener('input',event=>{state.query=event.target.value;renderFiles()});
+    global.KGSearchInputController.bind($('fmSearchInput'),{getValue:()=>state.query,onChange:value=>{state.query=value;renderFiles()}});
     $('fmSortSelect').addEventListener('change',event=>{state.sort=event.target.value;writeSetting(SORT_KEY,state.sort);renderFiles()});
     $('fmGridBtn').addEventListener('click',()=>setLayout('grid'));$('fmListBtn').addEventListener('click',()=>setLayout('list'));
     $('fmSelectionModeBtn').addEventListener('click',()=>setSelectionMode(!state.selectionMode));$('fmBatchCancelBtn').addEventListener('click',()=>setSelectionMode(false));$('fmBatchTagBtn').addEventListener('click',event=>global.KGFileManagerOrganize&&global.KGFileManagerOrganize.openTagPicker(selectedPayload(),event.currentTarget));$('fmBatchMoveBtn').addEventListener('click',openBatchMoveDialog);$('fmBatchTrashBtn').addEventListener('click',batchTrash);$('fmBatchExportBtn').addEventListener('click',batchExport);

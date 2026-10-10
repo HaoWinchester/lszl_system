@@ -78,7 +78,7 @@ def main():
             run_with_fresh_db('canvas-ink-browser.py')
             server = start_canvas_server()
             try:
-                for script in ('home-canvas-tools-browser.py', 'workspace-multitab-browser.py'):
+                for script in ('home-canvas-tools-browser.py', 'workspace-multitab-browser.py', 'file-manager-search-tabs-browser.py'):
                     subprocess.run([sys.executable, str(ROOT/'new-legacy/tests'/script), '--base-url', base], cwd=ROOT, check=True)
             finally:
                 stop_canvas_server(server)

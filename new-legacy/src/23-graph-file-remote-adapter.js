@@ -17,7 +17,8 @@
     if(!next||!next.id||!next.graphData)return null;
     current=clone(next);loadedGraph=clone(next.graphData);return clone(current);
   }
-  function clearSession(){sessionEpoch+=1;creating=null;unselectedFileId=null;initializedEpoch=-1;currentInitializer=null;current=null;loadedGraph=null;pendingSave=Promise.resolve()}
+  // Reset editor metadata and graph bodies together, before a new owner is seeded.
+  function clearSession(){sessionEpoch+=1;creating=null;unselectedFileId=null;initializedEpoch=-1;currentInitializer=null;current=null;loadedGraph=null;pendingSave=Promise.resolve();global.KGGraphFileRemoteStore?.clearSession?.()}
   function initializeCurrent(){
     if(!active())return Promise.resolve(null);
     const epoch=sessionEpoch;

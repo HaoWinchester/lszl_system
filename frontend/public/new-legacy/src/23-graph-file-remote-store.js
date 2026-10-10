@@ -1,7 +1,7 @@
 'use strict';
 
 (function(global){
-  let activeFiles=[],trashFiles=[],activeFolders=[],trashFolders=[],tags=[],currentId='',sessionEpoch=0,refreshSerial=0,lastError='',catalogLoaded=false,catalogPromise=null;
+  let activeFiles=[],trashFiles=[],activeFolders=[],trashFolders=[],tags=[],currentId='',sessionEpoch=0,refreshSerial=0,lastError='',catalogLoaded=false,catalogPromise=null,fileIndexLoaded=false,fileIndexPromise=null;
   const contentCache=new Map();
   function clone(value){return value==null?value:JSON.parse(JSON.stringify(value))}
   function api(){return global.KGGraphFileApi||null}
@@ -28,7 +28,7 @@
   }
   function rememberError(error){lastError=String(error&&error.message||error||'图谱文件服务请求失败');return false}
   function getLastError(){return lastError}
-  function clearSession(){sessionEpoch+=1;refreshSerial+=1;activeFiles=[];trashFiles=[];activeFolders=[];trashFolders=[];tags=[];currentId='';lastError='';catalogLoaded=false;catalogPromise=null;contentCache.clear()}
+  function clearSession(){sessionEpoch+=1;refreshSerial+=1;activeFiles=[];trashFiles=[];activeFolders=[];trashFolders=[];tags=[];currentId='';lastError='';catalogLoaded=false;catalogPromise=null;fileIndexLoaded=false;fileIndexPromise=null;contentCache.clear()}
   function seedCurrent(file){
     if(!file){currentId='';return null}
     const normalized=normalizeFile(file);
@@ -53,7 +53,7 @@
       activeFolders=(Array.isArray(folderPayload.folders)?folderPayload.folders:[]).map(normalizeFolder).filter(Boolean);
       trashFolders=(Array.isArray(trashFolderPayload.folders)?trashFolderPayload.folders:[]).map(normalizeFolder).filter(Boolean);
       tags=(Array.isArray(tagPayload.tags)?tagPayload.tags:[]).map(clone);
-      currentId=String(currentPayload.fileId||'');lastError='';catalogLoaded=true;return true;
+      currentId=String(currentPayload.fileId||'');lastError='';catalogLoaded=true;fileIndexLoaded=true;return true;
     }catch(error){rememberError(error);throw error}
   }
   function ensureCatalog(){
@@ -61,6 +61,28 @@
     if(catalogPromise)return catalogPromise;
     catalogPromise=refresh().finally(()=>{catalogPromise=null});
     return catalogPromise;
+  }
+  // Editor tabs need only file metadata; leave folders, trash and graph bodies lazy.
+  function ensureFileIndex(){
+    if(fileIndexLoaded)return Promise.resolve(true);
+    if(fileIndexPromise)return fileIndexPromise;
+    if(!active())return Promise.resolve(false);
+    const epoch=sessionEpoch,owner=currentOwner(),serial=refreshSerial,transport=api();
+    const pending=(async()=>{
+      try{
+        const payload=await transport.listFiles('active');
+        if(epoch!==sessionEpoch||owner!==currentOwner()||!active())return false;
+        if(serial!==refreshSerial)return fileIndexLoaded;
+        activeFiles=(Array.isArray(payload.files)?payload.files:[]).map(normalizeFile).filter(file=>file&&file.owner===owner);
+        fileIndexLoaded=true;lastError='';return true;
+      }catch(error){
+        if(epoch===sessionEpoch&&owner===currentOwner())rememberError(error);
+        return false;
+      }
+    })();
+    fileIndexPromise=pending;
+    pending.finally(()=>{if(fileIndexPromise===pending)fileIndexPromise=null});
+    return pending;
   }
   function initialize(){return ensureCatalog()}
   function listFiles(options={}){const status=options.status||'active';return clone(status==='trashed'?trashFiles:status==='all'||(options.includeTrash&&!options.status)?[...activeFiles,...trashFiles]:activeFiles)}
@@ -99,5 +121,5 @@
   function verifyIntegrity(){return{ok:true,checked:activeFiles.length+trashFiles.length,missing:[]}}
   function refreshFilePreviews(){return 0}
   function purgeExpiredTrash(){return 0}
-  global.KGGraphFileRemoteStore={active,currentOwner,initialize,ensureCatalog,seedCurrent,refresh,clearSession,listFiles,getFileMeta,getFile,getCurrentFileMeta,createFile,openFile,saveFile,renameFile,deleteFile,restoreFile,emptyTrash,purgeExpiredTrash,duplicateFile,setFileTags,getFileTags,setFileFavorite,listTags,createTag,updateTag,deleteTag,listFolders,getFolder,createFolder,renameFolder,moveFile,moveFolder,trashFolder,restoreFolder,deleteFolderPermanently,setCurrentFileId,getCurrentFileId,getLastError,estimateStorage,verifyIntegrity,refreshFilePreviews};
+  global.KGGraphFileRemoteStore={active,currentOwner,initialize,ensureCatalog,ensureFileIndex,seedCurrent,refresh,clearSession,listFiles,getFileMeta,getFile,getCurrentFileMeta,createFile,openFile,saveFile,renameFile,deleteFile,restoreFile,emptyTrash,purgeExpiredTrash,duplicateFile,setFileTags,getFileTags,setFileFavorite,listTags,createTag,updateTag,deleteTag,listFolders,getFolder,createFolder,renameFolder,moveFile,moveFolder,trashFolder,restoreFolder,deleteFolderPermanently,setCurrentFileId,getCurrentFileId,getLastError,estimateStorage,verifyIntegrity,refreshFilePreviews};
 })(window);

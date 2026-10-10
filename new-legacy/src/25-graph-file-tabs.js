@@ -374,8 +374,19 @@
     global.addEventListener('kg-graph-autosave-status',event=>renderSaveState(event.detail||{}));
     global.addEventListener('kg-graph-file-error',event=>{const message=event.detail&&event.detail.message;if(message&&typeof global.showStatus==='function')global.showStatus(message)});
   }
-  async function init(options={}){if(initialized)return;initialized=true;await initializeStore(options);bind();renderTabs()}
-  async function refresh(options={}){await initializeStore(options);renderTabs()}
+  function restoreFileIndex(options={}){
+    const store=fileStore();
+    if(!options.currentOnly||!store||typeof store.ensureFileIndex!=='function')return;
+    const ownerKey=owner();
+    // Keep first canvas paint on the current-only path; restore other tabs afterwards.
+    store.ensureFileIndex().then(ok=>{
+      if(fileStore()!==store||owner()!==ownerKey)return;
+      if(ok)renderTabs({scrollActive:false});
+      else if(typeof global.showStatus==='function')global.showStatus('文件页签加载失败，请返回文件管理后重试。');
+    });
+  }
+  async function init(options={}){if(initialized)return;initialized=true;await initializeStore(options);bind();renderTabs();restoreFileIndex(options)}
+  async function refresh(options={}){await initializeStore(options);renderTabs();restoreFileIndex(options)}
 
   global.KGGraphFileTabs={isSwitching:()=>switching,init,refresh,renderTabs,openFile,closeFile,createFile,manualSave,updateCurrentFileDisplay};
 })(window);
