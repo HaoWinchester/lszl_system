@@ -1205,6 +1205,8 @@
     const orderBadge=orderItem&&Number.isFinite(Number(orderItem.paperIndex))&&orderTotal
       ?'<span class="qw-card-question-order-badge" title="本试卷第 '+(Number(orderItem.paperIndex)+1)+' 题，共 '+orderTotal+' 题"><b>'+(Number(orderItem.paperIndex)+1)+'</b><small>/'+orderTotal+'</small></span>'
       :'';
+    const questionContent='<p class="qw-card-question-stem"><span class="qw-highlight-region" data-highlight-region="stem" data-highlight-language="zh">'+highlightedMarkup(stem,node,'stem')+'</span>'+englishLine(view.stem)+'</p>'
+      +(question.type==='matching'?'<div data-qw-matching></div><button type="button" data-qw-confirm-matching>确认配对</button>':optionsMarkup)+syncMarkup;
     return '<header class="qw-card-header" data-card-drag-handle>'
       +'<div class="qw-card-heading"><span class="qw-card-icon">题</span>'+orderBadge
       +(practiceLabel?'<div><small data-qw-practice-label>'+escapeHTML(practiceLabel)+'</small></div>':'')+'</div>'
@@ -1215,8 +1217,7 @@
       +'</header>'
       +'<div class="qw-card-body">'
       +'<div class="qw-card-content">'
-      +'<p class="qw-card-question-stem"><span class="qw-highlight-region" data-highlight-region="stem" data-highlight-language="zh">'+highlightedMarkup(stem,node,'stem')+'</span>'+englishLine(view.stem)+'</p>'
-      +(global.KGQuestionMaterials?.renderMaterials(question)||'')+(question.type==='matching'?'<div data-qw-matching></div><button type="button" data-qw-confirm-matching>确认配对</button>':optionsMarkup)+syncMarkup+'</div>'
+      +(global.KGQuestionMaterials?.renderCardContent(question,questionContent)||questionContent)+'</div>'
       +'<div class="qw-card-actions qw-card-learning-actions">'
       +cardIconButtonMarkup('analysis','显示或关闭本题解析',CARD_ACTION_ICONS.analysis,{active:analysisOpen,pressed:analysisOpen})
       +'</div></div>'+cardWidthResizeMarkup();

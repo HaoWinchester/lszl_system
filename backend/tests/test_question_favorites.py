@@ -11,7 +11,9 @@ from app.db.session import AsyncSessionLocal
 from app.main import app
 from app.models.question import Question, QuestionBank
 from app.models.question_favorite import QuestionFavorite
+from app.models.question_material import QuestionAsset, QuestionMaterial
 from app.models.user import User
+from mixed_question_support import mixed_data_cleanup
 
 PASSWORD = "question-favorite-pass"
 
@@ -27,6 +29,7 @@ def _ids() -> dict[str, str]:
         "other_question": f"qf-other-question-{token}",
         "private_question": f"qf-private-{token}",
         "private_bank": f"qf-private-bank-{token}",
+        "material": f"qf-material-{token}",
     }
 
 
@@ -77,6 +80,13 @@ def _cleanup(ids: dict[str, str]) -> None:
                 question = await db.get(Question, question_id)
                 if question:
                     await db.delete(question)
+            material = await db.get(QuestionMaterial, ids["material"])
+            if material:
+                await db.delete(material)
+                await db.flush()
+            for asset in (await db.scalars(select(QuestionAsset).where(QuestionAsset.owner_id == ids["teacher"]))).all():
+                await db.delete(asset)
+            await db.flush()
             for key in ("bank", "private_bank", "student", "other", "teacher"):
                 obj = await db.get({"bank": QuestionBank, "private_bank": QuestionBank, "student": User,
                                     "other": User, "teacher": User}[key], ids[key])
@@ -257,3 +267,112 @@ def test_favorite_list_search_source_and_detail() -> None:
             ).status_code == 404
     finally:
         _cleanup(ids)
+
+
+def test_favorite_detail_preserves_images_and_current_case_material() -> None:
+    """管理者收藏详情保留题图，并把材料引用解析为当前材料。"""
+    ids = _ids()
+    asyncio.run(_seed(ids))
+    from mixed_question_support import png
+
+    async def add_media() -> None:
+        async with AsyncSessionLocal() as db:
+            db.add(QuestionMaterial(id=ids["material"], owner_id=ids["teacher"], revision=2,
+                                    title="最新案例", text="当前案例正文", images=[material_image]))
+            question = await db.get(Question, ids["question"])
+            question.content_metadata = {"_mixedContent": {
+                "images": [image], "material": {"id": ids["material"], "revision": 1},
+                "caseGroup": {"order": 1, "total": 2},
+            }}
+            await db.commit()
+
+    try:
+        with TestClient(app) as uploader:
+            _login(uploader, ids["teacher"])
+            image = uploader.post('/api/v1/question-assets', json={**png(), 'alt': '题目关系图'}).json()['asset']
+            material_image = uploader.post('/api/v1/question-assets', json={**png(), 'alt': '案例趋势图'}).json()['asset']
+        asyncio.run(add_media())
+        with TestClient(app) as client:
+            _login(client, ids["teacher"])
+            response = client.get("/api/v1/question-favorites/detail", params={"question_id": ids["question"]})
+            assert response.status_code == 200, response.text
+            detail = response.json()
+            assert detail["images"] == [image]
+            assert detail["material"]["revision"] == 2
+            assert detail["material"]["title"] == "最新案例"
+            assert detail["material"]["text"] == "当前案例正文"
+            assert detail["material"]["images"] == [material_image]
+            assert detail["caseGroup"] == {"order": 1, "total": 2}
+            _login(client, ids["student"])
+            public_detail = client.get("/api/v1/question-favorites/detail", params={"question_id": ids["question"]}).json()
+            assert public_detail["stemParts"][0]["text"] == "以下哪个是正确选项？"
+            assert public_detail["material"]["text"] == "当前案例正文"
+            assert public_detail["images"] == [] and public_detail["material"]["images"] == []
+            assert client.get("/api/v1/question-favorites/detail", params={"question_id": ids["private_question"]}).status_code == 403
+        with TestClient(app) as anonymous:
+            assert anonymous.get("/api/v1/question-favorites/detail", params={"question_id": ids["question"]}).status_code == 401
+    finally:
+        _cleanup(ids)
+
+
+def test_learner_favorite_detail_uses_accessible_release_media(mixed_data_cleanup) -> None:
+    """未发布的改题/换图不能混入学生收藏详情；整题和图片取同一授权发布快照。"""
+    from mixed_question_support import seed_users, login, png, questions, publish
+    from app.services import question_catalog_service, question_service
+
+    ids = asyncio.run(seed_users())
+    with TestClient(app) as client:
+        login(client, ids['teacher'])
+        asset_v1 = client.post('/api/v1/question-assets', json=png()).json()['asset']
+        material = client.post('/api/v1/question-materials', json={
+            'title': '已发布材料', 'text': '学生可见正文', 'images': [asset_v1],
+        }).json()['material']
+
+        async def create_questions():
+            async with AsyncSessionLocal() as db:
+                teacher = await db.get(User, ids['teacher'])
+                return [question_catalog_service.question_to_payload(
+                    await question_service.create_question(db, teacher, ids['bank'], question)
+                ) for question in questions(ids, material, asset_v1)]
+
+        saved = asyncio.run(create_questions())
+        asyncio.run(publish(ids, saved))
+        case_question = saved[4]
+        asset_v2 = client.post('/api/v1/question-assets', json={**png(), 'alt': '未发布换图'}).json()['asset']
+        updated = client.put('/api/v1/question-materials/' + material['id'], json={
+            'revision': 1, 'title': '未发布材料', 'text': '未发布正文', 'images': [asset_v2],
+        })
+        assert updated.status_code == 200, updated.text
+
+        async def edit_question():
+            async with AsyncSessionLocal() as db:
+                question = await db.get(Question, case_question['id'])
+                question.title = '未发布标题'
+                question.stem_parts = [{'text': '未发布题干'}]
+                await db.commit()
+
+        asyncio.run(edit_question())
+        detail_path = '/api/v1/question-favorites/detail'
+        params = {'question_id': case_question['id']}
+        manager = client.get(detail_path, params=params).json()
+        assert manager['title'] == '未发布标题'
+        assert manager['material']['images'] == [asset_v2]
+        login(client, ids['other'])
+        other_teacher = client.get(detail_path, params=params)
+        assert other_teacher.status_code == 200, other_teacher.text
+        assert other_teacher.json()['material']['text'] == '未发布正文'
+        assert other_teacher.json()['material']['images'] == []
+        assert asset_v2['id'] not in other_teacher.text
+        assert client.get(asset_v2['url']).status_code == 404
+        login(client, ids['student'])
+        response = client.get(detail_path, params=params)
+        assert response.status_code == 200, response.text
+        learner = response.json()
+        assert learner['title'] == case_question['title']
+        assert learner['stemParts'] == case_question['stemParts']
+        assert learner['material']['text'] == '学生可见正文'
+        assert learner['material']['revision'] == 1
+        assert learner['material']['images'] == [asset_v1]
+        assert client.get(learner['material']['images'][0]['url']).status_code == 200
+        assert client.get(asset_v2['url']).status_code == 404
+        assert '未发布' not in response.text

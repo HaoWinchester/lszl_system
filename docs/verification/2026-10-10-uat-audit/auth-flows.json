@@ -1,0 +1,65 @@
+[
+  {
+    "time": "2026-10-10T10:14:18.333347+08:00",
+    "route": "https://uat.aihuanpu.com/practice-mode.html",
+    "step": "open login",
+    "data": null
+  },
+  {
+    "time": "2026-10-10T10:14:20.320109+08:00",
+    "route": "https://uat.aihuanpu.com/practice-mode.html",
+    "step": "login",
+    "data": {
+      "label": "访客只读，打开账号菜单",
+      "text": "管理员"
+    }
+  },
+  {
+    "time": "2026-10-10T10:14:21.323132+08:00",
+    "route": "https://uat.aihuanpu.com/practice-mode.html",
+    "step": "logout success",
+    "data": null
+  },
+  {
+    "time": "2026-10-10T10:14:24.384409+08:00",
+    "route": "https://uat.aihuanpu.com/knowledge-recall.html",
+    "step": "open login",
+    "data": null
+  },
+  {
+    "time": "2026-10-10T10:14:26.094285+08:00",
+    "route": "https://uat.aihuanpu.com/knowledge-recall.html",
+    "step": "login",
+    "data": {
+      "label": "管理员，打开账号菜单",
+      "text": "管理员"
+    }
+  },
+  {
+    "time": "2026-10-10T10:14:27.091250+08:00",
+    "route": "https://uat.aihuanpu.com/knowledge-recall.html",
+    "step": "logout success",
+    "data": null
+  },
+  {
+    "time": "2026-10-10T10:14:29.858304+08:00",
+    "route": "https://uat.aihuanpu.com/question-workspace.html?workspace=pmp-pattern-workspace",
+    "step": "open login",
+    "data": null
+  },
+  {
+    "time": "2026-10-10T10:14:31.557388+08:00",
+    "route": "https://uat.aihuanpu.com/question-workspace.html?workspace=pmp-pattern-workspace",
+    "step": "login",
+    "data": {
+      "label": "管理员，打开账号菜单",
+      "text": "管理员"
+    }
+  },
+  {
+    "time": "2026-10-10T10:14:32.567372+08:00",
+    "route": "https://uat.aihuanpu.com/question-workspace.html?workspace=pmp-pattern-workspace&paperId=tp_e1ebb75b5ede44d369170f3245cc57f3bb657013&releaseId=pr_6f5e665b76724e929368190b78b51ee3&questionId=q_54c48f62ec914d2291f928ae20946819&bankId=b_2bfbd278b0174da8af00a1d521bb0909",
+    "step": "logout success",
+    "data": null
+  }
+]

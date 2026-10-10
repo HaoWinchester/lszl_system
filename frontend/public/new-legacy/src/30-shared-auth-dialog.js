@@ -200,6 +200,7 @@
       if(accountTrigger){
         const label=status.querySelector('.account-menu-trigger-label,.auth-status-label');
         if(label)label.textContent=user?String(user.displayName||user.username):'访客';
+        status.setAttribute('aria-label',(user?String(user.displayName||user.username):'访客只读')+'，打开账号菜单');
         status.classList.toggle('logged-in',!!user);
       }else status.textContent=user?'已登录：'+String(user.displayName||user.username):'未登录 · 访客只读';
       const provider=core()?.providerStatus?.();

@@ -25,14 +25,23 @@
       }
       return THEMES.has(raw)?raw:'platform';
     }
-    function apply(theme){
+    function render(theme){
       const next=THEMES.has(theme)?theme:'platform';
       for(const el of roots())el.dataset.theme=next;
       document.body.dataset.krTheme=next;
-      writeRaw(KEY,next);
       global.dispatchEvent(new CustomEvent('kg:deep-recall-theme-change',{detail:{theme:next}}));
       return next;
     }
+    function apply(theme){
+      const next=THEMES.has(theme)?theme:'platform';
+      writeRaw(KEY,next);
+      return render(next);
+    }
+    // storage 只在其他标签页触发；更新外观与控件，不回写，避免标签页相互广播。
+    global.addEventListener('storage',event=>{
+      if(event.storageArea!==global.localStorage||(event.key!==KEY&&event.key!==null))return;
+      render(event.newValue);
+    });
     return {init:()=>apply(saved()),apply,saved,THEMES};
   }
   global.KGLearningTheme=Object.freeze({create,THEMES});

@@ -265,6 +265,9 @@ body[data-admin-skin="focus-vega"] .admin-dialog{
   body[data-admin-skin="focus-vega"] .admin-subject-workspace{grid-template-columns:220px minmax(0,1fr)}
   body[data-admin-skin="focus-vega"] .engagement-admin-grid{grid-template-columns:minmax(300px,38%) minmax(0,1fr)}
 }
+@media (max-width:880px){
+  body[data-admin-skin="focus-vega"] .admin-subject-workspace{grid-template-columns:minmax(0,1fr)}
+}
 
 /* Semantic typography for general administration pages. */
 body[data-admin-skin="focus-vega"] :where(.admin-main,.engagement-admin-main,.admin-dialog){

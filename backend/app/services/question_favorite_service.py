@@ -2,10 +2,12 @@
 import base64
 import json
 from datetime import datetime
+from fastapi import HTTPException
 from sqlalchemy import String, cast, delete, func, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from app.models.question import Question, QuestionBank
 from app.models.question_favorite import QuestionFavorite
+from app.services import published_paper_access_service, question_access_service, question_catalog_service, question_material_service
 from app.services.question_comment_service import (
     QuestionCommentNotFoundError,
     QuestionCommentPermissionError,
@@ -126,7 +128,33 @@ async def favorite_detail(db, viewer, question_id):
     await require_question_access(db, viewer, question.id)
     favorite = await db.get(QuestionFavorite, {'question_id': question.id, 'owner_id': viewer.username})
     bank = await db.get(QuestionBank, question.bank_id)
+    can_view_current = bank is not None and await question_access_service.can_view_bank(db, viewer, bank)
+    snapshot = None if can_view_current else await published_paper_access_service.load_latest_accessible_question_snapshot(db, viewer, question.id)
+    if snapshot is not None:
+        question = published_paper_access_service.question_from_snapshot(snapshot)
+        payload = snapshot
+    else:
+        payload = question_catalog_service.question_to_payload(question)
+        await question_material_service.hydrate_current_materials(db, [payload])
+        # Current catalog access does not grant access to another teacher's assets.
+        # Keep readable text while applying the asset endpoint's exact image policy.
+        for resource in (payload, payload.get('material')):
+            if not isinstance(resource, dict) or not resource.get('images'):
+                continue
+            visible_images = []
+            for image in resource['images']:
+                if not isinstance(image, dict) or not image.get('id'):
+                    continue
+                try:
+                    await question_material_service.authorized_asset(db, viewer, image['id'])
+                except HTTPException as error:
+                    if error.status_code != 404:
+                        raise
+                else:
+                    visible_images.append(image)
+            resource['images'] = visible_images
     return {
+        **{key: payload[key] for key in ('images', 'material', 'caseGroup', 'matching') if key in payload},
         'questionId': question.id,
         'title': question.title,
         'stemParts': question.stem_parts or [],

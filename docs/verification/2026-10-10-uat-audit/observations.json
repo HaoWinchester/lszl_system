@@ -1,0 +1,71 @@
+{
+  "recordedAt": "2026-10-10T10:18:03.395696+08:00",
+  "source": "Main-session agent-browser observations; steps are summaries, not generated timestamps",
+  "release": "v9.0-p4.1.302",
+  "recall": {
+    "textCreate": "UAT1010 中文 Élan",
+    "roundTripTextRestored": true,
+    "reloadTextRestored": true,
+    "editedText": "UAT1010 回填编辑 ✓",
+    "editedFontSize": 24,
+    "toolAfterNextQuestion": "text",
+    "rightClickTool": "select",
+    "selectedBBeforeNext": true,
+    "selectedAfterNext": false,
+    "ownInkCleanup": true
+  },
+  "workspace": {
+    "search": "预算",
+    "addedCards": 1,
+    "reloadCards": 1,
+    "reloadText": "UAT1010 多题文字",
+    "cleanupCards": 0,
+    "cleanupText": 0,
+    "cleanupPaths": 0
+  },
+  "theme": {
+    "sameSessionNavigation": "recall ocean -> workspace ocean",
+    "crossTab": {
+      "workspaceSelected": "sakura",
+      "recallRendered": "ocean",
+      "storage": "sakura"
+    },
+    "restoredPreference": "platform"
+  },
+  "favorites": {
+    "search": "聊天机器人",
+    "detailOpens": true,
+    "detailImages": 0,
+    "questionRequires": "参考测试协议表",
+    "ownFavoriteRemoved": true,
+    "bodyOverflowAfterEscape": ""
+  },
+  "practice": {
+    "newPaper": "新题型体验卷（图表·案例·连线）",
+    "answerCountBefore": 0,
+    "answerCountAfter": 1,
+    "savedExitLobbyProgress": "1/5",
+    "note": "Test leaves one saved answer in this UAT admin practice session; no existing history deleted"
+  },
+  "performance": {
+    "route": "/practice-mode.html",
+    "lcpMs": 724,
+    "cls": 0.16629959720145854,
+    "maxObservedEventDurationMs": 160,
+    "throttling": "none",
+    "note": "event duration is a short interaction sample, not field INP"
+  },
+  "mobileLayouts": {
+    "admin-subjects": {
+      "viewport": 390,
+      "grid": "240px 86px",
+      "detailWidth": 86,
+      "padding": 20
+    },
+    "user-management": {
+      "viewport": 390,
+      "grid": "280px 48px",
+      "scrollWidth": 451
+    }
+  }
+}

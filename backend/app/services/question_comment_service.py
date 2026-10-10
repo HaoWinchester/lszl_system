@@ -29,11 +29,7 @@ async def require_question_access(db, viewer, question_id):
     if viewer and bank and await question_access_service.can_view_bank(db, viewer, bank): return question
     if viewer and bank and bank.visibility == 'published' and question.scope == 'public': return question
     if viewer:
-        from app.models.paper_release import PaperRelease, PaperReleaseQuestion
-        releases = (await db.execute(select(PaperRelease).join(PaperReleaseQuestion, PaperReleaseQuestion.release_id == PaperRelease.id).where(PaperReleaseQuestion.question_id == question_id, PaperRelease.status.in_(['published','superseded'])))).scalars().all()
-        for release in releases:
-            for mode in release.enabled_modes or []:
-                if await published_paper_access_service.load_published_question_snapshot(db, viewer, release.id, question_id, mode=mode): return question
+        if await published_paper_access_service.load_latest_accessible_question_snapshot(db, viewer, question_id): return question
     raise QuestionCommentPermissionError('当前账号无权访问该题目')
 
 async def get_comment(db, comment_id, question_id):

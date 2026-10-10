@@ -256,6 +256,7 @@
       </header>
       <div class="practice-favorite-detail-body">
         <div class="practice-favorite-detail-stem">${stem}</div>
+        ${global.KGQuestionMaterials?.renderMaterials(detail) || ''}
         ${detail.options && detail.options.length ? `<ul class="practice-favorite-detail-options">${detail.options.map(detailOptionMarkup).join('')}</ul>` : ''}
         ${analysis ? `<div class="practice-favorite-analysis"><strong>解析</strong><p>${escapeHTML(analysis)}</p></div>` : ''}
         ${clues.length ? `<div class="practice-favorite-detail-tags"><strong>线索</strong>${clues.map(item => `<span>${escapeHTML(item)}</span>`).join('')}</div>` : ''}
@@ -274,6 +275,7 @@
     try {
       const detail = await request('detail?question_id=' + encodeURIComponent(questionId))
       controls.detail.innerHTML = detailMarkup(detail)
+      global.KGQuestionMaterials?.bindMedia(controls.detail)
       controls.detail.hidden = false
       controls.detail.setAttribute('aria-hidden', 'false')
       document.body.style.overflow = 'hidden'

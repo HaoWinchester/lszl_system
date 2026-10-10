@@ -184,6 +184,7 @@
   }
   function bindThemeSelect(){
     const select=$('krThemeSelect'),menu=$('krSceneMenu');
+    window.addEventListener('kg:deep-recall-theme-change',event=>syncThemeControls(event.detail?.theme||'platform'));
     applyTheme(savedTheme());
     if(select)select.addEventListener('change',()=>applyTheme(select.value));
     document.querySelectorAll('.kr-scene-option[data-kr-theme]').forEach(button=>button.addEventListener('click',event=>{
@@ -608,7 +609,8 @@
       ?viewOptions.map((o,i)=>optionRow(o,i,`${wrapKnownKeywords(escapeHTML(o.display?.zh||''),{inline:true})}${englishLine(o.display)}`))
       :(question.options||[]).map((o,i)=>optionRow(o,i,wrapKnownKeywords(escapeHTML(o.text||''),{inline:true})));
     const stemEn=view?.stem||{hasEnglish:false};
-    questionCard.innerHTML=`${questionIndex}<div class="kr-stem">${stem}${englishLine(stemEn)}</div>${window.KGQuestionMaterials?.renderMaterials(question)||''}${rows.length?`<ol class="qw-card-options">${rows.join('')}</ol>`:''}<p class="kr-option-feedback lp-visually-hidden" data-kr-option-feedback aria-live="polite"></p><div class="qw-card-actions qw-card-learning-actions"><button type="button" class="qw-card-action-square qw-card-icon-action${krAnalysisOpen?' is-active':''}" data-qw-action="analysis" title="显示或关闭本题解析" aria-label="显示或关闭本题解析" aria-pressed="${krAnalysisOpen?'true':'false'}">${KR_ANALYSIS_ICON}</button></div>`;
+    const questionContent=`<div class="kr-stem">${stem}${englishLine(stemEn)}</div>${rows.length?`<ol class="qw-card-options">${rows.join('')}</ol>`:''}`;
+    questionCard.innerHTML=`${questionIndex}${window.KGQuestionMaterials?.renderCardContent(question,questionContent)||questionContent}<p class="kr-option-feedback lp-visually-hidden" data-kr-option-feedback aria-live="polite"></p><div class="qw-card-actions qw-card-learning-actions"><button type="button" class="qw-card-action-square qw-card-icon-action${krAnalysisOpen?' is-active':''}" data-qw-action="analysis" title="显示或关闭本题解析" aria-label="显示或关闭本题解析" aria-pressed="${krAnalysisOpen?'true':'false'}">${KR_ANALYSIS_ICON}</button></div>`;
     window.KGQuestionMaterials?.bindMedia(questionCard);
     if(!questionCard.dataset.krMediaLayoutBound){
       questionCard.dataset.krMediaLayoutBound='true';

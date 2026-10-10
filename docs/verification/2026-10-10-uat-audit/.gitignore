@@ -1,0 +1,4 @@
+# Local browser evidence is retained in this workspace; keep the report in Git.
+*.png
+*.jpg
+*.log

@@ -169,6 +169,9 @@ body[data-admin-skin="focus-vega"] .um-right-tab-pane .um-panel{background:var(-
 body[data-admin-skin="focus-vega"] .um-collapse-btn{border-radius:var(--admin-radius-control)}
 body[data-admin-skin="focus-vega"] .um-pagination{padding:9px}
 body[data-admin-skin="focus-vega"] .um-empty{border-color:#d4d4d8;border-radius:var(--admin-radius-control);background:#fafafa;color:var(--admin-muted-foreground)}
+@media (max-width:820px){
+  body[data-admin-skin="focus-vega"] .um-layout{grid-template-columns:minmax(0,1fr)}
+}
 @media (min-width:901px) and (max-width:1180px){
   body[data-admin-skin="focus-vega"] .um-app{width:min(1440px,calc(100vw - 32px));padding-top:18px}
   body[data-admin-skin="focus-vega"] .um-topbar{padding:20px}

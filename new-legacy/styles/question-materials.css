@@ -3,3 +3,14 @@
 .qm-case-layout .practice-mark-question{justify-self:end}
 .qm-matching .qm-target,.qm-matching .qm-candidate{white-space:normal;overflow-wrap:anywhere;min-width:0}
 .qm-target b,.qm-target span{min-width:0}
+
+/* Canvas cards: text/options left, original question media right, one shared frame. */
+.qm-card-layout{container-type:inline-size;min-width:0;width:100%}
+.qm-card-columns{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:18px;align-items:start}
+.qm-card-main,.qm-card-media{min-width:0;overflow-wrap:anywhere}
+.qm-card-media .qm-image{margin:0 0 14px}
+.qm-card-media .qm-zoom{width:100%}
+.qm-card-media .qm-image img{width:100%;max-height:320px;object-fit:contain}
+.qm-card-media .qm-case summary{padding:10px 12px}
+.qm-card-media .qm-case-body{padding:0 12px 12px}
+@container(max-width:360px){.qm-card-columns{grid-template-columns:minmax(0,1fr);gap:12px}}

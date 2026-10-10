@@ -106,6 +106,9 @@ def visual_signature(page):
 
 
 def exercise_dialog(page):
+    account_trigger = page.locator('#authStatus[data-account-menu-trigger="true"]')
+    if account_trigger.count():
+        assert account_trigger.get_attribute('aria-label') == '访客只读，打开账号菜单'
     page.evaluate("KGSharedAuthDialog.open()")
     assert page.locator('#authModal').get_attribute('aria-hidden') == 'false'
     assert page.locator('#authUsername').evaluate('element=>element===document.activeElement')
@@ -142,9 +145,13 @@ def exercise_dialog(page):
     assert page.evaluate('__authHarness.calls.login') == 2
     assert page.evaluate('__authHarness.calls.loginContexts.at(-1).acceptedTermsVersion') == '2026-08-13-v1'
     assert page.evaluate('__authHarness.current().username') == 'admin'
+    if account_trigger.count():
+        assert account_trigger.get_attribute('aria-label') == '管理员，打开账号菜单'
 
     page.evaluate("KGSharedAuthDialog.logout()")
     page.wait_for_function("__authHarness.current()===null")
+    if account_trigger.count():
+        assert account_trigger.get_attribute('aria-label') == '访客只读，打开账号菜单'
     page.evaluate("KGSharedAuthDialog.open()")
     page.locator('#authUsername').fill('a')
     page.locator('#authPassword').fill('1234')
@@ -219,6 +226,7 @@ with sync_playwright() as playwright:
     initial_page.set_default_timeout(10000)
     install_harness(initial_page, 'practice-mode.html', 'admin')
     assert initial_page.locator('#authStatus .account-menu-trigger-label').inner_text() == '管理员'
+    assert initial_page.locator('#authStatus').get_attribute('aria-label') == '管理员，打开账号菜单'
     initial_page.close()
 
     for width in VIEWPORTS:

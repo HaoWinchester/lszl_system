@@ -3,7 +3,7 @@
   const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const answer=()=>global.KGQuestionAnswerSet;
   function safeUrl(value){const url=String(value||'');return /^\/api\/v1\/question-assets\/[\w-]+$/.test(url)?url:'';}
-  function extension(question){return {...(question?.metadata||{}),...(question?.raw||{}),...question};}
+  function extension(question){return {...(question?.metadata||{}),...(question?.metadata?._mixedContent||{}),...(question?.raw?._mixedContent||{}),...(question?.raw||{}),...question};}
   function images(rows){return (Array.isArray(rows)?rows:[]).map(image=>{
     const url=safeUrl(image?.url);if(!url)return '';
     return `<figure class="qm-image"><button type="button" class="qm-zoom" data-qm-zoom="${esc(url)}" aria-label="放大图表：${esc(image.alt||'题目图表')}"><img src="${esc(url)}" alt="${esc(image.alt||'题目图表')}" loading="lazy"/></button><figcaption>${esc(image.alt||'点击图表放大')}</figcaption><button type="button" data-qm-retry hidden>图表加载失败，点击重试</button></figure>`;
@@ -11,6 +11,11 @@
   function renderMaterials(question){
     const q=extension(question),m=q.material;
     return (m?`<details class="qm-case" data-case-id="${esc(m.id)}" open><summary>${esc(m.title||'案例材料')}${q.caseGroup?` · 第 ${Number(q.caseGroup.order)||1} / ${Number(q.caseGroup.total)||1} 小题`:''}</summary><div class="qm-case-body"><div class="qm-text">${esc(m.text||'')}</div>${images(m.images)}</div></details>`:'')+images(q.images);
+  }
+  // Both learning canvases keep question content and its media inside the same card.
+  function renderCardContent(question,content){
+    const media=renderMaterials(question);
+    return media?`<div class="qm-card-layout"><div class="qm-card-columns"><div class="qm-card-main">${content}</div><aside class="qm-card-media" aria-label="题目图表与材料">${media}</aside></div></div>`:content;
   }
   function renderMatching(question,{selectedPairs={},readOnly=false,reveal=false}={}){
     const q=extension(question),m=q.matching||{},selected=answer()?.pairs(q,selectedPairs)||{},right=m.right||[];
@@ -29,6 +34,7 @@
       const zoom=event.target.closest('[data-qm-zoom]');if(!zoom)return;
       const dialog=document.createElement('dialog');dialog.className='qm-image-dialog';
       dialog.innerHTML=`<button type="button" aria-label="关闭图表">关闭</button><img src="${esc(safeUrl(zoom.dataset.qmZoom))}" alt="${esc(zoom.querySelector('img')?.alt||'题目图表')}"/>`;
+      dialog.addEventListener('keydown',event=>{if(event.key==='Escape')event.stopPropagation()});
       dialog.querySelector('button').onclick=()=>dialog.close();dialog.addEventListener('close',()=>{dialog.remove();zoom.focus();});document.body.append(dialog);dialog.showModal();
     });
   }
@@ -61,5 +67,5 @@
     const data=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(',')[1]);reader.onerror=()=>reject(new Error('无法读取图片，请重新选择'));reader.readAsDataURL(file);});
     return (await request('question-assets',{method:'POST',body:{filename:file.name,mimeType:file.type,dataBase64:data,alt}})).asset;
   }
-  global.KGQuestionMaterials=Object.freeze({render,renderMaterials,renderMatching,bind,bindMedia,extension,safeUrl,request,upload});
+  global.KGQuestionMaterials=Object.freeze({render,renderMaterials,renderCardContent,renderMatching,bind,bindMedia,extension,safeUrl,request,upload});
 })(typeof window!=='undefined'?window:globalThis);

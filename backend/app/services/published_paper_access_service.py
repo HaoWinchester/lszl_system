@@ -41,6 +41,23 @@ async def load_published_question_snapshot(
     return dict(row.snapshot) if row is not None else None
 
 
+async def load_latest_accessible_question_snapshot(
+    db: AsyncSession, user: User, question_id: str,
+) -> dict | None:
+    """Resolve a question-only entry point to its newest accessible frozen release."""
+    releases = (await db.scalars(
+        select(PaperRelease).join(PaperReleaseQuestion, PaperReleaseQuestion.release_id == PaperRelease.id)
+        .where(PaperReleaseQuestion.question_id == question_id, PaperRelease.status.in_(['published', 'superseded']))
+        .order_by(PaperRelease.published_at.desc(), PaperRelease.version.desc(), PaperRelease.id.desc())
+    )).all()
+    for release in releases:
+        for mode in release.enabled_modes or []:
+            snapshot = await load_published_question_snapshot(db, user, release.id, question_id, mode=mode)
+            if snapshot is not None:
+                return snapshot
+    return None
+
+
 def question_from_snapshot(snapshot: dict) -> Question:
     """构造只读 Question 视图，避免学习链路回读已变化的题库正文。"""
     question = Question()

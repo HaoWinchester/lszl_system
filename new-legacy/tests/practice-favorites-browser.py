@@ -6,6 +6,7 @@
 3. Escape / 遮罩点击关闭抽屉；未登录提示登录后查看。
 """
 from pathlib import Path
+import base64
 import json
 import re
 
@@ -59,6 +60,14 @@ def harness(page):
     page.route("**/api/v1/question-favorites?*", list_favorites)
     page.route("**/api/v1/question-favorites/status*", lambda r: r.fulfill(content_type="application/json", body=json.dumps({"status": {}})))
     page.route("**/api/v1/question-favorites/*/toggle", toggle_favorite)
+    page.route("**/api/v1/question-favorites/detail?*", lambda r: r.fulfill(content_type="application/json", body=json.dumps({
+        "questionId": "q1", "stemParts": [{"text": "查看图表，选择正确选项。"}], "favorited": True,
+        "images": [{"url": "/api/v1/question-assets/favorite-diagram", "alt": "题目关系图"}],
+        "material": {"id": "case-1", "title": "案例材料", "text": "案例正文", "images": [
+            {"url": "/api/v1/question-assets/favorite-case", "alt": "案例趋势图"}]},
+    })))
+    page.route("**/api/v1/question-assets/*", lambda r: r.fulfill(content_type="image/png", body=base64.b64decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=")))
     page.route(
         "**/api/v1/questions/q1/comments",
         lambda r: r.fulfill(content_type="application/json", body=json.dumps({"comments": [], "nextCursor": None})),
@@ -123,6 +132,33 @@ with sync_playwright() as playwright:
     # 无解析的第二道题不渲染解析块
     assert page.locator('.practice-favorite-card[data-favorite-item="q2"] .practice-favorite-analysis').count() == 0
     assert '共收藏 2 道题' in page.locator('#practiceFavoritesSummary').inner_text()
+
+    # 收藏详情展示题图与案例图片，点击放大且关闭后仍可继续查看详情。
+    first.locator('[data-favorite-open]').click()
+    detail = page.get_by_role('dialog', name='收藏题目详情')
+    detail.wait_for(state='visible')
+    assert '案例正文' in detail.inner_text()
+    assert detail.locator('.qm-image img').count() == 2
+    for image in detail.locator('.qm-image img').all():
+        image.scroll_into_view_if_needed()
+        image.wait_for(state='visible')
+        image.evaluate('(image) => image.decode()')
+        assert image.evaluate('(image) => image.naturalWidth > 0')
+    detail.get_by_role('button', name='放大图表：题目关系图').click()
+    assert page.locator('dialog.qm-image-dialog').is_visible()
+    assert page.locator('dialog.qm-image-dialog img').get_attribute('alt') == '题目关系图'
+    page.get_by_role('button', name='关闭图表', exact=True).click()
+    page.locator('dialog.qm-image-dialog').wait_for(state='detached')
+    assert page.locator('dialog.qm-image-dialog').count() == 0
+    assert detail.is_visible()
+    detail.get_by_role('button', name='放大图表：案例趋势图').click()
+    page.locator('dialog.qm-image-dialog').wait_for(state='visible')
+    page.keyboard.press('Escape')
+    page.locator('dialog.qm-image-dialog').wait_for(state='detached')
+    assert detail.is_visible()
+    assert page.locator('#practiceFavoritesDrawer').is_visible()
+    detail.get_by_role('button', name='关闭题目详情', exact=True).click()
+    assert not detail.is_visible()
 
     # 取消收藏：列表移除并刷新统计
     page.locator('.practice-favorite-card[data-favorite-item="q1"] [data-favorite-remove]').click()
