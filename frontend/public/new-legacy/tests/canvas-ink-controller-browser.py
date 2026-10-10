@@ -8,7 +8,7 @@ with sync_playwright() as pw:
     page = browser.new_page(viewport={'width': 1100, 'height': 780})
     errors=[]
     page.on('pageerror', lambda error: errors.append(str(error)))
-    page.set_content('''<style>#view{position:relative;width:1000px;height:680px;overflow:hidden;background:#f8fafc}#world{position:absolute;transform-origin:0 0;transform:translate(100px,100px) scale(2)}#card{position:absolute;width:160px;height:90px;background:white;border:1px solid #ccc}</style><button id="launch" style="position:absolute;right:0;top:0" type="button">画笔工具</button><button id="outside" style="position:absolute;right:0;top:740px" type="button">其他</button><div id="view"><div id="world"><button id="card">卡片选项</button></div></div>''')
+    page.set_content('''<style>#view{position:relative;width:1000px;height:680px;overflow:hidden;background:#f8fafc}#world{position:absolute;transform-origin:0 0;transform:translate(100px,100px) scale(2)}#card{position:absolute;width:160px;height:90px;background:white;border:1px solid #ccc}</style><button id="launch" style="position:absolute;right:0;top:0" type="button">画笔工具</button><button id="outside" style="position:absolute;right:0;top:740px" type="button">其他</button><div id="view"><div class="qw-background" style="position:absolute;inset:0"></div><div id="world"><button id="card">卡片选项</button></div></div>''')
     page.add_style_tag(content=(ROOT/'styles/canvas-ink.css').read_text())
     for name in ['83-canvas-history-controller.js','94-canvas-ink.js']:
         page.add_script_tag(content=(ROOT/'src/canvas'/name).read_text())
@@ -31,6 +31,7 @@ with sync_playwright() as pw:
     pen.dblclick();expect(page.locator('.canvas-ink-options')).to_be_visible()
     page.locator('#outside').click();expect(page.locator('.canvas-ink-options')).to_be_hidden()
     assert page.evaluate('ink.tool')=='pen'
+    assert page.evaluate("document.elementFromPoint(500,300).classList.contains('qw-background')")
     page.evaluate('''() => {
       window.overlayClicks=0;
       for(const [index,attribute] of ['class="qw-analysis-panel"','data-canvas-ui','data-stage-ui'].entries()){
@@ -40,10 +41,19 @@ with sync_playwright() as pw:
         overlay.querySelector('button').onclick=()=>window.overlayClicks++;
         document.querySelector('#world').append(overlay);
       }
+      for(const [index,attribute] of ['class="qw-analysis-panel"','data-canvas-ui','data-stage-ui'].entries()){
+        const overlay=document.createElement('aside');
+        overlay.innerHTML=`<div ${attribute}><button id="sibling-ui-${index}">画布控件</button></div>`;
+        Object.assign(overlay.style,{position:'absolute',left:'850px',top:(100+index*50)+'px'});
+        overlay.querySelector('button').onclick=()=>window.overlayClicks++;
+        document.querySelector('#view').append(overlay);
+      }
     }''')
     for index in range(3):
         page.locator(f'#overlay-{index}').click()
-    assert page.evaluate('overlayClicks')==3
+    for index in range(3):
+        page.locator(f'#sibling-ui-{index}').click()
+    assert page.evaluate('overlayClicks')==6
     assert page.evaluate('strokes.length')==0
     page.evaluate('panStarts=0')
     page.mouse.move(148,158);page.mouse.down();page.mouse.move(220,190,steps=10);page.mouse.up()
@@ -82,6 +92,44 @@ with sync_playwright() as pw:
     # 文字工具存在且可选中；选中后注入按工具区分的自定义光标（压过 custom-cursor.css 的 crosshair）。
     page.get_by_role('button',name='文字',exact=True).click();assert page.evaluate('ink.tool')=='text'
     assert page.evaluate("() => [...document.head.querySelectorAll('style')].some(el => el.textContent.includes(`[data-ink-tool='text']{cursor:url(\"data:image/svg+xml`))")
+    page.evaluate('''()=>{
+      window.questionSwitches=0;window.zoomInputs=0;
+      const controls=document.createElement('div');
+      controls.innerHTML='<div class="kr-canvas-overlay-left" style="position:absolute;left:750px;top:300px"><input id="recall-search" aria-label="搜索题目"></div><div class="kr-canvas-overlay-right" style="position:absolute;left:750px;top:350px"><button id="recall-switch">下一题</button></div><div class="lp-canvas-zoom-dock" style="position:absolute;left:750px;top:400px"><input id="recall-zoom" type="range" min="10" max="100" value="64"></div>';
+      document.querySelector('#view').append(controls);
+      document.querySelector('#recall-switch').onclick=()=>window.questionSwitches++;
+      document.querySelector('#recall-zoom').oninput=()=>window.zoomInputs++;
+    }''')
+    def check_unmarked_recall_controls():
+        before=page.evaluate('strokes.length')
+        search=page.locator('#recall-search');search.click();expect(search).to_be_focused()
+        search.press('Meta+A');search.press('Backspace');search.type('搜索内容');expect(search).to_have_value('搜索内容')
+        switches=page.evaluate('questionSwitches');page.locator('#recall-switch').click()
+        assert page.evaluate('questionSwitches')==switches+1
+        zoom=page.locator('#recall-zoom');zoom.click();expect(zoom).to_be_focused()
+        inputs=page.evaluate('zoomInputs');zoom.press('ArrowRight');assert page.evaluate('zoomInputs')>inputs
+        expect(page.locator('.canvas-ink-text-editor')).to_have_count(0)
+        assert page.evaluate('strokes.length')==before
+    check_unmarked_recall_controls()
+    # The background is a viewport child outside world, including at real UAT zoom.
+    page.evaluate("ink.reset();document.querySelector('#world').style.transform='translate(100px,100px) scale(.64)';ink.destroy();window.ink=KGCanvasInk.create({trigger:document.querySelector('#launch'),viewport:document.querySelector('#view'),world:document.querySelector('#world'),getViewport:()=>({x:100,y:100,scale:.64}),getStrokes:()=>window.strokes,setStrokes:s=>{window.strokes=s},isReadonly:()=>window.locked,onError:message=>window.errors.push(message)});ink.setOpen(true);ink.setTool('text')")
+    assert page.evaluate("document.elementFromPoint(220,290).classList.contains('qw-background')")
+    page.mouse.click(220,290)
+    editor=page.locator('.canvas-ink-text-editor');expect(editor).to_be_visible()
+    editor.fill('背景文字');editor.press('Control+Enter')
+    assert page.evaluate("strokes.at(-1).text")=='背景文字'
+    assert page.evaluate('strokes.at(-1).points[0]')==[175,284.375]
+    count=page.evaluate('strokes.length')
+    for index in range(3):page.locator(f'#sibling-ui-{index}').click()
+    expect(editor).to_have_count(0);assert page.evaluate('strokes.length')==count
+    check_unmarked_recall_controls()
+    pen.click()
+    page.mouse.move(500,400);page.mouse.down();page.mouse.move(540,420,steps=5);page.mouse.up()
+    assert page.evaluate('strokes.length')==count+1
+    assert page.evaluate('strokes.at(-1).points[0]')==[612.5,456.25]
+    for index in range(3):page.locator(f'#sibling-ui-{index}').click()
+    assert page.evaluate('strokes.length')==count+1
+    check_unmarked_recall_controls()
     pen.click();page.keyboard.down('Space');page.mouse.click(600,300);page.keyboard.up('Space');assert page.evaluate('panStarts')>=1
     # 只读时工具选择保留（按钮 disabled + 无自定义光标），解锁后原工具与光标自动恢复。
     page.evaluate('locked=true;ink.render()');expect(pen).to_be_disabled()
