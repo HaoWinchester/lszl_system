@@ -20,3 +20,23 @@
 - 既有静态测试 v90-p40-practice-mode.test.js 的 api.startSession 断言在修改前同样失败，未将其算作通过。
 
 证据存于本地 artifacts/uat-canvas-text-fixes/。完整发布门禁及线上复测结果将在下方记录。
+
+## 完整发布门禁结果
+
+- 候选版本：v9.0-p4.1.305；功能提交 055ab64a，版本元数据提交 ff2fa5b4，已推送 uat。
+- `node frontend/scripts/manage-new-legacy.js update new-legacy --validation-profile full` 退出 0，耗时 741 秒。
+- 后端全量 970 passed，3 条既有依赖弃用警告；前端契约 312 passed。
+- 首页、共享认证、扩展契约、做题流程、画布、跨模块、学习资产浏览器门禁均通过。
+- practice/free × desktop/mobile 四项视觉回归差异均为 0.000%。
+- 现有 active 1038 文件全部保留，候选 1042 文件，新增 4 个测试文件；关键页面存在。
+- 首轮候选 304 因发现内容准备页版本元数据未更新而主动中止（当时 738 passed）；已补齐为 305 并重新跑完上述完整门禁，未复用未完成结果。
+
+## UAT 部署状态：网络阻塞，尚未更新
+
+2026-10-10：正式部署脚本在 SSH 前置检查阶段退出 255。实际原因是 `49.235.159.4:22` 连接超时；直连和现有代理多次重试均失败，尚未进行远端代码同步、镜像重建或重启。脚本的通用“前置配置缺失”提示不是配置确实缺失的证据。
+
+公网 UAT 网站及数据库健康检查正常，`https://uat.aihuanpu.com/VERSION` 仍为 **v9.0-p4.1.303**。因此本次修复尚未部署，未声称在线回归完成或用户验收通过。
+
+待 SSH 恢复：执行 `bash deploy/update-uat.sh`，随后运行本地 `artifacts/uat-canvas-text-fixes/live-uat-regression.py`（不替换线上代码/API，清理仅由本次测试新建的笔迹），检查部署版本/资源一致性并更新报告。用户尚未验收，禁止合入 main。
+
+main 保持 `7a24be322c4c560cc340ba1fdc4423d19a63df89`；功能分支保留。
