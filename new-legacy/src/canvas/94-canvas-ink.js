@@ -100,8 +100,8 @@
     const CURSOR_HOTSPOT={pen:'3 24',highlighter:'4 24',eraser:'5 22',text:'13 12'};
     doc.head.append(cursorStyle);
     function updateCursor(){
-      // eraser 无色板偏好但也需要专属光标（固定配色）；select 恢复默认光标。
-      if(destroyed||tool==='select'||!CURSOR_HOTSPOT[tool]){cursorStyle.textContent='';return}
+      // eraser 无色板偏好但也需要专属光标（固定配色）；select/只读时恢复默认光标。
+      if(destroyed||tool==='select'||!CURSOR_HOTSPOT[tool]||readonly()){cursorStyle.textContent='';return}
       const art=cursorArt(tool,TOOLS[tool]?prefs[tool].color:'#1e293b');
       // :not(#kg-cursor-anchor) 抬高特异性到 (1,3,1)，压过 custom-cursor.css 的 crosshair (1,2,1)!important
       cursorStyle.textContent=`.canvas-ink-drawing:not(#kg-cursor-anchor):not(.canvas-ink-panning)[data-ink-tool='${tool}']{cursor:url("data:image/svg+xml,${encodeURIComponent(art)}") ${CURSOR_HOTSPOT[tool]}, crosshair!important}.canvas-ink-drawing:not(#kg-cursor-anchor):not(.canvas-ink-panning)[data-ink-tool='${tool}'] *{cursor:inherit!important}`;
@@ -109,7 +109,9 @@
     function refreshControls(){
       if(destroyed)return;
       const locked=readonly(),state=history?.getState?.()||{};
-      if(locked&&tool!=='select')setTool('select');
+      // 只读（切题过渡/访客）不再把工具强制降回 select：工具选择保留，绘制入口由
+      // pointerdown 的 readonly 拦截兜底，按钮 disabled + 光标还原表达锁定；
+      // 只读解除后工具与自定义光标自动恢复（切题保持画笔状态的前提）。
       toolbar.querySelectorAll('[data-ink-tool]').forEach(btn=>{btn.setAttribute('aria-pressed',String(btn.dataset.inkTool===tool));btn.disabled=locked&&btn.dataset.inkTool!=='select'});
       for(const action of ['undo','redo']){const btn=toolbar.querySelector('[data-ink-action='+action+']');btn.hidden=!(ownHistory||options.showHistory);btn.disabled=locked||!state[action==='undo'?'canUndo':'canRedo']}
       toolbar.hidden=!opened;
