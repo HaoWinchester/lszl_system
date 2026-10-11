@@ -64,7 +64,11 @@ svg{display:block;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:
 .fm-storage-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px}.fm-storage-head strong{font-size:14px}.fm-storage-head span{overflow:hidden;color:var(--fm-muted);font-size:10px;text-overflow:ellipsis;white-space:nowrap}
 .fm-progress{height:7px;margin:12px 0 8px;border-radius:999px;background:var(--fm-surface-3);overflow:hidden}.fm-progress i{display:block;width:0;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--fm-accent),#45b8ff);transition:width .35s ease}
 .fm-storage-card>p{margin:0 0 13px;color:var(--fm-muted);font-size:10px}.fm-storage-card dl{display:grid;gap:8px;margin:0}.fm-storage-card dl div{display:flex;justify-content:space-between;gap:8px;color:var(--fm-muted);font-size:11px}.fm-storage-card dt,.fm-storage-card dd{margin:0}.fm-storage-card dd{color:var(--fm-text);font-weight:700}
-.fm-sidebar-foot{margin-top:auto;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:16px 8px 0;color:var(--fm-muted);font-size:11px}.fm-sidebar-foot a{color:var(--fm-accent-text);font-weight:800;text-decoration:none}
+.fm-sidebar-foot{margin-top:auto;padding:16px 0 0}
+.fm-return-canvas{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:52px;padding:12px 16px;border:1px solid color-mix(in srgb,var(--fm-accent) 50%,var(--fm-surface));border-radius:14px;background:color-mix(in srgb,var(--fm-accent) 9%,var(--fm-surface));color:var(--fm-text);font-size:16px;font-weight:600;line-height:24px;text-decoration:none;white-space:nowrap;transition:background .14s ease,border-color .14s ease}
+.fm-return-canvas svg{flex:0 0 20px;width:20px;height:20px}
+.fm-return-canvas:hover{background:color-mix(in srgb,var(--fm-accent) 15%,var(--fm-surface));border-color:var(--fm-accent)}
+.fm-return-canvas:focus-visible{outline:2px solid var(--fm-accent-text);outline-offset:3px}
 .fm-main{min-width:0;display:flex;flex-direction:column;height:100vh;overflow:hidden}
 .fm-topbar{position:relative;z-index:40;flex:0 0 78px;display:flex;align-items:center;justify-content:space-between;gap:24px;padding:14px 28px;border-bottom:1px solid var(--fm-border);background:color-mix(in srgb,var(--fm-bg) 88%,transparent);backdrop-filter:blur(18px);overflow:visible}
 .fm-heading h1{margin:0 0 3px;font-size:22px;letter-spacing:-.02em}.fm-heading p{margin:0;color:var(--fm-muted);font-size:12px}
