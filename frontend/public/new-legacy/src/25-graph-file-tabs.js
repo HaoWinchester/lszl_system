@@ -72,7 +72,7 @@
   }
   async function openStoredFile(id,options={}){const bridge=storeBridge();if(bridge&&typeof bridge.openFile==='function')return await bridge.openFile(id,options);const store=fileStore();return store?await Promise.resolve(store.openFile(id,options)):null}
   async function createStoredFile(input,options={}){const bridge=storeBridge();if(bridge&&typeof bridge.createFile==='function')return await bridge.createFile(input,options);const store=fileStore();return store?await Promise.resolve(store.createFile(input,options)):null}
-  async function saveBeforeSwitch(){const autosave=global.KGGraphFileAutosave;return !autosave||typeof autosave.saveBeforeSwitch!=='function'||await Promise.resolve(autosave.saveBeforeSwitch())!==false}
+  async function saveBeforeSwitch(){if(global.KGHomeInk?.hasTextDraft?.()&&await global.KGHomeInk.commitText()===false)return false;const inline=typeof ensureNodeInlineTextEditorController==='function'?ensureNodeInlineTextEditorController():null;if(inline?.isEditing()){await inline.commit();if(inline.isEditing())return false}const autosave=global.KGGraphFileAutosave;return !autosave||typeof autosave.saveBeforeSwitch!=='function'||await Promise.resolve(autosave.saveBeforeSwitch())!==false}
   function currentFile(){const store=fileStore();return store&&store.getCurrentFileMeta?store.getCurrentFileMeta():(store&&store.getCurrentFile?store.getCurrentFile():null)}
   function visibleFiles(){
     const store=fileStore();
@@ -139,9 +139,12 @@
   }
   function applyFile(file){
     if(!file||!file.graphData)return false;
+    // File history belongs to this file; graph clipboard belongs to the account session.
     global.resetGraphHistory?.();
     try{
-      state=typeof global.sanitizeState==='function'?global.sanitizeState(file.graphData):file.graphData;
+      const nextState=typeof global.sanitizeState==='function'?global.sanitizeState(file.graphData):file.graphData;
+      global.closeRelatedCanvasModal?.();
+      state=nextState;
     }catch(err){console.warn('[KGGraphFileTabs] invalid graph file:',err);return false}
     try{if(typeof selectedNodeIds!=='undefined'&&selectedNodeIds&&typeof selectedNodeIds.clear==='function')selectedNodeIds.clear()}catch(err){}
     try{lastSavedSnapshot=JSON.stringify(typeof global.saveableState==='function'?global.saveableState():file.graphData)}catch(err){lastSavedSnapshot=''}

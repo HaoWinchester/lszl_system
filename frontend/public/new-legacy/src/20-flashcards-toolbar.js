@@ -47,6 +47,7 @@ function applyImportedFile(fileRecord){
 }
 async function importLearningPackageFile(file){
   return globalThis.KGImportGuard.run("20-flashcards-toolbar.js:importLearningPackageFile",async()=>{
+  if(/\.xmind$/i.test(file.name))return window.KGXMindImport.open(file);
   const data=await parseLearningPackageFile(file);
   if(!data||typeof data!=='object'||!Array.isArray(data.nodes)||!Array.isArray(data.links))throw new Error('格式不正确');
   const clean=sanitizeState(data);
@@ -638,7 +639,7 @@ function selectedToolbarLinks(){const ids=new Set([...selectedLinkIds].map(Strin
 function applyLineStyle(style){if(!LINE_STYLES.has(style))style=DEFAULTS.linkStyle;const links=selectedToolbarLinks();if(links.length){if(links.some(l=>l.lineStyle!==style))runGraphStyleHistory(links.length>1?`批量修改 ${links.length} 条关系线样式`:'修改关系线样式',()=>links.forEach(l=>{l.lineStyle=style}));showStatus(`已将 ${links.length} 条选中关系线设为${lineStyleLabel(style)}。`)}else{if(state.defaults.linkStyle!==style)runGraphStyleHistory('修改默认关系线样式',()=>{state.defaults.linkStyle=style});showStatus(`新建关系线默认使用${lineStyleLabel(style)}。`)}render({mode:links.length?'edges':'header',persist:true})}
 function currentPathStyle(){const l=linkById(state.selectedLinkId);return LINE_PATH_STYLES.has(l&&l.pathStyle)?l.pathStyle:(LINE_PATH_STYLES.has(state.defaults.linkPathStyle)?state.defaults.linkPathStyle:DEFAULTS.linkPathStyle)}
 function pathStyleLabel(style){return style==='straight'?'直线':style==='elbow'?'折线':'曲线'}
-function applyPathStyle(style){if(!LINE_PATH_STYLES.has(style))style=DEFAULTS.linkPathStyle;const links=selectedToolbarLinks();if(links.length){if(links.some(l=>l.pathStyle!==style))runGraphStyleHistory(links.length>1?`批量修改 ${links.length} 条关系线路径`:'修改关系线路径',()=>links.forEach(l=>{l.pathStyle=style}));showStatus(`已将 ${links.length} 条选中关系线设为${pathStyleLabel(style)}。`)}else{if(state.defaults.linkPathStyle!==style)runGraphStyleHistory('修改默认关系线路径',()=>{state.defaults.linkPathStyle=style});showStatus(`新建关系线默认使用${pathStyleLabel(style)}。`)}render({mode:links.length?'edges':'header',persist:true})}
+function applyPathStyle(style){if(!LINE_PATH_STYLES.has(style))style=DEFAULTS.linkPathStyle;const links=selectedToolbarLinks();if(links.length){const reset=style==='curve'&&links.every(link=>link.pathStyle==='curve')&&links.some(link=>link.curveControls?.length||link.waypoints?.length);if(reset){runGraphStyleHistory(links.length>1?`恢复 ${links.length} 条自动曲线`:'恢复自动曲线',()=>links.forEach(link=>{delete link.curveControls;delete link.waypoints}));showStatus(`已恢复 ${links.length} 条自动曲线。`)}else{if(links.some(l=>l.pathStyle!==style))runGraphStyleHistory(links.length>1?`批量修改 ${links.length} 条关系线路径`:'修改关系线路径',()=>links.forEach(l=>{l.pathStyle=style}));showStatus(`已将 ${links.length} 条选中关系线设为${pathStyleLabel(style)}。`)}}else{if(state.defaults.linkPathStyle!==style)runGraphStyleHistory('修改默认关系线路径',()=>{state.defaults.linkPathStyle=style});showStatus(`新建关系线默认使用${pathStyleLabel(style)}。`)}render({mode:links.length?'edges':'header',persist:true})}
 function toggleLineStyle(){applyLineStyle(currentLineStyle()==='dashed'?'solid':'dashed')}
 function applyLineWidth(width){
   width=Math.max(1,Math.min(8,Number(width)||4));const links=selectedToolbarLinks();
@@ -732,11 +733,12 @@ initCanvasZoomDock();
 window.KGHomeToolbarActions={
   addNode:addAtCenter,
   addTextElement:()=>window.KGGraphTextElements?.addAtCenter?.(),
+  insertTable:event=>window.KGHomeTables?.openInsertPanel?.(event?.currentTarget||document.getElementById('addTableBtn')),
   openFlashcards:()=>openFlashcards('current'),
   fitView,
   zoomIn:()=>zoomAtCenterStep(1),
   zoomOut:()=>zoomAtCenterStep(-1),
-  openTemplate:()=>$('templateModal').classList.add('show'),
+  openTemplate:()=>window.KGGraphTemplateCenter.open(),
   toggleFocus:toggleFocusMode,
   togglePointerMode:()=>toggleGraphPointerMode(),
   toggleFlowMode:()=>toggleFlowMode(),
@@ -766,7 +768,7 @@ window.KGHomeToolbarActions={
     const f=event.target.files[0];
     if(!f)return;
     try{await importLearningPackageFile(f)}
-    catch(err){alert('导入失败：不是有效的学习包 ZIP 或知识图谱 JSON。\n'+(err.message||err))}
+    catch(err){alert('导入失败：'+(err.message||err))}
     event.target.value='';
   },
   resetGraph:()=>{
@@ -812,11 +814,10 @@ $('flashSwipeSpeed').addEventListener('input',e=>setFlashSwipeSpeed(e.target.val
 $('flashImportFile').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{await importFlashcardFile(f)}catch(err){alert('闪卡导入失败：'+(err.message||err))}e.target.value=''});
 
 $('cancelTemplateBtn').onclick=()=>$('templateModal').classList.remove('show');
-document.querySelectorAll('.template-card').forEach(card=>card.addEventListener('click',()=>{const kind=card.dataset.template;if(confirm('使用模板会替换当前图谱。确定继续吗？')){state=templateState(kind);normalizeState();if(window.KGGraphKernel&&window.KGGraphKernel.resetSession)window.KGGraphKernel.resetSession();$('templateModal').classList.remove('show');fitView(true);showStatus('模板已载入。')}}));
 for(const id of ['nodeModal','linkModal','graphModal','templateModal','flashcardModal']){
   const modal=$(id);if(modal){window.KGCanvasDomInteraction.mountOverlay(modal);modal.addEventListener('wheel',event=>event.stopPropagation(),{passive:true})}
 }
-document.addEventListener('keydown',e=>{if(e.defaultPrevented||e.isComposing||e.keyCode===229)return;if(e.key==='Escape'){for(const id of ['nodeModal','linkModal','graphModal','templateModal','flashcardModal']){if($(id).classList.contains('show')){$(id).classList.remove('show');return}}if(window.KGCanvasDomInteraction.isEditingTarget(e))return;clearSelection();return}if(e.key!=='Delete'&&e.key!=='Backspace')return;if(window.KGCanvasDomInteraction.isEditingTarget(e))return;const hasBatchLinks=typeof selectedLinkIds!=='undefined'&&selectedLinkIds&&selectedLinkIds.size;const hasBatchNodes=selectedNodeIds&&selectedNodeIds.size;if((state.selectedElementId||hasBatchLinks||hasBatchNodes||state.selectedLinkId)&&typeof deleteGraphBatchSelection==='function'){deleteGraphBatchSelection()}else if(state.selectedNodeId){deleteNode(state.selectedNodeId)}});
+document.addEventListener('keydown',e=>{if(document.body.classList.contains('related-canvas-open'))return;if(e.defaultPrevented||e.isComposing||e.keyCode===229)return;if(e.key==='Escape'){for(const id of ['nodeModal','linkModal','graphModal','templateModal','flashcardModal']){if($(id).classList.contains('show')){$(id).classList.remove('show');return}}if(window.KGCanvasDomInteraction.isEditingTarget(e))return;clearSelection();return}if(e.key!=='Delete'&&e.key!=='Backspace')return;if(window.KGCanvasDomInteraction.isEditingTarget(e))return;const hasBatchLinks=typeof selectedLinkIds!=='undefined'&&selectedLinkIds&&selectedLinkIds.size;const hasBatchNodes=selectedNodeIds&&selectedNodeIds.size;if((state.selectedElementId||hasBatchLinks||hasBatchNodes||state.selectedLinkId)&&typeof deleteGraphBatchSelection==='function'){deleteGraphBatchSelection()}else if(state.selectedNodeId){deleteNode(state.selectedNodeId)}});
 function graphMinZoom(){return typeof graphViewportMinScale==='function'?graphViewportMinScale():.01}
 function graphMaxZoom(){return typeof graphViewportMaxScale==='function'?graphViewportMaxScale():4}
 function setZoomAtStageCenter(scale,persist=true){

@@ -2967,13 +2967,20 @@
   function undoLayout(){
     if(state.readonly)return false;
     const command=state.kernel?.history?.undo?.();
-    if(command)notify('已撤销：'+command.label+'。');
+    if(command){
+      notify('已撤销：'+command.label+'。');
+      // 表格命令经 setTables 直写，撤销后按签名差异重绘表格层（rowspan/colspan 还原）。
+      state.tablesController?.sync?.();
+    }
     return !!command;
   }
   function redoLayout(){
     if(state.readonly)return false;
     const command=state.kernel?.history?.redo?.();
-    if(command)notify('已重做：'+command.label+'。');
+    if(command){
+      notify('已重做：'+command.label+'。');
+      state.tablesController?.sync?.();
+    }
     return !!command;
   }
   function nodeTitle(nodeId){
@@ -3973,6 +3980,7 @@
     // Initialization stays synchronous; changing an existing canvas waits for its server writes.
     if(!state.workspace||!state.workspaceId||state.workspaceId===workspaceId)return activateWorkspace(workspaceId,options);
     const previousId=state.workspaceId,session=state.workspaceSession,shouldSave=!state.readonly;
+    if(state.ink?.hasTextDraft?.())return state.ink.commitText().then(saved=>saved?loadWorkspace(workspaceId,options):false);
     if(state.inlineEdit?.finish)state.inlineEdit.finish(true);
     state.workspaceTransition=true;
     // 切换画布只取消进行中的笔迹，保留当前画笔工具状态。
@@ -4026,6 +4034,7 @@
     if(dropName)dropName.textContent=workspace.title;
     renderWorkspaceSelector();
     renderCards();
+    state.tablesController?.render?.();
     applyViewport();
     refreshPersonalCardReferences();
     replaceUrl(workspace.id,options.focusNodeId||'');
@@ -5805,6 +5814,7 @@
         try{state.workspace=store().write({...state.workspace,strokes},{reason:'canvas-ink'})}finally{state.suppressStoreEvent=false}
         global.KGMultiQuestionWorkspaceFilebar?.render?.(state.workspace);
       },
+      persistText:()=>global.KGCanvasWorkspaceAdapter.flush({throwOnError:true}),
       onError:notify,onDrawMode:()=>{setPointerMode('edit');clearCardSelection();clearEdgeSelection();setActiveGroup('')},
       onLongPressEraser:()=>{
         if(state.readonly||!state.workspace)return;
@@ -5814,6 +5824,23 @@
       }
     });
     global.KGWorkspaceInk=state.ink;
+    // 可编辑表格：workspace.tables 经 65 store 直写；历史并入 kernel 命令栈（与卡牌/笔迹共用撤销）。
+    state.tablesController=global.KGCanvasTableController?.create?.({
+      viewport:state.viewport,world:state.world,
+      getViewport:()=>({x:state.panX,y:state.panY,scale:state.zoom}),
+      getTables:()=>state.workspace?.tables||[],
+      setTables:tables=>{
+        if(!state.workspace||state.readonly)throw new Error('当前画布不能编辑');
+        state.suppressStoreEvent=true;
+        try{state.workspace=store().write({...state.workspace,tables},{reason:'canvas-tables'})}finally{state.suppressStoreEvent=false}
+        global.KGMultiQuestionWorkspaceFilebar?.render?.(state.workspace);
+      },
+      history:state.kernel.history,showHistory:true,undoKeyDelegated:true,
+      isReadonly:()=>state.readonly||!state.workspace,
+      onStatus:notify
+    });
+    global.KGWorkspaceTables=state.tablesController;
+    byId('qwTableBtn')?.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();state.tablesController?.openInsertPanel?.(event.currentTarget||byId('qwTableBtn'))});
     global.KGCanvasCapture?.bind(byId('qwCaptureBtn'),state.viewport,{filename:()=>state.workspace?.title||'多题归纳',onError:notify});
     bind();
     loadWorkspace(state.workspaceId,{focusNodeId});

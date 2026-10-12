@@ -1,0 +1,65 @@
+/* KGCanvasTableController · 三页共用可编辑表格视觉。
+   表格是 world 内真实 DOM table：1px 实线边框 + 真实文字，随画布变换保持 DPR 清晰度；
+   不渲染位图，不使用 transform: scale 缩放内容（仅手柄/面板按 1/scale 反向补偿）。 */
+
+.kg-canvas-tables-layer{position:absolute;left:0;top:0;width:1px;height:1px;overflow:visible;z-index:55}
+.kg-canvas-tables-layer [hidden]{display:none!important}
+
+.kg-canvas-table-wrap{position:absolute;box-sizing:border-box;background:#fff;outline:1px solid #94a3b8;outline-offset:0}
+.kg-canvas-table-wrap.kg-canvas-table-selected{outline:2px solid #2563eb;outline-offset:1px;box-shadow:0 10px 30px #0f172a1f}
+.kg-canvas-table-wrap.kg-canvas-table-readonly{outline-style:dashed}
+
+.kg-canvas-table{border-collapse:collapse;table-layout:fixed;width:100%;height:100%;background:#fff;font:14px/1.45 system-ui,-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;color:#0f172a}
+.kg-canvas-table col{min-width:28px}
+.kg-canvas-table td.kg-canvas-table-cell{box-sizing:border-box;border:1px solid #cbd5e1;padding:6px 8px;vertical-align:top;background:transparent;white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere}
+.kg-canvas-table td.kg-canvas-table-cell:focus{outline:2px solid #2563eb;outline-offset:-2px;background:#f8faff}
+.kg-canvas-table td.kg-canvas-table-cell-selected{background:#e8efff;box-shadow:inset 0 0 0 1px #b8ccff}
+.kg-canvas-table td.kg-canvas-table-cell:empty::before{content:'';display:inline-block;min-height:1em}
+.kg-canvas-tables-readonly .kg-canvas-table td.kg-canvas-table-cell:focus{outline:none;background:transparent;cursor:default}
+
+/* 整体拖动手柄 */
+.kg-canvas-table-movebar{position:absolute;left:0;top:-18px;height:16px;width:64px;border-radius:6px;background:#1d4ed8;color:#fff;opacity:0;cursor:grab;transition:opacity .12s ease;touch-action:none}
+.kg-canvas-table-movebar::before{content:'⠿ 移动表格';font:11px/16px system-ui,sans-serif;padding-left:8px;letter-spacing:.05em}
+.kg-canvas-table-wrap:hover .kg-canvas-table-movebar,.kg-canvas-table-wrap.kg-canvas-table-selected .kg-canvas-table-movebar{opacity:.92}
+.kg-canvas-table-movebar:active{cursor:grabbing}
+
+/* 列/行边界把手：6px 命中区，视觉为 2px 高亮线 */
+.kg-canvas-table-boundary{position:absolute;z-index:3;opacity:0;transition:opacity .12s ease;touch-action:none}
+.kg-canvas-table-boundary-col{top:0;bottom:0;width:6px;margin-left:-3px;cursor:col-resize}
+.kg-canvas-table-boundary-col::before{content:'';position:absolute;left:2px;top:0;bottom:0;width:2px;background:#2563eb}
+.kg-canvas-table-boundary-row{left:0;right:0;height:6px;margin-top:-3px;cursor:row-resize}
+.kg-canvas-table-boundary-row::before{content:'';position:absolute;top:2px;left:0;right:0;height:2px;background:#2563eb}
+.kg-canvas-table-wrap:hover .kg-canvas-table-boundary{opacity:.75}
+
+/* 四边缩放手柄：尺寸由 --kg-table-handle（=9/scale）补偿缩放，屏幕上恒定大小 */
+.kg-canvas-table-resize{position:absolute;z-index:4;width:var(--kg-table-handle,9px);height:var(--kg-table-handle,9px);background:#fff;border:1.5px solid #2563eb;border-radius:2px}
+.kg-canvas-table-resize-n{top:0;left:50%;transform:translate(-50%,-50%);cursor:n-resize}
+.kg-canvas-table-resize-s{bottom:0;left:50%;transform:translate(-50%,50%);cursor:s-resize}
+.kg-canvas-table-resize-e{right:0;top:50%;transform:translate(50%,-50%);cursor:e-resize}
+.kg-canvas-table-resize-w{left:0;top:50%;transform:translate(-50%,-50%);cursor:w-resize}
+.kg-canvas-table-wrap.kg-canvas-table-readonly .kg-canvas-table-resize,.kg-canvas-table-wrap.kg-canvas-table-readonly .kg-canvas-table-boundary,.kg-canvas-table-wrap.kg-canvas-table-readonly .kg-canvas-table-movebar{display:none}
+
+/* 表格工具面板：跟随表格（world 坐标），字号按 1/scale 反向补偿保持可读 */
+.kg-canvas-table-panel{position:absolute;left:0;top:100%;margin-top:6px;display:flex;align-items:center;gap:4px;padding:5px 6px;background:rgba(255,255,255,.98);border:1px solid #dbe2ea;border-radius:10px;box-shadow:0 5px 22px #0f172a17;font:12px/1.3 system-ui,sans-serif;transform:scale(var(--kg-table-panel-scale,1));transform-origin:top left;white-space:nowrap}
+.kg-canvas-table-wrap .kg-canvas-table-panel{display:none}
+.kg-canvas-table-wrap.kg-canvas-table-selected .kg-canvas-table-panel{display:flex}
+.kg-canvas-table-panel button{padding:4px 10px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;color:#1e293b;font:12px/1.2 system-ui,sans-serif;cursor:pointer}
+.kg-canvas-table-panel button:hover:not(:disabled){background:#f1f5f9}
+.kg-canvas-table-panel button:disabled{opacity:.4;cursor:default}
+.kg-canvas-table-panel-divider{width:1px;height:18px;background:#e2e8f0;margin:0 2px}
+
+/* 插入表格选择面板：挂 overlayHost（全屏宿主），fixed 定位 */
+.kg-canvas-table-insert-panel{position:fixed;z-index:1200;left:16px;top:64px;width:238px;padding:14px;background:#fff;border:1px solid #dbe2ea;border-radius:14px;box-shadow:0 8px 30px #0f172a1c;font:13px/1.4 system-ui,sans-serif;color:#1e293b}
+.kg-canvas-table-insert-panel strong{display:block;margin-bottom:10px;font-size:13px}
+.kg-canvas-table-insert-grid{display:grid;grid-template-columns:repeat(10,1fr);gap:3px;margin-bottom:12px}
+.kg-canvas-table-insert-grid button{aspect-ratio:1;padding:0;border:1px solid #e2e8f0;border-radius:3px;background:#f8fafc;cursor:pointer}
+.kg-canvas-table-insert-grid button:hover{border-color:#94a3b8}
+.kg-canvas-table-insert-grid button.is-active{background:#2563eb;border-color:#1d4ed8}
+.kg-canvas-table-insert-inputs{display:flex;gap:12px;margin-bottom:10px}
+.kg-canvas-table-insert-inputs label{display:flex;align-items:center;gap:6px;font-size:12px}
+.kg-canvas-table-insert-inputs input{width:74px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:6px;font:13px system-ui}
+.kg-canvas-table-insert-actions{display:flex;justify-content:flex-end;gap:8px}
+.kg-canvas-table-insert-actions button{padding:5px 14px;border:1px solid #cbd5e1;border-radius:7px;background:#fff;font:12px system-ui;cursor:pointer}
+.kg-canvas-table-insert-actions .kg-canvas-table-insert-confirm{background:#2563eb;border-color:#1d4ed8;color:#fff}
+.kg-canvas-table-insert-actions button:hover{filter:brightness(.97)}
+.kg-canvas-table-insert-panel small{display:block;margin-top:9px;color:#64748b;font-size:11px;text-align:center}

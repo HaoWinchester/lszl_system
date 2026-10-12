@@ -52,7 +52,7 @@ function ensureGraphDragController(){
   if(graphKernelControllers.drag)return graphKernelControllers.drag;
   const factory=window.KGGraphDragController;
   if(!factory||typeof factory.create!=='function')return null;
-  graphKernelControllers.drag=factory.create({threshold:5,onFirstMove:session=>pushGraphUndoSnapshot(session.historyLabel||'移动知识点')});
+  graphKernelControllers.drag=factory.create({threshold:5,onFirstMove:session=>session.historyController?.checkpoint(session.historyLabel||'移动知识点')});
   return graphKernelControllers.drag;
 }
 function ensureGraphElementResizeController(){
@@ -66,7 +66,7 @@ function ensureGraphElementResizeController(){
       if(config.entityType==='node'){
         const node=nodeById(id);return node&&window.KGGraphModel.geometryOf(node);
       }
-      const item=textElementById(id);return item&&window.KGGraphModel.textElementGeometryOf(item);
+      const item=textElementById(id);return item&&{...window.KGGraphModel.textElementGeometryOf(item),fontSize:window.KGGraphModel.textElementAppearanceOf(item).fontSize};
     },
     applyGeometry:(id,geometry,meta={})=>{
       if(meta.session&&meta.session.config&&meta.session.config.entityType==='node'){
@@ -77,7 +77,10 @@ function ensureGraphElementResizeController(){
       }
       const item=textElementById(id);if(!item)return false;
       window.KGGraphModel.updateTextElementGeometry(item,{...geometry,manualSize:meta.cancelled?resizeOriginalManualSize:true});
-      updateTextElementGeometryDom(id);return true;
+      if(geometry.fontSize!==undefined)window.KGGraphModel.updateTextElementAppearance(item,{fontSize:geometry.fontSize});
+      const el=textElementDomByIdValue(id);if(el)applyTextElementTypographyVariables(el,window.KGGraphModel.textElementAppearanceOf(item));
+      updateTextElementGeometryDom(id);
+      if(!meta.cancelled&&el){const content=el.querySelector('.graph-text-element-content'),height=Math.max(geometry.height,content?.scrollHeight||0);if(height>geometry.height){window.KGGraphModel.updateTextElementGeometry(item,{height:Math.min(4000,height)});updateTextElementGeometryDom(id)}}return true;
     },
     onBegin:session=>{
       resizeEntityType=session.config.entityType==='node'?'node':'text-element';
@@ -157,7 +160,6 @@ function ensureGraphRenderer(){
 }
 function resetGraphKernelSession(){
   const history=graphKernelControllers.history;if(history&&history.clear)history.clear();
-  const clipboard=graphKernelControllers.clipboard;if(clipboard&&clipboard.clear)clipboard.clear();
   const drag=graphKernelControllers.drag;if(drag&&drag.cancel)drag.cancel();
   const resize=graphKernelControllers.resize;if(resize&&resize.cancel)resize.cancel();
   nodeFreeResizeModeId=null;
@@ -223,45 +225,21 @@ function visualPositionForNode(n,options={}){
   }
   const model=window.KGGraphModel,geometry=model&&n?model.geometryOf(n):null;return{x:geometry?geometry.x:n.x,y:geometry?geometry.y:n.y};
 }
-function nodeCenter(n){const d=nodeDims(n),p=visualPositionForNode(n);return{x:p.x+d.w/2,y:p.y+d.h/2}}
-function graphCross(a,b){return a.x*b.y-a.y*b.x}
-function graphRayPolygonIntersection(origin,target,points){
-  const ray={x:target.x-origin.x,y:target.y-origin.y};if(Math.hypot(ray.x,ray.y)<.001)return origin;
-  let best=null;
-  for(let i=0;i<points.length;i++){
-    const a=points[i],b=points[(i+1)%points.length],edge={x:b.x-a.x,y:b.y-a.y},den=graphCross(ray,edge);
-    if(Math.abs(den)<1e-8)continue;
-    const offset={x:a.x-origin.x,y:a.y-origin.y},t=graphCross(offset,edge)/den,u=graphCross(offset,ray)/den;
-    if(t>=0&&u>=0&&u<=1&&(!best||t<best.t))best={t,x:origin.x+t*ray.x,y:origin.y+t*ray.y};
-  }
-  return best?{x:best.x,y:best.y}:origin;
-}
-function nodeOutlinePoint(n,toward){
-  const center=nodeCenter(n),dims=nodeDims(n),pos=visualPositionForNode(n),appearance=window.KGGraphModel&&window.KGGraphModel.appearanceOf?window.KGGraphModel.appearanceOf(n):{cardStyle:n&&n.cardStyle||'standard'};
-  const dx=toward.x-center.x,dy=toward.y-center.y;if(Math.hypot(dx,dy)<.001)return center;
-  if(appearance.cardStyle==='circle'){
-    const rx=Math.max(1,dims.w/2),ry=Math.max(1,dims.h/2),t=1/Math.sqrt((dx*dx)/(rx*rx)+(dy*dy)/(ry*ry));
-    return{x:center.x+dx*t,y:center.y+dy*t};
-  }
-  if(appearance.cardStyle==='triangle'){
-    return graphRayPolygonIntersection(center,toward,[{x:center.x,y:pos.y},{x:pos.x+dims.w,y:pos.y+dims.h},{x:pos.x,y:pos.y+dims.h}]);
-  }
-  // Rectangular cards share one anchor per side. Choose the side from centers,
-  // rather than spreading sibling links across the border by ray intersection.
-  return Math.abs(dx)>=Math.abs(dy)
-    ?{x:center.x+Math.sign(dx||1)*dims.w/2,y:center.y}
-    :{x:center.x,y:center.y+Math.sign(dy||1)*dims.h/2};
+function nodeCenter(n,options={}){const d=nodeDims(n),p=visualPositionForNode(n,options);return{x:p.x+d.w/2,y:p.y+d.h/2}}
+function nodeOutlinePoint(n,toward,port='auto',options={}){
+  const dims=nodeDims(n),pos=visualPositionForNode(n,options),appearance=window.KGGraphModel?.appearanceOf?.(n)||{cardStyle:n?.cardStyle||'standard'};
+  return window.KGGraphEdgeGeometry.portPoint({x:pos.x,y:pos.y,width:dims.w,height:dims.h,cardStyle:appearance.cardStyle},port,toward);
 }
 function linkOutlinePoints(a,b){const ca=nodeCenter(a),cb=nodeCenter(b);return{a:nodeOutlinePoint(a,cb),b:nodeOutlinePoint(b,ca),ca,cb}}
 function invalidateGraphIndexCache(){graphIndexCache=null;graphIndexStateRef=null;graphIndexNodesRef=null;graphIndexLinksRef=null;graphIndexNodeLength=-1;graphIndexLinkLength=-1}
 function linkEndpointPointKey(side){return side==='from'?'fromPoint':'toPoint'}
-function linkEndpointNode(link,side,nodeMap=null){const id=side==='from'?link&&link.from:link&&link.to;return id?((nodeMap&&nodeMap.get(id))||nodeById(id)):null}
+function linkEndpointNode(link,side,nodeMap=null){const id=side==='from'?link&&link.from:link&&link.to;return id?(nodeMap?nodeMap.get(id):nodeById(id)):null}
 function linkEndpointFreePoint(link,side){return normalizedEdgePoint(link&&link[linkEndpointPointKey(side)])}
-function linkRenderPoints(link,nodeMap=null){
+function linkRenderPoints(link,nodeMap=null,options={}){
   if(!link)return null;
   const aNode=linkEndpointNode(link,'from',nodeMap),bNode=linkEndpointNode(link,'to',nodeMap),freeA=linkEndpointFreePoint(link,'from'),freeB=linkEndpointFreePoint(link,'to');
-  const ca=aNode?nodeCenter(aNode):freeA,cb=bNode?nodeCenter(bNode):freeB;if(!ca||!cb)return null;
-  const a=aNode?nodeOutlinePoint(aNode,cb):ca,b=bNode?nodeOutlinePoint(bNode,ca):cb;return{a,b,ca,cb,aNode,bNode};
+  const ca=aNode?nodeCenter(aNode,options):freeA,cb=bNode?nodeCenter(bNode,options):freeB;if(!ca||!cb)return null;
+  const a=aNode?nodeOutlinePoint(aNode,cb,link.fromPort,options):ca,b=bNode?nodeOutlinePoint(bNode,ca,link.toPort,options):cb;return{a,b,ca,cb,aNode,bNode};
 }
 function setLinkFreeEndpoint(link,side,point){if(!link)return;const key=linkEndpointPointKey(side),clean=normalizedEdgePoint(point);if(side==='from')link.from='';else link.to='';if(clean)link[key]=clean;else delete link[key]}
 function bindLinkEndpoint(link,side,nodeId){if(!link)return false;const node=nodeById(nodeId);if(!node)return false;const other=side==='from'?link.to:link.from;if(other&&other===node.id)return false;if(side==='from')link.from=node.id;else link.to=node.id;delete link[linkEndpointPointKey(side)];return true}
@@ -346,12 +324,18 @@ function linkPathGeometry(link,a,b,points=null){
     const samples=[start,end],mid={x:(start.x+end.x)/2,y:(start.y+end.y)/2};
     return{style,d:edgePathFromPoints(samples),samples,bounds:edgeGeometryBounds(samples),endpoints:[start,end],controls:[{kind:'straight-bend',index:0,x:mid.x,y:mid.y}]};
   }
-  const detour=overlappingProjectionWaypoints(start,end,points,direction);
+  const fixedStart=window.KGGraphEdgeGeometry.portDirection(link?.fromPort),fixedEnd=window.KGGraphEdgeGeometry.portDirection(link?.toPort);
+  const detour=fixedStart||fixedEnd?null:overlappingProjectionWaypoints(start,end,points,direction);
   if(style==='elbow'){
     const stored=normalizedEdgePoints(link&&link.waypoints,12),waypoints=stored.length?stored:(detour||defaultElbowWaypoints(start,end,direction)),samples=[start,...waypoints,end];
     return{style,d:edgePathFromPoints(samples),samples,bounds:edgeGeometryBounds(samples),endpoints:[start,end],controls:waypoints.map((point,index)=>({kind:'waypoint',index,x:point.x,y:point.y})),derivedWaypoints:!stored.length};
   }
   const stored=normalizedEdgePoints(link&&link.curveControls,2),controls=stored.length===2?stored:defaultCurveControls(start,end,direction);
+  if(stored.length!==2&&(fixedStart||fixedEnd)){
+    const offset=Math.max(48,Math.min(220,Math.hypot(end.x-start.x,end.y-start.y)*.38));
+    if(fixedStart)controls[0]={x:start.x+fixedStart.x*offset,y:start.y+fixedStart.y*offset};
+    if(fixedEnd)controls[1]={x:end.x+fixedEnd.x*offset,y:end.y+fixedEnd.y*offset};
+  }
   const storedWaypoints=normalizedEdgePoints(link&&link.waypoints,12),waypoints=storedWaypoints.length?storedWaypoints:detour;
   if(stored.length!==2&&waypoints){
     const route=roundedEdgeRoute([start,...waypoints,end]);
@@ -359,7 +343,8 @@ function linkPathGeometry(link,a,b,points=null){
   }
   const c1=controls[0],c2=controls[1],d=`M ${formatSvgNumber(start.x)} ${formatSvgNumber(start.y)} C ${formatSvgNumber(c1.x)} ${formatSvgNumber(c1.y)}, ${formatSvgNumber(c2.x)} ${formatSvgNumber(c2.y)}, ${formatSvgNumber(end.x)} ${formatSvgNumber(end.y)}`;
   const samples=[];for(let index=0;index<=24;index++)samples.push(cubicEdgePoint(start,c1,c2,end,index/24));
-  return{style,d,samples,bounds:edgeGeometryBounds(samples),endpoints:[start,end],controls:controls.map((point,index)=>({kind:'curve-control',index,x:point.x,y:point.y})),derivedCurveControls:stored.length!==2};
+  const handles=window.KGGraphEdgeGeometry.curveHandles(start,controls,end);
+  return{style,d,samples,bounds:edgeGeometryBounds(samples),endpoints:[start,end],curveControls:controls,controls:handles.map((point,index)=>({kind:'curve-control',index,x:point.x,y:point.y})),derivedCurveControls:stored.length!==2};
 }
 function dashArrayForLineStyle(style,strokeWidth=4){
   const width=Math.max(1,Number(strokeWidth)||4);
@@ -500,339 +485,65 @@ const CENTER_SCOPE_ICON='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx=
 const FIT_SCOPE_ICON='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5"></path><path d="M16 3h5v5"></path><path d="M8 21H3v-5"></path><path d="M16 21h5v-5"></path><path d="M3 3l6 6"></path><path d="M21 3l-6 6"></path><path d="M3 21l6-6"></path><path d="M21 21l-6-6"></path></svg>';
 const RESTORE_SCOPE_ICON='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"></path><path d="M3 4v6h6"></path><path d="M9 12h6"></path></svg>';
 
-let relatedCanvasUnmount=null;
-let relatedCanvasModalEl=null,relatedCanvasState=null,relatedCanvasDrag=null,relatedCanvasPanDrag=null,relatedCanvasPanTimer=0,relatedCanvasInfoState=null,relatedCanvasInfoDrag=null;
-const RELATED_CANVAS_MIN_SCALE=.45,RELATED_CANVAS_MAX_SCALE=1.8,RELATED_CANVAS_SCALE_STEP=1.14;
-const RELATED_CANVAS_CLOSE_ICON='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"></path></svg>';
-const RELATED_CANVAS_MINIMIZE_ICON='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"></path></svg>';
-const RELATED_CANVAS_EXPAND_INFO_ICON='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"></rect><path d="M9 12h6"></path></svg>';
-const RELATED_CANVAS_FULLSCREEN_ICON='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"></path><path d="M3 3l6 6M21 3l-6 6M3 21l6-6M21 21l-6-6"></path></svg>';
-const RELATED_CANVAS_EXIT_FULLSCREEN_ICON='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3v6H3M15 3v6h6M9 21v-6H3M15 21v-6h6"></path></svg>';
-function relatedCanvasNodeCenter(id){
-  if(!relatedCanvasState||!relatedCanvasState.positions)return null;
-  const n=nodeById(id),p=relatedCanvasState.positions.get(id);if(!n||!p)return null;
-  const d=nodeDims(n);return{x:p.x+d.w/2,y:p.y+d.h/2};
+let relatedCanvasController=null,relatedCanvasModalEl=null,relatedCanvasOpening=false,relatedCanvasGeneration=0;
+function closeRelatedCanvasModal(showMessage=false){
+  relatedCanvasGeneration++;
+  if(relatedCanvasController)relatedCanvasController.close();
+  relatedCanvasController=null;relatedCanvasModalEl=null;
+  if(showMessage)showStatus('已关闭临时相关画布，本次修改已丢弃。');
 }
-
-function updateRelatedCanvasZoomLabel(){
-  if(!relatedCanvasModalEl||!relatedCanvasState)return;
-  const label=relatedCanvasModalEl.querySelector('.related-canvas-zoom-label');
-  if(label)label.textContent=Math.round((relatedCanvasState.scale||1)*100)+'%';
-}
-function applyRelatedCanvasScale(){
-  if(!relatedCanvasModalEl||!relatedCanvasState)return;
-  const viewport=relatedCanvasModalEl.querySelector('.related-canvas-viewport'),stageEl=relatedCanvasModalEl.querySelector('.related-canvas-stage');
-  if(!viewport||!stageEl)return;
-  const scale=relatedCanvasState.scale||1;
-  const panX=Number.isFinite(relatedCanvasState.panX)?relatedCanvasState.panX:0;
-  const panY=Number.isFinite(relatedCanvasState.panY)?relatedCanvasState.panY:0;
-  viewport.style.width='100%';
-  viewport.style.height='100%';
-  stageEl.style.width=relatedCanvasState.width+'px';stageEl.style.height=relatedCanvasState.height+'px';
-  stageEl.style.transform=`translate(${panX}px, ${panY}px) scale(${scale})`;
-  updateRelatedCanvasZoomLabel();
-}
-function centerRelatedCanvasStage(){
-  if(!relatedCanvasModalEl||!relatedCanvasState)return;
-  const body=relatedCanvasModalEl.querySelector('.related-canvas-body');if(!body)return;
-  const scale=relatedCanvasState.scale||1;
-  relatedCanvasState.panX=Math.round((body.clientWidth-relatedCanvasState.width*scale)/2);
-  relatedCanvasState.panY=Math.round((body.clientHeight-relatedCanvasState.height*scale)/2);
-}
-function fitRelatedCanvasContent(){
-  if(!relatedCanvasModalEl||!relatedCanvasState||!relatedCanvasState.positions||!relatedCanvasState.positions.size)return;
-  const body=relatedCanvasModalEl.querySelector('.related-canvas-body');if(!body)return;
-  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
-  for(const node of relatedCanvasState.nodes||[]){
-    const p=relatedCanvasState.positions.get(node.id);if(!p)continue;
-    const d=nodeDims(node);minX=Math.min(minX,p.x);minY=Math.min(minY,p.y);maxX=Math.max(maxX,p.x+d.w);maxY=Math.max(maxY,p.y+d.h);
-  }
-  if(!Number.isFinite(minX))return centerRelatedCanvasStage();
-  const margin=72,bw=Math.max(1,body.clientWidth),bh=Math.max(1,body.clientHeight),contentW=Math.max(1,maxX-minX),contentH=Math.max(1,maxY-minY);
-  const scale=clamp(Math.min((bw-margin*2)/contentW,(bh-margin*2)/contentH,1.15),RELATED_CANVAS_MIN_SCALE,RELATED_CANVAS_MAX_SCALE);
-  relatedCanvasState.scale=scale;
-  relatedCanvasState.panX=Math.round(bw/2-((minX+maxX)/2)*scale);
-  relatedCanvasState.panY=Math.round(bh/2-((minY+maxY)/2)*scale);
-  applyRelatedCanvasScale();
-}
-function setRelatedCanvasScale(next,originEvent){
-  if(!relatedCanvasModalEl||!relatedCanvasState)return;
-  const body=relatedCanvasModalEl.querySelector('.related-canvas-body');if(!body)return;
-  const oldScale=relatedCanvasState.scale||1,nextScale=clamp(next,RELATED_CANVAS_MIN_SCALE,RELATED_CANVAS_MAX_SCALE);
-  const oldPanX=Number.isFinite(relatedCanvasState.panX)?relatedCanvasState.panX:0;
-  const oldPanY=Number.isFinite(relatedCanvasState.panY)?relatedCanvasState.panY:0;
-  const r=body.getBoundingClientRect();
-  const anchorX=originEvent?originEvent.clientX-r.left:body.clientWidth/2;
-  const anchorY=originEvent?originEvent.clientY-r.top:body.clientHeight/2;
-  const worldX=(anchorX-oldPanX)/oldScale,worldY=(anchorY-oldPanY)/oldScale;
-  relatedCanvasState.scale=nextScale;
-  relatedCanvasState.panX=Math.round(anchorX-worldX*nextScale);
-  relatedCanvasState.panY=Math.round(anchorY-worldY*nextScale);
-  applyRelatedCanvasScale();
-}
-function beginRelatedCanvasPan(e){
-  if(e.button!==undefined&&e.button!==2)return;
-  if(!relatedCanvasModalEl||!relatedCanvasState)return;
-  if(e.target&&e.target.closest&&e.target.closest('.related-canvas-card,.related-canvas-info,.related-canvas-header,button,input,textarea,select,a'))return;
-  const body=e.currentTarget;if(!body)return;
-  clearTimeout(relatedCanvasPanTimer);
-  relatedCanvasPanDrag={pointerId:e.pointerId,body,startX:e.clientX,startY:e.clientY,lastX:e.clientX,lastY:e.clientY,startPanX:Number.isFinite(relatedCanvasState.panX)?relatedCanvasState.panX:0,startPanY:Number.isFinite(relatedCanvasState.panY)?relatedCanvasState.panY:0,moved:false,active:true};
-  body.classList.remove('right-pan-pending');body.classList.add('panning');
-  document.addEventListener('pointermove',moveRelatedCanvasPan,true);
-  document.addEventListener('pointerup',endRelatedCanvasPan,true);
-  document.addEventListener('pointercancel',endRelatedCanvasPan,true);
-  try{body.setPointerCapture(e.pointerId)}catch{}
-  e.preventDefault();e.stopPropagation();
-}
-function moveRelatedCanvasPan(e){
-  const drag=relatedCanvasPanDrag;if(!drag||drag.pointerId!==e.pointerId)return;
-  drag.lastX=e.clientX;drag.lastY=e.clientY;
-  if(!drag.active){e.preventDefault();e.stopPropagation();return}
-  const dx=e.clientX-drag.startX,dy=e.clientY-drag.startY;
-  if(Math.hypot(dx,dy)>2)drag.moved=true;
-  if(!relatedCanvasState)return;
-  relatedCanvasState.panX=Math.round(drag.startPanX+dx);
-  relatedCanvasState.panY=Math.round(drag.startPanY+dy);
-  applyRelatedCanvasScale();
-  e.preventDefault();e.stopPropagation();
-}
-function endRelatedCanvasPan(e){
-  const drag=relatedCanvasPanDrag;if(!drag||drag.pointerId!==e.pointerId)return;
-  clearTimeout(relatedCanvasPanTimer);relatedCanvasPanTimer=0;
-  try{drag.body.releasePointerCapture(e.pointerId)}catch{}
-  drag.body.classList.remove('panning','right-pan-pending');
-  relatedCanvasPanDrag=null;
-  document.removeEventListener('pointermove',moveRelatedCanvasPan,true);
-  document.removeEventListener('pointerup',endRelatedCanvasPan,true);
-  document.removeEventListener('pointercancel',endRelatedCanvasPan,true);
-  e.preventDefault();e.stopPropagation();
-}
-function resetRelatedCanvasScale(){if(!relatedCanvasState)return;fitRelatedCanvasContent()}
-function toggleRelatedCanvasFullscreen(){
-  if(!relatedCanvasModalEl)return;
-  const on=!relatedCanvasModalEl.classList.contains('related-canvas-fullscreen');
-  relatedCanvasModalEl.classList.toggle('related-canvas-fullscreen',on);
-  const btn=relatedCanvasModalEl.querySelector('.related-canvas-fullscreen-toggle');
-  if(btn){btn.title=on?'退出全屏':'全屏';btn.setAttribute('aria-label',on?'退出全屏':'全屏');btn.innerHTML=on?RELATED_CANVAS_EXIT_FULLSCREEN_ICON:RELATED_CANVAS_FULLSCREEN_ICON}
-  requestAnimationFrame(()=>{centerRelatedCanvasStage();applyRelatedCanvasScale();const info=relatedCanvasModalEl&&relatedCanvasModalEl.querySelector('.related-canvas-info');if(info)placeRelatedCanvasInfo(info)});
-}
-function beginRelatedCanvasInfoDrag(e){
-  if(e.button!==undefined&&e.button!==0)return;
-  if(e.target&&e.target.closest&&e.target.closest('button'))return;
-  const box=e.currentTarget.closest('.related-canvas-info'),dialog=relatedCanvasModalEl&&relatedCanvasModalEl.querySelector('.related-canvas-dialog');
-  if(!box||!dialog)return;
-  const br=box.getBoundingClientRect(),dr=dialog.getBoundingClientRect();
-  relatedCanvasInfoDrag={pointerId:e.pointerId,box,dialog,startX:e.clientX,startY:e.clientY,originX:br.left-dr.left,originY:br.top-dr.top};
-  box.classList.add('dragging');
-  document.addEventListener('pointermove',moveRelatedCanvasInfoDrag,true);
-  document.addEventListener('pointerup',endRelatedCanvasInfoDrag,true);
-  document.addEventListener('pointercancel',endRelatedCanvasInfoDrag,true);
-  try{box.setPointerCapture(e.pointerId)}catch{}
-  e.preventDefault();e.stopPropagation();
-}
-function placeRelatedCanvasInfo(box){
-  const dialog=relatedCanvasModalEl&&relatedCanvasModalEl.querySelector('.related-canvas-dialog');if(!box||!dialog)return;
-  const dw=dialog.clientWidth,dh=dialog.clientHeight;
-  if(!relatedCanvasInfoState)relatedCanvasInfoState={x:null,y:null,collapsed:false};
-  const defaultX=Math.max(18,dw-398),defaultY=76;
-  const w=box.offsetWidth||360,h=box.offsetHeight||260;
-  const x=clamp(relatedCanvasInfoState.x==null?defaultX:relatedCanvasInfoState.x,12,Math.max(12,dw-w-12));
-  const y=clamp(relatedCanvasInfoState.y==null?defaultY:relatedCanvasInfoState.y,58,Math.max(58,dh-h-12));
-  relatedCanvasInfoState.x=x;relatedCanvasInfoState.y=y;
-  box.style.left=x+'px';box.style.top=y+'px';box.style.right='auto';box.style.bottom='auto';
-}
-function moveRelatedCanvasInfoDrag(e){
-  const drag=relatedCanvasInfoDrag;if(!drag||drag.pointerId!==e.pointerId)return;
-  const dw=drag.dialog.clientWidth,dh=drag.dialog.clientHeight,w=drag.box.offsetWidth,h=drag.box.offsetHeight;
-  const x=clamp(Math.round(drag.originX+e.clientX-drag.startX),12,Math.max(12,dw-w-12));
-  const y=clamp(Math.round(drag.originY+e.clientY-drag.startY),58,Math.max(58,dh-h-12));
-  if(!relatedCanvasInfoState)relatedCanvasInfoState={};
-  relatedCanvasInfoState.x=x;relatedCanvasInfoState.y=y;
-  drag.box.style.left=x+'px';drag.box.style.top=y+'px';drag.box.style.right='auto';drag.box.style.bottom='auto';
-  e.preventDefault();e.stopPropagation();
-}
-function endRelatedCanvasInfoDrag(e){
-  const drag=relatedCanvasInfoDrag;if(!drag||drag.pointerId!==e.pointerId)return;
-  try{drag.box.releasePointerCapture(e.pointerId)}catch{}
-  drag.box.classList.remove('dragging');relatedCanvasInfoDrag=null;
-  document.removeEventListener('pointermove',moveRelatedCanvasInfoDrag,true);
-  document.removeEventListener('pointerup',endRelatedCanvasInfoDrag,true);
-  document.removeEventListener('pointercancel',endRelatedCanvasInfoDrag,true);
-  e.preventDefault();e.stopPropagation();
-}
-function removeRelatedCanvasInfo(){
-  if(!relatedCanvasModalEl)return;
-  const old=relatedCanvasModalEl.querySelector('.related-canvas-info');
-  if(old)old.remove();
-}
-function showRelatedCanvasNodeInfo(id){
-  if(!relatedCanvasModalEl)return;
-  const n=nodeById(id);if(!n)return;
-  removeRelatedCanvasInfo();
-  if(!relatedCanvasInfoState)relatedCanvasInfoState={x:null,y:null,collapsed:false};
-  const box=document.createElement('div');
-  box.className='related-canvas-info'+(relatedCanvasInfoState.collapsed?' collapsed':'');
-  const color=safeColor(n.color);
-  box.innerHTML=`<div class="related-canvas-info-header" title="拖拽移动详情窗"><div class="detail-top"><div class="detail-mini-icon" style="background:${color}">${escapeHTML((n.title||'?').slice(0,1))}</div><div><div class="detail-name">${escapeHTML(n.title||'未命名知识点')}</div><div class="detail-title">${escapeHTML(n.category||'未填写分类')} ${n.level?`｜${escapeHTML(n.level)}`:''}</div></div></div><div class="related-canvas-info-actions"><button type="button" class="related-canvas-info-collapse" title="收起/展开" aria-label="收起/展开">${relatedCanvasInfoState.collapsed?RELATED_CANVAS_EXPAND_INFO_ICON:RELATED_CANVAS_MINIMIZE_ICON}</button><button type="button" class="related-canvas-info-close" title="关闭" aria-label="关闭">${RELATED_CANVAS_CLOSE_ICON}</button></div></div><div class="related-canvas-info-content"><div class="detail-grid"><div class="label">关键词</div><div>${escapeHTML(n.keywords||'—')}</div><div class="label">说明</div><div>${escapeHTML(n.summary||'—')}</div><div class="label">学习提示</div><div>${escapeHTML(n.notes||'—')}</div></div></div>`;
-  box.querySelector('.related-canvas-info-close').onclick=()=>box.remove();
-  const collapseBtn=box.querySelector('.related-canvas-info-collapse');
-  collapseBtn.onclick=e=>{e.preventDefault();e.stopPropagation();relatedCanvasInfoState.collapsed=!relatedCanvasInfoState.collapsed;box.classList.toggle('collapsed',relatedCanvasInfoState.collapsed);collapseBtn.innerHTML=relatedCanvasInfoState.collapsed?RELATED_CANVAS_EXPAND_INFO_ICON:RELATED_CANVAS_MINIMIZE_ICON;requestAnimationFrame(()=>placeRelatedCanvasInfo(box))};
-  box.querySelector('.related-canvas-info-header').addEventListener('pointerdown',beginRelatedCanvasInfoDrag);
-  box.addEventListener('wheel',e=>e.stopPropagation(),{passive:true});
-  relatedCanvasModalEl.querySelector('.related-canvas-dialog').appendChild(box);
-  requestAnimationFrame(()=>placeRelatedCanvasInfo(box));
-}
-function closeRelatedCanvasModal(showMessage=false,options={}){
-  clearTimeout(relatedCanvasPanTimer);relatedCanvasPanTimer=0;relatedCanvasDrag=null;relatedCanvasPanDrag=null;relatedCanvasInfoDrag=null;relatedCanvasInfoState=null;
-  document.removeEventListener('pointermove',moveRelatedCanvasPan,true);
-  document.removeEventListener('pointerup',endRelatedCanvasPan,true);
-  document.removeEventListener('pointercancel',endRelatedCanvasPan,true);
-  document.removeEventListener('pointermove',moveRelatedCanvasInfoDrag,true);
-  document.removeEventListener('pointerup',endRelatedCanvasInfoDrag,true);
-  document.removeEventListener('pointercancel',endRelatedCanvasInfoDrag,true);
-  if(relatedCanvasUnmount){relatedCanvasUnmount();relatedCanvasUnmount=null}
-  if(relatedCanvasModalEl){relatedCanvasModalEl.remove();relatedCanvasModalEl=null}
-  relatedCanvasState=null;
-  document.body.classList.remove('related-canvas-open');
-  const shouldClearRelatedFocus=options.clearRelatedFocus!==false;
-  const hadRelatedOnly=largeGraphRelatedFocusEnabled||!!relatedScopeAnchorNodeId;
-  if(shouldClearRelatedFocus){
-    largeGraphRelatedFocusEnabled=false;relatedScopeAnchorNodeId=null;hoverLargeGraphNodeId=null;
-    clearRelatedGatherLayout({render:false,message:false});
-    if(hadRelatedOnly){syncGraphModeClasses();refreshCardClasses();renderEdges();renderDetails();updateCardQuickActions()}
-  }
-  if(showMessage&&typeof showStatus==='function')showStatus(shouldClearRelatedFocus&&hadRelatedOnly?'已退出临时相关画布，并取消“只看相关”状态。':'已退出临时相关画布，原图谱保持不变。');
-}
-function relatedCanvasLinksForNodeSet(nodeIds){
-  const set=new Set(nodeIds),seen=new Set(),links=[];
-  const anchor=currentRelatedScopeAnchorId()||state.selectedNodeId;
-  const anchorLinks=anchor?linksForNodeId(anchor):[];
-  for(const l of anchorLinks){if(l&&set.has(l.from)&&set.has(l.to)&&!seen.has(l.id)){seen.add(l.id);links.push(l)}}
-  for(const l of state.links){if(l&&set.has(l.from)&&set.has(l.to)&&!seen.has(l.id)){seen.add(l.id);links.push(l)}}
-  return links;
-}
-function computeRelatedCanvasLayout(nodes,viewW,viewH){
-  const anchorId=currentRelatedScopeAnchorId()||state.selectedNodeId||(nodes[0]&&nodes[0].id);
-  const anchor=nodeById(anchorId)||nodes[0];
-  const others=nodes.filter(n=>n&&n.id!==anchor.id).sort((a,b)=>String(a.category||'').localeCompare(String(b.category||''),'zh-Hans-CN')||String(a.title||'').localeCompare(String(b.title||''),'zh-Hans-CN'));
-  const ad=nodeDims(anchor),pad=46,cellW=isCoarse?176:198,cellH=isCoarse?158:178,gapY=30;
-  const maxCols=Math.max(1,Math.floor((Math.max(520,viewW)-pad*2)/cellW));
-  const idealCols=Math.max(1,Math.ceil(Math.sqrt(Math.max(1,others.length)*1.45)));
-  const cols=Math.max(1,Math.min(maxCols,idealCols));
-  const rows=Math.max(1,Math.ceil(others.length/cols));
-  const minCanvasScale=Math.max(.01,RELATED_CANVAS_MIN_SCALE||.45);
-  const minVisibleW=Math.ceil(viewW/minCanvasScale),minVisibleH=Math.ceil(viewH/minCanvasScale);
-  const canvasW=Math.max(minVisibleW,cols*cellW+pad*2,ad.w+pad*2);
-  const canvasH=Math.max(minVisibleH,ad.h+gapY+rows*cellH+pad*2);
-  const positions=new Map();
-  positions.set(anchor.id,{x:Math.round((canvasW-ad.w)/2),y:pad});
-  const startX=(canvasW-cols*cellW)/2,startY=pad+ad.h+gapY;
-  others.forEach((n,i)=>{const d=nodeDims(n),col=i%cols,row=Math.floor(i/cols);positions.set(n.id,{x:Math.round(startX+col*cellW+(cellW-d.w)/2),y:Math.round(startY+row*cellH+(cellH-d.h)/2)})});
-  return{anchorId:anchor.id,positions,width:Math.ceil(canvasW),height:Math.ceil(canvasH)};
-}
-function renderRelatedCanvasEdges(){
-  if(!relatedCanvasState||!relatedCanvasModalEl)return;
-  const svg=relatedCanvasModalEl.querySelector('.related-canvas-edges');if(!svg)return;
-  svg.setAttribute('width',relatedCanvasState.width);svg.setAttribute('height',relatedCanvasState.height);svg.setAttribute('viewBox',`0 0 ${relatedCanvasState.width} ${relatedCanvasState.height}`);
-  const frag=document.createDocumentFragment();
-  for(const l of relatedCanvasState.links){
-    const a=relatedCanvasNodeCenter(l.from),b=relatedCanvasNodeCenter(l.to);if(!a||!b)continue;
-    const g=document.createElementNS('http://www.w3.org/2000/svg','g'),path=document.createElementNS('http://www.w3.org/2000/svg','path');
-    path.setAttribute('class','edge-visible related-canvas-edge');path.style.setProperty('--edge-color',safeColor(l.color,DEFAULTS.linkColor));path.setAttribute('d',pathFor(a,b,pathStyleForLink(l)));
-    const relatedDash=dashArrayForLineStyle(LINE_STYLES.has(l.lineStyle)?l.lineStyle:DEFAULTS.linkStyle,2.6);if(relatedDash)path.setAttribute('stroke-dasharray',relatedDash)
-    g.appendChild(path);
-    const labelText=l.type||l.note;
-    if(labelText){const text=document.createElementNS('http://www.w3.org/2000/svg','text');text.setAttribute('text-anchor','middle');text.setAttribute('class','edge-label related-canvas-label');text.setAttribute('x',(a.x+b.x)/2);text.setAttribute('y',(a.y+b.y)/2-8);text.textContent=truncate(labelText,12);g.appendChild(text)}
-    frag.appendChild(g);
-  }
-  svg.replaceChildren(frag);
-}
-function beginRelatedCanvasCardDrag(e,id){
-  if(e.button!==undefined&&e.button!==0)return;
-  if(!relatedCanvasState||!relatedCanvasState.positions.has(id))return;
-  const card=e.currentTarget,pos=relatedCanvasState.positions.get(id);
-  relatedCanvasDrag={id,pointerId:e.pointerId,startX:e.clientX,startY:e.clientY,originX:pos.x,originY:pos.y,moved:false,card};
-  card.classList.add('dragging');
-  try{card.setPointerCapture(e.pointerId)}catch{}
-  e.preventDefault();e.stopPropagation();
-}
-function moveRelatedCanvasCardDrag(e){
-  const drag=relatedCanvasDrag;if(!drag||drag.pointerId!==e.pointerId||!relatedCanvasState)return;
-  const scale=relatedCanvasState.scale||1,dx=(e.clientX-drag.startX)/scale,dy=(e.clientY-drag.startY)/scale;
-  if(Math.hypot(e.clientX-drag.startX,e.clientY-drag.startY)>3)drag.moved=true;
-  const d=nodeDims(nodeById(drag.id)),nx=clamp(Math.round(drag.originX+dx),8,Math.max(8,relatedCanvasState.width-d.w-8)),ny=clamp(Math.round(drag.originY+dy),8,Math.max(8,relatedCanvasState.height-d.h-8));
-  relatedCanvasState.positions.set(drag.id,{x:nx,y:ny});
-  drag.card.style.left=nx+'px';drag.card.style.top=ny+'px';
-  renderRelatedCanvasEdges();
-  e.preventDefault();e.stopPropagation();
-}
-function endRelatedCanvasCardDrag(e){
-  const drag=relatedCanvasDrag;if(!drag||drag.pointerId!==e.pointerId)return false;
-  try{drag.card.releasePointerCapture(e.pointerId)}catch{}
-  drag.card.classList.remove('dragging');
-  const wasMoved=drag.moved,id=drag.id;
-  relatedCanvasDrag=null;
-  e.preventDefault();e.stopPropagation();
-  if(!wasMoved)showRelatedCanvasNodeInfo(id);
-  return true;
-}
-function renderRelatedCanvasCards(){
-  if(!relatedCanvasState||!relatedCanvasModalEl)return;
-  const layer=relatedCanvasModalEl.querySelector('.related-canvas-cards');if(!layer)return;
-  const frag=document.createDocumentFragment();
-  for(const n of relatedCanvasState.nodes){
-    const p=relatedCanvasState.positions.get(n.id);if(!p)continue;
-    const card=renderCardElement(n,null);
-    card.classList.add('related-canvas-card','readonly-card');
-    if(n.id===relatedCanvasState.anchorId)card.classList.add('related-canvas-anchor-card');
-    card.style.left=p.x+'px';card.style.top=p.y+'px';
-    const tools=card.querySelector('.node-size-tools');if(tools)tools.remove();
-    card.addEventListener('pointerdown',e=>beginRelatedCanvasCardDrag(e,n.id));
-    card.addEventListener('pointermove',moveRelatedCanvasCardDrag);
-    card.addEventListener('pointerup',endRelatedCanvasCardDrag);
-    card.addEventListener('pointercancel',endRelatedCanvasCardDrag);
-    card.addEventListener('dblclick',e=>{e.preventDefault();e.stopPropagation();showRelatedCanvasNodeInfo(n.id)});
-    frag.appendChild(card);
-  }
-  layer.replaceChildren(frag);
-}
-function openRelatedCanvasModal(showMessage=true){
-  const relation=largeGraphRelationState();
-  if(!relation||!relation.related||!relation.related.size){showStatus('请先开启只看相关并选择中心卡牌。');return false}
-  const nodes=[...relation.related].map(id=>nodeById(id)).filter(Boolean);
-  if(!nodes.length)return false;
-  closeRelatedCanvasModal(false,{clearRelatedFocus:false});
-  const overlay=document.createElement('div');overlay.className='related-canvas-backdrop';overlay.dataset.stageUi='true';
-  overlay.innerHTML=`<section class="related-canvas-dialog" role="dialog" aria-modal="true" aria-label="临时相关画布"><header class="related-canvas-header"><div><strong>临时相关画布</strong><span>只读学习视图，拖拽只调整临时展示位置</span></div><div class="related-canvas-header-actions"><button type="button" class="related-canvas-tool related-canvas-zoom-out" title="缩小" aria-label="缩小">−</button><span class="related-canvas-zoom-label">100%</span><button type="button" class="related-canvas-tool related-canvas-zoom-in" title="放大" aria-label="放大">+</button><button type="button" class="related-canvas-tool related-canvas-zoom-reset" title="重置缩放" aria-label="重置缩放">1:1</button><button type="button" class="related-canvas-tool related-canvas-fullscreen-toggle" title="全屏" aria-label="全屏">${RELATED_CANVAS_FULLSCREEN_ICON}</button><button type="button" class="related-canvas-close" title="退出临时画布" aria-label="退出临时画布">${RELATED_CANVAS_CLOSE_ICON}</button></div></header><div class="related-canvas-body"><div class="related-canvas-viewport"><div class="related-canvas-stage"><svg class="related-canvas-edges"></svg><div class="related-canvas-cards"></div></div></div></div></section>`;
-  overlay.addEventListener('wheel',e=>e.stopPropagation(),{passive:true});
-  overlay.addEventListener('pointerdown',e=>e.stopPropagation());
-  const bodyEl=overlay.querySelector('.related-canvas-body');
-  bodyEl.addEventListener('wheel',e=>{if(e.target&&e.target.closest&&e.target.closest('.related-canvas-info'))return;e.preventDefault();e.stopPropagation();const factor=e.deltaY<0?RELATED_CANVAS_SCALE_STEP:1/RELATED_CANVAS_SCALE_STEP;setRelatedCanvasScale((relatedCanvasState&&relatedCanvasState.scale||1)*factor,e)},{passive:false});
-  bodyEl.addEventListener('pointerdown',beginRelatedCanvasPan);
-  bodyEl.addEventListener('contextmenu',e=>{e.preventDefault();e.stopPropagation()});
-  overlay.querySelector('.related-canvas-zoom-out').onclick=()=>setRelatedCanvasScale((relatedCanvasState&&relatedCanvasState.scale||1)/RELATED_CANVAS_SCALE_STEP);
-  overlay.querySelector('.related-canvas-zoom-in').onclick=()=>setRelatedCanvasScale((relatedCanvasState&&relatedCanvasState.scale||1)*RELATED_CANVAS_SCALE_STEP);
-  overlay.querySelector('.related-canvas-zoom-reset').onclick=()=>resetRelatedCanvasScale();
-  overlay.querySelector('.related-canvas-fullscreen-toggle').onclick=()=>toggleRelatedCanvasFullscreen();
-  overlay.querySelector('.related-canvas-close').onclick=()=>closeRelatedCanvasModal(true);
-  overlay.addEventListener('click',e=>{if(e.target===overlay)closeRelatedCanvasModal(true)});
-  document.body.appendChild(overlay);relatedCanvasUnmount=window.KGCanvasDomInteraction.mountOverlay(overlay);document.body.classList.add('related-canvas-open');relatedCanvasModalEl=overlay;
-  requestAnimationFrame(()=>{
-    if(relatedCanvasModalEl!==overlay)return;
-    const body=overlay.querySelector('.related-canvas-body'),stageEl=overlay.querySelector('.related-canvas-stage');
-    const bw=Math.max(720,body.clientWidth||1200),bh=Math.max(520,body.clientHeight||760);
-    const layout=computeRelatedCanvasLayout(nodes,bw,bh);
-    const nodeIds=nodes.map(n=>n.id),links=relatedCanvasLinksForNodeSet(nodeIds);
-    relatedCanvasState={nodes,links,positions:layout.positions,anchorId:layout.anchorId,width:layout.width,height:layout.height,scale:1,panX:0,panY:0};
-    stageEl.style.width=layout.width+'px';stageEl.style.height=layout.height+'px';
-    renderRelatedCanvasEdges();renderRelatedCanvasCards();
-    requestAnimationFrame(()=>{fitRelatedCanvasContent();overlay.classList.add('related-canvas-content-centered')});
-    showRelatedCanvasNodeInfo(layout.anchorId);
-  });
-  if(showMessage)showStatus(`已打开临时相关画布：${nodes.length} 张卡牌，关闭后原图谱保持不变。`);
-  return true;
+async function openRelatedCanvasModal(showMessage=true){
+  graphQuestionDrawer?.close();
+  if(relatedCanvasOpening)return false;
+  const ids=selectedNodeIds.size?[...selectedNodeIds]:state.selectedNodeId?[state.selectedNodeId]:[];
+  if(!ids.length){showStatus('请先选择一个或多个知识卡片。');return false}
+  if(['nodeModal','linkModal','graphModal'].some(id=>document.getElementById(id)?.classList.contains('show'))){showStatus('请先完成或取消当前编辑表单，再打开临时画布。');return false}
+  relatedCanvasOpening=true;const generation=relatedCanvasGeneration,formalState=state;
+  try{
+    const initialDraft=nodeInlineTextEditorController?.current();
+    const initialEdgeDraft=edgeInlineLabelEditingId&&edgeInlineLabelEditorEl?.classList.contains('show')?{id:edgeInlineLabelEditingId,value:edgeInlineLabelEditorEl.querySelector('input').value}:null;
+    const transitionIsCurrent=()=>generation===relatedCanvasGeneration&&state===formalState&&!window.KGGraphFileTabs?.isSwitching?.();
+    const hasActiveDraft=()=>nodeInlineTextEditorController?.isEditing()||edgeInlineLabelEditorEl?.classList.contains('show')||['nodeModal','linkModal','graphModal'].some(id=>document.getElementById(id)?.classList.contains('show'));
+    function saveFailed(){
+      // Restore the original editable input only if no newer editor has taken its place.
+      if(transitionIsCurrent()&&!hasActiveDraft()){
+        if(initialDraft){
+          const started=initialDraft.entityType==='text-element'?startTextElementInlineEdit(initialDraft.nodeId):startNodeInlineEdit(initialDraft.nodeId);
+          if(started){const editor=document.querySelector('[data-node-inline-editor="true"]');if(editor)editor.textContent=initialDraft.value}
+        }else if(initialEdgeDraft){openEdgeInlineLabelEditor(initialEdgeDraft.id);if(edgeInlineLabelEditorEl)edgeInlineLabelEditorEl.querySelector('input').value=initialEdgeDraft.value}
+      }
+      showStatus('正式图谱保存失败，已保留当前会话与编辑输入。');return false;
+    }
+    if(window.KGHomeInk?.hasTextDraft?.()&&await window.KGHomeInk.commitText()===false)return saveFailed();
+    await nodeInlineTextEditorController?.commit();if(nodeInlineTextEditorController?.isEditing())return saveFailed();commitEdgeInlineLabelEditor();
+    const autosave=window.KGGraphFileAutosave;
+    if(autosave){
+      let needsSave=true;
+      while(needsSave){
+        if(await autosave.saveNow({force:true,reason:'before-temporary'})===false)return saveFailed();
+        if(!transitionIsCurrent())return false;
+        // New drafts started during the awaited request have not entered the saved graph.
+        // Keep their input intact and let the user finish them before retrying the switch.
+        if(hasActiveDraft()){showStatus('保存等待期间产生了新的编辑，请先完成当前输入，再打开临时画布。');return false}
+        needsSave=autosave.isDirty();
+      }
+    }
+    if(generation!==relatedCanvasGeneration||state!==formalState||window.KGGraphFileTabs?.isSwitching?.())return false;
+    const graph=window.KGRelatedCanvasController.scopeOneHop(state,ids);
+    if(!graph.nodes.length)return false;
+    closeRelatedCanvasModal();
+    const session=window.KGGraphSession.create({kind:'temporary',graph});
+    relatedCanvasController=window.KGRelatedCanvasController.create({session,model:window.KGGraphModel,nodeDims,idFactory:uid,renderCard:(n,context)=>renderCardElement(n,null,context),renderRelation:createGraphRelationPresentation,layoutEndpoints:(link,map)=>linkRenderPoints(link,map,{ignoreGather:true}),ensureMarkers:ensureGraphEdgeMarkers,onClose:()=>closeRelatedCanvasModal(true)});
+    relatedCanvasModalEl=relatedCanvasController.overlay;
+    nodeStyleToolbarController?.hide();
+    if(showMessage)showStatus(`已打开临时相关画布：${graph.nodes.length} 张卡片；关闭即丢弃修改。`);
+    return true;
+  }catch(error){showStatus('打开临时画布失败：'+String(error.message||error));return false}finally{relatedCanvasOpening=false}
 }
 window.closeRelatedCanvasModal=closeRelatedCanvasModal;
+window.addEventListener('pagehide',()=>closeRelatedCanvasModal());
+let relatedCanvasAccount=window.KGAuthCore?.currentUsername?.()||'';
+window.addEventListener('kg-auth-session-change',()=>{const account=window.KGAuthCore?.currentUsername?.()||'';if(!account||account!==relatedCanvasAccount)closeRelatedCanvasModal();relatedCanvasAccount=account});
 function isLargeGraphPreferenceEnabled(){
   const prefs=window.KGGraphUserPreferences&&typeof window.KGGraphUserPreferences.get==='function'?window.KGGraphUserPreferences.get():null;
   return !prefs||prefs.largeGraphMode!==false;
@@ -983,7 +694,7 @@ function syncGraphModeClasses(){
   updateGraphModeIndicator();
   return large;
 }
-function render(options={}){window.KGHomeInk?.sync?.();if(options&&options.persist)invalidateGraphSearchIndex();const renderer=ensureGraphRenderer();if(renderer){const result=renderer.render(options.mode||'full',options);window.KGHomeCanvasRuntime?.refreshMinimap?.(true);return result}syncGraphModeClasses();applyTransform();renderHeader();renderEdges();renderCards();renderDetails();renderSelectedEdgeQuickStylePanel();updateCardQuickActions();window.KGHomeCanvasRuntime?.refreshMinimap?.(true);if(options&&options.persist)save()}
+function render(options={}){window.KGHomeInk?.sync?.();window.KGHomeTables?.sync?.();if(options&&options.persist)invalidateGraphSearchIndex();const renderer=ensureGraphRenderer();if(renderer){const result=renderer.render(options.mode||'full',options);window.KGHomeCanvasRuntime?.refreshMinimap?.(true);return result}syncGraphModeClasses();applyTransform();renderHeader();renderEdges();renderCards();renderDetails();renderSelectedEdgeQuickStylePanel();updateCardQuickActions();window.KGHomeCanvasRuntime?.refreshMinimap?.(true);if(options&&options.persist)save()}
 window.addEventListener('kg-graph-preferences-change',event=>{
   const keys=event&&event.detail&&Array.isArray(event.detail.changedKeys)?event.detail.changedKeys:[];
   if(!keys.includes('largeGraphMode'))return;
@@ -1092,8 +803,8 @@ function createEdgeSelectionOverlay(id){
 }
 function removeEdgeSelectionOverlay(id){const dom=edgeDomById.get(String(id));if(dom?.overlay)dom.overlay.remove();if(dom)dom.overlay=null}
 function edgeControlGuidePath(geometry){
-  if(!geometry||geometry.style!=='curve'||geometry.controls.length!==2)return'';
-  const [start,end]=geometry.endpoints,[c1,c2]=geometry.controls;return`M ${start.x} ${start.y} L ${c1.x} ${c1.y} M ${end.x} ${end.y} L ${c2.x} ${c2.y}`;
+  // The curve handles are now points on the painted path; no off-path guide is needed.
+  return'';
 }
 function updateEdgeControlLayerGeometry(link,dom,geometry){
   if(!edgeControlLayer||edgeControlLayer.dataset.linkId!==String(link.id))return;
@@ -1113,18 +824,36 @@ function updateLinkGeometry(link,nodeMap){
   if(dom.label){dom.label.setAttribute('x',(points.ca.x+points.cb.x)/2);dom.label.setAttribute('y',(points.ca.y+points.cb.y)/2-8)}
   if(state.selectedLinkId===link.id)updateSelectedEdgeQuickStylePosition();return true;
 }
-function edgeRouteSnapshot(link){return{from:link.from||'',to:link.to||'',fromPoint:link.fromPoint?{...link.fromPoint}:undefined,toPoint:link.toPoint?{...link.toPoint}:undefined,pathStyle:link.pathStyle,waypoints:Array.isArray(link.waypoints)?link.waypoints.map(point=>({...point})):undefined,curveControls:Array.isArray(link.curveControls)?link.curveControls.map(point=>({...point})):undefined}}
+function edgeRouteSnapshot(link){return{from:link.from||'',to:link.to||'',fromPort:window.KGGraphPersistence.normalizePort(link.fromPort),toPort:window.KGGraphPersistence.normalizePort(link.toPort),fromPoint:link.fromPoint?{...link.fromPoint}:undefined,toPoint:link.toPoint?{...link.toPoint}:undefined,pathStyle:link.pathStyle,waypoints:Array.isArray(link.waypoints)?link.waypoints.map(point=>({...point})):undefined,curveControls:Array.isArray(link.curveControls)?link.curveControls.map(point=>({...point})):undefined}}
 function restoreEdgeRoute(link,snapshot){
   link.from=snapshot.from||'';link.to=snapshot.to||'';
+  link.fromPort=window.KGGraphPersistence.normalizePort(snapshot.fromPort);link.toPort=window.KGGraphPersistence.normalizePort(snapshot.toPort);
   if(snapshot.fromPoint===undefined)delete link.fromPoint;else link.fromPoint={...snapshot.fromPoint};
   if(snapshot.toPoint===undefined)delete link.toPoint;else link.toPoint={...snapshot.toPoint};
   link.pathStyle=snapshot.pathStyle;if(snapshot.waypoints===undefined)delete link.waypoints;else link.waypoints=snapshot.waypoints.map(point=>({...point}));if(snapshot.curveControls===undefined)delete link.curveControls;else link.curveControls=snapshot.curveControls.map(point=>({...point}));invalidateGraphIndexCache();
 }
+function captureNodeDragRoutes(nodeIds){
+  const ids=new Set(nodeIds.map(String)),nodeMap=getGraphIndex().nodeMap;
+  return state.links.filter(link=>(ids.has(String(link.from))||ids.has(String(link.to)))&&(normalizedEdgePoints(link.curveControls,2).length===2||normalizedEdgePoints(link.waypoints,12).length>0)).map(link=>{
+    const points=linkRenderPoints(link,nodeMap);if(!points)return null;
+    return{link,route:{...edgeRouteSnapshot(link),start:{...points.a},end:{...points.b}}};
+  }).filter(Boolean);
+}
+function applyNodeDragRoutes(records){
+  const nodeMap=getGraphIndex().nodeMap;
+  for(const {link,route} of records){
+    const points=linkRenderPoints(link,nodeMap);if(!points)continue;
+    const moved=window.KGGraphEdgeGeometry.moveRoute(route,{x:points.a.x-route.start.x,y:points.a.y-route.start.y},{x:points.b.x-route.end.x,y:points.b.y-route.end.y});
+    if(moved.curveControls)link.curveControls=moved.curveControls;
+    if(moved.waypoints)link.waypoints=moved.waypoints;
+  }
+}
+function restoreNodeDragRoutes(records){for(const {link,route} of records)restoreEdgeRoute(link,route)}
 function persistDerivedEdgeRoute(link,geometry){
   if(!link||!geometry)return;
   const usesWaypoints=geometry.style==='elbow'||geometry.controls[0]?.kind==='waypoint';
   if(usesWaypoints&&!normalizedEdgePoints(link.waypoints,12).length)link.waypoints=geometry.controls.map(point=>({x:point.x,y:point.y}));
-  if(!usesWaypoints&&geometry.style==='curve'&&normalizedEdgePoints(link.curveControls,2).length!==2)link.curveControls=geometry.controls.map(point=>({x:point.x,y:point.y}));
+  if(!usesWaypoints&&geometry.style==='curve'&&normalizedEdgePoints(link.curveControls,2).length!==2)link.curveControls=geometry.curveControls.map(point=>({x:point.x,y:point.y}));
 }
 function translateEdgePoint(point,dx,dy){return{x:point.x+dx,y:point.y+dy}}
 function selectEdgeForDirectManipulation(linkId,event){
@@ -1137,16 +866,17 @@ function beginEdgeMoveDrag(event,linkId){
   if(!graphModeAllows('edgeMove'))return false;
   if(isCanvasPanMode()||document.body.classList.contains('auth-readonly')||event.button!==0||event.ctrlKey||event.metaKey||event.shiftKey)return false;
   const link=linkById(linkId),dom=edgeDomById.get(String(linkId));if(!link||!dom?.geometry)return false;
-  edgeMoveDrag={pointerId:event.pointerId,linkId:String(linkId),handle:event.currentTarget,startClient:{x:event.clientX,y:event.clientY},startWorld:screenToWorld(event.clientX,event.clientY),original:edgeRouteSnapshot(link),geometry:{style:dom.geometry.style,endpoints:dom.geometry.endpoints.map(point=>({...point})),controls:dom.geometry.controls.map(point=>({...point}))},moved:false,history:false};
+  const historyController=beginGraphGestureHistory('移动关系线');if(!historyController)return false;
+  edgeMoveDrag={pointerId:event.pointerId,linkId:String(linkId),handle:event.currentTarget,startClient:{x:event.clientX,y:event.clientY},startWorld:screenToWorld(event.clientX,event.clientY),original:edgeRouteSnapshot(link),geometry:{style:dom.geometry.style,endpoints:dom.geometry.endpoints.map(point=>({...point})),controls:dom.geometry.controls.map(point=>({...point})),curveControls:dom.geometry.curveControls?.map(point=>({...point}))},historyController,moved:false,history:false};
   try{event.currentTarget.setPointerCapture(event.pointerId)}catch(error){}event.stopPropagation();return true;
 }
 function applyEdgeMoveDragPoint(point){
   const drag=edgeMoveDrag;if(!drag)return;const link=linkById(drag.linkId),dom=edgeDomById.get(drag.linkId);if(!link||!dom)return;
   const dx=point.x-drag.startWorld.x,dy=point.y-drag.startWorld.y;if(!drag.moved&&Math.hypot(dx,dy)<5/Math.max(.01,state.viewport.scale))return;
-  if(!drag.history){pushGraphUndoSnapshot('移动关系线');drag.history=true;selectEdgeForDirectManipulation(drag.linkId,{clientX:drag.startClient.x,clientY:drag.startClient.y})}
+  if(!drag.history){drag.historyController.checkpoint('移动关系线');drag.history=true;selectEdgeForDirectManipulation(drag.linkId,{clientX:drag.startClient.x,clientY:drag.startClient.y})}
   drag.moved=true;const geometry=drag.geometry;setLinkFreeEndpoint(link,'from',translateEdgePoint(geometry.endpoints[0],dx,dy));setLinkFreeEndpoint(link,'to',translateEdgePoint(geometry.endpoints[1],dx,dy));
   if(geometry.style==='elbow'||geometry.controls[0]?.kind==='waypoint'){link.waypoints=geometry.controls.map(point=>translateEdgePoint(point,dx,dy));delete link.curveControls}
-  else if(geometry.style==='curve'){link.curveControls=geometry.controls.map(point=>translateEdgePoint(point,dx,dy));delete link.waypoints}
+  else if(geometry.style==='curve'){link.curveControls=geometry.curveControls.map(point=>translateEdgePoint(point,dx,dy));delete link.waypoints}
   else{delete link.waypoints;delete link.curveControls}
   invalidateGraphIndexCache();updateLinkGeometry(link,getGraphIndex().nodeMap);stage.classList.add('graph-edge-moving','is-interacting');hideEdgeHoverFeedback();
 }
@@ -1158,8 +888,8 @@ function scheduleEdgeMoveDrag(event){
 function finishEdgeMoveDrag(event,cancelled=false){
   const drag=edgeMoveDrag;if(!drag||drag.pointerId!==event.pointerId)return false;
   if(edgeMoveDragFrame){cancelAnimationFrame(edgeMoveDragFrame);edgeMoveDragFrame=0}if(edgeMoveDragPoint&&!cancelled)applyEdgeMoveDragPoint(edgeMoveDragPoint);edgeMoveDragPoint=null;
-  const link=linkById(drag.linkId);if((cancelled||!drag.moved)&&link&&drag.history){restoreEdgeRoute(link,drag.original);updateLinkGeometry(link,getGraphIndex().nodeMap)}
   try{drag.handle?.releasePointerCapture?.(event.pointerId)}catch(error){}edgeMoveDrag=null;stage.classList.remove('graph-edge-moving','is-interacting');
+  finishGraphGestureHistory(drag,cancelled||!drag.moved);
   if(!cancelled&&drag.moved){suppressEdgeClickId=drag.linkId;suppressEdgeClickUntil=performance.now()+400;save();renderSelectedEdgeControls();renderSelectedEdgeQuickStylePanel();showStatus('关系线已独立移动，两个端点已解除节点绑定；可拖动端点重新绑定。')}else if(cancelled&&drag.moved)showStatus('已取消移动关系线。');
   if(drag.moved){event.preventDefault();event.stopPropagation()}return drag.moved;
 }
@@ -1170,13 +900,14 @@ function beginEdgeEndpointDrag(event,linkId,side){
   if(!graphModeAllows('edgeAdvanced'))return false;
   if(isCanvasPanMode()||document.body.classList.contains('auth-readonly')||event.button!==0)return;
   const link=linkById(linkId),dom=edgeDomById.get(String(linkId));if(!link||!dom?.geometry)return;const original=edgeRouteSnapshot(link);
-  edgeEndpointDrag={pointerId:event.pointerId,linkId:String(linkId),side:side==='from'?'from':'to',handle:event.currentTarget,original,startClient:{x:event.clientX,y:event.clientY},moved:false,history:false,targetId:''};
+  const historyController=beginGraphGestureHistory('调整关系线端点');if(!historyController)return false;
+  edgeEndpointDrag={pointerId:event.pointerId,linkId:String(linkId),side:side==='from'?'from':'to',handle:event.currentTarget,original,startClient:{x:event.clientX,y:event.clientY},historyController,moved:false,history:false,targetId:''};
   setSelectedEdgeQuickStyleAnchorFromEvent(event);hideSelectedEdgeQuickStylePanel();stage.classList.add('graph-edge-endpoint-dragging','is-interacting');try{event.currentTarget.setPointerCapture(event.pointerId)}catch(error){}event.preventDefault();event.stopPropagation();
 }
 function applyEdgeEndpointDragPoint(payload){
   const drag=edgeEndpointDrag;if(!drag||!payload)return;const link=linkById(drag.linkId);if(!link)return;
   if(!drag.moved&&Math.hypot(payload.clientX-drag.startClient.x,payload.clientY-drag.startClient.y)<3)return;
-  if(!drag.history){pushGraphUndoSnapshot('调整关系线端点');persistDerivedEdgeRoute(link,edgeDomById.get(drag.linkId)?.geometry);drag.history=true}
+  if(!drag.history){drag.historyController.checkpoint('调整关系线端点');persistDerivedEdgeRoute(link,edgeDomById.get(drag.linkId)?.geometry);drag.history=true}
   drag.moved=true;setLinkFreeEndpoint(link,drag.side,payload.world);invalidateGraphIndexCache();const target=edgeEndpointTargetFromClient(payload.clientX,payload.clientY),otherId=drag.side==='from'?link.to:link.from;
   if(target&&target.id!==otherId){drag.targetId=target.id;setEdgeEndpointBindTarget(target)}else{drag.targetId='';clearEdgeEndpointBindTarget()}
   updateLinkGeometry(link,getGraphIndex().nodeMap);
@@ -1189,8 +920,9 @@ function finishEdgeEndpointDrag(event,cancelled=false){
   const drag=edgeEndpointDrag;if(!drag||drag.pointerId!==event.pointerId)return;
   if(edgeEndpointDragFrame){cancelAnimationFrame(edgeEndpointDragFrame);edgeEndpointDragFrame=0}if(edgeEndpointDragPoint&&!cancelled)applyEdgeEndpointDragPoint(edgeEndpointDragPoint);edgeEndpointDragPoint=null;
   const link=linkById(drag.linkId);let bound=false;if(link&&!cancelled&&drag.moved&&drag.targetId)bound=bindLinkEndpoint(link,drag.side,drag.targetId);
-  if(link&&(cancelled||!drag.moved)&&drag.history){restoreEdgeRoute(link,drag.original)}else invalidateGraphIndexCache();if(link)updateLinkGeometry(link,getGraphIndex().nodeMap);
+  if(!cancelled&&drag.moved){invalidateGraphIndexCache();if(link)updateLinkGeometry(link,getGraphIndex().nodeMap)}
   clearEdgeEndpointBindTarget();try{drag.handle?.releasePointerCapture?.(event.pointerId)}catch(error){}edgeEndpointDrag=null;stage.classList.remove('graph-edge-endpoint-dragging','is-interacting');
+  finishGraphGestureHistory(drag,cancelled||!drag.moved);
   if(!cancelled&&drag.moved){save();renderSelectedEdgeControls();renderSelectedEdgeQuickStylePanel();showStatus(bound?'关系线端点已重新绑定到节点。':'关系线端点已移动，当前保持未绑定状态。')}else if(cancelled)showStatus('已取消调整关系线端点。');event.preventDefault();event.stopPropagation();
 }
 function createEdgeEndpointHandle(link,side,point){
@@ -1202,10 +934,11 @@ function beginEdgeControlDrag(event,linkId,kind,index){
   if(!graphModeAllows('edgeAdvanced'))return false;
   if(isCanvasPanMode()||document.body.classList.contains('auth-readonly')||event.button===2)return;
   const link=linkById(linkId),dom=edgeDomById.get(String(linkId));if(!link||!dom?.geometry)return;const original=edgeRouteSnapshot(link);
-  pushGraphUndoSnapshot('调整关系线路径');
+  const historyController=beginGraphGestureHistory('调整关系线路径');if(!historyController)return false;
+  historyController.checkpoint('调整关系线路径');
   if(kind==='waypoint'&&!normalizedEdgePoints(link.waypoints,12).length)link.waypoints=dom.geometry.controls.map(point=>({x:point.x,y:point.y}));
-  if(kind==='curve-control'&&normalizedEdgePoints(link.curveControls,2).length!==2)link.curveControls=dom.geometry.controls.map(point=>({x:point.x,y:point.y}));
-  edgeControlDrag={pointerId:event.pointerId,linkId:String(linkId),kind,index:Number(index)||0,handle:event.currentTarget,original,moved:false};stage.classList.add('graph-edge-control-dragging','is-interacting');
+  if(kind==='curve-control'&&normalizedEdgePoints(link.curveControls,2).length!==2)link.curveControls=dom.geometry.curveControls.map(point=>({x:point.x,y:point.y}));
+  edgeControlDrag={pointerId:event.pointerId,linkId:String(linkId),kind,index:Number(index)||0,handle:event.currentTarget,original,historyController,moved:false};stage.classList.add('graph-edge-control-dragging','is-interacting');
   try{event.currentTarget.setPointerCapture(event.pointerId)}catch(error){}
   event.preventDefault();event.stopPropagation();
 }
@@ -1217,7 +950,8 @@ function applyEdgeControlDragPoint(point){
   }else if(drag.kind==='waypoint'){
     const points=normalizedEdgePoints(link.waypoints,12);while(points.length<=drag.index)points.push({x:point.x,y:point.y});points[drag.index]={x:point.x,y:point.y};link.waypoints=points;
   }else if(drag.kind==='curve-control'){
-    const points=normalizedEdgePoints(link.curveControls,2);while(points.length<2)points.push({x:point.x,y:point.y});points[drag.index]={x:point.x,y:point.y};link.curveControls=points;
+    const current=linkRenderPoints(link,getGraphIndex().nodeMap),controls=normalizedEdgePoints(link.curveControls,2);
+    if(current&&controls.length===2){const handles=window.KGGraphEdgeGeometry.curveHandles(current.a,controls,current.b);handles[drag.index]={x:point.x,y:point.y};link.curveControls=window.KGGraphEdgeGeometry.controlsFromHandles(current.a,handles,current.b)}
   }
   updateLinkGeometry(link,getGraphIndex().nodeMap);
 }
@@ -1229,8 +963,8 @@ function scheduleEdgeControlDrag(event){
 function finishEdgeControlDrag(event,cancelled=false){
   const drag=edgeControlDrag;if(!drag||drag.pointerId!==event.pointerId)return;
   if(edgeControlDragFrame){cancelAnimationFrame(edgeControlDragFrame);edgeControlDragFrame=0}if(edgeControlDragPoint&&!cancelled)applyEdgeControlDragPoint(edgeControlDragPoint);edgeControlDragPoint=null;
-  const link=linkById(drag.linkId);if((cancelled||!drag.moved)&&link){restoreEdgeRoute(link,drag.original);updateLinkGeometry(link,getGraphIndex().nodeMap)}
   try{drag.handle?.releasePointerCapture?.(event.pointerId)}catch(error){}edgeControlDrag=null;stage.classList.remove('graph-edge-control-dragging','is-interacting');
+  finishGraphGestureHistory(drag,cancelled||!drag.moved);
   if(!cancelled&&drag.moved){save();renderSelectedEdgeQuickStylePanel();showStatus('关系线路径已更新。')}else if(cancelled)showStatus('已取消调整关系线路径。');
   renderSelectedEdgeControls();event.preventDefault();event.stopPropagation();
 }
@@ -1272,6 +1006,8 @@ function ensureSelectedEdgeQuickStylePanel(){
     onLineStyle:value=>{if(LINE_STYLES.has(value)&&typeof applyLineStyle==='function')applyLineStyle(value)},
     onPathStyle:value=>{if(LINE_PATH_STYLES.has(value)&&typeof applyPathStyle==='function')applyPathStyle(value)},
     onWidth:value=>{if(typeof applyLineWidth==='function')applyLineWidth(Number(value))},
+    onPort:(side,value)=>applySelectedEdgePorts({[side==='from'?'fromPort':'toPort']:value}),
+    onPortsReset:()=>applySelectedEdgePorts({fromPort:'auto',toPort:'auto'}),
     onArrowStyle:value=>{if(typeof applyArrowStyle==='function')applyArrowStyle(value)},
     onLabel:event=>{
       const links=selectedEditableLinks(),id=links.length===1?String(links[0].id):'';
@@ -1293,6 +1029,14 @@ function ensureSelectedEdgeQuickStylePanel(){
 }
 function selectedEdgeQuickScreenPoint(){
   const links=selectedEditableLinks();if(!links.length)return null;
+  if(links.length===1){
+    const geometry=edgeDomById.get(String(links[0].id))?.geometry;
+    if(geometry?.style==='curve'&&geometry.controls.length===2&&geometry.controls[0].kind==='curve-control'){
+      const handles=geometry.controls.map(point=>({x:point.x*state.viewport.scale+state.viewport.x,y:point.y*state.viewport.scale+state.viewport.y}));
+      const top=Math.min(handles[0].y,handles[1].y),bottom=Math.max(handles[0].y,handles[1].y);
+      return{x:(handles[0].x+handles[1].x)/2,y:top>80?top-24:bottom+80,link:links[0]};
+    }
+  }
   if(selectedEdgeQuickStyleAnchorWorld)return{x:selectedEdgeQuickStyleAnchorWorld.x*state.viewport.scale+state.viewport.x,y:selectedEdgeQuickStyleAnchorWorld.y*state.viewport.scale+state.viewport.y,link:links[0]};
   const points=[];
   for(const link of links){const point=linkGeometryMidpoint(link);if(point)points.push(point)}
@@ -1312,6 +1056,15 @@ function updateSelectedEdgeQuickStylePosition(){
 function hideSelectedEdgeQuickStylePanel(){
   selectedEdgeQuickStyleToolbarController?.hide?.();selectedEdgeQuickStyleAnchorWorld=null;
 }
+function applySelectedEdgePorts(patch){
+  const links=selectedEditableLinks(),persistence=window.KGGraphPersistence;
+  if(!links.length||document.body.classList.contains('auth-readonly'))return false;
+  const clean=Object.fromEntries(Object.entries(patch).filter(([key])=>key==='fromPort'||key==='toPort').map(([key,value])=>[key,persistence.normalizePort(value)]));
+  if(!links.some(link=>Object.entries(clean).some(([key,value])=>persistence.normalizePort(link[key])!==value)))return false;
+  const mutate=()=>links.forEach(link=>Object.assign(link,clean)),history=ensureGraphHistoryController();
+  if(history)history.run('修改连接位置',mutate);else mutate();
+  render({mode:'edges',persist:true});showStatus('连接位置已保存。');return true;
+}
 function renderSelectedEdgeQuickStylePanel(){
   if(!graphModeAllows('edgeToolbar')){hideSelectedEdgeQuickStylePanel();hideEdgeInlineLabelEditor();return}
   const links=selectedEditableLinks();
@@ -1324,6 +1077,7 @@ function renderSelectedEdgeQuickStylePanel(){
     pathStyle:edgeBatchMixedValue(links,'pathStyle',DEFAULTS.linkPathStyle),
     color:safeColor(edgeBatchMixedValue(links,'color',DEFAULTS.linkColor)||DEFAULTS.linkColor,DEFAULTS.linkColor),
     width:edgeBatchMixedValue(links,'strokeWidth',4),
+    fromPort:edgeBatchMixedValue(links,'fromPort','auto'),toPort:edgeBatchMixedValue(links,'toPort','auto'),
     arrowStyle:edgeBatchMixedValue(links,'arrowStyle','none'),
     selectionFilter:window.KGHomeCanvasRuntime?.selectionFilter
   });
@@ -1477,13 +1231,34 @@ function shouldRenderLinkInCurrentMode(link,nodeMap,localIds,renderedCount){
   if(!a||!b)return true;
   return isLargeGraphOverviewLink(link,a,b);
 }
-function ensureGraphEdgeMarkers(){
-  const svg=$('edgeLayer');if(!svg)return null;
+function ensureGraphEdgeMarkers(svg=$('edgeLayer'),markerId='kgGraphArrow'){
+  if(!svg)return null;
   let defs=svg.querySelector('defs[data-kg-edge-markers]');
   if(defs)return defs;
   defs=document.createElementNS('http://www.w3.org/2000/svg','defs');defs.dataset.kgEdgeMarkers='true';
-  defs.innerHTML='<marker id="kgGraphArrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse" markerUnits="strokeWidth"><path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke"></path></marker>';
+  defs.innerHTML='<marker id="'+markerId+'" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse" markerUnits="strokeWidth"><path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke"></path></marker>';
   svg.insertBefore(defs,svg.firstChild);return defs;
+}
+function applyGraphEdgeAppearance(vis,link,markerId='kgGraphArrow'){
+  const lineColor=safeColor(link.color,DEFAULTS.linkColor),lineStyle=LINE_STYLES.has(link.lineStyle)?link.lineStyle:DEFAULTS.linkStyle;
+  const strokeWidth=Math.max(1,Math.min(8,Number(link.strokeWidth)||4)),arrowStyle=['none','end','both'].includes(String(link.arrowStyle||''))?String(link.arrowStyle):'none';
+  vis.style.setProperty('--edge-color',lineColor);vis.style.strokeWidth=strokeWidth;vis.style.setProperty('--edge-base-width',String(strokeWidth));vis.dataset.strokeWidth=String(strokeWidth);vis.dataset.arrowStyle=arrowStyle;
+  vis.removeAttribute('marker-end');vis.removeAttribute('marker-start');vis.removeAttribute('stroke-dasharray');
+  if(arrowStyle==='end'||arrowStyle==='both')vis.setAttribute('marker-end',`url(#${markerId})`);
+  if(arrowStyle==='both')vis.setAttribute('marker-start',`url(#${markerId})`);
+  const dashArray=dashArrayForLineStyle(lineStyle,strokeWidth);if(dashArray)vis.setAttribute('stroke-dasharray',dashArray);
+}
+function createGraphRelationPresentation(link,nodeMap,{markerId='kgGraphArrow',ignoreGather=false}={}){
+  const points=linkRenderPoints(link,nodeMap,{ignoreGather});if(!points)return null;
+  const geometry=linkPathGeometry(link,points.a,points.b,points),path=svgElement('path','edge-visible');
+  path.setAttribute('d',geometry.d);applyGraphEdgeAppearance(path,link,markerId);
+  let label=null;const text=String(link.type||link.note||'');
+  if(text){
+    label=svgElement('text','edge-label');label.textContent=text;label.setAttribute('text-anchor','middle');
+    const samples=geometry.samples,mid=samples.length===2?{x:(samples[0].x+samples[1].x)/2,y:(samples[0].y+samples[1].y)/2}:samples[Math.floor(samples.length/2)];
+    label.setAttribute('x',mid.x);label.setAttribute('y',mid.y-8);
+  }
+  return{path,label,geometry};
 }
 function renderEdges(){
   ensureGraphEdgeMarkers();hideEdgeHoverFeedback();
@@ -1511,8 +1286,7 @@ function renderEdges(){
       if(graphModeAllows('edgeLabelEdit'))hit.addEventListener('dblclick',event=>{if(isCanvasPanMode()){event.preventDefault();return}event.preventDefault();event.stopPropagation();if(event.altKey&&graphModeAllows('edgeAdvanced'))openLinkModal(link.id);else openEdgeInlineLabelEditor(link.id,event)});
     }
     vis.setAttribute('class','edge-visible'+(importantLink?' focus-important-edge':'')+(normalRelationLayer==='active'?' edge-related-active':'')+(normalRelationLayer==='muted'?' edge-related-muted':''));vis.style.setProperty('--edge-color',lineColor);
-    const strokeWidth=Math.max(1,Math.min(8,Number(link.strokeWidth)||4)),arrowStyle=['none','end','both'].includes(String(link.arrowStyle||''))?String(link.arrowStyle):'none';vis.style.strokeWidth=strokeWidth;vis.style.setProperty('--edge-base-width',String(strokeWidth));vis.dataset.strokeWidth=String(strokeWidth);vis.dataset.arrowStyle=arrowStyle;
-    if(arrowStyle==='end'||arrowStyle==='both')vis.setAttribute('marker-end','url(#kgGraphArrow)');if(arrowStyle==='both')vis.setAttribute('marker-start','url(#kgGraphArrow)');const dashArray=dashArrayForLineStyle(lineStyle,strokeWidth);if(dashArray)vis.setAttribute('stroke-dasharray',dashArray);
+    applyGraphEdgeAppearance(vis,link);
     g.appendChild(hit);g.appendChild(vis);const label=null;nextEdgeDom.set(String(link.id),{g,hit,vis,label,link,overlay:null,geometry:null});baseFrag.appendChild(g);
   }
   edgeDomById=nextEdgeDom;for(const link of state.links){if(edgeDomById.has(String(link.id)))updateLinkGeometry(link,nodeMap)}
@@ -1582,7 +1356,9 @@ function graphUndoSnapshot(){
     links:cloneGraphValue(state.links||[]),
     elements:cloneGraphValue(state.elements||[]),
     strokes:cloneGraphValue(state.strokes||[]),
+    tables:cloneGraphValue(state.tables||[]),
     defaults:cloneGraphValue(state.defaults||{}),
+    mindmap:cloneGraphValue(state.mindmap||null),
     selection:{...selected,selectedElementId:state.selectedElementId||null,selectedTextElementIds:[...selectedTextElementIds]}
   };
 }
@@ -1592,7 +1368,9 @@ function applyGraphHistorySnapshot(snapshot={}){
   if(nodeContextMenuController)nodeContextMenuController.hide();
   state.nodes=cloneGraphValue(snapshot.nodes||[]).map(node=>window.KGGraphModel&&window.KGGraphModel.normalizeNode?window.KGGraphModel.normalizeNode(node):node);
   state.links=cloneGraphValue(snapshot.links||[]);
+  if(snapshot.mindmap)state.mindmap=cloneGraphValue(snapshot.mindmap);else delete state.mindmap;
   state.strokes=cloneGraphValue(snapshot.strokes||[]);
+  if(Array.isArray(snapshot.tables))state.tables=window.KGCanvasTableModel?.sanitizeCollection?window.KGCanvasTableModel.sanitizeCollection(snapshot.tables):(cloneGraphValue(snapshot.tables)||[]);
   state.elements=cloneGraphValue(snapshot.elements||[]).map(item=>window.KGGraphModel&&window.KGGraphModel.normalizeTextElement?window.KGGraphModel.normalizeTextElement(item):item);
   state.defaults={...state.defaults,...cloneGraphValue(snapshot.defaults||{})};
   const nodeIds=new Set(state.nodes.map(n=>n.id)),linkIds=new Set(state.links.map(l=>l.id)),elementIds=new Set((state.elements||[]).map(item=>item.id));
@@ -1619,12 +1397,14 @@ function ensureGraphHistoryController(){
   graphKernelControllers.history=factory.create({limit:GRAPH_UNDO_LIMIT,capture:graphUndoSnapshot,restore:applyGraphHistorySnapshot,onChange:()=>window.KGHomeInk?.refreshControls?.()});
   return graphKernelControllers.history;
 }
-function resetGraphHistory(){window.KGHomeInk?.reset?.();const history=ensureGraphHistoryController();history?.clear?.();graphKernelControllers.clipboard?.clear?.();graphClipboardNodes=null;graphClipboardTextElement=null;return true}
+function resetGraphHistory(){window.KGHomeInk?.reset?.();const history=ensureGraphHistoryController();history?.clear?.();return true}
 window.resetGraphHistory=resetGraphHistory;
 function pushGraphUndoSnapshot(label='操作'){
   const history=ensureGraphHistoryController();
   return history?history.checkpoint(label):false;
 }
+function beginGraphGestureHistory(label){const history=ensureGraphHistoryController();return history?.begin(label)?history:null}
+function finishGraphGestureHistory(drag,cancelled){return cancelled?drag.historyController.rollback():drag.historyController.commit()}
 function restoreGraphUndoSnapshot(){
   if(!canWriteGraph())return false;
   const history=ensureGraphHistoryController(),item=history&&history.undo();
@@ -1648,35 +1428,13 @@ function selectedNodeIdsForClipboard(){
 function copySelectedGraphCards(){
   const textItem=state.selectedElementId?textElementById(state.selectedElementId):null;
   if(!textItem&&rejectLockedNodeAction('复制'))return false;
-  if(textItem){graphClipboardTextElement=cloneGraphValue(textItem);graphClipboardNodes=null;showStatus('已复制文本框，将鼠标移到目标位置后按 Ctrl+V 粘贴。');return true}
   const ids=selectedNodeIdsForClipboard();
-  if(!ids.length){showStatus('请先选择要复制的卡牌或文本框。');return false}
-  graphClipboardTextElement=null;
-  graphClipboardNodes=ids.map(id=>{
-    const n=nodeById(id),d=nodeDims(n);
-    return{
-      title:n.title||'未命名知识点',
-      category:n.category||'',
-      color:safeColor(n.color,DEFAULTS.nodeColor),
-      size:NODE_SIZES.has(n.size)?n.size:'',
-      level:n.level||'基础',
-      keywords:n.keywords||'',
-      summary:n.summary||'',
-      notes:n.notes||'',
-      highlightTerms:n.highlightTerms||'',
-      x:n.x,
-      y:n.y,
-      w:d.w,
-      h:d.h,
-      content:window.KGGraphModel&&window.KGGraphModel.contentOf?window.KGGraphModel.contentOf(n):null,
-      appearance:window.KGGraphModel&&window.KGGraphModel.appearanceOf?window.KGGraphModel.appearanceOf(n):null,
-      geometry:window.KGGraphModel&&window.KGGraphModel.geometryOf?window.KGGraphModel.geometryOf(n):null,
-      cardStyle:n.cardStyle||'standard',
-      textAlign:n.textAlign||'center'
-    };
-  });
-  const clipboard=ensureGraphClipboardController();if(clipboard)clipboard.write(graphClipboardNodes);
-  showStatus(`已复制 ${graphClipboardNodes.length} 张卡牌。将鼠标移到目标位置后按 Ctrl+V 粘贴。`);
+  if(!textItem&&!ids.length){showStatus('请先选择要复制的卡牌或文本框。');return false}
+  const source=window.KGGraphFileEditorStoreBridge?.fragmentSource?.()||{};
+  const fragment=window.KGGraphFragment.capture({...state,...source},{nodeIds:textItem?[]:ids,elementIds:textItem?[textItem.id]:[]});
+  ensureGraphClipboardController().writeFragment(fragment);
+  graphClipboardNodes=null;graphClipboardTextElement=null;
+  showStatus(`已复制 ${fragment.nodes.length||fragment.elements.length} 个图谱对象。`);
   return true;
 }
 function graphClipboardBounds(nodes){const clipboard=ensureGraphClipboardController();if(clipboard)return clipboard.bounds(nodes);let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;nodes.forEach(n=>{minX=Math.min(minX,n.x);minY=Math.min(minY,n.y);maxX=Math.max(maxX,n.x+(n.w||CARD_W));maxY=Math.max(maxY,n.y+(n.h||CARD_H))});if(!Number.isFinite(minX))return{x:0,y:0,w:0,h:0,cx:0,cy:0};return{x:minX,y:minY,w:maxX-minX,h:maxY-minY,cx:(minX+maxX)/2,cy:(minY+maxY)/2}}
@@ -1685,53 +1443,80 @@ function currentPasteWorldPoint(){
   const r=stage.getBoundingClientRect();
   return screenToWorld(r.left+r.width/2,r.top+r.height/2);
 }
-function pasteGraphClipboardCards(){
-  if(graphClipboardTextElement){
-    const model=window.KGGraphModel,target=currentPasteWorldPoint(),source=graphClipboardTextElement,geometry=model.textElementGeometryOf(source),copy=model.normalizeTextElement(cloneGraphValue(source),{idFactory:()=>uid('t')});copy.id=uid('t');
-    model.updateTextElementGeometry(copy,{x:Math.round(target.x-geometry.width/2),y:Math.round(target.y-geometry.height/2)});pushGraphUndoSnapshot('粘贴文本框');state.elements.push(copy);clearMultiSelection();state.selectedElementId=copy.id;state.selectedNodeId=null;state.selectedLinkId=null;state.linkSourceId=null;render({persist:true});showStatus('已粘贴文本框。');return true;
-  }
-  const clipboard=ensureGraphClipboardController(),source=clipboard&&clipboard.hasData()?clipboard.read():(Array.isArray(graphClipboardNodes)?graphClipboardNodes:[]);
-  if(!source.length){showStatus('剪贴板中还没有已复制的卡牌或文本框。');return false}
-  if(typeof authRequire==='function'&&!authRequire('登录后才能粘贴卡牌。'))return true;
+// 跨文件粘贴走服务端受控端点：只有服务端读取的真实绑定才能创建新授权。
+let graphRemotePasteChain=Promise.resolve();
+function pasteGraphFragmentRemotely(source){
+  const local=window.KGGraphFileEditorStoreBridge?.fragmentSource?.();
+  if(!local?.fileId||!source.source?.fileId||source.source.fileId===local.fileId)return false;
   const sub=window.KGSubscription;
-  if(sub&&typeof sub.requireUsageLimit==='function'&&!sub.requireUsageLimit('graphNodes',state.nodes.length,source.length,{label:'图谱卡牌'}))return true;
-  const available=Math.max(0,2500-state.nodes.length);
-  if(source.length>available){showStatus(`当前图谱最多还可新增 ${available} 张卡牌，无法粘贴 ${source.length} 张。`);return true}
-  const target=currentPasteWorldPoint(),bounds=graphClipboardBounds(source),created=[];
-  clearRelatedGatherLayout({render:false,message:false});
-  pushGraphUndoSnapshot(`粘贴 ${source.length} 张卡牌`);
-  source.forEach(item=>{
-    const n=makeNode(
-      item.title||'未命名知识点',
-      Math.round(target.x+(item.x-bounds.cx)),
-      Math.round(target.y+(item.y-bounds.cy)),
-      safeColor(item.color,DEFAULTS.nodeColor),
-      item.category||'',
-      item.level||'基础',
-      item.keywords||'',
-      item.summary||'',
-      item.notes||'',
-      NODE_SIZES.has(item.size)?item.size:''
-    );
-    n.highlightTerms=item.highlightTerms||item.content&&item.content.highlightTerms||'';
-    if(window.KGGraphModel){
-      window.KGGraphModel.updateContent(n,item.content||{description:item.summary||'',highlightTerms:n.highlightTerms});
-      window.KGGraphModel.updateAppearance(n,item.appearance||{cardStyle:item.cardStyle||'standard',textAlign:item.textAlign||'center',color:item.color,size:item.size});
-      window.KGGraphModel.updateGeometry(n,{x:n.x,y:n.y,width:item.w||item.geometry&&item.geometry.width,height:item.h||item.geometry&&item.geometry.height});
-    }
-    state.nodes.push(n);
-    created.push(n.id);
+  if(source.nodes.length&&sub?.requireUsageLimit&&!sub.requireUsageLimit('graphNodes',state.nodes.length,source.nodes.length,{label:'图谱卡牌'}))return true;
+  if(source.nodes.length>2500-state.nodes.length){showStatus('当前图谱卡牌数量已达上限。');return true}
+  const target=currentPasteWorldPoint(),bounds=graphClipboardBounds(source.nodes.length?source.nodes:source.elements);
+  showStatus('正在跨图谱粘贴…');
+  // 串行化连续粘贴：每次请求都基于上一次完成后的最新 revision，避免快速连续粘贴 409。
+  graphRemotePasteChain=graphRemotePasteChain.then(async()=>{
+    try{
+      // 排队期间可能已切换文件：目标不再是当前文件时直接放弃本次粘贴。
+      const nowCurrent=window.KGGraphFileEditorStoreBridge?.fragmentSource?.();
+      if(nowCurrent?.fileId!==local.fileId)return;
+      const revision=nowCurrent.revision;
+      const response=await fetch(`/api/v1/files/${encodeURIComponent(local.fileId)}/fragments`,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({fragment:source,offset:{x:target.x-bounds.cx,y:target.y-bounds.cy},expectedFileRevision:revision})});
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok){showStatus(({GRAPH_FILE_REVISION_CONFLICT:'当前图谱已在其他窗口更新，请刷新后重新粘贴。',GRAPH_FRAGMENT_SOURCE_STALE:'来源图谱已变化，请回到来源重新复制后再粘贴。',GRAPH_NODE_QUOTA_EXCEEDED:'当前图谱卡牌数量已达上限。',TEMPLATE_NODE_QUOTA_EXCEEDED:'当前图谱卡牌数量已达上限。'})[data.detail?.code]||(typeof data.detail==='string'?data.detail:'跨图谱粘贴失败，请重试。'));return}
+      if(window.KGGraphFileEditorStoreBridge?.fragmentSource?.()?.fileId!==local.fileId)return;
+      const fragment=data.fragment||{},nodes=fragment.nodes||[];
+      window.KGGraphFileRemoteAdapter?.acceptRevision?.(local.fileId,data.fileRevision);
+      clearRelatedGatherLayout({render:false,message:false});pushGraphUndoSnapshot('粘贴图谱片段');
+      state.nodes.push(...nodes);state.links.push(...(fragment.links||[]));state.elements.push(...(fragment.elements||[]));
+      selectedNodeIds=new Set(nodes.map(n=>n.id));selectedLinkIds.clear();
+      state.selectedElementId=fragment.elements?.[0]?.id||null;state.selectedNodeId=nodes[0]?.id||null;state.selectedLinkId=null;state.linkSourceId=null;
+      render({persist:true});
+      const inherited=(data.bindings||[]).filter(item=>item.bindings?.length).length;
+      showStatus(`已粘贴 ${nodes.length||(fragment.elements||[]).length} 个图谱对象${inherited?`，${inherited} 张卡牌继承题目关联`:''}。`);
+    }catch(error){showStatus('跨图谱粘贴失败，请检查网络后重试。')}
   });
-  selectedNodeIds=new Set(created);
-  selectedLinkIds.clear();
-  state.selectedElementId=null;
-  state.selectedNodeId=created[0]||null;
-  state.selectedLinkId=null;
-  state.linkSourceId=null;
-  render({persist:true});
-  showStatus(`已粘贴 ${created.length} 张卡牌。`);
   return true;
 }
+function pasteGraphClipboardCards(){
+  if(!canWriteGraph())return false;
+  const clipboard=ensureGraphClipboardController(),source=clipboard?.readFragment();
+  if(!source||!clipboard.hasData())return false;
+  if(typeof authRequire==='function'&&!authRequire('登录后才能粘贴卡牌。'))return true;
+  const remote=pasteGraphFragmentRemotely(source);
+  if(remote!==false)return remote;
+  const sub=window.KGSubscription;
+  if(source.nodes.length&&sub?.requireUsageLimit&&!sub.requireUsageLimit('graphNodes',state.nodes.length,source.nodes.length,{label:'图谱卡牌'}))return true;
+  if(source.nodes.length>2500-state.nodes.length){showStatus('当前图谱卡牌数量已达上限。');return true}
+  const target=currentPasteWorldPoint(),bounds=graphClipboardBounds(source.nodes.length?source.nodes:source.elements);
+  let fragment;
+  try{
+    fragment=window.KGGraphFragment.remap(source,{idFactory:kind=>uid(kind==='nodes'?'n':kind==='links'?'l':'t'),offset:{x:target.x-bounds.cx,y:target.y-bounds.cy}}).fragment;
+    fragment=sanitizeState(fragment);
+  }catch(error){showStatus('剪贴板图谱片段格式无效。');return false}
+  clearRelatedGatherLayout({render:false,message:false});pushGraphUndoSnapshot('粘贴图谱片段');
+  state.nodes.push(...fragment.nodes);state.links.push(...fragment.links);state.elements.push(...fragment.elements);
+  selectedNodeIds=new Set(fragment.nodes.map(n=>n.id));selectedLinkIds.clear();
+  state.selectedElementId=fragment.elements[0]?.id||null;state.selectedNodeId=fragment.nodes[0]?.id||null;state.selectedLinkId=null;state.linkSourceId=null;
+  render({persist:true});showStatus(`已粘贴 ${fragment.nodes.length||fragment.elements.length} 个图谱对象。`);return true;
+}
+function clearGraphClipboard(){ensureGraphClipboardController()?.clear();graphClipboardNodes=null;graphClipboardTextElement=null}
+window.clearGraphClipboard=clearGraphClipboard;
+let graphClipboardAccount=window.KGAuthCore?.currentUsername?.()||'';
+window.addEventListener('kg-auth-session-change',()=>{
+  const account=window.KGAuthCore?.currentUsername?.()||'';
+  if(!account||account!==graphClipboardAccount)clearGraphClipboard();graphClipboardAccount=account;
+});
+document.addEventListener('copy',event=>{
+  if(isTextEditingTarget(event)||!graphModeAllows('editGraph'))return;
+  if(copySelectedGraphCards()&&ensureGraphClipboardController().exportEvent(event))event.preventDefault();
+});
+document.addEventListener('paste',event=>{
+  if(isTextEditingTarget(event)||!graphModeAllows('editGraph')||!canWriteGraph())return;
+  const clipboard=ensureGraphClipboardController(),data=event.clipboardData;
+  const explicit=data&&(data.getData(window.KGGraphFragment.mime)||data.getData('text/plain'));
+  if(explicit&&!clipboard.importEvent(event))return;
+  if(pasteGraphClipboardCards())event.preventDefault();
+});
 function toggleCardMultiSelection(id){
   if(!graphModeAllows('multiSelect')){handleNodeTap(id);return}
   window.KGHomeCanvasRuntime?.selectionFilter?.clear?.({reason:'direct-node-toggle',apply:false});
@@ -1835,9 +1620,10 @@ function beginHomeSelectionBoundsDrag(event){
   if(event.ctrlKey||event.metaKey||event.shiftKey)return false;
   const ids=selectedHomeMovableIds(),total=ids.nodes.length+ids.texts.length;if(total<2)return false;
   const locked=ids.nodes.filter(id=>window.KGGraphModel?.interactionOf?.(nodeById(id))?.locked);if(locked.length){showStatus(`选择中有 ${locked.length} 个锁定节点，已取消整体移动。`);return false}
+  const historyController=beginGraphGestureHistory(`移动 ${total} 个图元`);if(!historyController)return false;
   const nodeOrigins=Object.fromEntries(ids.nodes.map(id=>{const node=nodeById(id);return[id,{x:Number(node.x)||0,y:Number(node.y)||0}]}));
   const textOrigins=Object.fromEntries(ids.texts.map(id=>{const item=textElementById(id),g=window.KGGraphModel?.textElementGeometryOf?.(item)||item;return[id,{x:Number(g.x)||0,y:Number(g.y)||0}]}));
-  homeSelectionBoundsDrag={pointerId:event.pointerId,startX:event.clientX,startY:event.clientY,nodeIds:ids.nodes,textIds:ids.texts,nodeOrigins,textOrigins,moved:false,history:false,frame:0,pending:null,anchorRect:homeSelectionAnchorRect()};
+  homeSelectionBoundsDrag={pointerId:event.pointerId,startX:event.clientX,startY:event.clientY,nodeIds:ids.nodes,textIds:ids.texts,nodeOrigins,textOrigins,routeSnapshots:captureNodeDragRoutes(ids.nodes),historyController,moved:false,history:false,frame:0,pending:null,anchorRect:homeSelectionAnchorRect()};
   try{stage.setPointerCapture(event.pointerId)}catch(error){}
   stage.classList.add('home-selection-bounds-dragging','graph-card-dragging');nodeStyleToolbarController?.hide?.();hideSelectedEdgeQuickStylePanel();window.KGHomeCanvasRuntime?.alignment?.clearGuides?.();
   event.preventDefault();event.stopPropagation();event.stopImmediatePropagation();return true;
@@ -1845,9 +1631,10 @@ function beginHomeSelectionBoundsDrag(event){
 function applyHomeSelectionBoundsMove(point){
   const drag=homeSelectionBoundsDrag;if(!drag||drag.pointerId!==point.pointerId)return false;
   const dx=(point.clientX-drag.startX)/Math.max(.0001,Number(state.viewport.scale)||1),dy=(point.clientY-drag.startY)/Math.max(.0001,Number(state.viewport.scale)||1);
-  if(Math.hypot(point.clientX-drag.startX,point.clientY-drag.startY)>4&&!drag.moved){drag.moved=true;if(!drag.history){pushGraphUndoSnapshot(`移动 ${drag.nodeIds.length+drag.textIds.length} 个图元`);drag.history=true}ensureHomeEdgeDragPerformanceController()?.start?.(drag.nodeIds)}
+  if(Math.hypot(point.clientX-drag.startX,point.clientY-drag.startY)>4&&!drag.moved){drag.moved=true;if(!drag.history){drag.historyController.checkpoint(`移动 ${drag.nodeIds.length+drag.textIds.length} 个图元`);drag.history=true}ensureHomeEdgeDragPerformanceController()?.start?.(drag.nodeIds)}
   if(!drag.moved)return false;
   for(const id of drag.nodeIds){const node=nodeById(id),origin=drag.nodeOrigins[id];if(!node||!origin)continue;window.KGGraphModel?.updateGeometry?.(node,{x:Math.round(origin.x+dx),y:Math.round(origin.y+dy)});const el=cardElementByNodeId(id);if(el){el.style.left=node.x+'px';el.style.top=node.y+'px'}}
+  applyNodeDragRoutes(drag.routeSnapshots);
   for(const id of drag.textIds){const item=textElementById(id),origin=drag.textOrigins[id];if(!item||!origin)continue;window.KGGraphModel?.updateTextElementGeometry?.(item,{x:Math.round(origin.x+dx),y:Math.round(origin.y+dy)});const el=textElementDomByIdValue(id);if(el){el.style.left=item.x+'px';el.style.top=item.y+'px'}}
   ensureHomeEdgeDragPerformanceController()?.schedule?.(drag.nodeIds);
   if(drag.anchorRect){
@@ -1865,9 +1652,10 @@ function finishHomeSelectionBoundsDrag(event,cancelled=false){
   const drag=homeSelectionBoundsDrag;if(!drag||drag.pointerId!==event.pointerId)return false;
   if(drag.frame){cancelAnimationFrame(drag.frame);drag.frame=0}if(drag.pending&&!cancelled)applyHomeSelectionBoundsMove(drag.pending);homeSelectionBoundsDrag=null;
   try{stage.releasePointerCapture(event.pointerId)}catch(error){}stage.classList.remove('home-selection-bounds-dragging','graph-card-dragging');ensureHomeEdgeDragPerformanceController()?.stop?.(drag.nodeIds);
-  if(cancelled&&drag.moved){for(const id of drag.nodeIds){const node=nodeById(id),origin=drag.nodeOrigins[id];if(node&&origin)window.KGGraphModel?.updateGeometry?.(node,origin)}for(const id of drag.textIds){const item=textElementById(id),origin=drag.textOrigins[id];if(item&&origin)window.KGGraphModel?.updateTextElementGeometry?.(item,origin)}render();showStatus('已取消整体移动。')}
-  else if(!drag.moved)dismissLockedHomeSelection('selection-click-dismiss');
-  else{save();refreshSelectionUI();requestAnimationFrame(()=>window.KGHomeCanvasRuntime?.selectionFilter?.refreshPosition?.(homeSelectionAnchorRect()));showStatus(`已整体移动 ${drag.nodeIds.length+drag.textIds.length} 个图元，并恢复完整关系线。`)}
+  finishGraphGestureHistory(drag,cancelled||!drag.moved);
+  if(cancelled&&drag.moved)showStatus('已取消整体移动。');
+  else if(!drag.moved&&!cancelled)dismissLockedHomeSelection('selection-click-dismiss');
+  else if(!cancelled){save();refreshSelectionUI();requestAnimationFrame(()=>window.KGHomeCanvasRuntime?.selectionFilter?.refreshPosition?.(homeSelectionAnchorRect()));showStatus(`已整体移动 ${drag.nodeIds.length+drag.textIds.length} 个图元，并恢复完整关系线。`)}
   event.preventDefault();event.stopPropagation();event.stopImmediatePropagation();return true;
 }
 function beginLockedHomeSelectionPointer(event){
@@ -1979,17 +1767,18 @@ function textElementById(id){return (state.elements||[]).find(item=>item&&item.i
 function textElementDomByIdValue(id){return textElementDomById.get(id)||null}
 
 function cardRelationState(){const relationState=largeGraphRelationState();return relationLayerEnabled()?relationState:null}
-function classForCard(n,relationState=null){
+function classForCard(n,relationState=null,context=null){
+  const selectionState=context?.state||state,nodeSelection=context?.selectedNodeIds||selectedNodeIds;
   const appearance=window.KGGraphModel&&window.KGGraphModel.appearanceOf?window.KGGraphModel.appearanceOf(n):{size:n.size||'',cardStyle:n.cardStyle||'standard'};
   const sizeClass=appearance.size==='small'?' size-small':appearance.size==='big'?' size-big':'';
-  const styleClass=' card-style-'+(appearance.cardStyle||'standard');
-  let cls='knowledge-card'+sizeClass+styleClass+(state.selectedNodeId===n.id?' active':'')+(selectedNodeIds.has(n.id)?' multi-selected':'')+(state.linkSourceId===n.id?' link-source':'')+(isImportant(n)?' focus-card':'')+(nodeFreeResizeModeId===n.id?' node-free-resize-mode':'')+(window.KGGraphModel?.interactionOf?.(n).locked?' node-locked':'');
+  const styleClass=' card-style-'+(appearance.cardStyle||'standard')+(n.mindmapTheme?.id==='capsule'&&appearance.cardStyle==='rounded'?' mindmap-capsule':'');
+  let cls='knowledge-card'+sizeClass+styleClass+(selectionState.selectedNodeId===n.id?' active':'')+(nodeSelection.has(n.id)?' multi-selected':'')+(selectionState.linkSourceId===n.id?' link-source':'')+(isImportant(n)?' focus-card':'')+(!context&&nodeFreeResizeModeId===n.id?' node-free-resize-mode':'')+(window.KGGraphModel?.interactionOf?.(n).locked?' node-locked':'');
   if(relationState&&relationState.related&&relationState.related.size){
     if(relationState.anchors.has(n.id))cls+=' large-related-anchor';
     else if(relationState.related.has(n.id))cls+=' large-related-neighbor';
     else cls+=largeGraphRelatedFocusEnabled?' large-related-hidden':' large-related-muted';
   }
-  if(isRelatedGatherActive()&&relatedGatherLayout.positions&&relatedGatherLayout.positions.has(n.id)){
+  if(!context&&isRelatedGatherActive()&&relatedGatherLayout.positions&&relatedGatherLayout.positions.has(n.id)){
     cls+=' gather-temp-card';
     if(currentRelatedScopeAnchorId()===n.id)cls+=' gather-anchor-card';
   }
@@ -2032,15 +1821,19 @@ function graphResizeHandlesMarkup(entity='text'){
   const attr=entity==='node'?'data-node-resize-handle':'data-element-resize-handle';
   return `<div class="graph-element-resize-layer graph-${entity}-resize-layer" aria-hidden="true">${GRAPH_RESIZE_HANDLES.map(handle=>`<span class="graph-element-resize-handle handle-${handle}" ${attr}="${handle}"></span>`).join('')}</div>`;
 }
-function renderCardElement(n,relationState=null){
+function graphImagesMarkup(node,detail=false){
+  const model=window.KGGraphModel,fileId=window.KGGraphFileEditorStoreBridge?.fragmentSource?.().fileId;
+  return model.contentOf(node).images.map(image=>{const url=model.imageUrl(image,fileId);return url?`<img class="graph-content-image ${detail?'graph-detail-image':'graph-card-image'}" src="${escapeHTML(url)}" alt="${escapeHTML(image.alt)}" loading="lazy" draggable="false">`:''}).join('');
+}
+function renderCardElement(n,relationState=null,context=null){
   const model=window.KGGraphModel,view=model&&model.view?model.view(n):{content:{title:n.title||'未命名知识点'},appearance:{color:n.color||DEFAULTS.nodeColor,headerIconColor:n.headerIconColor||n.color||DEFAULTS.nodeColor,fillColor:n.fillColor||'#ffffff',fillOpacity:n.fillOpacity??1,headerFillColor:n.headerFillColor||'#eef2ff',bodyFillColor:n.bodyFillColor||n.fillColor||'#ffffff',headerTextColor:n.headerTextColor||'#ffffff',bodyTextColor:n.bodyTextColor||n.textColor||'#0f172a',regionColorsCustomized:!!n.regionColorsCustomized,borderVisible:n.borderVisible!==false,borderColor:n.borderColor||'#cbd5e1',borderWidth:n.borderWidth??1,borderStyle:n.borderStyle||'solid',borderOpacity:n.borderOpacity??1,textColor:n.textColor||'#0f172a',textBackgroundColor:n.textBackgroundColor||'#ffffff',textBackgroundOpacity:n.textBackgroundOpacity??0,cardStyle:n.cardStyle||'standard',textAlign:n.textAlign||'center',fontSize:n.fontSize||15,fontFamily:n.fontFamily||'system',fontWeight:n.fontWeight||'bold',fontStyle:n.fontStyle||'normal',underline:!!n.underline,strikeThrough:!!n.strikeThrough,lineHeight:n.lineHeight||1.25},geometry:{...visualPositionForNode(n),width:nodeDims(n).w,height:nodeDims(n).h},interaction:{locked:!!n.locked}};
-  const card=document.createElement('div'),appearance=view.appearance||{},accent=safeColor(appearance.headerIconColor||appearance.color||DEFAULTS.nodeColor),fill=safeColor(appearance.fillColor||'#ffffff'),border=safeColor(appearance.borderColor||'#cbd5e1'),pos=visualPositionForNode(n),dims=nodeDims(n);
+  const card=document.createElement('div'),appearance=view.appearance||{},accent=safeColor(appearance.headerIconColor||appearance.color||DEFAULTS.nodeColor),fill=safeColor(appearance.fillColor||'#ffffff'),border=safeColor(appearance.borderColor||'#cbd5e1'),pos=context?.position||visualPositionForNode(n),dims=nodeDims(n);
   const rawFillOpacity=Number(appearance.fillOpacity),rawBorderOpacity=Number(appearance.borderOpacity),rawBorderWidth=Number(appearance.borderWidth),fillOpacity=Math.max(0,Math.min(1,Number.isFinite(rawFillOpacity)?rawFillOpacity:1)),borderOpacity=Math.max(0,Math.min(1,Number.isFinite(rawBorderOpacity)?rawBorderOpacity:1)),borderWidth=appearance.borderVisible===false?0:Math.max(0,Math.min(8,Number.isFinite(rawBorderWidth)?rawBorderWidth:1));
   const textBg=safeColor(appearance.textBackgroundColor||'#ffffff','#ffffff'),textBgOpacity=Math.max(0,Math.min(1,Number(appearance.textBackgroundOpacity)||0));
   const headerFill=safeColor(appearance.headerFillColor||fill,fill),bodyFill=safeColor(appearance.bodyFillColor||fill,fill);
   const headerText=graphTextColorForFill(accent,1),bodyText=safeColor(appearance.bodyTextColor||appearance.textColor||'#0f172a','#0f172a');
   const headerBackground='linear-gradient(180deg,#f8fafc 0%,#eef2ff 100%)';
-  card.className=classForCard(n,relationState);
+  card.className=classForCard(n,relationState,context);
   card.style.left=pos.x+'px';card.style.top=pos.y+'px';
   card.style.setProperty('--node-color',accent);
   card.style.setProperty('--node-fill-color',graphHexToRgba(fill,fillOpacity));
@@ -2066,7 +1859,7 @@ function renderCardElement(n,relationState=null){
   card.dataset.nodeId=n.id;card.dataset.locked=view.interaction&&view.interaction.locked?'true':'false';card.dataset.cardStyle=appearance.cardStyle||'standard';card.dataset.fontSize=String(appearance.fontSize||15);
   const first=(view.content.title||'?').trim().slice(0,1);
   const title=`<span class="node-text-content">${escapeHTML(view.content.title||'未命名知识点')}</span>`;
-  card.innerHTML=`<div class="card-body"><div class="node-top" style="background:${headerBackground}"><div class="node-icon" style="background:${accent};color:${headerText}">${escapeHTML(first)}</div></div><div class="node-title">${title}</div></div><div class="node-size-tools" aria-label="卡牌尺寸"><button type="button" class="node-size-btn" data-size="small" title="小卡">-</button><button type="button" class="node-size-btn" data-size="big" title="大卡">+</button><button type="button" class="node-size-btn" data-size="" title="默认尺寸">o</button></div>${graphResizeHandlesMarkup('node')}`;
+  card.innerHTML=`<div class="card-body"><div class="node-top" style="background:${headerBackground}"><div class="node-icon" style="background:${accent};color:${headerText}">${escapeHTML(first)}</div></div><div class="node-title">${title}</div>${graphImagesMarkup(n)}</div><div class="node-size-tools" aria-label="卡牌尺寸"><button type="button" class="node-size-btn" data-size="small" title="小卡">-</button><button type="button" class="node-size-btn" data-size="big" title="大卡">+</button><button type="button" class="node-size-btn" data-size="" title="默认尺寸">o</button></div>${graphResizeHandlesMarkup('node')}`;
   return card;
 }
 function applyTextElementTypographyVariables(el,appearance){
@@ -2096,11 +1889,11 @@ function renderTextElement(item){
   const model=window.KGGraphModel,content=model&&model.textElementContentOf?model.textElementContentOf(item):{text:item.text||'点击编辑文字'},appearance=model&&model.textElementAppearanceOf?model.textElementAppearanceOf(item):{textColor:item.textColor||'#0f172a',textBackgroundColor:item.textBackgroundColor||'#ffffff',textBackgroundOpacity:item.textBackgroundOpacity??0,textAlign:item.textAlign||'center',fontSize:item.fontSize||20,fontFamily:item.fontFamily||'system',fontWeight:item.fontWeight||'bold',fontStyle:item.fontStyle||'normal',underline:!!item.underline,strikeThrough:!!item.strikeThrough,lineHeight:item.lineHeight||1.45},geometry=model&&model.textElementGeometryOf?model.textElementGeometryOf(item):{x:item.x||0,y:item.y||0,width:item.width||220,height:item.height||72,manualSize:!!item.manualSize};
   const selected=state.selectedElementId===item.id||selectedTextElementIds.has(item.id);
   const multiSelected=selected&&(selectedNodeIds.size+selectedTextElementIds.size+selectedLinkIds.size>1);
-  const el=document.createElement('div');el.className='graph-text-element'+(selected?' active':'')+(multiSelected?' multi-selected':'');el.dataset.textElementId=item.id;el.dataset.manualSize=geometry.manualSize?'true':'false';el.style.left=geometry.x+'px';el.style.top=geometry.y+'px';el.style.width=geometry.width+'px';el.style.height=geometry.height+'px';applyTextElementTypographyVariables(el,appearance);el.innerHTML=`<div class="graph-text-element-content"><span class="graph-text-inline">${escapeHTML(content.text||'点击编辑文字')}</span></div>${graphResizeHandlesMarkup('text')}`;return el;
+  const el=document.createElement('div');el.className='graph-text-element'+(selected?' active':'')+(multiSelected?' multi-selected':'');el.dataset.textElementId=item.id;el.dataset.manualSize=geometry.manualSize?'true':'false';el.style.left=geometry.x+'px';el.style.top=geometry.y+'px';el.style.width=geometry.width+'px';el.style.height=geometry.height+'px';applyTextElementTypographyVariables(el,appearance);el.innerHTML=`<div class="graph-text-element-content"><span class="graph-text-inline">${escapeHTML(content.text??'点击编辑文字')}</span></div>${graphResizeHandlesMarkup('text')}`;return el;
 }
 function measureTextElementTightSize(item){
   const model=window.KGGraphModel,content=model.textElementContentOf(item),appearance=model.textElementAppearanceOf(item);
-  const probe=document.createElement('div');probe.className='graph-text-element-measure';probe.textContent=content.text||'点击编辑文字';
+  const probe=document.createElement('div');probe.className='graph-text-element-measure';probe.textContent=content.text??'点击编辑文字';
   probe.style.fontFamily=graphFontFamilyCss(appearance.fontFamily);probe.style.fontSize=graphFontSizeCss(appearance.fontSize,20);probe.style.fontWeight=graphFontWeightCss(appearance.fontWeight,'text');probe.style.fontStyle=appearance.fontStyle==='italic'?'italic':'normal';probe.style.textDecorationLine=graphTextDecorationCss(appearance);probe.style.letterSpacing='normal';probe.style.lineHeight=graphLineHeightCss(appearance.lineHeight,1.45);
   cardsLayer.appendChild(probe);const width=Math.max(24,Math.min(640,Math.ceil(probe.offsetWidth)+2)),height=Math.max(24,Math.ceil(probe.offsetHeight)+2);probe.remove();return{width,height};
 }
@@ -2110,12 +1903,14 @@ function fitTextElementToContent(item,options={}){
   const x=preserveCenter?Math.round(geometry.x+(geometry.width-size.width)/2):geometry.x,y=preserveCenter?Math.round(geometry.y+(geometry.height-size.height)/2):geometry.y;
   model.updateTextElementGeometry(item,{x,y,width:size.width,height:size.height,manualSize:false});return true;
 }
-function renderCards(){const frag=document.createDocumentFragment(),nextCardDom=new Map(),nextTextDom=new Map(),relationState=cardRelationState();for(const n of state.nodes){const card=renderCardElement(n,relationState);nextCardDom.set(n.id,card);frag.appendChild(card)}for(const item of state.elements||[]){const el=renderTextElement(item);nextTextDom.set(item.id,el);frag.appendChild(el)}cardDomById=nextCardDom;textElementDomById=nextTextDom;cardsLayer.replaceChildren(frag);updateNodeGrowthHandles()}
+function renderCards(){const editing=nodeInlineTextEditorController?.current(),frag=document.createDocumentFragment(),nextCardDom=new Map(),nextTextDom=new Map(),relationState=cardRelationState();for(const n of state.nodes){const card=editing?.nodeId===n.id&&editing.entityType==='node'?cardElementByNodeId(n.id)||renderCardElement(n,relationState):renderCardElement(n,relationState);nextCardDom.set(n.id,card);frag.appendChild(card)}for(const item of state.elements||[]){const el=editing?.nodeId===item.id&&editing.entityType==='text-element'?textElementDomByIdValue(item.id)||renderTextElement(item):renderTextElement(item);nextTextDom.set(item.id,el);frag.appendChild(el)}cardDomById=nextCardDom;textElementDomById=nextTextDom;cardsLayer.replaceChildren(frag);updateNodeGrowthHandles()}
 function replaceCardDomForNode(id){
+  if(nodeInlineTextEditorController?.current()?.nodeId===id){const node=nodeById(id),card=cardElementByNodeId(id);if(node&&card)card.style.cssText=renderCardElement(node,cardRelationState()).style.cssText;return false;}
   const node=nodeById(id),old=cardElementByNodeId(id);if(!node||!old)return false;
   const next=renderCardElement(node,cardRelationState());old.replaceWith(next);cardDomById.set(id,next);return true;
 }
 function replaceTextElementDomForId(id){
+  if(nodeInlineTextEditorController?.current()?.nodeId===id){const item=textElementById(id),el=textElementDomByIdValue(id);if(item&&el)applyTextElementTypographyVariables(el,window.KGGraphModel.textElementAppearanceOf(item));return false}
   const item=textElementById(id),old=textElementDomByIdValue(id);if(!item||!old)return false;
   const next=renderTextElement(item);old.replaceWith(next);textElementDomById.set(id,next);return true;
 }
@@ -2158,6 +1953,7 @@ function refreshSelectionUI(options={}){
 let cardDrag=null;
 function resetGraphPointerInteractions(options={}){
   window.KGHomeCanvasRuntime?.alignment?.end?.();
+  if(homeSelectionBoundsDrag){const drag=homeSelectionBoundsDrag;finishHomeSelectionBoundsDrag({pointerId:drag.pointerId,preventDefault(){},stopPropagation(){},stopImmediatePropagation(){}},true)}
   clearPendingNodeRightClick();
   if(nodeRightPointerSession){
     const session=nodeRightPointerSession;nodeRightPointerSession=null;
@@ -2165,6 +1961,7 @@ function resetGraphPointerInteractions(options={}){
   }
   if(cardDrag){
     const drag=cardDrag;cardDrag=null;clearTimeout(drag.longTimer);
+    finishGraphGestureHistory(drag,true);
     try{drag.card?.releasePointerCapture?.(drag.pointerId)}catch(error){}
     (drag.ids||[drag.id]).forEach(id=>cardElementByNodeId(id)?.classList.remove('dragging','group-dragging'));
     const controller=ensureGraphDragController();controller?.cancel?.();
@@ -2796,9 +2593,12 @@ cardsLayer.addEventListener('pointerdown',e=>{
   const groupIds=toggleMulti?[id]:(selectedNodeIds.has(id)&&selectedNodeIds.size>1?[...selectedNodeIds]:[id]);
   const lockedGroup=groupIds.filter(gid=>window.KGGraphModel?.interactionOf?.(nodeById(gid)).locked);if(lockedGroup.length){showStatus(`选择中有 ${lockedGroup.length} 个锁定节点，已取消整体移动。`);return}
   if(groupIds.length===1&&!e.shiftKey&&!e.ctrlKey&&!e.metaKey)clearMultiSelection();
+  const historyLabel=groupIds.length>1?`移动 ${groupIds.length} 个知识点`:`移动“${n.title}”`,historyController=beginGraphGestureHistory(historyLabel);if(!historyController)return;
   const startPositions=Object.fromEntries(groupIds.map(gid=>{const gn=nodeById(gid);return[gid,{x:gn.x,y:gn.y}]}));
   const dragController=ensureGraphDragController();
-  cardDrag=dragController?dragController.begin('node',e,{id,ids:groupIds,card,moved:false,longOpened:false,toggleMulti,editOnRelease,startClient:{x:e.clientX,y:e.clientY},startPos:{x:n.x,y:n.y},startPositions,longTimer:null,historyLabel:groupIds.length>1?`移动 ${groupIds.length} 个知识点`:`移动“${n.title}”`}):{id,ids:groupIds,card,pointerId:e.pointerId,moved:false,longOpened:false,toggleMulti,editOnRelease,startClient:{x:e.clientX,y:e.clientY},startPos:{x:n.x,y:n.y},startPositions,longTimer:null};
+  const routeSnapshots=captureNodeDragRoutes(groupIds);
+  cardDrag=dragController?dragController.begin('node',e,{id,ids:groupIds,card,moved:false,longOpened:false,toggleMulti,editOnRelease,startClient:{x:e.clientX,y:e.clientY},startPos:{x:n.x,y:n.y},startPositions,routeSnapshots,historyController,longTimer:null,historyLabel}):{id,ids:groupIds,card,pointerId:e.pointerId,moved:false,longOpened:false,toggleMulti,editOnRelease,startClient:{x:e.clientX,y:e.clientY},startPos:{x:n.x,y:n.y},startPositions,routeSnapshots,historyController,longTimer:null,historyLabel};
+  if(!cardDrag){historyController.rollback();return}
   cardDrag.edgeLite=shouldUseHomeEdgeDragLite(cardDrag);
   const movingRecords=typeof homeAlignmentRecords==='function'?homeAlignmentRecords().filter(record=>groupIds.includes(String(record.id))):[];
   if(cardDrag.edgeLite)window.KGHomeCanvasRuntime?.alignment?.clearGuides?.();else window.KGHomeCanvasRuntime?.alignment?.begin?.(movingRecords,{kind:'node',ids:groupIds});
@@ -2817,7 +2617,7 @@ cardsLayer.addEventListener('pointermove',e=>{
   markStageInteracting();
   const px=e.clientX-cardDrag.startClient.x,py=e.clientY-cardDrag.startClient.y,wasMoved=!!cardDrag.moved;
   const dragController=ensureGraphDragController();if(dragController)dragController.update(e);
-  if(Math.hypot(px,py)>5){if(!wasMoved){stage.classList.add('graph-card-dragging');nodeStyleToolbarController?.hide()}cardDrag.moved=true;clearTimeout(cardDrag.longTimer)}
+  if(Math.hypot(px,py)>5){if(!wasMoved){if(!dragController)cardDrag.historyController.checkpoint(cardDrag.historyLabel);stage.classList.add('graph-card-dragging');nodeStyleToolbarController?.hide()}cardDrag.moved=true;clearTimeout(cardDrag.longTimer)}
   if(isRelatedGatherActive()&&cardDrag.moved){
     if(!cardDrag.gatherDragBlocked)showStatus('当前是临时聚拢布局，仅用于讲解查看；请先退出聚拢后再调整原图谱位置。');
     cardDrag.gatherDragBlocked=true;
@@ -2833,6 +2633,7 @@ cardsLayer.addEventListener('pointermove',e=>{
     const el=cardElementByNodeId(gid);
     if(el){el.style.left=n.x+'px';el.style.top=n.y+'px'}
   }
+  applyNodeDragRoutes(cardDrag.routeSnapshots);
   if(cardDrag.edgeLite){
     ensureHomeEdgeDragPerformanceController()?.start?.(cardDrag.ids||[cardDrag.id]);
     ensureHomeEdgeDragPerformanceController()?.schedule?.(cardDrag.ids||[cardDrag.id]);
@@ -2849,7 +2650,8 @@ function finishCardPointer(e,cancelled=false){
   (drag.ids||[drag.id]).forEach(gid=>{const el=cardElementByNodeId(gid);if(el)el.classList.remove('dragging','group-dragging')});
   stage.classList.remove('large-graph-dragging-local-lines','graph-card-dragging','graph-card-dragging-defer-edges');
   try{drag.card.releasePointerCapture(e.pointerId)}catch{}
-  if(cancelled||drag.longOpened){if(drag.edgeLite&&drag.moved&&!drag.gatherDragBlocked)renderEdges();return}
+  finishGraphGestureHistory(drag,cancelled||drag.longOpened||drag.gatherDragBlocked||!drag.moved);
+  if(cancelled||drag.longOpened){if(!drag.moved&&drag.edgeLite&&!drag.gatherDragBlocked)renderEdges();return}
   if(drag.gatherDragBlocked){handleNodeTap(drag.id);return}
   if(!drag.moved){
     if(drag.toggleMulti){toggleCardMultiSelection(drag.id);return}
@@ -2881,7 +2683,7 @@ cardsLayer.addEventListener('pointerdown',e=>{
   const el=handle.closest('.graph-text-element'),item=el&&textElementById(el.dataset.textElementId);if(!item||el.classList.contains('multi-selected')||currentHomeFilteredSelectionTotal()>1)return;
   e.preventDefault();e.stopPropagation();textElementDrag=null;nodeInlineTextEditorController?.commit?.();
   clearMultiSelection();state.selectedNodeId=null;state.selectedLinkId=null;state.linkSourceId=null;state.selectedElementId=item.id;
-  const controller=ensureGraphElementResizeController();controller&&controller.begin(e,{id:item.id,handle:handle.dataset.elementResizeHandle,element:el,captureTarget:handle,minWidth:24,minHeight:24});
+  const controller=ensureGraphElementResizeController();controller&&controller.begin(e,{id:item.id,handle:handle.dataset.elementResizeHandle,element:el,captureTarget:handle,minWidth:40,minHeight:24,maxWidth:4000,maxHeight:4000});
 });
 cardsLayer.addEventListener('pointermove',e=>{const controller=graphKernelControllers.resize;if(controller&&controller.isActive())controller.update(e)});
 cardsLayer.addEventListener('pointerup',e=>{const controller=graphKernelControllers.resize;if(controller&&controller.isActive())controller.finish(e)});
@@ -3005,6 +2807,7 @@ cardsLayer.addEventListener('pointerout',e=>{
   clearTimeout(hoverLargeGraphTimer);
   if(hoverDetailNodeId===id||hoverLargeGraphNodeId===id)scheduleHoverDetailHide();
 });
+detailPanel.addEventListener('wheel',e=>e.stopPropagation(),{passive:true});
 detailPanel.addEventListener('pointerenter',()=>clearTimeout(hoverDetailTimer));
 detailPanel.addEventListener('pointerleave',()=>scheduleHoverDetailHide());
 
@@ -3316,11 +3119,18 @@ function ensureNodeInlineTextEditorController(){
   if(nodeInlineTextEditorController)return nodeInlineTextEditorController;
   const factory=window.KGGraphInlineTextEditorController;if(!factory||typeof factory.create!=='function')return null;
   nodeInlineTextEditorController=factory.create({
-    onStart:()=>{stage.classList.add('graph-inline-text-editing');if(nodeStyleToolbarController)nodeStyleToolbarController.hide();nodeFloatingColorWindowController?.close({cancel:true})},
-    onEnd:()=>stage.classList.remove('graph-inline-text-editing'),
-    onCommit:({nodeId,entityType,value})=>{
-      if(entityType==='text-element'){const item=textElementById(nodeId);if(!item)return;const history=ensureGraphHistoryController(),mutate=()=>{window.KGGraphModel.updateTextElementContent(item,{text:value});fitTextElementToContent(item);return item};if(history)history.run('修改文本框文字',mutate);else mutate();render({persist:true});showStatus('文本框文字已保存，可按 Ctrl/Command+Z 撤销。');return}
-      const node=nodeById(nodeId),controller=ensureGraphStyleController();if(!node||!controller)return;controller.updateContent([nodeId],{title:value},`修改“${node.title}”文字`);showStatus('节点文字已保存，可按 Ctrl/Command+Z 撤销。');
+    onStart:()=>{stage.classList.add('graph-inline-text-editing');updateCardQuickActions();nodeFloatingColorWindowController?.close({cancel:true})},
+    onEnd:()=>{stage.classList.remove('graph-inline-text-editing');render({persist:false})},
+    onCommit:async({nodeId,entityType,value})=>{
+      const model=window.KGGraphModel,history=ensureGraphHistoryController();
+      if(entityType==='text-element'){
+        const item=textElementById(nodeId);if(!item)return false;
+        if(model.textElementContentOf(item).text!==value){const mutate=()=>{model.updateTextElementContent(item,{text:value});fitTextElementToContent(item);return item};if(history)history.run('修改文本框文字',mutate);else mutate()}
+      }else{
+        const node=nodeById(nodeId);if(!node)return false;
+        if(model.contentOf(node).title!==value){const mutate=()=>model.updateContent(node,{title:value});if(history)history.run('修改知识点文字',mutate);else mutate()}
+      }
+      const graph=state;save();const saved=await window.KGGraphFileAutosave.saveAcknowledged({force:true},()=>state===graph);if(saved===false){showStatus('文字未保存，输入已保留，请点击外部重试。');return false}showStatus('文字已保存，可按 Ctrl/Command+Z 撤销。');return true;
     },
     onOutsideCommit:({nodeId,textElementId})=>{
       if(nodeId&&nodeById(nodeId)){
@@ -3330,7 +3140,7 @@ function ensureNodeInlineTextEditorController(){
         clearMultiSelection();state.selectedNodeId=null;state.selectedLinkId=null;state.linkSourceId=null;state.selectedElementId=textElementId;refreshSelectionUI();
       }
     },
-    onCancel:()=>showStatus('已取消文字修改。')
+    onCancel:({nodeId,entityType,original})=>{const model=window.KGGraphModel;if(entityType==='text-element'){const item=textElementById(nodeId);if(item)model.updateTextElementContent(item,{text:original})}else{const node=nodeById(nodeId);if(node)model.updateContent(node,{title:original})}save();render({persist:false});showStatus('已取消文字修改。')}
   });
   return nodeInlineTextEditorController;
 }
@@ -3356,7 +3166,7 @@ function handleNodeToolbarAction(action,button,event=null){
     render({mode:'selection',ids:nodes.map(node=>node.id),persist:true});showStatus(allLocked?'节点已解锁，全部功能已恢复。':'节点已完全锁定；仅保留打开相关画布与解锁。');return
   }
   if(group==='related-canvas'&&!textItem){
-    setRelatedScopeCenter(primary.id);openRelatedCanvasModal(true);nodeStyleToolbarController?.closePanels();
+    openRelatedCanvasModal(true);nodeStyleToolbarController?.closePanels();
   }else if(group==='color-preset'){
     const kind=!textItem&&value==='fill'?activeNodeFillColorKind():value,color=extra,patch=nodeColorPatch(kind,{color,opacity:1});
     if(textItem){
@@ -3494,7 +3304,9 @@ function updateCardQuickActions(){
   updateNodeStyleToolbarControls();
 }
 
+let graphQuestionDrawer=null;
 function renderDetails(){
+  graphQuestionDrawer?.syncNode(state.selectedNodeId||hoverDetailNodeId);
   const l=linkById(state.selectedLinkId),n=nodeById(state.selectedNodeId||(!state.selectedLinkId?hoverDetailNodeId:null)),isHoverPreview=!state.selectedNodeId&&!state.selectedLinkId&&!!hoverDetailNodeId;
   if(!n&&!l){detailPanel.classList.remove('show','hover-preview','detail-actions-expanded');detailPanel.innerHTML='';return}
   detailPanel.classList.remove('detail-actions-expanded');
@@ -3504,8 +3316,8 @@ function renderDetails(){
   const nodeColor=safeColor(n.color),nodeRelation=relatedScopeRelationForNode(n.id),anchor=nodeById(currentRelatedScopeAnchorId()),relationInfo=nodeRelation?`<div class="label">局部关系</div><div>${nodeRelation.relatedCount} 个相关知识点 ｜ ${nodeRelation.linkCount} 条关系${largeGraphRelatedFocusEnabled?` ｜ 只看相关中心：${escapeHTML(anchor?anchor.title:n.title)}`:''}</div>`:'';
   const scopeButtons=largeGraphRelatedFocusEnabled?`<button id="setScopeCenterBtn">以当前卡牌为中心</button><button id="fitScopeFromDetailBtn">适配相关</button>${isRelatedGatherActive()?'<button id="exitGatherLayoutBtn">退出聚拢</button>':''}`:'';
   const locked=isNodeFullyLocked(n),lockedAttr=locked?' disabled aria-disabled="true"':'';
-  detailPanel.innerHTML=`${tools}<div class="detail-top"><div class="detail-mini-icon" style="background:${nodeColor}">${escapeHTML((n.title||'?').slice(0,1))}</div><div><div class="detail-name">${escapeHTML(n.title||'未命名知识点')}</div><div class="detail-title">${escapeHTML(n.category||'未填写分类')} ${n.level?`｜${escapeHTML(n.level)}`:''}</div></div></div><div class="detail-grid">${relationInfo}<div class="label">关键词</div><div>${escapeHTML(n.keywords||'—')}</div><div class="label">说明</div><div>${escapeHTML(n.summary||'—')}</div><div class="label">学习提示</div><div>${escapeHTML(n.notes||'—')}</div></div><div class="detail-actions"><button id="editFromDetailBtn" class="primary"${lockedAttr}>编辑知识点</button>${scopeButtons}<button id="toggleSourceBtn"${lockedAttr}>${state.linkSourceId===n.id?'取消起点':'设为连线起点'}</button><button id="deleteNodeFromDetailBtn" class="danger"${lockedAttr}>删除知识点</button></div>`;
-  detailPanel.classList.add('show');bindDetailBasics();$('editFromDetailBtn').onclick=()=>openNodeModal(n.id);const setScopeBtn=$('setScopeCenterBtn');if(setScopeBtn)setScopeBtn.onclick=()=>setRelatedScopeCenter(n.id);const fitScopeBtn=$('fitScopeFromDetailBtn');if(fitScopeBtn)fitScopeBtn.onclick=()=>fitRelatedScopeToView(true);const exitGatherBtn=$('exitGatherLayoutBtn');if(exitGatherBtn)exitGatherBtn.onclick=()=>clearRelatedGatherLayout({render:true,message:true});$('toggleSourceBtn').onclick=()=>{if(isNodeFullyLocked(n)){showStatus('该节点已锁定，不能建立关系；请先解锁。');return}const connection=ensureGraphConnectionController();if(state.linkSourceId===n.id){if(connection)connection.cancel();else state.linkSourceId=null}else if(connection)connection.setSource(n.id);else state.linkSourceId=n.id;showStatus(state.linkSourceId?`“${n.title}”已设为连线起点。`:'已取消连线起点。');render({mode:'selection'})};$('deleteNodeFromDetailBtn').onclick=()=>deleteNode(n.id);
+  detailPanel.innerHTML=`${tools}<div class="detail-top"><div class="detail-mini-icon" style="background:${nodeColor}">${escapeHTML((n.title||'?').slice(0,1))}</div><div><div class="detail-name">${escapeHTML(n.title||'未命名知识点')}</div><div class="detail-title">${escapeHTML(n.category||'未填写分类')} ${n.level?`｜${escapeHTML(n.level)}`:''}</div></div></div><div class="detail-grid">${relationInfo}<div class="label">关键词</div><div>${escapeHTML(n.keywords||'—')}</div><div class="label">说明</div><div>${escapeHTML(n.summary||'—')}</div><div class="label">学习提示</div><div>${escapeHTML(n.notes||'—')}</div></div>${graphImagesMarkup(n,true)}<button id="graphPracticeBtn" type="button" class="primary">做题</button><div class="detail-actions"><button id="editFromDetailBtn" class="primary"${lockedAttr}>编辑知识点</button>${scopeButtons}<button id="toggleSourceBtn"${lockedAttr}>${state.linkSourceId===n.id?'取消起点':'设为连线起点'}</button><button id="deleteNodeFromDetailBtn" class="danger"${lockedAttr}>删除知识点</button></div>`;
+  detailPanel.classList.add('show');bindDetailBasics();const practice=$('graphPracticeBtn');practice.disabled=!window.KGGraphFileEditorStoreBridge?.fragmentSource?.().fileId;practice.onclick=()=>{graphQuestionDrawer=graphQuestionDrawer||window.KGGraphQuestionDrawer.create({getContext:()=>relatedCanvasController?null:window.KGGraphFileEditorStoreBridge.fragmentSource()});graphQuestionDrawer.open(n)};$('editFromDetailBtn').onclick=()=>openNodeModal(n.id);const setScopeBtn=$('setScopeCenterBtn');if(setScopeBtn)setScopeBtn.onclick=()=>setRelatedScopeCenter(n.id);const fitScopeBtn=$('fitScopeFromDetailBtn');if(fitScopeBtn)fitScopeBtn.onclick=()=>fitRelatedScopeToView(true);const exitGatherBtn=$('exitGatherLayoutBtn');if(exitGatherBtn)exitGatherBtn.onclick=()=>clearRelatedGatherLayout({render:true,message:true});$('toggleSourceBtn').onclick=()=>{if(isNodeFullyLocked(n)){showStatus('该节点已锁定，不能建立关系；请先解锁。');return}const connection=ensureGraphConnectionController();if(state.linkSourceId===n.id){if(connection)connection.cancel();else state.linkSourceId=null}else if(connection)connection.setSource(n.id);else state.linkSourceId=n.id;showStatus(state.linkSourceId?`“${n.title}”已设为连线起点。`:'已取消连线起点。');render({mode:'selection'})};$('deleteNodeFromDetailBtn').onclick=()=>deleteNode(n.id);
 }
 function closeDetailPanel(){hoverDetailNodeId=null;clearTimeout(hoverDetailTimer);resetDetailPanelPosition();clearSelection()}
 function bindDetailBasics(){
@@ -3936,14 +3748,7 @@ function handleGraphClipboardShortcut(e){
     if(selectAllGraphNodesFromShortcut()){e.preventDefault();e.stopPropagation()}
     return;
   }
-  if(key==='c'){
-    if(copySelectedGraphCards()){e.preventDefault();e.stopPropagation()}
-    return;
-  }
-  if(key==='v'){
-    if(pasteGraphClipboardCards()){e.preventDefault();e.stopPropagation()}
-    return;
-  }
+  if(key==='c'||key==='v')return; // Native clipboard events carry the versioned fragment across tabs.
   if(key==='y'||(key==='z'&&e.shiftKey)){
     if(restoreGraphRedoSnapshot()){e.preventDefault();e.stopPropagation()}
     return;
@@ -4204,9 +4009,9 @@ function cancelGraphModeTransientInteractions(){
     if(boxSelect.frame)cancelAnimationFrame(boxSelect.frame);
     boxSelect=null;hideSelectionBox();stage.classList.remove('graph-box-selecting');
   }
-  if(edgeControlDrag){const drag=edgeControlDrag,link=linkById(drag.linkId);if(link)restoreEdgeRoute(link,drag.original);edgeControlDrag=null}
-  if(edgeEndpointDrag){const drag=edgeEndpointDrag,link=linkById(drag.linkId);if(link)restoreEdgeRoute(link,drag.original);edgeEndpointDrag=null;clearEdgeEndpointBindTarget()}
-  if(edgeMoveDrag){const drag=edgeMoveDrag,link=linkById(drag.linkId);if(link)restoreEdgeRoute(link,drag.original);edgeMoveDrag=null}
+  if(edgeControlDrag){const drag=edgeControlDrag;edgeControlDrag=null;if(edgeControlDragFrame)cancelAnimationFrame(edgeControlDragFrame);edgeControlDragFrame=0;edgeControlDragPoint=null;try{drag.handle?.releasePointerCapture?.(drag.pointerId)}catch(error){}finishGraphGestureHistory(drag,true)}
+  if(edgeEndpointDrag){const drag=edgeEndpointDrag;edgeEndpointDrag=null;if(edgeEndpointDragFrame)cancelAnimationFrame(edgeEndpointDragFrame);edgeEndpointDragFrame=0;edgeEndpointDragPoint=null;clearEdgeEndpointBindTarget();try{drag.handle?.releasePointerCapture?.(drag.pointerId)}catch(error){}finishGraphGestureHistory(drag,true)}
+  if(edgeMoveDrag){const drag=edgeMoveDrag;edgeMoveDrag=null;if(edgeMoveDragFrame)cancelAnimationFrame(edgeMoveDragFrame);edgeMoveDragFrame=0;edgeMoveDragPoint=null;try{drag.handle?.releasePointerCapture?.(drag.pointerId)}catch(error){}finishGraphGestureHistory(drag,true)}
   stage.classList.remove('graph-edge-control-dragging','graph-edge-endpoint-dragging','graph-edge-moving','graph-connector-dragging','is-interacting');
   hideSelectedEdgeQuickStylePanel();hideEdgeInlineLabelEditor();hideEdgeHoverFeedback();
   if(!graphModeAllows('multiSelect')){
@@ -4265,3 +4070,24 @@ $('nodeModal').addEventListener('click',e=>{if(e.target===$('nodeModal'))closeNo
 ['linkModal','graphModal','templateModal','flashcardModal'].forEach(id=>{$(id).addEventListener('click',e=>{if(e.target===$(id))$(id).classList.remove('show')})});
 
 document.addEventListener('keydown',e=>{if(e.key!=='Escape'||e.defaultPrevented||isTextEditingTarget(e))return;window.KGHomeCanvasRuntime?.selectionFilter?.clear?.({reason:'escape',apply:false});window.KGHomeCanvasRuntime?.alignment?.end?.();const resize=graphKernelControllers.resize;if(resize&&resize.isActive()){e.preventDefault();resize.cancel();return}if(nodeContextMenuController&&nodeContextMenuController.isVisible()){e.preventDefault();nodeContextMenuController.hide();return}if(nodeFreeResizeModeId){e.preventDefault();exitNodeFreeResizeMode({message:true});return}if(relatedCanvasModalEl){e.preventDefault();closeRelatedCanvasModal(true);return}if(nodeFloatingColorWindowController&&nodeFloatingColorWindowController.isOpen()){e.preventDefault();nodeFloatingColorWindowController.close({cancel:true,force:true,reason:'escape'});return}if(nodeStyleToolbarController&&nodeStyleToolbarController.isVisible()){e.preventDefault();nodeStyleToolbarController.hide()}});
+
+function applyMindmapLayout(options={}){
+  if(!canWriteGraph())throw new Error('当前不能编辑图谱');
+  clearRelatedGatherLayout({render:false,message:false});
+  const result=ensureGraphHistoryController().run('整理思维导图布局',()=>window.KGGraphMindmapLayout.apply(state,{...options,model:window.KGGraphModel,endpoints:(link,map)=>linkRenderPoints(link,map,{ignoreGather:true})}));
+  render({persist:true});return result;
+}
+function applyMindmapTheme(options={}){
+  if(!canWriteGraph())throw new Error('当前不能编辑图谱');
+  const result=ensureGraphHistoryController().run('应用思维导图主题',()=>window.KGGraphMindmapThemes.apply(state,options));render({persist:true});return result;
+}
+let formalMindmapCleanup=null;
+function closeMindmapControls(){if(formalMindmapCleanup){const cleanup=formalMindmapCleanup;formalMindmapCleanup=null;cleanup()}}
+function openMindmapControls(){
+  if(!canWriteGraph())return false;
+  closeMindmapControls();
+  const host=document.createElement('section');host.dataset.formalMindmapPanel='true';host.dataset.stageUi='true';host.style.cssText='position:fixed;z-index:1100;left:80px;top:100px;max-width:650px;box-shadow:0 8px 30px #0003;border:1px solid #cbd5e1;background:white';
+  const close=document.createElement('button');close.textContent='关闭布局与主题';close.onclick=closeMindmapControls;host.append(close);
+  window.KGGraphMindmapThemes.controls(host,{getGraph:()=>state,getSelectedIds:()=>[...new Set([...selectedNodeIds,state.selectedNodeId].filter(Boolean))],runLayout:applyMindmapLayout,runTheme:applyMindmapTheme});
+  const unmount=window.KGCanvasDomInteraction.mountOverlay(host);formalMindmapCleanup=()=>{unmount();host.remove()};return true;
+}

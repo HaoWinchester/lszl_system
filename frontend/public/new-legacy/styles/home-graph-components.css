@@ -734,3 +734,21 @@
 }
 .edge-radial-style-panel.batch-mode{width:min(560px,calc(100% - 20px))!important;height:auto!important}
 .graph-text-element.group-dragging{opacity:.9;transition:none!important}
+
+/* Temporary editor controls stay inside the session overlay. */
+.related-canvas-backdrop .related-canvas-info label{display:block;margin-bottom:12px;font-size:13px;color:#334155}
+.related-canvas-backdrop .related-canvas-info input:not([type=color]),.related-canvas-backdrop .related-canvas-info textarea{display:block;width:100%;margin-top:5px;box-sizing:border-box}
+.related-canvas-backdrop .related-canvas-info textarea{min-height:80px;resize:vertical}
+.related-canvas-backdrop .related-canvas-header-actions{flex-wrap:wrap;justify-content:flex-end}
+.related-canvas-backdrop .related-canvas-header-actions button{white-space:nowrap}
+.related-canvas-backdrop .related-canvas-info[hidden]{display:none}
+.related-canvas-backdrop .related-canvas-empty{font-size:12px;color:#64748b;line-height:1.5}
+
+.knowledge-card.card-style-rounded.mindmap-capsule{border-radius:999px}
+
+.graph-content-image{display:block;object-fit:contain;max-width:100%;height:auto}.graph-card-image{max-height:48%;margin:auto;pointer-events:none}.graph-detail-image{max-height:260px;margin:8px auto}
+
+/* Media must share visible card space with titles, including full-height shape styles. */
+.knowledge-card .card-body:has(.graph-card-image){display:flex;flex-direction:column}
+.knowledge-card .card-body:has(.graph-card-image) .node-title{height:auto;flex:1 1 auto;min-height:0;max-height:52%;box-sizing:border-box;overflow:auto}
+.knowledge-card .card-body .graph-card-image{flex:0 1 auto;min-height:0;max-height:48%;width:100%;box-sizing:border-box}

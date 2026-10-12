@@ -1,0 +1,45 @@
+{
+  "sheet": "粘贴验收",
+  "range": "A1:D5",
+  "cells": [
+    [
+      "中文",
+      "English",
+      "数字",
+      "空尾列"
+    ],
+    [
+      "多行\n第二行",
+      "含\"引号\"",
+      123,
+      null
+    ],
+    [
+      "合并区域",
+      null,
+      "首尾空格 ",
+      null
+    ],
+    [
+      null,
+      null,
+      "00123",
+      null
+    ],
+    [
+      "普通文本",
+      "含\t制表符",
+      "纯文本 =SUM(A1:A2)",
+      null
+    ]
+  ],
+  "merges": [
+    {
+      "row": 2,
+      "column": 0,
+      "rowSpan": 2,
+      "columnSpan": 2
+    }
+  ],
+  "provenance": "Synthetic local test workbook created with openpyxl; no user data. Native Excel clipboard capture pending."
+}

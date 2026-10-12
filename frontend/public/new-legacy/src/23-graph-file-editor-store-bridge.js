@@ -40,5 +40,9 @@
     if(isRemote()&&file&&typeof store.openFile==='function')file=await Promise.resolve(store.openFile(file.id,options));
     return adopt(file);
   }
-  global.KGGraphFileEditorStoreBridge={initialize,initializeCurrent,current,isRemote,openFile,createFile,adopt};
+  function fragmentSource(){
+    const store=current(),file=store?.getCurrentFileMeta?.()||store?.getCurrentFile?.()||(remoteActive()?global.KGGraphFileRemoteAdapter?.getCurrentFileMeta?.():null);
+    return{fileId:file?.id||null,revision:file?.revision??null};
+  }
+  global.KGGraphFileEditorStoreBridge={initialize,initializeCurrent,current,isRemote,openFile,createFile,adopt,fragmentSource};
 })(window);

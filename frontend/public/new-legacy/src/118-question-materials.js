@@ -2,7 +2,13 @@
   'use strict';
   const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const answer=()=>global.KGQuestionAnswerSet;
-  function safeUrl(value){const url=String(value||'');return /^\/api\/v1\/question-assets\/[\w-]+$/.test(url)?url:'';}
+  function safeUrl(value){
+    const raw=String(value||'');if(!/^\/api\/v1\/question-assets\/[\w-]+(?:\?[^#]+)?$/.test(raw))return '';
+    const url=new URL(raw,'http://localhost');if(!url.search)return raw;
+    const required=['fileId','nodeId','bindingId','sourceVersion'],allowed=[...required,'attemptId'];
+    if(required.some(k=>!url.searchParams.get(k))||[...url.searchParams.keys()].some(k=>!allowed.includes(k)||url.searchParams.getAll(k).length!==1))return '';
+    return raw;
+  }
   function extension(question){return {...(question?.metadata||{}),...(question?.metadata?._mixedContent||{}),...(question?.raw?._mixedContent||{}),...(question?.raw||{}),...question};}
   function images(rows){return (Array.isArray(rows)?rows:[]).map(image=>{
     const url=safeUrl(image?.url);if(!url)return '';
@@ -35,7 +41,7 @@
       const dialog=document.createElement('dialog');dialog.className='qm-image-dialog';
       dialog.innerHTML=`<button type="button" aria-label="关闭图表">关闭</button><img src="${esc(safeUrl(zoom.dataset.qmZoom))}" alt="${esc(zoom.querySelector('img')?.alt||'题目图表')}"/>`;
       dialog.addEventListener('keydown',event=>{if(event.key==='Escape')event.stopPropagation()});
-      dialog.querySelector('button').onclick=()=>dialog.close();dialog.addEventListener('close',()=>{dialog.remove();zoom.focus();});document.body.append(dialog);dialog.showModal();
+      dialog.querySelector('button').onclick=()=>dialog.close();dialog.addEventListener('close',()=>{dialog.remove();zoom.focus();});(global.KGCanvasDomInteraction?.overlayHost?.(document.body)||document.body).append(dialog);dialog.showModal();
     });
   }
   function bind(container,{question,selectedPairs={},readOnly=false,reveal=false,onChange=()=>{}}={}){

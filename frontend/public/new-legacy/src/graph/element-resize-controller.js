@@ -4,7 +4,7 @@
   const HANDLES=Object.freeze(['nw','n','ne','e','se','s','sw','w']);
   const HANDLE_SET=new Set(HANDLES);
   function finite(value,fallback=0){const n=Number(value);return Number.isFinite(n)?n:fallback}
-  function cloneGeometry(value={}){return{x:finite(value.x),y:finite(value.y),width:finite(value.width,1),height:finite(value.height,1)}}
+  function cloneGeometry(value={}){return{x:finite(value.x),y:finite(value.y),width:finite(value.width,1),height:finite(value.height,1),...(value.fontSize===undefined?{}:{fontSize:finite(value.fontSize,20)})}}
   function changed(a,b,epsilon=.25){return Math.abs(a.x-b.x)>epsilon||Math.abs(a.y-b.y)>epsilon||Math.abs(a.width-b.width)>epsilon||Math.abs(a.height-b.height)>epsilon}
   function computeGeometry(start,handle,dx,dy,limits={}){
     const minWidth=Math.max(1,finite(limits.minWidth,40)),minHeight=Math.max(1,finite(limits.minHeight,24));
@@ -45,13 +45,14 @@
     function update(event){
       if(!active||!event||active.pointerId!==event.pointerId)return false;
       const dx=(finite(event.clientX)-active.startClientX)/scale(),dy=(finite(event.clientY)-active.startClientY)/scale();
-      const next=computeGeometry(active.start,active.handle,dx,dy,{
+      const limits={
         minWidth:active.config.minWidth??options.minWidth,
         minHeight:active.config.minHeight??options.minHeight,
         maxWidth:active.config.maxWidth??options.maxWidth,
         maxHeight:active.config.maxHeight??options.maxHeight,
         preserveAspectRatio:!!(active.config.preserveAspectRatio??options.preserveAspectRatio)
-      });
+      };
+      const next=active.start.fontSize!==undefined?global.KGTextBoxGeometry.resize(active.start,active.handle,{x:dx,y:dy},limits):computeGeometry(active.start,active.handle,dx,dy,limits);
       if(!active.moved&&Math.hypot(dx,dy)>=threshold){
         active.moved=true;
         if(!active.historyCaptured&&typeof options.onFirstResize==='function'){options.onFirstResize(active,event);active.historyCaptured=true}

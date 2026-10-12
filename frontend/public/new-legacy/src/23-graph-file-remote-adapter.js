@@ -98,11 +98,12 @@
     global.KGGraphFileRemoteStore?.seedCurrent?.({...current,graphData:loadedGraph});
     return current;
   }
+  function acceptRevision(id,revision){if(current?.id!==id||!Number.isInteger(revision))return false;current={...current,revision};global.KGGraphFileRemoteStore?.seedCurrent?.({...current,graphData:loadedGraph});return true}
   function flush(){return pendingSave}
   async function handleSessionChange(event){
     clearSession();
     if(!event?.detail?.authenticated||!active())return null;
     return initializeCurrent();
   }
-  global.KGGraphFileRemoteAdapter={active,initialize,initializeCurrent,adoptFile,getLoadedGraph,getCurrentFileMeta,queueSave,save,flush,clearSession,handleSessionChange};
+  global.KGGraphFileRemoteAdapter={active,initialize,initializeCurrent,adoptFile,getLoadedGraph,getCurrentFileMeta,queueSave,save,flush,acceptRevision,clearSession,handleSessionChange};
 })(window);

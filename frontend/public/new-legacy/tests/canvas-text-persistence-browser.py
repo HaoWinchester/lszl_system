@@ -1,35 +1,65 @@
 #!/usr/bin/env python3
-"""Real-page text edit/drag/style/history persists via disposable backend APIs."""
-import argparse,json
+"""Three actual pages: blur text saves, failure retains input, resize and reload."""
+import argparse,uuid,math
 from pathlib import Path
 from urllib.parse import urlparse
 from playwright.sync_api import sync_playwright,expect
-ROOT=Path(__file__).resolve().parents[2];OUT=ROOT/'artifacts/uat-canvas-text-fixes';OUT.mkdir(parents=True,exist_ok=True)
-a=argparse.ArgumentParser();a.add_argument('--base-url',required=True);args=a.parse_args();BASE=args.base_url.rstrip('/')
-assert urlparse(BASE).hostname in ('localhost','127.0.0.1'), 'Requires disposable canvas_ink_server.py'
+ROOT=Path(__file__).resolve().parents[2];OUT=ROOT/'artifacts/canvas-m2-m5/t09';OUT.mkdir(parents=True,exist_ok=True)
+a=argparse.ArgumentParser();a.add_argument('--base-url',required=True);BASE=a.parse_args().base_url.rstrip('/')
+assert urlparse(BASE).hostname in ('localhost','127.0.0.1')
 with sync_playwright() as p:
-    b=p.chromium.launch();c=b.new_context(viewport={'width':1440,'height':1000})
+    b=p.chromium.launch(channel='chrome');c=b.new_context(viewport={'width':1440,'height':1000})
     assert c.request.post(BASE+'/api/v1/auth/login',data={'username':'ink-browser','password':'ink-browser-test'}).ok
-    for mode,path,trigger in [('recall','/knowledge-recall.html?questionId=ink-question-1&bankId=ink-bank&paperId=ink-paper&releaseId=ink-release','#krInkBtn'),('workspace','/question-workspace.html?paperId=ink-paper&releaseId=ink-release','#qwInkBtn')]:
-        page=c.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)));page.goto(BASE+path,wait_until='networkidle');expect(page.locator(trigger)).to_be_enabled();page.wait_for_timeout(600)
-        page.locator(trigger).click();toolbar=page.locator('.canvas-ink-toolbar');toolbar.get_by_role('button',name='文字',exact=True).click();expect(toolbar.locator('.canvas-ink-options')).to_be_visible()
-        page.mouse.click(230,280);editor=page.get_by_role('textbox',name='画布文字内容');expect(editor).to_be_visible();editor.fill('画布文字回归');editor.press('End');editor.press('Enter');editor.type('第二行')
-        expect(editor).to_have_value('画布文字回归\n第二行')
-        toolbar.get_by_role('button',name='红色',exact=True).click();toolbar.get_by_role('button',name='文字加粗',exact=True).click();toolbar.get_by_role('slider',name='文字字号').fill('28');expect(editor).to_have_value('画布文字回归\n第二行');page.get_by_role('button',name='保存画布文字').click();expect(editor).to_have_count(0)
-        text=page.locator('.canvas-ink-layer text').filter(has_text='画布文字回归');expect(text).to_be_visible();expect(text).to_have_attribute('font-weight','700');expect(text).to_have_attribute('fill','#ef4444');expect(text.locator('tspan')).to_have_count(2)
-        box=text.bounding_box();page.mouse.move(box['x']+8,box['y']+8);page.mouse.down();page.mouse.move(box['x']+78,box['y']+48,steps=10);page.mouse.up();moved=text.bounding_box();assert abs(moved['x']-box['x']-70)<2 and abs(moved['y']-box['y']-40)<2,(box,moved)
-        toolbar.locator('[data-ink-action=undo]').click();undo=text.bounding_box();assert abs(undo['x']-box['x'])<2 and abs(undo['y']-box['y'])<2
-        toolbar.locator('[data-ink-action=redo]').click();moved=text.bounding_box();assert abs(moved['x']-box['x']-70)<2
-        if mode=='recall':
-            page.evaluate("KGLearningProgress.flush('deep_recall')");page.wait_for_function("document.querySelector('#krSaveStatus')?.dataset.state==='saved'")
-            response=c.request.get(BASE+'/api/v1/recall/session/ink-question-1?releaseId=ink-release');strokes=response.json()['progress']['strokes']
+    r=c.request.post(BASE+'/api/v1/files',data={'name':'文本'+uuid.uuid4().hex[:8],'graphData':{'nodes':[],'links':[],'strokes':[]}});assert r.ok;file_id=r.json()['file']['id']
+    assert c.request.put(BASE+'/api/v1/files/current',data={'fileId':file_id}).ok
+    modes=[('home','/index.html','#homeInkBtn'),('recall','/knowledge-recall.html?questionId=ink-question-1&bankId=ink-bank&paperId=ink-paper&releaseId=ink-release','#krInkBtn'),('workspace','/question-workspace.html?paperId=ink-paper&releaseId=ink-release','#qwInkBtn')]
+    for mode,path,trigger in modes:
+        page=c.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)));page.goto(BASE+path,wait_until='networkidle')
+        if mode=='home':
+            for sel in ['#learningEntryDismissBtn','.tour-skip','#hideHelpBtn']:
+                if page.locator(sel).is_visible():page.locator(sel).click()
+            page.locator('.graph-mode-trigger').click();page.locator('[data-graph-mode-option="professional"]').click()
+        expect(page.locator(trigger)).to_be_enabled();page.wait_for_timeout(600)
+        page.locator(trigger).click();toolbar=page.locator('.canvas-ink-toolbar');toolbar.get_by_role('button',name='橡皮擦',exact=True).dblclick();toolbar.get_by_role('button',name='文字',exact=True).click()
+        expect(toolbar.get_by_role('slider',name='文字字号')).to_have_count(0);expect(page.get_by_role('button',name='保存画布文字')).to_have_count(0)
+        page.mouse.click(230,280);editor=page.get_by_role('textbox',name='画布文字内容');expect(editor).to_be_visible();editor.fill('画布文字回归\n第二行')
+        toolbar.get_by_role('button',name='红色',exact=True).click();toolbar.get_by_role('button',name='文字加粗',exact=True).click();expect(editor).to_have_value('画布文字回归\n第二行')
+        # Native deletion and IME remain inside editor, including outside clicks while composing.
+        editor.press('End');editor.press('Backspace');editor.type('行');expect(editor).to_have_value('画布文字回归\n第二行')
+        editor.evaluate("el=>el.dispatchEvent(new CompositionEvent('compositionstart',{bubbles:true}))");page.mouse.click(1050,350);expect(editor).to_be_visible()
+        editor.evaluate("el=>el.dispatchEvent(new CompositionEvent('compositionend',{bubbles:true}))");expect(editor).to_have_count(0)
+        text=page.locator('.canvas-ink-layer text').filter(has_text='画布文字回归');expect(text).to_be_visible();expect(text).to_have_attribute('font-weight','700');expect(text).to_have_attribute('fill','#ef4444')
+        text.click(position={'x':8,'y':8},force=True);handle=page.locator('[data-ink-resize-handle=e]');expect(handle).to_be_visible()
+        # Read authoritative frame/scale; real drag, one undo, redo restores dimensions/font.
+        before_font=float(text.get_attribute('font-size'));start=handle.bounding_box();left=page.locator('[data-ink-resize-handle=w]').bounding_box();width_screen=start['x']-left['x'];delta=width_screen*.5
+        page.mouse.move(start['x']+start['width']/2,start['y']+start['height']/2);page.mouse.down();page.mouse.move(start['x']+start['width']/2+delta,start['y']+start['height']/2,steps=8);page.mouse.up()
+        after_font=float(text.get_attribute('font-size'));assert abs(after_font-before_font*math.sqrt(1.5))<.2,(before_font,after_font)
+        toolbar.locator('[data-ink-action=undo]').click();assert abs(float(text.get_attribute('font-size'))-before_font)<.05
+        toolbar.locator('[data-ink-action=redo]').click();assert abs(float(text.get_attribute('font-size'))-after_font)<.05
+        # Outside commit fails at the actual server boundary, retains textarea, then retries.
+        box=text.bounding_box();page.mouse.dblclick(box['x']+8,box['y']+8);expect(editor).to_be_visible();editor.fill('保留失败草稿 mixed 中文长句自动换行\n第二行')
+        def fail_write(route):
+            if route.request.method in ('POST','PUT','PATCH','DELETE'):route.fulfill(status=503,content_type='application/json',body='{"detail":"offline"}')
+            else:route.continue_()
+        page.route('**/api/v1/**',fail_write);page.mouse.click(1050,350);expect(editor).to_have_attribute('data-save-state','failed');expect(editor).to_have_value('保留失败草稿 mixed 中文长句自动换行\n第二行')
+        page.unroute('**/api/v1/**',fail_write);page.mouse.click(1050,350);expect(editor).to_have_count(0)
+        if mode=='home':strokes=c.request.get(BASE+'/api/v1/files/'+file_id).json()['graphData']['strokes']
+        elif mode=='recall':strokes=c.request.get(BASE+'/api/v1/recall/session/ink-question-1?releaseId=ink-release').json()['progress']['strokes']
         else:
-            page.evaluate('KGCanvasWorkspaceAdapter.flush()');data=c.request.get(BASE+'/api/v1/workspaces').json();strokes=next(w['payload']['strokes'] for w in data['workspaces'] if w['payload'].get('id')=='pmp-pattern-workspace')
-        stroke=next(s for s in strokes if s.get('text')=='画布文字回归\n第二行');assert stroke['bold'] is True and stroke['color']=='#ef4444' and stroke['width']==28,stroke
-        page.reload(wait_until='networkidle');text=page.locator('.canvas-ink-layer text[data-stroke-id="'+stroke['id']+'"]');expect(text).to_be_visible();expect(text).to_have_attribute('font-weight','700');expect(text).to_have_attribute('fill','#ef4444');expect(text.locator('tspan')).to_have_count(2)
-        assert float(text.get_attribute('x'))==stroke['points'][0][0] and float(text.get_attribute('y'))==stroke['points'][0][1]
-        # Edit existing text, cancel, then save a real change and ensure history can undo it.
-        page.locator(trigger).click();toolbar.get_by_role('button',name='文字',exact=True).click();box=text.bounding_box();page.mouse.dblclick(box['x']+8,box['y']+8);expect(editor).to_be_visible();editor.fill('取消内容');editor.press('Escape');expect(text.locator('tspan').first).to_have_text('画布文字回归')
-        page.mouse.dblclick(box['x']+8,box['y']+8);editor.fill('已编辑\n保留换行');editor.press('Control+Enter');expect(text.locator('tspan').first).to_have_text('已编辑');toolbar.locator('[data-ink-action=undo]').click();expect(text.locator('tspan').first).to_have_text('画布文字回归')
-        page.screenshot(path=str(OUT/f'text-persisted-{mode}.png'));assert not errors,errors;print('PASS '+mode+': multiline, drag, formatting, UI undo/redo, DB persistence, reload, edit/cancel',flush=True);page.close()
+            data=c.request.get(BASE+'/api/v1/workspaces').json();strokes=next(w['payload']['strokes'] for w in data['workspaces'] if w['payload'].get('id')=='pmp-pattern-workspace')
+        stroke=next(s for s in strokes if s.get('text','').startswith('保留失败草稿'));assert stroke['bold'] and stroke['color']=='#ef4444';assert stroke['boxWidth']>=40 and stroke['boxHeight']>=24 and abs(stroke['width']-after_font)<.05
+        line_count=page.locator('.canvas-ink-layer text[data-stroke-id="'+stroke['id']+'"] tspan').count();assert line_count>2
+        page.reload(wait_until='networkidle');
+        if mode=='home':
+            for sel in ['#learningEntryDismissBtn','.tour-skip','#hideHelpBtn']:
+                if page.locator(sel).is_visible():page.locator(sel).click()
+        text=page.locator('.canvas-ink-layer text[data-stroke-id="'+stroke['id']+'"]');expect(text).to_be_visible();assert abs(float(text.get_attribute('font-size'))-stroke['width'])<.05;expect(text.locator('tspan')).to_have_count(line_count)
+        page.wait_for_timeout(700)
+        # Existing empty text stays as an undoable object and survives persistence.
+        page.locator(trigger).click();toolbar.get_by_role('button',name='文字',exact=True).click();box=text.bounding_box();page.mouse.dblclick(box['x']+8,box['y']+8);expect(editor).to_be_visible();editor.fill('');page.mouse.click(1050,350);expect(editor).to_have_count(0);expect(text).to_have_count(1)
+        toolbar.locator('[data-ink-action=undo]').click();expect(text).to_contain_text('保留失败草稿')
+        assert text.evaluate('el=>getComputedStyle(el).filter')=='none';page.screenshot(path=str(OUT/f'text-persisted-{mode}.png'))
+        controller={'home':'KGHomeInk','recall':'KGRecallInk','workspace':'KGWorkspaceInk'}[mode];page.evaluate(controller+".setTool('select')");page.mouse.click(1050,450);page.screenshot(path=str(OUT/f'text-unselected-{mode}.png'))
+        box=text.bounding_box();page.mouse.dblclick(box['x']+8,box['y']+8);expect(editor).to_be_visible();page.screenshot(path=str(OUT/f'text-editing-{mode}.png'));editor.press('Escape')
+        assert not errors,errors;print('PASS '+mode+': external/IME commit, formatting/native delete, area resize, one-step undo/redo, failed remote retention/retry, DB/reload/wrapping, empty undo',flush=True);page.close()
     b.close()

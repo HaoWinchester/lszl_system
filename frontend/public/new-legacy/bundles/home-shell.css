@@ -501,6 +501,13 @@ input[type=file]{display:none}
 /* 详情窗口可拖拽、按钮折叠与移动端顶部显示 */
 .detail-panel{
   cursor:default;
+  box-sizing:border-box;
+  max-height:calc(100dvh - 160px);
+  overflow:auto;
+}
+/* 长备注滚动后底部做题按钮可能与小地图 dock(z-index:42) 重叠，面板显示时提升到其上 */
+.detail-panel.show{
+  z-index:43;
 }
 .detail-panel .detail-top{
   cursor:move;
@@ -8245,10 +8252,83 @@ body.qw-selection-toolbar-motion .uc-selection-bounds,.stage.graph-card-dragging
 .canvas-ink-toolbar button:disabled,.canvas-ink-entry:disabled{cursor:default!important}
 .canvas-ink-toolbar button[type] *,.canvas-ink-entry[type] *{cursor:inherit!important}
 
-.canvas-ink-text-selected{filter:drop-shadow(0 0 2px #2563eb);outline:none}
+.canvas-ink-text-selected{filter:none;outline:none}
 .canvas-ink-text-actions{position:fixed;z-index:131;display:flex;gap:6px;background:white;padding:4px;border:1px solid #cbd5e1;border-radius:6px}
 .canvas-ink-text-actions button{padding:5px 12px;border:1px solid #cbd5e1;background:white;border-radius:4px;cursor:pointer}
 .canvas-ink-toolbar [data-ink-bold]{margin-top:8px;font-weight:700}
+
+.canvas-ink-text-editor{min-width:0;max-width:none;box-sizing:content-box;white-space:pre-wrap;overflow-wrap:anywhere}
+.canvas-ink-text-status{position:fixed;z-index:131;background:white;color:#b91c1c;font:12px system-ui}
+.canvas-ink-text-editor[data-save-state=failed]{border-color:#dc2626}
+/* Formatting controls remain reachable above a tall editor. */
+.canvas-ink-toolbar{z-index:140}
+.canvas-ink-toolbar.canvas-ink-popover{z-index:140}
+/* style: styles/canvas-table.css */
+/* KGCanvasTableController · 三页共用可编辑表格视觉。
+   表格是 world 内真实 DOM table：1px 实线边框 + 真实文字，随画布变换保持 DPR 清晰度；
+   不渲染位图，不使用 transform: scale 缩放内容（仅手柄/面板按 1/scale 反向补偿）。 */
+
+.kg-canvas-tables-layer{position:absolute;left:0;top:0;width:1px;height:1px;overflow:visible;z-index:55}
+.kg-canvas-tables-layer [hidden]{display:none!important}
+
+.kg-canvas-table-wrap{position:absolute;box-sizing:border-box;background:#fff;outline:1px solid #94a3b8;outline-offset:0}
+.kg-canvas-table-wrap.kg-canvas-table-selected{outline:2px solid #2563eb;outline-offset:1px;box-shadow:0 10px 30px #0f172a1f}
+.kg-canvas-table-wrap.kg-canvas-table-readonly{outline-style:dashed}
+
+.kg-canvas-table{border-collapse:collapse;table-layout:fixed;width:100%;height:100%;background:#fff;font:14px/1.45 system-ui,-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;color:#0f172a}
+.kg-canvas-table col{min-width:28px}
+.kg-canvas-table td.kg-canvas-table-cell{box-sizing:border-box;border:1px solid #cbd5e1;padding:6px 8px;vertical-align:top;background:transparent;white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere}
+.kg-canvas-table td.kg-canvas-table-cell:focus{outline:2px solid #2563eb;outline-offset:-2px;background:#f8faff}
+.kg-canvas-table td.kg-canvas-table-cell-selected{background:#e8efff;box-shadow:inset 0 0 0 1px #b8ccff}
+.kg-canvas-table td.kg-canvas-table-cell:empty::before{content:'';display:inline-block;min-height:1em}
+.kg-canvas-tables-readonly .kg-canvas-table td.kg-canvas-table-cell:focus{outline:none;background:transparent;cursor:default}
+
+/* 整体拖动手柄 */
+.kg-canvas-table-movebar{position:absolute;left:0;top:-18px;height:16px;width:64px;border-radius:6px;background:#1d4ed8;color:#fff;opacity:0;cursor:grab;transition:opacity .12s ease;touch-action:none}
+.kg-canvas-table-movebar::before{content:'⠿ 移动表格';font:11px/16px system-ui,sans-serif;padding-left:8px;letter-spacing:.05em}
+.kg-canvas-table-wrap:hover .kg-canvas-table-movebar,.kg-canvas-table-wrap.kg-canvas-table-selected .kg-canvas-table-movebar{opacity:.92}
+.kg-canvas-table-movebar:active{cursor:grabbing}
+
+/* 列/行边界把手：6px 命中区，视觉为 2px 高亮线 */
+.kg-canvas-table-boundary{position:absolute;z-index:3;opacity:0;transition:opacity .12s ease;touch-action:none}
+.kg-canvas-table-boundary-col{top:0;bottom:0;width:6px;margin-left:-3px;cursor:col-resize}
+.kg-canvas-table-boundary-col::before{content:'';position:absolute;left:2px;top:0;bottom:0;width:2px;background:#2563eb}
+.kg-canvas-table-boundary-row{left:0;right:0;height:6px;margin-top:-3px;cursor:row-resize}
+.kg-canvas-table-boundary-row::before{content:'';position:absolute;top:2px;left:0;right:0;height:2px;background:#2563eb}
+.kg-canvas-table-wrap:hover .kg-canvas-table-boundary{opacity:.75}
+
+/* 四边缩放手柄：尺寸由 --kg-table-handle（=9/scale）补偿缩放，屏幕上恒定大小 */
+.kg-canvas-table-resize{position:absolute;z-index:4;width:var(--kg-table-handle,9px);height:var(--kg-table-handle,9px);background:#fff;border:1.5px solid #2563eb;border-radius:2px}
+.kg-canvas-table-resize-n{top:0;left:50%;transform:translate(-50%,-50%);cursor:n-resize}
+.kg-canvas-table-resize-s{bottom:0;left:50%;transform:translate(-50%,50%);cursor:s-resize}
+.kg-canvas-table-resize-e{right:0;top:50%;transform:translate(50%,-50%);cursor:e-resize}
+.kg-canvas-table-resize-w{left:0;top:50%;transform:translate(-50%,-50%);cursor:w-resize}
+.kg-canvas-table-wrap.kg-canvas-table-readonly .kg-canvas-table-resize,.kg-canvas-table-wrap.kg-canvas-table-readonly .kg-canvas-table-boundary,.kg-canvas-table-wrap.kg-canvas-table-readonly .kg-canvas-table-movebar{display:none}
+
+/* 表格工具面板：跟随表格（world 坐标），字号按 1/scale 反向补偿保持可读 */
+.kg-canvas-table-panel{position:absolute;left:0;top:100%;margin-top:6px;display:flex;align-items:center;gap:4px;padding:5px 6px;background:rgba(255,255,255,.98);border:1px solid #dbe2ea;border-radius:10px;box-shadow:0 5px 22px #0f172a17;font:12px/1.3 system-ui,sans-serif;transform:scale(var(--kg-table-panel-scale,1));transform-origin:top left;white-space:nowrap}
+.kg-canvas-table-wrap .kg-canvas-table-panel{display:none}
+.kg-canvas-table-wrap.kg-canvas-table-selected .kg-canvas-table-panel{display:flex}
+.kg-canvas-table-panel button{padding:4px 10px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;color:#1e293b;font:12px/1.2 system-ui,sans-serif;cursor:pointer}
+.kg-canvas-table-panel button:hover:not(:disabled){background:#f1f5f9}
+.kg-canvas-table-panel button:disabled{opacity:.4;cursor:default}
+.kg-canvas-table-panel-divider{width:1px;height:18px;background:#e2e8f0;margin:0 2px}
+
+/* 插入表格选择面板：挂 overlayHost（全屏宿主），fixed 定位 */
+.kg-canvas-table-insert-panel{position:fixed;z-index:1200;left:16px;top:64px;width:238px;padding:14px;background:#fff;border:1px solid #dbe2ea;border-radius:14px;box-shadow:0 8px 30px #0f172a1c;font:13px/1.4 system-ui,sans-serif;color:#1e293b}
+.kg-canvas-table-insert-panel strong{display:block;margin-bottom:10px;font-size:13px}
+.kg-canvas-table-insert-grid{display:grid;grid-template-columns:repeat(10,1fr);gap:3px;margin-bottom:12px}
+.kg-canvas-table-insert-grid button{aspect-ratio:1;padding:0;border:1px solid #e2e8f0;border-radius:3px;background:#f8fafc;cursor:pointer}
+.kg-canvas-table-insert-grid button:hover{border-color:#94a3b8}
+.kg-canvas-table-insert-grid button.is-active{background:#2563eb;border-color:#1d4ed8}
+.kg-canvas-table-insert-inputs{display:flex;gap:12px;margin-bottom:10px}
+.kg-canvas-table-insert-inputs label{display:flex;align-items:center;gap:6px;font-size:12px}
+.kg-canvas-table-insert-inputs input{width:74px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:6px;font:13px system-ui}
+.kg-canvas-table-insert-actions{display:flex;justify-content:flex-end;gap:8px}
+.kg-canvas-table-insert-actions button{padding:5px 14px;border:1px solid #cbd5e1;border-radius:7px;background:#fff;font:12px system-ui;cursor:pointer}
+.kg-canvas-table-insert-actions .kg-canvas-table-insert-confirm{background:#2563eb;border-color:#1d4ed8;color:#fff}
+.kg-canvas-table-insert-actions button:hover{filter:brightness(.97)}
+.kg-canvas-table-insert-panel small{display:block;margin-top:9px;color:#64748b;font-size:11px;text-align:center}
 /* style: styles/canvas-color-picker.css */
 /* Shared floating color picker for graph and multi-question canvases. */
 .kg-color-picker{display:grid;gap:9px;min-width:282px}
@@ -9087,6 +9167,24 @@ body.qw-selection-toolbar-motion .uc-selection-bounds,.stage.graph-card-dragging
 }
 .edge-radial-style-panel.batch-mode{width:min(560px,calc(100% - 20px))!important;height:auto!important}
 .graph-text-element.group-dragging{opacity:.9;transition:none!important}
+
+/* Temporary editor controls stay inside the session overlay. */
+.related-canvas-backdrop .related-canvas-info label{display:block;margin-bottom:12px;font-size:13px;color:#334155}
+.related-canvas-backdrop .related-canvas-info input:not([type=color]),.related-canvas-backdrop .related-canvas-info textarea{display:block;width:100%;margin-top:5px;box-sizing:border-box}
+.related-canvas-backdrop .related-canvas-info textarea{min-height:80px;resize:vertical}
+.related-canvas-backdrop .related-canvas-header-actions{flex-wrap:wrap;justify-content:flex-end}
+.related-canvas-backdrop .related-canvas-header-actions button{white-space:nowrap}
+.related-canvas-backdrop .related-canvas-info[hidden]{display:none}
+.related-canvas-backdrop .related-canvas-empty{font-size:12px;color:#64748b;line-height:1.5}
+
+.knowledge-card.card-style-rounded.mindmap-capsule{border-radius:999px}
+
+.graph-content-image{display:block;object-fit:contain;max-width:100%;height:auto}.graph-card-image{max-height:48%;margin:auto;pointer-events:none}.graph-detail-image{max-height:260px;margin:8px auto}
+
+/* Media must share visible card space with titles, including full-height shape styles. */
+.knowledge-card .card-body:has(.graph-card-image){display:flex;flex-direction:column}
+.knowledge-card .card-body:has(.graph-card-image) .node-title{height:auto;flex:1 1 auto;min-height:0;max-height:52%;box-sizing:border-box;overflow:auto}
+.knowledge-card .card-body .graph-card-image{flex:0 1 auto;min-height:0;max-height:48%;width:100%;box-sizing:border-box}
 /* style: styles/home-canvas-performance.css */
 /* V9.0-P4.3.6 · 首页画布独立关系线、轮廓悬浮与稳定便签阴影 */
 .stage .edge-visible{
@@ -9576,3 +9674,31 @@ button[aria-label="关闭"]:not(.engagement-close):focus-visible{
   outline:2px solid #2563eb;
   outline-offset:2px;
 }
+/* style: styles/graph-question-drawer.css */
+.graph-question-drawer{position:fixed;inset:0 0 0 auto;width:440px;max-width:40vw;height:100dvh;z-index:2147483100;background:var(--panel-bg,#fff);color:var(--text,#172033);box-shadow:-6px 0 24px #17203326;display:flex;flex-direction:column;pointer-events:auto}.graph-question-drawer[hidden]{display:none}.graph-question-drawer header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px;border-bottom:1px solid #dce2ea}.graph-question-drawer header strong{overflow-wrap:anywhere}.graph-question-drawer button{min-height:36px;padding:6px 10px;cursor:pointer}.gqd-scroll{flex:1;min-height:0;overflow:auto;padding:16px;overscroll-behavior:contain}.gqd-question{padding:18px 0;border-bottom:1px solid #dce2ea}.gqd-question h3{font-size:16px}.gqd-option{display:block;padding:10px 0;white-space:pre-wrap;overflow-wrap:anywhere}.gqd-option input{margin-right:8px}.gqd-option small{display:block}.gqd-analysis{background:#f1f5f9;padding:12px;margin-top:12px}.graph-question-drawer .qm-text{white-space:pre-wrap}.graph-question-drawer img{max-width:100%;height:auto}.graph-question-drawer form label{display:block;margin:10px 0}.graph-question-drawer form input{display:block;width:100%;box-sizing:border-box;padding:8px}.gqd-pagination{display:flex;align-items:center;justify-content:space-between;margin:12px 0}@media(max-width:700px){.graph-question-drawer{width:100%;max-width:100vw}.graph-question-drawer header{padding-top:max(12px,env(safe-area-inset-top))}.gqd-scroll{padding-bottom:max(20px,env(safe-area-inset-bottom))}}
+/* style: styles/graph-template-center.css */
+.graph-template-center{width:min(760px,90vw);max-height:85vh;overflow:auto;padding:24px;border:1px solid #cbd5e1;border-radius:16px;color:#0f172a;background:#fff;box-sizing:border-box}
+.graph-template-center::backdrop{background:rgba(15,23,42,.45)}
+.graph-template-center article{border:1px solid #cbd5e1;border-radius:10px;padding:16px;margin:12px 0}
+.graph-template-center button,.graph-template-center a{margin:8px 8px 0 0}
+.template-center-actions{position:sticky;bottom:0;background:#fff;padding:12px 0}
+.template-publication-form{display:grid;gap:12px;padding:16px;background:#f8fafc;border:1px solid #cbd5e1}
+.template-publication-form input:not([type=checkbox]),.template-publication-form textarea{width:100%;box-sizing:border-box;padding:8px;font:inherit}
+@media(max-width:700px){.graph-template-center{width:100vw;max-width:100vw;max-height:100dvh;height:100dvh;margin:0;padding:16px;border-radius:0}}
+/* style: styles/question-materials.css */
+.qm-text{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.9}.qm-case{border:1px solid #d8e1ee;border-radius:12px;background:#f7f9fc;margin-bottom:16px;overflow:hidden}.qm-case summary{cursor:pointer;font-weight:650;padding:14px 18px;color:#174778}.qm-case-body{padding:0 18px 18px;max-height:55vh;overflow:auto;overscroll-behavior:contain}.qm-image{margin:14px 0;max-width:100%}.qm-image button{font:inherit}.qm-zoom{display:block;max-width:100%;padding:0;background:white;border:1px solid #dce5f0;border-radius:8px;cursor:zoom-in}.qm-image img{max-width:100%;height:auto;display:block}.qm-image figcaption{font-size:13px;color:#52657b;margin-top:6px}.qm-image [data-qm-retry]{padding:10px;color:#a03924;border:1px solid #e6b1a4;background:#fff5f1;border-radius:6px}.qm-image-dialog{max-width:94vw;max-height:92vh;border:0;border-radius:12px;padding:16px}.qm-image-dialog::backdrop{background:#102338b3}.qm-image-dialog img{display:block;max-width:88vw;max-height:80vh;object-fit:contain}.qm-image-dialog button{display:block;margin:0 0 12px auto;padding:8px 18px}.qm-matching{width:100%}.qm-help{font-size:14px;color:#52657b;line-height:1.6}.qm-pairs,.qm-candidates{display:grid;gap:12px}.qm-pair{position:relative}.qm-target{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px;align-items:center;width:100%;text-align:left;padding:16px;border:1px solid #cbd9ea;border-radius:10px;background:#f7faff;color:#16344f;font:inherit;line-height:1.7;cursor:pointer}.qm-target b{font-weight:500}.qm-target span{border:1px dashed #a4bad6;border-radius:6px;padding:10px 14px;background:white;min-height:44px;overflow-wrap:anywhere}.qm-target[aria-pressed=true]{outline:3px solid #3482cc;outline-offset:2px}.qm-target:disabled{opacity:1;cursor:default}.qm-clear{margin:6px 0 0 auto;display:block;border:0;color:#486585;background:transparent;cursor:pointer;padding:4px 10px}.qm-candidates{border-top:1px dashed #ccd9e8;padding-top:18px;margin-top:20px}.qm-candidate{font:inherit;text-align:left;line-height:1.6;padding:12px 16px;border:1px solid #c6d9ef;border-radius:9px;background:white;color:#183b63;cursor:grab;box-shadow:0 2px 5px #1933510b}.qm-candidate small{display:block;color:#64748b}.qm-status{min-height:22px;color:#24588e;font-size:13px}.qm-pair-feedback{font-size:14px;line-height:1.6;margin:6px 0}.qm-pair.is-correct .qm-target{border-color:#3c9868}.qm-pair.is-wrong .qm-target{border-color:#cf6858}.qm-pair.is-wrong .qm-pair-feedback{color:#a13324}.qm-matching button:focus-visible,.qm-image button:focus-visible{outline:3px solid #3482cc;outline-offset:3px}.qm-editor{border:1px solid #d8e1ee;border-radius:10px;padding:16px;margin:16px 0}.qm-editor label{display:block;margin:10px 0}.qm-editor input,.qm-editor textarea,.qm-editor select{width:100%;box-sizing:border-box;padding:9px;font:inherit}.qm-editor-row{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:10px;margin:10px 0;align-items:start}.qm-editor-actions{display:flex;gap:10px;flex-wrap:wrap}.qm-editor button{padding:8px 12px;cursor:pointer}.qm-editor-error{color:#a13324;white-space:pre-wrap}.qm-case-layout{display:grid;grid-template-columns:minmax(260px,.9fr) minmax(0,1.1fr);gap:24px}.qm-case-layout>.qm-question-materials{grid-column:1;grid-row:1 / span 20;min-width:0}.qm-case-layout>:not(.qm-question-materials){grid-column:2;min-width:0}.qm-question-materials:empty{display:none}@media(max-width:760px){.qm-case-layout{display:block}.qm-target{grid-template-columns:1fr;gap:8px;padding:12px}.qm-case-body{max-height:40vh}.qm-editor-row{grid-template-columns:1fr 1fr}.qm-editor-row select{grid-column:1 / -1}.qm-case summary{padding:12px}.qm-case-body{padding:0 12px 12px}}
+
+.qm-case-layout .practice-mark-question{justify-self:end}
+.qm-matching .qm-target,.qm-matching .qm-candidate{white-space:normal;overflow-wrap:anywhere;min-width:0}
+.qm-target b,.qm-target span{min-width:0}
+
+/* Canvas cards: text/options left, original question media right, one shared frame. */
+.qm-card-layout{container-type:inline-size;min-width:0;width:100%}
+.qm-card-columns{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:18px;align-items:start}
+.qm-card-main,.qm-card-media{min-width:0;overflow-wrap:anywhere}
+.qm-card-media .qm-image{margin:0 0 14px}
+.qm-card-media .qm-zoom{width:100%}
+.qm-card-media .qm-image img{width:100%;max-height:320px;object-fit:contain}
+.qm-card-media .qm-case summary{padding:10px 12px}
+.qm-card-media .qm-case-body{padding:0 12px 12px}
+@container(max-width:360px){.qm-card-columns{grid-template-columns:minmax(0,1fr);gap:12px}}

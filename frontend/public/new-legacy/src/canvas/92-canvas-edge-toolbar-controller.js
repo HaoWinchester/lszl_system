@@ -62,6 +62,7 @@
     return{open,toggle,close,reposition,isOpen:name=>active===String(name)&&!panelFor(name)?.hidden,getActive:()=>active};
   }
   function create(options={}){
+    const supportsPorts=typeof options.onPort==='function'&&typeof options.onPortsReset==='function';
     const host=options.host;let root=null,visible=false,current={},popover=null,floating=null,lastPoint=null;
     function ensure(){
       if(root?.isConnected)return root;if(!host||typeof document==='undefined')return null;
@@ -74,6 +75,7 @@
         <button type="button" class="uc-toolbar-btn" data-uc-edge-panel="line" aria-haspopup="true" aria-expanded="false" aria-label="线条类型" data-tooltip="线条类型">${icon.path}</button>
         <span class="uc-toolbar-divider" aria-hidden="true"></span>
         <button type="button" class="uc-toolbar-btn" data-uc-edge-action="label" data-edge-action="label" aria-label="添加文本" data-tooltip="添加文本">${icon.label}</button>
+        ${supportsPorts?'<span class="uc-toolbar-divider" aria-hidden="true"></span><button type="button" class="uc-toolbar-btn" data-uc-edge-panel="ports" aria-haspopup="true" aria-expanded="false" aria-label="连接位置" data-tooltip="连接位置">↔</button>':''}
         <span class="uc-edge-batch-count" data-uc-edge-count data-edge-batch-count hidden></span>
       </div>
       <div class="uc-toolbar-panels uc-edge-toolbar-panels">
@@ -92,8 +94,12 @@
           <strong class="uc-toolbar-panel-title secondary">箭头样式</strong>
           <div class="uc-edge-option-grid uc-edge-arrow-grid" role="group" aria-label="箭头样式"><button type="button" data-uc-edge-arrow="none" data-tooltip="无箭头">—</button><button type="button" data-uc-edge-arrow="end" data-tooltip="末端箭头">→</button><button type="button" data-uc-edge-arrow="both" data-tooltip="双向箭头">↔</button></div>
         </section>
+          ${supportsPorts?`<section class="uc-toolbar-popover uc-edge-toolbar-popover" data-uc-edge-popover="ports" hidden aria-label="连接位置设置"><strong class="uc-toolbar-panel-title">连接位置</strong>
+          ${['from','to'].map(side=>`<label>${side==='from'?'起点':'终点'} <select data-uc-edge-port="${side}" aria-label="${side==='from'?'起点':'终点'}连接位置"><option value="" disabled>多种位置</option>${[['auto','自动'],['top','上侧'],['right','右侧'],['bottom','下侧'],['left','左侧']].map(([value,label])=>`<option value="${value}">${label}</option>`).join('')}</select></label>`).join('')}
+          <button type="button" data-uc-edge-action="ports-reset">恢复自动连接</button></section>`:''}
       </div>`;
       ['pointerdown','pointerup','dblclick','contextmenu'].forEach(type=>root.addEventListener(type,event=>event.stopPropagation()));
+      root.addEventListener('pointerdown',event=>{const button=event.target.closest?.('[data-uc-edge-panel="ports"],[data-uc-edge-action="ports-reset"]');if(button){event.preventDefault();button.focus({preventScroll:true})}});
       root.addEventListener('uc-selection-filter-open',event=>{event.stopPropagation();popover?.close?.()});
       root.addEventListener('click',event=>{
         event.stopPropagation();const panelButton=event.target.closest?.('[data-uc-edge-panel]');if(panelButton){event.preventDefault();current.selectionFilter?.closeMenu?.();popover?.toggle?.(panelButton.dataset.ucEdgePanel,panelButton);return}
@@ -101,9 +107,11 @@
         if(!action&&!color&&!line&&!path&&!arrow)return;event.preventDefault();
         if(color)options.onColorPreset?.(color,event,root);
         else if(action==='color-custom'){(options.onColorCustom||options.onColor)?.(event,root,root.querySelector('[data-uc-edge-panel="color"]'));popover?.close?.()}
+        else if(action==='ports-reset'){root.querySelector('[data-uc-edge-panel="ports"]')?.focus({preventScroll:true});popover?.close?.({immediate:true});options.onPortsReset?.()}
         else if(action==='label'&&!event.target.closest('button')?.disabled)options.onLabel?.(event,root);
         else if(line){options.onLineStyle?.(line,event);popover?.close?.()}else if(path){options.onPathStyle?.(path,event);popover?.close?.()}else if(arrow){options.onArrowStyle?.(arrow,event);popover?.close?.()}
       });
+      root.querySelectorAll('[data-uc-edge-port]').forEach(select=>select.addEventListener('change',event=>{event.stopPropagation();const value=select.value;root.querySelector('[data-uc-edge-panel="ports"]')?.focus({preventScroll:true});popover?.close?.({immediate:true});options.onPort?.(select.dataset.ucEdgePort,value)}));
       const slider=root.querySelector('[data-uc-edge-width]');slider.addEventListener('input',event=>{event.stopPropagation();root.querySelector('[data-uc-edge-width-output]').textContent=event.target.value});slider.addEventListener('change',event=>{event.stopPropagation();options.onWidth?.(Number(event.target.value),event);popover?.close?.()});
       host.appendChild(root);
       const shared=global.KGCanvasFloatingToolbarController;
@@ -120,6 +128,7 @@
       root.querySelectorAll('[data-uc-edge-path]').forEach(button=>button.classList.toggle('active',current.pathStyle!=null&&button.dataset.ucEdgePath===String(current.pathStyle)));
       root.querySelectorAll('[data-uc-edge-arrow]').forEach(button=>button.classList.toggle('active',current.arrowStyle!=null&&button.dataset.ucEdgeArrow===String(current.arrowStyle)));
       const slider=root.querySelector('[data-uc-edge-width]'),out=root.querySelector('[data-uc-edge-width-output]');if(slider&&current.width!=null)slider.value=String(Math.max(1,Math.min(8,Number(current.width)||1)));if(out)out.textContent=slider?.value||'';
+      root.querySelectorAll('[data-uc-edge-port]').forEach(select=>{select.value=current[select.dataset.ucEdgePort+'Port']??''});
       root.classList.toggle('is-batch',count>1);root.dataset.selectionCount=String(count);const badge=root.querySelector('[data-uc-edge-count]'),hasSnapshot=!!current.selectionFilter?.hasSnapshot?.();if(badge){badge.hidden=hasSnapshot||count<=1;badge.textContent=count>1?String(count)+' 条':''}root.querySelectorAll('[data-uc-edge-color]').forEach(button=>button.classList.toggle('active',String(button.dataset.ucEdgeColor).toLowerCase()===String(current.color||'').toLowerCase()));return root;
     }
     function show(context={}){ensure();update(context);visible=true;root.hidden=false;root.classList.add('show');if(context.selectionFilter?.mountInto)context.selectionFilter.mountInto(root.querySelector('.uc-edge-toolbar-main'),{beforeSelector:'[data-uc-edge-panel="color"]'});position(context.point||lastPoint);return root}

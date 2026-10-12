@@ -176,6 +176,18 @@
     const nested=raw.interaction&&typeof raw.interaction==='object'?raw.interaction:{};
     return{locked:!!(nested.locked??raw.locked??DEFAULT_INTERACTION.locked)};
   }
+  function notesValue(value){const result=String(value??'');if(result.length>100000)throw new Error('备注超过 100000 字符，不能完整导入');return result}
+  function imagesOf(value){
+    if(value==null)return[];
+    if(!Array.isArray(value))throw new Error('content.images 必须是数组');
+    return value.map(image=>{
+      if(!image||typeof image.assetId!=='string'||!/^ga_[a-zA-Z0-9_-]+$/.test(image.assetId))throw new Error('图片资源引用无效');
+      const out={assetId:image.assetId,alt:String(image.alt??'')};
+      for(const key of ['width','height'])if(image[key]!=null){const n=Number(image[key]);if(!Number.isFinite(n)||n<=0||n>40000000)throw new Error('图片尺寸无效');out[key]=n}
+      return out;
+    });
+  }
+  function imageUrl(image,fileId){return fileId?'/api/v1/graph-assets/'+encodeURIComponent(image.assetId)+'?fileId='+encodeURIComponent(fileId):''}
   function contentOf(raw={}){
     const nested=raw.content&&typeof raw.content==='object'?raw.content:{};
     return{
@@ -184,7 +196,8 @@
       category:text(nested.category??raw.category,'',120),
       level:text(nested.level??raw.level,'基础',60),
       keywords:text(nested.keywords??raw.keywords,'',600),
-      notes:text(nested.notes??raw.notes,'',3000),
+      notes:notesValue(nested.notes??raw.notes),
+      images:imagesOf(nested.images),
       highlightTerms:text(nested.highlightTerms??raw.highlightTerms,'',600)
     };
   }
@@ -263,7 +276,7 @@
   function normalizeGraph(graph={},options={}){
     const output=graph&&typeof graph==='object'?clone(graph):{};
     output.nodes=normalizeNodes(output.nodes,options);
-    output.links=Array.isArray(output.links)?output.links:[];
+    output.links=Array.isArray(output.links)?output.links.map(link=>({...link,hierarchy:link.hierarchy===true})):[];
     output.elements=normalizeTextElements(output.elements,options);
     return output;
   }
@@ -328,9 +341,10 @@
     next.size=sizeKey(next.size);
     return next;
   }
-  function updateAppearance(node,patch={}){
+  function updateAppearance(node,patch={},options={}){
     if(!node)return null;
     const current=appearanceOf(node),next=normalizeAppearancePatch(current,patch);
+    if(options.theme!==true&&node.mindmapTheme)node.manualAppearanceFields=[...new Set([...(node.manualAppearanceFields||[]),...Object.keys(patch)])];
     node.appearance=next;
     const dims=dimensionsForSize(next.size);
     const currentGeometry=geometryOf(node,current);
@@ -466,7 +480,7 @@
 
   global.KGGraphModel=Object.freeze({
     CARD_STYLES,TEXT_ALIGNS,FONT_SIZE_PRESETS,FONT_SIZES,LEGACY_FONT_SIZE_MAP,FONT_FAMILIES,FONT_WEIGHTS,FONT_STYLES,BORDER_STYLES,DEFAULT_APPEARANCE,CARD_STYLE_DEFAULTS,SIZE_DIMENSIONS,LEGACY_CARD_STYLE_ALIASES,DEFAULT_INTERACTION,
-    clone,safeColor,contrastTextColor,dimensionsForSize,sizeForDimensions,fontSizeValue,lineHeightValue,canonicalCardStyle,defaultsForCardStyle,contentOf,appearanceOf,geometryOf,interactionOf,
+    clone,notesValue,imagesOf,imageUrl,safeColor,contrastTextColor,dimensionsForSize,sizeForDimensions,fontSizeValue,lineHeightValue,canonicalCardStyle,defaultsForCardStyle,contentOf,appearanceOf,geometryOf,interactionOf,
     normalizeNode,normalizeNodes,normalizeGraph,syncLegacy,updateInteraction,updateContent,updateAppearance,resetAppearanceToCardStyle,updateGeometry,updateNode,updateNodes,
     findNode,createIndex,createNode,view,
     textElementContentOf,textElementAppearanceOf,textElementGeometryOf,syncTextElement,normalizeTextElement,normalizeTextElements,updateTextElementContent,updateTextElementAppearance,updateTextElementGeometry,createTextElement

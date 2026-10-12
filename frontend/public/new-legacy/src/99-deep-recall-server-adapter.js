@@ -36,6 +36,7 @@
     return {
       nodes:Array.isArray(progress.nodes)?clone(progress.nodes):[],
       strokes:Array.isArray(progress.strokes)?clone(progress.strokes):[],
+      tables:Array.isArray(progress.tables)?clone(progress.tables):[],
       edges:Array.isArray(progress.edges)?clone(progress.edges):[],
       customNodes:progress.customNodes&&typeof progress.customNodes==='object'?clone(progress.customNodes):{},
       activeKeywords:Array.isArray(progress.activeKeywords)?clone(progress.activeKeywords):[],
@@ -51,6 +52,7 @@
     return {
       nodes:Array.isArray(value.nodes)?clone(value.nodes):[],
       strokes:Array.isArray(value.strokes)?clone(value.strokes):[],
+      tables:Array.isArray(value.tables)?clone(value.tables):[],
       edges:Array.isArray(value.edges)?clone(value.edges):[],
       customNodes:value.customNodes&&typeof value.customNodes==='object'?clone(value.customNodes):{},
       activeKeywords:Array.isArray(value.activeKeywords)?clone(value.activeKeywords):[],
@@ -133,6 +135,7 @@
         graphSchemaVersion:pending.graphSchemaVersion,
         nodes:pending.nodes,
         strokes:pending.strokes,
+        tables:pending.tables,
         edges:pending.edges,
         customNodes:pending.customNodes,
         activeKeywords:pending.activeKeywords,

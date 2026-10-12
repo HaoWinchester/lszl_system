@@ -12,12 +12,14 @@
       if(typeof options.onChange==='function')options.onChange({type:'source',sourceId:id});return true;
     }
     function cancel(){const s=state();const had=!!s.linkSourceId;s.linkSourceId=null;if(had&&typeof options.onChange==='function')options.onChange({type:'cancel'});return had}
-    function connectTo(targetId){
+    function connectTo(targetId,ports={}){
       const s=state(),sourceId=s.linkSourceId;
       if(!sourceId||sourceId===targetId||!node(sourceId)||!node(targetId))return{ok:false,code:'INVALID_TARGET'};
       if(exists(sourceId,targetId)){s.linkSourceId=null;return{ok:false,code:'DUPLICATE',sourceId,targetId}}
       const link=typeof options.createLink==='function'?options.createLink(sourceId,targetId):null;
       if(!link)return{ok:false,code:'CREATE_FAILED',sourceId,targetId};
+      link.fromPort=global.KGGraphPersistence.normalizePort(ports.fromPort??link.fromPort);
+      link.toPort=global.KGGraphPersistence.normalizePort(ports.toPort??link.toPort);
       if(typeof options.addLink==='function')options.addLink(link);
       s.selectedNodeId=null;s.selectedLinkId=link.id||null;s.linkSourceId=null;
       if(typeof options.onChange==='function')options.onChange({type:'connect',sourceId,targetId,link});
