@@ -75,6 +75,8 @@
         "src/graph/history-controller.js",
         "src/graph/selection-controller.js",
         "src/graph/drag-controller.js",
+        "src/canvas/text-box-geometry.js",
+        "src/canvas/text-edit-session.js",
         "src/graph/element-resize-controller.js",
         "src/graph/connection-controller.js",
         "src/graph/graph-fragment.js",

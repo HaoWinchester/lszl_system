@@ -9,7 +9,7 @@ _COLOR = re.compile(r"#[0-9a-fA-F]{6}")
 _FIELDS = {"id", "tool", "color", "width", "points"}
 _TEXT_FIELDS = {"id", "tool", "color", "width", "points", "text"}
 # 各工具允许的粗细/字号范围，须与前端 94-canvas-ink.js 的 TOOLS 保持一致
-_TOOL_WIDTH_RANGE = {"pen": (1, 24), "highlighter": (4, 48), "text": (12, 72)}
+_TOOL_WIDTH_RANGE = {"pen": (1, 24), "highlighter": (4, 48), "text": (6, 288)}
 
 
 def _number(value: Any, minimum: float, maximum: float) -> bool:
@@ -28,7 +28,7 @@ def validate_strokes(value: Any) -> list[dict]:
     ids = set()
     total_points = 0
     for stroke in value:
-        if not isinstance(stroke, dict) or set(stroke) not in (_FIELDS, _TEXT_FIELDS, _TEXT_FIELDS | {"bold"}):
+        if not isinstance(stroke, dict) or not _FIELDS <= set(stroke) or not set(stroke) <= (_TEXT_FIELDS | {"bold", "boxWidth", "boxHeight"}):
             raise ValueError("笔迹必须包含 id、tool、color、width、points 且不能有额外字段")
         stroke_id = stroke["id"]
         if not isinstance(stroke_id, str) or not stroke_id.strip() or len(stroke_id) > 100:
@@ -55,8 +55,13 @@ def validate_strokes(value: Any) -> list[dict]:
             raise ValueError("画布笔迹总点数最多 100000")
         if tool == "text" or "text" in stroke:
             text = stroke.get("text")
-            if not isinstance(text, str) or not text.strip() or len(text) > 500:
-                raise ValueError("文字笔迹内容必须是 1–500 字符的非空字符串")
+            if not isinstance(text, str) or len(text) > 500:
+                raise ValueError("文字笔迹内容必须是 0–500 字符的字符串")
+        for key, minimum in (("boxWidth", 40), ("boxHeight", 24)):
+            if key in stroke and (tool != "text" or not _number(stroke[key], minimum, 4000)):
+                raise ValueError("文字框尺寸超出允许范围")
+        if tool != "text" and "text" in stroke:
+            raise ValueError("文字内容只适用于文字工具")
         cloned_points = []
         for point in points:
             if (

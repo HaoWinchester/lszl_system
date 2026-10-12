@@ -3973,6 +3973,7 @@
     // Initialization stays synchronous; changing an existing canvas waits for its server writes.
     if(!state.workspace||!state.workspaceId||state.workspaceId===workspaceId)return activateWorkspace(workspaceId,options);
     const previousId=state.workspaceId,session=state.workspaceSession,shouldSave=!state.readonly;
+    if(state.ink?.hasTextDraft?.())return state.ink.commitText().then(saved=>saved?loadWorkspace(workspaceId,options):false);
     if(state.inlineEdit?.finish)state.inlineEdit.finish(true);
     state.workspaceTransition=true;
     // 切换画布只取消进行中的笔迹，保留当前画笔工具状态。
@@ -5805,6 +5806,7 @@
         try{state.workspace=store().write({...state.workspace,strokes},{reason:'canvas-ink'})}finally{state.suppressStoreEvent=false}
         global.KGMultiQuestionWorkspaceFilebar?.render?.(state.workspace);
       },
+      persistText:()=>global.KGCanvasWorkspaceAdapter.flush({throwOnError:true}),
       onError:notify,onDrawMode:()=>{setPointerMode('edit');clearCardSelection();clearEdgeSelection();setActiveGroup('')},
       onLongPressEraser:()=>{
         if(state.readonly||!state.workspace)return;

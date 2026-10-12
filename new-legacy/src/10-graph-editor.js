@@ -66,7 +66,7 @@ function ensureGraphElementResizeController(){
       if(config.entityType==='node'){
         const node=nodeById(id);return node&&window.KGGraphModel.geometryOf(node);
       }
-      const item=textElementById(id);return item&&window.KGGraphModel.textElementGeometryOf(item);
+      const item=textElementById(id);return item&&{...window.KGGraphModel.textElementGeometryOf(item),fontSize:window.KGGraphModel.textElementAppearanceOf(item).fontSize};
     },
     applyGeometry:(id,geometry,meta={})=>{
       if(meta.session&&meta.session.config&&meta.session.config.entityType==='node'){
@@ -77,7 +77,10 @@ function ensureGraphElementResizeController(){
       }
       const item=textElementById(id);if(!item)return false;
       window.KGGraphModel.updateTextElementGeometry(item,{...geometry,manualSize:meta.cancelled?resizeOriginalManualSize:true});
-      updateTextElementGeometryDom(id);return true;
+      if(geometry.fontSize!==undefined)window.KGGraphModel.updateTextElementAppearance(item,{fontSize:geometry.fontSize});
+      const el=textElementDomByIdValue(id);if(el)applyTextElementTypographyVariables(el,window.KGGraphModel.textElementAppearanceOf(item));
+      updateTextElementGeometryDom(id);
+      if(!meta.cancelled&&el){const content=el.querySelector('.graph-text-element-content'),height=Math.max(geometry.height,content?.scrollHeight||0);if(height>geometry.height){window.KGGraphModel.updateTextElementGeometry(item,{height:Math.min(4000,height)});updateTextElementGeometryDom(id)}}return true;
     },
     onBegin:session=>{
       resizeEntityType=session.config.entityType==='node'?'node':'text-element';
@@ -510,7 +513,8 @@ async function openRelatedCanvasModal(showMessage=true){
       }
       showStatus('正式图谱保存失败，已保留当前会话与编辑输入。');return false;
     }
-    nodeInlineTextEditorController?.commit();commitEdgeInlineLabelEditor();
+    if(window.KGHomeInk?.hasTextDraft?.()&&await window.KGHomeInk.commitText()===false)return saveFailed();
+    await nodeInlineTextEditorController?.commit();if(nodeInlineTextEditorController?.isEditing())return saveFailed();commitEdgeInlineLabelEditor();
     const autosave=window.KGGraphFileAutosave;
     if(autosave){
       let needsSave=true;
@@ -1840,11 +1844,11 @@ function renderTextElement(item){
   const model=window.KGGraphModel,content=model&&model.textElementContentOf?model.textElementContentOf(item):{text:item.text||'点击编辑文字'},appearance=model&&model.textElementAppearanceOf?model.textElementAppearanceOf(item):{textColor:item.textColor||'#0f172a',textBackgroundColor:item.textBackgroundColor||'#ffffff',textBackgroundOpacity:item.textBackgroundOpacity??0,textAlign:item.textAlign||'center',fontSize:item.fontSize||20,fontFamily:item.fontFamily||'system',fontWeight:item.fontWeight||'bold',fontStyle:item.fontStyle||'normal',underline:!!item.underline,strikeThrough:!!item.strikeThrough,lineHeight:item.lineHeight||1.45},geometry=model&&model.textElementGeometryOf?model.textElementGeometryOf(item):{x:item.x||0,y:item.y||0,width:item.width||220,height:item.height||72,manualSize:!!item.manualSize};
   const selected=state.selectedElementId===item.id||selectedTextElementIds.has(item.id);
   const multiSelected=selected&&(selectedNodeIds.size+selectedTextElementIds.size+selectedLinkIds.size>1);
-  const el=document.createElement('div');el.className='graph-text-element'+(selected?' active':'')+(multiSelected?' multi-selected':'');el.dataset.textElementId=item.id;el.dataset.manualSize=geometry.manualSize?'true':'false';el.style.left=geometry.x+'px';el.style.top=geometry.y+'px';el.style.width=geometry.width+'px';el.style.height=geometry.height+'px';applyTextElementTypographyVariables(el,appearance);el.innerHTML=`<div class="graph-text-element-content"><span class="graph-text-inline">${escapeHTML(content.text||'点击编辑文字')}</span></div>${graphResizeHandlesMarkup('text')}`;return el;
+  const el=document.createElement('div');el.className='graph-text-element'+(selected?' active':'')+(multiSelected?' multi-selected':'');el.dataset.textElementId=item.id;el.dataset.manualSize=geometry.manualSize?'true':'false';el.style.left=geometry.x+'px';el.style.top=geometry.y+'px';el.style.width=geometry.width+'px';el.style.height=geometry.height+'px';applyTextElementTypographyVariables(el,appearance);el.innerHTML=`<div class="graph-text-element-content"><span class="graph-text-inline">${escapeHTML(content.text??'点击编辑文字')}</span></div>${graphResizeHandlesMarkup('text')}`;return el;
 }
 function measureTextElementTightSize(item){
   const model=window.KGGraphModel,content=model.textElementContentOf(item),appearance=model.textElementAppearanceOf(item);
-  const probe=document.createElement('div');probe.className='graph-text-element-measure';probe.textContent=content.text||'点击编辑文字';
+  const probe=document.createElement('div');probe.className='graph-text-element-measure';probe.textContent=content.text??'点击编辑文字';
   probe.style.fontFamily=graphFontFamilyCss(appearance.fontFamily);probe.style.fontSize=graphFontSizeCss(appearance.fontSize,20);probe.style.fontWeight=graphFontWeightCss(appearance.fontWeight,'text');probe.style.fontStyle=appearance.fontStyle==='italic'?'italic':'normal';probe.style.textDecorationLine=graphTextDecorationCss(appearance);probe.style.letterSpacing='normal';probe.style.lineHeight=graphLineHeightCss(appearance.lineHeight,1.45);
   cardsLayer.appendChild(probe);const width=Math.max(24,Math.min(640,Math.ceil(probe.offsetWidth)+2)),height=Math.max(24,Math.ceil(probe.offsetHeight)+2);probe.remove();return{width,height};
 }
@@ -1854,12 +1858,14 @@ function fitTextElementToContent(item,options={}){
   const x=preserveCenter?Math.round(geometry.x+(geometry.width-size.width)/2):geometry.x,y=preserveCenter?Math.round(geometry.y+(geometry.height-size.height)/2):geometry.y;
   model.updateTextElementGeometry(item,{x,y,width:size.width,height:size.height,manualSize:false});return true;
 }
-function renderCards(){const frag=document.createDocumentFragment(),nextCardDom=new Map(),nextTextDom=new Map(),relationState=cardRelationState();for(const n of state.nodes){const card=renderCardElement(n,relationState);nextCardDom.set(n.id,card);frag.appendChild(card)}for(const item of state.elements||[]){const el=renderTextElement(item);nextTextDom.set(item.id,el);frag.appendChild(el)}cardDomById=nextCardDom;textElementDomById=nextTextDom;cardsLayer.replaceChildren(frag);updateNodeGrowthHandles()}
+function renderCards(){const editing=nodeInlineTextEditorController?.current(),frag=document.createDocumentFragment(),nextCardDom=new Map(),nextTextDom=new Map(),relationState=cardRelationState();for(const n of state.nodes){const card=editing?.nodeId===n.id&&editing.entityType==='node'?cardElementByNodeId(n.id)||renderCardElement(n,relationState):renderCardElement(n,relationState);nextCardDom.set(n.id,card);frag.appendChild(card)}for(const item of state.elements||[]){const el=editing?.nodeId===item.id&&editing.entityType==='text-element'?textElementDomByIdValue(item.id)||renderTextElement(item):renderTextElement(item);nextTextDom.set(item.id,el);frag.appendChild(el)}cardDomById=nextCardDom;textElementDomById=nextTextDom;cardsLayer.replaceChildren(frag);updateNodeGrowthHandles()}
 function replaceCardDomForNode(id){
+  if(nodeInlineTextEditorController?.current()?.nodeId===id){const node=nodeById(id),card=cardElementByNodeId(id);if(node&&card)card.style.cssText=renderCardElement(node,cardRelationState()).style.cssText;return false;}
   const node=nodeById(id),old=cardElementByNodeId(id);if(!node||!old)return false;
   const next=renderCardElement(node,cardRelationState());old.replaceWith(next);cardDomById.set(id,next);return true;
 }
 function replaceTextElementDomForId(id){
+  if(nodeInlineTextEditorController?.current()?.nodeId===id){const item=textElementById(id),el=textElementDomByIdValue(id);if(item&&el)applyTextElementTypographyVariables(el,window.KGGraphModel.textElementAppearanceOf(item));return false}
   const item=textElementById(id),old=textElementDomByIdValue(id);if(!item||!old)return false;
   const next=renderTextElement(item);old.replaceWith(next);textElementDomById.set(id,next);return true;
 }
@@ -2632,7 +2638,7 @@ cardsLayer.addEventListener('pointerdown',e=>{
   const el=handle.closest('.graph-text-element'),item=el&&textElementById(el.dataset.textElementId);if(!item||el.classList.contains('multi-selected')||currentHomeFilteredSelectionTotal()>1)return;
   e.preventDefault();e.stopPropagation();textElementDrag=null;nodeInlineTextEditorController?.commit?.();
   clearMultiSelection();state.selectedNodeId=null;state.selectedLinkId=null;state.linkSourceId=null;state.selectedElementId=item.id;
-  const controller=ensureGraphElementResizeController();controller&&controller.begin(e,{id:item.id,handle:handle.dataset.elementResizeHandle,element:el,captureTarget:handle,minWidth:24,minHeight:24});
+  const controller=ensureGraphElementResizeController();controller&&controller.begin(e,{id:item.id,handle:handle.dataset.elementResizeHandle,element:el,captureTarget:handle,minWidth:40,minHeight:24,maxWidth:4000,maxHeight:4000});
 });
 cardsLayer.addEventListener('pointermove',e=>{const controller=graphKernelControllers.resize;if(controller&&controller.isActive())controller.update(e)});
 cardsLayer.addEventListener('pointerup',e=>{const controller=graphKernelControllers.resize;if(controller&&controller.isActive())controller.finish(e)});
@@ -3067,11 +3073,18 @@ function ensureNodeInlineTextEditorController(){
   if(nodeInlineTextEditorController)return nodeInlineTextEditorController;
   const factory=window.KGGraphInlineTextEditorController;if(!factory||typeof factory.create!=='function')return null;
   nodeInlineTextEditorController=factory.create({
-    onStart:()=>{stage.classList.add('graph-inline-text-editing');if(nodeStyleToolbarController)nodeStyleToolbarController.hide();nodeFloatingColorWindowController?.close({cancel:true})},
-    onEnd:()=>stage.classList.remove('graph-inline-text-editing'),
-    onCommit:({nodeId,entityType,value})=>{
-      if(entityType==='text-element'){const item=textElementById(nodeId);if(!item)return;const history=ensureGraphHistoryController(),mutate=()=>{window.KGGraphModel.updateTextElementContent(item,{text:value});fitTextElementToContent(item);return item};if(history)history.run('修改文本框文字',mutate);else mutate();render({persist:true});showStatus('文本框文字已保存，可按 Ctrl/Command+Z 撤销。');return}
-      const node=nodeById(nodeId),controller=ensureGraphStyleController();if(!node||!controller)return;controller.updateContent([nodeId],{title:value},`修改“${node.title}”文字`);showStatus('节点文字已保存，可按 Ctrl/Command+Z 撤销。');
+    onStart:()=>{stage.classList.add('graph-inline-text-editing');updateCardQuickActions();nodeFloatingColorWindowController?.close({cancel:true})},
+    onEnd:()=>{stage.classList.remove('graph-inline-text-editing');render({persist:false})},
+    onCommit:async({nodeId,entityType,value})=>{
+      const model=window.KGGraphModel,history=ensureGraphHistoryController();
+      if(entityType==='text-element'){
+        const item=textElementById(nodeId);if(!item)return false;
+        if(model.textElementContentOf(item).text!==value){const mutate=()=>{model.updateTextElementContent(item,{text:value});fitTextElementToContent(item);return item};if(history)history.run('修改文本框文字',mutate);else mutate()}
+      }else{
+        const node=nodeById(nodeId);if(!node)return false;
+        if(model.contentOf(node).title!==value){const mutate=()=>model.updateContent(node,{title:value});if(history)history.run('修改知识点文字',mutate);else mutate()}
+      }
+      save();const saved=await window.KGGraphFileAutosave.saveNow({force:true});if(saved===false){showStatus('文字未保存，输入已保留，请点击外部重试。');return false}showStatus('文字已保存，可按 Ctrl/Command+Z 撤销。');return true;
     },
     onOutsideCommit:({nodeId,textElementId})=>{
       if(nodeId&&nodeById(nodeId)){
@@ -3081,7 +3094,7 @@ function ensureNodeInlineTextEditorController(){
         clearMultiSelection();state.selectedNodeId=null;state.selectedLinkId=null;state.linkSourceId=null;state.selectedElementId=textElementId;refreshSelectionUI();
       }
     },
-    onCancel:()=>showStatus('已取消文字修改。')
+    onCancel:({nodeId,entityType,original})=>{const model=window.KGGraphModel;if(entityType==='text-element'){const item=textElementById(nodeId);if(item)model.updateTextElementContent(item,{text:original})}else{const node=nodeById(nodeId);if(node)model.updateContent(node,{title:original})}save();render({persist:false});showStatus('已取消文字修改。')}
   });
   return nodeInlineTextEditorController;
 }

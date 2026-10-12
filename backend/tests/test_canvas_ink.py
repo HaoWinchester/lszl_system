@@ -91,3 +91,18 @@ def test_multiline_bold_text_round_trip_and_invalid_style():
     assert validate_strokes([text]) == [text]
     with pytest.raises(ValueError):
         validate_strokes([{**text, "bold": "true"}])
+
+
+def test_text_boxes_empty_text_and_full_font_range_round_trip():
+    from app.schemas.canvas_ink import validate_strokes
+    for size in (6, 20, 288):
+        text = stroke(tool="text", width=size, text="", boxWidth=200, boxHeight=100)
+        assert validate_strokes([text]) == [text]
+        assert request(strokes=[text]).strokes == [text]
+
+
+@pytest.mark.parametrize("patch", [{"boxWidth": True}, {"boxWidth": 39}, {"boxHeight": 23}, {"boxHeight": 4001}, {"boxWidth": float('nan')}, {"width": 5}, {"width": 289}, {"unknown": 1}])
+def test_text_box_malformed_dimensions_rejected(patch):
+    from app.schemas.canvas_ink import validate_strokes
+    with pytest.raises(ValueError):
+        validate_strokes([stroke(**{"tool":"text", "width":20, "text":"", **patch})])

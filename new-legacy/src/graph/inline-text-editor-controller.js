@@ -24,16 +24,16 @@
     const outsideHandler=event=>{
       if(!session)return;
       const target=event.target;
-      if(target===session.editor||session.editor.contains?.(target))return;
+      if(target===session.editor||session.editor.contains?.(target)||target?.closest?.('.node-style-toolbar,.node-floating-color-window'))return;
       if(session.card?.contains?.(target)&&now()-session.startedAt<180)return;
       const outsideTarget={
         nodeId:target?.closest?String(target.closest('.knowledge-card')?.dataset?.nodeId||''):'',
         textElementId:target?.closest?String(target.closest('.graph-text-element')?.dataset?.textElementId||''):'',
         isCanvas:!!target?.closest?.('#stage')
       };
-      setTimeout(()=>{
+      setTimeout(async()=>{
         if(!session)return;
-        const committed=commit();
+        const committed=await commit();if(session)return;
         if(typeof options.onOutsideCommit==='function')options.onOutsideCommit({...outsideTarget,committed,event});
       },0);
     };
@@ -50,7 +50,7 @@
       value.editor.removeAttribute('aria-multiline');
       value.editor.removeAttribute('aria-label');
       value.editor.removeAttribute('spellcheck');
-      value.editor.removeAttribute('data-node-inline-editor');
+      value.editor.removeAttribute('data-node-inline-editor');value.editor.removeAttribute('data-save-state');
       value.editor.classList.remove('node-inline-direct-editor');
       value.card.classList.remove('node-inline-editing');
       if(typeof options.onEnd==='function')options.onEnd({nodeId:value.nodeId,entityType:value.entityType});
@@ -63,20 +63,21 @@
       if(typeof options.onCancel==='function')options.onCancel({nodeId:value.nodeId,entityType:value.entityType,original:value.original});
       return true;
     }
-    function commit(){
+    async function commit(){
       if(!session)return false;
       const value=session;
-      const raw=readText(value.editor),trimmed=raw.trim();
-      const next=trimmed||(value.entityType==='text-element'?'文字':'未命名知识点');
-      const changed=next!==value.original.trim();
-      writeText(value.editor,changed?next:value.original);
-      cleanup();
-      if(!changed)return false;
-      if(typeof options.onCommit==='function')options.onCommit({nodeId:value.nodeId,entityType:value.entityType,value:next,original:value.original,multiline:value.multiline});
-      return true;
+      if(value.composing){value.deferredCommit=true;return false}
+      const raw=readText(value.editor),next=value.entityType==='text-element'?(raw.trim()?raw:''):(raw.trim()||'未命名知识点');
+      if(next!==value.edit.state().draft)value.edit.update(next);
+      if(next===value.original){cleanup();return false}
+      const success=await value.edit.commit();
+      if(session!==value)return false;
+      value.editor.dataset.saveState=value.edit.state().status;
+      if(!success){if(value.edit.state().status==='failed')value.editor.setAttribute('aria-label','文字未保存，请重试');return false}
+      writeText(value.editor,next);cleanup();return true;
     }
     function start(config={}){
-      if(session)commit();
+      if(session){commit();return false}
       const card=config.card,host=config.host;
       if(!card||!host)return false;
       const editor=host.querySelector?.('.node-text-content,.graph-text-inline');
@@ -96,10 +97,15 @@
       session={
         nodeId:config.nodeId||card.dataset.nodeId||card.dataset.textElementId||'',
         entityType:config.entityType||'node',card,host,editor,original,multiline,
-        blurTimer:null,startedAt:now(),listeners:[]
+        blurTimer:null,startedAt:now(),listeners:[],composing:false,deferredCommit:false
       };
 
+      const currentSession=session;
+      currentSession.edit=global.KGTextEditSession.create({original,persist:value=>options.onCommit?.({nodeId:currentSession.nodeId,entityType:currentSession.entityType,value,original,multiline})});
       const listen=(type,handler)=>{editor.addEventListener(type,handler);session.listeners.push([type,handler])};
+      listen('input',()=>{currentSession.edit.update(readText(editor));editor.dataset.saveState='draft'});
+      listen('compositionstart',()=>{currentSession.composing=true;currentSession.edit.setComposing(true)});
+      listen('compositionend',()=>{currentSession.composing=false;currentSession.edit.setComposing(false);if(currentSession.deferredCommit){currentSession.deferredCommit=false;commit()}});
       listen('pointerdown',event=>event.stopPropagation());
       listen('click',event=>event.stopPropagation());
       listen('dblclick',event=>event.stopPropagation());
@@ -111,11 +117,12 @@
         const shouldCommit=(!multiline&&event.key==='Enter')||(multiline&&event.key==='Enter'&&(event.ctrlKey||event.metaKey));
         if(shouldCommit){event.preventDefault();event.stopPropagation();commit()}
       });
-      listen('blur',()=>{
+      listen('blur',event=>{
+        if(event.relatedTarget?.closest?.('.node-style-toolbar,.node-floating-color-window'))return;
         const currentSession=session;
         if(!currentSession||currentSession.editor!==editor)return;
         clearTimeout(currentSession.blurTimer);
-        currentSession.blurTimer=setTimeout(()=>{if(session===currentSession)commit()},160);
+        currentSession.blurTimer=setTimeout(()=>{if(session===currentSession&&!document.activeElement?.closest?.('.node-style-toolbar,.node-floating-color-window'))commit()},160);
       });
       requestAnimationFrame(()=>placeCaretAtEnd(editor));
       if(typeof options.onStart==='function')options.onStart({nodeId:session.nodeId,entityType:session.entityType,multiline,editor});

@@ -11,6 +11,7 @@
       isReadonly:()=>!canWriteGraph(),
       history:ensureGraphHistoryController(),showHistory:true,
       change:(strokes,label)=>ensureGraphHistoryController().run(label,()=>{state.strokes=strokes;save()}),
+      persistText:()=>window.KGGraphFileAutosave?.saveNow({force:true}),
       onDrawMode:()=>setGraphPointerMode('edit'),onError:showStatus
     });
     function sync(){if(previous!==state.strokes){previous=state.strokes;ink.render()}else ink.refreshControls()}

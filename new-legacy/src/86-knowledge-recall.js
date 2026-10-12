@@ -1463,6 +1463,7 @@
   }
   async function switchQuestion(bankId,questionId){
     if(recallTransitionBusy)return false;
+    if(inkController?.hasTextDraft?.()&&await inkController.commitText()===false)return false;
     const shouldSave=!isRecallReadonly()&&recallAdapter;
     setRecallTransitionBusy(true);
     // 过渡期给出加载反馈（随机鼓励语），避免"点了没反应"的冻结感。
@@ -1674,6 +1675,7 @@
     inkController=window.KGCanvasInk?.create?.({
       trigger:$('krInkBtn'),viewport,world,getViewport:()=>state.transform,getStrokes:()=>state.strokes,
       setStrokes:strokes=>{state.strokes=strokes;saveProgress()},
+      persistText:flushProgress,
       isReadonly:()=>isRecallReadonly()||isTeacherDraftPreview(),onError:notifyRecallLimit,
       onDrawMode:()=>{closeGuide();closeNodeSearch()},
       onLongPressEraser:()=>{
