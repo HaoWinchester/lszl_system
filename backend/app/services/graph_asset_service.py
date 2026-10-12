@@ -1,6 +1,7 @@
 """Immutable owner assets. Graph JSON never grants asset ownership."""
 import base64
 import binascii
+import math
 from copy import deepcopy
 from fastapi import HTTPException
 from sqlalchemy import select
@@ -27,6 +28,14 @@ def references(graph):
         for image in images:
             if not isinstance(image, dict) or not isinstance(image.get('assetId'), str) or not image['assetId']:
                 raise HTTPException(422, detail='图片必须引用 assetId')
+            for key in ('width', 'height'):
+                if image.get(key) is not None:
+                    try:
+                        dimension = float(image[key])
+                    except (TypeError, ValueError, OverflowError):
+                        raise HTTPException(422, detail='图片尺寸无效')
+                    if not math.isfinite(dimension) or not 0 < dimension <= 40_000_000:
+                        raise HTTPException(422, detail='图片尺寸无效')
             result.append(image['assetId'])
     return result
 
@@ -37,6 +46,15 @@ async def validate_graph_assets(db, owner, graph):
         found = set((await db.scalars(select(GraphAsset.id).where(GraphAsset.id.in_(ids), GraphAsset.owner_id == owner))).all())
         if found != ids:
             missing()
+    # Canonicalize only after validating the entire request and its ownership.
+    # Optional absent/null dimensions are omitted by the frontend model as well.
+    for node in graph.get('nodes', []):
+        for image in (node.get('content') or {}).get('images', []):
+            for key in ('width', 'height'):
+                if image.get(key) is None:
+                    image.pop(key, None)
+                else:
+                    image[key] = float(image[key])
 
 
 async def create_asset(db, owner, *, image_bytes, mime_type, filename='', alt='', commit=False):

@@ -108,3 +108,32 @@ def test_trusted_cross_owner_clone_remaps_once_and_transaction_rollback():
             assert await db.scalar(select(func.count()).select_from(GraphAsset))==before
             assert await db.scalar(select(GraphFile.id).where(GraphFile.owner_id==target,GraphFile.name=='rollback')) is None
     asyncio.run(check())
+
+
+def test_invalid_image_dimensions_reject_create_save_import_without_persisting():
+    owner,_=asyncio.run(users())
+    with TestClient(app) as c:
+        login(c,owner)
+        asset=c.post('/api/v1/graph-assets',json=upload_payload()).json()['asset']
+        original=graph(asset)
+        file=c.post('/api/v1/files',json={'name':'dimensions','graphData':original}).json()['file']
+        for key in ('width','height'):
+            for value in (-1,0,40000001,'NaN','Infinity',{},'invalid'):
+                invalid=graph({**asset,key:value})
+                before=c.get('/api/v1/files/'+file['id']).json()
+                assert c.post('/api/v1/files',json={'name':'invalid-dimensions','graphData':invalid}).status_code==422
+                assert c.put('/api/v1/files/'+file['id'],json={'graphData':invalid}).status_code==422
+                after=c.get('/api/v1/files/'+file['id']).json()
+                assert after['graphData']==before['graphData']==original
+                assert after['meta']['revision']==before['meta']['revision']
+                assert c.post('/api/v1/files/import-legacy',json={'files':[{'name':'invalid-dimensions','graphData':invalid}],'folders':[{'id':'bad','name':'must-not-create'}]}).status_code==422
+        listing=c.get('/api/v1/files').json()['files']
+        assert [f['name'] for f in listing]==['dimensions']
+        assert not c.get('/api/v1/files/folders').json()['folders']
+        accepted=graph({**asset,'width':'2.5','height':40000000})
+        assert c.put('/api/v1/files/'+file['id'],json={'graphData':accepted}).status_code==200
+        saved=c.get('/api/v1/files/'+file['id']).json()['graphData']
+        assert saved['nodes'][0]['content']['images'][0]['width']==2.5
+        assert saved['nodes'][0]['content']['images'][0]['height']==40000000
+        optional=graph({'assetId':asset['assetId'],'alt':'optional'})
+        assert c.post('/api/v1/files',json={'name':'optional','graphData':optional}).status_code==200
