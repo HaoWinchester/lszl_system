@@ -688,7 +688,7 @@
       ownHistoryStack.length=0;ownRedoStack=[];
       if(!keepSelection)selectTable(null);
       closeInsertPanel();
-      drag=null;editingCell=null;dragOriginalId=null;dragOriginalTable=null;
+      drag=null;editingCell=null;
       render({force:true});
     }
     function destroy(){
