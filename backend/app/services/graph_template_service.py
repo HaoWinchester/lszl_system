@@ -113,6 +113,7 @@ async def publish(db, user, data, template_id=None):
         fail('GRAPH_FILE_NOT_FOUND')
     graph = published_graph(content.graph_data)
     remap_graph(graph)  # Reject malformed source before producing a publication.
+    file_service.validate_graph_tables(graph)
     descriptors = {}
     for node in graph['nodes']:
         descriptors[node['id']] = await questions.export_card_bindings(db, user, file.id, node['id'])

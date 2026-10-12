@@ -79,6 +79,7 @@
       nodes:{},
       edges:[],
       strokes:[],
+      tables:[],
       groups:[],
       createdAt,
       updatedAt:createdAt
@@ -245,6 +246,8 @@
       nodes,
       edges,
       strokes:global.KGCanvasInk?global.KGCanvasInk.normalize(value.strokes):clone(value.strokes||[]),
+      // 表格（TableV1）与图谱页共用同一模型校验；非法表安全降级丢弃。
+      tables:global.KGCanvasTableModel?.sanitizeCollection?global.KGCanvasTableModel.sanitizeCollection(value.tables):(Array.isArray(value.tables)?value.tables:[]),
       groups:(Array.isArray(value.groups)?value.groups:[]).map(normalizeGroup).map(group=>({...group,nodeIds:group.nodeIds.filter(id=>nodes[id])})).filter(group=>group.nodeIds.length),
       createdAt:Number(value.createdAt||base.createdAt),
       updatedAt:Number(value.updatedAt||base.updatedAt)
@@ -924,4 +927,4 @@
     workspaceUrl,
     subscribe
   });
-})(window);
+})(typeof window!=='undefined'?window:globalThis);

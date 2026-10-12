@@ -66,6 +66,7 @@ class RecallProgress(Base):
     nodes: Mapped[list] = mapped_column(JSONB, default=list)
     edges: Mapped[list] = mapped_column(JSONB, default=list)
     strokes: Mapped[list] = mapped_column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    tables: Mapped[list] = mapped_column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
     custom_nodes: Mapped[list | dict] = mapped_column(JSONB, default=list)
     active_keywords: Mapped[list] = mapped_column(JSONB, default=list)
     choice_offsets: Mapped[dict] = mapped_column(JSONB, default=dict)

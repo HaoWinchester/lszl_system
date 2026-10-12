@@ -1810,6 +1810,14 @@ def _workspace_values(data: dict) -> tuple[str, int, dict]:
         raise ValueError("工作区 payload 必须是对象")
     if "strokes" in payload:
         payload = {**payload, "strokes": validate_strokes(payload["strokes"])}
+    if "tables" in payload and payload["tables"] is not None:
+        # TableV1 校验与图谱/回忆页共用同一 schema 语义；非法/超限整体拒绝。
+        from app.schemas.canvas_table import CanvasTable, validate_tables
+
+        tables = payload["tables"]
+        if not isinstance(tables, list):
+            raise ValueError("工作区 tables 必须是数组")
+        validate_tables([CanvasTable(**item) for item in tables])
     return title[:200], version, payload
 
 

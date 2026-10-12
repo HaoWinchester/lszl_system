@@ -34,6 +34,26 @@ class FolderNotEmpty(ValueError):
     pass
 
 
+class GraphTablesInvalid(ValueError):
+    """graphData.tables 违反 TableV1 契约（画布级整体拒绝）。"""
+
+
+def validate_graph_tables(graph_data: dict) -> None:
+    """TableV1 服务端校验：graphData.tables 缺省为空，超限/非法整体拒绝。"""
+    tables = (graph_data or {}).get("tables")
+    if tables is None:
+        return
+    if not isinstance(tables, list):
+        raise GraphTablesInvalid("tables 必须是数组")
+    from app.schemas.canvas_table import CanvasTable, validate_tables
+
+    try:
+        validated = [CanvasTable(**item) for item in tables]
+        validate_tables(validated)
+    except ValueError as exc:
+        raise GraphTablesInvalid(str(exc)) from exc
+
+
 def blank_graph_data(title: str = "知识点关系图谱") -> dict:
     return {
         "meta": {"title": title, "subject": "通用课程", "audience": "", "description": ""},
@@ -237,6 +257,7 @@ async def create_file(
         if folder is None:
             return None
     graph_data = graph_data or blank_graph_data(name)
+    validate_graph_tables(graph_data)
     await validate_graph_assets(db, owner, graph_data)
     file_id = uid("f_")
     file = GraphFile(
@@ -281,6 +302,7 @@ async def save_file(
     current_revision = max(1, int(f.revision or 1))
     if expected_revision is not None and expected_revision != current_revision:
         raise FileRevisionConflict(current_revision)
+    validate_graph_tables(graph_data)
     await validate_graph_assets(db, owner, graph_data)
     c = await get_content(db, file_id)
     next_revision = current_revision + 1

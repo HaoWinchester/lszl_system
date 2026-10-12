@@ -106,6 +106,7 @@
         "src/23-graph-file-editor-store-bridge.js",
         "src/canvas/dom-interaction.js",
         "src/canvas/94-canvas-ink.js",
+        "src/canvas/table-model.js",
         "src/00-config-state.js",
         "src/18-graph-user-preferences.js",
         "src/09-graph-connector-drag-controller.js",

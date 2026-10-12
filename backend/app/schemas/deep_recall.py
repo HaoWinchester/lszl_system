@@ -34,6 +34,7 @@ class RecallProgressSaveRequest(BaseModel):
     nodes: list[dict[str, Any]] = Field(max_length=5000)
     edges: list[dict[str, Any]] = Field(max_length=20000)
     strokes: list[dict[str, Any]] = Field(default_factory=list)
+    tables: list[dict[str, Any]] = Field(default_factory=list)
     custom_nodes: dict[str, dict[str, Any]] = Field(
         default_factory=dict,
         alias="customNodes",
@@ -47,6 +48,15 @@ class RecallProgressSaveRequest(BaseModel):
     @classmethod
     def validate_ink(cls, value: Any) -> list[dict]:
         return validate_strokes(value)
+
+    @field_validator("tables")
+    @classmethod
+    def validate_tables_field(cls, value: list[dict]) -> list[dict]:
+        """TableV1 校验：非法表格整体拒绝（与图谱/多题页同一 schema 语义）。"""
+        from app.schemas.canvas_table import CanvasTable, validate_tables
+
+        validate_tables([CanvasTable(**item) for item in value])
+        return value
 
     @model_validator(mode="after")
     def validate_graph(self) -> "RecallProgressSaveRequest":

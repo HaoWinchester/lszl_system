@@ -133,7 +133,23 @@
     return normalize(next);
   }
 
-  const api=Object.freeze({LIMITS,create,normalize,cellCount,merge,split,paste});
+  // 集合级清洗：逐表 normalize，非法表安全降级丢弃；画布总格数超限整组丢弃。
+  // 三页读取旧/不可信数据时共用，保证坏表格不阻断整个画布加载。
+  function sanitizeCollection(input,{onInvalid}={}){
+    if(!Array.isArray(input))return [];
+    const clean=[];
+    for(const item of input){
+      try{clean.push(normalize(item))}catch(error){if(onInvalid)onInvalid(error)}
+    }
+    let total=0;
+    for(const table of clean){
+      total+=cellCount(table);
+      if(total>LIMITS.MAX_CELLS_PER_CANVAS){if(onInvalid)onInvalid(new Error('画布单元格总数超限'));return []}
+    }
+    return clean;
+  }
+
+  const api=Object.freeze({LIMITS,create,normalize,cellCount,merge,split,paste,sanitizeCollection});
   global.KGCanvasTableModel=api;
   if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);

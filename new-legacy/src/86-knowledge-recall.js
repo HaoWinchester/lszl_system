@@ -13,7 +13,7 @@
   let question=cloneValue(fallbackQuestion);
   let rootMap=buildRootMap(question);
   let keywordMatchers=buildKeywordMatchers(rootMap);
-  let state={nodes:[],edges:[],strokes:[],lastNewEdgeId:'',lastNewNodeId:'',activeNodeId:null,activeKeywords:[],transform:{x:0,y:0,scale:1},customNodes:{},choiceOffsets:{},metrics:{keywordClicks:0,choiceClicks:0,nodeOpens:0,sessionStartedAt:Date.now()}};
+  let state={nodes:[],edges:[],strokes:[],tables:[],lastNewEdgeId:'',lastNewNodeId:'',activeNodeId:null,activeKeywords:[],transform:{x:0,y:0,scale:1},customNodes:{},choiceOffsets:{},metrics:{keywordClicks:0,choiceClicks:0,nodeOpens:0,sessionStartedAt:Date.now()}};
   let isDragging=false,dragStart=null,worldStart=null,panPointerId=null,panButton=0,rightPanStart=null,contextMenuSuppressUntil=0,contextMenu=null,customOpen=false,lastViewportSize=null;
   let canvasRuntime=null,inkController=null,recallViewportRestored=false,recallTransitionBusy=false;
   let progressSaveTimer=0,questionSessionToken=0,cardClickTimer=0,searchTimer=0,nodeSearchTimer=0;
@@ -380,7 +380,8 @@
     return prepared.latest;
   }
   function progressPayload(){
-    return {nodes:state.nodes,edges:state.edges,strokes:state.strokes,customNodes:state.customNodes,activeKeywords:state.activeKeywords,choiceOffsets:state.choiceOffsets,metrics:state.metrics,graphSchemaVersion:3,transform:{x:Number(state.transform.x)||0,y:Number(state.transform.y)||0,scale:Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,Number(state.transform.scale)||1))},optionState:{selected:String(krOptionState.selected||''),persistent:String(krOptionState.persistent||'')}};
+    const tables=window.KGCanvasTableModel?.sanitizeCollection?window.KGCanvasTableModel.sanitizeCollection(state.tables):(Array.isArray(state.tables)?state.tables:[]);
+    return {nodes:state.nodes,edges:state.edges,strokes:state.strokes,tables,customNodes:state.customNodes,activeKeywords:state.activeKeywords,choiceOffsets:state.choiceOffsets,metrics:state.metrics,graphSchemaVersion:3,transform:{x:Number(state.transform.x)||0,y:Number(state.transform.y)||0,scale:Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,Number(state.transform.scale)||1))},optionState:{selected:String(krOptionState.selected||''),persistent:String(krOptionState.persistent||'')}};
   }
   async function writeProgressNow({allowTransition=false}={}){
     if(isRecallSessionReadonly()||(recallTransitionBusy&&!allowTransition)||isTeacherDraftPreview()||!recallAdapter)return false;
@@ -408,6 +409,7 @@
       raw=raw||recallAdapter?.getState?.().graph||null;
       if(raw&&Array.isArray(raw.nodes)&&Array.isArray(raw.edges)){
         state.strokes=window.KGCanvasInk?.normalize?.(raw.strokes)||cloneValue(raw.strokes||[]);
+        state.tables=window.KGCanvasTableModel?.sanitizeCollection?window.KGCanvasTableModel.sanitizeCollection(raw.tables):(Array.isArray(raw.tables)?raw.tables:[]);
         inkController?.reset({keepTool:true});
         state.nodes=raw.nodes;state.edges=raw.edges;state.customNodes=raw.customNodes&&typeof raw.customNodes==='object'?raw.customNodes:{};state.activeKeywords=Array.isArray(raw.activeKeywords)?raw.activeKeywords:[];state.choiceOffsets=raw.choiceOffsets&&typeof raw.choiceOffsets==='object'?raw.choiceOffsets:{};state.metrics=raw.metrics&&typeof raw.metrics==='object'?{keywordClicks:Number(raw.metrics.keywordClicks)||0,choiceClicks:Number(raw.metrics.choiceClicks)||0,nodeOpens:Number(raw.metrics.nodeOpens)||0,sessionStartedAt:Date.now()}:{keywordClicks:0,choiceClicks:0,nodeOpens:0,sessionStartedAt:Date.now()};
         if(raw.optionState&&typeof raw.optionState==='object')krOptionState={selected:String(raw.optionState.selected||''),persistent:String(raw.optionState.persistent||'')};
@@ -1489,7 +1491,7 @@
       const routeContext=window.KGLearningRouteContext?.normalize?.({paperId:selected.sourcePaperId,releaseId:selected.sourceReleaseId,bankId:selected.sourceBankId,questionId:selected.id,mode:'deep_recall',returnUrl:window.KGLearningRouteContext?.parse?.({mode:'deep_recall'})?.returnUrl||'index.html'})||{};
       window.KGLearningRouteContext?.replace?.(routeContext,{target:'knowledge-recall.html'});
       destroyingNodeIds.clear();inkController?.reset({keepTool:true});setRecallReadonly(true);
-      state={nodes:[],edges:[],strokes:[],lastNewEdgeId:'',lastNewNodeId:'',activeNodeId:null,activeKeywords:[],transform:{x:0,y:0,scale:1},customNodes:{},choiceOffsets:{},metrics:{keywordClicks:0,choiceClicks:0,nodeOpens:0,sessionStartedAt:Date.now()}};
+      state={nodes:[],edges:[],strokes:[],tables:[],lastNewEdgeId:'',lastNewNodeId:'',activeNodeId:null,activeKeywords:[],transform:{x:0,y:0,scale:1},customNodes:{},choiceOffsets:{},metrics:{keywordClicks:0,choiceClicks:0,nodeOpens:0,sessionStartedAt:Date.now()}};
       applyServerSession(prepared.latest,{history:prepared.history});
       renderSaveState(recallAdapter.getState());
       closeGuide();closeNodeSearch();closeQuestionDrawer();renderAll();setTimeout(()=>{centerOn(0,0,true);playQuestionCardEntry()},30);enforceRecallPermission();return true;
@@ -1671,7 +1673,7 @@
     if(isTeacherDraftPreview()){
       const back=$('krBackBtn');if(back){back.title='退出深度回忆预览';back.setAttribute('aria-label','退出深度回忆预览');back.addEventListener('click',event=>{event.preventDefault();cleanupTeacherDraftPreview();try{window.close()}catch(error){};if(!window.closed)location.href='training-config.html?section=recall'},{once:true})}
     }
-    window.KGLearningProgress?.registerAdapter?.('deep_recall',{flush:flushProgress,clearTransient:()=>{cancelProgressSave();destroyingNodeIds.clear();state.nodes=[];state.edges=[];state.strokes=[];inkController?.reset({keepTool:true});state.customNodes={};state.activeKeywords=[];state.choiceOffsets={};state.activeNodeId=null;state.lastNewEdgeId='';state.lastNewNodeId='';}});
+    window.KGLearningProgress?.registerAdapter?.('deep_recall',{flush:flushProgress,clearTransient:()=>{cancelProgressSave();destroyingNodeIds.clear();state.nodes=[];state.edges=[];state.strokes=[];state.tables=[];inkController?.reset({keepTool:true});state.customNodes={};state.activeKeywords=[];state.choiceOffsets={};state.activeNodeId=null;state.lastNewEdgeId='';state.lastNewNodeId='';}});
     inkController=window.KGCanvasInk?.create?.({
       trigger:$('krInkBtn'),viewport,world,getViewport:()=>state.transform,getStrokes:()=>state.strokes,
       setStrokes:strokes=>{state.strokes=strokes;saveProgress()},

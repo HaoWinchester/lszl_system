@@ -40,15 +40,21 @@ async def list_files(
 
 @router.post("", dependencies=[Depends(file_import_submission_guard)])
 async def create_file(body: dict, db: DB, user: CurrentUser):
-    f = await file_service.create_file(
-        db,
-        user.username,
-        name=body.get("name", "新图谱"),
-        graph_data=body.get("graphData"),
-        folder_id=body.get("folderId"),
-        source=body.get("source", "created"),
-        source_file_id=body.get("sourceFileId"),
-    )
+    try:
+        f = await file_service.create_file(
+            db,
+            user.username,
+            name=body.get("name", "新图谱"),
+            graph_data=body.get("graphData"),
+            folder_id=body.get("folderId"),
+            source=body.get("source", "created"),
+            source_file_id=body.get("sourceFileId"),
+        )
+    except file_service.GraphTablesInvalid as exc:
+        raise HTTPException(status_code=422, detail={
+            "code": "GRAPH_TABLES_INVALID",
+            "message": str(exc),
+        })
     if not f:
         raise HTTPException(status_code=404, detail="目标文件夹不存在")
     return {"file": file_service.file_meta(f)}
@@ -208,6 +214,11 @@ async def save_file(file_id: str, body: dict, db: DB, user: CurrentUser):
             body.get("learningState"),
             body.get("expectedRevision"),
         )
+    except file_service.GraphTablesInvalid as exc:
+        raise HTTPException(status_code=422, detail={
+            "code": "GRAPH_TABLES_INVALID",
+            "message": str(exc),
+        })
     except file_service.FileRevisionConflict as exc:
         raise HTTPException(status_code=409, detail={
             "code": "FILE_REVISION_CONFLICT",

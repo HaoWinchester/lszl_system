@@ -244,6 +244,7 @@ def _empty_progress(*, read_only: bool) -> dict[str, Any]:
         "nodes": [],
         "edges": [],
         "strokes": [],
+        "tables": [],
         "customNodes": {},
         "activeKeywords": [],
         "choiceOffsets": {},
@@ -261,6 +262,7 @@ def progress_payload(progress: RecallProgress, *, read_only: bool = False) -> di
         "nodes": progress.nodes or [],
         "edges": progress.edges or [],
         "strokes": progress.strokes or [],
+        "tables": progress.tables or [],
         "customNodes": progress.custom_nodes or {},
         "activeKeywords": progress.active_keywords or [],
         "choiceOffsets": progress.choice_offsets or {},
@@ -444,6 +446,7 @@ async def save_progress(
     progress.nodes = request.nodes
     progress.edges = request.edges
     progress.strokes = request.strokes
+    progress.tables = request.tables
     progress.custom_nodes = request.custom_nodes
     progress.active_keywords = request.active_keywords
     progress.choice_offsets = request.choice_offsets
@@ -508,6 +511,7 @@ async def reset_progress(
     progress.nodes = []
     progress.edges = []
     progress.strokes = []
+    progress.tables = []
     progress.custom_nodes = {}
     progress.active_keywords = []
     progress.choice_offsets = {}

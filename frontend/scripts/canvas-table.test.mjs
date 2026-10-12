@@ -11,3 +11,8 @@ test('spreadsheet clipboard: TSV quoting and Excel sample parity',()=>{
  const result=spawnSync(process.execPath,['--test',fileURLToPath(new URL('../../new-legacy/tests/canvas-table-clipboard.test.js',import.meta.url))],{encoding:'utf8'});
  assert.equal(result.status,0,`${result.stdout}\n${result.stderr}`);
 });
+
+test('table persistence adapters: sanitizeCollection, store and recall adapter',()=>{
+ const result=spawnSync(process.execPath,['--test',fileURLToPath(new URL('../../new-legacy/tests/canvas-table-adapters.test.js',import.meta.url))],{encoding:'utf8'});
+ assert.equal(result.status,0,`${result.stdout}\n${result.stderr}`);
+});
