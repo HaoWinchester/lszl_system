@@ -87,7 +87,11 @@
       getState(){return{canUndo:ownHistoryStack.length>0,canRedo:ownRedoStack.length>0}},
     };
     const pageDrivenHistory=typeof options.change==='function';
-    function mutate(next,label,{transient=false}={}){
+    // 整集合替换中只改目标表，兄弟表保持原对象不动（防止单表操作丢失多表画布的其它表）。
+    function withTableReplaced(table,replacement){
+      return getTables().map(item=>item.id===table.id?replacement:item);
+    }
+    function mutate(next,label,{transient=false,before=null}={}){
       if(readonly()){status('当前画布只读，不能修改表格');return false}
       const factory=model();if(!factory)return false;
       let normalized;
@@ -95,11 +99,16 @@
       catch(error){status(error?.message||'表格数据无效，已拒绝写入');return false}
       let total=0;
       for(const item of normalized){total+=factory.cellCount(item);if(total>factory.LIMITS.MAX_CELLS_PER_CANVAS){status(`画布单元格总数不能超过 ${factory.LIMITS.MAX_CELLS_PER_CANVAS}`);return false}}
-      if(transient){applyTables(normalized);lastSignature=JSON.stringify(getTables());return true}
-      const before=getTables();
-      if(pageDrivenHistory)applyTables(normalized,label);
-      else{
-        const command={label:label||'编辑表格',undo:()=>applyTables(before),redo:()=>applyTables(normalized)};
+      if(transient){applyTables(normalized);paintRenderedSignature();return true}
+      // before：显式传入拖前状态（拖动直写后 getTables() 已是拖后位置，必须用拖前快照进历史）。
+      const previous=before||getTables();
+      if(pageDrivenHistory){
+        // 页面 checkpoint 在 run 调用时捕获：先把拖前状态写回，再走一次带历史的写入，
+        // 撤销才能回到拖前位置。
+        applyTables(previous,null);
+        applyTables(normalized,label);
+      }else{
+        const command={label:label||'编辑表格',undo:()=>applyTables(previous),redo:()=>applyTables(normalized)};
         if(options.history&&typeof options.history.push==='function')options.history.push(command);
         else ownHistory.push(command);
         applyTables(normalized);
@@ -120,7 +129,7 @@
     insertPanel.hidden=true;
     let unmountInsertPanel=null;
 
-    let selectedTableId=null,anchor=null,focusCellPos=null,drag=null,editingCell=null,lastSignature='';
+    let selectedTableId=null,anchor=null,focusCellPos=null,drag=null,editingCell=null;
     const listeners=[];
     function listen(target,type,callback,config){target.addEventListener(type,callback,config);listeners.push(()=>target.removeEventListener(type,callback,config))}
     const tableById=id=>getTables().find(item=>item.id===id)||null;
@@ -240,6 +249,7 @@
         if(current&&anchor){anchor=clampCell(current,anchor);focusCellPos=focusCellPos?clampCell(current,focusCellPos):null}
       }
       layer.replaceChildren(...tables.map(table=>buildWrap(table,scale)));
+      paintRenderedSignature();
       refreshControls();
     }
     function clampCell(table,cell){
@@ -282,11 +292,14 @@
         });
       });
     }
+    function tableSignature(){try{return JSON.stringify(getTables())}catch(error){return ''}}
+    // 渲染时把当前数据签名记在 layer 上；sync 只在“DOM 落后于数据”时重建
+    // （撤销/重做恢复出与上次缓存签名相同的 JSON 时也能正确重绘）。
+    function paintRenderedSignature(){layer.dataset.kgTableSignature=tableSignature()}
     function sync(){
-      let signature;
-      try{signature=JSON.stringify(getTables())}catch(error){signature=''}
-      if(signature!==lastSignature){lastSignature=signature;render({force:!editingCell})}
+      if(domSignature()!==tableSignature())render({force:!editingCell})
     }
+    function domSignature(){return layer.dataset.kgTableSignature||''}
 
     // —— 选中与单元格事件（委托到 layer；stopPropagation 隔离画布平移/框选/拖卡） ——
     listen(layer,'pointerdown',event=>{
@@ -335,11 +348,9 @@
       const hit=findCell(event.target);
       if(hit&&editingCell===hit.cell)editingCell=null;
     });
-    listen(layer,'input',event=>{
-      const hit=findCell(event.target);
-      if(!hit||readonly())return;
+    // 单元格文本入库：contenteditable 末尾可能残留一个表现换行符，入库前去掉。
+    function commitCellText(hit){
       const table=tableById(hit.tableId);if(!table)return;
-      // contenteditable 末尾可能残留一个表现换行符，入库前去掉。
       let text=hit.cell.innerText.replace(/\r\n?/g,'\n');
       if(text.endsWith('\n'))text=text.replace(/\n$/,'');
       const max=model()?.LIMITS?.MAX_CELL_CHARS||3000;
@@ -355,6 +366,17 @@
         return {...item,cells};
       });
       mutate(tables,null,{transient:true});
+    }
+    listen(layer,'input',event=>{
+      const hit=findCell(event.target);
+      if(!hit||readonly())return;
+      // IME 组词中间态不入库；compositionend 后的最终 input/事件统一提交。
+      if(event.isComposing)return;
+      commitCellText(hit);
+    });
+    listen(layer,'compositionend',event=>{
+      const hit=findCell(event.target);
+      if(hit&&!readonly()&&!event.isComposing)commitCellText(hit);
     });
     // 单元格内粘贴：表格结构（Excel HTML/多格 TSV）优先按表格粘贴到选中起始格；
     // 普通文本按纯文本插入（“正在文本编辑”由 isEditingTarget 识别，画布快捷键不介入）。
@@ -452,7 +474,7 @@
         next=getTables().map(item=>item.id===drag.tableId?factory.normalize({...item,rowHeights:heights}):item);
       }
       if(!next)return;
-      applyTables(next); // 拖动过程直写，pointerup 时再以一次操作进历史
+      applyTables(next); // 拖动过程直写，pointerup 时以「拖前快照 → 拖后状态」单条历史进栈
       render({force:true});
     });
     listen(viewport,'pointerup',event=>{
@@ -463,7 +485,8 @@
       const current=tableById(session.tableId);
       if(!current)return;
       const labels={move:'移动表格',table:'调整表格大小',col:'调整表格列宽',row:'调整表格行高'};
-      mutate([current],labels[session.kind]||'调整表格');
+      // before 用拖前快照（pointermove 直写绕过历史，getTables() 已是拖后位置）。
+      mutate(getTables(),labels[session.kind]||'调整表格',{before:withTableReplaced(current,session.original)});
     });
     listen(viewport,'pointercancel',event=>{
       if(!drag||event.pointerId!==drag.pointerId)return;
@@ -486,7 +509,7 @@
         if(action==='undo'||action==='redo'){
           const stack=options.history&&typeof options.history[action]==='function'?options.history:ownHistory;
           if(stack[action]&&!stack[action]())status(action==='undo'?'暂无可撤销的表格操作。':'暂无可重做的表格操作。');
-          lastSignature=JSON.stringify(getTables());render({force:true});return;
+          render({force:true});return;
         }
         const table=tableById(tableId);if(!table)return;
         selectTable(tableId);
@@ -503,13 +526,13 @@
           const rect=selectionRect(table,cellAnchor,endAnchor);
           if(!rect||(rect.rowSpan===1&&rect.columnSpan===1)){status('请用 Shift+点击 选中要合并的相邻矩形区域。');return}
           const next=model().merge(table,rect);
-          mutate([next],'合并单元格');
+          mutate(withTableReplaced(table,next),'合并单元格');
           anchor={row:rect.row,column:rect.column};focusCellPos=null;
           status('已合并单元格，内容按行拼入左上格。');return;
         }
         if(action==='split'){
           const next=model().split(table,cellAnchor.row,cellAnchor.column);
-          mutate([next],'拆分单元格');
+          mutate(withTableReplaced(table,next),'拆分单元格');
           status('已拆分合并单元格。');return;
         }
       }catch(error){status(error?.message||'表格操作失败');render({force:true})}
@@ -529,7 +552,7 @@
         const origin=resolveMergeAnchor(table,anchor.row,anchor.column);
         try{
           const next=model().paste(table,{row:origin.row,column:origin.column},grid);
-          if(mutate([next],'粘贴表格数据')){
+          if(mutate(withTableReplaced(table,next),'粘贴表格数据')){
             anchor={row:origin.row,column:origin.column};focusCellPos=null;
             status('已粘贴剪贴板表格数据。');return true;
           }
@@ -543,6 +566,8 @@
       if(readonly()||drag)return;
       if(global.KGCanvasDomInteraction?.isEditingTarget?.(event))return; // 编辑态：文本优先
       if(!selectedTableId&&getTables().length>0)return; // 既有页面粘贴语义优先
+      // 只接管表格状数据（≥2 格）；1×1 纯文本/图谱片段放行页面语义（卡牌复制粘贴不受影响）。
+      if(!isTabularGrid(parseGrid(event.clipboardData)))return;
       if(pasteIntoSelection(event.clipboardData)){event.preventDefault();event.stopPropagation()}
     },true);
 
@@ -656,7 +681,7 @@
     function undoRedo(action){
       const stack=options.history&&typeof options.history[action]==='function'?options.history:ownHistory;
       const done=!!stack[action]?.();
-      if(done){lastSignature=JSON.stringify(getTables());render({force:true})}
+      if(done)render({force:true})
       return done;
     }
     function reset({keepSelection=false}={}){
@@ -664,7 +689,6 @@
       if(!keepSelection)selectTable(null);
       closeInsertPanel();
       drag=null;editingCell=null;dragOriginalId=null;dragOriginalTable=null;
-      lastSignature=JSON.stringify(getTables());
       render({force:true});
     }
     function destroy(){
@@ -672,7 +696,6 @@
       unmountInsertPanel?.();insertPanel.remove();layer.remove();
     }
 
-    lastSignature=JSON.stringify(getTables());
     render({force:true});
     return Object.freeze({
       render:()=>render({force:!editingCell}),sync,refreshControls,

@@ -2967,13 +2967,20 @@
   function undoLayout(){
     if(state.readonly)return false;
     const command=state.kernel?.history?.undo?.();
-    if(command)notify('已撤销：'+command.label+'。');
+    if(command){
+      notify('已撤销：'+command.label+'。');
+      // 表格命令经 setTables 直写，撤销后按签名差异重绘表格层（rowspan/colspan 还原）。
+      state.tablesController?.sync?.();
+    }
     return !!command;
   }
   function redoLayout(){
     if(state.readonly)return false;
     const command=state.kernel?.history?.redo?.();
-    if(command)notify('已重做：'+command.label+'。');
+    if(command){
+      notify('已重做：'+command.label+'。');
+      state.tablesController?.sync?.();
+    }
     return !!command;
   }
   function nodeTitle(nodeId){

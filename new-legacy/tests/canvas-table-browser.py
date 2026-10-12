@@ -45,7 +45,7 @@ def main():
         # —— 服务端准备（独立 API 会话）：图谱测试文件 + 深度回忆试卷发布 ——
         setup=proxy=browser.new_context(viewport={'width':1440,'height':900})
         assert setup.request.post(base+'/api/v1/auth/login',data={'username':users['teacher'],'password':password}).ok
-        file=setup.request.post(base+'/api/v1/files',data={'name':'T19 表格验证','graphData':{'nodes':[],'links':[]}}).json()['file']
+        file=setup.request.post(base+'/api/v1/files',data={'name':'T19 表格验证','graphData':{'nodes':[{'id':'n1','title':'复制源卡','x':700,'y':420,'content':{'title':'复制源卡'}}],'links':[]}}).json()['file']
         file2=setup.request.post(base+'/api/v1/files',data={'name':'T19 空画布粘贴','graphData':{'nodes':[],'links':[]}}).json()['file']
         # 深度回忆：other 老师建卷（公开题库里的题）→ 发布 deep_recall 免费卷给 student。
         assert setup.request.post(base+'/api/v1/auth/login',data={'username':users['other'],'password':password}).ok
@@ -160,6 +160,52 @@ def main():
         assert reopened['merges']==[{'row':1,'column':0,'rowSpan':1,'columnSpan':2}],reopened['merges']
         assert reopened['cells'].get('0,0')=='重点整理' and reopened['cells'].get('0,1','').startswith('risk')
         assert reopened['columnWidths']==col_after and reopened['x']==after['x']
+
+        # —— 审查修复回归：多表隔离（C1）/ 拖动撤销回拖前（M1）/ 卡牌粘贴不被劫持（M3） ——
+        insert_table(page,2,2,'#addTableBtn')
+        assert page.evaluate('KGHomeTables.tables.length===2')
+        pair=json.loads(page.evaluate('JSON.stringify(KGHomeTables.tables)'))
+        tableA,tableB=pair[0],pair[1]
+        wrapA=f'.kg-canvas-table-wrap[data-table-id="{tableA["id"]}"]'
+        wrapB=f'.kg-canvas-table-wrap[data-table-id="{tableB["id"]}"]'
+        # 拖动表 B（后插入者在顶层）：A 位置保持不动
+        bar=page.locator(f'{wrapB} .kg-canvas-table-movebar');box=bar.bounding_box()
+        page.mouse.move(box['x']+box['width']/2,box['y']+box['height']/2)
+        page.mouse.down();page.mouse.move(box['x']+box['width']/2+260,box['y']+box['height']/2+160,steps=8);page.mouse.up()
+        page.wait_for_timeout(300)
+        pair=json.loads(page.evaluate('JSON.stringify(KGHomeTables.tables)'))
+        assert abs(pair[1]['x']-tableB['x']-260)<3 and abs(pair[1]['y']-tableB['y']-160)<3,pair[1]
+        assert pair[0]['id']==tableA['id'] and abs(pair[0]['x']-tableA['x'])<1 and abs(pair[0]['y']-tableA['y'])<1,'拖动 B 影响了 A'
+        # 撤销拖动：B 回到拖前位置，A 仍在（快照含兄弟表）
+        page.keyboard.press('Meta+z');page.wait_for_timeout(300)
+        pair=json.loads(page.evaluate('JSON.stringify(KGHomeTables.tables)'))
+        assert abs(pair[1]['x']-tableB['x'])<1 and abs(pair[1]['y']-tableB['y'])<1,f'拖动撤销未回拖前: {pair[1]}'
+        assert len(pair)==2 and pair[0]['id']==tableA['id'] and abs(pair[0]['x']-tableA['x'])<1,'撤销拖动丢失兄弟表'
+        # 表格选中状态下复制卡牌→Ctrl/⌘+V 仍走卡牌粘贴（M3：非表格状剪贴板放行页面语义；B 在顶层可点）
+        page.locator('.knowledge-card[data-node-id="n1"]').click()
+        page.keyboard.press('Meta+c')
+        page.wait_for_function('KGGraphKernel.clipboard.hasData()')
+        page.locator(f'{wrapB} {CELL}[data-row="0"][data-column="0"]').click()  # 选中表格 B
+        page.keyboard.press('Escape')  # 退出编辑态，保持表格选择
+        node_before=page.evaluate('state.nodes.length')
+        page.keyboard.press('Meta+v')
+        page.wait_for_timeout(800)
+        assert page.evaluate('state.nodes.length')>node_before,'卡牌粘贴被表格劫持'
+        assert cell_text(page,0,0)=='重点整理','图谱片段文本被写进单元格'
+        # 在 B 上合并：A 的内容/合并不受影响（单表操作只替换目标表；B 在顶层可点）
+        page.locator(f'{wrapB} {CELL}[data-row="0"][data-column="0"]').click()
+        page.keyboard.down('Shift');page.locator(f'{wrapB} {CELL}[data-row="0"][data-column="1"]').click();page.keyboard.up('Shift')
+        page.locator(f'{wrapB} [data-table-action="merge"]').click()
+        page.wait_for_timeout(300)
+        pair=json.loads(page.evaluate('JSON.stringify(KGHomeTables.tables)'))
+        assert len(pair)==2 and pair[0]['cells'].get('0,0')=='重点整理' and pair[0]['cells'].get('1,0')=='甲\n乙',pair[0]
+        assert pair[0]['merges']==[{'row':1,'column':0,'rowSpan':1,'columnSpan':2}]
+        assert pair[1]['merges']==[{'row':0,'column':0,'rowSpan':1,'columnSpan':2}],pair[1]
+        # 撤销 B 合并：B 恢复，A 合并保留
+        page.keyboard.press('Meta+z');page.wait_for_timeout(300)
+        pair=json.loads(page.evaluate('JSON.stringify(KGHomeTables.tables)'))
+        assert len(pair)==2 and pair[0]['merges']==[{'row':1,'column':0,'rowSpan':1,'columnSpan':2}] and pair[1]['merges']==[],pair
+        page.screenshot(path=str(out/'graph-two-tables.png'))
         page.close()
 
         # —— 空画布粘贴建新表；普通句子不建表 ——
@@ -209,10 +255,14 @@ def main():
         page.keyboard.down('Shift');page.locator(f'{CELL}[data-row="0"][data-column="1"]').click();page.keyboard.up('Shift')
         page.locator('[data-table-action="merge"]').click();page.wait_for_timeout(300)
         assert page.evaluate('KGMultiQuestionWorkspace.activeWorkspace().tables[0].merges.length===1')
-        page.keyboard.press('Meta+z');page.wait_for_timeout(300)
-        assert page.evaluate('KGMultiQuestionWorkspace.activeWorkspace().tables[0].merges.length===0'),'kernel 撤销未恢复合并'
-        page.keyboard.press('Meta+Shift+z');page.wait_for_timeout(300)
-        assert page.evaluate('KGMultiQuestionWorkspace.activeWorkspace().tables[0].merges.length===1')
+        assert page.locator(f'{CELL}[colspan]').count()==1,'合并后 DOM 未呈现 colspan'
+        # 撤销：模型与 DOM（rowspan/colspan 消失）都要还原（M2）
+        page.keyboard.press('Meta+z')
+        page.wait_for_function('KGMultiQuestionWorkspace.activeWorkspace().tables[0].merges.length===0')
+        page.wait_for_function('document.querySelectorAll(".kg-canvas-table-cell[rowspan],.kg-canvas-table-cell[colspan]").length===0',timeout=5000)  # 撤销后表格层重绘（M2）
+        page.keyboard.press('Meta+Shift+z')
+        page.wait_for_function('KGMultiQuestionWorkspace.activeWorkspace().tables[0].merges.length===1')
+        page.wait_for_function('document.querySelectorAll(".kg-canvas-table-cell[colspan]").length===1',timeout=5000)  # 重做后表格层重绘
         page.wait_for_timeout(2000)  # 等待 store 服务端保存
         page.reload(wait_until='networkidle')
         page.wait_for_function('!!window.KGWorkspaceTables');page.wait_for_timeout(800);dismiss_overlays(page)
@@ -252,6 +302,18 @@ def main():
         kr_reopened=json.loads(page.evaluate('JSON.stringify(KGRecallTables.tables[0])'))
         assert kr_reopened['merges']==[{'row':0,'column':0,'rowSpan':1,'columnSpan':2}],kr_reopened
         assert kr_reopened['cells'].get('0,0')=='回忆线索'
+        # 拖动后撤销回到拖前位置（M1：内部命令栈用拖前快照）
+        pre=json.loads(page.evaluate('JSON.stringify({x:KGRecallTables.tables[0].x,y:KGRecallTables.tables[0].y})'))
+        bar=page.locator('.kg-canvas-table-movebar').first;box=bar.bounding_box()
+        page.mouse.move(box['x']+box['width']/2,box['y']+box['height']/2)
+        page.mouse.down();page.mouse.move(box['x']+box['width']/2+50,box['y']+box['height']/2+40,steps=6);page.mouse.up()
+        page.wait_for_timeout(300)
+        moved=json.loads(page.evaluate('JSON.stringify({x:KGRecallTables.tables[0].x,y:KGRecallTables.tables[0].y})'))
+        assert abs(moved['x']-pre['x']-50)<3 and abs(moved['y']-pre['y']-40)<3,(pre,moved)
+        page.locator('[data-table-action="undo"]').first.click()
+        page.wait_for_timeout(300)
+        restored=json.loads(page.evaluate('JSON.stringify({x:KGRecallTables.tables[0].x,y:KGRecallTables.tables[0].y})'))
+        assert abs(restored['x']-pre['x'])<1 and abs(restored['y']-pre['y'])<1,f'拖动撤销未回拖前: {pre}→{restored}'
         page.screenshot(path=str(out/'kr-table.png'))
         # 只读态（kr-readonly 与服务端 canWrite=false 同一判定路径）：禁写
         page.evaluate('document.body.classList.add("kr-readonly");KGRecallTables.refreshControls()')
