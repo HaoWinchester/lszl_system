@@ -27,3 +27,17 @@ test('manual edge appearance remains protected through multiple themes and expli
 });
 
 test('directed hierarchy descendants take priority over incoming cycle shortcuts',()=>{const r=layout.compute(fixture(),{rootIds:['a']});assert(r.treeEdges.some(e=>e.id==='bd'));assert(r.crossEdges.some(e=>e.id==='da'));assert(r.crossEdges.some(e=>e.id==='cd'))});
+test('declared hierarchy beats earlier ordinary shortcuts and determines the inferred root',()=>{
+ const g=global.KGGraphModel.normalizeGraph({nodes:['a','b','c'].map(id=>({id})),links:[{id:'shortcut',from:'a',to:'c'},{id:'back',from:'c',to:'a'},{id:'ab',from:'a',to:'b',hierarchy:true},{id:'bc',from:'b',to:'c',hierarchy:true}]});
+ const r=layout.compute(g,{});assert.deepEqual(r.rootIds,['a']);assert.deepEqual(r.treeEdges.map(l=>l.id),['ab','bc']);assert.deepEqual(r.crossEdges.map(l=>l.id),['shortcut','back']);
+});
+test('hierarchy boolean survives model, storage and fragment copy; missing or truthy strings are ordinary',()=>{
+ require('../src/graph/graph-persistence.js');const fragment=require('../src/graph/graph-fragment.js');
+ const g=model.normalizeGraph({nodes:[{id:'a'},{id:'b'}],links:[{id:'ab',from:'a',to:'b',hierarchy:true},{id:'ba',from:'b',to:'a',hierarchy:'true'}]});
+ const stored=global.KGGraphPersistence.toStorageState(g);assert.equal(stored.links[0].hierarchy,true);assert.equal(stored.links[1].hierarchy,false);assert.equal(global.KGGraphPersistence.hydrate({nodes:g.nodes,links:[{id:'old',from:'a',to:'b'}]}).links[0].hierarchy,false);
+ const copied=fragment.remap(fragment.capture(stored,{nodeIds:['a','b']}),{idFactory:(kind,id)=>'copy-'+id}).fragment;assert.equal(copied.links[0].hierarchy,true);assert.equal(copied.links[1].hierarchy,false);
+});
+
+test('explicit ordinary root reaches a declared parent before consuming its child shortcut',()=>{
+ const g=model.normalizeGraph({nodes:['a','b','c'].map(id=>({id})),links:[{id:'ac',from:'a',to:'c'},{id:'ab',from:'a',to:'b'},{id:'bc',from:'b',to:'c',hierarchy:true}]});const r=layout.compute(g,{rootIds:['a']});assert.deepEqual(r.treeEdges.map(l=>l.id),['ab','bc']);assert.deepEqual(r.crossEdges.map(l=>l.id),['ac']);
+});

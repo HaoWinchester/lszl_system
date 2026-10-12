@@ -8,12 +8,31 @@
     for(const l of links){adj.get(l.from).push({id:l.to,link:l});adj.get(l.to).push({id:l.from,link:l});incoming.set(l.to,incoming.get(l.to)+1)}
     const requested=[...new Set(rootIds)].filter(id=>map.has(id)),visited=new Set(),treeEdges=[],children=new Map(nodes.map(n=>[n.id,[]])),roots=[];
     for(const n of nodes){if(visited.has(n.id))continue;const component=[],seen=new Set([n.id]),queue=[n.id];for(let i=0;i<queue.length;i++){const id=queue[i];component.push(id);for(const e of adj.get(id))if(!seen.has(e.id)){seen.add(e.id);queue.push(e.id)}}
-      let root=requested.find(id=>seen.has(id));if(!root){const candidates=component.filter(id=>incoming.get(id)===0);if(candidates.length!==1&&component.length>1)throw new Error('请为普通关系图指定根节点');root=candidates[0]||component[0]}
+      const hierarchyLinks=links.filter(l=>l.hierarchy===true&&seen.has(l.from)&&seen.has(l.to));
+      const hierarchyNodes=new Set(hierarchyLinks.flatMap(l=>[l.from,l.to]));
+      const hierarchyChildren=new Set(hierarchyLinks.map(l=>l.to));
+      let root=requested.find(id=>seen.has(id));if(!root){const candidates=hierarchyLinks.length?component.filter(id=>hierarchyNodes.has(id)&&!hierarchyChildren.has(id)):component.filter(id=>incoming.get(id)===0);if(candidates.length!==1&&component.length>1)throw new Error('请为普通关系图指定根节点');root=candidates[0]||component[0]}
       roots.push(root);visited.add(root);const walk=[root];let cursor=0;
       const attach=(id,e)=>{visited.add(e.id);children.get(id).push(e.id);treeEdges.push(e.link);walk.push(e.id)};
-      // Exhaust directed descendants before using reverse relations to reach the rest of a component.
-      const descend=()=>{for(;cursor<walk.length;cursor++){const id=walk[cursor];for(const e of adj.get(id))if(e.link.from===id&&!visited.has(e.id))attach(id,e)}};
-      descend();while(component.some(id=>!visited.has(id))){let attached=false;for(const id of walk){const edge=adj.get(id).find(e=>!visited.has(e.id));if(edge){attach(id,edge);attached=true;break}}if(!attached)break;descend()}
+      // Exhaust declared hierarchy descendants before admitting an ordinary shortcut.
+      const descendHierarchy=()=>{for(;cursor<walk.length;cursor++){const id=walk[cursor];for(const e of adj.get(id))if(e.link.from===id&&e.link.hierarchy===true&&!visited.has(e.id))attach(id,e)}};
+      descendHierarchy();
+      while(component.some(id=>!visited.has(id))){
+        let candidate=null;
+        // Preserve an unvisited declared parent even when an ordinary shortcut appears first.
+        for(const allowReservedChild of [false,true]){
+          for(const outgoing of [true,false]){
+            for(const id of walk){
+              const edge=adj.get(id).find(e=>!visited.has(e.id)&&(!outgoing||e.link.from===id)&&(allowReservedChild||!hierarchyLinks.some(l=>l.to===e.id&&!visited.has(l.from))));
+              if(edge){candidate={id,edge};break}
+            }
+            if(candidate)break;
+          }
+          if(candidate)break;
+        }
+        if(!candidate)break;
+        attach(candidate.id,candidate.edge);descendHierarchy();
+      }
     }
     const geometry=n=>global.KGGraphModel?global.KGGraphModel.geometryOf(n):{x:n.x||0,y:n.y||0,width:n.geometry?.width||128,height:n.geometry?.height||132};
     const dims=new Map(nodes.map(n=>[n.id,geometry(n)])),down=direction==='down',size=new Map(),weights=new Map();

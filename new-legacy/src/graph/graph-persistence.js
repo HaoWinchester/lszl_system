@@ -5,7 +5,7 @@
     try{return JSON.parse(JSON.stringify(value))}catch(error){return value}
   }
   function normalizePort(value){return ['auto','top','right','bottom','left'].includes(value)?value:'auto'}
-  function normalizeLinkPorts(link){if(!link||typeof link!=='object')return link;return{...link,fromPort:normalizePort(link.fromPort),toPort:normalizePort(link.toPort)}}
+  function normalizeLinkPorts(link){if(!link||typeof link!=='object')return link;return{...link,hierarchy:link.hierarchy===true,fromPort:normalizePort(link.fromPort),toPort:normalizePort(link.toPort)}}
   function hydrate(raw={},options={}){
     const model=global.KGGraphModel;
     const state=raw&&typeof raw==='object'?clone(raw):{};
