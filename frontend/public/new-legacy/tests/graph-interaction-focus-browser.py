@@ -162,7 +162,11 @@ def main():
             def aligned(value):
                 for handle,sample in zip(value['handles'],value['samples']):
                     assert abs(handle['x']-sample['x'])<1e-6 and abs(handle['y']-sample['y'])<1e-6,value
-            page.evaluate("state.selectedLinkId='ab';state.selectedNodeId=null;selectedNodeIds.clear();refreshSelectionUI()")
+            # ports 段改变了卡尺寸/标题/端点并保存；曲线段切回未改动的第二份 fixture，
+            # 在干净图上验证纯曲线把手交互（与单独运行 curves 段等价）。
+            assert ctx.request.put(base+'/api/v1/files/current',data={'fileId':files[1]['id']}).ok
+            reload()
+            page.evaluate("state.selectedLinkId='ab';state.selectedNodeId=null;selectedNodeIds.clear();refreshSelectionUI()");page.wait_for_timeout(200)
             before=curve_state();aligned(before)
             hit=page.locator('.edge-control-handle[data-edge-control-index="0"] .edge-control-hit');box=hit.bounding_box();assert box, 'curve handle visible'
             x=box['x']+box['width']/2;y=box['y']+box['height']/2
@@ -216,6 +220,9 @@ def main():
             assert restored['controls']==cancelled['controls']
             print('PASS curves: real handle drag, dual-card and single-card drags, cancel, undo/redo, viewport transform, saved reload and auto reset',flush=True)
         if args.section in ('all','cancel-history'):
+            # 前段留下组选/边选状态；本段在干净 fixture 上自成体系验证取消与历史。
+            assert ctx.request.put(base+'/api/v1/files/current',data={'fileId':files[2]['id']}).ok
+            reload()
             def snapshot():
                 return page.evaluate('''()=>{const history=ensureGraphHistoryController().getState();return{nodes:Object.fromEntries(['a','b','c'].map(id=>{const n=nodeById(id);return[id,{x:n.x,y:n.y}]})),controls:state.links.find(l=>l.id==='ab').curveControls.map(p=>({...p})),binding:state.links.find(l=>l.id==='ab').from+':'+state.links.find(l=>l.id==='ab').to,history:{undoCount:history.undoCount,redoCount:history.redoCount,undoLabel:history.undoLabel,redoLabel:history.redoLabel,transaction:history.transaction}}}''')
             def seed_redo():
