@@ -47,6 +47,7 @@ function applyImportedFile(fileRecord){
 }
 async function importLearningPackageFile(file){
   return globalThis.KGImportGuard.run("20-flashcards-toolbar.js:importLearningPackageFile",async()=>{
+  if(/\.xmind$/i.test(file.name))return window.KGXMindImport.open(file);
   const data=await parseLearningPackageFile(file);
   if(!data||typeof data!=='object'||!Array.isArray(data.nodes)||!Array.isArray(data.links))throw new Error('格式不正确');
   const clean=sanitizeState(data);
@@ -766,7 +767,7 @@ window.KGHomeToolbarActions={
     const f=event.target.files[0];
     if(!f)return;
     try{await importLearningPackageFile(f)}
-    catch(err){alert('导入失败：不是有效的学习包 ZIP 或知识图谱 JSON。\n'+(err.message||err))}
+    catch(err){alert('导入失败：'+(err.message||err))}
     event.target.value='';
   },
   resetGraph:()=>{

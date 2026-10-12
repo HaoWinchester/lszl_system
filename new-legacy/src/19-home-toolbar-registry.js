@@ -106,7 +106,7 @@
     {
       id: "hidden-file-input",
       tools: [
-        {id:"importFile", type:"file", accept:".zip,application/zip,application/x-zip-compressed,.json,application/json", action:"importLearningPackage", event:"change"}
+        {id:"importFile", type:"file", accept:".xmind,.zip,application/zip,application/x-zip-compressed,.json,application/json", action:"importLearningPackage", event:"change"}
       ]
     }
   ];

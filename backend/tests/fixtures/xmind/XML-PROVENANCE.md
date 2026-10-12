@@ -1,0 +1,1 @@
+Synthetic XML-only format fixture created with Python zipfile in this repository, using documented XMind 2.0 namespaced XML fields. Image copied from our native desktop-created test archive. Not an old XMind desktop export and not evidence of old desktop version compatibility. Desktop open validation, if performed, will be appended by the controller.

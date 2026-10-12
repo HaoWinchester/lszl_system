@@ -838,6 +838,7 @@
       };
       for(const inputFile of files){
         try{
+          if(/\.xmind$/i.test(inputFile.name)){await global.KGXMindImport.open(inputFile);continue}
           const raw=await packages.parseFile(inputFile),graph=normalizeImportedGraph(raw),base=graph.meta&&graph.meta.title||String(inputFile.name||'导入的图谱').replace(/\.(zip|json)$/i,''),name=reserveUnique(base);
           graph.meta.title=name;
           const created=await Promise.resolve(store.createFile({name,graphData:graph,source:'package-import',sourceFileId:raw&&raw.id||'',folderId:state.currentFolderId},{owner:currentOwner(),makeCurrent:false,emit:false}));
@@ -846,7 +847,7 @@
         }catch(err){errors.push(`${inputFile.name||'未命名文件'}：${err.message||err}`)}
       }
     }finally{setBusy(false);$('fmFileInput').value=''}
-    state.view='files';state.filter='all';state.query='';$('fmSearchInput').value='';await refreshData({skipStoreRefresh:true});
+    state.view='files';state.filter='all';state.query='';$('fmSearchInput').value='';await refreshData();
     if(success)toast(`成功导入 ${success} 个图谱文件。`);
     if(errors.length)toast(errors.slice(0,3).join('\n')+(errors.length>3?`\n另有 ${errors.length-3} 个错误。`:''),'error',6500);
 
