@@ -32,6 +32,8 @@ def main():
         def paste(p,text):
             return p.evaluate("""(text)=>{const d=new DataTransfer();d.setData('text/plain',text);const e=new ClipboardEvent('paste',{clipboardData:d,bubbles:true,cancelable:true});document.dispatchEvent(e);return e.defaultPrevented}""",text)
         assert paste(page,json.dumps(fragment));assert paste(page,json.dumps(fragment))
+        # T16: 跨文件粘贴走服务端受控端点（异步），等待串行粘贴完成后断言。
+        page.wait_for_function('state.nodes.length===4')
         copied=page.evaluate('saveableState()');assert len(copied['nodes'])==4 and len(copied['links'])==2
         ids=[n['id'] for n in copied['nodes']];assert len(set(ids))==4 and not set(ids)&{'a','b','c'}
         assert all(l['from'] in ids and l['to'] in ids and l['fromPort']=='left' and l['toPort']=='top' for l in copied['links'])
@@ -46,7 +48,7 @@ def main():
         assert page.evaluate("state.nodes[2].title")=='源正文','repeated paste shares content'
         # Separate tab receives only the explicit serialized fragment, no background clipboard read.
         tab=ctx.new_page();tab.on('pageerror',lambda e:errors.append(str(e)));tab.goto(base+'/index.html',wait_until='networkidle');ready(tab)
-        assert paste(tab,json.dumps(fragment));assert tab.evaluate('state.nodes.length')==6
+        assert paste(tab,json.dumps(fragment));tab.wait_for_function('state.nodes.length===6')
         # Native textarea editing must leave application fragments and graph untouched.
         tab.evaluate("const t=document.createElement('textarea');t.id='native-copy-test';t.value='文本优先';document.body.append(t);t.focus();t.select()")
         count=tab.evaluate('state.nodes.length');tab.keyboard.press('Meta+c');tab.keyboard.press('Meta+v');assert tab.evaluate('state.nodes.length')==count

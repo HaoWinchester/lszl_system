@@ -1441,11 +1441,44 @@ function currentPasteWorldPoint(){
   const r=stage.getBoundingClientRect();
   return screenToWorld(r.left+r.width/2,r.top+r.height/2);
 }
+// 跨文件粘贴走服务端受控端点：只有服务端读取的真实绑定才能创建新授权。
+let graphRemotePasteChain=Promise.resolve();
+function pasteGraphFragmentRemotely(source){
+  const local=window.KGGraphFileEditorStoreBridge?.fragmentSource?.();
+  if(!local?.fileId||!source.source?.fileId||source.source.fileId===local.fileId)return false;
+  const sub=window.KGSubscription;
+  if(source.nodes.length&&sub?.requireUsageLimit&&!sub.requireUsageLimit('graphNodes',state.nodes.length,source.nodes.length,{label:'图谱卡牌'}))return true;
+  if(source.nodes.length>2500-state.nodes.length){showStatus('当前图谱卡牌数量已达上限。');return true}
+  const target=currentPasteWorldPoint(),bounds=graphClipboardBounds(source.nodes.length?source.nodes:source.elements);
+  showStatus('正在跨图谱粘贴…');
+  // 串行化连续粘贴：每次请求都基于上一次完成后的最新 revision，避免快速连续粘贴 409。
+  graphRemotePasteChain=graphRemotePasteChain.then(async()=>{
+    try{
+      const revision=window.KGGraphFileEditorStoreBridge?.fragmentSource?.()?.revision;
+      const response=await fetch(`/api/v1/files/${encodeURIComponent(local.fileId)}/fragments`,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({fragment:source,offset:{x:target.x-bounds.cx,y:target.y-bounds.cy},expectedFileRevision:revision})});
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok){showStatus(({GRAPH_FILE_REVISION_CONFLICT:'当前图谱已在其他窗口更新，请刷新后重新粘贴。',GRAPH_FRAGMENT_SOURCE_STALE:'来源图谱已变化，请回到来源重新复制后再粘贴。',GRAPH_NODE_QUOTA_EXCEEDED:'当前图谱卡牌数量已达上限。',TEMPLATE_NODE_QUOTA_EXCEEDED:'当前图谱卡牌数量已达上限。'})[data.detail?.code]||(typeof data.detail==='string'?data.detail:'跨图谱粘贴失败，请重试。'));return}
+      if(window.KGGraphFileEditorStoreBridge?.fragmentSource?.()?.fileId!==local.fileId)return;
+      const fragment=data.fragment||{},nodes=fragment.nodes||[];
+      window.KGGraphFileRemoteAdapter?.acceptRevision?.(local.fileId,data.fileRevision);
+      clearRelatedGatherLayout({render:false,message:false});pushGraphUndoSnapshot('粘贴图谱片段');
+      state.nodes.push(...nodes);state.links.push(...(fragment.links||[]));state.elements.push(...(fragment.elements||[]));
+      selectedNodeIds=new Set(nodes.map(n=>n.id));selectedLinkIds.clear();
+      state.selectedElementId=fragment.elements?.[0]?.id||null;state.selectedNodeId=nodes[0]?.id||null;state.selectedLinkId=null;state.linkSourceId=null;
+      render({persist:true});
+      const inherited=(data.bindings||[]).filter(item=>item.bindings?.length).length;
+      showStatus(`已粘贴 ${nodes.length||(fragment.elements||[]).length} 个图谱对象${inherited?`，${inherited} 张卡牌继承题目关联`:''}。`);
+    }catch(error){showStatus('跨图谱粘贴失败，请检查网络后重试。')}
+  });
+  return true;
+}
 function pasteGraphClipboardCards(){
   if(!canWriteGraph())return false;
   const clipboard=ensureGraphClipboardController(),source=clipboard?.readFragment();
   if(!source||!clipboard.hasData())return false;
   if(typeof authRequire==='function'&&!authRequire('登录后才能粘贴卡牌。'))return true;
+  const remote=pasteGraphFragmentRemotely(source);
+  if(remote!==false)return remote;
   const sub=window.KGSubscription;
   if(source.nodes.length&&sub?.requireUsageLimit&&!sub.requireUsageLimit('graphNodes',state.nodes.length,source.nodes.length,{label:'图谱卡牌'}))return true;
   if(source.nodes.length>2500-state.nodes.length){showStatus('当前图谱卡牌数量已达上限。');return true}

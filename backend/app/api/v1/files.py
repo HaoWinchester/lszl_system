@@ -9,7 +9,8 @@ from pydantic import BaseModel, Field, StrictStr, field_validator
 from app.core.import_guard import import_submission_guard, file_import_submission_guard
 from app.core.auth import CurrentUser
 from app.db.session import get_db
-from app.services import file_service
+from app.schemas.graph_fragment import FragmentPasteInput
+from app.services import file_service, graph_fragment_service as graph_fragments
 
 router = APIRouter(prefix="/files", tags=["files"])
 DB = Annotated[AsyncSession, Depends(get_db)]
@@ -263,3 +264,9 @@ async def duplicate_file(file_id: str, body: dict, db: DB, user: CurrentUser):
     if not f:
         raise _nf()
     return {"file": file_service.file_meta(f)}
+
+
+@router.post("/{file_id}/fragments")
+async def paste_fragment(file_id: str, body: FragmentPasteInput, db: DB, user: CurrentUser):
+    """受控跨文件片段粘贴：服务端读取来源绑定并原子合并，客户端授权字段一律忽略。"""
+    return await graph_fragments.paste_fragment(db, user, file_id, body)
