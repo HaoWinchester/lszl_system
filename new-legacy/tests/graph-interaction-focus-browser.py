@@ -8,7 +8,7 @@ ROOT=Path(__file__).resolve().parents[2]
 OUT=ROOT/'artifacts/graph-interaction-focus-fixes'
 
 def main():
-    parser=argparse.ArgumentParser();parser.add_argument('--base-url',required=True);parser.add_argument('--section',choices=['all','tabs','card','focus','edges','curves'],default='all');args=parser.parse_args()
+    parser=argparse.ArgumentParser();parser.add_argument('--base-url',required=True);parser.add_argument('--section',choices=['all','tabs','card','focus','edges','curves','cancel-history'],default='all');args=parser.parse_args()
     base=args.base_url.rstrip('/');assert urlparse(base).hostname in ('localhost','127.0.0.1')
     OUT.mkdir(parents=True,exist_ok=True)
     with sync_playwright() as pw:
@@ -152,6 +152,47 @@ def main():
             page.evaluate('restoreGraphUndoSnapshot()');restored=curve_state();aligned(restored)
             assert restored['controls']==cancelled['controls']
             print('PASS curves: real handle drag, dual-card and single-card drags, cancel, undo/redo, viewport transform, saved reload and auto reset',flush=True)
+        if args.section in ('all','cancel-history'):
+            def snapshot():
+                return page.evaluate('''()=>{const history=ensureGraphHistoryController().getState();return{nodes:Object.fromEntries(['a','b','c'].map(id=>{const n=nodeById(id);return[id,{x:n.x,y:n.y}]})),controls:state.links.find(l=>l.id==='ab').curveControls.map(p=>({...p})),binding:state.links.find(l=>l.id==='ab').from+':'+state.links.find(l=>l.id==='ab').to,history:{undoCount:history.undoCount,redoCount:history.redoCount,undoLabel:history.undoLabel,redoLabel:history.redoLabel,transaction:history.transaction}}}''')
+            def seed_redo():
+                page.evaluate('''()=>{resetGraphHistory();pushGraphUndoSnapshot('先前操作 A');let node=nodeById('c');KGGraphModel.updateGeometry(node,{x:node.x+17});render();pushGraphUndoSnapshot('先前操作 B');node=nodeById('c');KGGraphModel.updateGeometry(node,{x:node.x+23});render();restoreGraphUndoSnapshot()}''')
+                value=snapshot();assert value['history']=={'undoCount':1,'redoCount':1,'undoLabel':'先前操作 A','redoLabel':'先前操作 B','transaction':''},value
+                return value
+            def check_cancelled(before):
+                after=snapshot();assert after==before,(before,after)
+                page.evaluate('restoreGraphRedoSnapshot()');redone=snapshot()
+                assert redone['nodes']['c']['x']==before['nodes']['c']['x']+23,(before,redone)
+                page.evaluate('restoreGraphUndoSnapshot()');assert snapshot()['nodes']['c']==before['nodes']['c']
+                page.evaluate('restoreGraphUndoSnapshot()');assert snapshot()['nodes']['c']['x']==before['nodes']['c']['x']-17
+            before=seed_redo()
+            card=page.locator('.knowledge-card[data-node-id="a"]');box=card.bounding_box();x=box['x']+box['width']/2;y=box['y']+box['height']/2
+            page.mouse.move(x,y);page.mouse.down();page.mouse.move(x+65,y+31,steps=7)
+            assert snapshot()['nodes']['a']!=before['nodes']['a']
+            page.evaluate('resetGraphPointerInteractions()');page.mouse.up();check_cancelled(before)
+            before=seed_redo()
+            page.evaluate('''()=>KGHomeCanvasRuntime.selectionFilter.setSnapshot([{id:'a',type:'node'},{id:'b',type:'node'}],{anchorRect:homeSelectionAnchorRect(),reason:'cancel-history-test'})''')
+            before=snapshot();bounds=page.locator('.uc-selection-bounds:not([hidden])');assert bounds.is_visible()
+            box=bounds.bounding_box();x=box['x']+box['width']/2;y=box['y']+box['height']/2
+            page.mouse.move(x,y);page.mouse.down();assert page.evaluate('!!homeSelectionBoundsDrag')
+            page.mouse.move(x+69,y+34,steps=7);assert snapshot()['nodes']['a']!=before['nodes']['a']
+            page.evaluate('''()=>{const drag=homeSelectionBoundsDrag;finishHomeSelectionBoundsDrag({pointerId:drag.pointerId,preventDefault(){},stopPropagation(){},stopImmediatePropagation(){}},true)}''');page.mouse.up()
+            check_cancelled(before)
+            before=seed_redo()
+            page.evaluate("state.selectedLinkId='ab';state.selectedNodeId=null;selectedNodeIds.clear();refreshSelectionUI()")
+            before=snapshot();hit=page.locator('.edge-control-handle[data-edge-control-index="0"] .edge-control-hit');box=hit.bounding_box();x=box['x']+box['width']/2;y=box['y']+box['height']/2
+            page.mouse.move(x,y);page.mouse.down();assert page.evaluate('!!edgeControlDrag')
+            page.mouse.move(x+42,y-26,steps=6);assert snapshot()['controls']!=before['controls']
+            page.evaluate('''()=>{const id=edgeControlDrag.pointerId;finishEdgeControlDrag({pointerId:id,preventDefault(){},stopPropagation(){}},true)}''');page.mouse.up();check_cancelled(before)
+            before=seed_redo()
+            page.evaluate('''()=>{const g=edgeDomById.get('ab').geometry,p=g.samples[3],rect=stage.getBoundingClientRect(),clientX=rect.left+state.viewport.x+p.x*state.viewport.scale,clientY=rect.top+state.viewport.y+p.y*state.viewport.scale,handle={setPointerCapture(){},releasePointerCapture(){}};beginEdgeMoveDrag({pointerId:771,button:0,clientX,clientY,currentTarget:handle,stopPropagation(){}},'ab');applyEdgeMoveDragPoint({x:p.x+37,y:p.y+24})}''')
+            assert snapshot()['binding']==':'
+            page.evaluate('''()=>finishEdgeMoveDrag({pointerId:771,preventDefault(){},stopPropagation(){}},true)''');check_cancelled(before)
+            before=seed_redo()
+            page.evaluate('''()=>{const p=edgeDomById.get('ab').geometry.endpoints[0],rect=stage.getBoundingClientRect(),clientX=rect.left+state.viewport.x+p.x*state.viewport.scale,clientY=rect.top+state.viewport.y+p.y*state.viewport.scale,handle={setPointerCapture(){},releasePointerCapture(){}};beginEdgeEndpointDrag({pointerId:772,button:0,clientX,clientY,currentTarget:handle,preventDefault(){},stopPropagation(){}},'ab','from');applyEdgeEndpointDragPoint({world:{x:p.x+31,y:p.y+19},clientX:clientX+31,clientY:clientY+19})}''')
+            assert snapshot()['binding']==':b'
+            page.evaluate('''()=>finishEdgeEndpointDrag({pointerId:772,preventDefault(){},stopPropagation(){}},true)''');check_cancelled(before)
+            print('PASS cancel history: card, selection-bounds, curve-handle, whole-edge and endpoint cancellation retain prior redo and next undo',flush=True)
         assert not errors,errors
         browser.close()
 if __name__=='__main__':main()

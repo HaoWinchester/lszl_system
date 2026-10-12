@@ -52,7 +52,7 @@ function ensureGraphDragController(){
   if(graphKernelControllers.drag)return graphKernelControllers.drag;
   const factory=window.KGGraphDragController;
   if(!factory||typeof factory.create!=='function')return null;
-  graphKernelControllers.drag=factory.create({threshold:5,onFirstMove:session=>pushGraphUndoSnapshot(session.historyLabel||'移动知识点')});
+  graphKernelControllers.drag=factory.create({threshold:5,onFirstMove:session=>session.historyController?.checkpoint(session.historyLabel||'移动知识点')});
   return graphKernelControllers.drag;
 }
 function ensureGraphElementResizeController(){
@@ -1155,13 +1155,14 @@ function beginEdgeMoveDrag(event,linkId){
   if(!graphModeAllows('edgeMove'))return false;
   if(isCanvasPanMode()||document.body.classList.contains('auth-readonly')||event.button!==0||event.ctrlKey||event.metaKey||event.shiftKey)return false;
   const link=linkById(linkId),dom=edgeDomById.get(String(linkId));if(!link||!dom?.geometry)return false;
-  edgeMoveDrag={pointerId:event.pointerId,linkId:String(linkId),handle:event.currentTarget,startClient:{x:event.clientX,y:event.clientY},startWorld:screenToWorld(event.clientX,event.clientY),original:edgeRouteSnapshot(link),geometry:{style:dom.geometry.style,endpoints:dom.geometry.endpoints.map(point=>({...point})),controls:dom.geometry.controls.map(point=>({...point})),curveControls:dom.geometry.curveControls?.map(point=>({...point}))},moved:false,history:false};
+  const historyController=beginGraphGestureHistory('移动关系线');if(!historyController)return false;
+  edgeMoveDrag={pointerId:event.pointerId,linkId:String(linkId),handle:event.currentTarget,startClient:{x:event.clientX,y:event.clientY},startWorld:screenToWorld(event.clientX,event.clientY),original:edgeRouteSnapshot(link),geometry:{style:dom.geometry.style,endpoints:dom.geometry.endpoints.map(point=>({...point})),controls:dom.geometry.controls.map(point=>({...point})),curveControls:dom.geometry.curveControls?.map(point=>({...point}))},historyController,moved:false,history:false};
   try{event.currentTarget.setPointerCapture(event.pointerId)}catch(error){}event.stopPropagation();return true;
 }
 function applyEdgeMoveDragPoint(point){
   const drag=edgeMoveDrag;if(!drag)return;const link=linkById(drag.linkId),dom=edgeDomById.get(drag.linkId);if(!link||!dom)return;
   const dx=point.x-drag.startWorld.x,dy=point.y-drag.startWorld.y;if(!drag.moved&&Math.hypot(dx,dy)<5/Math.max(.01,state.viewport.scale))return;
-  if(!drag.history){pushGraphUndoSnapshot('移动关系线');drag.history=true;selectEdgeForDirectManipulation(drag.linkId,{clientX:drag.startClient.x,clientY:drag.startClient.y})}
+  if(!drag.history){drag.historyController.checkpoint('移动关系线');drag.history=true;selectEdgeForDirectManipulation(drag.linkId,{clientX:drag.startClient.x,clientY:drag.startClient.y})}
   drag.moved=true;const geometry=drag.geometry;setLinkFreeEndpoint(link,'from',translateEdgePoint(geometry.endpoints[0],dx,dy));setLinkFreeEndpoint(link,'to',translateEdgePoint(geometry.endpoints[1],dx,dy));
   if(geometry.style==='elbow'||geometry.controls[0]?.kind==='waypoint'){link.waypoints=geometry.controls.map(point=>translateEdgePoint(point,dx,dy));delete link.curveControls}
   else if(geometry.style==='curve'){link.curveControls=geometry.curveControls.map(point=>translateEdgePoint(point,dx,dy));delete link.waypoints}
@@ -1176,8 +1177,8 @@ function scheduleEdgeMoveDrag(event){
 function finishEdgeMoveDrag(event,cancelled=false){
   const drag=edgeMoveDrag;if(!drag||drag.pointerId!==event.pointerId)return false;
   if(edgeMoveDragFrame){cancelAnimationFrame(edgeMoveDragFrame);edgeMoveDragFrame=0}if(edgeMoveDragPoint&&!cancelled)applyEdgeMoveDragPoint(edgeMoveDragPoint);edgeMoveDragPoint=null;
-  const link=linkById(drag.linkId);if((cancelled||!drag.moved)&&link&&drag.history){restoreEdgeRoute(link,drag.original);updateLinkGeometry(link,getGraphIndex().nodeMap)}
   try{drag.handle?.releasePointerCapture?.(event.pointerId)}catch(error){}edgeMoveDrag=null;stage.classList.remove('graph-edge-moving','is-interacting');
+  finishGraphGestureHistory(drag,cancelled||!drag.moved);
   if(!cancelled&&drag.moved){suppressEdgeClickId=drag.linkId;suppressEdgeClickUntil=performance.now()+400;save();renderSelectedEdgeControls();renderSelectedEdgeQuickStylePanel();showStatus('关系线已独立移动，两个端点已解除节点绑定；可拖动端点重新绑定。')}else if(cancelled&&drag.moved)showStatus('已取消移动关系线。');
   if(drag.moved){event.preventDefault();event.stopPropagation()}return drag.moved;
 }
@@ -1188,13 +1189,14 @@ function beginEdgeEndpointDrag(event,linkId,side){
   if(!graphModeAllows('edgeAdvanced'))return false;
   if(isCanvasPanMode()||document.body.classList.contains('auth-readonly')||event.button!==0)return;
   const link=linkById(linkId),dom=edgeDomById.get(String(linkId));if(!link||!dom?.geometry)return;const original=edgeRouteSnapshot(link);
-  edgeEndpointDrag={pointerId:event.pointerId,linkId:String(linkId),side:side==='from'?'from':'to',handle:event.currentTarget,original,startClient:{x:event.clientX,y:event.clientY},moved:false,history:false,targetId:''};
+  const historyController=beginGraphGestureHistory('调整关系线端点');if(!historyController)return false;
+  edgeEndpointDrag={pointerId:event.pointerId,linkId:String(linkId),side:side==='from'?'from':'to',handle:event.currentTarget,original,startClient:{x:event.clientX,y:event.clientY},historyController,moved:false,history:false,targetId:''};
   setSelectedEdgeQuickStyleAnchorFromEvent(event);hideSelectedEdgeQuickStylePanel();stage.classList.add('graph-edge-endpoint-dragging','is-interacting');try{event.currentTarget.setPointerCapture(event.pointerId)}catch(error){}event.preventDefault();event.stopPropagation();
 }
 function applyEdgeEndpointDragPoint(payload){
   const drag=edgeEndpointDrag;if(!drag||!payload)return;const link=linkById(drag.linkId);if(!link)return;
   if(!drag.moved&&Math.hypot(payload.clientX-drag.startClient.x,payload.clientY-drag.startClient.y)<3)return;
-  if(!drag.history){pushGraphUndoSnapshot('调整关系线端点');persistDerivedEdgeRoute(link,edgeDomById.get(drag.linkId)?.geometry);drag.history=true}
+  if(!drag.history){drag.historyController.checkpoint('调整关系线端点');persistDerivedEdgeRoute(link,edgeDomById.get(drag.linkId)?.geometry);drag.history=true}
   drag.moved=true;setLinkFreeEndpoint(link,drag.side,payload.world);invalidateGraphIndexCache();const target=edgeEndpointTargetFromClient(payload.clientX,payload.clientY),otherId=drag.side==='from'?link.to:link.from;
   if(target&&target.id!==otherId){drag.targetId=target.id;setEdgeEndpointBindTarget(target)}else{drag.targetId='';clearEdgeEndpointBindTarget()}
   updateLinkGeometry(link,getGraphIndex().nodeMap);
@@ -1207,8 +1209,9 @@ function finishEdgeEndpointDrag(event,cancelled=false){
   const drag=edgeEndpointDrag;if(!drag||drag.pointerId!==event.pointerId)return;
   if(edgeEndpointDragFrame){cancelAnimationFrame(edgeEndpointDragFrame);edgeEndpointDragFrame=0}if(edgeEndpointDragPoint&&!cancelled)applyEdgeEndpointDragPoint(edgeEndpointDragPoint);edgeEndpointDragPoint=null;
   const link=linkById(drag.linkId);let bound=false;if(link&&!cancelled&&drag.moved&&drag.targetId)bound=bindLinkEndpoint(link,drag.side,drag.targetId);
-  if(link&&(cancelled||!drag.moved)&&drag.history){restoreEdgeRoute(link,drag.original)}else invalidateGraphIndexCache();if(link)updateLinkGeometry(link,getGraphIndex().nodeMap);
+  if(!cancelled&&drag.moved){invalidateGraphIndexCache();if(link)updateLinkGeometry(link,getGraphIndex().nodeMap)}
   clearEdgeEndpointBindTarget();try{drag.handle?.releasePointerCapture?.(event.pointerId)}catch(error){}edgeEndpointDrag=null;stage.classList.remove('graph-edge-endpoint-dragging','is-interacting');
+  finishGraphGestureHistory(drag,cancelled||!drag.moved);
   if(!cancelled&&drag.moved){save();renderSelectedEdgeControls();renderSelectedEdgeQuickStylePanel();showStatus(bound?'关系线端点已重新绑定到节点。':'关系线端点已移动，当前保持未绑定状态。')}else if(cancelled)showStatus('已取消调整关系线端点。');event.preventDefault();event.stopPropagation();
 }
 function createEdgeEndpointHandle(link,side,point){
@@ -1220,10 +1223,11 @@ function beginEdgeControlDrag(event,linkId,kind,index){
   if(!graphModeAllows('edgeAdvanced'))return false;
   if(isCanvasPanMode()||document.body.classList.contains('auth-readonly')||event.button===2)return;
   const link=linkById(linkId),dom=edgeDomById.get(String(linkId));if(!link||!dom?.geometry)return;const original=edgeRouteSnapshot(link);
-  pushGraphUndoSnapshot('调整关系线路径');
+  const historyController=beginGraphGestureHistory('调整关系线路径');if(!historyController)return false;
+  historyController.checkpoint('调整关系线路径');
   if(kind==='waypoint'&&!normalizedEdgePoints(link.waypoints,12).length)link.waypoints=dom.geometry.controls.map(point=>({x:point.x,y:point.y}));
   if(kind==='curve-control'&&normalizedEdgePoints(link.curveControls,2).length!==2)link.curveControls=dom.geometry.curveControls.map(point=>({x:point.x,y:point.y}));
-  edgeControlDrag={pointerId:event.pointerId,linkId:String(linkId),kind,index:Number(index)||0,handle:event.currentTarget,original,moved:false};stage.classList.add('graph-edge-control-dragging','is-interacting');
+  edgeControlDrag={pointerId:event.pointerId,linkId:String(linkId),kind,index:Number(index)||0,handle:event.currentTarget,original,historyController,moved:false};stage.classList.add('graph-edge-control-dragging','is-interacting');
   try{event.currentTarget.setPointerCapture(event.pointerId)}catch(error){}
   event.preventDefault();event.stopPropagation();
 }
@@ -1248,8 +1252,8 @@ function scheduleEdgeControlDrag(event){
 function finishEdgeControlDrag(event,cancelled=false){
   const drag=edgeControlDrag;if(!drag||drag.pointerId!==event.pointerId)return;
   if(edgeControlDragFrame){cancelAnimationFrame(edgeControlDragFrame);edgeControlDragFrame=0}if(edgeControlDragPoint&&!cancelled)applyEdgeControlDragPoint(edgeControlDragPoint);edgeControlDragPoint=null;
-  const link=linkById(drag.linkId);if((cancelled||!drag.moved)&&link){restoreEdgeRoute(link,drag.original);updateLinkGeometry(link,getGraphIndex().nodeMap)}
   try{drag.handle?.releasePointerCapture?.(event.pointerId)}catch(error){}edgeControlDrag=null;stage.classList.remove('graph-edge-control-dragging','is-interacting');
+  finishGraphGestureHistory(drag,cancelled||!drag.moved);
   if(!cancelled&&drag.moved){save();renderSelectedEdgeQuickStylePanel();showStatus('关系线路径已更新。')}else if(cancelled)showStatus('已取消调整关系线路径。');
   renderSelectedEdgeControls();event.preventDefault();event.stopPropagation();
 }
@@ -1652,6 +1656,8 @@ function pushGraphUndoSnapshot(label='操作'){
   const history=ensureGraphHistoryController();
   return history?history.checkpoint(label):false;
 }
+function beginGraphGestureHistory(label){const history=ensureGraphHistoryController();return history?.begin(label)?history:null}
+function finishGraphGestureHistory(drag,cancelled){return cancelled?drag.historyController.rollback():drag.historyController.commit()}
 function restoreGraphUndoSnapshot(){
   if(!canWriteGraph())return false;
   const history=ensureGraphHistoryController(),item=history&&history.undo();
@@ -1862,9 +1868,10 @@ function beginHomeSelectionBoundsDrag(event){
   if(event.ctrlKey||event.metaKey||event.shiftKey)return false;
   const ids=selectedHomeMovableIds(),total=ids.nodes.length+ids.texts.length;if(total<2)return false;
   const locked=ids.nodes.filter(id=>window.KGGraphModel?.interactionOf?.(nodeById(id))?.locked);if(locked.length){showStatus(`选择中有 ${locked.length} 个锁定节点，已取消整体移动。`);return false}
+  const historyController=beginGraphGestureHistory(`移动 ${total} 个图元`);if(!historyController)return false;
   const nodeOrigins=Object.fromEntries(ids.nodes.map(id=>{const node=nodeById(id);return[id,{x:Number(node.x)||0,y:Number(node.y)||0}]}));
   const textOrigins=Object.fromEntries(ids.texts.map(id=>{const item=textElementById(id),g=window.KGGraphModel?.textElementGeometryOf?.(item)||item;return[id,{x:Number(g.x)||0,y:Number(g.y)||0}]}));
-  homeSelectionBoundsDrag={pointerId:event.pointerId,startX:event.clientX,startY:event.clientY,nodeIds:ids.nodes,textIds:ids.texts,nodeOrigins,textOrigins,routeSnapshots:captureNodeDragRoutes(ids.nodes),moved:false,history:false,frame:0,pending:null,anchorRect:homeSelectionAnchorRect()};
+  homeSelectionBoundsDrag={pointerId:event.pointerId,startX:event.clientX,startY:event.clientY,nodeIds:ids.nodes,textIds:ids.texts,nodeOrigins,textOrigins,routeSnapshots:captureNodeDragRoutes(ids.nodes),historyController,moved:false,history:false,frame:0,pending:null,anchorRect:homeSelectionAnchorRect()};
   try{stage.setPointerCapture(event.pointerId)}catch(error){}
   stage.classList.add('home-selection-bounds-dragging','graph-card-dragging');nodeStyleToolbarController?.hide?.();hideSelectedEdgeQuickStylePanel();window.KGHomeCanvasRuntime?.alignment?.clearGuides?.();
   event.preventDefault();event.stopPropagation();event.stopImmediatePropagation();return true;
@@ -1872,7 +1879,7 @@ function beginHomeSelectionBoundsDrag(event){
 function applyHomeSelectionBoundsMove(point){
   const drag=homeSelectionBoundsDrag;if(!drag||drag.pointerId!==point.pointerId)return false;
   const dx=(point.clientX-drag.startX)/Math.max(.0001,Number(state.viewport.scale)||1),dy=(point.clientY-drag.startY)/Math.max(.0001,Number(state.viewport.scale)||1);
-  if(Math.hypot(point.clientX-drag.startX,point.clientY-drag.startY)>4&&!drag.moved){drag.moved=true;if(!drag.history){pushGraphUndoSnapshot(`移动 ${drag.nodeIds.length+drag.textIds.length} 个图元`);drag.history=true}ensureHomeEdgeDragPerformanceController()?.start?.(drag.nodeIds)}
+  if(Math.hypot(point.clientX-drag.startX,point.clientY-drag.startY)>4&&!drag.moved){drag.moved=true;if(!drag.history){drag.historyController.checkpoint(`移动 ${drag.nodeIds.length+drag.textIds.length} 个图元`);drag.history=true}ensureHomeEdgeDragPerformanceController()?.start?.(drag.nodeIds)}
   if(!drag.moved)return false;
   for(const id of drag.nodeIds){const node=nodeById(id),origin=drag.nodeOrigins[id];if(!node||!origin)continue;window.KGGraphModel?.updateGeometry?.(node,{x:Math.round(origin.x+dx),y:Math.round(origin.y+dy)});const el=cardElementByNodeId(id);if(el){el.style.left=node.x+'px';el.style.top=node.y+'px'}}
   applyNodeDragRoutes(drag.routeSnapshots);
@@ -1893,9 +1900,10 @@ function finishHomeSelectionBoundsDrag(event,cancelled=false){
   const drag=homeSelectionBoundsDrag;if(!drag||drag.pointerId!==event.pointerId)return false;
   if(drag.frame){cancelAnimationFrame(drag.frame);drag.frame=0}if(drag.pending&&!cancelled)applyHomeSelectionBoundsMove(drag.pending);homeSelectionBoundsDrag=null;
   try{stage.releasePointerCapture(event.pointerId)}catch(error){}stage.classList.remove('home-selection-bounds-dragging','graph-card-dragging');ensureHomeEdgeDragPerformanceController()?.stop?.(drag.nodeIds);
-  if(cancelled&&drag.moved){for(const id of drag.nodeIds){const node=nodeById(id),origin=drag.nodeOrigins[id];if(node&&origin)window.KGGraphModel?.updateGeometry?.(node,origin)}restoreNodeDragRoutes(drag.routeSnapshots);for(const id of drag.textIds){const item=textElementById(id),origin=drag.textOrigins[id];if(item&&origin)window.KGGraphModel?.updateTextElementGeometry?.(item,origin)}render();showStatus('已取消整体移动。')}
-  else if(!drag.moved)dismissLockedHomeSelection('selection-click-dismiss');
-  else{save();refreshSelectionUI();requestAnimationFrame(()=>window.KGHomeCanvasRuntime?.selectionFilter?.refreshPosition?.(homeSelectionAnchorRect()));showStatus(`已整体移动 ${drag.nodeIds.length+drag.textIds.length} 个图元，并恢复完整关系线。`)}
+  finishGraphGestureHistory(drag,cancelled||!drag.moved);
+  if(cancelled&&drag.moved)showStatus('已取消整体移动。');
+  else if(!drag.moved&&!cancelled)dismissLockedHomeSelection('selection-click-dismiss');
+  else if(!cancelled){save();refreshSelectionUI();requestAnimationFrame(()=>window.KGHomeCanvasRuntime?.selectionFilter?.refreshPosition?.(homeSelectionAnchorRect()));showStatus(`已整体移动 ${drag.nodeIds.length+drag.textIds.length} 个图元，并恢复完整关系线。`)}
   event.preventDefault();event.stopPropagation();event.stopImmediatePropagation();return true;
 }
 function beginLockedHomeSelectionPointer(event){
@@ -2186,6 +2194,7 @@ function refreshSelectionUI(options={}){
 let cardDrag=null;
 function resetGraphPointerInteractions(options={}){
   window.KGHomeCanvasRuntime?.alignment?.end?.();
+  if(homeSelectionBoundsDrag){const drag=homeSelectionBoundsDrag;finishHomeSelectionBoundsDrag({pointerId:drag.pointerId,preventDefault(){},stopPropagation(){},stopImmediatePropagation(){}},true)}
   clearPendingNodeRightClick();
   if(nodeRightPointerSession){
     const session=nodeRightPointerSession;nodeRightPointerSession=null;
@@ -2193,7 +2202,7 @@ function resetGraphPointerInteractions(options={}){
   }
   if(cardDrag){
     const drag=cardDrag;cardDrag=null;clearTimeout(drag.longTimer);
-    if(drag.moved){for(const id of drag.ids||[drag.id]){const node=nodeById(id),origin=drag.startPositions?.[id];if(node&&origin)window.KGGraphModel?.updateGeometry?.(node,origin)}restoreNodeDragRoutes(drag.routeSnapshots||[]);render()}
+    finishGraphGestureHistory(drag,true);
     try{drag.card?.releasePointerCapture?.(drag.pointerId)}catch(error){}
     (drag.ids||[drag.id]).forEach(id=>cardElementByNodeId(id)?.classList.remove('dragging','group-dragging'));
     const controller=ensureGraphDragController();controller?.cancel?.();
@@ -2825,10 +2834,12 @@ cardsLayer.addEventListener('pointerdown',e=>{
   const groupIds=toggleMulti?[id]:(selectedNodeIds.has(id)&&selectedNodeIds.size>1?[...selectedNodeIds]:[id]);
   const lockedGroup=groupIds.filter(gid=>window.KGGraphModel?.interactionOf?.(nodeById(gid)).locked);if(lockedGroup.length){showStatus(`选择中有 ${lockedGroup.length} 个锁定节点，已取消整体移动。`);return}
   if(groupIds.length===1&&!e.shiftKey&&!e.ctrlKey&&!e.metaKey)clearMultiSelection();
+  const historyLabel=groupIds.length>1?`移动 ${groupIds.length} 个知识点`:`移动“${n.title}”`,historyController=beginGraphGestureHistory(historyLabel);if(!historyController)return;
   const startPositions=Object.fromEntries(groupIds.map(gid=>{const gn=nodeById(gid);return[gid,{x:gn.x,y:gn.y}]}));
   const dragController=ensureGraphDragController();
   const routeSnapshots=captureNodeDragRoutes(groupIds);
-  cardDrag=dragController?dragController.begin('node',e,{id,ids:groupIds,card,moved:false,longOpened:false,toggleMulti,editOnRelease,startClient:{x:e.clientX,y:e.clientY},startPos:{x:n.x,y:n.y},startPositions,routeSnapshots,longTimer:null,historyLabel:groupIds.length>1?`移动 ${groupIds.length} 个知识点`:`移动“${n.title}”`}):{id,ids:groupIds,card,pointerId:e.pointerId,moved:false,longOpened:false,toggleMulti,editOnRelease,startClient:{x:e.clientX,y:e.clientY},startPos:{x:n.x,y:n.y},startPositions,routeSnapshots,longTimer:null};
+  cardDrag=dragController?dragController.begin('node',e,{id,ids:groupIds,card,moved:false,longOpened:false,toggleMulti,editOnRelease,startClient:{x:e.clientX,y:e.clientY},startPos:{x:n.x,y:n.y},startPositions,routeSnapshots,historyController,longTimer:null,historyLabel}):{id,ids:groupIds,card,pointerId:e.pointerId,moved:false,longOpened:false,toggleMulti,editOnRelease,startClient:{x:e.clientX,y:e.clientY},startPos:{x:n.x,y:n.y},startPositions,routeSnapshots,historyController,longTimer:null,historyLabel};
+  if(!cardDrag){historyController.rollback();return}
   cardDrag.edgeLite=shouldUseHomeEdgeDragLite(cardDrag);
   const movingRecords=typeof homeAlignmentRecords==='function'?homeAlignmentRecords().filter(record=>groupIds.includes(String(record.id))):[];
   if(cardDrag.edgeLite)window.KGHomeCanvasRuntime?.alignment?.clearGuides?.();else window.KGHomeCanvasRuntime?.alignment?.begin?.(movingRecords,{kind:'node',ids:groupIds});
@@ -2847,7 +2858,7 @@ cardsLayer.addEventListener('pointermove',e=>{
   markStageInteracting();
   const px=e.clientX-cardDrag.startClient.x,py=e.clientY-cardDrag.startClient.y,wasMoved=!!cardDrag.moved;
   const dragController=ensureGraphDragController();if(dragController)dragController.update(e);
-  if(Math.hypot(px,py)>5){if(!wasMoved){stage.classList.add('graph-card-dragging');nodeStyleToolbarController?.hide()}cardDrag.moved=true;clearTimeout(cardDrag.longTimer)}
+  if(Math.hypot(px,py)>5){if(!wasMoved){if(!dragController)cardDrag.historyController.checkpoint(cardDrag.historyLabel);stage.classList.add('graph-card-dragging');nodeStyleToolbarController?.hide()}cardDrag.moved=true;clearTimeout(cardDrag.longTimer)}
   if(isRelatedGatherActive()&&cardDrag.moved){
     if(!cardDrag.gatherDragBlocked)showStatus('当前是临时聚拢布局，仅用于讲解查看；请先退出聚拢后再调整原图谱位置。');
     cardDrag.gatherDragBlocked=true;
@@ -2880,7 +2891,8 @@ function finishCardPointer(e,cancelled=false){
   (drag.ids||[drag.id]).forEach(gid=>{const el=cardElementByNodeId(gid);if(el)el.classList.remove('dragging','group-dragging')});
   stage.classList.remove('large-graph-dragging-local-lines','graph-card-dragging','graph-card-dragging-defer-edges');
   try{drag.card.releasePointerCapture(e.pointerId)}catch{}
-  if(cancelled||drag.longOpened){if(drag.moved){for(const id of drag.ids||[drag.id]){const node=nodeById(id),origin=drag.startPositions?.[id];if(node&&origin)window.KGGraphModel?.updateGeometry?.(node,origin)}restoreNodeDragRoutes(drag.routeSnapshots||[]);render()}else if(drag.edgeLite&&!drag.gatherDragBlocked)renderEdges();return}
+  finishGraphGestureHistory(drag,cancelled||drag.longOpened||drag.gatherDragBlocked||!drag.moved);
+  if(cancelled||drag.longOpened){if(!drag.moved&&drag.edgeLite&&!drag.gatherDragBlocked)renderEdges();return}
   if(drag.gatherDragBlocked){handleNodeTap(drag.id);return}
   if(!drag.moved){
     if(drag.toggleMulti){toggleCardMultiSelection(drag.id);return}
@@ -4235,9 +4247,9 @@ function cancelGraphModeTransientInteractions(){
     if(boxSelect.frame)cancelAnimationFrame(boxSelect.frame);
     boxSelect=null;hideSelectionBox();stage.classList.remove('graph-box-selecting');
   }
-  if(edgeControlDrag){const drag=edgeControlDrag,link=linkById(drag.linkId);if(link)restoreEdgeRoute(link,drag.original);edgeControlDrag=null}
-  if(edgeEndpointDrag){const drag=edgeEndpointDrag,link=linkById(drag.linkId);if(link)restoreEdgeRoute(link,drag.original);edgeEndpointDrag=null;clearEdgeEndpointBindTarget()}
-  if(edgeMoveDrag){const drag=edgeMoveDrag,link=linkById(drag.linkId);if(link)restoreEdgeRoute(link,drag.original);edgeMoveDrag=null}
+  if(edgeControlDrag){const drag=edgeControlDrag;edgeControlDrag=null;if(edgeControlDragFrame)cancelAnimationFrame(edgeControlDragFrame);edgeControlDragFrame=0;edgeControlDragPoint=null;try{drag.handle?.releasePointerCapture?.(drag.pointerId)}catch(error){}finishGraphGestureHistory(drag,true)}
+  if(edgeEndpointDrag){const drag=edgeEndpointDrag;edgeEndpointDrag=null;if(edgeEndpointDragFrame)cancelAnimationFrame(edgeEndpointDragFrame);edgeEndpointDragFrame=0;edgeEndpointDragPoint=null;clearEdgeEndpointBindTarget();try{drag.handle?.releasePointerCapture?.(drag.pointerId)}catch(error){}finishGraphGestureHistory(drag,true)}
+  if(edgeMoveDrag){const drag=edgeMoveDrag;edgeMoveDrag=null;if(edgeMoveDragFrame)cancelAnimationFrame(edgeMoveDragFrame);edgeMoveDragFrame=0;edgeMoveDragPoint=null;try{drag.handle?.releasePointerCapture?.(drag.pointerId)}catch(error){}finishGraphGestureHistory(drag,true)}
   stage.classList.remove('graph-edge-control-dragging','graph-edge-endpoint-dragging','graph-edge-moving','graph-connector-dragging','is-interacting');
   hideSelectedEdgeQuickStylePanel();hideEdgeInlineLabelEditor();hideEdgeHoverFeedback();
   if(!graphModeAllows('multiSelect')){
