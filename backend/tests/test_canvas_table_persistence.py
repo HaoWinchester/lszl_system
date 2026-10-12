@@ -101,12 +101,24 @@ def test_template_publish_and_load_preserve_tables():
             published = c.post("/api/v1/graph-templates", json={
                 "sourceFileId": source, "expectedFileRevision": revision,
                 "name": "表格模板", "description": "tables 往返", "memberOnly": False}).json()["template"]
-            # 非法 tables 源发布被拒。
-            c.put(f"/api/v1/files/{source}", json={"graphData": {"nodes": [], "tables": [{"bad": 1}]}, "expectedRevision": revision + 1})
+            # 非法 tables 源发布被拒（422 GRAPH_TABLES_INVALID；PUT 用正确 revision 写入坏数据）。
+            put_bad = c.put(f"/api/v1/files/{source}", json={"graphData": {"nodes": [], "tables": [{"bad": 1}]}, "expectedRevision": revision})
+            assert put_bad.status_code == 422, put_bad.text
+            # 坏表格绕过文件接口直接落库后发布也必须被拒——直接验证 publish 校验：
+            from app.services import file_service as fs
+            async def force_bad():
+                async with AsyncSessionLocal() as db:
+                    from app.models.file import FileContent as FC
+                    row = await db.get(FC, source)
+                    row.graph_data = {"nodes": [], "tables": [{"bad": 1}]}
+                    await db.commit()
+            asyncio.run(force_bad())
             r = c.post("/api/v1/graph-templates", json={
-                "sourceFileId": source, "expectedFileRevision": revision + 2,
+                "sourceFileId": source, "expectedFileRevision": revision,
                 "name": "坏表格模板", "description": "x", "memberOnly": False})
-            assert r.status_code in (409, 422)
+            assert r.status_code == 422, r.text
+            # remap 先报 TEMPLATE_GRAPH_INVALID；无论走哪个校验，发布都被拒绝。
+            assert r.json()["detail"]["code"] in ("GRAPH_TABLES_INVALID", "TEMPLATE_GRAPH_INVALID")
             # 学生加载副本：tables 保留（id 已重映射）。
             login(c, value, "student")
             loaded = c.post(f"/api/v1/graph-templates/{published['id']}/loads",

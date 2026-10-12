@@ -1815,8 +1815,8 @@ def _workspace_values(data: dict) -> tuple[str, int, dict]:
         from app.schemas.canvas_table import CanvasTable, validate_tables
 
         tables = payload["tables"]
-        if not isinstance(tables, list):
-            raise ValueError("工作区 tables 必须是数组")
+        if not isinstance(tables, list) or any(not isinstance(item, dict) for item in tables):
+            raise ValueError("工作区 tables 必须是对象数组")
         validate_tables([CanvasTable(**item) for item in tables])
     return title[:200], version, payload
 

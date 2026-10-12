@@ -48,7 +48,9 @@ def validate_graph_tables(graph_data: dict) -> None:
     from app.schemas.canvas_table import CanvasTable, validate_tables
 
     try:
-        validated = [CanvasTable(**item) for item in tables]
+        validated = [CanvasTable(**item) for item in tables if isinstance(item, dict)]
+        if any(not isinstance(item, dict) for item in tables):
+            raise ValueError("tables 元素必须是对象")
         validate_tables(validated)
     except ValueError as exc:
         raise GraphTablesInvalid(str(exc)) from exc

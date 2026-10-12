@@ -34,7 +34,7 @@ class RecallProgressSaveRequest(BaseModel):
     nodes: list[dict[str, Any]] = Field(max_length=5000)
     edges: list[dict[str, Any]] = Field(max_length=20000)
     strokes: list[dict[str, Any]] = Field(default_factory=list)
-    tables: list[dict[str, Any]] = Field(default_factory=list)
+    tables: list[dict[str, Any]] = Field(default_factory=list, max_length=500)
     custom_nodes: dict[str, dict[str, Any]] = Field(
         default_factory=dict,
         alias="customNodes",

@@ -47,7 +47,7 @@ test('deep recall server adapter carries tables through save and reset payloads'
   await client.saveGraph(graph);
   const body=JSON.parse(requests[1].init.body);
   assert.deepEqual(body.tables,[table()]);
-  // 失败草稿保留 tables：409 后 lastUnsavedGraph 仍含表格，重试载荷一致。
-  call=1; // 复用成功响应保持简单，仅校验 state
+  // lastUnsavedGraph 保留 pending 图（含 tables）由 adapter 代码保证；
+  // 真实 409 失败重试路径由 T19/T20 浏览器测试覆盖。
   assert.equal(client.getState().saveState,'saved');
 });
