@@ -328,9 +328,10 @@
     next.size=sizeKey(next.size);
     return next;
   }
-  function updateAppearance(node,patch={}){
+  function updateAppearance(node,patch={},options={}){
     if(!node)return null;
     const current=appearanceOf(node),next=normalizeAppearancePatch(current,patch);
+    if(options.theme!==true&&node.mindmapTheme)node.manualAppearanceFields=[...new Set([...(node.manualAppearanceFields||[]),...Object.keys(patch)])];
     node.appearance=next;
     const dims=dimensionsForSize(next.size);
     const currentGeometry=geometryOf(node,current);

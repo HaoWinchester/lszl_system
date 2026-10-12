@@ -532,7 +532,7 @@ async function openRelatedCanvasModal(showMessage=true){
     if(!graph.nodes.length)return false;
     closeRelatedCanvasModal();
     const session=window.KGGraphSession.create({kind:'temporary',graph});
-    relatedCanvasController=window.KGRelatedCanvasController.create({session,model:window.KGGraphModel,nodeDims,idFactory:uid,renderCard:(n,context)=>renderCardElement(n,null,context),renderRelation:createGraphRelationPresentation,ensureMarkers:ensureGraphEdgeMarkers,onClose:()=>closeRelatedCanvasModal(true)});
+    relatedCanvasController=window.KGRelatedCanvasController.create({session,model:window.KGGraphModel,nodeDims,idFactory:uid,renderCard:(n,context)=>renderCardElement(n,null,context),renderRelation:createGraphRelationPresentation,layoutEndpoints:(link,map)=>linkRenderPoints(link,map,{ignoreGather:true}),ensureMarkers:ensureGraphEdgeMarkers,onClose:()=>closeRelatedCanvasModal(true)});
     relatedCanvasModalEl=relatedCanvasController.overlay;
     nodeStyleToolbarController?.hide();
     if(showMessage)showStatus(`已打开临时相关画布：${graph.nodes.length} 张卡片；关闭即丢弃修改。`);
@@ -1356,6 +1356,7 @@ function graphUndoSnapshot(){
     elements:cloneGraphValue(state.elements||[]),
     strokes:cloneGraphValue(state.strokes||[]),
     defaults:cloneGraphValue(state.defaults||{}),
+    mindmap:cloneGraphValue(state.mindmap||null),
     selection:{...selected,selectedElementId:state.selectedElementId||null,selectedTextElementIds:[...selectedTextElementIds]}
   };
 }
@@ -1365,6 +1366,7 @@ function applyGraphHistorySnapshot(snapshot={}){
   if(nodeContextMenuController)nodeContextMenuController.hide();
   state.nodes=cloneGraphValue(snapshot.nodes||[]).map(node=>window.KGGraphModel&&window.KGGraphModel.normalizeNode?window.KGGraphModel.normalizeNode(node):node);
   state.links=cloneGraphValue(snapshot.links||[]);
+  if(snapshot.mindmap)state.mindmap=cloneGraphValue(snapshot.mindmap);else delete state.mindmap;
   state.strokes=cloneGraphValue(snapshot.strokes||[]);
   state.elements=cloneGraphValue(snapshot.elements||[]).map(item=>window.KGGraphModel&&window.KGGraphModel.normalizeTextElement?window.KGGraphModel.normalizeTextElement(item):item);
   state.defaults={...state.defaults,...cloneGraphValue(snapshot.defaults||{})};
@@ -1730,7 +1732,7 @@ function classForCard(n,relationState=null,context=null){
   const selectionState=context?.state||state,nodeSelection=context?.selectedNodeIds||selectedNodeIds;
   const appearance=window.KGGraphModel&&window.KGGraphModel.appearanceOf?window.KGGraphModel.appearanceOf(n):{size:n.size||'',cardStyle:n.cardStyle||'standard'};
   const sizeClass=appearance.size==='small'?' size-small':appearance.size==='big'?' size-big':'';
-  const styleClass=' card-style-'+(appearance.cardStyle||'standard');
+  const styleClass=' card-style-'+(appearance.cardStyle||'standard')+(n.mindmapTheme?.id==='capsule'&&appearance.cardStyle==='rounded'?' mindmap-capsule':'');
   let cls='knowledge-card'+sizeClass+styleClass+(selectionState.selectedNodeId===n.id?' active':'')+(nodeSelection.has(n.id)?' multi-selected':'')+(selectionState.linkSourceId===n.id?' link-source':'')+(isImportant(n)?' focus-card':'')+(!context&&nodeFreeResizeModeId===n.id?' node-free-resize-mode':'')+(window.KGGraphModel?.interactionOf?.(n).locked?' node-locked':'');
   if(relationState&&relationState.related&&relationState.related.size){
     if(relationState.anchors.has(n.id))cls+=' large-related-anchor';
@@ -4022,3 +4024,22 @@ $('nodeModal').addEventListener('click',e=>{if(e.target===$('nodeModal'))closeNo
 ['linkModal','graphModal','templateModal','flashcardModal'].forEach(id=>{$(id).addEventListener('click',e=>{if(e.target===$(id))$(id).classList.remove('show')})});
 
 document.addEventListener('keydown',e=>{if(e.key!=='Escape'||e.defaultPrevented||isTextEditingTarget(e))return;window.KGHomeCanvasRuntime?.selectionFilter?.clear?.({reason:'escape',apply:false});window.KGHomeCanvasRuntime?.alignment?.end?.();const resize=graphKernelControllers.resize;if(resize&&resize.isActive()){e.preventDefault();resize.cancel();return}if(nodeContextMenuController&&nodeContextMenuController.isVisible()){e.preventDefault();nodeContextMenuController.hide();return}if(nodeFreeResizeModeId){e.preventDefault();exitNodeFreeResizeMode({message:true});return}if(relatedCanvasModalEl){e.preventDefault();closeRelatedCanvasModal(true);return}if(nodeFloatingColorWindowController&&nodeFloatingColorWindowController.isOpen()){e.preventDefault();nodeFloatingColorWindowController.close({cancel:true,force:true,reason:'escape'});return}if(nodeStyleToolbarController&&nodeStyleToolbarController.isVisible()){e.preventDefault();nodeStyleToolbarController.hide()}});
+
+function applyMindmapLayout(options={}){
+  if(!canWriteGraph())throw new Error('当前不能编辑图谱');
+  clearRelatedGatherLayout({render:false,message:false});
+  const result=ensureGraphHistoryController().run('整理思维导图布局',()=>window.KGGraphMindmapLayout.apply(state,{...options,model:window.KGGraphModel,endpoints:(link,map)=>linkRenderPoints(link,map,{ignoreGather:true})}));
+  render({persist:true});return result;
+}
+function applyMindmapTheme(options={}){
+  if(!canWriteGraph())throw new Error('当前不能编辑图谱');
+  const result=ensureGraphHistoryController().run('应用思维导图主题',()=>window.KGGraphMindmapThemes.apply(state,options));render({persist:true});return result;
+}
+function openMindmapControls(){
+  if(!canWriteGraph())return false;
+  document.querySelector('[data-formal-mindmap-panel]')?.remove();
+  const host=document.createElement('section');host.dataset.formalMindmapPanel='true';host.dataset.stageUi='true';host.style.cssText='position:fixed;z-index:1100;left:80px;top:100px;max-width:650px;box-shadow:0 8px 30px #0003;border:1px solid #cbd5e1;background:white';
+  const close=document.createElement('button');close.textContent='关闭布局与主题';close.onclick=()=>{unmount();host.remove()};host.append(close);
+  window.KGGraphMindmapThemes.controls(host,{getGraph:()=>state,getSelectedIds:()=>[...new Set([...selectedNodeIds,state.selectedNodeId].filter(Boolean))],runLayout:applyMindmapLayout,runTheme:applyMindmapTheme});
+  const unmount=window.KGCanvasDomInteraction.mountOverlay(host);return true;
+}

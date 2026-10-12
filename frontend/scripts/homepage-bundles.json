@@ -81,6 +81,8 @@
         "src/graph/connection-controller.js",
         "src/graph/graph-fragment.js",
         "src/graph/clipboard-controller.js",
+        "src/graph/mindmap-layout.js",
+        "src/graph/mindmap-themes.js",
         "src/graph/style-controller.js",
         "src/graph/node-alignment-controller.js",
         "src/graph/layer-controller.js",

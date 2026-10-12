@@ -43,7 +43,7 @@
   let activeMode = "efficient";
   const MODE_TOOL_IDS = Object.freeze({
     reading: new Set(["homeCaptureBtn", "focusBtn", "flowModeBtn", "relationViewMenuBtn", "largeGraphLinesBtn", "largeGraphRelatedBtn"]),
-    efficient: new Set(["templateBtn", "addBtn", "addTextElementBtn", "focusBtn", "flashcardBtn", "homeInkBtn", "homeCaptureBtn", "pointerModeBtn", "flowModeBtn", "relationViewMenuBtn", "largeGraphLinesBtn", "largeGraphRelatedBtn", "importFile"]),
+    efficient: new Set(["templateBtn", "addBtn", "addTextElementBtn", "mindmapBtn", "focusBtn", "flashcardBtn", "homeInkBtn", "homeCaptureBtn", "pointerModeBtn", "flowModeBtn", "relationViewMenuBtn", "largeGraphLinesBtn", "largeGraphRelatedBtn", "importFile"]),
     professional: null
   });
   function normalizeMode(value){
@@ -75,6 +75,7 @@
     {
       id: "style",
       tools: [
+        {id:"mindmapBtn",label:"布局与主题",tooltip:"思维导图布局与主题",icon:"relations",permission:"editGraph",action:"openMindmap"},
         {id:"sizeMenuBtn", type:"menu", label:"尺寸", ariaLabel:"卡牌尺寸", tooltip:"卡牌尺寸", icon:"size", permission:"editGraph", shortTip:"尺寸", children:[
           {id:"sizeSmallBtn", label:"小卡", icon:"small", action:"setSmallCards", shortcut:"1"},
           {id:"sizeDefaultBtn", label:"默认", icon:"size", action:"setDefaultCards", shortcut:"`"},
@@ -291,7 +292,7 @@
     }
   }
   function registerActions(actions={}){
-    toolbarActions = {...toolbarActions, ...actions};
+    toolbarActions = {openMindmap:()=>window.openMindmapControls(),...toolbarActions, ...actions};
     bindHandlers();
   }
 
