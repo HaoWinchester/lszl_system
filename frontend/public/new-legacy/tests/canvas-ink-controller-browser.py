@@ -10,7 +10,7 @@ with sync_playwright() as pw:
     page.on('pageerror', lambda error: errors.append(str(error)))
     page.set_content('''<style>#view{position:relative;width:1000px;height:680px;overflow:hidden;background:#f8fafc}#world{position:absolute;transform-origin:0 0;transform:translate(100px,100px) scale(2)}#card{position:absolute;width:160px;height:90px;background:white;border:1px solid #ccc}</style><button id="launch" style="position:absolute;right:0;top:0" type="button">画笔工具</button><button id="outside" style="position:absolute;right:0;top:740px" type="button">其他</button><div id="view"><div class="qw-background" style="position:absolute;inset:0"></div><div id="world"><button id="card">卡片选项</button></div></div>''')
     page.add_style_tag(content=(ROOT/'styles/canvas-ink.css').read_text())
-    for name in ['83-canvas-history-controller.js','94-canvas-ink.js']:
+    for name in ['83-canvas-history-controller.js','text-edit-session.js','94-canvas-ink.js']:
         page.add_script_tag(content=(ROOT/'src/canvas'/name).read_text())
     page.evaluate('''() => {
       window.strokes=[];window.locked=false;window.cardClicks=0;window.errors=[];window.panStarts=0;
