@@ -105,12 +105,15 @@ def test_template_publish_and_load_preserve_tables():
             put_bad = c.put(f"/api/v1/files/{source}", json={"graphData": {"nodes": [], "tables": [{"bad": 1}]}, "expectedRevision": revision})
             assert put_bad.status_code == 422, put_bad.text
             # 坏表格绕过文件接口直接落库后发布也必须被拒——直接验证 publish 校验：
-            from app.services import file_service as fs
             async def force_bad():
                 async with AsyncSessionLocal() as db:
                     from app.models.file import FileContent as FC
                     row = await db.get(FC, source)
-                    row.graph_data = {"nodes": [], "tables": [{"bad": 1}]}
+                    good_id_bad_shape = {"id": "tb_bad", "schemaVersion": 1, "x": 0, "y": 0,
+                                         "rows": 1000, "cols": 50,
+                                         "columnWidths": [140.0] * 50, "rowHeights": [40.0] * 1000,
+                                         "cells": {}, "merges": []}
+                    row.graph_data = {"nodes": [], "tables": [good_id_bad_shape]}
                     await db.commit()
             asyncio.run(force_bad())
             r = c.post("/api/v1/graph-templates", json={

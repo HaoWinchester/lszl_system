@@ -100,7 +100,7 @@ def test_frozen_versions_assets_grants_no_retroactive_revocation(data):
         graph={'meta':{'title':'version one'},'viewport':{'x':900,'y':10,'scale':2},'flashReviews':{'n':{'reviewCount':3}},'importedFlashcards':[{'id':'secret'}],
                'mindmap':{'rootIds':['n'],'themeId':'mint'},'nodes':[{'id':'n','title':'card','x':200,'y':200,'content':{'title':'card','notes':'保持完整\n'*3000,'images':[image]},'questionIds':[data.unused]}],
                'links':[{'id':'l','from':'n','to':'','toPoint':{'x':800,'y':500},'fromPort':{'side':'right','offset':0.25},'curveControls':[{'x':200,'y':30},{'x':800,'y':400}]}],
-               'elements':[{'id':'e','text':'文字','x':12,'y':32}], 'tables':[{'id':'t','rows':[[1]]}]}
+               'elements':[{'id':'e','text':'文字','x':12,'y':32}], 'tables':[{'id':'t','schemaVersion':1,'x':0,'y':0,'rows':2,'cols':2,'columnWidths':[140.0,140.0],'rowHeights':[40.0,40.0],'cells':{'0,0':'cell'},'merges':[]}]}
         source=c.post('/api/v1/files',json={'name':'frozen','graphData':graph}).json()['file']['id']
         bind(c,source,[data.q]);template=publish(c,publication(source,2));tid=template['id']
         assert c.post('/api/v1/graph-templates/'+tid+'/versions',json=publication(source,1)).status_code==409
