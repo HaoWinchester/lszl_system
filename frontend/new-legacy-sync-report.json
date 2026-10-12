@@ -1,11 +1,12 @@
 {
   "schemaVersion": 1,
   "fromVersion": "v9.0-p4.1.314",
-  "toVersion": "v9.0-p4.1.314",
+  "toVersion": "v9.0-p4.1.315",
   "changes": {
     "added": [],
     "changed": [
-      "src/canvas/table-controller.js"
+      "VERSION",
+      "content-prep-studio/dist/content-prep.html"
     ],
     "removed": []
   },
