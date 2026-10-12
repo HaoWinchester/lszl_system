@@ -34,3 +34,9 @@ T22 为用户本人验收，不由自动化测试或智能体确认替代。
 - 整分支独立审查（uat..HEAD 44+ commits，general-purpose 审查员实跑复核）：跨任务链路（模板×表格校验、片段×表格排除、授权冻结快照、临时会话×表格）全部自洽；owner 隔离/advisory 锁序/客户端授权字段/XSS 四项安全不变量全部通过；两个一行级项（模板 load 422 映射、片段 tables 死工作）已在 a13a4917 关闭。
 - 结论：**分支可进入 UAT 候选**。
 - UAT 观察清单（非阻断）：save_file 无节点配额（既有缺口）；模态开启时 paste 穿透主画布选中表格；`node_ids[:2500]` 静默截断；77 拖动逐事件 store 写；T15 性能/可达性 Minor；表格移动端触屏与行边界拖拽无专项断言；DPR/缩放完整矩阵归 D10 全局任务（表格为真实 DOM 文字，与卡牌同一清晰度机制，不单独许诺所有缩放同样易读）。
+
+## T21 UAT 部署（2026-10-13）
+
+- **v9.0-p4.1.316 已部署 https://uat.aihuanpu.com**（容器 current.json 与公网版本核对一致，健康 ok）。
+- 部署验收发现并修复 4 项（详见 .superpowers/sdd/.../task-21-report.md）：ink 测试缺 text-edit-session 依赖、table-controller reset 残留未声明变量（严格模式 ReferenceError）、interaction-focus 测试段落状态污染（改切干净 fixture）、T13 搜索 fixture 首页挤占。
+- 证据：artifacts/canvas-m2-m5/t21/deploy-uat8.log；清单校验 candidate-inventory.json。
