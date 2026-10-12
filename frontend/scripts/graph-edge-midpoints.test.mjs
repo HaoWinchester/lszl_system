@@ -20,3 +20,8 @@ test('graph fragments preserve internal relations and remap independent objects'
   const result = spawnSync(process.execPath, ['--test', fileURLToPath(new URL('../../new-legacy/tests/graph-fragment.test.js', import.meta.url))], { encoding: 'utf8', cwd: fileURLToPath(new URL('../../', import.meta.url)) })
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`)
 })
+
+test('temporary related sessions isolate one-hop edits and history', () => {
+  const result = spawnSync(process.execPath, ['--test', fileURLToPath(new URL('../../new-legacy/tests/graph-temporary-session.test.js', import.meta.url))], { encoding: 'utf8' })
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`)
+})

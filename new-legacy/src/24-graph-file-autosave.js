@@ -25,6 +25,8 @@
   }
   function isDirty(){return dirty}
   function saveNow(options={}){
+    // Explicit context callers cannot attach this formal-file adapter to a temporary session.
+    if(options.session&&options.session.kind!=='formal')return false;
     if(pending)return pending;
     if(saving)return false;
     if(!dirty&&!options.force)return true;

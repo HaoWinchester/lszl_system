@@ -142,7 +142,9 @@
     // File history belongs to this file; graph clipboard belongs to the account session.
     global.resetGraphHistory?.();
     try{
-      state=typeof global.sanitizeState==='function'?global.sanitizeState(file.graphData):file.graphData;
+      const nextState=typeof global.sanitizeState==='function'?global.sanitizeState(file.graphData):file.graphData;
+      global.closeRelatedCanvasModal?.();
+      state=nextState;
     }catch(err){console.warn('[KGGraphFileTabs] invalid graph file:',err);return false}
     try{if(typeof selectedNodeIds!=='undefined'&&selectedNodeIds&&typeof selectedNodeIds.clear==='function')selectedNodeIds.clear()}catch(err){}
     try{lastSavedSnapshot=JSON.stringify(typeof global.saveableState==='function'?global.saveableState():file.graphData)}catch(err){lastSavedSnapshot=''}

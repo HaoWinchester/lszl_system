@@ -111,6 +111,8 @@
         "src/canvas/92-canvas-edge-toolbar-controller.js",
         "src/canvas/93-canvas-drag-performance-controller.js",
         "src/canvas/89-canvas-runtime.js",
+        "src/graph/graph-session.js",
+        "src/graph/related-canvas-controller.js",
         "src/10-graph-editor.js",
         "src/19-home-toolbar-registry.js",
         "src/21-home-package-service.js",

@@ -482,339 +482,39 @@ const CENTER_SCOPE_ICON='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx=
 const FIT_SCOPE_ICON='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5"></path><path d="M16 3h5v5"></path><path d="M8 21H3v-5"></path><path d="M16 21h5v-5"></path><path d="M3 3l6 6"></path><path d="M21 3l-6 6"></path><path d="M3 21l6-6"></path><path d="M21 21l-6-6"></path></svg>';
 const RESTORE_SCOPE_ICON='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"></path><path d="M3 4v6h6"></path><path d="M9 12h6"></path></svg>';
 
-let relatedCanvasUnmount=null;
-let relatedCanvasModalEl=null,relatedCanvasState=null,relatedCanvasDrag=null,relatedCanvasPanDrag=null,relatedCanvasPanTimer=0,relatedCanvasInfoState=null,relatedCanvasInfoDrag=null;
-const RELATED_CANVAS_MIN_SCALE=.45,RELATED_CANVAS_MAX_SCALE=1.8,RELATED_CANVAS_SCALE_STEP=1.14;
-const RELATED_CANVAS_CLOSE_ICON='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"></path></svg>';
-const RELATED_CANVAS_MINIMIZE_ICON='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"></path></svg>';
-const RELATED_CANVAS_EXPAND_INFO_ICON='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"></rect><path d="M9 12h6"></path></svg>';
-const RELATED_CANVAS_FULLSCREEN_ICON='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"></path><path d="M3 3l6 6M21 3l-6 6M3 21l6-6M21 21l-6-6"></path></svg>';
-const RELATED_CANVAS_EXIT_FULLSCREEN_ICON='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3v6H3M15 3v6h6M9 21v-6H3M15 21v-6h6"></path></svg>';
-function relatedCanvasNodeCenter(id){
-  if(!relatedCanvasState||!relatedCanvasState.positions)return null;
-  const n=nodeById(id),p=relatedCanvasState.positions.get(id);if(!n||!p)return null;
-  const d=nodeDims(n);return{x:p.x+d.w/2,y:p.y+d.h/2};
+let relatedCanvasController=null,relatedCanvasModalEl=null,relatedCanvasOpening=false,relatedCanvasGeneration=0;
+function closeRelatedCanvasModal(showMessage=false){
+  relatedCanvasGeneration++;
+  if(relatedCanvasController)relatedCanvasController.close();
+  relatedCanvasController=null;relatedCanvasModalEl=null;
+  if(showMessage)showStatus('已关闭临时相关画布，本次修改已丢弃。');
 }
-
-function updateRelatedCanvasZoomLabel(){
-  if(!relatedCanvasModalEl||!relatedCanvasState)return;
-  const label=relatedCanvasModalEl.querySelector('.related-canvas-zoom-label');
-  if(label)label.textContent=Math.round((relatedCanvasState.scale||1)*100)+'%';
-}
-function applyRelatedCanvasScale(){
-  if(!relatedCanvasModalEl||!relatedCanvasState)return;
-  const viewport=relatedCanvasModalEl.querySelector('.related-canvas-viewport'),stageEl=relatedCanvasModalEl.querySelector('.related-canvas-stage');
-  if(!viewport||!stageEl)return;
-  const scale=relatedCanvasState.scale||1;
-  const panX=Number.isFinite(relatedCanvasState.panX)?relatedCanvasState.panX:0;
-  const panY=Number.isFinite(relatedCanvasState.panY)?relatedCanvasState.panY:0;
-  viewport.style.width='100%';
-  viewport.style.height='100%';
-  stageEl.style.width=relatedCanvasState.width+'px';stageEl.style.height=relatedCanvasState.height+'px';
-  stageEl.style.transform=`translate(${panX}px, ${panY}px) scale(${scale})`;
-  updateRelatedCanvasZoomLabel();
-}
-function centerRelatedCanvasStage(){
-  if(!relatedCanvasModalEl||!relatedCanvasState)return;
-  const body=relatedCanvasModalEl.querySelector('.related-canvas-body');if(!body)return;
-  const scale=relatedCanvasState.scale||1;
-  relatedCanvasState.panX=Math.round((body.clientWidth-relatedCanvasState.width*scale)/2);
-  relatedCanvasState.panY=Math.round((body.clientHeight-relatedCanvasState.height*scale)/2);
-}
-function fitRelatedCanvasContent(){
-  if(!relatedCanvasModalEl||!relatedCanvasState||!relatedCanvasState.positions||!relatedCanvasState.positions.size)return;
-  const body=relatedCanvasModalEl.querySelector('.related-canvas-body');if(!body)return;
-  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
-  for(const node of relatedCanvasState.nodes||[]){
-    const p=relatedCanvasState.positions.get(node.id);if(!p)continue;
-    const d=nodeDims(node);minX=Math.min(minX,p.x);minY=Math.min(minY,p.y);maxX=Math.max(maxX,p.x+d.w);maxY=Math.max(maxY,p.y+d.h);
-  }
-  if(!Number.isFinite(minX))return centerRelatedCanvasStage();
-  const margin=72,bw=Math.max(1,body.clientWidth),bh=Math.max(1,body.clientHeight),contentW=Math.max(1,maxX-minX),contentH=Math.max(1,maxY-minY);
-  const scale=clamp(Math.min((bw-margin*2)/contentW,(bh-margin*2)/contentH,1.15),RELATED_CANVAS_MIN_SCALE,RELATED_CANVAS_MAX_SCALE);
-  relatedCanvasState.scale=scale;
-  relatedCanvasState.panX=Math.round(bw/2-((minX+maxX)/2)*scale);
-  relatedCanvasState.panY=Math.round(bh/2-((minY+maxY)/2)*scale);
-  applyRelatedCanvasScale();
-}
-function setRelatedCanvasScale(next,originEvent){
-  if(!relatedCanvasModalEl||!relatedCanvasState)return;
-  const body=relatedCanvasModalEl.querySelector('.related-canvas-body');if(!body)return;
-  const oldScale=relatedCanvasState.scale||1,nextScale=clamp(next,RELATED_CANVAS_MIN_SCALE,RELATED_CANVAS_MAX_SCALE);
-  const oldPanX=Number.isFinite(relatedCanvasState.panX)?relatedCanvasState.panX:0;
-  const oldPanY=Number.isFinite(relatedCanvasState.panY)?relatedCanvasState.panY:0;
-  const r=body.getBoundingClientRect();
-  const anchorX=originEvent?originEvent.clientX-r.left:body.clientWidth/2;
-  const anchorY=originEvent?originEvent.clientY-r.top:body.clientHeight/2;
-  const worldX=(anchorX-oldPanX)/oldScale,worldY=(anchorY-oldPanY)/oldScale;
-  relatedCanvasState.scale=nextScale;
-  relatedCanvasState.panX=Math.round(anchorX-worldX*nextScale);
-  relatedCanvasState.panY=Math.round(anchorY-worldY*nextScale);
-  applyRelatedCanvasScale();
-}
-function beginRelatedCanvasPan(e){
-  if(e.button!==undefined&&e.button!==2)return;
-  if(!relatedCanvasModalEl||!relatedCanvasState)return;
-  if(e.target&&e.target.closest&&e.target.closest('.related-canvas-card,.related-canvas-info,.related-canvas-header,button,input,textarea,select,a'))return;
-  const body=e.currentTarget;if(!body)return;
-  clearTimeout(relatedCanvasPanTimer);
-  relatedCanvasPanDrag={pointerId:e.pointerId,body,startX:e.clientX,startY:e.clientY,lastX:e.clientX,lastY:e.clientY,startPanX:Number.isFinite(relatedCanvasState.panX)?relatedCanvasState.panX:0,startPanY:Number.isFinite(relatedCanvasState.panY)?relatedCanvasState.panY:0,moved:false,active:true};
-  body.classList.remove('right-pan-pending');body.classList.add('panning');
-  document.addEventListener('pointermove',moveRelatedCanvasPan,true);
-  document.addEventListener('pointerup',endRelatedCanvasPan,true);
-  document.addEventListener('pointercancel',endRelatedCanvasPan,true);
-  try{body.setPointerCapture(e.pointerId)}catch{}
-  e.preventDefault();e.stopPropagation();
-}
-function moveRelatedCanvasPan(e){
-  const drag=relatedCanvasPanDrag;if(!drag||drag.pointerId!==e.pointerId)return;
-  drag.lastX=e.clientX;drag.lastY=e.clientY;
-  if(!drag.active){e.preventDefault();e.stopPropagation();return}
-  const dx=e.clientX-drag.startX,dy=e.clientY-drag.startY;
-  if(Math.hypot(dx,dy)>2)drag.moved=true;
-  if(!relatedCanvasState)return;
-  relatedCanvasState.panX=Math.round(drag.startPanX+dx);
-  relatedCanvasState.panY=Math.round(drag.startPanY+dy);
-  applyRelatedCanvasScale();
-  e.preventDefault();e.stopPropagation();
-}
-function endRelatedCanvasPan(e){
-  const drag=relatedCanvasPanDrag;if(!drag||drag.pointerId!==e.pointerId)return;
-  clearTimeout(relatedCanvasPanTimer);relatedCanvasPanTimer=0;
-  try{drag.body.releasePointerCapture(e.pointerId)}catch{}
-  drag.body.classList.remove('panning','right-pan-pending');
-  relatedCanvasPanDrag=null;
-  document.removeEventListener('pointermove',moveRelatedCanvasPan,true);
-  document.removeEventListener('pointerup',endRelatedCanvasPan,true);
-  document.removeEventListener('pointercancel',endRelatedCanvasPan,true);
-  e.preventDefault();e.stopPropagation();
-}
-function resetRelatedCanvasScale(){if(!relatedCanvasState)return;fitRelatedCanvasContent()}
-function toggleRelatedCanvasFullscreen(){
-  if(!relatedCanvasModalEl)return;
-  const on=!relatedCanvasModalEl.classList.contains('related-canvas-fullscreen');
-  relatedCanvasModalEl.classList.toggle('related-canvas-fullscreen',on);
-  const btn=relatedCanvasModalEl.querySelector('.related-canvas-fullscreen-toggle');
-  if(btn){btn.title=on?'退出全屏':'全屏';btn.setAttribute('aria-label',on?'退出全屏':'全屏');btn.innerHTML=on?RELATED_CANVAS_EXIT_FULLSCREEN_ICON:RELATED_CANVAS_FULLSCREEN_ICON}
-  requestAnimationFrame(()=>{centerRelatedCanvasStage();applyRelatedCanvasScale();const info=relatedCanvasModalEl&&relatedCanvasModalEl.querySelector('.related-canvas-info');if(info)placeRelatedCanvasInfo(info)});
-}
-function beginRelatedCanvasInfoDrag(e){
-  if(e.button!==undefined&&e.button!==0)return;
-  if(e.target&&e.target.closest&&e.target.closest('button'))return;
-  const box=e.currentTarget.closest('.related-canvas-info'),dialog=relatedCanvasModalEl&&relatedCanvasModalEl.querySelector('.related-canvas-dialog');
-  if(!box||!dialog)return;
-  const br=box.getBoundingClientRect(),dr=dialog.getBoundingClientRect();
-  relatedCanvasInfoDrag={pointerId:e.pointerId,box,dialog,startX:e.clientX,startY:e.clientY,originX:br.left-dr.left,originY:br.top-dr.top};
-  box.classList.add('dragging');
-  document.addEventListener('pointermove',moveRelatedCanvasInfoDrag,true);
-  document.addEventListener('pointerup',endRelatedCanvasInfoDrag,true);
-  document.addEventListener('pointercancel',endRelatedCanvasInfoDrag,true);
-  try{box.setPointerCapture(e.pointerId)}catch{}
-  e.preventDefault();e.stopPropagation();
-}
-function placeRelatedCanvasInfo(box){
-  const dialog=relatedCanvasModalEl&&relatedCanvasModalEl.querySelector('.related-canvas-dialog');if(!box||!dialog)return;
-  const dw=dialog.clientWidth,dh=dialog.clientHeight;
-  if(!relatedCanvasInfoState)relatedCanvasInfoState={x:null,y:null,collapsed:false};
-  const defaultX=Math.max(18,dw-398),defaultY=76;
-  const w=box.offsetWidth||360,h=box.offsetHeight||260;
-  const x=clamp(relatedCanvasInfoState.x==null?defaultX:relatedCanvasInfoState.x,12,Math.max(12,dw-w-12));
-  const y=clamp(relatedCanvasInfoState.y==null?defaultY:relatedCanvasInfoState.y,58,Math.max(58,dh-h-12));
-  relatedCanvasInfoState.x=x;relatedCanvasInfoState.y=y;
-  box.style.left=x+'px';box.style.top=y+'px';box.style.right='auto';box.style.bottom='auto';
-}
-function moveRelatedCanvasInfoDrag(e){
-  const drag=relatedCanvasInfoDrag;if(!drag||drag.pointerId!==e.pointerId)return;
-  const dw=drag.dialog.clientWidth,dh=drag.dialog.clientHeight,w=drag.box.offsetWidth,h=drag.box.offsetHeight;
-  const x=clamp(Math.round(drag.originX+e.clientX-drag.startX),12,Math.max(12,dw-w-12));
-  const y=clamp(Math.round(drag.originY+e.clientY-drag.startY),58,Math.max(58,dh-h-12));
-  if(!relatedCanvasInfoState)relatedCanvasInfoState={};
-  relatedCanvasInfoState.x=x;relatedCanvasInfoState.y=y;
-  drag.box.style.left=x+'px';drag.box.style.top=y+'px';drag.box.style.right='auto';drag.box.style.bottom='auto';
-  e.preventDefault();e.stopPropagation();
-}
-function endRelatedCanvasInfoDrag(e){
-  const drag=relatedCanvasInfoDrag;if(!drag||drag.pointerId!==e.pointerId)return;
-  try{drag.box.releasePointerCapture(e.pointerId)}catch{}
-  drag.box.classList.remove('dragging');relatedCanvasInfoDrag=null;
-  document.removeEventListener('pointermove',moveRelatedCanvasInfoDrag,true);
-  document.removeEventListener('pointerup',endRelatedCanvasInfoDrag,true);
-  document.removeEventListener('pointercancel',endRelatedCanvasInfoDrag,true);
-  e.preventDefault();e.stopPropagation();
-}
-function removeRelatedCanvasInfo(){
-  if(!relatedCanvasModalEl)return;
-  const old=relatedCanvasModalEl.querySelector('.related-canvas-info');
-  if(old)old.remove();
-}
-function showRelatedCanvasNodeInfo(id){
-  if(!relatedCanvasModalEl)return;
-  const n=nodeById(id);if(!n)return;
-  removeRelatedCanvasInfo();
-  if(!relatedCanvasInfoState)relatedCanvasInfoState={x:null,y:null,collapsed:false};
-  const box=document.createElement('div');
-  box.className='related-canvas-info'+(relatedCanvasInfoState.collapsed?' collapsed':'');
-  const color=safeColor(n.color);
-  box.innerHTML=`<div class="related-canvas-info-header" title="拖拽移动详情窗"><div class="detail-top"><div class="detail-mini-icon" style="background:${color}">${escapeHTML((n.title||'?').slice(0,1))}</div><div><div class="detail-name">${escapeHTML(n.title||'未命名知识点')}</div><div class="detail-title">${escapeHTML(n.category||'未填写分类')} ${n.level?`｜${escapeHTML(n.level)}`:''}</div></div></div><div class="related-canvas-info-actions"><button type="button" class="related-canvas-info-collapse" title="收起/展开" aria-label="收起/展开">${relatedCanvasInfoState.collapsed?RELATED_CANVAS_EXPAND_INFO_ICON:RELATED_CANVAS_MINIMIZE_ICON}</button><button type="button" class="related-canvas-info-close" title="关闭" aria-label="关闭">${RELATED_CANVAS_CLOSE_ICON}</button></div></div><div class="related-canvas-info-content"><div class="detail-grid"><div class="label">关键词</div><div>${escapeHTML(n.keywords||'—')}</div><div class="label">说明</div><div>${escapeHTML(n.summary||'—')}</div><div class="label">学习提示</div><div>${escapeHTML(n.notes||'—')}</div></div></div>`;
-  box.querySelector('.related-canvas-info-close').onclick=()=>box.remove();
-  const collapseBtn=box.querySelector('.related-canvas-info-collapse');
-  collapseBtn.onclick=e=>{e.preventDefault();e.stopPropagation();relatedCanvasInfoState.collapsed=!relatedCanvasInfoState.collapsed;box.classList.toggle('collapsed',relatedCanvasInfoState.collapsed);collapseBtn.innerHTML=relatedCanvasInfoState.collapsed?RELATED_CANVAS_EXPAND_INFO_ICON:RELATED_CANVAS_MINIMIZE_ICON;requestAnimationFrame(()=>placeRelatedCanvasInfo(box))};
-  box.querySelector('.related-canvas-info-header').addEventListener('pointerdown',beginRelatedCanvasInfoDrag);
-  box.addEventListener('wheel',e=>e.stopPropagation(),{passive:true});
-  relatedCanvasModalEl.querySelector('.related-canvas-dialog').appendChild(box);
-  requestAnimationFrame(()=>placeRelatedCanvasInfo(box));
-}
-function closeRelatedCanvasModal(showMessage=false,options={}){
-  clearTimeout(relatedCanvasPanTimer);relatedCanvasPanTimer=0;relatedCanvasDrag=null;relatedCanvasPanDrag=null;relatedCanvasInfoDrag=null;relatedCanvasInfoState=null;
-  document.removeEventListener('pointermove',moveRelatedCanvasPan,true);
-  document.removeEventListener('pointerup',endRelatedCanvasPan,true);
-  document.removeEventListener('pointercancel',endRelatedCanvasPan,true);
-  document.removeEventListener('pointermove',moveRelatedCanvasInfoDrag,true);
-  document.removeEventListener('pointerup',endRelatedCanvasInfoDrag,true);
-  document.removeEventListener('pointercancel',endRelatedCanvasInfoDrag,true);
-  if(relatedCanvasUnmount){relatedCanvasUnmount();relatedCanvasUnmount=null}
-  if(relatedCanvasModalEl){relatedCanvasModalEl.remove();relatedCanvasModalEl=null}
-  relatedCanvasState=null;
-  document.body.classList.remove('related-canvas-open');
-  const shouldClearRelatedFocus=options.clearRelatedFocus!==false;
-  const hadRelatedOnly=largeGraphRelatedFocusEnabled||!!relatedScopeAnchorNodeId;
-  if(shouldClearRelatedFocus){
-    largeGraphRelatedFocusEnabled=false;relatedScopeAnchorNodeId=null;hoverLargeGraphNodeId=null;
-    clearRelatedGatherLayout({render:false,message:false});
-    if(hadRelatedOnly){syncGraphModeClasses();refreshCardClasses();renderEdges();renderDetails();updateCardQuickActions()}
-  }
-  if(showMessage&&typeof showStatus==='function')showStatus(shouldClearRelatedFocus&&hadRelatedOnly?'已退出临时相关画布，并取消“只看相关”状态。':'已退出临时相关画布，原图谱保持不变。');
-}
-function relatedCanvasLinksForNodeSet(nodeIds){
-  const set=new Set(nodeIds),seen=new Set(),links=[];
-  const anchor=currentRelatedScopeAnchorId()||state.selectedNodeId;
-  const anchorLinks=anchor?linksForNodeId(anchor):[];
-  for(const l of anchorLinks){if(l&&set.has(l.from)&&set.has(l.to)&&!seen.has(l.id)){seen.add(l.id);links.push(l)}}
-  for(const l of state.links){if(l&&set.has(l.from)&&set.has(l.to)&&!seen.has(l.id)){seen.add(l.id);links.push(l)}}
-  return links;
-}
-function computeRelatedCanvasLayout(nodes,viewW,viewH){
-  const anchorId=currentRelatedScopeAnchorId()||state.selectedNodeId||(nodes[0]&&nodes[0].id);
-  const anchor=nodeById(anchorId)||nodes[0];
-  const others=nodes.filter(n=>n&&n.id!==anchor.id).sort((a,b)=>String(a.category||'').localeCompare(String(b.category||''),'zh-Hans-CN')||String(a.title||'').localeCompare(String(b.title||''),'zh-Hans-CN'));
-  const ad=nodeDims(anchor),pad=46,cellW=isCoarse?176:198,cellH=isCoarse?158:178,gapY=30;
-  const maxCols=Math.max(1,Math.floor((Math.max(520,viewW)-pad*2)/cellW));
-  const idealCols=Math.max(1,Math.ceil(Math.sqrt(Math.max(1,others.length)*1.45)));
-  const cols=Math.max(1,Math.min(maxCols,idealCols));
-  const rows=Math.max(1,Math.ceil(others.length/cols));
-  const minCanvasScale=Math.max(.01,RELATED_CANVAS_MIN_SCALE||.45);
-  const minVisibleW=Math.ceil(viewW/minCanvasScale),minVisibleH=Math.ceil(viewH/minCanvasScale);
-  const canvasW=Math.max(minVisibleW,cols*cellW+pad*2,ad.w+pad*2);
-  const canvasH=Math.max(minVisibleH,ad.h+gapY+rows*cellH+pad*2);
-  const positions=new Map();
-  positions.set(anchor.id,{x:Math.round((canvasW-ad.w)/2),y:pad});
-  const startX=(canvasW-cols*cellW)/2,startY=pad+ad.h+gapY;
-  others.forEach((n,i)=>{const d=nodeDims(n),col=i%cols,row=Math.floor(i/cols);positions.set(n.id,{x:Math.round(startX+col*cellW+(cellW-d.w)/2),y:Math.round(startY+row*cellH+(cellH-d.h)/2)})});
-  return{anchorId:anchor.id,positions,width:Math.ceil(canvasW),height:Math.ceil(canvasH)};
-}
-function renderRelatedCanvasEdges(){
-  if(!relatedCanvasState||!relatedCanvasModalEl)return;
-  const svg=relatedCanvasModalEl.querySelector('.related-canvas-edges');if(!svg)return;
-  svg.setAttribute('width',relatedCanvasState.width);svg.setAttribute('height',relatedCanvasState.height);svg.setAttribute('viewBox',`0 0 ${relatedCanvasState.width} ${relatedCanvasState.height}`);
-  const frag=document.createDocumentFragment();
-  for(const l of relatedCanvasState.links){
-    const a=relatedCanvasNodeCenter(l.from),b=relatedCanvasNodeCenter(l.to);if(!a||!b)continue;
-    const g=document.createElementNS('http://www.w3.org/2000/svg','g'),path=document.createElementNS('http://www.w3.org/2000/svg','path');
-    path.setAttribute('class','edge-visible related-canvas-edge');path.style.setProperty('--edge-color',safeColor(l.color,DEFAULTS.linkColor));path.setAttribute('d',pathFor(a,b,pathStyleForLink(l)));
-    const relatedDash=dashArrayForLineStyle(LINE_STYLES.has(l.lineStyle)?l.lineStyle:DEFAULTS.linkStyle,2.6);if(relatedDash)path.setAttribute('stroke-dasharray',relatedDash)
-    g.appendChild(path);
-    const labelText=l.type||l.note;
-    if(labelText){const text=document.createElementNS('http://www.w3.org/2000/svg','text');text.setAttribute('text-anchor','middle');text.setAttribute('class','edge-label related-canvas-label');text.setAttribute('x',(a.x+b.x)/2);text.setAttribute('y',(a.y+b.y)/2-8);text.textContent=truncate(labelText,12);g.appendChild(text)}
-    frag.appendChild(g);
-  }
-  svg.replaceChildren(frag);
-}
-function beginRelatedCanvasCardDrag(e,id){
-  if(e.button!==undefined&&e.button!==0)return;
-  if(!relatedCanvasState||!relatedCanvasState.positions.has(id))return;
-  const card=e.currentTarget,pos=relatedCanvasState.positions.get(id);
-  relatedCanvasDrag={id,pointerId:e.pointerId,startX:e.clientX,startY:e.clientY,originX:pos.x,originY:pos.y,moved:false,card};
-  card.classList.add('dragging');
-  try{card.setPointerCapture(e.pointerId)}catch{}
-  e.preventDefault();e.stopPropagation();
-}
-function moveRelatedCanvasCardDrag(e){
-  const drag=relatedCanvasDrag;if(!drag||drag.pointerId!==e.pointerId||!relatedCanvasState)return;
-  const scale=relatedCanvasState.scale||1,dx=(e.clientX-drag.startX)/scale,dy=(e.clientY-drag.startY)/scale;
-  if(Math.hypot(e.clientX-drag.startX,e.clientY-drag.startY)>3)drag.moved=true;
-  const d=nodeDims(nodeById(drag.id)),nx=clamp(Math.round(drag.originX+dx),8,Math.max(8,relatedCanvasState.width-d.w-8)),ny=clamp(Math.round(drag.originY+dy),8,Math.max(8,relatedCanvasState.height-d.h-8));
-  relatedCanvasState.positions.set(drag.id,{x:nx,y:ny});
-  drag.card.style.left=nx+'px';drag.card.style.top=ny+'px';
-  renderRelatedCanvasEdges();
-  e.preventDefault();e.stopPropagation();
-}
-function endRelatedCanvasCardDrag(e){
-  const drag=relatedCanvasDrag;if(!drag||drag.pointerId!==e.pointerId)return false;
-  try{drag.card.releasePointerCapture(e.pointerId)}catch{}
-  drag.card.classList.remove('dragging');
-  const wasMoved=drag.moved,id=drag.id;
-  relatedCanvasDrag=null;
-  e.preventDefault();e.stopPropagation();
-  if(!wasMoved)showRelatedCanvasNodeInfo(id);
-  return true;
-}
-function renderRelatedCanvasCards(){
-  if(!relatedCanvasState||!relatedCanvasModalEl)return;
-  const layer=relatedCanvasModalEl.querySelector('.related-canvas-cards');if(!layer)return;
-  const frag=document.createDocumentFragment();
-  for(const n of relatedCanvasState.nodes){
-    const p=relatedCanvasState.positions.get(n.id);if(!p)continue;
-    const card=renderCardElement(n,null);
-    card.classList.add('related-canvas-card','readonly-card');
-    if(n.id===relatedCanvasState.anchorId)card.classList.add('related-canvas-anchor-card');
-    card.style.left=p.x+'px';card.style.top=p.y+'px';
-    const tools=card.querySelector('.node-size-tools');if(tools)tools.remove();
-    card.addEventListener('pointerdown',e=>beginRelatedCanvasCardDrag(e,n.id));
-    card.addEventListener('pointermove',moveRelatedCanvasCardDrag);
-    card.addEventListener('pointerup',endRelatedCanvasCardDrag);
-    card.addEventListener('pointercancel',endRelatedCanvasCardDrag);
-    card.addEventListener('dblclick',e=>{e.preventDefault();e.stopPropagation();showRelatedCanvasNodeInfo(n.id)});
-    frag.appendChild(card);
-  }
-  layer.replaceChildren(frag);
-}
-function openRelatedCanvasModal(showMessage=true){
-  const relation=largeGraphRelationState();
-  if(!relation||!relation.related||!relation.related.size){showStatus('请先开启只看相关并选择中心卡牌。');return false}
-  const nodes=[...relation.related].map(id=>nodeById(id)).filter(Boolean);
-  if(!nodes.length)return false;
-  closeRelatedCanvasModal(false,{clearRelatedFocus:false});
-  const overlay=document.createElement('div');overlay.className='related-canvas-backdrop';overlay.dataset.stageUi='true';
-  overlay.innerHTML=`<section class="related-canvas-dialog" role="dialog" aria-modal="true" aria-label="临时相关画布"><header class="related-canvas-header"><div><strong>临时相关画布</strong><span>只读学习视图，拖拽只调整临时展示位置</span></div><div class="related-canvas-header-actions"><button type="button" class="related-canvas-tool related-canvas-zoom-out" title="缩小" aria-label="缩小">−</button><span class="related-canvas-zoom-label">100%</span><button type="button" class="related-canvas-tool related-canvas-zoom-in" title="放大" aria-label="放大">+</button><button type="button" class="related-canvas-tool related-canvas-zoom-reset" title="重置缩放" aria-label="重置缩放">1:1</button><button type="button" class="related-canvas-tool related-canvas-fullscreen-toggle" title="全屏" aria-label="全屏">${RELATED_CANVAS_FULLSCREEN_ICON}</button><button type="button" class="related-canvas-close" title="退出临时画布" aria-label="退出临时画布">${RELATED_CANVAS_CLOSE_ICON}</button></div></header><div class="related-canvas-body"><div class="related-canvas-viewport"><div class="related-canvas-stage"><svg class="related-canvas-edges"></svg><div class="related-canvas-cards"></div></div></div></div></section>`;
-  overlay.addEventListener('wheel',e=>e.stopPropagation(),{passive:true});
-  overlay.addEventListener('pointerdown',e=>e.stopPropagation());
-  const bodyEl=overlay.querySelector('.related-canvas-body');
-  bodyEl.addEventListener('wheel',e=>{if(e.target&&e.target.closest&&e.target.closest('.related-canvas-info'))return;e.preventDefault();e.stopPropagation();const factor=e.deltaY<0?RELATED_CANVAS_SCALE_STEP:1/RELATED_CANVAS_SCALE_STEP;setRelatedCanvasScale((relatedCanvasState&&relatedCanvasState.scale||1)*factor,e)},{passive:false});
-  bodyEl.addEventListener('pointerdown',beginRelatedCanvasPan);
-  bodyEl.addEventListener('contextmenu',e=>{e.preventDefault();e.stopPropagation()});
-  overlay.querySelector('.related-canvas-zoom-out').onclick=()=>setRelatedCanvasScale((relatedCanvasState&&relatedCanvasState.scale||1)/RELATED_CANVAS_SCALE_STEP);
-  overlay.querySelector('.related-canvas-zoom-in').onclick=()=>setRelatedCanvasScale((relatedCanvasState&&relatedCanvasState.scale||1)*RELATED_CANVAS_SCALE_STEP);
-  overlay.querySelector('.related-canvas-zoom-reset').onclick=()=>resetRelatedCanvasScale();
-  overlay.querySelector('.related-canvas-fullscreen-toggle').onclick=()=>toggleRelatedCanvasFullscreen();
-  overlay.querySelector('.related-canvas-close').onclick=()=>closeRelatedCanvasModal(true);
-  overlay.addEventListener('click',e=>{if(e.target===overlay)closeRelatedCanvasModal(true)});
-  document.body.appendChild(overlay);relatedCanvasUnmount=window.KGCanvasDomInteraction.mountOverlay(overlay);document.body.classList.add('related-canvas-open');relatedCanvasModalEl=overlay;
-  requestAnimationFrame(()=>{
-    if(relatedCanvasModalEl!==overlay)return;
-    const body=overlay.querySelector('.related-canvas-body'),stageEl=overlay.querySelector('.related-canvas-stage');
-    const bw=Math.max(720,body.clientWidth||1200),bh=Math.max(520,body.clientHeight||760);
-    const layout=computeRelatedCanvasLayout(nodes,bw,bh);
-    const nodeIds=nodes.map(n=>n.id),links=relatedCanvasLinksForNodeSet(nodeIds);
-    relatedCanvasState={nodes,links,positions:layout.positions,anchorId:layout.anchorId,width:layout.width,height:layout.height,scale:1,panX:0,panY:0};
-    stageEl.style.width=layout.width+'px';stageEl.style.height=layout.height+'px';
-    renderRelatedCanvasEdges();renderRelatedCanvasCards();
-    requestAnimationFrame(()=>{fitRelatedCanvasContent();overlay.classList.add('related-canvas-content-centered')});
-    showRelatedCanvasNodeInfo(layout.anchorId);
-  });
-  if(showMessage)showStatus(`已打开临时相关画布：${nodes.length} 张卡牌，关闭后原图谱保持不变。`);
-  return true;
+async function openRelatedCanvasModal(showMessage=true){
+  if(relatedCanvasOpening)return false;
+  const ids=selectedNodeIds.size?[...selectedNodeIds]:state.selectedNodeId?[state.selectedNodeId]:[];
+  if(!ids.length){showStatus('请先选择一个或多个知识卡片。');return false}
+  if(['nodeModal','linkModal','graphModal'].some(id=>document.getElementById(id)?.classList.contains('show'))){showStatus('请先完成或取消当前编辑表单，再打开临时画布。');return false}
+  relatedCanvasOpening=true;const generation=relatedCanvasGeneration,formalState=state;
+  try{
+    nodeInlineTextEditorController?.commit();commitEdgeInlineLabelEditor();
+    const autosave=window.KGGraphFileAutosave;
+    if(autosave){if(await autosave.saveNow({force:true,reason:'before-temporary'})===false){showStatus('正式图谱保存失败，已保留当前会话。');return false}while(autosave.isDirty()){if(await autosave.saveNow({force:true,reason:'before-temporary'})===false){showStatus('正式图谱保存失败，已保留当前会话。');return false}}}
+    if(generation!==relatedCanvasGeneration||state!==formalState||window.KGGraphFileTabs?.isSwitching?.())return false;
+    const graph=window.KGRelatedCanvasController.scopeOneHop(state,ids);
+    if(!graph.nodes.length)return false;
+    closeRelatedCanvasModal();
+    const session=window.KGGraphSession.create({kind:'temporary',graph});
+    relatedCanvasController=window.KGRelatedCanvasController.create({session,model:window.KGGraphModel,nodeDims,idFactory:uid,renderCard:(n,context)=>renderCardElement(n,null,context),edgePath:(a,b,l)=>pathFor(a,b,pathStyleForLink(l)),onClose:()=>closeRelatedCanvasModal(true)});
+    relatedCanvasModalEl=relatedCanvasController.overlay;
+    nodeStyleToolbarController?.hide();
+    if(showMessage)showStatus(`已打开临时相关画布：${graph.nodes.length} 张卡片；关闭即丢弃修改。`);
+    return true;
+  }catch(error){showStatus('打开临时画布失败：'+String(error.message||error));return false}finally{relatedCanvasOpening=false}
 }
 window.closeRelatedCanvasModal=closeRelatedCanvasModal;
+window.addEventListener('pagehide',()=>closeRelatedCanvasModal());
+let relatedCanvasAccount=window.KGAuthCore?.currentUsername?.()||'';
+window.addEventListener('kg-auth-session-change',()=>{const account=window.KGAuthCore?.currentUsername?.()||'';if(!account||account!==relatedCanvasAccount)closeRelatedCanvasModal();relatedCanvasAccount=account});
 function isLargeGraphPreferenceEnabled(){
   const prefs=window.KGGraphUserPreferences&&typeof window.KGGraphUserPreferences.get==='function'?window.KGGraphUserPreferences.get():null;
   return !prefs||prefs.largeGraphMode!==false;
@@ -1978,17 +1678,18 @@ function textElementById(id){return (state.elements||[]).find(item=>item&&item.i
 function textElementDomByIdValue(id){return textElementDomById.get(id)||null}
 
 function cardRelationState(){const relationState=largeGraphRelationState();return relationLayerEnabled()?relationState:null}
-function classForCard(n,relationState=null){
+function classForCard(n,relationState=null,context=null){
+  const selectionState=context?.state||state,nodeSelection=context?.selectedNodeIds||selectedNodeIds;
   const appearance=window.KGGraphModel&&window.KGGraphModel.appearanceOf?window.KGGraphModel.appearanceOf(n):{size:n.size||'',cardStyle:n.cardStyle||'standard'};
   const sizeClass=appearance.size==='small'?' size-small':appearance.size==='big'?' size-big':'';
   const styleClass=' card-style-'+(appearance.cardStyle||'standard');
-  let cls='knowledge-card'+sizeClass+styleClass+(state.selectedNodeId===n.id?' active':'')+(selectedNodeIds.has(n.id)?' multi-selected':'')+(state.linkSourceId===n.id?' link-source':'')+(isImportant(n)?' focus-card':'')+(nodeFreeResizeModeId===n.id?' node-free-resize-mode':'')+(window.KGGraphModel?.interactionOf?.(n).locked?' node-locked':'');
+  let cls='knowledge-card'+sizeClass+styleClass+(selectionState.selectedNodeId===n.id?' active':'')+(nodeSelection.has(n.id)?' multi-selected':'')+(selectionState.linkSourceId===n.id?' link-source':'')+(isImportant(n)?' focus-card':'')+(!context&&nodeFreeResizeModeId===n.id?' node-free-resize-mode':'')+(window.KGGraphModel?.interactionOf?.(n).locked?' node-locked':'');
   if(relationState&&relationState.related&&relationState.related.size){
     if(relationState.anchors.has(n.id))cls+=' large-related-anchor';
     else if(relationState.related.has(n.id))cls+=' large-related-neighbor';
     else cls+=largeGraphRelatedFocusEnabled?' large-related-hidden':' large-related-muted';
   }
-  if(isRelatedGatherActive()&&relatedGatherLayout.positions&&relatedGatherLayout.positions.has(n.id)){
+  if(!context&&isRelatedGatherActive()&&relatedGatherLayout.positions&&relatedGatherLayout.positions.has(n.id)){
     cls+=' gather-temp-card';
     if(currentRelatedScopeAnchorId()===n.id)cls+=' gather-anchor-card';
   }
@@ -2031,15 +1732,15 @@ function graphResizeHandlesMarkup(entity='text'){
   const attr=entity==='node'?'data-node-resize-handle':'data-element-resize-handle';
   return `<div class="graph-element-resize-layer graph-${entity}-resize-layer" aria-hidden="true">${GRAPH_RESIZE_HANDLES.map(handle=>`<span class="graph-element-resize-handle handle-${handle}" ${attr}="${handle}"></span>`).join('')}</div>`;
 }
-function renderCardElement(n,relationState=null){
+function renderCardElement(n,relationState=null,context=null){
   const model=window.KGGraphModel,view=model&&model.view?model.view(n):{content:{title:n.title||'未命名知识点'},appearance:{color:n.color||DEFAULTS.nodeColor,headerIconColor:n.headerIconColor||n.color||DEFAULTS.nodeColor,fillColor:n.fillColor||'#ffffff',fillOpacity:n.fillOpacity??1,headerFillColor:n.headerFillColor||'#eef2ff',bodyFillColor:n.bodyFillColor||n.fillColor||'#ffffff',headerTextColor:n.headerTextColor||'#ffffff',bodyTextColor:n.bodyTextColor||n.textColor||'#0f172a',regionColorsCustomized:!!n.regionColorsCustomized,borderVisible:n.borderVisible!==false,borderColor:n.borderColor||'#cbd5e1',borderWidth:n.borderWidth??1,borderStyle:n.borderStyle||'solid',borderOpacity:n.borderOpacity??1,textColor:n.textColor||'#0f172a',textBackgroundColor:n.textBackgroundColor||'#ffffff',textBackgroundOpacity:n.textBackgroundOpacity??0,cardStyle:n.cardStyle||'standard',textAlign:n.textAlign||'center',fontSize:n.fontSize||15,fontFamily:n.fontFamily||'system',fontWeight:n.fontWeight||'bold',fontStyle:n.fontStyle||'normal',underline:!!n.underline,strikeThrough:!!n.strikeThrough,lineHeight:n.lineHeight||1.25},geometry:{...visualPositionForNode(n),width:nodeDims(n).w,height:nodeDims(n).h},interaction:{locked:!!n.locked}};
-  const card=document.createElement('div'),appearance=view.appearance||{},accent=safeColor(appearance.headerIconColor||appearance.color||DEFAULTS.nodeColor),fill=safeColor(appearance.fillColor||'#ffffff'),border=safeColor(appearance.borderColor||'#cbd5e1'),pos=visualPositionForNode(n),dims=nodeDims(n);
+  const card=document.createElement('div'),appearance=view.appearance||{},accent=safeColor(appearance.headerIconColor||appearance.color||DEFAULTS.nodeColor),fill=safeColor(appearance.fillColor||'#ffffff'),border=safeColor(appearance.borderColor||'#cbd5e1'),pos=context?.position||visualPositionForNode(n),dims=nodeDims(n);
   const rawFillOpacity=Number(appearance.fillOpacity),rawBorderOpacity=Number(appearance.borderOpacity),rawBorderWidth=Number(appearance.borderWidth),fillOpacity=Math.max(0,Math.min(1,Number.isFinite(rawFillOpacity)?rawFillOpacity:1)),borderOpacity=Math.max(0,Math.min(1,Number.isFinite(rawBorderOpacity)?rawBorderOpacity:1)),borderWidth=appearance.borderVisible===false?0:Math.max(0,Math.min(8,Number.isFinite(rawBorderWidth)?rawBorderWidth:1));
   const textBg=safeColor(appearance.textBackgroundColor||'#ffffff','#ffffff'),textBgOpacity=Math.max(0,Math.min(1,Number(appearance.textBackgroundOpacity)||0));
   const headerFill=safeColor(appearance.headerFillColor||fill,fill),bodyFill=safeColor(appearance.bodyFillColor||fill,fill);
   const headerText=graphTextColorForFill(accent,1),bodyText=safeColor(appearance.bodyTextColor||appearance.textColor||'#0f172a','#0f172a');
   const headerBackground='linear-gradient(180deg,#f8fafc 0%,#eef2ff 100%)';
-  card.className=classForCard(n,relationState);
+  card.className=classForCard(n,relationState,context);
   card.style.left=pos.x+'px';card.style.top=pos.y+'px';
   card.style.setProperty('--node-color',accent);
   card.style.setProperty('--node-fill-color',graphHexToRgba(fill,fillOpacity));
@@ -3362,7 +3063,7 @@ function handleNodeToolbarAction(action,button,event=null){
     render({mode:'selection',ids:nodes.map(node=>node.id),persist:true});showStatus(allLocked?'节点已解锁，全部功能已恢复。':'节点已完全锁定；仅保留打开相关画布与解锁。');return
   }
   if(group==='related-canvas'&&!textItem){
-    setRelatedScopeCenter(primary.id);openRelatedCanvasModal(true);nodeStyleToolbarController?.closePanels();
+    openRelatedCanvasModal(true);nodeStyleToolbarController?.closePanels();
   }else if(group==='color-preset'){
     const kind=!textItem&&value==='fill'?activeNodeFillColorKind():value,color=extra,patch=nodeColorPatch(kind,{color,opacity:1});
     if(textItem){
