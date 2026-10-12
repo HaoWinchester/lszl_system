@@ -1,6 +1,6 @@
 # 画布与知识图谱开发计划
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. 如用户另行选择多智能体执行，再使用 superpowers:subagent-driven-development。步骤采用 `- [ ]` 跟踪；本轮已获用户授权执行 M0／M1，自检后只部署 UAT。
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. 如用户另行选择多智能体执行，再使用 superpowers:subagent-driven-development。步骤采用 `- [ ]` 跟踪；M0／M1 已部署 UAT；用户现已授权继续完成 M2—M5 全部剩余功能，自检后只部署 UAT。
 
 **Goal:** 完成 R01—R16，并以可追溯证据验证编辑、内容复用、题目权限与三个画布的持久化行为。
 
