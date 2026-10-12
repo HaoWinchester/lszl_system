@@ -171,3 +171,76 @@ def test_native_readable_media_geometry_and_human_warning_labels():
     assert root['appearance']['textColor']=='#ffffff'
     assert root['geometry']['width']>=320 and root['geometry']['height']>=300
     assert all(w['sheetTitle'] and w['objectTitle'] for w in parsed['warnings'])
+
+def test_conversion_amplification_has_incremental_budgets(monkeypatch):
+    from app.services import xmind_import_service as service
+    from fastapi import HTTPException
+    properties={f'unsupported-{i}':'x'*20 for i in range(100)}
+    sheet={'id':'s','title':'bounded','theme':{'centralTopic':{'properties':properties},'mainTopic':{'properties':properties}},'rootTopic':{'id':'r','title':'root','children':{'attached':[{'id':str(i),'title':'child'} for i in range(24)]}}}
+    data=archive([('content.json',json.dumps([sheet]))])
+    parsed=service.parse(data,'amplification.xmind')
+    assert len(parsed['warnings'])==101
+    inherited=[w for w in parsed['warnings'] if w['code']=='style-property']
+    assert all(len(w['affectedObjects'])==25 for w in inherited)
+    monkeypatch.setattr(service,'MAX_WARNING_BYTES',4096)
+    with pytest.raises(HTTPException) as error:service.parse(data,'amplification.xmind')
+    assert error.value.status_code==413 and '转换' in error.value.detail
+    monkeypatch.setattr(service,'MAX_WARNING_BYTES',2*1024*1024)
+    # Exercise aggregate source growth independently of warnings using 20KB, not a malicious load.
+    monkeypatch.setattr(service,'MAX_CONVERTED_BYTES',16384)
+    with pytest.raises(HTTPException) as error:service.parse(simple(notes={'plain':{'content':'n'*20000}}),'notes.xmind')
+    assert error.value.status_code==413
+
+
+def test_xml_attributes_preserved_warned_and_duplicate_groups_rejected():
+    from app.services import xmind_import_service as service
+    from fastapi import HTTPException
+    manifest='<manifest/>'
+    xml='''<xmap-content xmlns="urn:xmind:xmap:xmlns:content:2.0" xmlns:xlink="http://www.w3.org/1999/xlink"><sheet id="s" custom="sheet-value"><title>sheet</title><topic id="r" xlink:href="https://example.com" custom="topic-value"><title>root</title><children custom="container-value"><topics type="attached" custom="group-value"><topic id="a"><title>A</title></topic></topics></children></topic></sheet></xmap-content>'''
+    parsed=service.parse(archive([('content.xml',xml),('META-INF/manifest.xml',manifest)]),'attrs.xmind')
+    node=parsed['sheets'][0]['graph']['nodes'][0]
+    assert node['xmindSource']['topic']['href']=='https://example.com'
+    assert node['xmindSource']['topic']['xmlAttributes']['custom']=='topic-value'
+    assert parsed['sheets'][0]['graph']['meta']['xmindSource']['sheetExtras']['xmlAttributes']['custom']=='sheet-value'
+    assert any(w['code']=='special-objects' and 'href' in w['detail'] for w in parsed['warnings'])
+    assert any(w['code']=='xml-attributes' for w in parsed['warnings'])
+    attrs=node['xmindSource']['topic']['xmlElementAttributes']
+    assert attrs['{urn:xmind:xmap:xmlns:content:2.0}children']['custom']=='container-value'
+    assert attrs['children/topics:attached']['custom']=='group-value'
+    duplicate=xml.replace('</children>','<topics type="attached"><topic id="b"><title>B</title></topic></topics></children>')
+    with pytest.raises(HTTPException) as error:service.parse(archive([('content.xml',duplicate),('META-INF/manifest.xml',manifest)]),'duplicates.xmind')
+    assert error.value.status_code==422 and '重复' in error.value.detail
+
+
+def test_corrupt_deflate_api_rejects_before_writes():
+    owner=asyncio.run(actor());data=bytearray(simple())
+    # Local-file header: filename/extra sizes determine start of raw DEFLATE bytes.
+    offset=30+int.from_bytes(data[26:28],'little')+int.from_bytes(data[28:30],'little')
+    data[offset]=(data[offset]&~6)|6  # reserved BTYPE=3: decoder raises zlib.error
+    with TestClient(app,raise_server_exceptions=False) as c:
+        login(c,owner)
+        for action in ('preview','import'):
+            r=request(c,action,bytes(data),['s'],[]);assert r.status_code==422,r.text
+            assert 'ZIP' in r.json()['detail']
+        assert asyncio.run(counts(owner))==(0,0)
+
+
+def test_ordinary_200_topic_theme_and_confirmation_transport():
+    from app.services import xmind_import_service as service
+    from app.schemas.xmind_import import XMindConfirmation,MAX_IMPORT_WARNINGS,MAX_ACCEPTED_WARNINGS_BYTES
+    from pydantic import ValidationError
+    # Native theme, moderate real structure: repeated inherited differences must share records.
+    with zipfile.ZipFile(FIX/'xmind-24.04-desktop-rich.xmind') as z:native=json.loads(z.read('content.json'))
+    sheet={'id':'moderate','title':'普通200主题','theme':native[0]['theme'],'rootTopic':{'id':'r','title':'root','children':{'attached':[{'id':f'n{i}','title':f'主题{i}'} for i in range(199)]}}}
+    parsed=service.parse(archive([('content.json',json.dumps([sheet],ensure_ascii=False))]),'moderate.xmind')
+    assert parsed['sheets'][0]['nodeCount']==200
+    assert len(parsed['warnings'])<40
+    assert any(len(w['affectedObjects'])==200 for w in parsed['warnings'])
+    accepted=[w['id'] for w in parsed['warnings']]
+    assert len(json.dumps(accepted))<=MAX_ACCEPTED_WARNINGS_BYTES
+    XMindConfirmation(sheetIds=['moderate'],acceptedWarnings=accepted)
+    # Even maximal allowed count of longest real IDs fits the HTTP Form bound.
+    maximum=[f'0123456789abcdef-w{i}' for i in range(MAX_IMPORT_WARNINGS)]
+    assert len(json.dumps(maximum))<=MAX_ACCEPTED_WARNINGS_BYTES
+    XMindConfirmation(sheetIds=['moderate'],acceptedWarnings=maximum)
+    with pytest.raises(ValidationError):XMindConfirmation(sheetIds=['moderate'],acceptedWarnings=maximum+['extra'])

@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth import require_role
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.xmind_import import XMindConfirmation
+from app.schemas.xmind_import import XMindConfirmation, MAX_ACCEPTED_WARNINGS_BYTES
 from app.services import xmind_import_service as service
 
 router=APIRouter(prefix='/graph-imports/xmind',tags=['graph-imports'])
@@ -29,7 +29,7 @@ async def preview(db:DB,user:Editor,file:UploadFile=File(...)):
 
 @router.post('/import',status_code=201)
 async def confirm(db:DB,user:Editor,file:UploadFile=File(...),sheet_ids:str=Form(alias='sheetIds'),accepted_warnings:str=Form('[]',alias='acceptedWarnings')):
-    if len(sheet_ids)>20000 or len(accepted_warnings)>4000000:
+    if len(sheet_ids)>20000 or len(accepted_warnings)>MAX_ACCEPTED_WARNINGS_BYTES:
         raise HTTPException(413,'确认参数超限')
     try:
         data=XMindConfirmation(sheetIds=json.loads(sheet_ids),acceptedWarnings=json.loads(accepted_warnings))

@@ -13,12 +13,15 @@ from pathlib import PurePosixPath
 import re
 import stat
 import zipfile
+import zlib
+import lzma
 from xml.etree import ElementTree as ET
 from fastapi import HTTPException
 from sqlalchemy import select
 from app.core.image_validation import validate_image_bytes
 from app.models.subscription import Subscription
 from app.models.user import User
+from app.schemas.xmind_import import MAX_IMPORT_WARNINGS
 from app.services import file_service, graph_asset_service, subscription_service
 
 MAX_UPLOAD = 50 * 1024 * 1024
@@ -26,6 +29,9 @@ MAX_EXPANDED = 60 * 1024 * 1024
 MAX_ENTRIES = 1000
 MAX_NODES = 2500
 MAX_DEPTH = 128
+MAX_CONVERTED_BYTES = 16 * 1024 * 1024
+MAX_WARNING_BYTES = 2 * 1024 * 1024
+MAX_WARNING_REFERENCES = 40000
 CONTENT_NS = 'urn:xmind:xmap:xmlns:content:2.0'
 STYLE_NS = 'urn:xmind:xmap:xmlns:style:2.0'
 XHTML_NS = 'http://www.w3.org/1999/xhtml'
@@ -34,6 +40,36 @@ XHTML_NS = 'http://www.w3.org/1999/xhtml'
 def reject(message, status=422):
     raise HTTPException(status_code=status, detail=message)
 
+
+
+def estimated_json_bytes(value):
+    """Conservative UTF-8/escaped JSON bound without serializing/copying strings.
+
+    A Unicode code point needs at most6 UTF-8 JSON bytes with ensure_ascii=False;
+    control characters need6 escaped bytes. Containers/scalars include separators.
+    """
+    if isinstance(value,str):return 2+6*len(value)
+    if isinstance(value,dict):return 2+sum(estimated_json_bytes(k)+estimated_json_bytes(v)+2 for k,v in value.items())
+    if isinstance(value,list):return 2+sum(estimated_json_bytes(v)+1 for v in value)
+    return 32
+
+
+class ConversionBudget:
+    def __init__(self):self.converted=0;self.warning_bytes=0;self.warning_references=0
+    def charge(self,size):
+        if size>MAX_CONVERTED_BYTES-self.converted:reject('转换内容与来源记录超过16 MiB安全额度，请拆分文档后重试',413)
+        self.converted+=size
+    def warning(self,record,count):
+        size=estimated_json_bytes(record)
+        if count>=MAX_IMPORT_WARNINGS or size>MAX_WARNING_BYTES-self.warning_bytes:
+            reject('转换差异超过2048项或2 MiB安全额度，请简化主题样式或拆分文档',413)
+        self.warning_bytes+=size
+        self.charge(size*2+256)  # Response, persisted warnings and bounded display count.
+    def reference(self,record):
+        size=estimated_json_bytes(record)
+        if self.warning_references>=MAX_WARNING_REFERENCES or size>MAX_WARNING_BYTES-self.warning_bytes:
+            reject('转换差异关联超过40000条或2 MiB安全额度，请拆分文档',413)
+        self.warning_references+=1;self.warning_bytes+=size;self.charge(size*2)
 
 def safe_path(name):
     if not isinstance(name, str) or not name or '\\' in name or '\x00' in name or ':' in name:
@@ -81,7 +117,7 @@ def unpack(data, filename):
                         chunks.append(chunk)
                 result[name] = b''.join(chunks)
             return result
-    except (zipfile.BadZipFile, RuntimeError, ValueError, NotImplementedError, EOFError, OSError) as exc:
+    except (zipfile.BadZipFile, RuntimeError, ValueError, NotImplementedError, EOFError, OSError, zlib.error, lzma.LZMAError) as exc:
         reject('损坏或不支持的 ZIP 文件：' + type(exc).__name__)
 
 
@@ -156,30 +192,66 @@ def xml_sheets(entries):
         for theme in style_root.findall('.//{' + STYLE_NS + '}theme'):
             themes[theme.get('id')] = {el.get('style-family'): {'properties': styles.get(el.get('style-id'), {})} for el in theme.findall('{' + STYLE_NS + '}default-style')}
     ns = '{' + CONTENT_NS + '}'
+    def structural(element,tags):
+        for tag in tags:
+            if len(element.findall(tag))>1:reject('XML 存在重复结构元素，未丢弃内容')
+    def attributes(element,known):return {k:v for k,v in element.attrib.items() if k not in known}
+    def child_attributes(element):
+        result={}
+        for child in element:
+            attrs=attributes(child,{'src','{'+XHTML_NS+'}src'} if child.tag=='{'+XHTML_NS+'}img' else set())
+            if attrs:result[child.tag]=attrs
+            if child.tag==ns+'notes':
+                for field in child:
+                    if field.attrib:result[child.tag+'/'+field.tag]=dict(field.attrib)
+        return result
     def topic(el):
         if el is None: reject('工作表缺少根主题')
+        structural(el,[ns+'title',ns+'notes',ns+'children','{'+XHTML_NS+'}img'])
+        title_element=el.find(ns+'title')
+        if title_element is not None and len(title_element):reject('XML 结构化标题暂不支持，未丢弃内容')
         result = {'id': el.get('id'), 'title': el.findtext(ns + 'title', ''), 'style': {'properties': styles.get(el.get('style-id'), {})}}
+        result['xmlAttributes']=attributes(el,{'id','style-id'})
+        result['xmlElementAttributes']=child_attributes(el)
+        href=el.get('{http://www.w3.org/1999/xlink}href')
+        if href is not None:result['href']=href
         plain = el.find(ns + 'notes/' + ns + 'plain')
-        if plain is not None: result['notes'] = {'plain': {'content': ''.join(plain.itertext())}}
+        if plain is not None:
+            if len(plain):reject('XML 结构化纯文本备注暂不支持，未丢弃内容')
+            result['notes'] = {'plain': {'content': ''.join(plain.itertext())}}
+            for field in el.find(ns+'notes'):
+                if field.tag!=ns+'plain':result.setdefault('xmlUnsupported',[]).append(ET.tostring(field,encoding='unicode'))
         elif el.find(ns + 'notes') is not None: reject('XML 富文本备注暂不支持，请先转换为纯文本')
         img = el.find('{' + XHTML_NS + '}img')
         if img is not None:
             result['image'] = {'src': img.get('{' + XHTML_NS + '}src') or img.get('src') or ''}
         children = {}
+        container=el.find(ns+'children')
+        if container is not None and any(child.tag!=ns+'topics' for child in container):reject('XML 子主题容器存在不支持元素，未丢弃内容')
         for group in el.findall(ns + 'children/' + ns + 'topics'):
-            children[group.get('type', 'attached')] = [topic(child) for child in group.findall(ns + 'topic')]
+            if any(child.tag!=ns+'topic' for child in group):reject('XML 子主题组存在不支持元素，未丢弃内容')
+            kind=group.get('type','attached')
+            if kind in children:reject('XML 存在重复子主题组，未丢弃任何主题')
+            group_attrs=attributes(group,{'type'})
+            if group_attrs:result['xmlElementAttributes']['children/topics:'+kind]=group_attrs
+            children[kind] = [topic(child) for child in group.findall(ns + 'topic')]
         result['children'] = children
-        known = {'title','notes','children','img'}
+        known = {ns+'title',ns+'notes',ns+'children','{'+XHTML_NS+'}img'}
         for child in el:
             name = child.tag.split('}')[-1]
-            if name not in known:
+            if child.tag not in known:
                 result.setdefault('xmlUnsupported', []).append(ET.tostring(child, encoding='unicode'))
         return result
     sheets = []
     for el in root.findall(ns + 'sheet'):
+        structural(el,[ns+'title',ns+'topic',ns+'relationships'])
         s = {'id': el.get('id'), 'title': el.findtext(ns + 'title', ''), 'rootTopic': topic(el.find(ns + 'topic')), 'theme': themes.get(el.get('theme'), {})}
-        if el.find(ns + 'relationships') is not None:
-            s['xmlUnsupported'] = ET.tostring(el.find(ns + 'relationships'), encoding='unicode')
+        s['xmlAttributes']=attributes(el,{'id','theme'})
+        s['xmlDocumentAttributes']=attributes(root,{'version'})
+        s['xmlElementAttributes']={child.tag:dict(child.attrib) for child in el if child.tag==ns+'title' and child.attrib}
+        for child in el:
+            if child.tag not in (ns+'title',ns+'topic'):
+                s.setdefault('xmlUnsupported',[]).append(ET.tostring(child,encoding='unicode'))
         sheets.append(s)
     return sheets
 
@@ -202,9 +274,23 @@ def _parse(data, filename):
         reject('工作表必须为非空数组，最多 100 张')
     result = {'format': fmt, 'sha256': sha256(data).hexdigest(), 'sheets': [], 'warnings': [], 'resources': {}}
     labels = {}
+    budget = ConversionBudget()
+    warning_index={};warning_refs={}
     def warn(sheet_id, object_id, code, detail):
-        index = len(result['warnings'])
-        result['warnings'].append({'id': f'{result["sha256"][:16]}-w{index}', 'sheetId': sheet_id, 'objectId': object_id, 'code': code, 'detail': detail, 'sheetTitle': labels.get(sheet_id, sheet_id), 'objectTitle': labels.get(object_id, object_id)})
+        key=(sheet_id,code,detail)
+        ref={'id':object_id,'title':labels.get(object_id,object_id)}
+        if key in warning_index:
+            record=warning_index[key]
+            if object_id in warning_refs[key]:return
+            budget.reference(ref)
+            warning_refs[key].add(object_id);record['affectedObjects'].append(ref)
+            record['objectTitle']=record['affectedObjects'][0]['title']+f" 等{len(record['affectedObjects'])}个主题"
+            return
+        index=len(result['warnings'])
+        record={'id':f'{result["sha256"][:16]}-w{index}','sheetId':sheet_id,'objectId':object_id,'code':code,'detail':detail,'sheetTitle':labels.get(sheet_id,sheet_id),'objectTitle':ref['title'],'affectedObjects':[]}
+        budget.warning(record,index);budget.reference(ref)
+        record['affectedObjects'].append(ref)
+        warning_index[key]=record;warning_refs[key]={object_id};result['warnings'].append(record)
     used_sheets = set()
     for sheet in sheets:
         if not isinstance(sheet, dict): reject('工作表结构非法')
@@ -223,7 +309,11 @@ def _parse(data, filename):
         warn(sid, sid, 'layout', '原始主题布局改为可编辑的向右层级布局；坐标、主题几何及排版不等价。')
         if sheet.get('extensions') or sheet.get('xmlUnsupported'):
             warn(sid, sid, 'sheet-objects', '工作表扩展或 XML 关系仅保留来源记录，未转为可交互对象。')
-        graph['meta']['xmindSource']['sheetExtras'] = {k: v for k, v in sheet.items() if k != 'rootTopic'}
+        extras={k:v for k,v in sheet.items() if k!='rootTopic'}
+        budget.charge(estimated_json_bytes(extras)+2048)
+        graph['meta']['xmindSource']['sheetExtras']=extras
+        if sheet.get('xmlAttributes') or sheet.get('xmlDocumentAttributes') or sheet.get('xmlElementAttributes'):
+            warn(sid,sid,'xml-attributes','工作表或文档的未映射 XML 属性保留在来源记录，未应用其行为。')
         theme = sheet.get('theme') if sheet.get('theme') is not None else {}
         if not isinstance(theme, dict): reject('主题样式结构非法')
         if theme.get('map', {}).get('properties'):
@@ -258,11 +348,14 @@ def _parse(data, filename):
             inherited = theme.get(kind, {}).get('properties', {})
             own = (topic.get('style') or {}).get('properties', {})
             if not isinstance(inherited, dict) or not isinstance(own, dict): reject('主题样式必须为对象')
+            topic_source={k:v for k,v in topic.items() if k!='children'}
+            # Reserve all replicated source/style/content BEFORE merge, deepcopy or warnings.
+            budget.charge(estimated_json_bytes(topic_source)+estimated_json_bytes(inherited)+estimated_json_bytes(own)+estimated_json_bytes(parent_line or {})+6*(len(text)+len(plain))+4096)
             props = {**(parent_line or {}), **inherited, **own}
             appearance, edge = map_style(props, lambda code, detail: warn(sid, tid, code, detail))
             node = {'id': tid, 'content': {'title': text, 'notes': plain, 'images': []}, 'appearance': appearance,
                     'geometry': {'x': 100+depth*260, 'y': 80+len(graph['nodes'])*190, 'width':160, 'height':166},
-                    'xmindSource': {'topic': deepcopy({k:v for k,v in topic.items() if k!='children'}), 'style': props}}
+                    'xmindSource': {'topic': deepcopy(topic_source), 'style': props}}
             if topic.get('image'):
                 image = topic['image']
                 if not isinstance(image, dict) or not isinstance(image.get('src'), str): reject('图片引用非法')
@@ -285,6 +378,8 @@ def _parse(data, filename):
             card_height = max(166,math.ceil(text_height / .52) if node['content']['images'] else math.ceil(text_height))
             if node['content']['images']:card_height = max(300,card_height)
             node['geometry'].update(width=card_width,height=card_height)
+            if topic.get('xmlAttributes') or topic.get('xmlElementAttributes'):
+                warn(sid,tid,'xml-attributes','主题的未映射 XML 属性保留在来源记录：'+', '.join((topic.get('xmlAttributes') or {}).keys())+'；未应用其行为。')
             ignored = [k for k in ('markers','labels','boundaries','summaries','numbering','extensions','href','xmlUnsupported') if topic.get(k)]
             if ignored: warn(sid,tid,'special-objects','对象 '+', '.join(ignored)+' 仅保留原始来源记录，未转为交互对象。')
             if topic.get('attributedTitle') and any(set(span)-{'text'} for span in topic['attributedTitle']):
@@ -305,7 +400,9 @@ def _parse(data, filename):
             if a not in ids or b not in ids: reject('关系引用缺失主题')
             labels[rel.get('id','relationship')] = rel.get('title') or '主题关系'
             if not isinstance(rel.get('title',''),str) or len(rel.get('title',''))>60:reject('关系标题必须为文本且不超过 60 字，未截断')
-            props={**theme.get('relationship',{}).get('properties',{}),**(rel.get('style') or {}).get('properties',{})}
+            inherited=theme.get('relationship',{}).get('properties',{});own=(rel.get('style') or {}).get('properties',{})
+            budget.charge(estimated_json_bytes(rel)+estimated_json_bytes(inherited)+estimated_json_bytes(own)+2048)
+            props={**inherited,**own}
             _,edge=map_style(props,lambda code,detail:warn(sid,rel.get('id','relationship'),code,detail))
             graph['links'].append({'id':f'r{len(graph["links"])}','from':a,'to':b,'hierarchy':False,'type':str(rel.get('title','')),**edge,'xmindSource':rel})
             warn(sid,rel.get('id','relationship'),'relationship','关系端点和文字保留；原始控制点、箭头和曲线几何改为系统关系。')
