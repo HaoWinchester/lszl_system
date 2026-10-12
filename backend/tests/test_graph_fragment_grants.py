@@ -59,7 +59,7 @@ def test_paste_inherits_bindings_and_ignores_client_question_fields(data):
         copy = c.get('/api/v1/files/' + target).json()['graphData']
         assert copy['nodes'][0]['id'] == nid and copy['nodes'][0]['x'] == 30
         # tables/resources 不在合并范围（T18 前编辑器 state 不支持，合并会被 autosave 覆盖）。
-        assert 'resources' not in copy
+        assert 'resources' not in copy and 'tables' not in copy
         # Client-attached question authority never survives the paste.
         assert all(k not in copy['nodes'][0] for k in ('questionIds', 'bindings'))
         assert copy['links'][0]['from'] == nid and copy['links'][0]['toPoint'] == {'x': 31, 'y': 42}
@@ -102,6 +102,10 @@ def test_paste_rejects_stale_source_and_foreign_files_without_partial_writes(dat
         assert paste(c, own, {'fragment': fragment([{'id': 'n', 'title': 'x'}]), 'expectedFileRevision': 7}).status_code == 409
         bad = fragment([{'id': 'n', 'title': 'x'}], [{'id': 'l', 'from': 'n', 'to': 'missing'}])
         assert paste(c, own, {'fragment': bad}).status_code == 422
+        elements_only = fragment([], elements=[{'id': 'e', 'text': '文字', 'x': 1, 'y': 2}])
+        r = paste(c, own, {'fragment': elements_only})
+        assert r.status_code == 200 and r.json()['idMap']['e']
+        assert c.get('/api/v1/files/' + own).json()['graphData']['elements'][-1]['text'] == '文字'
         forged = fragment([{'id': 'n', 'title': 'x', 'questionIds': [data.q]}])
         r = paste(c, own, {'fragment': forged})
         assert r.status_code == 200
