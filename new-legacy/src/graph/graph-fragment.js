@@ -1,13 +1,15 @@
 'use strict';
 (function(global){
   const FORMAT='kg-graph-fragment',MIME='application/x-kg-graph-fragment+json';
+  // Match the existing graph sanitizer; table integration retains its provisional limit.
+  const COLLECTION_LIMITS=Object.freeze({nodes:2500,links:5000,elements:1500,tables:2500});
   function clone(value){return JSON.parse(JSON.stringify(value))}
   function validate(value){
     if(!value||value.format!==FORMAT||value.version!==1)throw new Error('Unsupported graph fragment');
     if(!value.source||!Array.isArray(value.source.nodeIds)||value.source.nodeIds.some(id=>typeof id!=='string'))throw new Error('Invalid fragment source');
     const ids=new Set();
     for(const key of ['nodes','links','elements','tables']){
-      if(!Array.isArray(value[key])||value[key].length>2500)throw new Error('Invalid fragment collection');
+      if(!Array.isArray(value[key])||value[key].length>COLLECTION_LIMITS[key])throw new Error('Invalid fragment collection');
       for(const item of value[key]){
         if(!item||typeof item!=='object'||typeof item.id!=='string'||!item.id||ids.has(item.id))throw new Error('Invalid fragment id');
         ids.add(item.id);

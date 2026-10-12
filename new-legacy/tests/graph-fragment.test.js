@@ -32,3 +32,31 @@ test('malformed provenance and endpoint coordinates are rejected',()=>{
   assert.equal(api.parse(JSON.stringify({...f,source:null})),null);
   assert.equal(api.parse(JSON.stringify({...f,links:[{...f.links[0],fromPoint:{x:'bad',y:1}}]})),null);
 });
+test('valid dense graph captures and remaps all 5000 internal links',()=>{
+  const api=moduleApi();
+  const nodes=Array.from({length:101},(_,index)=>({id:`node-${index}`,x:index*20,y:0}));
+  const links=[];
+  for(let from=0;from<nodes.length&&links.length<5000;from++){
+    for(let to=from+1;to<nodes.length&&links.length<5000;to++){
+      links.push({id:`edge-${links.length}`,from:nodes[from].id,to:nodes[to].id,fromPort:'right',toPort:'left'});
+    }
+  }
+  const dense={nodes,links,elements:[],tables:[]};
+  const fragment=api.capture(dense,{nodeIds:nodes.map(node=>node.id)});
+  assert.equal(fragment.links.length,5000);
+  let id=0;
+  const copy=api.remap(fragment,{idFactory:()=>`copied-${++id}`}).fragment;
+  const copiedIds=new Set(copy.nodes.map(node=>node.id));
+  assert.equal(copy.links.length,5000);
+  assert.ok(copy.links.every(link=>copiedIds.has(link.from)&&copiedIds.has(link.to)));
+  assert.equal(dense.links[4999].id,'edge-4999');
+  assert.throws(()=>api.capture({...dense,links:[...links,{id:'overflow',from:nodes[0].id,to:nodes[1].id}]},{nodeIds:nodes.map(node=>node.id)}),/Invalid fragment collection/);
+});
+test('node and text-element collection limits match existing sanitizer',()=>{
+  const api=moduleApi(),empty=api.capture({nodes:[],links:[]},{nodeIds:[]});
+  for(const [key,limit] of [['nodes',2500],['elements',1500]]){
+    const items=Array.from({length:limit},(_,index)=>({id:`${key}-${index}`}));
+    assert.doesNotThrow(()=>api.validate({...empty,[key]:items}));
+    assert.throws(()=>api.validate({...empty,[key]:[...items,{id:'overflow'}]}),/Invalid fragment collection/);
+  }
+});
