@@ -93,8 +93,9 @@ async def paste_fragment(db, user, target_file_id, data):
                 descriptors[node_id] = exported
 
     clean = _strip_personal(fragment.model_dump(by_alias=True, exclude_none=True))
+    # tables 不随片段复制（UI 复制入口不选表格；跨文件表格经模板/另存承载），入口即丢弃。
     payload = {'nodes': clean['nodes'], 'links': clean['links'],
-               'elements': clean['elements'], 'tables': clean['tables'],
+               'elements': clean['elements'], 'tables': [],
                'resources': clean.get('resources') or []}
     # 同 owner 粘贴沿用 duplicate_file 模式：校验归属后复用原 assetId，不复制 blob。
     await assets.validate_graph_assets(db, user.username, payload)
@@ -118,8 +119,7 @@ async def paste_fragment(db, user, target_file_id, data):
     graph.setdefault('nodes', []).extend(payload['nodes'])
     graph.setdefault('links', []).extend(payload['links'])
     graph.setdefault('elements', []).extend(payload['elements'])
-    # tables/resources stay excluded until T18 table persistence lands; merging them
-    # now would be silently dropped by the next editor autosave (no state support yet).
+    # tables/resources 不在片段合并范围（表格由 T18 持久化管道承载，片段复制不携带）。
 
     next_revision = current_revision + 1
     content.graph_data = graph

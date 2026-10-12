@@ -177,6 +177,10 @@ async def load(db, user, template_id, data):
     if len(version.graph_data.get('nodes', [])) > (2500 if paid else 50):
         fail('TEMPLATE_NODE_QUOTA_EXCEEDED', 422)
     try:
+        try:
+            file_service.validate_graph_tables(version.graph_data)
+        except file_service.GraphTablesInvalid:
+            fail('GRAPH_TABLES_INVALID', 422)
         graph, mapping = remap_graph(version.graph_data)
         graph, _ = await assets.clone_graph_assets(db, version.asset_owner, user.username, graph)
         file = await file_service.create_file(db, user.username, name=row.name, graph_data=graph, source='template', source_file_id=row.id, commit=False)
