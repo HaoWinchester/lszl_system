@@ -1,4 +1,5 @@
 """TableV1 服务端校验。与 new-legacy/src/canvas/table-model.js 保持同一限额语义。"""
+import math
 import re
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -7,7 +8,13 @@ LIMITS = {
     'MAX_CELLS_PER_TABLE': 5000, 'MAX_CELLS_PER_CANVAS': 20000,
     'MAX_CELL_CHARS': 3000, 'DEFAULT_ROWS': 3, 'DEFAULT_COLS': 3,
 }
-_CELL_KEY = re.compile(r'^(\d+),(\d+)$')
+# \Z 锚定：$ 会放过尾部换行，导致 JS 端 normalize 拒绝的键通过服务端。
+_CELL_KEY = re.compile(r'^(\d+),(\d+)\Z')
+
+
+def utf16_length(value: str) -> int:
+    """与 JS String.length 同口径（UTF-16 code units）。"""
+    return len(value.encode('utf-16-le')) // 2
 
 
 class TableMerge(BaseModel):
@@ -41,9 +48,9 @@ class CanvasTable(BaseModel):
             raise ValueError(f'表格列数必须在 1-{LIMITS["MAX_COLS"]} 之间')
         if self.rows * self.cols > LIMITS['MAX_CELLS_PER_TABLE']:
             raise ValueError(f'表格单元格总数不能超过 {LIMITS["MAX_CELLS_PER_TABLE"]}')
-        if len(self.columnWidths) != self.cols or not all(w > 0 for w in self.columnWidths):
+        if len(self.columnWidths) != self.cols or not all(math.isfinite(w) and w > 0 for w in self.columnWidths):
             raise ValueError('列宽配置无效')
-        if len(self.rowHeights) != self.rows or not all(h > 0 for h in self.rowHeights):
+        if len(self.rowHeights) != self.rows or not all(math.isfinite(h) and h > 0 for h in self.rowHeights):
             raise ValueError('行高配置无效')
         if not self.id:
             raise ValueError('表格缺少 id')
@@ -51,7 +58,7 @@ class CanvasTable(BaseModel):
             match = _CELL_KEY.match(key)
             if not match or int(match.group(1)) >= self.rows or int(match.group(2)) >= self.cols:
                 raise ValueError(f'单元格坐标越界：{key}')
-            if len(value) > LIMITS['MAX_CELL_CHARS']:
+            if utf16_length(value) > LIMITS['MAX_CELL_CHARS']:
                 raise ValueError(f'单元格 {key} 超过 {LIMITS["MAX_CELL_CHARS"]} 字符上限')
         taken: set[tuple[int, int]] = set()
         for merge in self.merges:

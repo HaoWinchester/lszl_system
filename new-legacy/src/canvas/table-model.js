@@ -75,7 +75,11 @@
     const next=clone(table);
     const request={row,column,rowSpan,columnSpan};
     for(const m of next.merges){
-      if(covers(request,m)||covers(m,request))continue; // 整体包含允许（结果并入外层）
+      if(covers(request,m))continue; // 新合并覆盖旧合并：整体并入
+      if(covers(m,request)){
+        if(m.row===row&&m.column===column&&m.rowSpan===rowSpan&&m.columnSpan===columnSpan)continue; // 幂等
+        fail('该区域已在更大的合并单元格内，请先拆分');
+      }
       if(intersects(request,m))fail('合并区域与已有合并部分重叠，请先拆分');
     }
     const combined=[];
@@ -106,6 +110,7 @@
     const grid=clipboardGrid&&Array.isArray(clipboardGrid.cells)?clipboardGrid:fail('剪贴板数据无效');
     const gridRows=grid.cells.length,gridCols=grid.cells[0]?.length||0;
     if(!gridRows||!gridCols)fail('剪贴板数据为空');
+    if(grid.cells.some(r=>r.length!==gridCols))fail('剪贴板各行列数不一致');
     const merges=(Array.isArray(grid.merges)?grid.merges:[]).map(m=>({
       row:origin.row+m.row,column:origin.column+m.column,rowSpan:m.rowSpan,columnSpan:m.columnSpan}));
     for(const m of merges)if(!isIndex(m.rowSpan)||!isIndex(m.columnSpan)||m.rowSpan<1||m.columnSpan<1)fail('剪贴板合并区域无效');

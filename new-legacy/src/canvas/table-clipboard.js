@@ -7,7 +7,7 @@
   function cellText(element){
     const parts=[];
     for(const node of element.childNodes){
-      if(node.nodeType===Node.TEXT_NODE)parts.push(node.nodeValue||'');
+      if(node.nodeType===Node.TEXT_NODE)parts.push((node.nodeValue||'').replace(/[ \r\n]+/g,' '));
       else if(node.nodeType===Node.ELEMENT_NODE){
         if(node.tagName==='BR')parts.push('\n');
         else if(node.tagName==='SCRIPT'||node.tagName==='STYLE')continue;
@@ -31,10 +31,17 @@
       let column=0;
       for(const td of tr.children){
         if(!/^(TD|TH)$/.test(td.tagName))continue;
-        while(occupied.has(row+':'+column)){cells[row].push('');column++}
+        // 补齐锚格行的逻辑列占位：rowspan 延续格与锚格 colspan 都不能让后续格左移。
+        for(;;){
+          while(cells[row].length<column)cells[row].push('');
+          if(!occupied.has(row+':'+column))break;
+          cells[row].push('');column++;
+        }
         const rowSpan=Math.max(1,Math.min(1000,parseInt(td.getAttribute('rowspan')||'1',10)||1));
         const colSpan=Math.max(1,Math.min(1000,parseInt(td.getAttribute('colspan')||'1',10)||1));
-        const text=cellText(td).replace(/\r\n?/g,'\n');
+        // HTML 空白语义：NBSP 是 Excel 的显示空格，源码换行缩进是格式噪声，仅 <br> 产生真实换行。
+        const text=cellText(td).replace(/ /g,' ').replace(/\r\n?/g,'\n')
+          .replace(/[ \t]*\n[ \t]*/g,'\n').replace(/\n{2,}/g,'\n');
         cells[row].push(EMPTY_CELL.test(text)?'':text);
         if(rowSpan>1||colSpan>1){
           merges.push({row,column,rowSpan,columnSpan:colSpan});
@@ -44,7 +51,7 @@
       }
     }
     if(!cells.length||!cells.some(r=>r.length))return null;
-    const width=Math.max(...cells.map(r=>r.length));
+    const width=cells.reduce((max,r)=>Math.max(max,r.length),0);
     for(const r of cells)while(r.length<width)r.push('');
     return {cells,merges};
   }
@@ -69,7 +76,7 @@
     if(field||row.length)pushRow();
     while(rows.length&&!rows[rows.length-1].some(v=>v))rows.pop(); // 尾随空行
     if(!rows.length)return null;
-    const width=Math.max(...rows.map(r=>r.length));
+    const width=rows.reduce((max,r)=>Math.max(max,r.length),0);
     return {cells:rows.map(r=>Array.from({length:width},(_,c)=>{const v=r[c]||'';return EMPTY_CELL.test(v)?'':v})),merges:[]};
   }
   // data：ClipboardEvent.clipboardData 或 {html,text}。

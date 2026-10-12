@@ -1,5 +1,5 @@
 'use strict';
-/* 剪贴板 TSV 解析（HTML 解析需 DOM，由浏览器测试覆盖真实 Excel 样本）。 */
+/* 剪贴板 TSV 解析。HTML 解析需 DOM，由 canvas-table-clipboard-browser.py 用真实 Excel 样本覆盖。 */
 const test=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');

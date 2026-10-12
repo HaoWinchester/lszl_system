@@ -48,6 +48,10 @@ test('merge keeps row-major content in top-left cell and supports split',()=>{
   assert.throws(()=>model.merge(model.normalize({...base(),merges:[{row:0,column:0,rowSpan:2,columnSpan:2}]}),{row:1,column:1,rowSpan:2,columnSpan:2}),/先拆分/);
   const nested=model.merge(model.normalize({...base(),merges:[{row:0,column:0,rowSpan:1,columnSpan:1}]}),{row:0,column:0,rowSpan:2,columnSpan:2});
   assert.deepEqual(nested.merges,[{row:0,column:0,rowSpan:2,columnSpan:2}]);
+  // 子区域落在更大合并内 → 拒绝（防止外层合并被静默收缩）；重复同一区域幂等。
+  const outer=model.normalize({...base(),cells:{'0,0':'OUTER'},merges:[{row:0,column:0,rowSpan:3,columnSpan:3}]});
+  assert.throws(()=>model.merge(outer,{row:1,column:1,rowSpan:2,columnSpan:2}),/更大的合并/);
+  assert.equal(model.merge(outer,{row:0,column:0,rowSpan:3,columnSpan:3}).merges.length,1);
   assert.throws(()=>model.merge(t,{row:0,column:2,rowSpan:9,columnSpan:1}),/越界/);
   assert.throws(()=>model.split(base(),0,0),/不在合并区域/);
 });
@@ -68,6 +72,8 @@ test('paste expands, rejects merge conflicts and never writes partially',()=>{
   assert.throws(()=>model.paste(t,{row:99,column:0},grid),/上限/);
   assert.throws(()=>model.paste(t,{row:0,column:49},grid),/上限/);
   assert.throws(()=>model.paste(t,{row:99,column:49},{cells:[['x'.repeat(3001)]]}),/上限|字符/);
+  // 不规则 grid（行列数不一致）拒绝，不静默丢格。
+  assert.throws(()=>model.paste(base(),{row:0,column:0},{cells:[['a'],['b','c']]}),/不一致/);
   // 剪贴板合并随粘贴进入目标。
   const withMerge=model.paste(base(),{row:0,column:0},{cells:[['x','y'],['z','']],merges:[{row:0,column:0,rowSpan:1,columnSpan:2}]});
   assert.deepEqual(withMerge.merges,[{row:0,column:0,rowSpan:1,columnSpan:2}]);
