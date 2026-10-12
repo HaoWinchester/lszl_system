@@ -210,7 +210,6 @@ html,body{
   width:8000px;
   height:5000px;
   transform-origin:0 0;
-  will-change:transform;
 }
 .qw-edge-layer{
   position:absolute;

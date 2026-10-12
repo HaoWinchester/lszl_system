@@ -1,6 +1,6 @@
 # 画布与知识图谱开发计划
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. 如用户另行选择多智能体执行，再使用 superpowers:subagent-driven-development。步骤采用 `- [ ]` 跟踪；当前文档仅为计划，不启动实现。
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. 如用户另行选择多智能体执行，再使用 superpowers:subagent-driven-development。步骤采用 `- [ ]` 跟踪；本轮已获用户授权执行 M0／M1，自检后只部署 UAT。
 
 **Goal:** 完成 R01—R16，并以可追溯证据验证编辑、内容复用、题目权限与三个画布的持久化行为。
 
@@ -12,13 +12,13 @@
 
 文档位置采用仓库可跟踪的 `docs/superpowers/specs/`，因为现有 `.gitignore` 忽略整个 `docs/superpowers/plans/`；不修改仓库忽略规则。
 
-- 需求：[R01—R16](2026-10-12-canvas-and-knowledge-graph-requirements.md)；设计：[实现核查与 D01—D10 推荐](2026-10-12-canvas-and-knowledge-graph-design.md)。推荐参数尚不等于用户确认，实施前冻结所采用的设计版本。
-- 当前工作仅交付文档。所有任务默认未开始；当前 HEAD `6289fa0b`、本地 active `v9.0-p4.1.309` 为证据基线，不保证后续执行时仍相同。
+- 需求：[R01—R16](2026-10-12-canvas-and-knowledge-graph-requirements.md)；设计：[实现核查与 D01—D10 推荐](2026-10-12-canvas-and-knowledge-graph-design.md)。用户已授权采用推荐方案；本期实现采用 2026-10-12 设计版本。
+- M0／M1 已进入实施，进度与偏差以任务清单及验证报告为准；原始 HEAD `6289fa0b`、本地 active `v9.0-p4.1.309` 为证据基线，不保证后续执行时仍相同。
 - 修改前检查真实文件和仓库状态，已有未提交文档保留；不将他人工作混入任务提交。功能开发分支使用 `codex/` 前缀。
 - 业务前端只改 `new-legacy/`；适配改 `frontend/scripts/new-legacy-assets/`；不直接改同步产物或 active site。
 - 公共行为先扩展已有公共模块；大业务文件只接线，不复制多个版本的算法／编辑器／鉴权。
 - `main`、`uat` 永久保留，不删除、不重命名、不强制覆盖。功能自检后进入 UAT；用户本人确认验收前不合入／推送 main。
-- 推送必须使用命令级代理 `http://127.0.0.1:7897`，推送后核对远端引用；本计划本身不执行推送。
+- 推送必须使用命令级代理 `http://127.0.0.1:7897`，推送后核对远端引用；本轮只推送 uat，不推送 main。
 - 发布由 `node frontend/scripts/manage-new-legacy.js update new-legacy --skip-browser` 管理；已有浏览器验证单独执行。文件数量不一致时中止，核清文件清单和合理新增原因，不凭更高版本号继续发布。
 - 正式环境部署前备份代码和 PostgreSQL，校验非空并记录 manifest；本轮不部署正式环境。
 - 涉及新 ORM 写入继续采用 commit 后 refresh；多对象事务先父表 flush，再子表；迁移需要在 models/__init__.py 注册模型。
@@ -91,11 +91,11 @@ KGCanvasTableModel.paste(table, origin, clipboardGrid) // 新 TableV1，超限�
 
 **接口**：产出最终采用的设计版本、测试样本 ID、基线缺陷表；不改业务权限。
 
-- [ ] 在执行时重新记录 branch、HEAD、active 版本、相关源／active 差异；保留原始需求及附件。
-- [ ] 从 `new-legacy/` 运行本计划第 4 节定向命令。对 adapter 失败核对正常化后增加 `strokes` 的含义；如确属 fixture 过旧则显式期望空 strokes，并增加“非空笔迹失败后仍完整保留”的断言，不能只删 deepEqual。
-- [ ] 准备两节点手工曲线、多选改色、全屏文字、未匹配关键词、XMind 图片／备注／多工作表、Excel 空格／换行样本；样本不含私人题库数据。
-- [ ] 用现有浏览器测试方式复现 R04、R09、R14，记录实际资源版本、点击路径、console 和截图。无法复现的保持“未复现”，不以静态猜测记为修复。
-- [ ] 提交仅包含必要基线测试和记录的独立提交，后续任务引用其证据。
+- [x] 在执行时重新记录 branch、HEAD、active 版本、相关源／active 差异；保留原始需求及附件。
+- [x] 从 `new-legacy/` 运行本计划第 4 节定向命令。对 adapter 失败核对正常化后增加 `strokes` 的含义；如确属 fixture 过旧则显式期望空 strokes，并增加“非空笔迹失败后仍完整保留”的断言，不能只删 deepEqual。
+- [x] 本期使用图谱交互、多选改色、全屏文字、未匹配关键词的合成可复现样本；XMind／Excel 样本随 M3／M5，尚未完成。
+- [x] 用现有浏览器测试方式复现 R04、R09、R14，记录实际资源版本、点击路径、console 和截图。无法复现的保持“未复现”，不以静态猜测记为修复。
+- [x] 提交仅包含必要基线测试和记录的独立提交，后续任务引用其证据。
 
 ### T01 输入焦点与全屏浮层公共入口
 
@@ -105,11 +105,11 @@ KGCanvasTableModel.paste(table, origin, clipboardGrid) // 新 TableV1，超限�
 
 **接口**：产出 `isEditingTarget`、`overlayHost`；所有新浮层必须调用，正文输入捕获有优先级。
 
-- [ ] 增加覆盖 `contenteditable="plaintext-only"` 子元素、input、textarea、select、IME、失焦的失败用例；浏览器复现删字弹整卡确认框及全屏 nodeModal 不可见。
-- [ ] 实现公共输入判定，替换删除、复制、粘贴、空格平移、Escape 的重复判断；保留正常对象删除确认。
-- [ ] 用占位节点保留浮层原位置，全屏切换时移动真实节点，不复制 DOM；颜色窗口、笔迹文字、节点编辑窗口统一宿主，校正宿主坐标。
-- [ ] 验证全屏输入、滚动、保存、Esc、退出恢复，三页浮层无重复监听；验收 AC09-1/2、AC11-1/2/3。运行新 Node 测试、浏览器脚本和现有图谱交互浏览器测试。
-- [ ] 仅提交本任务文件，提交信息 `fix(canvas): isolate editable focus and fullscreen overlays`。
+- [x] 增加覆盖 `contenteditable="plaintext-only"` 子元素、input、textarea、select、IME、失焦的失败用例；浏览器复现删字弹整卡确认框及全屏 nodeModal 不可见。
+- [x] 实现公共输入判定，替换删除、复制、粘贴、空格平移、Escape 的重复判断；保留正常对象删除确认。
+- [x] 用占位节点保留浮层原位置，全屏切换时移动真实节点，不复制 DOM；颜色窗口、笔迹文字、节点编辑窗口统一宿主，校正宿主坐标。
+- [x] 验证全屏输入、滚动、保存、Esc、退出恢复，三页浮层无重复监听；验收 AC09-1/2、AC11-1/2/3。运行新 Node 测试、浏览器脚本和现有图谱交互浏览器测试。
+- [x] 与共享背景／文字修复一起作为 M1 提交，避免拆分共享文件造成不完整状态。
 
 ### T02 多题背景与水滴改色
 
@@ -119,11 +119,11 @@ KGCanvasTableModel.paste(table, origin, clipboardGrid) // 新 TableV1，超限�
 
 **接口**：workspace.background 独立于 theme；颜色窗口使用 T01 宿主和按钮 DOM 锚点。
 
-- [ ] 增加“同一背景切换七种主题后配置不变”“多选点击面板后 selectionCount 不变”的断言，先验证当前失败或记录未复现差异。
-- [ ] 将旧 workspace 首次有效背景作为缺省值保留，theme 不再覆盖 `.qw-background` 与 `--uc-canvas-bg`；存取 background。
-- [ ] 按 T00 证据修复颜色面板的选区保持／事件关闭／定位；已支持的卡片与分组继续支持，混合选区按现有能力给出可理解提示。
-- [ ] 逐页回归主题同步，确认深度回忆主题未被连带禁用；多题保存重开后背景与卡色分别保持，覆盖全部 AC13、AC14。
-- [ ] 测试通过后提交 `fix(workspace): preserve backgrounds and selection color actions`。
+- [x] 增加“同一背景切换七种主题后配置不变”“多选点击面板后 selectionCount 不变”的断言，先验证当前失败或记录未复现差异。
+- [x] 将旧 workspace 首次有效背景作为缺省值保留，theme 不再覆盖 `.qw-background` 与 `--uc-canvas-bg`；存取 background。
+- [x] 按 T00 证据修复颜色面板的选区保持／事件关闭／定位；已支持的卡片与分组继续支持，混合选区按现有能力给出可理解提示。
+- [x] 逐页回归主题同步，确认深度回忆主题未被连带禁用；多题保存重开后背景与卡色分别保持，覆盖全部 AC13、AC14。
+- [x] 测试通过，与 T01／T03／T04 合并为同一 M1 集成提交。
 
 ### T03 关键词精确匹配与自定义根卡
 
@@ -133,11 +133,11 @@ KGCanvasTableModel.paste(table, origin, clipboardGrid) // 新 TableV1，超限�
 
 **接口**：新增 `KGRecallAssociationLibrary.resolveExact(library,value)`，返回唯一命中节点或 null；自定义根卡使用现有 personal dataId／customNodes。
 
-- [ ] 测试“进度”不能自动绑定“进度基准”、同名不同候选返回 null、有效显式绑定优先、合法 concept 关联不丢失。
-- [ ] 为自动创建链路接入精确匹配；保留主动搜索需要的模糊 resolve，不全局删除其他页面搜索能力。
-- [ ] 无唯一命中生成可编辑 custom 根卡；按来源关键词复用，保存并恢复内容，历史卡牌只在用户明确转换时改变。
-- [ ] 对修改前后的现有自定义子卡、输入法和重置进行回归；覆盖全部 AC15，运行新测试与现有 deep-recall-flow-continuity 测试。
-- [ ] 提交 `fix(recall): create custom roots for unmatched keywords`。
+- [x] 测试“进度”不能自动绑定“进度基准”、同名不同候选返回 null、有效显式绑定优先、合法 concept 关联不丢失。
+- [x] 为自动创建链路接入精确匹配；保留主动搜索需要的模糊 resolve，不全局删除其他页面搜索能力。
+- [x] 无唯一命中生成可编辑 custom 根卡；按来源关键词复用，保存并恢复内容，历史卡牌只在用户明确转换时改变。
+- [x] 对修改前后的现有自定义子卡、输入法和重置进行回归；覆盖全部 AC15，运行新测试与现有 deep-recall-flow-continuity 测试。
+- [x] 测试通过，与其余 M1 修复一并提交。
 
 ### T04 文字清晰度实验及缩放保存契约
 
@@ -147,11 +147,11 @@ KGCanvasTableModel.paste(table, origin, clipboardGrid) // 新 TableV1，超限�
 
 **接口**：三页有效缩放 0.01—4；后端接受同范围有限数值；viewport 世界坐标定义不变。
 
-- [ ] 新增 `RecallTransform(scale=.01)` 接受、0／负值／NaN 拒绝的测试；在三页采集字体就绪后的 DPR／倍率基线。
-- [ ] 先把后端缩放契约修正为 .01—4；核查 adapter 和 normalization 无二次截断。
-- [ ] 比较“常驻 will-change”“交互期 will-change”“2D transform”实验，选择有真实字形改善且命中／性能不回退的最小改动；记录选择依据。
-- [ ] 验证 1%、10%、20%、50%、100%、200%、400% 及回到 100%，普通／全屏和 DPR 1／2；极小比例按设计标准评估，不宣称每字可读。
-- [ ] 运行相关定向测试后提交 `fix(canvas): align zoom persistence and text rendering`；R04 在 T09、T19 后再次纳入联调，不重复无关全量测试。
+- [x] 新增 `RecallTransform(scale=.01)` 接受、0／负值／NaN 拒绝的测试；在三页采集字体就绪后的 DPR／倍率基线。
+- [x] 先把后端缩放契约修正为 .01—4；核查 adapter 和 normalization 无二次截断。
+- [x] 比较“常驻 will-change”“交互期 will-change”“2D transform”实验，选择有真实字形改善且命中／性能不回退的最小改动；记录选择依据。
+- [x] 验证 1%、10%、20%、50%、100%、200%、400% 及回到 100%，普通／全屏和 DPR 1／2；极小比例按设计标准评估，不宣称每字可读。
+- [x] 相关定向测试通过，与其余 M1 修复一并提交；R04 在 T09、T19 后再次纳入联调，不重复无关全量测试。
 
 ### T05 曲线上手柄与路线变换
 

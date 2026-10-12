@@ -1,0 +1,100 @@
+/* Shared floating color picker for graph and multi-question canvases. */
+.kg-color-picker{display:grid;gap:9px;min-width:282px}
+.kg-color-picker-sv{
+  --picker-hue:0;
+  position:relative;height:142px;border-radius:11px;overflow:hidden;cursor:crosshair;
+  background:
+    linear-gradient(to top,#000,transparent),
+    linear-gradient(to right,#fff,hsl(var(--picker-hue) 100% 50%));
+  box-shadow:inset 0 0 0 1px rgba(15,23,42,.14);
+  touch-action:none;
+}
+.kg-color-picker-marker{
+  position:absolute;width:14px;height:14px;border:2px solid #fff;border-radius:50%;
+  transform:translate(-50%,-50%);box-shadow:0 0 0 1px rgba(15,23,42,.65),0 2px 5px rgba(15,23,42,.22);
+  pointer-events:none;
+}
+.kg-color-picker-slider-row{display:grid;grid-template-columns:34px minmax(0,1fr) 40px;align-items:center;gap:8px;font-size:11px;color:#64748b}
+.kg-color-picker-slider-row:not(:has(output)){grid-template-columns:34px minmax(0,1fr)}
+.kg-color-picker-slider-row input[type="range"]{width:100%;margin:0;accent-color:#6366f1}
+.kg-color-picker-slider-row [data-color-picker-hue]{
+  appearance:none;height:10px;border-radius:999px;
+  background:linear-gradient(90deg,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00);
+}
+.kg-color-picker-slider-row [data-color-picker-hue]::-webkit-slider-thumb,
+.kg-color-picker-alpha-track input::-webkit-slider-thumb{
+  appearance:none;width:15px;height:15px;border-radius:50%;background:#fff;border:1px solid #64748b;box-shadow:0 1px 4px rgba(15,23,42,.25)
+}
+.kg-color-picker-alpha-track{
+  --picker-alpha-color:#000;
+  border-radius:999px;padding:0;
+  background:
+    linear-gradient(90deg,transparent,var(--picker-alpha-color)),
+    linear-gradient(45deg,#d7dee8 25%,transparent 25%,transparent 75%,#d7dee8 75%),
+    linear-gradient(45deg,#d7dee8 25%,#fff 25%,#fff 75%,#d7dee8 75%);
+  background-size:auto,10px 10px,10px 10px;background-position:0 0,0 0,5px 5px;
+}
+.kg-color-picker-alpha-track input{appearance:none;display:block;width:100%;height:10px;margin:0;background:transparent}
+.kg-color-picker-slider-row output{text-align:right;font-variant-numeric:tabular-nums}
+.kg-color-picker-fields{display:grid;grid-template-columns:34px 1fr 34px;gap:8px;align-items:center}
+.kg-color-picker-preview{width:34px;height:30px;border-radius:8px;border:1px solid rgba(15,23,42,.16)}
+.kg-color-picker-fields label{display:flex;align-items:center;gap:4px;height:30px;padding:0 9px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#64748b;font-size:12px}
+.kg-color-picker-fields input{min-width:0;width:100%;border:0;outline:0;text-transform:uppercase;font:600 12px/1 ui-monospace,SFMono-Regular,Consolas,monospace;color:#0f172a}
+.kg-color-picker-eyedropper{width:34px;height:30px;min-width:34px;padding:0;border-radius:8px;border:1px solid #cbd5e1;background:#fff;color:#475569;box-shadow:none}
+.kg-color-picker-transparent{height:30px;border:1px dashed #cbd5e1;border-radius:8px;background:linear-gradient(135deg,#fff 0 47%,#ef4444 48% 52%,#fff 53% 100%);color:#475569;font-size:12px}
+.kg-color-picker-section{display:grid;gap:6px;padding-top:7px;border-top:1px solid #eef2f7}
+.kg-color-picker-section[hidden]{display:none}
+.kg-color-picker-section>span{font-size:11px;font-weight:750;color:#64748b}
+.kg-color-picker-swatches{display:grid;grid-template-columns:repeat(9,24px);gap:6px}
+.kg-color-picker-swatch{
+  width:24px;height:24px;min-width:24px;padding:0;border-radius:7px;border:1px solid rgba(15,23,42,.16);
+  background:var(--picker-swatch);box-shadow:none;position:relative;
+}
+.kg-color-picker-swatch:hover{transform:scale(1.08)}
+.kg-color-picker-swatch.active::after{content:"";position:absolute;inset:5px;border:2px solid #fff;border-radius:50%;box-shadow:0 0 0 1px rgba(15,23,42,.7)}
+.graph-floating-color-window{
+  position:absolute;z-index:72;width:326px;max-width:calc(100% - 20px);display:none;
+  background:rgba(255,255,255,.985);border:1px solid rgba(148,163,184,.38);border-radius:15px;
+  box-shadow:0 24px 64px rgba(15,23,42,.24);backdrop-filter:blur(18px);overflow:hidden;pointer-events:auto;
+}
+.graph-floating-color-window.show{display:block}
+.graph-floating-color-head{height:42px;display:flex;align-items:center;gap:8px;padding:0 8px;border-bottom:1px solid #e2e8f0;background:#f8fafc;user-select:none}
+.graph-floating-color-head strong{flex:1;font-size:13px;color:#1e293b}
+.graph-floating-color-grip,.graph-floating-color-close{
+  width:30px;height:30px;min-width:30px;padding:0;display:grid;place-items:center;border:0;border-radius:8px;background:transparent;color:#64748b;box-shadow:none;
+}
+.graph-floating-color-grip{cursor:grab}.graph-floating-color-window.dragging .graph-floating-color-grip{cursor:grabbing;background:#e0e7ff;color:#4338ca}
+.graph-floating-color-close:hover,.graph-floating-color-grip:hover{background:#e2e8f0;color:#0f172a;transform:none}
+.graph-floating-color-grip svg,.graph-floating-color-close svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.graph-floating-color-grip circle{fill:currentColor;stroke:none}
+.graph-floating-color-body{padding:12px}
+.graph-floating-color-body.kg-color-picker{min-width:0}
+
+
+@media(max-width:720px),(pointer:coarse){
+  .graph-floating-color-window{width:min(326px,calc(100% - 16px))}
+}
+
+
+
+/* 颜色窗默认可点击外部关闭；拖动顶部后固定为手动关闭。 */
+.graph-floating-color-head{cursor:grab}
+.graph-floating-color-window.dragging .graph-floating-color-head{cursor:grabbing}
+.graph-floating-color-pin-state{
+  display:none!important;font-size:10px!important;color:#64748b!important;margin:0 2px!important;white-space:nowrap;
+}
+.graph-floating-color-window.manual-close .graph-floating-color-pin-state{display:block!important;color:#4f46e5!important}
+.graph-floating-color-window.manual-close{border-color:rgba(99,102,241,.48);box-shadow:0 24px 64px rgba(79,70,229,.22)}
+
+
+.graph-floating-color-window{width:min(286px,calc(100% - 16px));border-radius:12px}
+.graph-floating-color-head{height:34px;gap:5px;padding:0 6px}
+.graph-floating-color-head strong{font-size:12px}
+.graph-floating-color-grip,.graph-floating-color-close{width:27px;height:27px;min-width:27px;border-radius:7px}
+.graph-floating-color-grip svg,.graph-floating-color-close svg{width:15px;height:15px}
+.graph-floating-color-body{padding:8px}
+.graph-floating-color-body .kg-color-picker-section{margin-top:7px}
+.graph-floating-color-body .kg-color-picker-title{margin-bottom:5px;font-size:11px}
+.graph-floating-color-body .kg-color-picker-grid{gap:5px}
+.graph-floating-color-body .kg-color-picker-sv{height:118px}
+.graph-floating-color-body .kg-color-picker-presets,.graph-floating-color-body .kg-color-picker-recent,.graph-floating-color-body .kg-color-picker-document{gap:5px}

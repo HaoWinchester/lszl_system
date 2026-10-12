@@ -6,7 +6,8 @@
   function create(options={}){
     const appearance=global.KGCanvasAppearanceController;
     if(!appearance)throw new Error('CanvasSettingsController requires KGCanvasAppearanceController');
-    let dialog=null,previewController=null,original=null,draft=null,destroyed=false;
+    let dialog=null,previewController=null,original=null,draft=null,destroyed=false,context={},releaseOverlay=null;
+    const write=(value,meta)=>context.writePreferences?context.writePreferences(value,meta):appearance.write(value,meta);
     function palette(theme){return appearance.PALETTES[theme]||appearance.PALETTES.light}
     function renderSwatches(){
       const root=dialog?.querySelector('[data-uc-color-list]');if(!root)return;
@@ -24,7 +25,8 @@
     function ensure(){
       if(dialog)return dialog;
       dialog=document.createElement('div');
-      dialog.className='uc-settings-backdrop';dialog.hidden=true;
+      dialog.className='uc-settings-backdrop';dialog.dataset.canvasUi='true';dialog.hidden=true;
+      dialog.addEventListener('wheel',event=>event.stopPropagation(),{passive:true});
       dialog.innerHTML=`<section class="uc-settings-dialog" role="dialog" aria-modal="true" aria-labelledby="ucCanvasSettingsTitle">
         <header><div><small>VIEW SETTINGS</small><h2 id="ucCanvasSettingsTitle">画布设置</h2><p>统一首页、多题、单题和深度回忆画布的背景与显示偏好。</p></div><button type="button" class="uc-icon-button" data-uc-close aria-label="关闭">${ICON_CLOSE}</button></header>
         <div class="uc-settings-body">
@@ -41,13 +43,13 @@
         const theme=event.target.closest('[data-uc-theme]');if(theme){
           draft.theme=theme.dataset.ucTheme==='dark'?'dark':'light';
           draft.backgroundColor=draft.theme==='dark'?draft.darkColor:draft.lightColor;
-          appearance.write(draft,{source:'canvas-settings-preview'});sync();return;
+          write(draft,{source:'canvas-settings-preview'});sync();return;
         }
-        const pattern=event.target.closest('[data-uc-pattern]');if(pattern){draft.pattern=pattern.dataset.ucPattern;appearance.write(draft,{source:'canvas-settings-preview'});sync();return}
+        const pattern=event.target.closest('[data-uc-pattern]');if(pattern){draft.pattern=pattern.dataset.ucPattern;write(draft,{source:'canvas-settings-preview'});sync();return}
         const swatch=event.target.closest('[data-uc-color]');if(swatch){
           draft.backgroundColor=swatch.dataset.ucColor;
           if(draft.theme==='dark')draft.darkColor=draft.backgroundColor;else draft.lightColor=draft.backgroundColor;
-          appearance.write(draft,{source:'canvas-settings-preview'});sync();return;
+          write(draft,{source:'canvas-settings-preview'});sync();return;
         }
         if(event.target.closest('[data-uc-close],[data-uc-cancel]'))cancel();
         if(event.target.closest('[data-uc-confirm]'))confirm();
@@ -55,16 +57,18 @@
       document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!dialog.hidden)cancel()});
       return dialog;
     }
-    function open(){
-      if(destroyed)return false;ensure();
-      original=appearance.read();draft=appearance.normalize(original);
+    function open(nextContext={}){
+      if(destroyed)return false;ensure();context=nextContext;
+      releaseOverlay?.();releaseOverlay=global.KGCanvasDomInteraction?.mountOverlay?.(dialog,context.surface||document.body);
+      dialog.querySelector('header p').textContent=context.readPreferences?'调整当前画布的背景与显示偏好。':'统一首页、多题、单题和深度回忆画布的背景与显示偏好。';
+      original=context.readPreferences?context.readPreferences():appearance.read();draft=appearance.normalize(original);
       dialog.hidden=false;document.body.classList.add('uc-settings-open');sync();
       dialog.querySelector('[data-uc-close]')?.focus();return true;
     }
     function close(){if(!dialog)return;dialog.hidden=true;document.body.classList.remove('uc-settings-open')}
-    function cancel(){if(original)appearance.write(original,{source:'canvas-settings-cancel'});close()}
-    function confirm(){appearance.write(draft,{source:'canvas-settings-confirm'});close();options.onConfirm?.(appearance.read())}
-    return Object.freeze({open,close,cancel,confirm,destroy(){destroyed=true;dialog?.remove();dialog=null;return true}});
+    function cancel(){if(original)write(original,{source:'canvas-settings-cancel'});close()}
+    function confirm(){write(draft,{source:'canvas-settings-confirm'});close();options.onConfirm?.(appearance.read())}
+    return Object.freeze({open,close,cancel,confirm,isOpen:()=>!!dialog&&!dialog.hidden,destroy(){destroyed=true;releaseOverlay?.();dialog?.remove();dialog=null;return true}});
   }
   global.KGCanvasSettingsController=Object.freeze({create});
 })(window);

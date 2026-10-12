@@ -1,0 +1,20 @@
+{
+  "active": "v9.0-p4.1.309",
+  "activeFiles": 1051,
+  "candidateFiles": 1062,
+  "removed": [],
+  "added": [
+    "src/canvas/dom-interaction.js",
+    "styles/canvas-color-picker.css",
+    "tests/canvas-dom-interaction.test.js",
+    "tests/canvas-fullscreen-overlays-browser.py",
+    "tests/canvas-text-clarity-browser.py",
+    "tests/canvas-zoom-persistence-browser.py",
+    "tests/graph-fullscreen-editing-browser.py",
+    "tests/recall-keyword-resolution.test.js",
+    "tests/recall-unmatched-custom-browser.py",
+    "tests/workspace-background.test.js",
+    "tests/workspace-theme-color-browser.py"
+  ],
+  "adminConsole": true
+}

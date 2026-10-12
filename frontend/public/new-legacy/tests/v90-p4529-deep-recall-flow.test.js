@@ -95,11 +95,12 @@ test('core priority is semantic only and learner markup exposes one shared keywo
 
 test('learner page starts hidden and offers one explicit reveal action', () => {
   const html = read('knowledge-recall.html');
-  const css = read('styles/knowledge-recall-p4529.css');
+  const css = read('styles/knowledge-recall-patch-2.css');
   const controller = read('src/86-knowledge-recall.js');
 
   assert.match(html, /id="krRevealKeywordsBtn"[^>]*>\s*揭示关键词\s*</);
-  assert.match(html, /id="krVersionChoice"/);
+  // Version changes are now handled by the database session adoption flow.
+  assert.match(controller, /if\(session.versionState==='mismatch'\)\{[\s\S]*?await adoptCurrentVersion\(\)/);
   assert.match(html, /src\/question-keyword\/keyword-runtime-service\.js/);
   assert.match(html, /src\/recall\/deep-recall-flow-model\.js/);
   assert.match(controller, /keywordsRevealed=false/);

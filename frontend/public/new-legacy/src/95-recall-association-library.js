@@ -209,6 +209,11 @@
     indexCache.set(normalized,result);
     return result;
   }
+  function resolveExact(library,value){
+    const key=clean(value).normalize('NFKC').toLowerCase();if(!key)return null;
+    const matches=index(library).library.nodes.filter(node=>[node.title,node.titleEn,...node.aliases].some(term=>clean(term).normalize('NFKC').toLowerCase()===key));
+    return matches.length===1?matches[0]:null;
+  }
   function resolve(library,value){
     const idx=index(library);const key=lookupKey(value);
     const exact=idx.lookup.get(key)||'';if(exact)return idx.byId.get(exact)||null;
@@ -330,7 +335,7 @@
     return {valid:true,revision:Number(saved?.contentRevision)||revision+1,identity:{id:clean(savedIdentity.id),subjectId:clean(savedIdentity.subjectId)||subject,version:Number(savedIdentity.version)||1,status:clean(savedIdentity.status)||'published'},library:normalizeLibrary(savedIdentity)};
   }
 
-  const api=Object.freeze({storageKey,legacyStorageKey,normalizeLibrary,parseText,merge,read,write,saveText,index,resolve,choices,toText,asRecallNode,nodeId,reconcileIncoming,updateNode,setChoices,saveNode,setSessionLibrary,clearSessionLibrary,sessionInfo,readServer,writeServer});
+  const api=Object.freeze({storageKey,legacyStorageKey,normalizeLibrary,parseText,merge,read,write,saveText,index,resolve,resolveExact,choices,toText,asRecallNode,nodeId,reconcileIncoming,updateNode,setChoices,saveNode,setSessionLibrary,clearSessionLibrary,sessionInfo,readServer,writeServer});
   global.KGRecallAssociationLibrary=api;
   if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);

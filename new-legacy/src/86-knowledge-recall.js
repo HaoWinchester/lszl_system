@@ -17,6 +17,7 @@
   let isDragging=false,dragStart=null,worldStart=null,panPointerId=null,panButton=0,rightPanStart=null,contextMenuSuppressUntil=0,contextMenu=null,customOpen=false,lastViewportSize=null;
   let canvasRuntime=null,inkController=null,recallViewportRestored=false,recallTransitionBusy=false;
   let progressSaveTimer=0,questionSessionToken=0,cardClickTimer=0,searchTimer=0,nodeSearchTimer=0;
+  let customConversionUndo=null;
   let associationRuntime={subject:'',library:null,nodeCache:new Map(),resolveCache:new Map()};
   let nodeDrag=null,suppressNodeClickUntil=0;
   let recallAdapter=null,recallSession=null,keywordsRevealed=false;
@@ -295,6 +296,7 @@
     return next;
   }
   function applyServerSession(session,{history=false}={}){
+    customConversionUndo=null;
     recallSession=cloneValue(session);
     if(history){
       recallSession.permissions={...(recallSession.permissions||{}),canWrite:false,canReveal:false,readOnly:true};
@@ -399,6 +401,7 @@
   function flushProgress(){return writeProgressNow()}
   function cancelProgressSave(){if(progressSaveTimer){clearTimeout(progressSaveTimer);progressSaveTimer=0}}
   function loadProgress(raw=null){
+    customConversionUndo=null;
     inkController?.cancel();
     recallViewportRestored=false;if(isTeacherDraftPreview())return false;
     try{
@@ -422,6 +425,7 @@
     const versionReset=recallSession?.versionState==='mismatch'&&recallSession?.permissions?.canReset;
     if(isRecallReadonly()&&!versionReset){notifyRecallReadonly();return}
     if(!confirm('确定清除这道题已回忆的全部知识点和笔迹吗？'))return;
+    customConversionUndo=null;
     cancelProgressSave();if(!recallAdapter)return;
     setRecallTransitionBusy(true);
     try{
@@ -431,8 +435,8 @@
     }catch(error){notifyRecallLimit(error?.message||'重置失败，请稍后重试。')}
     finally{setRecallTransitionBusy(false)}
   }
-  function isTextEditingTarget(target){
-    return Boolean(target?.closest?.('input,textarea,select,[contenteditable="true"],[contenteditable=""]'));
+  function isTextEditingTarget(eventOrElement){
+    return window.KGCanvasDomInteraction.isEditingTarget(eventOrElement);
   }
   function rootKeyForNode(node){
     if(node?.rootKey)return String(node.rootKey);
@@ -501,7 +505,7 @@
     const api=window.KGRecallAssociationLibrary,library=associationLibrary();if(!api||!library)return null;
     const key=String(value||'').trim();if(!key)return null;
     if(associationRuntime.resolveCache.has(key))return associationRuntime.resolveCache.get(key);
-    const result=api.resolve?.(library,key)||null;associationRuntime.resolveCache.set(key,result);return result;
+    const result=api.index?.(library).byId.get(key)||api.resolveExact?.(library,key)||null;associationRuntime.resolveCache.set(key,result);return result;
   }
   function ancestorDataIdSet(node){
     return DeepRecallFlow.ancestorDataIds?.(state.nodes,node?.instanceId)||new Set([String(node?.dataId||'')]);
@@ -534,21 +538,16 @@
   }
   function nodeData(id){return state.customNodes[id]||associationNode(id)||DATA.nodes?.[id]||null}
   function buildRootMap(q){
-    const map={};
+    const map={},library=window.KGRecallAssociationLibrary,source=library?.read?.(currentSubject())||null;
+    const root=(keyword)=>({title:keyword.text||keyword.title,...DeepRecallFlow.resolveKeywordRoot(keyword,q.concepts||[],source,library),matchTexts:[keyword.text||keyword.title],keywordProfile:keywordProfile(keyword)});
     (q.stemParts||[]).forEach(part=>{
-      const key=String(part?.clue||'');
-      const legacy=key&&DATA.roots?.[key];
-      if(legacy)map[key]={...legacy,matchTexts:Array.isArray(legacy.matchTexts)?[...legacy.matchTexts]:[legacy.title].filter(Boolean)};
+      const key=String(part?.clue||''),legacy=key&&DATA.roots?.[key];
+      if(legacy)map[key]=root({text:legacy.title,recallNodeId:legacy.nodeId});
     });
-    (q.clues||[]).forEach(clue=>{
-      const first=(clue.conceptIds||[]).map(id=>(q.concepts||[]).find(c=>String(c.id)===String(id))).find(Boolean);
-      const library=window.KGRecallAssociationLibrary;
-      const resolved=library?.resolve?.(library.read(currentSubject()),clue.recallNodeId||clue.text);
-      map[clue.id]={title:clue.text,nodeId:resolved?.id||clue.recallNodeId||first?.id||clue.id,matchTexts:[clue.text],keywordProfile:keywordProfile(clue)};
-    });
+    (q.clues||[]).forEach(clue=>{map[clue.id]=root(clue)});
     (q.concepts||[]).forEach(c=>{
       if(c.title&&!Object.values(map).some(r=>String(r.title)===String(c.title))){
-        map[c.id]={title:c.title,nodeId:c.recallNodeId||c.id,matchTexts:[c.title,...String(c.keywords||'').split(/[,，、;；|]/).map(x=>x.trim()).filter(Boolean).slice(0,2)],keywordProfile:keywordProfile(c)};
+        map[c.id]={...root(c),matchTexts:[c.title,...String(c.keywords||'').split(/[,，、;；|]/).map(x=>x.trim()).filter(Boolean).slice(0,2)]};
       }
     });
     return map;
@@ -892,13 +891,16 @@
     markKeywordActive(key);state.metrics.keywordClicks=(Number(state.metrics.keywordClicks)||0)+1;
     questionCard.querySelectorAll(`.kr-keyword-token[data-keyword-id="${cssAttr(key)}"]`).forEach(x=>x.classList.add('active'));
     el.classList.add('active');
-    const rootDataId=root.nodeId||key;
-    let node=state.nodes.find(n=>String(n.dataId)===String(rootDataId));
+    // Saved roots retain their binding until the learner explicitly converts them.
+    let node=state.nodes.find(n=>!n.parentId&&String(n.rootKey)===String(key));
+    const rootDataId=node?.dataId||root.nodeId||DeepRecallFlow.personalNodeId(question.id);
+    if(!node&&!root.custom)node=state.nodes.find(n=>String(n.dataId)===String(rootDataId));
     if(!node){
       if(!requireRecallNodeLimit(1))return;
       const pos=keywordNodePosition(el,state.nodes.filter(n=>n.depth===0).length);
+      if(root.custom)state.customNodes[rootDataId]={title:root.title,prompt:'写下你对这个关键词的理解，再继续联想。',hint:'',choices:[],sourceKeyword:String(root.title||''),sourceKeywordId:String(key)};
       const data=getNodeData(rootDataId);
-      node={instanceId:uid('node'),dataId:rootDataId,rootKey:key,title:data.title||root.title,x:pos.x,y:pos.y,parentId:null,depth:0,createdAt:Date.now()};
+      node={instanceId:uid('node'),dataId:rootDataId,rootKey:key,title:data.title||root.title,x:pos.x,y:pos.y,parentId:null,depth:0,createdAt:Date.now(),custom:!!root.custom,matchSource:root.matchSource||'legacy',sourceKeyword:String(root.title||'')};
       state.nodes.push(node);
       state.lastNewNodeId=node.instanceId;
       saveProgress();
@@ -1080,6 +1082,32 @@
       : `<div class="kr-empty-choices">${readOnly?'旧版本回忆图为只读。':'没有更多推荐了，输入你想到的知识点继续。'}</div>`;
     const editingMarkup=readOnly?'':`<div class="kr-guide-actions"><button class="secondary" id="krMoreChoicesBtn" type="button"${choicePage.canRotate?'':' disabled aria-disabled="true"'}>换一组</button></div><div class="kr-custom-form" id="krCustomForm"><input id="krCustomInput" placeholder="输入你想到的知识点，例如：发起人" maxlength="30"/><button id="krCustomSaveBtn" type="button">生成</button></div>`;
     guide.innerHTML=`<div class="kr-guide-head"><div><h2>${escapeHTML(display?.title?.zh||d.title||node.title)}${englishLine(display?.title)}</h2><p>${escapeHTML(display?.prompt?.zh||d.prompt||'你还能从这里继续回忆到什么？')}${englishLine(display?.prompt)}</p>${d.hint?`<p><strong>轻提示：</strong>${escapeHTML(display?.hint?.zh||d.hint)}${englishLine(display?.hint)}</p>`:''}</div><button class="kr-guide-close" title="关闭" type="button">×</button></div>${choiceMarkup}${editingMarkup}`;
+    if(!readOnly){
+      const personalMarkup=node.custom?`<div class="kr-personal-editor"><label for="krPersonalTitle">卡牌标题</label><input id="krPersonalTitle" maxlength="120" value="${escapeHTML(d.title||node.title)}"/><label for="krPersonalContent">我的回忆内容</label><textarea id="krPersonalContent" rows="3" placeholder="写下你对这个知识点的理解">${escapeHTML(d.hint||'')}</textarea><button type="button" id="krPersonalSaveBtn">保存我的回忆</button></div>`:`<button type="button" class="secondary" id="krConvertPersonalBtn">转为自定义卡牌</button>`;
+      guide.insertAdjacentHTML('beforeend',personalMarkup+(customConversionUndo?.instanceId===instanceId&&node.dataId===customConversionUndo.personalId?'<button type="button" class="secondary" id="krUndoPersonalBtn">撤销转为自定义</button>':''));
+      const personalSave=$('krPersonalSaveBtn');
+      if(personalSave)personalSave.onclick=()=>{
+        const title=String($('krPersonalTitle')?.value||'').trim();
+        if(!title){$('krPersonalTitle')?.focus();return}
+        state.customNodes[node.dataId]={...d,title,hint:String($('krPersonalContent')?.value||'')};
+        state.nodes.filter(item=>item.dataId===node.dataId).forEach(item=>{item.title=title});
+        saveProgress();renderGraphOnly();openNodeGuide(instanceId,null,{countOpen:false});
+      };
+      const convert=$('krConvertPersonalBtn');
+      if(convert)convert.onclick=()=>{
+        const id=DeepRecallFlow.personalNodeId(question.id);
+        customConversionUndo={instanceId,personalId:id,node:cloneValue(node)};
+        state.customNodes[id]={title:node.sourceKeyword||rootConfig(node.rootKey)?.title||node.title,prompt:'写下你对这个关键词的理解，再继续联想。',hint:'',choices:[]};
+        node.dataId=id;node.title=state.customNodes[id].title;node.custom=true;node.matchSource='manual-conversion';
+        saveProgress();renderGraphOnly();openNodeGuide(instanceId,null,{countOpen:false});
+      };
+      const undo=$('krUndoPersonalBtn');
+      if(undo)undo.onclick=()=>{
+        delete state.customNodes[customConversionUndo.personalId];
+        Object.keys(node).forEach(key=>{delete node[key]});Object.assign(node,customConversionUndo.node);
+        customConversionUndo=null;saveProgress();renderGraphOnly();openNodeGuide(instanceId,null,{countOpen:false});
+      };
+    }
     guide.querySelector('.kr-guide-close').onclick=closeGuide;
     makeGuideDraggable();
     guide.querySelectorAll('[data-choice-index]').forEach(btn=>btn.onclick=()=>{
@@ -1097,7 +1125,7 @@
       customInput.setCustomValidity('');createCustomChild(node,title);
     };
     if(customSave)customSave.onclick=submitCustomChild;
-    if(customInput){customInput.oninput=()=>customInput.setCustomValidity('');customInput.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();submitCustomChild()}}}
+    if(customInput){customInput.oninput=()=>customInput.setCustomValidity('');customInput.onkeydown=e=>{if(e.key==='Enter'&&!e.isComposing&&e.keyCode!==229){e.preventDefault();submitCustomChild()}}}
     requestAnimationFrame(()=>placeGuide(liveAnchor));
   }
   function hideGuide(){guide.hidden=true;guide.innerHTML='';guide.dataset.dragged='';guideDragging=false;state.activeNodeId=null}
@@ -1591,7 +1619,7 @@
     document.addEventListener('pointerdown',event=>{const dock=$('krCanvasZoomDock');if(dock?.classList.contains('slider-open')&&!dock.contains(event.target))showZoomSlider(false)},true);
     document.addEventListener('keydown',event=>{
       if(event.key==='Escape'){showZoomSlider(false);return}
-      if(event.ctrlKey||event.metaKey||event.altKey||isTextEditingTarget(event.target))return;
+      if(event.ctrlKey||event.metaKey||event.altKey||isTextEditingTarget(event))return;
       if(event.key!=='Delete')return;
       const accountMenu=$('accountMenu');if(questionDrawerOpen()||(accountMenu&&!accountMenu.hidden))return;
       if(!state.activeNodeId)return;

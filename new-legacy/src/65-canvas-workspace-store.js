@@ -75,6 +75,7 @@
       userId:String(options.userId||currentUserId()),
       title:String(options.title||'我的PMP解题规律'),
       viewport:{x:0,y:0,zoom:1},
+      background:null,
       nodes:{},
       edges:[],
       strokes:[],
@@ -235,6 +236,7 @@
       id:String(value.id||base.id),
       userId:String(value.userId||base.userId),
       title:String(value.title||base.title),
+      background:value.background&&typeof value.background==='object'&&!Array.isArray(value.background)?clone(value.background):null,
       viewport:{
         x:Number.isFinite(Number(value.viewport?.x))?Number(value.viewport.x):0,
         y:Number.isFinite(Number(value.viewport?.y))?Number(value.viewport.y):0,

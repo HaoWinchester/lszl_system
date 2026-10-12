@@ -32,7 +32,24 @@
     return `personal:${slug(questionId)}:${slug(suffix)}`;
   }
 
-  const api=Object.freeze({ancestorDataIds,filterAncestorChoices,personalNodeId});
+  function resolveKeywordRoot(keyword,concepts,library,association){
+    const list=Array.isArray(concepts)?concepts:[];
+    const byId=association?.index?.(library||{}).byId;
+    const unmatched={custom:true,nodeId:null,matchSource:'unmatched'};
+    const explicit=clean(keyword?.recallNodeId);
+    if(explicit)return byId?.has(explicit)?{nodeId:explicit,matchSource:'explicit'}:unmatched;
+    const ids=[...new Set((keyword?.conceptIds||[]).map(clean).filter(Boolean))];
+    if(ids.length){
+      if(ids.length!==1)return unmatched;
+      const concept=list.find(item=>clean(item.id)===ids[0]);if(!concept)return unmatched;
+      const binding=clean(concept.recallNodeId);
+      if(binding)return byId?.has(binding)?{nodeId:binding,matchSource:'concept'}:unmatched;
+      return {nodeId:clean(concept.id),matchSource:'concept'};
+    }
+    const node=association?.resolveExact?.(library||{},keyword?.text||keyword?.title);
+    return node?{nodeId:node.id,matchSource:'exact'}:unmatched;
+  }
+  const api=Object.freeze({ancestorDataIds,filterAncestorChoices,personalNodeId,resolveKeywordRoot});
   global.KGDeepRecallFlowModel=api;
   if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);

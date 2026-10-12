@@ -4,7 +4,7 @@ const root=path.resolve(__dirname,'..');
 const read=file=>fs.readFileSync(path.join(root,file),'utf8');
 const html=read('knowledge-recall.html');
 const js=read('src/86-knowledge-recall.js');
-const css=read('styles/knowledge-recall-p4519.css');
+const css=read('styles/knowledge-recall-patch-1.css');
 assert(html.indexOf('id="krNodeSearchBtn"')<html.indexOf('id="krResetBtn"'),'search button must be left of reset');
 for(const token of ['id="krNodeSearchPanel"','id="krNodeSearchInput"','id="krNodeSearchResults"'])assert(html.includes(token),token);
 for(const token of ['function renderNodeSearchResults','function bindNodeSearch','focusNode(instanceId,true)','bindNodeSearch();'])assert(js.includes(token),token);

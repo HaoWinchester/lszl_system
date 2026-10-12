@@ -68,7 +68,7 @@
       else merged.lightColor=merged.backgroundColor;
     }
     try{global.localStorage?.setItem(STORAGE_KEY,JSON.stringify(merged))}catch(_){}
-    const detail={preferences:clone(merged),source:String(meta.source||'canvas-appearance')};
+    const detail={preferences:clone(merged),changedKeys:Object.keys(next),source:String(meta.source||'canvas-appearance')};
     listeners.forEach(listener=>{try{listener(detail.preferences,detail)}catch(error){console.error(error)}});
     try{global.dispatchEvent(new CustomEvent(EVENT_NAME,{detail}))}catch(_){}
     return clone(merged);

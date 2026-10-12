@@ -947,8 +947,35 @@
   }
   function initUnifiedCanvasRuntime(){
     if(state.runtime||!global.KGUnifiedCanvasRuntime)return state.runtime;
+    let settingsBackgroundSnapshot=null,settingsWorkspaceId='';
     const adapter=Object.freeze({
       id:'multi-question-canvas-adapter',
+      getAppearancePreferences:()=>{
+        settingsBackgroundSnapshot=clone(state.workspace?.background);settingsWorkspaceId=state.workspaceId;
+        return {...global.KGCanvasAppearanceController.read(),...clone(state.workspace?.background?.appearance)};
+      },
+      writeAppearancePreferences:(preferences,meta={})=>{
+        if(state.workspaceId!==settingsWorkspaceId)return clone(preferences);
+        if(meta.source==='canvas-settings-cancel'&&settingsBackgroundSnapshot){
+          state.workspace.background=clone(settingsBackgroundSnapshot);
+          applyWorkspaceBackground();
+          if(!state.readonly){
+            state.suppressStoreEvent=true;
+            try{state.workspace=store().write(state.workspace,{reason:'workspace-background-settings-cancel'})}finally{state.suppressStoreEvent=false}
+          }
+          return clone(preferences);
+        }
+        // Document settings preview is local to this surface; canceled previews never change global defaults.
+        state.runtime?.appearance?.apply?.(preferences);
+        const captured=global.KGLearningTheme.captureWorkspaceBackground(state.viewport,state.viewport.querySelector('.qw-background'));
+        state.workspace.background={...state.workspace.background,appearance:clone(preferences),surface:captured.surface};
+        applyWorkspaceBackground();
+        if(!state.readonly){
+          state.suppressStoreEvent=true;
+          try{state.workspace=store().write(state.workspace,{reason:'workspace-background-'+meta.source})}finally{state.suppressStoreEvent=false}
+        }
+        return clone(preferences);
+      },
       getSurface:()=>state.viewport,getViewportElement:()=>state.viewport,getZoomDock:()=>byId('qwCanvasZoomDock'),getFullscreenElement:()=>byId('qwCanvasShell')||state.viewport,
       getViewport:()=>({x:state.panX,y:state.panY,zoom:state.zoom}),
       setViewport:(next,meta={})=>setViewport(next,{...meta,persist:meta.persist}),
@@ -2620,7 +2647,7 @@
     const picker=global.KGColorPickerV2;
     if(!picker||typeof picker.open!=='function')return false;
     const pointer=anchor&&Number.isFinite(anchor.clientX)?{x:anchor.clientX,y:anchor.clientY}:null;
-    const target=anchor&&anchor.currentTarget?anchor.currentTarget:anchor;
+    const target=anchor?.target?.closest?.('[data-qw-selection-action="color"]')||anchor;
     return picker.open({kind:'multi-question-card',title:'卡牌或分组颜色',anchor:target,pointer,value:{color:currentSelectionColor(),opacity:1},allowOpacity:false,allowTransparent:false,documentColors:workspaceDocumentColors(),documentLabel:'当前画布',onCommit:value=>applySelectionColor(value.color)});
   }
   function applySelectionColor(color){
@@ -2632,6 +2659,8 @@
     const before=workspaceSnapshot();
     const draft=clone(before);
     const group=ids.length>1?selectedCommonGroup(ids):null;
+    // Closing the picker may commit the already-applied swatch again. Keep undo meaningful.
+    if(group?String(group.color||'').toLowerCase()===color.toLowerCase():ids.every(id=>String(draft.nodes?.[id]?.color||'').toLowerCase()===color.toLowerCase()))return true;
     let label='设置卡片颜色';
     if(group){
       const target=(draft.groups||[]).find(item=>String(item.id)===String(group.id));
@@ -3829,9 +3858,28 @@
     state.suppressStoreEvent=true;try{state.workspace=store()?.write?.(workspace,{reason:'group-membership-updated'})||workspace}finally{state.suppressStoreEvent=false}
     const after=workspaceSnapshot();pushWorkspaceHistory('调整分组成员',before,after);renderCards();notify('已根据卡片落点更新分组成员。');return true;
   }
+  function applyWorkspaceBackground(){
+    if(!state.workspace||!state.viewport)return;
+    const layer=state.viewport.querySelector('.qw-background');
+    if(!state.workspace.background){
+      document.body.removeAttribute('data-workspace-background');
+      if(layer){layer.style.removeProperty('background-color');layer.style.removeProperty('background-image');layer.style.removeProperty('background-repeat')}
+      const background=global.KGLearningTheme?.captureWorkspaceBackground?.(state.viewport,layer);
+      if(background){
+        state.workspace.background=background;
+        if(canEdit()){
+          state.suppressStoreEvent=true;
+          try{state.workspace=store().write(state.workspace,{reason:'workspace-background-migrated'})}finally{state.suppressStoreEvent=false}
+        }
+      }
+    }
+    document.body.dataset.workspaceBackground='document';
+    global.KGLearningTheme?.applyWorkspaceBackground?.(state.viewport,layer,state.workspace.background);
+  }
   function renderCards(){
     clearOptionTransientState();
     state.workspace=store()?.ensure?.(workspaceOptions())||state.workspace||{nodes:{},edges:[],groups:[]};
+    applyWorkspaceBackground();
     const liveNodeIds=new Set(Object.keys(state.workspace?.nodes||{}));
     [...state.sessionHighlights.keys()].forEach(nodeId=>{if(!liveNodeIds.has(String(nodeId)))state.sessionHighlights.delete(nodeId)});
     const nodes=Object.values(state.workspace.nodes||{}).sort((a,b)=>Number(a.createdAt)-Number(b.createdAt));
@@ -3920,6 +3968,7 @@
   }
   function loadWorkspace(workspaceId,options={}){
     if(state.workspaceTransition)return false;
+    state.runtime?.closeSettings?.();
     workspaceId=String(workspaceId||'');
     // Initialization stays synchronous; changing an existing canvas waits for its server writes.
     if(!state.workspace||!state.workspaceId||state.workspaceId===workspaceId)return activateWorkspace(workspaceId,options);
@@ -4505,8 +4554,7 @@
   }
 
   function isTextEditingTarget(target){
-    const element=target?.closest?.('input,textarea,select,[contenteditable]');
-    return !!(element&&element.getAttribute?.('contenteditable')!=='false');
+    return !!global.KGCanvasDomInteraction?.isEditingTarget?.(target);
   }
   function isCanvasPanMode(){return state.pointerMode==='pan'||state.temporaryPanMode}
   function updatePointerModeUI(){
@@ -5527,7 +5575,7 @@
       showCanvasContextMenu(event);
     });
     document.addEventListener('keydown',event=>{
-      const editing=isTextEditingTarget(event.target);
+      const editing=isTextEditingTarget(event);
       const key=String(event.key||'').toLowerCase();
       if((event.ctrlKey||event.metaKey)&&!event.altKey&&!editing&&key==='z'){
         event.preventDefault();
@@ -5711,9 +5759,33 @@
     const workspace=store()?.ensure?.({workspaceId:requested,activate:true});
     state.workspaceId=workspace?.id||requested;
     initUnifiedCanvasRuntime();
+    state.workspace=workspace;
+    global.addEventListener('kg:canvas-view-preferences-changed',event=>{
+      if(!state.workspace)return;
+      const appearance=event.detail?.preferences;
+      if(!appearance)return;
+      const changedKeys=event.detail?.changedKeys||Object.keys(appearance);
+      const backgroundChange=changedKeys.some(key=>['theme','pattern','backgroundColor','lightColor','darkColor'].includes(key));
+      if(backgroundChange){
+        const merged={...state.workspace.background?.appearance};
+        changedKeys.forEach(key=>{if(Object.prototype.hasOwnProperty.call(appearance,key))merged[key]=appearance[key]});
+        if(changedKeys.includes('theme')&&!changedKeys.includes('backgroundColor'))merged.backgroundColor=appearance.backgroundColor;
+        if(changedKeys.includes('backgroundColor'))merged[appearance.theme==='dark'?'darkColor':'lightColor']=appearance.backgroundColor;
+        const captured=global.KGLearningTheme?.captureWorkspaceBackground?.(state.viewport,state.viewport.querySelector('.qw-background'));
+        state.workspace.background={...state.workspace.background,appearance:merged,surface:captured?.surface};
+      }else{
+        state.workspace.background={...state.workspace.background,appearance:{...state.workspace.background?.appearance,minimapExpanded:appearance.minimapExpanded}};
+      }
+      applyWorkspaceBackground();
+      if(canEdit()){
+        state.suppressStoreEvent=true;
+        try{state.workspace=store().write(state.workspace,{reason:'workspace-background-updated'})}finally{state.suppressStoreEvent=false}
+      }
+    });
     // 主题与深度回忆共用同一存储（kg_deep_recall_theme_v1），任一页切换双向同步。
     const themeController=global.KGLearningTheme?.create?.({roots:()=>[document.body]});
     themeController?.init();
+    applyWorkspaceBackground();
     const themeSelect=byId('qwThemeSelect');
     if(themeSelect){
       themeSelect.value=themeController?themeController.saved():'platform';

@@ -500,6 +500,7 @@ const CENTER_SCOPE_ICON='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx=
 const FIT_SCOPE_ICON='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5"></path><path d="M16 3h5v5"></path><path d="M8 21H3v-5"></path><path d="M16 21h5v-5"></path><path d="M3 3l6 6"></path><path d="M21 3l-6 6"></path><path d="M3 21l6-6"></path><path d="M21 21l-6-6"></path></svg>';
 const RESTORE_SCOPE_ICON='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"></path><path d="M3 4v6h6"></path><path d="M9 12h6"></path></svg>';
 
+let relatedCanvasUnmount=null;
 let relatedCanvasModalEl=null,relatedCanvasState=null,relatedCanvasDrag=null,relatedCanvasPanDrag=null,relatedCanvasPanTimer=0,relatedCanvasInfoState=null,relatedCanvasInfoDrag=null;
 const RELATED_CANVAS_MIN_SCALE=.45,RELATED_CANVAS_MAX_SCALE=1.8,RELATED_CANVAS_SCALE_STEP=1.14;
 const RELATED_CANVAS_CLOSE_ICON='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"></path></svg>';
@@ -689,6 +690,7 @@ function closeRelatedCanvasModal(showMessage=false,options={}){
   document.removeEventListener('pointermove',moveRelatedCanvasInfoDrag,true);
   document.removeEventListener('pointerup',endRelatedCanvasInfoDrag,true);
   document.removeEventListener('pointercancel',endRelatedCanvasInfoDrag,true);
+  if(relatedCanvasUnmount){relatedCanvasUnmount();relatedCanvasUnmount=null}
   if(relatedCanvasModalEl){relatedCanvasModalEl.remove();relatedCanvasModalEl=null}
   relatedCanvasState=null;
   document.body.classList.remove('related-canvas-open');
@@ -814,8 +816,9 @@ function openRelatedCanvasModal(showMessage=true){
   overlay.querySelector('.related-canvas-fullscreen-toggle').onclick=()=>toggleRelatedCanvasFullscreen();
   overlay.querySelector('.related-canvas-close').onclick=()=>closeRelatedCanvasModal(true);
   overlay.addEventListener('click',e=>{if(e.target===overlay)closeRelatedCanvasModal(true)});
-  document.body.appendChild(overlay);document.body.classList.add('related-canvas-open');relatedCanvasModalEl=overlay;
+  document.body.appendChild(overlay);relatedCanvasUnmount=window.KGCanvasDomInteraction.mountOverlay(overlay);document.body.classList.add('related-canvas-open');relatedCanvasModalEl=overlay;
   requestAnimationFrame(()=>{
+    if(relatedCanvasModalEl!==overlay)return;
     const body=overlay.querySelector('.related-canvas-body'),stageEl=overlay.querySelector('.related-canvas-stage');
     const bw=Math.max(720,body.clientWidth||1200),bh=Math.max(520,body.clientHeight||760);
     const layout=computeRelatedCanvasLayout(nodes,bw,bh);
@@ -3906,8 +3909,8 @@ function endStagePointer(e){
   }else if(activePointers.size===1){const remain=[...activePointers.values()][0];pan={id:[...activePointers.keys()][0],x:remain.x,y:remain.y,vx:state.viewport.x,vy:state.viewport.y,moved:false}}
 }
 stage.addEventListener('dblclick',e=>{if(isCanvasPanMode()||isUI(e.target))return;const pt=screenToWorld(e.clientX,e.clientY);createNodeAt(pt.x,pt.y)});
-function isTextEditingTarget(target){const el=target&&target.closest&&target.closest('input,textarea,select,[contenteditable]');return !!(el&&(!el.hasAttribute||el.getAttribute('contenteditable')!=='false'))}
-document.addEventListener('keydown',e=>{if((e.code==='Space'||e.key===' ')&&!e.repeat&&!isTextEditingTarget(e.target)){setTemporaryGraphPanMode(true,'space');e.preventDefault()}});
+function isTextEditingTarget(target){return window.KGCanvasDomInteraction.isEditingTarget(target)}
+document.addEventListener('keydown',e=>{if((e.code==='Space'||e.key===' ')&&!e.repeat&&!isTextEditingTarget(e)){setTemporaryGraphPanMode(true,'space');e.preventDefault()}});
 document.addEventListener('keyup',e=>{if(e.code==='Space'||e.key===' '){setTemporaryGraphPanMode(false,'space');e.preventDefault()}});
 updateGraphPointerModeUI();
 stage.addEventListener('pointermove',e=>{lastGraphPointerWorldPosition=screenToWorld(e.clientX,e.clientY)},{passive:true});
@@ -3925,7 +3928,7 @@ function selectAllGraphNodesFromShortcut(){
   return true;
 }
 function handleGraphClipboardShortcut(e){
-  if(isTextEditingTarget(e.target)||e.altKey||!graphModeAllows('editGraph'))return;
+  if(isTextEditingTarget(e)||e.altKey||!graphModeAllows('editGraph'))return;
   const combo=e.ctrlKey||e.metaKey;
   if(!combo)return;
   const key=String(e.key||'').toLowerCase();
@@ -3951,7 +3954,7 @@ function handleGraphClipboardShortcut(e){
 }
 document.addEventListener('keydown',handleGraphClipboardShortcut);
 stage.addEventListener('wheel',e=>{
-  if(isTextEditingTarget(e.target))return;
+  if(isTextEditingTarget(e))return;
   hideGraphTransientMenus();
   e.preventDefault();
   markStageInteracting();
@@ -4261,4 +4264,4 @@ requestAnimationFrame(()=>requestAnimationFrame(()=>recoverMobileGraphViewport()
 $('nodeModal').addEventListener('click',e=>{if(e.target===$('nodeModal'))closeNodeModal({discardNew:true})});
 ['linkModal','graphModal','templateModal','flashcardModal'].forEach(id=>{$(id).addEventListener('click',e=>{if(e.target===$(id))$(id).classList.remove('show')})});
 
-document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;window.KGHomeCanvasRuntime?.selectionFilter?.clear?.({reason:'escape',apply:false});window.KGHomeCanvasRuntime?.alignment?.end?.();const resize=graphKernelControllers.resize;if(resize&&resize.isActive()){e.preventDefault();resize.cancel();return}if(nodeContextMenuController&&nodeContextMenuController.isVisible()){e.preventDefault();nodeContextMenuController.hide();return}if(nodeFreeResizeModeId){e.preventDefault();exitNodeFreeResizeMode({message:true});return}if(relatedCanvasModalEl){e.preventDefault();closeRelatedCanvasModal(true);return}if(nodeFloatingColorWindowController&&nodeFloatingColorWindowController.isOpen()){e.preventDefault();nodeFloatingColorWindowController.close({cancel:true,force:true,reason:'escape'});return}if(nodeStyleToolbarController&&nodeStyleToolbarController.isVisible()){e.preventDefault();nodeStyleToolbarController.hide()}});
+document.addEventListener('keydown',e=>{if(e.key!=='Escape'||e.defaultPrevented||isTextEditingTarget(e))return;window.KGHomeCanvasRuntime?.selectionFilter?.clear?.({reason:'escape',apply:false});window.KGHomeCanvasRuntime?.alignment?.end?.();const resize=graphKernelControllers.resize;if(resize&&resize.isActive()){e.preventDefault();resize.cancel();return}if(nodeContextMenuController&&nodeContextMenuController.isVisible()){e.preventDefault();nodeContextMenuController.hide();return}if(nodeFreeResizeModeId){e.preventDefault();exitNodeFreeResizeMode({message:true});return}if(relatedCanvasModalEl){e.preventDefault();closeRelatedCanvasModal(true);return}if(nodeFloatingColorWindowController&&nodeFloatingColorWindowController.isOpen()){e.preventDefault();nodeFloatingColorWindowController.close({cancel:true,force:true,reason:'escape'});return}if(nodeStyleToolbarController&&nodeStyleToolbarController.isVisible()){e.preventDefault();nodeStyleToolbarController.hide()}});

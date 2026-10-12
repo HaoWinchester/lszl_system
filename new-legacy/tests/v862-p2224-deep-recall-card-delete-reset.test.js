@@ -4,7 +4,7 @@ const root=path.resolve(__dirname,'..');
 const read=file=>fs.readFileSync(path.join(root,file),'utf8');
 const html=read('knowledge-recall.html');
 const js=read('src/86-knowledge-recall.js');
-const css=read('styles/knowledge-recall-p2224.css');
+const css=read('styles/knowledge-recall-patch-1.css');
 
 assert(html.includes('id="krBackBtn"')&&html.includes('data-practice-back'),'深度回忆应恢复原左上角返回按钮');
 assert(!html.includes('id="krTopContext"'),'页面标题后不应继续显示题号');

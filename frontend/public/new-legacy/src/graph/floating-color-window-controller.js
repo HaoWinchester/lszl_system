@@ -5,8 +5,10 @@
   const GRIP_ICON='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="7" r="1"></circle><circle cx="16" cy="7" r="1"></circle><circle cx="8" cy="12" r="1"></circle><circle cx="16" cy="12" r="1"></circle><circle cx="8" cy="17" r="1"></circle><circle cx="16" cy="17" r="1"></circle></svg>';
   function clamp(value,min,max){return Math.min(max,Math.max(min,Number(value)||0))}
   function create(options={}){
-    const stage=options.stage||document.body;
+    const home=options.stage||document.body;
+    let stage=home,unmount=null;
     let root=null,picker=null,drag=null,current=null,pinned=false,outsideBound=false;
+    let outsideHandler=null;
     function ensure(){
       if(root&&root.isConnected)return root;
       root=document.createElement('aside');
@@ -17,6 +19,7 @@
       root.addEventListener('pointerdown',event=>event.stopPropagation());
       root.addEventListener('click',event=>event.stopPropagation());
       root.addEventListener('dblclick',event=>event.stopPropagation());
+      root.addEventListener('wheel',event=>event.stopPropagation(),{passive:true});
       root.querySelector('[data-color-window-close]').addEventListener('click',()=>close({cancel:true,force:true,reason:'explicit'}));
       const grip=root.querySelector('[data-color-window-drag]');
       grip.addEventListener('pointerdown',event=>{
@@ -41,18 +44,20 @@
       };
       grip.addEventListener('pointerup',finish);grip.addEventListener('pointercancel',finish);
       stage.appendChild(root);
+      if(global.KGCanvasDomInteraction)unmount=global.KGCanvasDomInteraction.mountOverlay(root,home,host=>{stage=host;if(current)requestAnimationFrame(()=>positionNear(current.anchor,current.pointer))});
       bindOutsideClose();
       return root;
     }
     function bindOutsideClose(){
       if(outsideBound)return;outsideBound=true;
-      document.addEventListener('pointerdown',event=>{
+      outsideHandler=event=>{
         if(!root||root.hidden||pinned)return;
         const target=event.target;
         if(root.contains(target))return;
         if(current&&current.anchor&&current.anchor.contains&&current.anchor.contains(target))return;
         close({cancel:false,reason:'outside'});
-      },true);
+      };
+      document.addEventListener('pointerdown',outsideHandler,true);
     }
     function setPosition(left,top){
       ensure();const sr=stage.getBoundingClientRect(),width=root.offsetWidth||320,height=root.offsetHeight||420,pad=10;
@@ -114,7 +119,7 @@
     }
     function isOpen(){return !!(root&&!root.hidden)}
     function reposition(){if(isOpen())setPosition(parseFloat(root.style.left)||10,parseFloat(root.style.top)||10)}
-    function destroy(){if(picker&&picker.destroy)picker.destroy();if(root)root.remove();root=null;picker=null;current=null;drag=null}
+    function destroy(){if(unmount)unmount();unmount=null;if(outsideHandler)document.removeEventListener('pointerdown',outsideHandler,true);outsideBound=false;outsideHandler=null;if(picker&&picker.destroy)picker.destroy();if(root)root.remove();root=null;picker=null;current=null;drag=null}
     return Object.freeze({ensure,open,close,isOpen,isPinned:()=>pinned,reposition,destroy,getRoot:()=>ensure()});
   }
   global.KGGraphFloatingColorWindowController=Object.freeze({create});

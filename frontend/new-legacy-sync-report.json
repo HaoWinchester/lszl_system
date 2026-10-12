@@ -1,12 +1,14 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.308",
+  "fromVersion": "v9.0-p4.1.309",
   "toVersion": "v9.0-p4.1.309",
   "changes": {
     "added": [],
     "changed": [
-      "VERSION",
-      "content-prep-studio/dist/content-prep.html"
+      "src/77-multi-question-workspace.js",
+      "src/canvas/88-canvas-settings-controller.js",
+      "src/canvas/89-canvas-runtime.js",
+      "tests/workspace-theme-color-browser.py"
     ],
     "removed": []
   },

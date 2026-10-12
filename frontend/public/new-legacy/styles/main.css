@@ -66,7 +66,7 @@ button.active-toggle{background:#0f172a;color:#fff;box-shadow:0 8px 22px rgba(15
 .stage.focus-mode.is-interacting .edge-label{display:none!important}
 
 .stage.panning{cursor:grabbing}
-.world{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform;touch-action:none}
+.world{position:absolute;left:0;top:0;transform-origin:0 0;touch-action:none}
 .edge-layer{position:absolute;left:-50000px;top:-50000px;width:100000px;height:100000px;overflow:visible;z-index:1;pointer-events:none}
 .cards-layer{position:absolute;left:0;top:0;z-index:2}
 .edge-visible{fill:none;stroke:var(--edge-color,var(--line));stroke-width:4;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 3px 3px rgba(37,99,235,.18));pointer-events:none}

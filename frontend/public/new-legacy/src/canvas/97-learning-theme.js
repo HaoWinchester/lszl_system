@@ -13,6 +13,31 @@
   function writeRaw(key,value){
     try{if(Store.writeString)Store.writeString(key,value);else global.localStorage?.setItem(key,value)}catch(e){/* 存储不可用时仅失去持久化 */}
   }
+  // A learning theme decorates controls/cards; workspace background belongs to the document.
+  function captureWorkspaceBackground(surface,layer){
+    const css=layer?global.getComputedStyle(layer):null;
+    const appearance=global.KGCanvasAppearanceController?.read?.()||{};
+    const color=surface?global.getComputedStyle(surface).getPropertyValue('--uc-canvas-bg').trim():'';
+    if(/^#[0-9a-f]{6}$/i.test(color))appearance.backgroundColor=color;
+    const surfaceCss=surface?global.getComputedStyle(surface):null;
+    return {appearance,surface:{ink:surfaceCss?.getPropertyValue('--uc-canvas-pattern-ink').trim()||'',majorInk:surfaceCss?.getPropertyValue('--uc-canvas-pattern-major-ink').trim()||''},layer:{
+      color:css?.backgroundColor||'',image:css?.backgroundImage||'none',repeat:css?.backgroundRepeat||'repeat'
+    }};
+  }
+  function applyWorkspaceBackground(surface,layer,background){
+    if(!background)return false;
+    global.KGCanvasAppearanceController?.applySurface?.(surface,background.appearance);
+    if(surface&&background.surface){
+      surface.style.setProperty('--uc-canvas-pattern-ink',background.surface.ink);
+      surface.style.setProperty('--uc-canvas-pattern-major-ink',background.surface.majorInk);
+    }
+    if(layer&&background.layer){
+      layer.style.backgroundColor=background.layer.color;
+      layer.style.backgroundImage=background.layer.image;
+      layer.style.backgroundRepeat=background.layer.repeat;
+    }
+    return true;
+  }
   function create(options={}){
     const roots=()=>[].concat(typeof options.roots==='function'?options.roots():options.roots||[]).filter(Boolean);
     // 一次性迁移：旧默认 parchment 统一升级为 platform，之后按存储值走。
@@ -44,5 +69,5 @@
     });
     return {init:()=>apply(saved()),apply,saved,THEMES};
   }
-  global.KGLearningTheme=Object.freeze({create,THEMES});
+  global.KGLearningTheme=Object.freeze({create,THEMES,captureWorkspaceBackground,applyWorkspaceBackground});
 })(window);

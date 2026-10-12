@@ -222,7 +222,7 @@
           }else if(value.trim())change([...getStrokes(),{id:'ink-'+Date.now().toString(36)+'-'+(++sequence)+'-'+Math.random().toString(36).slice(2,8),tool:'text',...session.style,points:[session.world],text:value}],'添加文字');
         }catch(error){report(error);session.editor.focus();return}
       }
-      textSession=null;session.editor.remove();session.actions.remove();
+      textSession=null;session.unmount?.forEach(dispose=>dispose());session.editor.remove();session.actions.remove();
     }
     function openTextEditor(clientX,clientY,existing){
       closeTextEditor(false);
@@ -236,8 +236,12 @@
       editor.style.fontSize=style.width*scale+'px';editor.style.color=style.color;editor.style.fontWeight=style.bold?'700':'400';
       const actions=doc.createElement('div');actions.className='canvas-ink-text-actions';actions.dataset.canvasUi='true';actions.style.left=editor.style.left;
       actions.innerHTML='<button type="button" aria-label="保存画布文字">保存</button><button type="button" aria-label="取消画布文字">取消</button>';
-      doc.body.append(editor,actions);textSession={editor,actions,existing,world,style};
+      doc.body.append(editor,actions);textSession={editor,actions,existing,world,style,unmount:[]};
       const resize=()=>{editor.style.height='auto';editor.style.height=editor.scrollHeight+'px';actions.style.top=(parseFloat(editor.style.top)+editor.offsetHeight+4)+'px'};
+      if(global.KGCanvasDomInteraction){
+        const relocate=()=>{const r=viewport.getBoundingClientRect(),v=options.getViewport(),s=v.scale||v.zoom||1;editor.style.left=(r.left+v.x+world[0]*s)+'px';editor.style.top=(r.top+v.y+world[1]*s)+'px';actions.style.left=editor.style.left;resize()};
+        textSession.unmount.push(global.KGCanvasDomInteraction.mountOverlay(editor,doc.body,relocate),global.KGCanvasDomInteraction.mountOverlay(actions,doc.body));
+      }
       actions.querySelectorAll('button').forEach((button,index)=>button.addEventListener('click',()=>closeTextEditor(index===0)));
       editor.addEventListener('keydown',event=>{
         event.stopPropagation();if(event.isComposing||event.keyCode===229)return;
@@ -330,7 +334,7 @@
     listen(global,'dblclick',event=>{if(readonly()||space||!inside(event.target)||(tool!=='select'&&tool!=='text'))return;const view=options.getViewport(),hit=hitTextStroke(point(event,viewport.getBoundingClientRect(),view),4/(view.scale||view.zoom||1));if(hit){stop(event);selectedTextId=hit.id;openTextEditor(event.clientX,event.clientY,hit)}},true);
     listen(global,'click',event=>{if(inside(event.target)&&(Date.now()<suppressClickUntil||(tool!=='select'&&!space)))stop(event)},true);
     listen(global,'keydown',event=>{
-      if(event.target?.closest?.('input,textarea,select,[contenteditable="true"],[contenteditable=""]'))return;
+      if(global.KGCanvasDomInteraction?.isEditingTarget(event))return;
       if(event.key==='Escape'){setTool('select');return}
       if(event.code==='Space'&&tool!=='select'){space=true;cancel();viewport.classList.add('canvas-ink-panning');event.preventDefault()}
       if(ownHistory&&!readonly()&&(event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='z'&&!event.altKey){stop(event);cancel();try{history?.[event.shiftKey?'redo':'undo']?.();refreshControls()}catch(error){report(error)}}

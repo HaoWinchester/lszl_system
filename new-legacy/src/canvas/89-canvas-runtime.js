@@ -200,7 +200,7 @@
     const settingsButton=options.settingsButton||ensureDockButton(dock,'[data-uc-canvas-settings]','canvas-zoom-btn lp-canvas-zoom-btn uc-canvas-settings-button','视图设置 · 画布设置',ICON_SETTINGS);
     if(settingsButton)settingsButton.dataset.ucCanvasSettings='true';
     const zoom=global.KGCanvasZoomDockController?.create?.({adapter,dock,percent,fullscreen})||null;
-    settingsButton?.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();ensureSettings()?.open?.()});
+    settingsButton?.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();ensureSettings()?.open?.({surface,readPreferences:adapter.getAppearancePreferences,writePreferences:adapter.writeAppearancePreferences})});
     fullscreen?.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();zoom?.toggleFullscreen?.()});
     let minimap=null,minimapDom=null;
     if(options.minimap!==false){
@@ -246,7 +246,8 @@
         return viewport;
       },
       refreshMinimap(rebuild=true){return minimap?.schedule?.({rebuild})||false},
-      openSettings(){return ensureSettings()?.open?.()||false},
+      closeSettings(){if(sharedSettings?.isOpen?.())sharedSettings.cancel();return true},
+      openSettings(){return ensureSettings()?.open?.({surface,readPreferences:adapter.getAppearancePreferences,writePreferences:adapter.writeAppearancePreferences})||false},
       destroy(){if(destroyed)return false;destroyed=true;appearance?.destroy?.();zoom?.destroy?.();minimap?.destroy?.();selectionFilter?.destroy?.();alignment?.destroy?.();instances.delete(id);return true}
     });
     instances.set(id,api);
@@ -256,6 +257,6 @@
   }
   global.KGUnifiedCanvasRuntime=Object.freeze({
     register,get:id=>instances.get(String(id||''))||null,list:()=>[...instances.values()],destroy:id=>instances.get(String(id||''))?.destroy?.()||false,
-    openSettings:()=>ensureSettings()?.open?.()||false
+    openSettings:()=>[...instances.values()].find(instance=>typeof instance.adapter.getAppearancePreferences==='function')?.openSettings?.()||ensureSettings()?.open?.()||false
   });
 })(window);

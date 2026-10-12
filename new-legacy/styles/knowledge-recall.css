@@ -23,8 +23,8 @@ button,select{font:inherit}
   linear-gradient(90deg,var(--kr-grid-line) 1px,transparent 1px);
   background-size:40px 40px}
 .kr-viewport.dragging{cursor:grabbing}
-.kr-world{position:absolute;left:0;top:0;width:1px;height:1px;transform-origin:0 0;will-change:transform}
-.kr-world.smooth{transition:transform .42s cubic-bezier(.2,.72,.2,1)}
+.kr-world{position:absolute;left:0;top:0;width:1px;height:1px;transform-origin:0 0;}
+.kr-world.smooth{will-change:transform;transition:transform .42s cubic-bezier(.2,.72,.2,1)}
 .kr-edges{position:absolute;left:0;top:0;width:1px;height:1px;overflow:visible;pointer-events:none;z-index:1}
 .kr-edge{fill:none;stroke:var(--kr-line);stroke-width:4.5;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 3px 2px rgba(0,0,0,.18));stroke-dasharray:9 10;opacity:.88}
 .kr-edge.new{stroke-dasharray:1;animation:krDrawLine .7s ease both}
@@ -82,6 +82,12 @@ button,select{font:inherit}
 .kr-guide-actions button{border:0;border-radius:999px;background:var(--kr-primary-dark);color:white;padding:8px 12px;cursor:pointer;box-shadow:0 7px 16px color-mix(in srgb,var(--kr-primary-dark) 24%,transparent)}
 .kr-guide-actions button.secondary{background:var(--kr-control-bg);color:var(--kr-control-ink);border:1px solid var(--kr-border)}
 .kr-custom-form{position:relative;margin-top:10px;display:flex;gap:8px}
+.kr-personal-editor{display:grid;gap:8px;margin-top:14px;padding-top:14px;border-top:1px solid var(--kr-border)}
+.kr-personal-editor label{font-size:12px;font-weight:700;color:var(--kr-card-ink)}
+.kr-personal-editor input,.kr-personal-editor textarea{box-sizing:border-box;width:100%;min-width:0;border:1px solid var(--kr-border);border-radius:12px;padding:10px 12px;background:var(--kr-card);color:var(--kr-card-ink);font:inherit}
+.kr-personal-editor textarea{resize:vertical;min-height:78px;line-height:1.5}
+.kr-personal-editor input:focus-visible,.kr-personal-editor textarea:focus-visible{outline:2px solid var(--kr-green);outline-offset:2px}
+.kr-personal-editor button{justify-self:start;border:0;border-radius:12px;padding:10px 12px;background:var(--kr-green);color:white;font-weight:700;cursor:pointer}
 .kr-custom-form input{flex:1;min-width:0;border:1px solid var(--kr-border);border-radius:14px;padding:10px 12px;background:var(--kr-card);color:var(--kr-card-ink);outline:none}
 .kr-custom-form button{border:0;border-radius:14px;background:var(--kr-green);color:white;font-weight:700;padding:10px 12px;cursor:pointer}
 .kr-empty-choices{position:relative;background:rgba(255,255,255,.38);border-radius:16px;padding:12px;color:var(--kr-muted);line-height:1.5}

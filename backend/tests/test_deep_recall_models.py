@@ -1,4 +1,7 @@
 from sqlalchemy import Index, UniqueConstraint
+import pytest
+from pydantic import ValidationError
+from app.schemas.deep_recall import RecallTransform
 
 from app.models.training import (
     RecallLibrarySnapshot,
@@ -13,6 +16,17 @@ def _unique_constraint_names(model: type) -> set[str | None]:
         for constraint in model.__table__.constraints
         if isinstance(constraint, UniqueConstraint)
     }
+
+
+def test_recall_transform_accepts_full_canvas_zoom_range() -> None:
+    for scale in (.01, .1, .2, .5, 1, 2, 4):
+        assert RecallTransform(scale=scale).scale == scale
+
+
+@pytest.mark.parametrize("scale", [0, -.01, float("nan"), float("inf"), .009, 4.01])
+def test_recall_transform_rejects_invalid_zoom(scale: float) -> None:
+    with pytest.raises(ValidationError):
+        RecallTransform(scale=scale)
 
 
 def _index_names(model: type) -> set[str | None]:

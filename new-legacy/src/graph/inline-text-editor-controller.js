@@ -104,7 +104,7 @@
       listen('click',event=>event.stopPropagation());
       listen('dblclick',event=>event.stopPropagation());
       listen('keydown',event=>{
-        if(!session||session.editor!==editor)return;
+        if(!session||session.editor!==editor||event.isComposing||event.keyCode===229)return;
         if(event.key==='Escape'){
           event.preventDefault();event.stopPropagation();cancel();return;
         }

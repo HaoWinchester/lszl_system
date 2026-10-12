@@ -154,28 +154,10 @@ body.question-workspace-page[data-theme]{
   --lp-shell-ink:var(--kr-ink);
   --lp-shell-muted:var(--kr-muted);
   --lp-shell-border:var(--kr-border);
-  /* 统一画布表面（unified-canvas-runtime）的底色与网格点颜色：
-     变量在 .uc-canvas-surface 自身声明，须同位覆盖而非依赖继承 */
-  --uc-canvas-bg:var(--kr-bg-b);
-  --uc-canvas-pattern-ink:var(--kr-grid-line);
-  --uc-canvas-pattern-major-ink:var(--kr-grid-line);
   background:var(--kr-bg);
   color:var(--kr-ink);
 }
-body.question-workspace-page[data-theme] .uc-canvas-surface{
-  /* 画布运行时会把这几个变量以内联样式写到 viewport，需 !important 才能赢得级联 */
-  --uc-canvas-bg:var(--kr-bg-b)!important;
-  --uc-canvas-pattern-ink:var(--kr-grid-line)!important;
-  --uc-canvas-pattern-major-ink:var(--kr-grid-line)!important;
-}
 body.question-workspace-page[data-theme] .qw-topbar{border-bottom-color:var(--kr-border);background:var(--kr-topbar-bg)}
-body.question-workspace-page[data-theme] .qw-background{
-  background-color:var(--kr-bg-b);
-  background-image:
-    radial-gradient(circle at 1px 1px,var(--kr-grid-line) 1.15px,transparent 1.35px),
-    radial-gradient(circle at 1px 1px,var(--kr-grid-line) .85px,transparent 1.05px),
-    linear-gradient(135deg,color-mix(in srgb,var(--kr-bg-a) 74%,transparent),color-mix(in srgb,var(--kr-bg-b) 92%,transparent));
-}
 body.question-workspace-page[data-theme] .qw-question-card{background:var(--kr-card);border-color:var(--kr-border);color:var(--kr-card-ink)}
 body.question-workspace-page[data-theme] .qw-question-card:hover{border-color:color-mix(in srgb,var(--kr-primary) 42%,transparent);box-shadow:0 18px 52px color-mix(in srgb,var(--kr-primary) 18%,transparent)}
 body.question-workspace-page[data-theme] .qw-card-header{border-bottom-color:var(--kr-border);background:linear-gradient(135deg,color-mix(in srgb,var(--kr-primary) 8%,var(--kr-card)),var(--kr-card))}
@@ -183,3 +165,18 @@ body.question-workspace-page[data-theme] .qw-card-header{border-bottom-color:var
 .qw-theme-select{height:36px;padding:0 10px;border:1px solid #dfe4ed;border-radius:11px;background:#fff;color:#475569;font-size:11px;font-weight:900;cursor:pointer;outline:0}
 .qw-theme-select:focus-visible{outline:2px solid var(--qw-primary,#6d5dfc);outline-offset:2px}
 body.question-workspace-page[data-theme] .qw-theme-select{border-color:var(--kr-border);background:var(--kr-control-bg);color:var(--kr-control-ink)}
+
+/* Legacy documents capture their first effective themed background once. */
+body.question-workspace-page[data-theme]:not([data-workspace-background]) .uc-canvas-surface{
+  /* 画布运行时会把这几个变量以内联样式写到 viewport，需 !important 才能赢得级联 */
+  --uc-canvas-bg:var(--kr-bg-b)!important;
+  --uc-canvas-pattern-ink:var(--kr-grid-line)!important;
+  --uc-canvas-pattern-major-ink:var(--kr-grid-line)!important;
+}
+body.question-workspace-page[data-theme]:not([data-workspace-background]) .qw-background{
+  background-color:var(--kr-bg-b);
+  background-image:
+    radial-gradient(circle at 1px 1px,var(--kr-grid-line) 1.15px,transparent 1.35px),
+    radial-gradient(circle at 1px 1px,var(--kr-grid-line) .85px,transparent 1.05px),
+    linear-gradient(135deg,color-mix(in srgb,var(--kr-bg-a) 74%,transparent),color-mix(in srgb,var(--kr-bg-b) 92%,transparent));
+}

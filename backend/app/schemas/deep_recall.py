@@ -15,7 +15,7 @@ class RecallTransform(BaseModel):
 
     x: float = 0
     y: float = 0
-    scale: float = Field(default=1, ge=0.2, le=4)
+    scale: float = Field(default=1, ge=0.01, le=4)
 
     @model_validator(mode="after")
     def finite_values(self) -> "RecallTransform":
