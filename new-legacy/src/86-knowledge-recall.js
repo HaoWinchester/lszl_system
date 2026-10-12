@@ -15,7 +15,7 @@
   let keywordMatchers=buildKeywordMatchers(rootMap);
   let state={nodes:[],edges:[],strokes:[],tables:[],lastNewEdgeId:'',lastNewNodeId:'',activeNodeId:null,activeKeywords:[],transform:{x:0,y:0,scale:1},customNodes:{},choiceOffsets:{},metrics:{keywordClicks:0,choiceClicks:0,nodeOpens:0,sessionStartedAt:Date.now()}};
   let isDragging=false,dragStart=null,worldStart=null,panPointerId=null,panButton=0,rightPanStart=null,contextMenuSuppressUntil=0,contextMenu=null,customOpen=false,lastViewportSize=null;
-  let canvasRuntime=null,inkController=null,recallViewportRestored=false,recallTransitionBusy=false;
+  let canvasRuntime=null,inkController=null,tableController=null,recallViewportRestored=false,recallTransitionBusy=false;
   let progressSaveTimer=0,questionSessionToken=0,cardClickTimer=0,searchTimer=0,nodeSearchTimer=0;
   let customConversionUndo=null;
   let associationRuntime={subject:'',library:null,nodeCache:new Map(),resolveCache:new Map()};
@@ -1064,7 +1064,7 @@
     });
   }
   function renderGraphOnly(){renderNodes();renderEdges();renderStats();applyTransform(false);canvasRuntime?.refreshMinimap?.(true)}
-  function renderAll(){renderQuestion();renderGraphOnly();updateQuestionNavigator();inkController?.render()}
+  function renderAll(){renderQuestion();renderGraphOnly();updateQuestionNavigator();inkController?.render();tableController?.sync?.()}
   function syncActiveNodeClass(){nodeLayer.querySelectorAll('.kr-node').forEach(wrap=>wrap.classList.toggle('is-active',String(wrap.dataset.instanceId||'')===String(state.activeNodeId||'')))}
   function openNodeGuide(instanceId,anchor,{countOpen=true}={}){
     const node=state.nodes.find(n=>n.instanceId===instanceId);if(!node)return;
@@ -1326,7 +1326,7 @@
     if(!rightPan&&event.button!==0)return false;
     if(rightPan&&event.button!==2)return false;
     if(event.target.closest('.canvas-ink-toolbar'))return false;
-    if(!rightPan&&!inkController?.temporaryPan&&event.target.closest('.kr-node,.kr-question-card,.kr-guide,.kr-tools,.kr-topbar,.kr-canvas-overlay-left,.kr-canvas-overlay-right,.kr-question-library-trigger,.lp-canvas-zoom-dock,.qw-analysis-panel,summary,label,button,a,input,select,textarea'))return false;
+    if(!rightPan&&!inkController?.temporaryPan&&event.target.closest('.kr-node,.kr-question-card,.kr-guide,.kr-tools,.kr-topbar,.kr-canvas-overlay-left,.kr-canvas-overlay-right,.kr-question-library-trigger,.lp-canvas-zoom-dock,.qw-analysis-panel,.kg-canvas-table-wrap,summary,label,button,a,input,select,textarea'))return false;
     isDragging=true;panPointerId=event.pointerId;panButton=event.button;
     dragStart={x:event.clientX,y:event.clientY};worldStart={x:state.transform.x,y:state.transform.y};
     rightPanStart=rightPan?{x:event.clientX,y:event.clientY,moved:false}:null;
@@ -1367,7 +1367,7 @@
       showCanvasContextMenu(event);
     },true);
     viewport.addEventListener('wheel',e=>{if(e.target.closest('.kr-canvas-overlay-left,.kr-question-library-trigger,.qw-analysis-panel,button,a,input,select,textarea'))return;e.preventDefault();zoomByLevel(e.deltaY<0?1:-1,WHEEL_ZOOM_LEVELS,e.clientX,e.clientY,false)},{passive:false});
-    viewport.addEventListener('dblclick',e=>{if(e.target.closest('.kr-node,.kr-question-card,.kr-guide,.kr-canvas-overlay-left,.kr-question-library-trigger,button,a,input,select,textarea'))return;centerOn(0,0,true)});
+    viewport.addEventListener('dblclick',e=>{if(e.target.closest('.kr-node,.kr-question-card,.kr-guide,.kr-canvas-overlay-left,.kr-question-library-trigger,.kg-canvas-table-wrap,button,a,input,select,textarea'))return;centerOn(0,0,true)});
     const rect=viewport.getBoundingClientRect();lastViewportSize={width:rect.width,height:rect.height};
     window.addEventListener('resize',()=>{
       contextMenu?.hide?.();
@@ -1673,7 +1673,7 @@
     if(isTeacherDraftPreview()){
       const back=$('krBackBtn');if(back){back.title='退出深度回忆预览';back.setAttribute('aria-label','退出深度回忆预览');back.addEventListener('click',event=>{event.preventDefault();cleanupTeacherDraftPreview();try{window.close()}catch(error){};if(!window.closed)location.href='training-config.html?section=recall'},{once:true})}
     }
-    window.KGLearningProgress?.registerAdapter?.('deep_recall',{flush:flushProgress,clearTransient:()=>{cancelProgressSave();destroyingNodeIds.clear();state.nodes=[];state.edges=[];state.strokes=[];state.tables=[];inkController?.reset({keepTool:true});state.customNodes={};state.activeKeywords=[];state.choiceOffsets={};state.activeNodeId=null;state.lastNewEdgeId='';state.lastNewNodeId='';}});
+    window.KGLearningProgress?.registerAdapter?.('deep_recall',{flush:flushProgress,clearTransient:()=>{cancelProgressSave();destroyingNodeIds.clear();state.nodes=[];state.edges=[];state.strokes=[];state.tables=[];inkController?.reset({keepTool:true});tableController?.reset();state.customNodes={};state.activeKeywords=[];state.choiceOffsets={};state.activeNodeId=null;state.lastNewEdgeId='';state.lastNewNodeId='';}});
     inkController=window.KGCanvasInk?.create?.({
       trigger:$('krInkBtn'),viewport,world,getViewport:()=>state.transform,getStrokes:()=>state.strokes,
       setStrokes:strokes=>{state.strokes=strokes;saveProgress()},
@@ -1687,6 +1687,19 @@
       }
     });
     window.KGRecallInk=inkController;
+    // 可编辑表格：state.tables 读写 + saveProgress 持久化；历史由控制器内部命令栈承载。
+    tableController=window.KGCanvasTableController?.create?.({
+      trigger:$('krTableBtn'),viewport,world,
+      getViewport:()=>state.transform,
+      getTables:()=>state.tables||[],
+      setTables:tables=>{state.tables=tables;saveProgress()},
+      showHistory:true,
+      isReadonly:()=>isRecallReadonly()||isTeacherDraftPreview(),
+      onStatus:notifyRecallLimit,
+      confirm:message=>{try{return window.confirm(message)}catch(error){return false}}
+    });
+    window.KGRecallTables=tableController;
+    $('krTableBtn')?.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();tableController?.openInsertPanel?.(event.currentTarget||$('krTableBtn'))});
     window.KGCanvasCapture?.bind($('krCaptureBtn'),viewport,{filename:'深度回忆',onError:notifyRecallLimit});
     applyRandomHighlight();bindThemeSelect();bindCanvas();bindQuestionInteractions();bindNodeInteractions();bindQuestionDrawer();bindLanguageMode();bindNodeSearch();renderAll();initUnifiedCanvasRuntime();bindTools();
     $('krRevealKeywordsBtn')?.addEventListener('click',revealKeywords);

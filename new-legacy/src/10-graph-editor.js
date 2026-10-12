@@ -694,7 +694,7 @@ function syncGraphModeClasses(){
   updateGraphModeIndicator();
   return large;
 }
-function render(options={}){window.KGHomeInk?.sync?.();if(options&&options.persist)invalidateGraphSearchIndex();const renderer=ensureGraphRenderer();if(renderer){const result=renderer.render(options.mode||'full',options);window.KGHomeCanvasRuntime?.refreshMinimap?.(true);return result}syncGraphModeClasses();applyTransform();renderHeader();renderEdges();renderCards();renderDetails();renderSelectedEdgeQuickStylePanel();updateCardQuickActions();window.KGHomeCanvasRuntime?.refreshMinimap?.(true);if(options&&options.persist)save()}
+function render(options={}){window.KGHomeInk?.sync?.();window.KGHomeTables?.sync?.();if(options&&options.persist)invalidateGraphSearchIndex();const renderer=ensureGraphRenderer();if(renderer){const result=renderer.render(options.mode||'full',options);window.KGHomeCanvasRuntime?.refreshMinimap?.(true);return result}syncGraphModeClasses();applyTransform();renderHeader();renderEdges();renderCards();renderDetails();renderSelectedEdgeQuickStylePanel();updateCardQuickActions();window.KGHomeCanvasRuntime?.refreshMinimap?.(true);if(options&&options.persist)save()}
 window.addEventListener('kg-graph-preferences-change',event=>{
   const keys=event&&event.detail&&Array.isArray(event.detail.changedKeys)?event.detail.changedKeys:[];
   if(!keys.includes('largeGraphMode'))return;
@@ -1356,6 +1356,7 @@ function graphUndoSnapshot(){
     links:cloneGraphValue(state.links||[]),
     elements:cloneGraphValue(state.elements||[]),
     strokes:cloneGraphValue(state.strokes||[]),
+    tables:cloneGraphValue(state.tables||[]),
     defaults:cloneGraphValue(state.defaults||{}),
     mindmap:cloneGraphValue(state.mindmap||null),
     selection:{...selected,selectedElementId:state.selectedElementId||null,selectedTextElementIds:[...selectedTextElementIds]}
@@ -1369,6 +1370,7 @@ function applyGraphHistorySnapshot(snapshot={}){
   state.links=cloneGraphValue(snapshot.links||[]);
   if(snapshot.mindmap)state.mindmap=cloneGraphValue(snapshot.mindmap);else delete state.mindmap;
   state.strokes=cloneGraphValue(snapshot.strokes||[]);
+  if(Array.isArray(snapshot.tables))state.tables=window.KGCanvasTableModel?.sanitizeCollection?window.KGCanvasTableModel.sanitizeCollection(snapshot.tables):(cloneGraphValue(snapshot.tables)||[]);
   state.elements=cloneGraphValue(snapshot.elements||[]).map(item=>window.KGGraphModel&&window.KGGraphModel.normalizeTextElement?window.KGGraphModel.normalizeTextElement(item):item);
   state.defaults={...state.defaults,...cloneGraphValue(snapshot.defaults||{})};
   const nodeIds=new Set(state.nodes.map(n=>n.id)),linkIds=new Set(state.links.map(l=>l.id)),elementIds=new Set((state.elements||[]).map(item=>item.id));

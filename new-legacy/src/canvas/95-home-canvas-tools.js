@@ -16,6 +16,25 @@
     });
     function sync(){if(previous!==state.strokes){previous=state.strokes;ink.render()}else ink.refreshControls()}
     global.KGHomeInk=Object.assign(ink,{sync});
+    // 可编辑表格：共享控制器渲染 state.tables，写入经图谱历史（单次操作一次撤销）+ 自动保存。
+    if(global.KGCanvasTableController&&!global.KGHomeTables){
+      const tablesController=global.KGCanvasTableController.create({
+        viewport:stage,world,
+        getViewport:()=>state.viewport,
+        getTables:()=>state.tables||[],
+        change:(next,label)=>{
+          const history=ensureGraphHistoryController();
+          if(label&&history)history.run(label,()=>{state.tables=next;save()});
+          else{state.tables=next;save()}
+        },
+        isReadonly:()=>!canWriteGraph(),
+        getLastWorldPoint:()=>(lastGraphPointerWorldPosition&&Number.isFinite(lastGraphPointerWorldPosition.x))?{...lastGraphPointerWorldPosition}:null,
+        onStatus:showStatus
+      });
+      global.KGHomeTables=tablesController;
+      global.addEventListener('kg-graph-current-file-change',()=>tablesController.reset());
+      global.addEventListener('kg-home-interaction-mode-change',()=>tablesController.refreshControls());
+    }
     function bind(){
       ink.refreshControls();
       global.KGCanvasCapture?.bind(document.getElementById('homeCaptureBtn'),stage,{filename:()=>state.meta.title||'知识图谱',onError:showStatus});

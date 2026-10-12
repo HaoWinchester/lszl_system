@@ -16,6 +16,7 @@
     add: '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
     textBox: '<span class="home-text-tool-icon" aria-hidden="true">T</span>',
     template: '<svg aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M4 10h16M10 10v10"/></svg>',
+    table: '<svg aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M4 10h16M10 5v14M16 5v14M4 15h16"/></svg>',
     focus: '<svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>',
     flow: '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3.5c3.2 2.2 6 5.2 6 9.2 0 3.5-2.6 6.3-6 7.8-3.4-1.5-6-4.3-6-7.8 0-4 2.8-7 6-9.2z"/><path d="M9 12.5h6M12 9.5v6"/></svg>',
     flashcard: '<svg aria-hidden="true" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="16" rx="3"/><path d="M8 8h8M8 12h6M8 16h4"/></svg>',
@@ -43,7 +44,7 @@
   let activeMode = "efficient";
   const MODE_TOOL_IDS = Object.freeze({
     reading: new Set(["homeCaptureBtn", "focusBtn", "flowModeBtn", "relationViewMenuBtn", "largeGraphLinesBtn", "largeGraphRelatedBtn"]),
-    efficient: new Set(["templateBtn", "addBtn", "addTextElementBtn", "mindmapBtn", "focusBtn", "flashcardBtn", "homeInkBtn", "homeCaptureBtn", "pointerModeBtn", "flowModeBtn", "relationViewMenuBtn", "largeGraphLinesBtn", "largeGraphRelatedBtn", "importFile"]),
+    efficient: new Set(["templateBtn", "addBtn", "addTextElementBtn", "addTableBtn", "mindmapBtn", "focusBtn", "flashcardBtn", "homeInkBtn", "homeCaptureBtn", "pointerModeBtn", "flowModeBtn", "relationViewMenuBtn", "largeGraphLinesBtn", "largeGraphRelatedBtn", "importFile"]),
     professional: null
   });
   function normalizeMode(value){
@@ -66,6 +67,7 @@
         {id:"templateBtn", label:"模板", ariaLabel:"选择模板", tooltip:"模板", icon:"template", shortcut:"T", permission:"editGraph", action:"openTemplate", shortTip:"模板"},
         {id:"addBtn", label:"新增知识点", tooltip:"新增知识点", icon:"add", shortcut:"N", className:"primary", permission:"editGraph", action:"addNode", shortTip:"新增"},
         {id:"addTextElementBtn", label:"新增文本框", tooltip:"新增独立文本框", icon:"textBox", permission:"editGraph", action:"addTextElement", shortTip:"文本"},
+        {id:"addTableBtn", label:"插入表格", tooltip:"插入可编辑表格", icon:"table", permission:"editGraph", action:"insertTable", shortTip:"表格"},
         {id:"focusBtn", label:"重点聚焦", tooltip:"重点聚焦", icon:"focus", shortcut:"F", className:"focus-menu-btn", action:"toggleFocus", shortTip:"聚焦"},
         {id:"flashcardBtn", label:"记忆闪卡", tooltip:"记忆闪卡", icon:"flashcard", shortcut:"K", className:"flash-menu-btn", permission:"editGraph", action:"openFlashcards", shortTip:"闪卡"},
         {id:"homeInkBtn", label:"画笔工具", tooltip:"画笔工具", permission:"editGraph"},

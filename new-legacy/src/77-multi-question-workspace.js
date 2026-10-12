@@ -4027,6 +4027,7 @@
     if(dropName)dropName.textContent=workspace.title;
     renderWorkspaceSelector();
     renderCards();
+    state.tablesController?.render?.();
     applyViewport();
     refreshPersonalCardReferences();
     replaceUrl(workspace.id,options.focusNodeId||'');
@@ -5816,6 +5817,23 @@
       }
     });
     global.KGWorkspaceInk=state.ink;
+    // 可编辑表格：workspace.tables 经 65 store 直写；历史并入 kernel 命令栈（与卡牌/笔迹共用撤销）。
+    state.tablesController=global.KGCanvasTableController?.create?.({
+      viewport:state.viewport,world:state.world,
+      getViewport:()=>({x:state.panX,y:state.panY,scale:state.zoom}),
+      getTables:()=>state.workspace?.tables||[],
+      setTables:tables=>{
+        if(!state.workspace||state.readonly)throw new Error('当前画布不能编辑');
+        state.suppressStoreEvent=true;
+        try{state.workspace=store().write({...state.workspace,tables},{reason:'canvas-tables'})}finally{state.suppressStoreEvent=false}
+        global.KGMultiQuestionWorkspaceFilebar?.render?.(state.workspace);
+      },
+      history:state.kernel.history,showHistory:true,undoKeyDelegated:true,
+      isReadonly:()=>state.readonly||!state.workspace,
+      onStatus:notify
+    });
+    global.KGWorkspaceTables=state.tablesController;
+    byId('qwTableBtn')?.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();state.tablesController?.openInsertPanel?.(event.currentTarget||byId('qwTableBtn'))});
     global.KGCanvasCapture?.bind(byId('qwCaptureBtn'),state.viewport,{filename:()=>state.workspace?.title||'多题归纳',onError:notify});
     bind();
     loadWorkspace(state.workspaceId,{focusNodeId});

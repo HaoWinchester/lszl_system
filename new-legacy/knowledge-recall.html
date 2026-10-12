@@ -25,6 +25,7 @@
 <link rel="stylesheet" href="styles/learning-weekly-open-gate.css"/>
   <link rel="stylesheet" href="styles/close-button.css"/>
 <link rel="stylesheet" href="styles/canvas-ink.css"/>
+<link rel="stylesheet" href="styles/canvas-table.css"/>
 </head>
 <body class="knowledge-recall-page" data-ui-skin="focus-vega">
   <div class="kr-app" id="krApp">
@@ -104,6 +105,7 @@
       <div class="kr-canvas-overlay-right">
         <div class="kr-canvas-action-group" role="group" aria-label="本题知识点工具">
           <button type="button" id="krInkBtn" class="kr-reset-question-btn" aria-label="画笔工具" title="画笔工具" aria-expanded="false" data-canvas-ui="true"></button>
+        <button type="button" id="krTableBtn" class="kr-reset-question-btn" aria-label="插入表格" title="插入可编辑表格" data-canvas-ui="true"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M4 10h16M10 5v14M16 5v14M4 15h16"/></svg></button>
         <button type="button" id="krCaptureBtn" class="kr-reset-question-btn" aria-label="截取当前画布" title="截取当前画布并下载 PNG" data-canvas-ui="true"></button>
         <button class="kr-reset-question-btn kr-node-search-btn" id="krNodeSearchBtn" type="button" title="搜索本页知识点" aria-label="搜索本页知识点" aria-expanded="false" aria-controls="krNodeSearchPanel">
             <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"></circle><path d="m16 16 4 4"></path></svg>
@@ -227,6 +229,7 @@
 <script defer src="src/canvas/94-canvas-ink.js"></script>
 <script defer src="src/canvas/table-model.js"></script>
 <script defer src="src/canvas/table-clipboard.js"></script>
+<script defer src="src/canvas/table-controller.js"></script>
 <script defer src="src/canvas/97-learning-theme.js"></script>
 <script defer src="src/canvas/96-canvas-capture.js"></script>
 <script defer src="src/118-question-materials.js"></script>

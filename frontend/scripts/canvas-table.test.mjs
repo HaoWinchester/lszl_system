@@ -16,3 +16,8 @@ test('table persistence adapters: sanitizeCollection, store and recall adapter',
  const result=spawnSync(process.execPath,['--test',fileURLToPath(new URL('../../new-legacy/tests/canvas-table-adapters.test.js',import.meta.url))],{encoding:'utf8'});
  assert.equal(result.status,0,`${result.stdout}\n${result.stderr}`);
 });
+
+test('table UI controller: selection/scaling pure logic and three-page registration',()=>{
+ const result=spawnSync(process.execPath,['--test',fileURLToPath(new URL('../../new-legacy/tests/canvas-table-ui.test.js',import.meta.url))],{encoding:'utf8'});
+ assert.equal(result.status,0,`${result.stdout}\n${result.stderr}`);
+});
