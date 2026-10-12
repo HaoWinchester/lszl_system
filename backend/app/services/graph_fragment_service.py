@@ -96,7 +96,8 @@ async def paste_fragment(db, user, target_file_id, data):
     payload = {'nodes': clean['nodes'], 'links': clean['links'],
                'elements': clean['elements'], 'tables': clean['tables'],
                'resources': clean.get('resources') or []}
-    payload, _ = await assets.clone_graph_assets(db, user.username, user.username, payload)
+    # 同 owner 粘贴沿用 duplicate_file 模式：校验归属后复用原 assetId，不复制 blob。
+    await assets.validate_graph_assets(db, user.username, payload)
 
     existing_ids = {item.get('id') for key in PASTE_ID_PREFIXES for item in (graph.get(key) or [])}
     id_map = {}
@@ -145,6 +146,7 @@ async def paste_fragment(db, user, target_file_id, data):
         await db.rollback()
         raise
     await db.refresh(target)
+    # tables/resources 不在合并范围（见上），也不进返回值，防止前端误用。
     return {'fragment': {'nodes': payload['nodes'], 'links': payload['links'],
-                         'elements': payload['elements'], 'tables': payload['tables']},
+                         'elements': payload['elements']},
             'idMap': id_map, 'fileRevision': next_revision, 'bindings': bindings}

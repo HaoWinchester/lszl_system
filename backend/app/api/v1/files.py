@@ -266,7 +266,7 @@ async def duplicate_file(file_id: str, body: dict, db: DB, user: CurrentUser):
     return {"file": file_service.file_meta(f)}
 
 
-@router.post("/{file_id}/fragments")
+@router.post("/{file_id}/fragments", dependencies=[Depends(import_submission_guard)])
 async def paste_fragment(file_id: str, body: FragmentPasteInput, db: DB, user: CurrentUser):
     """受控跨文件片段粘贴：服务端读取来源绑定并原子合并，客户端授权字段一律忽略。"""
     return await graph_fragments.paste_fragment(db, user, file_id, body)

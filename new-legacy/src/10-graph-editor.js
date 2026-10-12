@@ -1454,7 +1454,10 @@ function pasteGraphFragmentRemotely(source){
   // 串行化连续粘贴：每次请求都基于上一次完成后的最新 revision，避免快速连续粘贴 409。
   graphRemotePasteChain=graphRemotePasteChain.then(async()=>{
     try{
-      const revision=window.KGGraphFileEditorStoreBridge?.fragmentSource?.()?.revision;
+      // 排队期间可能已切换文件：目标不再是当前文件时直接放弃本次粘贴。
+      const nowCurrent=window.KGGraphFileEditorStoreBridge?.fragmentSource?.();
+      if(nowCurrent?.fileId!==local.fileId)return;
+      const revision=nowCurrent.revision;
       const response=await fetch(`/api/v1/files/${encodeURIComponent(local.fileId)}/fragments`,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({fragment:source,offset:{x:target.x-bounds.cx,y:target.y-bounds.cy},expectedFileRevision:revision})});
       const data=await response.json().catch(()=>({}));
       if(!response.ok){showStatus(({GRAPH_FILE_REVISION_CONFLICT:'当前图谱已在其他窗口更新，请刷新后重新粘贴。',GRAPH_FRAGMENT_SOURCE_STALE:'来源图谱已变化，请回到来源重新复制后再粘贴。',GRAPH_NODE_QUOTA_EXCEEDED:'当前图谱卡牌数量已达上限。',TEMPLATE_NODE_QUOTA_EXCEEDED:'当前图谱卡牌数量已达上限。'})[data.detail?.code]||(typeof data.detail==='string'?data.detail:'跨图谱粘贴失败，请重试。'));return}
