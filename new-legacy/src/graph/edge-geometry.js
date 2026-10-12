@@ -30,7 +30,35 @@
     if(route.toPoint)result.toPoint=point(route.toPoint.x+deltaB.x,route.toPoint.y+deltaB.y);
     return result;
   }
-  const api=Object.freeze({curveHandles,controlsFromHandles,moveRoute});
+  function portDirection(port){
+    switch(port){case 'top':return point(0,-1);case 'right':return point(1,0);case 'bottom':return point(0,1);case 'left':return point(-1,0);default:return null}
+  }
+  function portPoint(nodeGeometry,port,oppositeCenter){
+    const {x,y,width,height,cardStyle='standard'}=nodeGeometry;
+    const center=point(x+width/2,y+height/2);
+    const ray=portDirection(port)||point(oppositeCenter.x-center.x,oppositeCenter.y-center.y);
+    if(Math.hypot(ray.x,ray.y)<.001)return center;
+    if(cardStyle==='circle'){
+      const rx=Math.max(1,width/2),ry=Math.max(1,height/2),t=1/Math.sqrt(ray.x*ray.x/(rx*rx)+ray.y*ray.y/(ry*ry));
+      return point(center.x+ray.x*t,center.y+ray.y*t);
+    }
+    if(cardStyle==='triangle'){
+      const vertices=[point(center.x,y),point(x+width,y+height),point(x,y+height)];
+      let best=null;
+      for(let i=0;i<vertices.length;i++){
+        const a=vertices[i],b=vertices[(i+1)%vertices.length],segment=point(b.x-a.x,b.y-a.y),offset=point(a.x-center.x,a.y-center.y);
+        const cross=(a,b)=>a.x*b.y-a.y*b.x,denominator=cross(ray,segment);
+        if(Math.abs(denominator)<1e-9)continue;
+        const t=cross(offset,segment)/denominator,u=cross(offset,ray)/denominator;
+        if(t>=0&&u>=0&&u<=1&&(best===null||t<best))best=t;
+      }
+      return best===null?center:point(center.x+ray.x*best,center.y+ray.y*best);
+    }
+    return Math.abs(ray.x)>=Math.abs(ray.y)
+      ?point(center.x+Math.sign(ray.x||1)*width/2,center.y)
+      :point(center.x,center.y+Math.sign(ray.y||1)*height/2);
+  }
+  const api=Object.freeze({curveHandles,controlsFromHandles,moveRoute,portPoint,portDirection});
   global.KGGraphEdgeGeometry=api;
   if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);

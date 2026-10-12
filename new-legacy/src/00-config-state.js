@@ -13,7 +13,7 @@ const isCoarse=matchMedia('(pointer: coarse)').matches;
 function uid(p){const c=globalThis.crypto;return p+(c&&c.randomUUID?c.randomUUID():Math.random().toString(36).slice(2)+Date.now().toString(36))}
 function baseState(){return{meta:{title:'知识点关系图谱',subject:'通用课程',audience:'学员自学 / 课堂共创',description:'用于梳理不同学科、课程或考试的知识点关系。'},viewport:{x:260,y:170,scale:1},defaults:{...DEFAULTS},focusMode:false,selectedNodeId:null,selectedLinkId:null,selectedElementId:null,linkSourceId:null,nodes:[],links:[],elements:[],importedFlashcards:[],flashReviews:{}}}
 function makeNode(title,x,y,color,category='',level='基础',keywords='',summary='',notes='',size=''){const raw={id:uid('n'),title,x,y,color,category,level,keywords,summary,notes,size,cardStyle:DEFAULTS.nodeCardStyle,textAlign:DEFAULTS.nodeTextAlign,fontSize:DEFAULTS.nodeFontSize,fontFamily:DEFAULTS.nodeFontFamily,fontWeight:DEFAULTS.nodeFontWeight,fontStyle:DEFAULTS.nodeFontStyle,underline:DEFAULTS.nodeUnderline,strikeThrough:DEFAULTS.nodeStrikeThrough,lineHeight:DEFAULTS.nodeLineHeight,textBackgroundColor:DEFAULTS.nodeTextBackgroundColor,textBackgroundOpacity:DEFAULTS.nodeTextBackgroundOpacity};return window.KGGraphModel&&window.KGGraphModel.normalizeNode?window.KGGraphModel.normalizeNode(raw):raw}
-function makeLink(from,to,type='',note='',lineStyle=DEFAULTS.linkStyle,color=DEFAULTS.linkColor,pathStyle=DEFAULTS.linkPathStyle){return{id:uid('l'),from,to,type,note,lineStyle,color,pathStyle}}
+function makeLink(from,to,type='',note='',lineStyle=DEFAULTS.linkStyle,color=DEFAULTS.linkColor,pathStyle=DEFAULTS.linkPathStyle){return{id:uid('l'),from,to,type,note,lineStyle,color,pathStyle,fromPort:'auto',toPort:'auto'}}
 function templateState(kind='pmp'){
   const s=baseState();
   if(kind==='acp'){
@@ -223,7 +223,7 @@ function sanitizeState(data={}){
     const rawFrom=safeString(l.from,'',120),rawTo=safeString(l.to,'',120),from=nodeIds.has(rawFrom)?rawFrom:'',to=nodeIds.has(rawTo)?rawTo:'',fromPoint=point(l.fromPoint),toPoint=point(l.toPoint);
     if((!from&&!fromPoint)||(!to&&!toPoint)||(from&&to&&from===to))return null;
     let id=safeString(l.id,'',120)||uid('l');if(linkIds.has(id))id=uid('l');linkIds.add(id);
-    const clean={id,from,to,type:safeString(l.type??'','',60),note:safeString(l.note||'','',1200),lineStyle:LINE_STYLES.has(l.lineStyle)?l.lineStyle:DEFAULTS.linkStyle,pathStyle:LINE_PATH_STYLES.has(l.pathStyle)?l.pathStyle:DEFAULTS.linkPathStyle,color:safeColor(l.color,DEFAULTS.linkColor),strokeWidth:safeNumber(l.strokeWidth,4,1,8),arrowStyle:['none','end','both'].includes(String(l.arrowStyle||''))?String(l.arrowStyle):'none'};
+    const clean={id,from,to,fromPort:window.KGGraphPersistence.normalizePort(l.fromPort),toPort:window.KGGraphPersistence.normalizePort(l.toPort),type:safeString(l.type??'','',60),note:safeString(l.note||'','',1200),lineStyle:LINE_STYLES.has(l.lineStyle)?l.lineStyle:DEFAULTS.linkStyle,pathStyle:LINE_PATH_STYLES.has(l.pathStyle)?l.pathStyle:DEFAULTS.linkPathStyle,color:safeColor(l.color,DEFAULTS.linkColor),strokeWidth:safeNumber(l.strokeWidth,4,1,8),arrowStyle:['none','end','both'].includes(String(l.arrowStyle||''))?String(l.arrowStyle):'none'};
     if(!from)clean.fromPoint=fromPoint;if(!to)clean.toPoint=toPoint;
     const waypoints=pointList(l.waypoints,12),curveControls=pointList(l.curveControls,2);if(waypoints.length)clean.waypoints=waypoints;if(curveControls.length===2)clean.curveControls=curveControls;return clean;
   }).filter(Boolean);

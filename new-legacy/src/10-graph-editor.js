@@ -224,33 +224,9 @@ function visualPositionForNode(n,options={}){
   const model=window.KGGraphModel,geometry=model&&n?model.geometryOf(n):null;return{x:geometry?geometry.x:n.x,y:geometry?geometry.y:n.y};
 }
 function nodeCenter(n){const d=nodeDims(n),p=visualPositionForNode(n);return{x:p.x+d.w/2,y:p.y+d.h/2}}
-function graphCross(a,b){return a.x*b.y-a.y*b.x}
-function graphRayPolygonIntersection(origin,target,points){
-  const ray={x:target.x-origin.x,y:target.y-origin.y};if(Math.hypot(ray.x,ray.y)<.001)return origin;
-  let best=null;
-  for(let i=0;i<points.length;i++){
-    const a=points[i],b=points[(i+1)%points.length],edge={x:b.x-a.x,y:b.y-a.y},den=graphCross(ray,edge);
-    if(Math.abs(den)<1e-8)continue;
-    const offset={x:a.x-origin.x,y:a.y-origin.y},t=graphCross(offset,edge)/den,u=graphCross(offset,ray)/den;
-    if(t>=0&&u>=0&&u<=1&&(!best||t<best.t))best={t,x:origin.x+t*ray.x,y:origin.y+t*ray.y};
-  }
-  return best?{x:best.x,y:best.y}:origin;
-}
-function nodeOutlinePoint(n,toward){
-  const center=nodeCenter(n),dims=nodeDims(n),pos=visualPositionForNode(n),appearance=window.KGGraphModel&&window.KGGraphModel.appearanceOf?window.KGGraphModel.appearanceOf(n):{cardStyle:n&&n.cardStyle||'standard'};
-  const dx=toward.x-center.x,dy=toward.y-center.y;if(Math.hypot(dx,dy)<.001)return center;
-  if(appearance.cardStyle==='circle'){
-    const rx=Math.max(1,dims.w/2),ry=Math.max(1,dims.h/2),t=1/Math.sqrt((dx*dx)/(rx*rx)+(dy*dy)/(ry*ry));
-    return{x:center.x+dx*t,y:center.y+dy*t};
-  }
-  if(appearance.cardStyle==='triangle'){
-    return graphRayPolygonIntersection(center,toward,[{x:center.x,y:pos.y},{x:pos.x+dims.w,y:pos.y+dims.h},{x:pos.x,y:pos.y+dims.h}]);
-  }
-  // Rectangular cards share one anchor per side. Choose the side from centers,
-  // rather than spreading sibling links across the border by ray intersection.
-  return Math.abs(dx)>=Math.abs(dy)
-    ?{x:center.x+Math.sign(dx||1)*dims.w/2,y:center.y}
-    :{x:center.x,y:center.y+Math.sign(dy||1)*dims.h/2};
+function nodeOutlinePoint(n,toward,port='auto'){
+  const dims=nodeDims(n),pos=visualPositionForNode(n),appearance=window.KGGraphModel?.appearanceOf?.(n)||{cardStyle:n?.cardStyle||'standard'};
+  return window.KGGraphEdgeGeometry.portPoint({x:pos.x,y:pos.y,width:dims.w,height:dims.h,cardStyle:appearance.cardStyle},port,toward);
 }
 function linkOutlinePoints(a,b){const ca=nodeCenter(a),cb=nodeCenter(b);return{a:nodeOutlinePoint(a,cb),b:nodeOutlinePoint(b,ca),ca,cb}}
 function invalidateGraphIndexCache(){graphIndexCache=null;graphIndexStateRef=null;graphIndexNodesRef=null;graphIndexLinksRef=null;graphIndexNodeLength=-1;graphIndexLinkLength=-1}
@@ -261,7 +237,7 @@ function linkRenderPoints(link,nodeMap=null){
   if(!link)return null;
   const aNode=linkEndpointNode(link,'from',nodeMap),bNode=linkEndpointNode(link,'to',nodeMap),freeA=linkEndpointFreePoint(link,'from'),freeB=linkEndpointFreePoint(link,'to');
   const ca=aNode?nodeCenter(aNode):freeA,cb=bNode?nodeCenter(bNode):freeB;if(!ca||!cb)return null;
-  const a=aNode?nodeOutlinePoint(aNode,cb):ca,b=bNode?nodeOutlinePoint(bNode,ca):cb;return{a,b,ca,cb,aNode,bNode};
+  const a=aNode?nodeOutlinePoint(aNode,cb,link.fromPort):ca,b=bNode?nodeOutlinePoint(bNode,ca,link.toPort):cb;return{a,b,ca,cb,aNode,bNode};
 }
 function setLinkFreeEndpoint(link,side,point){if(!link)return;const key=linkEndpointPointKey(side),clean=normalizedEdgePoint(point);if(side==='from')link.from='';else link.to='';if(clean)link[key]=clean;else delete link[key]}
 function bindLinkEndpoint(link,side,nodeId){if(!link)return false;const node=nodeById(nodeId);if(!node)return false;const other=side==='from'?link.to:link.from;if(other&&other===node.id)return false;if(side==='from')link.from=node.id;else link.to=node.id;delete link[linkEndpointPointKey(side)];return true}
@@ -346,12 +322,18 @@ function linkPathGeometry(link,a,b,points=null){
     const samples=[start,end],mid={x:(start.x+end.x)/2,y:(start.y+end.y)/2};
     return{style,d:edgePathFromPoints(samples),samples,bounds:edgeGeometryBounds(samples),endpoints:[start,end],controls:[{kind:'straight-bend',index:0,x:mid.x,y:mid.y}]};
   }
-  const detour=overlappingProjectionWaypoints(start,end,points,direction);
+  const fixedStart=window.KGGraphEdgeGeometry.portDirection(link?.fromPort),fixedEnd=window.KGGraphEdgeGeometry.portDirection(link?.toPort);
+  const detour=fixedStart||fixedEnd?null:overlappingProjectionWaypoints(start,end,points,direction);
   if(style==='elbow'){
     const stored=normalizedEdgePoints(link&&link.waypoints,12),waypoints=stored.length?stored:(detour||defaultElbowWaypoints(start,end,direction)),samples=[start,...waypoints,end];
     return{style,d:edgePathFromPoints(samples),samples,bounds:edgeGeometryBounds(samples),endpoints:[start,end],controls:waypoints.map((point,index)=>({kind:'waypoint',index,x:point.x,y:point.y})),derivedWaypoints:!stored.length};
   }
   const stored=normalizedEdgePoints(link&&link.curveControls,2),controls=stored.length===2?stored:defaultCurveControls(start,end,direction);
+  if(stored.length!==2&&(fixedStart||fixedEnd)){
+    const offset=Math.max(48,Math.min(220,Math.hypot(end.x-start.x,end.y-start.y)*.38));
+    if(fixedStart)controls[0]={x:start.x+fixedStart.x*offset,y:start.y+fixedStart.y*offset};
+    if(fixedEnd)controls[1]={x:end.x+fixedEnd.x*offset,y:end.y+fixedEnd.y*offset};
+  }
   const storedWaypoints=normalizedEdgePoints(link&&link.waypoints,12),waypoints=storedWaypoints.length?storedWaypoints:detour;
   if(stored.length!==2&&waypoints){
     const route=roundedEdgeRoute([start,...waypoints,end]);
@@ -1114,9 +1096,10 @@ function updateLinkGeometry(link,nodeMap){
   if(dom.label){dom.label.setAttribute('x',(points.ca.x+points.cb.x)/2);dom.label.setAttribute('y',(points.ca.y+points.cb.y)/2-8)}
   if(state.selectedLinkId===link.id)updateSelectedEdgeQuickStylePosition();return true;
 }
-function edgeRouteSnapshot(link){return{from:link.from||'',to:link.to||'',fromPoint:link.fromPoint?{...link.fromPoint}:undefined,toPoint:link.toPoint?{...link.toPoint}:undefined,pathStyle:link.pathStyle,waypoints:Array.isArray(link.waypoints)?link.waypoints.map(point=>({...point})):undefined,curveControls:Array.isArray(link.curveControls)?link.curveControls.map(point=>({...point})):undefined}}
+function edgeRouteSnapshot(link){return{from:link.from||'',to:link.to||'',fromPort:window.KGGraphPersistence.normalizePort(link.fromPort),toPort:window.KGGraphPersistence.normalizePort(link.toPort),fromPoint:link.fromPoint?{...link.fromPoint}:undefined,toPoint:link.toPoint?{...link.toPoint}:undefined,pathStyle:link.pathStyle,waypoints:Array.isArray(link.waypoints)?link.waypoints.map(point=>({...point})):undefined,curveControls:Array.isArray(link.curveControls)?link.curveControls.map(point=>({...point})):undefined}}
 function restoreEdgeRoute(link,snapshot){
   link.from=snapshot.from||'';link.to=snapshot.to||'';
+  link.fromPort=window.KGGraphPersistence.normalizePort(snapshot.fromPort);link.toPort=window.KGGraphPersistence.normalizePort(snapshot.toPort);
   if(snapshot.fromPoint===undefined)delete link.fromPoint;else link.fromPoint={...snapshot.fromPoint};
   if(snapshot.toPoint===undefined)delete link.toPoint;else link.toPoint={...snapshot.toPoint};
   link.pathStyle=snapshot.pathStyle;if(snapshot.waypoints===undefined)delete link.waypoints;else link.waypoints=snapshot.waypoints.map(point=>({...point}));if(snapshot.curveControls===undefined)delete link.curveControls;else link.curveControls=snapshot.curveControls.map(point=>({...point}));invalidateGraphIndexCache();
@@ -1295,6 +1278,8 @@ function ensureSelectedEdgeQuickStylePanel(){
     onLineStyle:value=>{if(LINE_STYLES.has(value)&&typeof applyLineStyle==='function')applyLineStyle(value)},
     onPathStyle:value=>{if(LINE_PATH_STYLES.has(value)&&typeof applyPathStyle==='function')applyPathStyle(value)},
     onWidth:value=>{if(typeof applyLineWidth==='function')applyLineWidth(Number(value))},
+    onPort:(side,value)=>applySelectedEdgePorts({[side==='from'?'fromPort':'toPort']:value}),
+    onPortsReset:()=>applySelectedEdgePorts({fromPort:'auto',toPort:'auto'}),
     onArrowStyle:value=>{if(typeof applyArrowStyle==='function')applyArrowStyle(value)},
     onLabel:event=>{
       const links=selectedEditableLinks(),id=links.length===1?String(links[0].id):'';
@@ -1343,6 +1328,15 @@ function updateSelectedEdgeQuickStylePosition(){
 function hideSelectedEdgeQuickStylePanel(){
   selectedEdgeQuickStyleToolbarController?.hide?.();selectedEdgeQuickStyleAnchorWorld=null;
 }
+function applySelectedEdgePorts(patch){
+  const links=selectedEditableLinks(),persistence=window.KGGraphPersistence;
+  if(!links.length||document.body.classList.contains('auth-readonly'))return false;
+  const clean=Object.fromEntries(Object.entries(patch).filter(([key])=>key==='fromPort'||key==='toPort').map(([key,value])=>[key,persistence.normalizePort(value)]));
+  if(!links.some(link=>Object.entries(clean).some(([key,value])=>persistence.normalizePort(link[key])!==value)))return false;
+  const mutate=()=>links.forEach(link=>Object.assign(link,clean)),history=ensureGraphHistoryController();
+  if(history)history.run('修改连接位置',mutate);else mutate();
+  render({mode:'edges',persist:true});showStatus('连接位置已保存。');return true;
+}
 function renderSelectedEdgeQuickStylePanel(){
   if(!graphModeAllows('edgeToolbar')){hideSelectedEdgeQuickStylePanel();hideEdgeInlineLabelEditor();return}
   const links=selectedEditableLinks();
@@ -1355,6 +1349,7 @@ function renderSelectedEdgeQuickStylePanel(){
     pathStyle:edgeBatchMixedValue(links,'pathStyle',DEFAULTS.linkPathStyle),
     color:safeColor(edgeBatchMixedValue(links,'color',DEFAULTS.linkColor)||DEFAULTS.linkColor,DEFAULTS.linkColor),
     width:edgeBatchMixedValue(links,'strokeWidth',4),
+    fromPort:edgeBatchMixedValue(links,'fromPort','auto'),toPort:edgeBatchMixedValue(links,'toPort','auto'),
     arrowStyle:edgeBatchMixedValue(links,'arrowStyle','none'),
     selectionFilter:window.KGHomeCanvasRuntime?.selectionFilter
   });

@@ -7,6 +7,7 @@ const nodes=new Map();
 const context={Math,Number,String,Array,Map,Set,window:{KGGraphEdgeGeometry:require('../src/graph/edge-geometry.js')},DEFAULTS:{linkPathStyle:'curve'},LINE_PATH_STYLES:new Set(['curve','straight','elbow']),nodeById:id=>nodes.get(id),nodeDims:n=>({w:n.w,h:n.h}),visualPositionForNode:n=>({x:n.x,y:n.y}),nodeCenter:n=>({x:n.x+n.w/2,y:n.y+n.h/2})};
 vm.createContext(context);
 vm.runInContext(source.slice(source.indexOf('function nodeOutlinePoint('),source.indexOf('function relationExists(')),context);
+vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'../src/graph/graph-persistence.js'),'utf8'),context);
 const plain=value=>JSON.parse(JSON.stringify(value));
 function check(a,b,start,end){
   nodes.set('a',a);nodes.set('b',b);
