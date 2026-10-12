@@ -3084,7 +3084,7 @@ function ensureNodeInlineTextEditorController(){
         const node=nodeById(nodeId);if(!node)return false;
         if(model.contentOf(node).title!==value){const mutate=()=>model.updateContent(node,{title:value});if(history)history.run('修改知识点文字',mutate);else mutate()}
       }
-      save();const saved=await window.KGGraphFileAutosave.saveNow({force:true});if(saved===false){showStatus('文字未保存，输入已保留，请点击外部重试。');return false}showStatus('文字已保存，可按 Ctrl/Command+Z 撤销。');return true;
+      const graph=state;save();const saved=await window.KGGraphFileAutosave.saveAcknowledged({force:true},()=>state===graph);if(saved===false){showStatus('文字未保存，输入已保留，请点击外部重试。');return false}showStatus('文字已保存，可按 Ctrl/Command+Z 撤销。');return true;
     },
     onOutsideCommit:({nodeId,textElementId})=>{
       if(nodeId&&nodeById(nodeId)){

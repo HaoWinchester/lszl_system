@@ -48,6 +48,17 @@
     }catch(err){console.warn('[KGGraphFileAutosave] save failed:',err);lastError=String(err&&err.message||err||'保存失败');result=false}
     saving=false;emit(result?'saved':'error');return result;
   }
+  // saveNow can return an older pending request. Text may close only after the
+  // current graph is clean, and never after its file/session has been replaced.
+  async function saveAcknowledged(options={},isCurrent=()=>true){
+    const context=()=>global.KGGraphFileEditorStoreBridge?.fragmentSource?.()?.fileId||'';
+    const fileId=context(),current=()=>isCurrent()&&context()===fileId;
+    do{
+      if(!current())return false;
+      if(await saveNow(options)===false||!current())return false;
+    }while(dirty);
+    return true;
+  }
   function saveBeforeSwitch(){return dirty?saveNow({force:true,silent:false,reason:'before-switch'}):true}
   function start(){
     if(timer)return true;
@@ -64,5 +75,5 @@
   function status(){return{dirty,saving,lastSavedAt,lastError,intervalMs:INTERVAL_MS}}
 
   bindBeforeUnload();
-  global.KGGraphFileAutosave={INTERVAL_MS,start,stop,markDirty,clearDirty,reportError,reportSaved,isDirty,saveNow,saveBeforeSwitch,bindBeforeUnload,status};
+  global.KGGraphFileAutosave={INTERVAL_MS,start,stop,markDirty,clearDirty,reportError,reportSaved,isDirty,saveNow,saveAcknowledged,saveBeforeSwitch,bindBeforeUnload,status};
 })(window);

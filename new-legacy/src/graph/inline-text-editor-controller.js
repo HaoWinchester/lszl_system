@@ -69,7 +69,8 @@
       if(value.composing){value.deferredCommit=true;return false}
       const raw=readText(value.editor),next=value.entityType==='text-element'?(raw.trim()?raw:''):(raw.trim()||'未命名知识点');
       if(next!==value.edit.state().draft)value.edit.update(next);
-      if(next===value.original){cleanup();return false}
+      if(next===value.original&&!value.commitAttempted){cleanup();return false}
+      value.commitAttempted=true;
       const success=await value.edit.commit();
       if(session!==value)return false;
       value.editor.dataset.saveState=value.edit.state().status;

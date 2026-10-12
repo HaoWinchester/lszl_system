@@ -17,3 +17,11 @@ test('pending save never closes newer draft or commits during composition',async
 });
 
 test('synchronous persistence rejection remains retryable',async()=>{let fail=true;const s=S.create({original:'a',persist:()=>{if(fail)throw Error('offline');return true}});s.update('b');assert.equal(await s.commit(),false);fail=false;assert.equal(await s.commit(),true)});
+
+test('graph acknowledgement drains older pending writes and refuses current failure or context changes',async()=>{
+ const fs=require('node:fs'),vm=require('node:vm');let resolve,requests=0,context='one';
+ const window={addEventListener(){},dispatchEvent(){},KGGraphFileEditorStoreBridge:{fragmentSource:()=>({fileId:context})},persistCurrentGraphNow:()=>{requests++;return requests===1?new Promise(r=>resolve=r):Promise.resolve(false)}};
+ vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'../src/24-graph-file-autosave.js'),'utf8'),{window,document:{documentElement:{dataset:{}}},CustomEvent:function(){}});
+ const auto=window.KGGraphFileAutosave;assert.equal(typeof auto.saveAcknowledged,'function');auto.markDirty();const older=auto.saveNow({force:true});auto.markDirty();const latest=auto.saveAcknowledged({force:true});resolve(true);await older;assert.equal(await latest,false);assert.equal(requests,2);assert.equal(auto.isDirty(),true);
+ window.persistCurrentGraphNow=()=>new Promise(r=>resolve=r);const moved=auto.saveAcknowledged({force:true});context='two';resolve(true);assert.equal(await moved,false);
+});
