@@ -128,12 +128,13 @@ test('a conflict or network failure preserves the exact unsaved graph for recove
   });
   const adapter = adapterApi.create({ questionId: 'q1' });
   await adapter.loadSession();
-  const graph = graphFixture();
+  const graph = { ...graphFixture(), strokes: [] };
 
   await assert.rejects(adapter.saveGraph(graph), error => error.status === 409);
   assert.equal(adapter.getState().saveState, 'conflict');
   assert.deepEqual(plain(adapter.getState().lastUnsavedGraph), graph);
 
+  graph.strokes = [{ id: 's1', tool: 'pen', color: '#2563eb', width: 3, points: [[1, 2], [20, 30]] }];
   mode = 'network';
   await assert.rejects(adapter.saveGraph(graph), /offline/);
   assert.equal(adapter.getState().saveState, 'failed');
