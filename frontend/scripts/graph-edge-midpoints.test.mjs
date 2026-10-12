@@ -6,3 +6,7 @@ test('card links use directional side midpoints and matching default tangents', 
   const result = spawnSync(process.execPath, [fileURLToPath(new URL('../../new-legacy/tests/graph-edge-midpoints.test.js', import.meta.url))], { encoding: 'utf8' })
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`)
 })
+test('edge geometry keeps handles on the cubic and moves manual routes from snapshots', () => {
+  const result = spawnSync(process.execPath, ['--test', fileURLToPath(new URL('../../new-legacy/tests/graph-edge-geometry.test.js', import.meta.url))], { encoding: 'utf8' })
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`)
+})

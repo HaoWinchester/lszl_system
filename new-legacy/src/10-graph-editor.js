@@ -359,7 +359,8 @@ function linkPathGeometry(link,a,b,points=null){
   }
   const c1=controls[0],c2=controls[1],d=`M ${formatSvgNumber(start.x)} ${formatSvgNumber(start.y)} C ${formatSvgNumber(c1.x)} ${formatSvgNumber(c1.y)}, ${formatSvgNumber(c2.x)} ${formatSvgNumber(c2.y)}, ${formatSvgNumber(end.x)} ${formatSvgNumber(end.y)}`;
   const samples=[];for(let index=0;index<=24;index++)samples.push(cubicEdgePoint(start,c1,c2,end,index/24));
-  return{style,d,samples,bounds:edgeGeometryBounds(samples),endpoints:[start,end],controls:controls.map((point,index)=>({kind:'curve-control',index,x:point.x,y:point.y})),derivedCurveControls:stored.length!==2};
+  const handles=window.KGGraphEdgeGeometry.curveHandles(start,controls,end);
+  return{style,d,samples,bounds:edgeGeometryBounds(samples),endpoints:[start,end],curveControls:controls,controls:handles.map((point,index)=>({kind:'curve-control',index,x:point.x,y:point.y})),derivedCurveControls:stored.length!==2};
 }
 function dashArrayForLineStyle(style,strokeWidth=4){
   const width=Math.max(1,Number(strokeWidth)||4);
@@ -1092,8 +1093,8 @@ function createEdgeSelectionOverlay(id){
 }
 function removeEdgeSelectionOverlay(id){const dom=edgeDomById.get(String(id));if(dom?.overlay)dom.overlay.remove();if(dom)dom.overlay=null}
 function edgeControlGuidePath(geometry){
-  if(!geometry||geometry.style!=='curve'||geometry.controls.length!==2)return'';
-  const [start,end]=geometry.endpoints,[c1,c2]=geometry.controls;return`M ${start.x} ${start.y} L ${c1.x} ${c1.y} M ${end.x} ${end.y} L ${c2.x} ${c2.y}`;
+  // The curve handles are now points on the painted path; no off-path guide is needed.
+  return'';
 }
 function updateEdgeControlLayerGeometry(link,dom,geometry){
   if(!edgeControlLayer||edgeControlLayer.dataset.linkId!==String(link.id))return;
@@ -1120,11 +1121,28 @@ function restoreEdgeRoute(link,snapshot){
   if(snapshot.toPoint===undefined)delete link.toPoint;else link.toPoint={...snapshot.toPoint};
   link.pathStyle=snapshot.pathStyle;if(snapshot.waypoints===undefined)delete link.waypoints;else link.waypoints=snapshot.waypoints.map(point=>({...point}));if(snapshot.curveControls===undefined)delete link.curveControls;else link.curveControls=snapshot.curveControls.map(point=>({...point}));invalidateGraphIndexCache();
 }
+function captureNodeDragRoutes(nodeIds){
+  const ids=new Set(nodeIds.map(String)),nodeMap=getGraphIndex().nodeMap;
+  return state.links.filter(link=>(ids.has(String(link.from))||ids.has(String(link.to)))&&(normalizedEdgePoints(link.curveControls,2).length===2||normalizedEdgePoints(link.waypoints,12).length>0)).map(link=>{
+    const points=linkRenderPoints(link,nodeMap);if(!points)return null;
+    return{link,route:{...edgeRouteSnapshot(link),start:{...points.a},end:{...points.b}}};
+  }).filter(Boolean);
+}
+function applyNodeDragRoutes(records){
+  const nodeMap=getGraphIndex().nodeMap;
+  for(const {link,route} of records){
+    const points=linkRenderPoints(link,nodeMap);if(!points)continue;
+    const moved=window.KGGraphEdgeGeometry.moveRoute(route,{x:points.a.x-route.start.x,y:points.a.y-route.start.y},{x:points.b.x-route.end.x,y:points.b.y-route.end.y});
+    if(moved.curveControls)link.curveControls=moved.curveControls;
+    if(moved.waypoints)link.waypoints=moved.waypoints;
+  }
+}
+function restoreNodeDragRoutes(records){for(const {link,route} of records)restoreEdgeRoute(link,route)}
 function persistDerivedEdgeRoute(link,geometry){
   if(!link||!geometry)return;
   const usesWaypoints=geometry.style==='elbow'||geometry.controls[0]?.kind==='waypoint';
   if(usesWaypoints&&!normalizedEdgePoints(link.waypoints,12).length)link.waypoints=geometry.controls.map(point=>({x:point.x,y:point.y}));
-  if(!usesWaypoints&&geometry.style==='curve'&&normalizedEdgePoints(link.curveControls,2).length!==2)link.curveControls=geometry.controls.map(point=>({x:point.x,y:point.y}));
+  if(!usesWaypoints&&geometry.style==='curve'&&normalizedEdgePoints(link.curveControls,2).length!==2)link.curveControls=geometry.curveControls.map(point=>({x:point.x,y:point.y}));
 }
 function translateEdgePoint(point,dx,dy){return{x:point.x+dx,y:point.y+dy}}
 function selectEdgeForDirectManipulation(linkId,event){
@@ -1137,7 +1155,7 @@ function beginEdgeMoveDrag(event,linkId){
   if(!graphModeAllows('edgeMove'))return false;
   if(isCanvasPanMode()||document.body.classList.contains('auth-readonly')||event.button!==0||event.ctrlKey||event.metaKey||event.shiftKey)return false;
   const link=linkById(linkId),dom=edgeDomById.get(String(linkId));if(!link||!dom?.geometry)return false;
-  edgeMoveDrag={pointerId:event.pointerId,linkId:String(linkId),handle:event.currentTarget,startClient:{x:event.clientX,y:event.clientY},startWorld:screenToWorld(event.clientX,event.clientY),original:edgeRouteSnapshot(link),geometry:{style:dom.geometry.style,endpoints:dom.geometry.endpoints.map(point=>({...point})),controls:dom.geometry.controls.map(point=>({...point}))},moved:false,history:false};
+  edgeMoveDrag={pointerId:event.pointerId,linkId:String(linkId),handle:event.currentTarget,startClient:{x:event.clientX,y:event.clientY},startWorld:screenToWorld(event.clientX,event.clientY),original:edgeRouteSnapshot(link),geometry:{style:dom.geometry.style,endpoints:dom.geometry.endpoints.map(point=>({...point})),controls:dom.geometry.controls.map(point=>({...point})),curveControls:dom.geometry.curveControls?.map(point=>({...point}))},moved:false,history:false};
   try{event.currentTarget.setPointerCapture(event.pointerId)}catch(error){}event.stopPropagation();return true;
 }
 function applyEdgeMoveDragPoint(point){
@@ -1146,7 +1164,7 @@ function applyEdgeMoveDragPoint(point){
   if(!drag.history){pushGraphUndoSnapshot('移动关系线');drag.history=true;selectEdgeForDirectManipulation(drag.linkId,{clientX:drag.startClient.x,clientY:drag.startClient.y})}
   drag.moved=true;const geometry=drag.geometry;setLinkFreeEndpoint(link,'from',translateEdgePoint(geometry.endpoints[0],dx,dy));setLinkFreeEndpoint(link,'to',translateEdgePoint(geometry.endpoints[1],dx,dy));
   if(geometry.style==='elbow'||geometry.controls[0]?.kind==='waypoint'){link.waypoints=geometry.controls.map(point=>translateEdgePoint(point,dx,dy));delete link.curveControls}
-  else if(geometry.style==='curve'){link.curveControls=geometry.controls.map(point=>translateEdgePoint(point,dx,dy));delete link.waypoints}
+  else if(geometry.style==='curve'){link.curveControls=geometry.curveControls.map(point=>translateEdgePoint(point,dx,dy));delete link.waypoints}
   else{delete link.waypoints;delete link.curveControls}
   invalidateGraphIndexCache();updateLinkGeometry(link,getGraphIndex().nodeMap);stage.classList.add('graph-edge-moving','is-interacting');hideEdgeHoverFeedback();
 }
@@ -1204,7 +1222,7 @@ function beginEdgeControlDrag(event,linkId,kind,index){
   const link=linkById(linkId),dom=edgeDomById.get(String(linkId));if(!link||!dom?.geometry)return;const original=edgeRouteSnapshot(link);
   pushGraphUndoSnapshot('调整关系线路径');
   if(kind==='waypoint'&&!normalizedEdgePoints(link.waypoints,12).length)link.waypoints=dom.geometry.controls.map(point=>({x:point.x,y:point.y}));
-  if(kind==='curve-control'&&normalizedEdgePoints(link.curveControls,2).length!==2)link.curveControls=dom.geometry.controls.map(point=>({x:point.x,y:point.y}));
+  if(kind==='curve-control'&&normalizedEdgePoints(link.curveControls,2).length!==2)link.curveControls=dom.geometry.curveControls.map(point=>({x:point.x,y:point.y}));
   edgeControlDrag={pointerId:event.pointerId,linkId:String(linkId),kind,index:Number(index)||0,handle:event.currentTarget,original,moved:false};stage.classList.add('graph-edge-control-dragging','is-interacting');
   try{event.currentTarget.setPointerCapture(event.pointerId)}catch(error){}
   event.preventDefault();event.stopPropagation();
@@ -1217,7 +1235,8 @@ function applyEdgeControlDragPoint(point){
   }else if(drag.kind==='waypoint'){
     const points=normalizedEdgePoints(link.waypoints,12);while(points.length<=drag.index)points.push({x:point.x,y:point.y});points[drag.index]={x:point.x,y:point.y};link.waypoints=points;
   }else if(drag.kind==='curve-control'){
-    const points=normalizedEdgePoints(link.curveControls,2);while(points.length<2)points.push({x:point.x,y:point.y});points[drag.index]={x:point.x,y:point.y};link.curveControls=points;
+    const current=linkRenderPoints(link,getGraphIndex().nodeMap),controls=normalizedEdgePoints(link.curveControls,2);
+    if(current&&controls.length===2){const handles=window.KGGraphEdgeGeometry.curveHandles(current.a,controls,current.b);handles[drag.index]={x:point.x,y:point.y};link.curveControls=window.KGGraphEdgeGeometry.controlsFromHandles(current.a,handles,current.b)}
   }
   updateLinkGeometry(link,getGraphIndex().nodeMap);
 }
@@ -1293,6 +1312,14 @@ function ensureSelectedEdgeQuickStylePanel(){
 }
 function selectedEdgeQuickScreenPoint(){
   const links=selectedEditableLinks();if(!links.length)return null;
+  if(links.length===1){
+    const geometry=edgeDomById.get(String(links[0].id))?.geometry;
+    if(geometry?.style==='curve'&&geometry.controls.length===2&&geometry.controls[0].kind==='curve-control'){
+      const handles=geometry.controls.map(point=>({x:point.x*state.viewport.scale+state.viewport.x,y:point.y*state.viewport.scale+state.viewport.y}));
+      const top=Math.min(handles[0].y,handles[1].y),bottom=Math.max(handles[0].y,handles[1].y);
+      return{x:(handles[0].x+handles[1].x)/2,y:top>80?top-24:bottom+80,link:links[0]};
+    }
+  }
   if(selectedEdgeQuickStyleAnchorWorld)return{x:selectedEdgeQuickStyleAnchorWorld.x*state.viewport.scale+state.viewport.x,y:selectedEdgeQuickStyleAnchorWorld.y*state.viewport.scale+state.viewport.y,link:links[0]};
   const points=[];
   for(const link of links){const point=linkGeometryMidpoint(link);if(point)points.push(point)}
@@ -1837,7 +1864,7 @@ function beginHomeSelectionBoundsDrag(event){
   const locked=ids.nodes.filter(id=>window.KGGraphModel?.interactionOf?.(nodeById(id))?.locked);if(locked.length){showStatus(`选择中有 ${locked.length} 个锁定节点，已取消整体移动。`);return false}
   const nodeOrigins=Object.fromEntries(ids.nodes.map(id=>{const node=nodeById(id);return[id,{x:Number(node.x)||0,y:Number(node.y)||0}]}));
   const textOrigins=Object.fromEntries(ids.texts.map(id=>{const item=textElementById(id),g=window.KGGraphModel?.textElementGeometryOf?.(item)||item;return[id,{x:Number(g.x)||0,y:Number(g.y)||0}]}));
-  homeSelectionBoundsDrag={pointerId:event.pointerId,startX:event.clientX,startY:event.clientY,nodeIds:ids.nodes,textIds:ids.texts,nodeOrigins,textOrigins,moved:false,history:false,frame:0,pending:null,anchorRect:homeSelectionAnchorRect()};
+  homeSelectionBoundsDrag={pointerId:event.pointerId,startX:event.clientX,startY:event.clientY,nodeIds:ids.nodes,textIds:ids.texts,nodeOrigins,textOrigins,routeSnapshots:captureNodeDragRoutes(ids.nodes),moved:false,history:false,frame:0,pending:null,anchorRect:homeSelectionAnchorRect()};
   try{stage.setPointerCapture(event.pointerId)}catch(error){}
   stage.classList.add('home-selection-bounds-dragging','graph-card-dragging');nodeStyleToolbarController?.hide?.();hideSelectedEdgeQuickStylePanel();window.KGHomeCanvasRuntime?.alignment?.clearGuides?.();
   event.preventDefault();event.stopPropagation();event.stopImmediatePropagation();return true;
@@ -1848,6 +1875,7 @@ function applyHomeSelectionBoundsMove(point){
   if(Math.hypot(point.clientX-drag.startX,point.clientY-drag.startY)>4&&!drag.moved){drag.moved=true;if(!drag.history){pushGraphUndoSnapshot(`移动 ${drag.nodeIds.length+drag.textIds.length} 个图元`);drag.history=true}ensureHomeEdgeDragPerformanceController()?.start?.(drag.nodeIds)}
   if(!drag.moved)return false;
   for(const id of drag.nodeIds){const node=nodeById(id),origin=drag.nodeOrigins[id];if(!node||!origin)continue;window.KGGraphModel?.updateGeometry?.(node,{x:Math.round(origin.x+dx),y:Math.round(origin.y+dy)});const el=cardElementByNodeId(id);if(el){el.style.left=node.x+'px';el.style.top=node.y+'px'}}
+  applyNodeDragRoutes(drag.routeSnapshots);
   for(const id of drag.textIds){const item=textElementById(id),origin=drag.textOrigins[id];if(!item||!origin)continue;window.KGGraphModel?.updateTextElementGeometry?.(item,{x:Math.round(origin.x+dx),y:Math.round(origin.y+dy)});const el=textElementDomByIdValue(id);if(el){el.style.left=item.x+'px';el.style.top=item.y+'px'}}
   ensureHomeEdgeDragPerformanceController()?.schedule?.(drag.nodeIds);
   if(drag.anchorRect){
@@ -1865,7 +1893,7 @@ function finishHomeSelectionBoundsDrag(event,cancelled=false){
   const drag=homeSelectionBoundsDrag;if(!drag||drag.pointerId!==event.pointerId)return false;
   if(drag.frame){cancelAnimationFrame(drag.frame);drag.frame=0}if(drag.pending&&!cancelled)applyHomeSelectionBoundsMove(drag.pending);homeSelectionBoundsDrag=null;
   try{stage.releasePointerCapture(event.pointerId)}catch(error){}stage.classList.remove('home-selection-bounds-dragging','graph-card-dragging');ensureHomeEdgeDragPerformanceController()?.stop?.(drag.nodeIds);
-  if(cancelled&&drag.moved){for(const id of drag.nodeIds){const node=nodeById(id),origin=drag.nodeOrigins[id];if(node&&origin)window.KGGraphModel?.updateGeometry?.(node,origin)}for(const id of drag.textIds){const item=textElementById(id),origin=drag.textOrigins[id];if(item&&origin)window.KGGraphModel?.updateTextElementGeometry?.(item,origin)}render();showStatus('已取消整体移动。')}
+  if(cancelled&&drag.moved){for(const id of drag.nodeIds){const node=nodeById(id),origin=drag.nodeOrigins[id];if(node&&origin)window.KGGraphModel?.updateGeometry?.(node,origin)}restoreNodeDragRoutes(drag.routeSnapshots);for(const id of drag.textIds){const item=textElementById(id),origin=drag.textOrigins[id];if(item&&origin)window.KGGraphModel?.updateTextElementGeometry?.(item,origin)}render();showStatus('已取消整体移动。')}
   else if(!drag.moved)dismissLockedHomeSelection('selection-click-dismiss');
   else{save();refreshSelectionUI();requestAnimationFrame(()=>window.KGHomeCanvasRuntime?.selectionFilter?.refreshPosition?.(homeSelectionAnchorRect()));showStatus(`已整体移动 ${drag.nodeIds.length+drag.textIds.length} 个图元，并恢复完整关系线。`)}
   event.preventDefault();event.stopPropagation();event.stopImmediatePropagation();return true;
@@ -2165,6 +2193,7 @@ function resetGraphPointerInteractions(options={}){
   }
   if(cardDrag){
     const drag=cardDrag;cardDrag=null;clearTimeout(drag.longTimer);
+    if(drag.moved){for(const id of drag.ids||[drag.id]){const node=nodeById(id),origin=drag.startPositions?.[id];if(node&&origin)window.KGGraphModel?.updateGeometry?.(node,origin)}restoreNodeDragRoutes(drag.routeSnapshots||[]);render()}
     try{drag.card?.releasePointerCapture?.(drag.pointerId)}catch(error){}
     (drag.ids||[drag.id]).forEach(id=>cardElementByNodeId(id)?.classList.remove('dragging','group-dragging'));
     const controller=ensureGraphDragController();controller?.cancel?.();
@@ -2798,7 +2827,8 @@ cardsLayer.addEventListener('pointerdown',e=>{
   if(groupIds.length===1&&!e.shiftKey&&!e.ctrlKey&&!e.metaKey)clearMultiSelection();
   const startPositions=Object.fromEntries(groupIds.map(gid=>{const gn=nodeById(gid);return[gid,{x:gn.x,y:gn.y}]}));
   const dragController=ensureGraphDragController();
-  cardDrag=dragController?dragController.begin('node',e,{id,ids:groupIds,card,moved:false,longOpened:false,toggleMulti,editOnRelease,startClient:{x:e.clientX,y:e.clientY},startPos:{x:n.x,y:n.y},startPositions,longTimer:null,historyLabel:groupIds.length>1?`移动 ${groupIds.length} 个知识点`:`移动“${n.title}”`}):{id,ids:groupIds,card,pointerId:e.pointerId,moved:false,longOpened:false,toggleMulti,editOnRelease,startClient:{x:e.clientX,y:e.clientY},startPos:{x:n.x,y:n.y},startPositions,longTimer:null};
+  const routeSnapshots=captureNodeDragRoutes(groupIds);
+  cardDrag=dragController?dragController.begin('node',e,{id,ids:groupIds,card,moved:false,longOpened:false,toggleMulti,editOnRelease,startClient:{x:e.clientX,y:e.clientY},startPos:{x:n.x,y:n.y},startPositions,routeSnapshots,longTimer:null,historyLabel:groupIds.length>1?`移动 ${groupIds.length} 个知识点`:`移动“${n.title}”`}):{id,ids:groupIds,card,pointerId:e.pointerId,moved:false,longOpened:false,toggleMulti,editOnRelease,startClient:{x:e.clientX,y:e.clientY},startPos:{x:n.x,y:n.y},startPositions,routeSnapshots,longTimer:null};
   cardDrag.edgeLite=shouldUseHomeEdgeDragLite(cardDrag);
   const movingRecords=typeof homeAlignmentRecords==='function'?homeAlignmentRecords().filter(record=>groupIds.includes(String(record.id))):[];
   if(cardDrag.edgeLite)window.KGHomeCanvasRuntime?.alignment?.clearGuides?.();else window.KGHomeCanvasRuntime?.alignment?.begin?.(movingRecords,{kind:'node',ids:groupIds});
@@ -2833,6 +2863,7 @@ cardsLayer.addEventListener('pointermove',e=>{
     const el=cardElementByNodeId(gid);
     if(el){el.style.left=n.x+'px';el.style.top=n.y+'px'}
   }
+  applyNodeDragRoutes(cardDrag.routeSnapshots);
   if(cardDrag.edgeLite){
     ensureHomeEdgeDragPerformanceController()?.start?.(cardDrag.ids||[cardDrag.id]);
     ensureHomeEdgeDragPerformanceController()?.schedule?.(cardDrag.ids||[cardDrag.id]);
@@ -2849,7 +2880,7 @@ function finishCardPointer(e,cancelled=false){
   (drag.ids||[drag.id]).forEach(gid=>{const el=cardElementByNodeId(gid);if(el)el.classList.remove('dragging','group-dragging')});
   stage.classList.remove('large-graph-dragging-local-lines','graph-card-dragging','graph-card-dragging-defer-edges');
   try{drag.card.releasePointerCapture(e.pointerId)}catch{}
-  if(cancelled||drag.longOpened){if(drag.edgeLite&&drag.moved&&!drag.gatherDragBlocked)renderEdges();return}
+  if(cancelled||drag.longOpened){if(drag.moved){for(const id of drag.ids||[drag.id]){const node=nodeById(id),origin=drag.startPositions?.[id];if(node&&origin)window.KGGraphModel?.updateGeometry?.(node,origin)}restoreNodeDragRoutes(drag.routeSnapshots||[]);render()}else if(drag.edgeLite&&!drag.gatherDragBlocked)renderEdges();return}
   if(drag.gatherDragBlocked){handleNodeTap(drag.id);return}
   if(!drag.moved){
     if(drag.toggleMulti){toggleCardMultiSelection(drag.id);return}

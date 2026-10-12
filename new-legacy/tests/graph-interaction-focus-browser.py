@@ -8,7 +8,7 @@ ROOT=Path(__file__).resolve().parents[2]
 OUT=ROOT/'artifacts/graph-interaction-focus-fixes'
 
 def main():
-    parser=argparse.ArgumentParser();parser.add_argument('--base-url',required=True);parser.add_argument('--section',choices=['all','tabs','card','focus','edges'],default='all');args=parser.parse_args()
+    parser=argparse.ArgumentParser();parser.add_argument('--base-url',required=True);parser.add_argument('--section',choices=['all','tabs','card','focus','edges','curves'],default='all');args=parser.parse_args()
     base=args.base_url.rstrip('/');assert urlparse(base).hostname in ('localhost','127.0.0.1')
     OUT.mkdir(parents=True,exist_ok=True)
     with sync_playwright() as pw:
@@ -18,7 +18,7 @@ def main():
         nodes=[{'id':'a','title':'重点卡牌','level':'重点','color':'#db2777','cardStyle':'rounded','geometry':{'x':150,'y':200,'width':260,'height':100},'fontSize':24,'fontWeight':'bold','fillColor':'#fff1f2','borderColor':'#db2777','surfaceCustomized':True},
                {'id':'b','title':'普通卡牌','level':'基础','cardStyle':'standard','geometry':{'x':550,'y':300,'width':200,'height':150}},
                {'id':'c','title':'第二重点','level':'重点','cardStyle':'rectangle','geometry':{'x':240,'y':530,'width':260,'height':85}}]
-        graph={'meta':{'title':'图谱回归'},'viewport':{'x':100,'y':30,'scale':1},'nodes':nodes,'links':[{'id':'ab','from':'a','to':'b'},{'id':'ac','from':'a','to':'c'}]}
+        graph={'meta':{'title':'图谱回归'},'viewport':{'x':100,'y':30,'scale':1},'nodes':nodes,'links':[{'id':'ab','from':'a','to':'b','pathStyle':'curve','curveControls':[{'x':455,'y':185},{'x':510,'y':490}]},{'id':'ac','from':'a','to':'c'}]}
         files=[]
         for i in range(3):
             r=ctx.request.post(base+'/api/v1/files',data={'name':f'交互回归{i}-{suffix}','graphData':graph});assert r.ok;files.append(r.json()['file'])
@@ -93,6 +93,65 @@ def main():
             card=page.locator('.knowledge-card[data-node-id="b"]');box=card.bounding_box();page.mouse.move(box['x']+box['width']/2,box['y']+box['height']/2);page.mouse.down();page.mouse.move(box['x']+box['width']/2-100,box['y']+box['height']/2+200,steps=12);page.mouse.up();assert check_edges()
             flush();reload();assert check_edges();page.screenshot(path=str(OUT/'edge-midpoints.png'))
             print('PASS edges: rendered midpoint paths follow actual card drag and durable geometry after reload',flush=True)
+        if args.section in ('all','curves'):
+            def curve_state():
+                return page.evaluate('''()=>{const link=state.links.find(l=>l.id==='ab'),g=edgeDomById.get('ab').geometry;return{nodes:Object.fromEntries(['a','b'].map(id=>{const n=nodeById(id);return[id,{x:n.x,y:n.y}]})),from:link.from,to:link.to,endpoints:g.endpoints.map(p=>({...p})),controls:link.curveControls.map(p=>({...p})),handles:g.controls.map(p=>({x:p.x,y:p.y})),samples:[g.samples[8],g.samples[16]],viewport:{...state.viewport}}}''')
+            def aligned(value):
+                for handle,sample in zip(value['handles'],value['samples']):
+                    assert abs(handle['x']-sample['x'])<1e-6 and abs(handle['y']-sample['y'])<1e-6,value
+            page.evaluate("state.selectedLinkId='ab';state.selectedNodeId=null;selectedNodeIds.clear();refreshSelectionUI()")
+            before=curve_state();aligned(before)
+            hit=page.locator('.edge-control-handle[data-edge-control-index="0"] .edge-control-hit');box=hit.bounding_box();assert box, 'curve handle visible'
+            x=box['x']+box['width']/2;y=box['y']+box['height']/2
+            page.mouse.move(x,y);page.mouse.down();assert page.evaluate('!!edgeControlDrag'),page.evaluate('''({x,y})=>({at:document.elementFromPoint(x,y)?.outerHTML.slice(0,300),mode:state.graphMode,readonly:document.body.classList.contains('auth-readonly')})''',{'x':x,'y':y});page.mouse.move(x+45,y-32,steps=8);page.mouse.up()
+            edited=curve_state();aligned(edited)
+            assert edited['controls']!=before['controls'],(before,edited)
+            assert abs(edited['handles'][1]['x']-before['handles'][1]['x'])<1e-6 and abs(edited['handles'][1]['y']-before['handles'][1]['y'])<1e-6
+            page.evaluate("selectedNodeIds=new Set(['a','b']);state.selectedLinkId=null;state.selectedNodeId='a';refreshSelectionUI()")
+            card=page.locator('.knowledge-card[data-node-id="a"]');box=card.bounding_box();x=box['x']+box['width']/2;y=box['y']+box['height']/2
+            page.mouse.move(x,y);page.mouse.down();page.mouse.move(x+76,y+44,steps=10);page.mouse.up()
+            grouped=curve_state();aligned(grouped)
+            delta={axis:grouped['nodes']['a'][axis]-edited['nodes']['a'][axis] for axis in ('x','y')}
+            assert delta=={axis:grouped['nodes']['b'][axis]-edited['nodes']['b'][axis] for axis in ('x','y')},(edited,grouped)
+            assert grouped['from']=='a' and grouped['to']=='b' and any(delta.values())
+            for old,new in zip(edited['controls'],grouped['controls']):
+                assert abs(new['x']-old['x']-delta['x'])<1e-6 and abs(new['y']-old['y']-delta['y'])<1e-6,(edited,grouped)
+            page.evaluate('restoreGraphUndoSnapshot()');undone=curve_state();aligned(undone)
+            assert undone['controls']==edited['controls'] and undone['nodes']==edited['nodes'] and undone['from']=='a' and undone['to']=='b'
+            page.evaluate('restoreGraphRedoSnapshot()');redone=curve_state();aligned(redone)
+            assert redone['controls']==grouped['controls'] and redone['nodes']==grouped['nodes']
+            page.evaluate('state.viewport.x+=61;state.viewport.y-=39;state.viewport.scale=1.25;applyTransform()')
+            viewed=curve_state();aligned(viewed);assert viewed['controls']==redone['controls'] and viewed['handles']==redone['handles']
+            flush();reload();reopened=curve_state();aligned(reopened)
+            assert reopened['controls']==redone['controls'] and reopened['from']=='a' and reopened['to']=='b'
+            card=page.locator('.knowledge-card[data-node-id="b"]');box=card.bounding_box();x=box['x']+box['width']/2;y=box['y']+box['height']/2
+            page.mouse.move(x,y);page.mouse.down();page.mouse.move(x+52,y+19,steps=8);page.mouse.up()
+            single=curve_state();aligned(single)
+            assert single['nodes']['a']==reopened['nodes']['a'] and single['from']=='a' and single['to']=='b'
+            start_delta={axis:single['endpoints'][0][axis]-reopened['endpoints'][0][axis] for axis in ('x','y')}
+            end_delta={axis:single['endpoints'][1][axis]-reopened['endpoints'][1][axis] for axis in ('x','y')}
+            axis={coord:reopened['endpoints'][1][coord]-reopened['endpoints'][0][coord] for coord in ('x','y')};length2=axis['x']**2+axis['y']**2
+            for old,new in zip(reopened['controls'],single['controls']):
+                weight=max(0,min(1,((old['x']-reopened['endpoints'][0]['x'])*axis['x']+(old['y']-reopened['endpoints'][0]['y'])*axis['y'])/length2))
+                for coord in ('x','y'):
+                    expected=old[coord]+start_delta[coord]*(1-weight)+end_delta[coord]*weight
+                    assert abs(new[coord]-expected)<1e-6,(reopened,single)
+            page.evaluate('restoreGraphUndoSnapshot()');undone_single=curve_state();aligned(undone_single)
+            assert undone_single['controls']==reopened['controls'] and undone_single['nodes']==reopened['nodes']
+            page.evaluate("selectedNodeIds=new Set(['a','b']);state.selectedNodeId='a';refreshSelectionUI()")
+            card=page.locator('.knowledge-card[data-node-id="a"]');box=card.bounding_box();x=box['x']+box['width']/2;y=box['y']+box['height']/2
+            page.mouse.move(x,y);page.mouse.down();page.mouse.move(x+65,y+34,steps=6)
+            assert curve_state()['controls']!=undone_single['controls']
+            page.evaluate('resetGraphPointerInteractions()');page.mouse.up()
+            cancelled=curve_state();aligned(cancelled)
+            assert cancelled['controls']==undone_single['controls'] and cancelled['nodes']==undone_single['nodes'] and cancelled['from']=='a' and cancelled['to']=='b'
+            page.evaluate("selectedNodeIds.clear();state.selectedNodeId=null;state.selectedLinkId='ab';refreshSelectionUI()")
+            page.locator('[data-uc-edge-panel="line"]').click();page.locator('[data-uc-edge-path="curve"]').click()
+            auto=page.evaluate('''()=>{const link=state.links.find(l=>l.id==='ab'),g=edgeDomById.get('ab').geometry;return{controls:link.curveControls,waypoints:link.waypoints,handles:g.controls.map(p=>({x:p.x,y:p.y})),samples:[g.samples[8],g.samples[16]]}}''')
+            assert not auto['controls'] and not auto['waypoints'];aligned(auto)
+            page.evaluate('restoreGraphUndoSnapshot()');restored=curve_state();aligned(restored)
+            assert restored['controls']==cancelled['controls']
+            print('PASS curves: real handle drag, dual-card and single-card drags, cancel, undo/redo, viewport transform, saved reload and auto reset',flush=True)
         assert not errors,errors
         browser.close()
 if __name__=='__main__':main()

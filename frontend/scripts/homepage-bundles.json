@@ -69,6 +69,7 @@
       "retainStyleArtifact": true,
       "scripts": [
         "src/graph/graph-model.js",
+        "src/graph/edge-geometry.js",
         "src/graph/card-style-registry.js",
         "src/graph/graph-persistence.js",
         "src/graph/history-controller.js",

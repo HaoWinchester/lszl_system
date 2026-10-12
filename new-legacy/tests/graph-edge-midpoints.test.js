@@ -4,7 +4,7 @@ const fs=require('node:fs');
 const vm=require('node:vm');
 const source=fs.readFileSync(require('node:path').join(__dirname,'../src/10-graph-editor.js'),'utf8');
 const nodes=new Map();
-const context={Math,Number,String,Array,Map,Set,window:{},DEFAULTS:{linkPathStyle:'curve'},LINE_PATH_STYLES:new Set(['curve','straight','elbow']),nodeById:id=>nodes.get(id),nodeDims:n=>({w:n.w,h:n.h}),visualPositionForNode:n=>({x:n.x,y:n.y}),nodeCenter:n=>({x:n.x+n.w/2,y:n.y+n.h/2})};
+const context={Math,Number,String,Array,Map,Set,window:{KGGraphEdgeGeometry:require('../src/graph/edge-geometry.js')},DEFAULTS:{linkPathStyle:'curve'},LINE_PATH_STYLES:new Set(['curve','straight','elbow']),nodeById:id=>nodes.get(id),nodeDims:n=>({w:n.w,h:n.h}),visualPositionForNode:n=>({x:n.x,y:n.y}),nodeCenter:n=>({x:n.x+n.w/2,y:n.y+n.h/2})};
 vm.createContext(context);
 vm.runInContext(source.slice(source.indexOf('function nodeOutlinePoint('),source.indexOf('function relationExists(')),context);
 const plain=value=>JSON.parse(JSON.stringify(value));
@@ -29,13 +29,15 @@ check(a,{x:40,y:-350,w:200,h:100},{x:80,y:0},{x:140,y:-250});
 const wideA={x:0,y:0,w:500,h:80},wideB={x:530,y:170,w:500,h:80};
 const p=check(wideA,wideB,{x:500,y:40},{x:530,y:210});
 const curve=context.linkPathGeometry({pathStyle:'curve'},p.a,p.b,p);
-assert.equal(curve.controls[0].y,40);assert.equal(curve.controls[1].y,210);
-assert.ok(curve.controls[0].x>=500&&curve.controls[0].x<=530,'short gap controls cannot overshoot');
+assert.equal(curve.curveControls[0].y,40);assert.equal(curve.curveControls[1].y,210);
+assert.ok(curve.curveControls[0].x>=500&&curve.curveControls[0].x<=530,'short gap controls cannot overshoot');
 // Multiple children in one horizontal branch share their parent's exact side midpoint.
 const siblings=[100,200,-100].map(y=>context.linkOutlinePoints(a,{x:500,y,w:100,h:60}).a);
 assert.deepEqual(plain(siblings),[{x:160,y:40},{x:160,y:40},{x:160,y:40}]);
 const stored=[{x:250,y:-100},{x:400,y:250}];
-assert.deepEqual(plain(context.linkPathGeometry({pathStyle:'curve',curveControls:stored},p.a,p.b,p).controls.map(({x,y})=>({x,y}))),stored,'retain user-controlled curve');
+const storedCurve=context.linkPathGeometry({pathStyle:'curve',curveControls:stored},p.a,p.b,p);
+assert.deepEqual(plain(storedCurve.curveControls),stored,'retain underlying cubic controls');
+assert.deepEqual(plain(storedCurve.controls.map(({x,y})=>({x,y}))),plain([storedCurve.samples[8],storedCurve.samples[16]]),'visible handles must lie on the cubic path');
 const free=context.linkRenderPoints({fromPoint:{x:7,y:8},toPoint:{x:30,y:40}});
 assert.deepEqual(plain([free.a,free.b]),[{x:7,y:8},{x:30,y:40}]);
 assert.equal(context.linkRenderPoints({from:'missing',to:'b'}),null);
@@ -61,7 +63,9 @@ for(const [first,second] of [
     assert.ok(dense.every(p=>p.x>=Math.min(first.x,second.x)-25&&p.x<=Math.max(first.x+first.w,second.x+second.w)+25&&p.y>=Math.min(first.y,second.y)-25&&p.y<=Math.max(first.y+first.h,second.y+second.h)+25),'detours stay near cards');
   }
   const manual=[{x:-20,y:-40},{x:30,y:15}];
-  assert.deepEqual(plain(context.linkPathGeometry({pathStyle:'curve',curveControls:manual},points.a,points.b,points).controls.map(({x,y})=>({x,y}))),manual);
+  const curved=context.linkPathGeometry({pathStyle:'curve',curveControls:manual},points.a,points.b,points);
+  assert.deepEqual(plain(curved.curveControls),manual);
+  assert.deepEqual(plain(curved.controls.map(({x,y})=>({x,y}))),plain([curved.samples[8],curved.samples[16]]));
   assert.deepEqual(plain(context.linkPathGeometry({pathStyle:'elbow',waypoints:manual},points.a,points.b,points).samples),plain([points.a,...manual,points.b]));
   assert.equal(context.linkPathGeometry({pathStyle:'straight'},points.a,points.b,points).samples.length,2,'explicit straight style remains one direct segment');
 }
@@ -106,4 +110,17 @@ assert.deepEqual(plain(routeLink.waypoints[2]),{x:350,y:130});
 assert.equal(context.movedGeometry.controls.length,4,'manual corner drag retains all four controls');
 context.restoreEdgeRoute(routeLink,original);
 assert.equal(context.linkPathGeometry(routeLink,routePoints.a,routePoints.b,routePoints).d,routeGeometry.d,'cancel/restore retains original smooth geometry');
+// A real two-node group move must translate stored cubic controls without detaching either end.
+nodes.set('a',{id:'a',x:0,y:0,w:160,h:80});nodes.set('b',{id:'b',x:400,y:100,w:200,h:100});
+const groupLink={id:'group',from:'a',to:'b',pathStyle:'curve',curveControls:[{x:220,y:-45},{x:340,y:230}]};
+context.state={links:[groupLink]};
+const snapshots=context.captureNodeDragRoutes(['a','b']);
+assert.equal(snapshots.length,1);
+nodes.get('a').x+=34;nodes.get('a').y-=21;nodes.get('b').x+=34;nodes.get('b').y-=21;
+context.applyNodeDragRoutes(snapshots);
+assert.deepEqual(plain(groupLink.curveControls),[{x:254,y:-66},{x:374,y:209}]);
+assert.equal(groupLink.from,'a');assert.equal(groupLink.to,'b');
+context.restoreNodeDragRoutes(snapshots);
+assert.deepEqual(plain(groupLink.curveControls),[{x:220,y:-45},{x:340,y:230}]);
+assert.equal(groupLink.from,'a');assert.equal(groupLink.to,'b');
 console.log('PASS graph edge midpoints: directions, overlapping projections, tight gaps, manual routes, free endpoints, route persistence, move/reload, rebind and control dragging');

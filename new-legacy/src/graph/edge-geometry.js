@@ -1,0 +1,36 @@
+'use strict';
+
+(function(global){
+  const point=(x,y)=>({x,y});
+  function curvePoint(start,end,controls,t){
+    const u=1-t,a=u*u*u,b=3*u*u*t,c=3*u*t*t,d=t*t*t;
+    return point(a*start.x+b*controls[0].x+c*controls[1].x+d*end.x,
+      a*start.y+b*controls[0].y+c*controls[1].y+d*end.y);
+  }
+  function curveHandles(start,controls,end){return[curvePoint(start,end,controls,1/3),curvePoint(start,end,controls,2/3)]}
+  function controlsFromHandles(start,handles,end){
+    // At t=1/3 and 2/3, the two unknown controls have coefficients
+    // [4/9, 2/9] and [2/9, 4/9]. Invert that fixed 2x2 system.
+    const residual=(handle,a,b)=>point(handle.x-a*start.x-b*end.x,handle.y-a*start.y-b*end.y);
+    const first=residual(handles[0],8/27,1/27),second=residual(handles[1],1/27,8/27);
+    return[point(3*first.x-1.5*second.x,3*first.y-1.5*second.y),
+      point(3*second.x-1.5*first.x,3*second.y-1.5*first.y)];
+  }
+  function moveRoute(route,startDelta,endDelta){
+    const deltaA=startDelta,deltaB=endDelta,before=[route.start,route.end];
+    const axis=point(before[1].x-before[0].x,before[1].y-before[0].y),length2=axis.x*axis.x+axis.y*axis.y;
+    const move=(value,index,total)=>{
+      if(deltaA.x===deltaB.x&&deltaA.y===deltaB.y)return point(value.x+deltaA.x,value.y+deltaA.y);
+      const t=length2>1e-12?Math.max(0,Math.min(1,((value.x-before[0].x)*axis.x+(value.y-before[0].y)*axis.y)/length2)):(index+1)/(total+1);
+      return point(value.x+deltaA.x*(1-t)+deltaB.x*t,value.y+deltaA.y*(1-t)+deltaB.y*t);
+    };
+    const result={...route,start:point(route.start.x+deltaA.x,route.start.y+deltaA.y),end:point(route.end.x+deltaB.x,route.end.y+deltaB.y)};
+    for(const key of ['curveControls','waypoints'])if(Array.isArray(route[key]))result[key]=route[key].map((value,index,all)=>move(value,index,all.length));
+    if(route.fromPoint)result.fromPoint=point(route.fromPoint.x+deltaA.x,route.fromPoint.y+deltaA.y);
+    if(route.toPoint)result.toPoint=point(route.toPoint.x+deltaB.x,route.toPoint.y+deltaB.y);
+    return result;
+  }
+  const api=Object.freeze({curveHandles,controlsFromHandles,moveRoute});
+  global.KGGraphEdgeGeometry=api;
+  if(typeof module!=='undefined'&&module.exports)module.exports=api;
+})(typeof window!=='undefined'?window:globalThis);
