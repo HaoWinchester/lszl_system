@@ -41,7 +41,7 @@
     return adopt(file);
   }
   function fragmentSource(){
-    const store=current(),file=store?.getCurrentFileMeta?.()||store?.getCurrentFile?.();
+    const store=current(),file=store?.getCurrentFileMeta?.()||store?.getCurrentFile?.()||(remoteActive()?global.KGGraphFileRemoteAdapter?.getCurrentFileMeta?.():null);
     return{fileId:file?.id||null,revision:file?.revision??null};
   }
   global.KGGraphFileEditorStoreBridge={initialize,initializeCurrent,current,isRemote,openFile,createFile,adopt,fragmentSource};

@@ -30,3 +30,9 @@ test('mindmap layouts and themes preserve graph content and manual appearance',(
   const result=spawnSync(process.execPath,['--test',fileURLToPath(new URL('../../new-legacy/tests/graph-mindmap-layout.test.js',import.meta.url))],{encoding:'utf8'});
   assert.equal(result.status,0,`${result.stdout}\n${result.stderr}`)
 })
+
+
+test('graph image content and notes roundtrip without truncation',()=>{
+  const result=spawnSync(process.execPath,['--test',fileURLToPath(new URL('../../new-legacy/tests/graph-media-roundtrip.test.js',import.meta.url))],{encoding:'utf8'});
+  assert.equal(result.status,0,`${result.stdout}\n${result.stderr}`)
+})

@@ -52,3 +52,6 @@ api_router.include_router(engagement.router)
 
 from app.api.v1 import teacher_assistant
 api_router.include_router(teacher_assistant.router)
+
+from app.api.v1 import graph_assets
+api_router.include_router(graph_assets.router)

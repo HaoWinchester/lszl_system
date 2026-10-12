@@ -6,6 +6,7 @@
 
 import hashlib
 import json
+from app.services.graph_asset_service import validate_graph_assets
 
 from sqlalchemy import case, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -225,6 +226,7 @@ async def create_file(
     folder_id: str | None = None,
     source: str = "created",
     source_file_id: str | None = None,
+    commit: bool = True,
 ) -> GraphFile | None:
     if folder_id is not None:
         folder = await db.scalar(select(Folder).where(
@@ -235,6 +237,7 @@ async def create_file(
         if folder is None:
             return None
     graph_data = graph_data or blank_graph_data(name)
+    await validate_graph_assets(db, owner, graph_data)
     file_id = uid("f_")
     file = GraphFile(
         id=file_id,
@@ -251,8 +254,10 @@ async def create_file(
     db.add(file)
     await db.flush()  # 先写入 graph_files 行，满足 file_contents 外键依赖
     db.add(FileContent(file_id=file_id, graph_data=graph_data, learning_state={}))
-    await db.commit()
-    await db.refresh(file)
+    await db.flush()
+    if commit:
+        await db.commit()
+        await db.refresh(file)
     return file
 
 
@@ -276,6 +281,7 @@ async def save_file(
     current_revision = max(1, int(f.revision or 1))
     if expected_revision is not None and expected_revision != current_revision:
         raise FileRevisionConflict(current_revision)
+    await validate_graph_assets(db, owner, graph_data)
     c = await get_content(db, file_id)
     next_revision = current_revision + 1
     if c:
@@ -765,6 +771,9 @@ async def import_legacy(db: AsyncSession, owner: str, payload: dict) -> dict:
     folders = payload.get("folders") or []
     tags = payload.get("tags") or []
     files = payload.get("files") or payload.get("contents") or []
+
+    for rec in files:
+        await validate_graph_assets(db, owner, rec.get("graphData") or rec.get("graph_data") or {})
 
     folder_id_map: dict[str, str] = {}
     for fd in folders:

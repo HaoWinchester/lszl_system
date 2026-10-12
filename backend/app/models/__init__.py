@@ -133,3 +133,5 @@ __all__ = [
 from app.models.question_material import QuestionAsset, QuestionMaterial, QuestionMaterialRevision
 
 from app.models.teacher_assistant import TeacherAssistantSession, TeacherAssistantUpload, TeacherAssistantJob
+
+from app.models.graph_asset import GraphAsset

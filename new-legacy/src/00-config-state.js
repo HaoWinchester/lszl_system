@@ -188,7 +188,7 @@ function sanitizeState(data={}){
       level,
       keywords:safeString(content.keywords??n.keywords??'','',500),
       summary:safeString(content.description??n.summary??'','',3000),
-      notes:safeString(content.notes??n.notes??'','',3000),
+      notes:window.KGGraphModel.notesValue(content.notes??n.notes??''),
       size:NODE_SIZES.has(rawSize)?rawSize:'',
       highlightTerms:safeString(content.highlightTerms??n.highlightTerms??'','',500),
       cardStyle:window.KGGraphModel&&window.KGGraphModel.canonicalCardStyle?window.KGGraphModel.canonicalCardStyle(appearance.cardStyle||n.cardStyle||DEFAULTS.nodeCardStyle):(appearance.cardStyle||n.cardStyle||DEFAULTS.nodeCardStyle),

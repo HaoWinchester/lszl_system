@@ -3,9 +3,7 @@ from __future__ import annotations
 import base64
 import binascii
 from copy import deepcopy
-from io import BytesIO
-import warnings
-from PIL import Image
+from app.core.image_validation import validate_image_bytes
 from fastapi import HTTPException
 from sqlalchemy import or_, select
 from app.core.security import uid
@@ -43,18 +41,7 @@ async def upload_asset(db, user, data):
         image_bytes = base64.b64decode(data.data_base64, validate=True)
     except (ValueError, binascii.Error):
         fail('ASSET_INVALID', '图片必须是有效 Base64')
-    if not image_bytes or len(image_bytes) > 5 * 1024 * 1024:
-        fail('ASSET_SIZE_INVALID', '图片不能超过 5 MiB')
-    formats = {'image/png': 'PNG', 'image/jpeg': 'JPEG', 'image/webp': 'WEBP'}
-    try:
-        with warnings.catch_warnings():
-            warnings.simplefilter('error', Image.DecompressionBombWarning)
-            with Image.open(BytesIO(image_bytes)) as image:
-                if image.format != formats.get(data.mime_type) or image.width * image.height > 40_000_000:
-                    raise ValueError('format')
-                image.verify()
-    except Exception:
-        fail('ASSET_INVALID', '仅支持有效的 PNG、JPEG、WebP 图片')
+    validate_image_bytes(image_bytes, data.mime_type)
     row = QuestionAsset(id=uid('qa_'), owner_id=user.username, filename=data.filename, mime_type=data.mime_type, alt=data.alt, data=image_bytes)
     db.add(row)
     await db.commit()

@@ -745,3 +745,5 @@
 .related-canvas-backdrop .related-canvas-empty{font-size:12px;color:#64748b;line-height:1.5}
 
 .knowledge-card.card-style-rounded.mindmap-capsule{border-radius:999px}
+
+.graph-content-image{display:block;object-fit:contain;max-width:100%;height:auto}.graph-card-image{max-height:48%;margin:auto;pointer-events:none}.graph-detail-image{max-height:260px;margin:8px auto}
