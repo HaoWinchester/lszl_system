@@ -157,7 +157,6 @@ function ensureGraphRenderer(){
 }
 function resetGraphKernelSession(){
   const history=graphKernelControllers.history;if(history&&history.clear)history.clear();
-  const clipboard=graphKernelControllers.clipboard;if(clipboard&&clipboard.clear)clipboard.clear();
   const drag=graphKernelControllers.drag;if(drag&&drag.cancel)drag.cancel();
   const resize=graphKernelControllers.resize;if(resize&&resize.cancel)resize.cancel();
   nodeFreeResizeModeId=null;
@@ -1645,7 +1644,7 @@ function ensureGraphHistoryController(){
   graphKernelControllers.history=factory.create({limit:GRAPH_UNDO_LIMIT,capture:graphUndoSnapshot,restore:applyGraphHistorySnapshot,onChange:()=>window.KGHomeInk?.refreshControls?.()});
   return graphKernelControllers.history;
 }
-function resetGraphHistory(){window.KGHomeInk?.reset?.();const history=ensureGraphHistoryController();history?.clear?.();graphKernelControllers.clipboard?.clear?.();graphClipboardNodes=null;graphClipboardTextElement=null;return true}
+function resetGraphHistory(){window.KGHomeInk?.reset?.();const history=ensureGraphHistoryController();history?.clear?.();return true}
 window.resetGraphHistory=resetGraphHistory;
 function pushGraphUndoSnapshot(label='操作'){
   const history=ensureGraphHistoryController();
@@ -1676,35 +1675,13 @@ function selectedNodeIdsForClipboard(){
 function copySelectedGraphCards(){
   const textItem=state.selectedElementId?textElementById(state.selectedElementId):null;
   if(!textItem&&rejectLockedNodeAction('复制'))return false;
-  if(textItem){graphClipboardTextElement=cloneGraphValue(textItem);graphClipboardNodes=null;showStatus('已复制文本框，将鼠标移到目标位置后按 Ctrl+V 粘贴。');return true}
   const ids=selectedNodeIdsForClipboard();
-  if(!ids.length){showStatus('请先选择要复制的卡牌或文本框。');return false}
-  graphClipboardTextElement=null;
-  graphClipboardNodes=ids.map(id=>{
-    const n=nodeById(id),d=nodeDims(n);
-    return{
-      title:n.title||'未命名知识点',
-      category:n.category||'',
-      color:safeColor(n.color,DEFAULTS.nodeColor),
-      size:NODE_SIZES.has(n.size)?n.size:'',
-      level:n.level||'基础',
-      keywords:n.keywords||'',
-      summary:n.summary||'',
-      notes:n.notes||'',
-      highlightTerms:n.highlightTerms||'',
-      x:n.x,
-      y:n.y,
-      w:d.w,
-      h:d.h,
-      content:window.KGGraphModel&&window.KGGraphModel.contentOf?window.KGGraphModel.contentOf(n):null,
-      appearance:window.KGGraphModel&&window.KGGraphModel.appearanceOf?window.KGGraphModel.appearanceOf(n):null,
-      geometry:window.KGGraphModel&&window.KGGraphModel.geometryOf?window.KGGraphModel.geometryOf(n):null,
-      cardStyle:n.cardStyle||'standard',
-      textAlign:n.textAlign||'center'
-    };
-  });
-  const clipboard=ensureGraphClipboardController();if(clipboard)clipboard.write(graphClipboardNodes);
-  showStatus(`已复制 ${graphClipboardNodes.length} 张卡牌。将鼠标移到目标位置后按 Ctrl+V 粘贴。`);
+  if(!textItem&&!ids.length){showStatus('请先选择要复制的卡牌或文本框。');return false}
+  const source=window.KGGraphFileEditorStoreBridge?.fragmentSource?.()||{};
+  const fragment=window.KGGraphFragment.capture({...state,...source},{nodeIds:textItem?[]:ids,elementIds:textItem?[textItem.id]:[]});
+  ensureGraphClipboardController().writeFragment(fragment);
+  graphClipboardNodes=null;graphClipboardTextElement=null;
+  showStatus(`已复制 ${fragment.nodes.length||fragment.elements.length} 个图谱对象。`);
   return true;
 }
 function graphClipboardBounds(nodes){const clipboard=ensureGraphClipboardController();if(clipboard)return clipboard.bounds(nodes);let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;nodes.forEach(n=>{minX=Math.min(minX,n.x);minY=Math.min(minY,n.y);maxX=Math.max(maxX,n.x+(n.w||CARD_W));maxY=Math.max(maxY,n.y+(n.h||CARD_H))});if(!Number.isFinite(minX))return{x:0,y:0,w:0,h:0,cx:0,cy:0};return{x:minX,y:minY,w:maxX-minX,h:maxY-minY,cx:(minX+maxX)/2,cy:(minY+maxY)/2}}
@@ -1714,52 +1691,43 @@ function currentPasteWorldPoint(){
   return screenToWorld(r.left+r.width/2,r.top+r.height/2);
 }
 function pasteGraphClipboardCards(){
-  if(graphClipboardTextElement){
-    const model=window.KGGraphModel,target=currentPasteWorldPoint(),source=graphClipboardTextElement,geometry=model.textElementGeometryOf(source),copy=model.normalizeTextElement(cloneGraphValue(source),{idFactory:()=>uid('t')});copy.id=uid('t');
-    model.updateTextElementGeometry(copy,{x:Math.round(target.x-geometry.width/2),y:Math.round(target.y-geometry.height/2)});pushGraphUndoSnapshot('粘贴文本框');state.elements.push(copy);clearMultiSelection();state.selectedElementId=copy.id;state.selectedNodeId=null;state.selectedLinkId=null;state.linkSourceId=null;render({persist:true});showStatus('已粘贴文本框。');return true;
-  }
-  const clipboard=ensureGraphClipboardController(),source=clipboard&&clipboard.hasData()?clipboard.read():(Array.isArray(graphClipboardNodes)?graphClipboardNodes:[]);
-  if(!source.length){showStatus('剪贴板中还没有已复制的卡牌或文本框。');return false}
+  if(!canWriteGraph())return false;
+  const clipboard=ensureGraphClipboardController(),source=clipboard?.readFragment();
+  if(!source||!clipboard.hasData())return false;
   if(typeof authRequire==='function'&&!authRequire('登录后才能粘贴卡牌。'))return true;
   const sub=window.KGSubscription;
-  if(sub&&typeof sub.requireUsageLimit==='function'&&!sub.requireUsageLimit('graphNodes',state.nodes.length,source.length,{label:'图谱卡牌'}))return true;
-  const available=Math.max(0,2500-state.nodes.length);
-  if(source.length>available){showStatus(`当前图谱最多还可新增 ${available} 张卡牌，无法粘贴 ${source.length} 张。`);return true}
-  const target=currentPasteWorldPoint(),bounds=graphClipboardBounds(source),created=[];
-  clearRelatedGatherLayout({render:false,message:false});
-  pushGraphUndoSnapshot(`粘贴 ${source.length} 张卡牌`);
-  source.forEach(item=>{
-    const n=makeNode(
-      item.title||'未命名知识点',
-      Math.round(target.x+(item.x-bounds.cx)),
-      Math.round(target.y+(item.y-bounds.cy)),
-      safeColor(item.color,DEFAULTS.nodeColor),
-      item.category||'',
-      item.level||'基础',
-      item.keywords||'',
-      item.summary||'',
-      item.notes||'',
-      NODE_SIZES.has(item.size)?item.size:''
-    );
-    n.highlightTerms=item.highlightTerms||item.content&&item.content.highlightTerms||'';
-    if(window.KGGraphModel){
-      window.KGGraphModel.updateContent(n,item.content||{description:item.summary||'',highlightTerms:n.highlightTerms});
-      window.KGGraphModel.updateAppearance(n,item.appearance||{cardStyle:item.cardStyle||'standard',textAlign:item.textAlign||'center',color:item.color,size:item.size});
-      window.KGGraphModel.updateGeometry(n,{x:n.x,y:n.y,width:item.w||item.geometry&&item.geometry.width,height:item.h||item.geometry&&item.geometry.height});
-    }
-    state.nodes.push(n);
-    created.push(n.id);
-  });
-  selectedNodeIds=new Set(created);
-  selectedLinkIds.clear();
-  state.selectedElementId=null;
-  state.selectedNodeId=created[0]||null;
-  state.selectedLinkId=null;
-  state.linkSourceId=null;
-  render({persist:true});
-  showStatus(`已粘贴 ${created.length} 张卡牌。`);
-  return true;
+  if(source.nodes.length&&sub?.requireUsageLimit&&!sub.requireUsageLimit('graphNodes',state.nodes.length,source.nodes.length,{label:'图谱卡牌'}))return true;
+  if(source.nodes.length>2500-state.nodes.length){showStatus('当前图谱卡牌数量已达上限。');return true}
+  const target=currentPasteWorldPoint(),bounds=graphClipboardBounds(source.nodes.length?source.nodes:source.elements);
+  let fragment;
+  try{
+    fragment=window.KGGraphFragment.remap(source,{idFactory:kind=>uid(kind==='nodes'?'n':kind==='links'?'l':'t'),offset:{x:target.x-bounds.cx,y:target.y-bounds.cy}}).fragment;
+    fragment=sanitizeState(fragment);
+  }catch(error){showStatus('剪贴板图谱片段格式无效。');return false}
+  clearRelatedGatherLayout({render:false,message:false});pushGraphUndoSnapshot('粘贴图谱片段');
+  state.nodes.push(...fragment.nodes);state.links.push(...fragment.links);state.elements.push(...fragment.elements);
+  selectedNodeIds=new Set(fragment.nodes.map(n=>n.id));selectedLinkIds.clear();
+  state.selectedElementId=fragment.elements[0]?.id||null;state.selectedNodeId=fragment.nodes[0]?.id||null;state.selectedLinkId=null;state.linkSourceId=null;
+  render({persist:true});showStatus(`已粘贴 ${fragment.nodes.length||fragment.elements.length} 个图谱对象。`);return true;
 }
+function clearGraphClipboard(){ensureGraphClipboardController()?.clear();graphClipboardNodes=null;graphClipboardTextElement=null}
+window.clearGraphClipboard=clearGraphClipboard;
+let graphClipboardAccount=window.KGAuthCore?.currentUsername?.()||'';
+window.addEventListener('kg-auth-session-change',()=>{
+  const account=window.KGAuthCore?.currentUsername?.()||'';
+  if(!account||account!==graphClipboardAccount)clearGraphClipboard();graphClipboardAccount=account;
+});
+document.addEventListener('copy',event=>{
+  if(isTextEditingTarget(event)||!graphModeAllows('editGraph'))return;
+  if(copySelectedGraphCards()&&ensureGraphClipboardController().exportEvent(event))event.preventDefault();
+});
+document.addEventListener('paste',event=>{
+  if(isTextEditingTarget(event)||!graphModeAllows('editGraph')||!canWriteGraph())return;
+  const clipboard=ensureGraphClipboardController(),data=event.clipboardData;
+  const explicit=data&&(data.getData(window.KGGraphFragment.mime)||data.getData('text/plain'));
+  if(explicit&&!clipboard.importEvent(event))return;
+  if(pasteGraphClipboardCards())event.preventDefault();
+});
 function toggleCardMultiSelection(id){
   if(!graphModeAllows('multiSelect')){handleNodeTap(id);return}
   window.KGHomeCanvasRuntime?.selectionFilter?.clear?.({reason:'direct-node-toggle',apply:false});
@@ -3974,14 +3942,7 @@ function handleGraphClipboardShortcut(e){
     if(selectAllGraphNodesFromShortcut()){e.preventDefault();e.stopPropagation()}
     return;
   }
-  if(key==='c'){
-    if(copySelectedGraphCards()){e.preventDefault();e.stopPropagation()}
-    return;
-  }
-  if(key==='v'){
-    if(pasteGraphClipboardCards()){e.preventDefault();e.stopPropagation()}
-    return;
-  }
+  if(key==='c'||key==='v')return; // Native clipboard events carry the versioned fragment across tabs.
   if(key==='y'||(key==='z'&&e.shiftKey)){
     if(restoreGraphRedoSnapshot()){e.preventDefault();e.stopPropagation()}
     return;

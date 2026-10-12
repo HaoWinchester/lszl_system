@@ -15,3 +15,8 @@ test('fixed card ports follow the outline and survive creation, storage and rebi
   const result = spawnSync(process.execPath, ['--test', fileURLToPath(new URL('../../new-legacy/tests/graph-fixed-ports.test.js', import.meta.url))], { encoding: 'utf8' })
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`)
 })
+
+test('graph fragments preserve internal relations and remap independent objects', () => {
+  const result = spawnSync(process.execPath, ['--test', fileURLToPath(new URL('../../new-legacy/tests/graph-fragment.test.js', import.meta.url))], { encoding: 'utf8', cwd: fileURLToPath(new URL('../../', import.meta.url)) })
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`)
+})

@@ -77,6 +77,7 @@
         "src/graph/drag-controller.js",
         "src/graph/element-resize-controller.js",
         "src/graph/connection-controller.js",
+        "src/graph/graph-fragment.js",
         "src/graph/clipboard-controller.js",
         "src/graph/style-controller.js",
         "src/graph/node-alignment-controller.js",

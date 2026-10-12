@@ -139,6 +139,7 @@
   }
   function applyFile(file){
     if(!file||!file.graphData)return false;
+    // File history belongs to this file; graph clipboard belongs to the account session.
     global.resetGraphHistory?.();
     try{
       state=typeof global.sanitizeState==='function'?global.sanitizeState(file.graphData):file.graphData;
