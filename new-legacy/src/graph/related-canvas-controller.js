@@ -25,7 +25,19 @@
     const selection=global.KGGraphSelectionController.create({getState:graph,getNodeSet:()=>nodeIds,setNodeSet:value=>nodeIds=value,getLinkSet:()=>linkIds,setLinkSet:value=>linkIds=value,onChange:()=>renderer.render()});
     const styles=global.KGGraphStyleController.create({getGraph:graph,model,history:session.history,onChange:()=>renderer.render('full',{persist:true})});
     const connection=global.KGGraphConnectionController.create({getState:graph,getNode:node,relationExists:(a,b)=>graph().links.some(l=>l.from===a&&l.to===b),createLink:(from,to)=>({id:idFactory('l'),from,to,type:'',color:'#64748b',lineStyle:'solid',pathStyle:'curve'}),addLink:link=>session.history.run('临时连线',()=>graph().links.push(link)),onChange:()=>renderer.render('full',{persist:true})});
-    function renderEdges(){svg.setAttribute('width','10000');svg.setAttribute('height','10000');svg.style.overflow='visible';svg.replaceChildren();for(const l of graph().links){const a=node(l.from),b=node(l.to);if(!a||!b)continue;const ga=model.geometryOf(a),gb=model.geometryOf(b),da=nodeDims(a),db=nodeDims(b),start={x:ga.x+da.w/2,y:ga.y+da.h/2},end={x:gb.x+db.w/2,y:gb.y+db.h/2};const p=document.createElementNS('http://www.w3.org/2000/svg','path');p.setAttribute('d',options.edgePath(start,end,l));p.setAttribute('class','edge-visible related-canvas-edge');p.dataset.linkId=l.id;p.style.setProperty('--edge-color',l.color||'#64748b');p.style.pointerEvents='stroke';p.onclick=e=>{e.stopPropagation();selection.selectLink(l.id)};svg.append(p)}}
+    const markerId=idFactory('temporary-arrow');
+    function renderEdges(){
+      svg.setAttribute('width','10000');svg.setAttribute('height','10000');svg.style.overflow='visible';svg.replaceChildren();
+      options.ensureMarkers(svg,markerId);
+      const nodeMap=new Map(graph().nodes.map(n=>[n.id,n]));
+      for(const link of graph().links){
+        const presentation=options.renderRelation(link,nodeMap,{markerId,ignoreGather:true});if(!presentation)continue;
+        const {path,label}=presentation;
+        path.classList.add('related-canvas-edge');path.dataset.linkId=link.id;path.style.pointerEvents='stroke';
+        path.onclick=e=>{e.stopPropagation();selection.selectLink(link.id)};svg.append(path);
+        if(label){label.classList.add('related-canvas-label');label.style.pointerEvents='none';svg.append(label)}
+      }
+    }
     function renderCards(){cards.replaceChildren();for(const n of graph().nodes){const card=renderCard(n,{state:graph(),selectedNodeIds:nodeIds,position:model.geometryOf(n)});card.classList.add('related-canvas-card');card.style.pointerEvents='auto';card.querySelectorAll('.node-size-tools,.graph-node-resize-layer').forEach(el=>el.remove());card.addEventListener('pointerdown',e=>{if(e.button!==0)return;e.preventDefault();if(connection.source()){connection.connectTo(n.id);return}selection.selectNodes([n.id]);const g=model.geometryOf(n);drag={id:n.id,pointerId:e.pointerId,x:e.clientX,y:e.clientY,start:g};body.setPointerCapture(e.pointerId)});cards.append(card)}}
     const renderer=global.KGGraphRenderer.create({renderCards,renderEdges,renderDetails:details,applyViewport,persist:()=>session.persist()});
     function mutate(label,work){session.history.run(label,work);renderer.render('full',{persist:true})}

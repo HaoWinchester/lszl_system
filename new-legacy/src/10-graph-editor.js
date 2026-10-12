@@ -222,21 +222,21 @@ function visualPositionForNode(n,options={}){
   }
   const model=window.KGGraphModel,geometry=model&&n?model.geometryOf(n):null;return{x:geometry?geometry.x:n.x,y:geometry?geometry.y:n.y};
 }
-function nodeCenter(n){const d=nodeDims(n),p=visualPositionForNode(n);return{x:p.x+d.w/2,y:p.y+d.h/2}}
-function nodeOutlinePoint(n,toward,port='auto'){
-  const dims=nodeDims(n),pos=visualPositionForNode(n),appearance=window.KGGraphModel?.appearanceOf?.(n)||{cardStyle:n?.cardStyle||'standard'};
+function nodeCenter(n,options={}){const d=nodeDims(n),p=visualPositionForNode(n,options);return{x:p.x+d.w/2,y:p.y+d.h/2}}
+function nodeOutlinePoint(n,toward,port='auto',options={}){
+  const dims=nodeDims(n),pos=visualPositionForNode(n,options),appearance=window.KGGraphModel?.appearanceOf?.(n)||{cardStyle:n?.cardStyle||'standard'};
   return window.KGGraphEdgeGeometry.portPoint({x:pos.x,y:pos.y,width:dims.w,height:dims.h,cardStyle:appearance.cardStyle},port,toward);
 }
 function linkOutlinePoints(a,b){const ca=nodeCenter(a),cb=nodeCenter(b);return{a:nodeOutlinePoint(a,cb),b:nodeOutlinePoint(b,ca),ca,cb}}
 function invalidateGraphIndexCache(){graphIndexCache=null;graphIndexStateRef=null;graphIndexNodesRef=null;graphIndexLinksRef=null;graphIndexNodeLength=-1;graphIndexLinkLength=-1}
 function linkEndpointPointKey(side){return side==='from'?'fromPoint':'toPoint'}
-function linkEndpointNode(link,side,nodeMap=null){const id=side==='from'?link&&link.from:link&&link.to;return id?((nodeMap&&nodeMap.get(id))||nodeById(id)):null}
+function linkEndpointNode(link,side,nodeMap=null){const id=side==='from'?link&&link.from:link&&link.to;return id?(nodeMap?nodeMap.get(id):nodeById(id)):null}
 function linkEndpointFreePoint(link,side){return normalizedEdgePoint(link&&link[linkEndpointPointKey(side)])}
-function linkRenderPoints(link,nodeMap=null){
+function linkRenderPoints(link,nodeMap=null,options={}){
   if(!link)return null;
   const aNode=linkEndpointNode(link,'from',nodeMap),bNode=linkEndpointNode(link,'to',nodeMap),freeA=linkEndpointFreePoint(link,'from'),freeB=linkEndpointFreePoint(link,'to');
-  const ca=aNode?nodeCenter(aNode):freeA,cb=bNode?nodeCenter(bNode):freeB;if(!ca||!cb)return null;
-  const a=aNode?nodeOutlinePoint(aNode,cb,link.fromPort):ca,b=bNode?nodeOutlinePoint(bNode,ca,link.toPort):cb;return{a,b,ca,cb,aNode,bNode};
+  const ca=aNode?nodeCenter(aNode,options):freeA,cb=bNode?nodeCenter(bNode,options):freeB;if(!ca||!cb)return null;
+  const a=aNode?nodeOutlinePoint(aNode,cb,link.fromPort,options):ca,b=bNode?nodeOutlinePoint(bNode,ca,link.toPort,options):cb;return{a,b,ca,cb,aNode,bNode};
 }
 function setLinkFreeEndpoint(link,side,point){if(!link)return;const key=linkEndpointPointKey(side),clean=normalizedEdgePoint(point);if(side==='from')link.from='';else link.to='';if(clean)link[key]=clean;else delete link[key]}
 function bindLinkEndpoint(link,side,nodeId){if(!link)return false;const node=nodeById(nodeId);if(!node)return false;const other=side==='from'?link.to:link.from;if(other&&other===node.id)return false;if(side==='from')link.from=node.id;else link.to=node.id;delete link[linkEndpointPointKey(side)];return true}
@@ -496,15 +496,39 @@ async function openRelatedCanvasModal(showMessage=true){
   if(['nodeModal','linkModal','graphModal'].some(id=>document.getElementById(id)?.classList.contains('show'))){showStatus('请先完成或取消当前编辑表单，再打开临时画布。');return false}
   relatedCanvasOpening=true;const generation=relatedCanvasGeneration,formalState=state;
   try{
+    const initialDraft=nodeInlineTextEditorController?.current();
+    const initialEdgeDraft=edgeInlineLabelEditingId&&edgeInlineLabelEditorEl?.classList.contains('show')?{id:edgeInlineLabelEditingId,value:edgeInlineLabelEditorEl.querySelector('input').value}:null;
+    const transitionIsCurrent=()=>generation===relatedCanvasGeneration&&state===formalState&&!window.KGGraphFileTabs?.isSwitching?.();
+    const hasActiveDraft=()=>nodeInlineTextEditorController?.isEditing()||edgeInlineLabelEditorEl?.classList.contains('show')||['nodeModal','linkModal','graphModal'].some(id=>document.getElementById(id)?.classList.contains('show'));
+    function saveFailed(){
+      // Restore the original editable input only if no newer editor has taken its place.
+      if(transitionIsCurrent()&&!hasActiveDraft()){
+        if(initialDraft){
+          const started=initialDraft.entityType==='text-element'?startTextElementInlineEdit(initialDraft.nodeId):startNodeInlineEdit(initialDraft.nodeId);
+          if(started){const editor=document.querySelector('[data-node-inline-editor="true"]');if(editor)editor.textContent=initialDraft.value}
+        }else if(initialEdgeDraft){openEdgeInlineLabelEditor(initialEdgeDraft.id);if(edgeInlineLabelEditorEl)edgeInlineLabelEditorEl.querySelector('input').value=initialEdgeDraft.value}
+      }
+      showStatus('正式图谱保存失败，已保留当前会话与编辑输入。');return false;
+    }
     nodeInlineTextEditorController?.commit();commitEdgeInlineLabelEditor();
     const autosave=window.KGGraphFileAutosave;
-    if(autosave){if(await autosave.saveNow({force:true,reason:'before-temporary'})===false){showStatus('正式图谱保存失败，已保留当前会话。');return false}while(autosave.isDirty()){if(await autosave.saveNow({force:true,reason:'before-temporary'})===false){showStatus('正式图谱保存失败，已保留当前会话。');return false}}}
+    if(autosave){
+      let needsSave=true;
+      while(needsSave){
+        if(await autosave.saveNow({force:true,reason:'before-temporary'})===false)return saveFailed();
+        if(!transitionIsCurrent())return false;
+        // New drafts started during the awaited request have not entered the saved graph.
+        // Keep their input intact and let the user finish them before retrying the switch.
+        if(hasActiveDraft()){showStatus('保存等待期间产生了新的编辑，请先完成当前输入，再打开临时画布。');return false}
+        needsSave=autosave.isDirty();
+      }
+    }
     if(generation!==relatedCanvasGeneration||state!==formalState||window.KGGraphFileTabs?.isSwitching?.())return false;
     const graph=window.KGRelatedCanvasController.scopeOneHop(state,ids);
     if(!graph.nodes.length)return false;
     closeRelatedCanvasModal();
     const session=window.KGGraphSession.create({kind:'temporary',graph});
-    relatedCanvasController=window.KGRelatedCanvasController.create({session,model:window.KGGraphModel,nodeDims,idFactory:uid,renderCard:(n,context)=>renderCardElement(n,null,context),edgePath:(a,b,l)=>pathFor(a,b,pathStyleForLink(l)),onClose:()=>closeRelatedCanvasModal(true)});
+    relatedCanvasController=window.KGRelatedCanvasController.create({session,model:window.KGGraphModel,nodeDims,idFactory:uid,renderCard:(n,context)=>renderCardElement(n,null,context),renderRelation:createGraphRelationPresentation,ensureMarkers:ensureGraphEdgeMarkers,onClose:()=>closeRelatedCanvasModal(true)});
     relatedCanvasModalEl=relatedCanvasController.overlay;
     nodeStyleToolbarController?.hide();
     if(showMessage)showStatus(`已打开临时相关画布：${graph.nodes.length} 张卡片；关闭即丢弃修改。`);
@@ -1202,13 +1226,34 @@ function shouldRenderLinkInCurrentMode(link,nodeMap,localIds,renderedCount){
   if(!a||!b)return true;
   return isLargeGraphOverviewLink(link,a,b);
 }
-function ensureGraphEdgeMarkers(){
-  const svg=$('edgeLayer');if(!svg)return null;
+function ensureGraphEdgeMarkers(svg=$('edgeLayer'),markerId='kgGraphArrow'){
+  if(!svg)return null;
   let defs=svg.querySelector('defs[data-kg-edge-markers]');
   if(defs)return defs;
   defs=document.createElementNS('http://www.w3.org/2000/svg','defs');defs.dataset.kgEdgeMarkers='true';
-  defs.innerHTML='<marker id="kgGraphArrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse" markerUnits="strokeWidth"><path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke"></path></marker>';
+  defs.innerHTML='<marker id="'+markerId+'" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse" markerUnits="strokeWidth"><path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke"></path></marker>';
   svg.insertBefore(defs,svg.firstChild);return defs;
+}
+function applyGraphEdgeAppearance(vis,link,markerId='kgGraphArrow'){
+  const lineColor=safeColor(link.color,DEFAULTS.linkColor),lineStyle=LINE_STYLES.has(link.lineStyle)?link.lineStyle:DEFAULTS.linkStyle;
+  const strokeWidth=Math.max(1,Math.min(8,Number(link.strokeWidth)||4)),arrowStyle=['none','end','both'].includes(String(link.arrowStyle||''))?String(link.arrowStyle):'none';
+  vis.style.setProperty('--edge-color',lineColor);vis.style.strokeWidth=strokeWidth;vis.style.setProperty('--edge-base-width',String(strokeWidth));vis.dataset.strokeWidth=String(strokeWidth);vis.dataset.arrowStyle=arrowStyle;
+  vis.removeAttribute('marker-end');vis.removeAttribute('marker-start');vis.removeAttribute('stroke-dasharray');
+  if(arrowStyle==='end'||arrowStyle==='both')vis.setAttribute('marker-end',`url(#${markerId})`);
+  if(arrowStyle==='both')vis.setAttribute('marker-start',`url(#${markerId})`);
+  const dashArray=dashArrayForLineStyle(lineStyle,strokeWidth);if(dashArray)vis.setAttribute('stroke-dasharray',dashArray);
+}
+function createGraphRelationPresentation(link,nodeMap,{markerId='kgGraphArrow',ignoreGather=false}={}){
+  const points=linkRenderPoints(link,nodeMap,{ignoreGather});if(!points)return null;
+  const geometry=linkPathGeometry(link,points.a,points.b,points),path=svgElement('path','edge-visible');
+  path.setAttribute('d',geometry.d);applyGraphEdgeAppearance(path,link,markerId);
+  let label=null;const text=String(link.type||link.note||'');
+  if(text){
+    label=svgElement('text','edge-label');label.textContent=text;label.setAttribute('text-anchor','middle');
+    const samples=geometry.samples,mid=samples.length===2?{x:(samples[0].x+samples[1].x)/2,y:(samples[0].y+samples[1].y)/2}:samples[Math.floor(samples.length/2)];
+    label.setAttribute('x',mid.x);label.setAttribute('y',mid.y-8);
+  }
+  return{path,label,geometry};
 }
 function renderEdges(){
   ensureGraphEdgeMarkers();hideEdgeHoverFeedback();
@@ -1236,8 +1281,7 @@ function renderEdges(){
       if(graphModeAllows('edgeLabelEdit'))hit.addEventListener('dblclick',event=>{if(isCanvasPanMode()){event.preventDefault();return}event.preventDefault();event.stopPropagation();if(event.altKey&&graphModeAllows('edgeAdvanced'))openLinkModal(link.id);else openEdgeInlineLabelEditor(link.id,event)});
     }
     vis.setAttribute('class','edge-visible'+(importantLink?' focus-important-edge':'')+(normalRelationLayer==='active'?' edge-related-active':'')+(normalRelationLayer==='muted'?' edge-related-muted':''));vis.style.setProperty('--edge-color',lineColor);
-    const strokeWidth=Math.max(1,Math.min(8,Number(link.strokeWidth)||4)),arrowStyle=['none','end','both'].includes(String(link.arrowStyle||''))?String(link.arrowStyle):'none';vis.style.strokeWidth=strokeWidth;vis.style.setProperty('--edge-base-width',String(strokeWidth));vis.dataset.strokeWidth=String(strokeWidth);vis.dataset.arrowStyle=arrowStyle;
-    if(arrowStyle==='end'||arrowStyle==='both')vis.setAttribute('marker-end','url(#kgGraphArrow)');if(arrowStyle==='both')vis.setAttribute('marker-start','url(#kgGraphArrow)');const dashArray=dashArrayForLineStyle(lineStyle,strokeWidth);if(dashArray)vis.setAttribute('stroke-dasharray',dashArray);
+    applyGraphEdgeAppearance(vis,link);
     g.appendChild(hit);g.appendChild(vis);const label=null;nextEdgeDom.set(String(link.id),{g,hit,vis,label,link,overlay:null,geometry:null});baseFrag.appendChild(g);
   }
   edgeDomById=nextEdgeDom;for(const link of state.links){if(edgeDomById.has(String(link.id)))updateLinkGeometry(link,nodeMap)}

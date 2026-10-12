@@ -9,7 +9,7 @@ def main():
     with sync_playwright() as pw:
         browser=pw.chromium.launch(channel='chrome');ctx=browser.new_context(viewport={'width':1440,'height':1000})
         assert ctx.request.post(base+'/api/v1/auth/login',data={'username':'ink-browser','password':'ink-browser-test'}).ok
-        graph={'nodes':[{'id':i,'title':i,'x':x,'y':y,'cardStyle':'rounded'} for i,x,y in [('a',400,300),('b',750,300),('c',750,550),('d',1000,550),('isolated',350,650)]],'links':[{'id':'ab','from':'a','to':'b'},{'id':'bc','from':'b','to':'c'},{'id':'cd','from':'c','to':'d'}]}
+        graph={'nodes':[{'id':i,'title':i,'x':x,'y':y,'cardStyle':'rounded'} for i,x,y in [('a',400,300),('b',750,300),('c',750,550),('d',1000,550),('isolated',350,650)]],'links':[{'id':'ab','from':'a','to':'b','type':'先决条件','arrowStyle':'both','lineStyle':'dashed','strokeWidth':6,'color':'#db2777','pathStyle':'curve','fromPort':'left','toPort':'top','curveControls':[{'x':300,'y':100},{'x':850,'y':120}]},{'id':'bc','from':'b','to':'c'},{'id':'cd','from':'c','to':'d'}]}
         files=[]
         for data in [graph,{'nodes':[],'links':[]}]:
             r=ctx.request.post(base+'/api/v1/files',data={'name':'临时'+uuid.uuid4().hex[:6],'graphData':data});assert r.ok;files.append(r.json()['file'])
@@ -27,6 +27,10 @@ def main():
         open_selected(['a','c']);assert page.locator('.related-canvas-card').count()==4
         assert page.evaluate('relatedCanvasController.session.getState().nodes[0].x')==400
         assert page.evaluate('JSON.stringify(state.viewport)')==view
+        expect(page.locator('.related-canvas-label')).to_contain_text('先决条件')
+        edge=page.locator('.related-canvas-edge[data-link-id="ab"]');assert edge.get_attribute('marker-end') and edge.get_attribute('marker-start');assert edge.get_attribute('stroke-dasharray')=='24 12'
+        expected=page.evaluate('(()=>{const l=relatedCanvasController.session.getState().links[0],m=new Map(relatedCanvasController.session.getState().nodes.map(n=>[n.id,n])),p=linkRenderPoints(l,m,{ignoreGather:true});return linkPathGeometry(l,p.a,p.b,p).d})()');assert edge.get_attribute('d')==expected
+        assert '300 100' in expected and '850 120' in expected
         assert page.locator('.related-canvas-backdrop [data-question-id]').count()==0
         page.get_by_label('临时卡片标题').fill('临时改文');page.get_by_label('临时卡片说明').fill('临时说明');page.get_by_label('临时卡片颜色').fill('#db2777');page.get_by_role('button',name='应用临时修改').click()
         assert page.evaluate('relatedCanvasController.session.getState().nodes[0].title')=='临时改文'
@@ -52,6 +56,38 @@ def main():
         open_selected(['a']);assert page.locator('.related-canvas-card').count()==2;expect(page.get_by_label('临时卡片标题')).to_have_value('a');page.locator('[data-action="close"]').click()
         open_selected(['isolated']);assert page.locator('.related-canvas-card').count()==1;expect(page.locator('.related-canvas-empty')).to_contain_text('没有一跳关联')
         page.locator('[data-action="close"]').click()
+        # While a save waits, a newly typed formal draft must remain visible, even on success.
+        page.evaluate("()=>{window.savedPersist=persistCurrentGraphNow;window.persistCurrentGraphNow=()=>new Promise(resolve=>window.finishDelayedSave=resolve);window.openResult=null;selectedNodeIds=new Set(['a']);state.selectedNodeId='a';openRelatedCanvasModal(false).then(ok=>window.openResult=ok)}")
+        page.wait_for_function('!!window.finishDelayedSave');page.evaluate("startNodeInlineEdit('a')");page.evaluate('()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))')
+        page.locator('[data-node-inline-editor="true"]').fill('保存等待期间的新草稿')
+        page.evaluate('finishDelayedSave(true)');page.wait_for_function('window.openResult!==null')
+        assert page.evaluate('window.openResult') is False
+        expect(page.locator('[data-node-inline-editor="true"]')).to_have_text('保存等待期间的新草稿')
+        assert page.locator('.related-canvas-backdrop').count()==0
+        assert page.evaluate('KGGraphFileEditorStoreBridge.fragmentSource().fileId')==file_id
+        assert page.evaluate('JSON.stringify(state.viewport)')==view
+        page.evaluate('nodeInlineTextEditorController.cancel()')
+        # Failure must also preserve a newer draft typed while the request was pending.
+        page.evaluate("()=>{window.finishDelayedSave=null;window.openResult=null;openRelatedCanvasModal(false).then(ok=>window.openResult=ok)}")
+        page.wait_for_function('!!window.finishDelayedSave');page.evaluate("startNodeInlineEdit('a')");page.evaluate('()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))')
+        page.locator('[data-node-inline-editor="true"]').fill('请求失败时的新草稿')
+        page.evaluate('finishDelayedSave(false)');page.wait_for_function('window.openResult!==null')
+        assert page.evaluate('window.openResult') is False
+        expect(page.locator('[data-node-inline-editor="true"]')).to_have_text('请求失败时的新草稿')
+        assert page.locator('.related-canvas-backdrop').count()==0
+        assert page.evaluate('KGGraphFileEditorStoreBridge.fragmentSource().fileId')==file_id
+        assert page.evaluate('JSON.stringify(state.viewport)')==view
+        page.evaluate('nodeInlineTextEditorController.cancel()')
+        # Failed save with an initial active draft restores the same editable input.
+        page.evaluate("startNodeInlineEdit('a')");page.evaluate('()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');page.locator('[data-node-inline-editor="true"]').fill('失败时保留草稿')
+        page.evaluate("()=>{window.finishDelayedSave=null;window.openResult=null;openRelatedCanvasModal(false).then(ok=>window.openResult=ok)}")
+        page.wait_for_function('!!window.finishDelayedSave');page.evaluate('finishDelayedSave(false)');page.wait_for_function('window.openResult!==null')
+        assert page.evaluate('window.openResult') is False
+        expect(page.locator('[data-node-inline-editor="true"]')).to_have_text('失败时保留草稿')
+        assert page.locator('.related-canvas-backdrop').count()==0
+        assert page.evaluate('KGGraphFileEditorStoreBridge.fragmentSource().fileId')==file_id
+        assert page.evaluate('JSON.stringify(state.viewport)')==view
+        page.evaluate('nodeInlineTextEditorController.cancel()');page.evaluate('()=>{window.persistCurrentGraphNow=window.savedPersist}')
         # Failed formal flush refuses transition and preserves source context.
         page.evaluate('window.savedPersist=persistCurrentGraphNow;window.persistCurrentGraphNow=()=>false')
         assert page.evaluate('openRelatedCanvasModal(false)') is False;assert page.locator('.related-canvas-backdrop').count()==0
