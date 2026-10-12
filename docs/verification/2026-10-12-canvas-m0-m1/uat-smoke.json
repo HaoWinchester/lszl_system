@@ -1,0 +1,68 @@
+{
+  "release": "v9.0-p4.1.311",
+  "health": "ok",
+  "db": "ok",
+  "pagesAndAssets": [
+    {
+      "page": "/index.html",
+      "release": "v9.0-p4.1.311"
+    },
+    {
+      "page": "/question-workspace.html",
+      "release": "v9.0-p4.1.311"
+    },
+    {
+      "page": "/knowledge-recall.html",
+      "release": "v9.0-p4.1.311"
+    },
+    {
+      "asset": "bundles/home-graph.js",
+      "sha256": "439a1028c73d4a3630d076b406efc3646aaf47f3596f657944dc980f39ccc9a1"
+    },
+    {
+      "asset": "bundles/home-shell.css",
+      "sha256": "f7cfe271b25140109dae492ec621ef22272a1ae844e69dde5318b8fd56955d48"
+    },
+    {
+      "asset": "src/canvas/dom-interaction.js",
+      "sha256": "406b3c26399dfe6c67fcae7b2ae462fe420ebb2d86eea44c3a05e856607d7467"
+    },
+    {
+      "asset": "src/canvas/88-canvas-settings-controller.js",
+      "sha256": "08b2419dd45c86335ff83112b8272bf7ee6f9f509e8c2b730ed225b58361a8dc"
+    },
+    {
+      "asset": "src/77-multi-question-workspace.js",
+      "sha256": "136158ae2d2f9a0a1a87eb3eaa72fe45bf28274cd5f716f6c60632653b9b6c92"
+    },
+    {
+      "asset": "src/86-knowledge-recall.js",
+      "sha256": "97d0e037d2adcdfa22d9504183148c6c3f049048444b53a0195a1f8859b0e37e"
+    },
+    {
+      "asset": "src/95-recall-association-library.js",
+      "sha256": "672d0b320276f768bfb07f296f20f964bc94787f83e7a2c51808aea523b2de37"
+    },
+    {
+      "asset": "styles/canvas-color-picker.css",
+      "sha256": "dcf52a319d67a55bb27c04380ea7c85921a6b6ae91be7596be4188db8c1515c3"
+    },
+    {
+      "asset": "styles/learning-theme.css",
+      "sha256": "de5bbe16d180ce05ac642f7371524fb5cbed81c2a8f403eba9a181d12f05ad9f"
+    },
+    {
+      "asset": "styles/question-workspace.css",
+      "sha256": "622ae7acf1c5b533ecf4b0a4a34919d9b61dd0d719297cf82c0ac576c9781179"
+    },
+    {
+      "asset": "styles/knowledge-recall.css",
+      "sha256": "dd8cee7eee15d14857c530937ff5ba703039b03ea93b7561a717da69fc4289a6"
+    }
+  ],
+  "recallScale": {
+    "min": 0.01,
+    "max": 4.0
+  },
+  "dataWrites": 0
+}
