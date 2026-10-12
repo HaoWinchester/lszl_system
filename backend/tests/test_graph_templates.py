@@ -67,7 +67,8 @@ def test_permission_subscription_and_preview_matrix(data):
         assert 'graphData' not in str(preview) and 'SECRET' not in str(preview)
         login(c,data,'admin');assert load(c,paid).status_code==201
         assert c.patch('/api/v1/graph-templates/'+paid['id'],json={'listed':False}).status_code==200
-        assert c.patch('/api/v1/graph-templates/'+paid['id'],json={'listed':True}).status_code==200
+        login(c,data,'student');assert paid['id'] not in [t['id'] for t in c.get('/api/v1/graph-templates').json()['templates']]
+        login(c,data,'admin');assert c.patch('/api/v1/graph-templates/'+paid['id'],json={'listed':True}).status_code==200
         own=create_card(c);assert publish(c,publication(own))['canMaintain']
         login(c,data,'other')
         assert c.post('/api/v1/graph-templates/'+paid['id']+'/versions',json=publication(source)).status_code==404
@@ -134,6 +135,34 @@ def test_frozen_versions_assets_grants_no_retroactive_revocation(data):
         login(c,data,'student');assert load(c,t2).status_code==403
         set_subscription(data.student,'lifetime');old=load(c,template,version=1);assert old.status_code==201
         oldgraph=c.get('/api/v1/files/'+old.json()['fileId']).json()['graphData'];assert oldgraph['nodes'][0]['title']=='card'
+
+
+def test_free_template_node_quota(data):
+    with TestClient(app) as c:
+        login(c,data,'teacher')
+        graph={'meta':{'title':'配额'},'nodes':[{'id':f'n{i}','title':f'k{i}','x':i*10,'y':0,'content':{'title':f'k{i}'}} for i in range(51)]}
+        source=c.post('/api/v1/files',json={'name':'quota','graphData':graph}).json()['file']['id']
+        big=publish(c,publication(source))
+        login(c,data,'student')
+        assert load(c,big).status_code==422
+        assert load(c,big,request=uuid4().hex).json()['detail']['code']=='TEMPLATE_NODE_QUOTA_EXCEEDED'
+        graph['nodes']=graph['nodes'][:50]
+        login(c,data,'teacher')
+        assert c.put('/api/v1/files/'+source,json={'graphData':graph,'expectedRevision':1}).status_code==200
+        small=publish(c,publication(source,2))
+        login(c,data,'student');assert load(c,small).status_code==201
+
+
+def test_update_keeps_listing_state(data):
+    with TestClient(app) as c:
+        login(c,data,'teacher');source=create_card(c)
+        template=publish(c,publication(source))
+        c.patch('/api/v1/graph-templates/'+template['id'],json={'listed':False})
+        updated=c.post('/api/v1/graph-templates/'+template['id']+'/versions',json=publication(source)|{'name':'静默上架检查'}).json()['template']
+        assert updated['version']==2
+        login(c,data,'student');assert template['id'] not in [t['id'] for t in c.get('/api/v1/graph-templates').json()['templates']]
+        login(c,data,'teacher');assert c.patch('/api/v1/graph-templates/'+template['id'],json={'listed':True}).status_code==200
+        login(c,data,'student');assert load(c,updated).status_code==201
 
 
 def test_atomic_rollback_and_concurrent_request_receipt(data,monkeypatch):

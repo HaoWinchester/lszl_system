@@ -7,7 +7,7 @@
   async function request(path,options={}){
     const response=await fetch('/api/v1/graph-templates'+path,{credentials:'same-origin',...options,headers:{'Content-Type':'application/json'},body:options.body?JSON.stringify(options.body):undefined});
     const data=await response.json();
-    if(!response.ok){const code=data.detail?.code;throw new Error(({TEMPLATE_MEMBERSHIP_REQUIRED:'此模板需要有效会员，请先开通会员。',TEMPLATE_NOT_AVAILABLE:'模板已下架，不能新加载。',TEMPLATE_NODE_QUOTA_EXCEEDED:'此模板超出当前账号的卡牌额度。',GRAPH_FILE_REVISION_CONFLICT:'源图谱已改变，请保存并重新发布。',TEMPLATE_PUBLISHER_REQUIRED:'仅教师和管理员可以发布模板。'})[code]|| (typeof data.detail==='string'?data.detail:'模板请求失败，请检查登录或重试。'))}
+    if(!response.ok){const code=data.detail?.code;throw new Error(({TEMPLATE_MEMBERSHIP_REQUIRED:'此模板需要有效会员，请先开通会员。',TEMPLATE_NOT_AVAILABLE:'模板已下架，不能新加载。',TEMPLATE_NODE_QUOTA_EXCEEDED:'此模板超出当前账号的卡牌额度。',GRAPH_FILE_REVISION_CONFLICT:'源图谱已改变，请保存并重新发布。',TEMPLATE_PUBLISHER_REQUIRED:'仅教师和管理员可以发布模板。',TEMPLATE_REQUEST_ID_CONFLICT:'该加载请求已被用于其他模板或版本，请重新加载。'})[code]|| (typeof data.detail==='string'?data.detail:'模板请求失败，请检查登录或重试。'))}
     return data;
   }
   function open(){

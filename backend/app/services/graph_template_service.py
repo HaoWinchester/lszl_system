@@ -119,9 +119,10 @@ async def publish(db, user, data, template_id=None):
     # Snapshot each resource independently: no future source edits or deletion alter it.
     graph, _ = await assets.clone_graph_assets(db, user.username, user.username, graph)
     if row is None:
-        row = Template(id=uid('gt_'), owner_id=user.username, current_version=0)
+        row = Template(id=uid('gt_'), owner_id=user.username, current_version=0, listed=True)
         db.add(row)
-    row.name, row.description, row.member_only, row.listed = data.name, data.description, data.member_only, True
+    # 发布新版本不改变上下架状态；已下架的模板保持下架，由显式 set_listing 重新公开。
+    row.name, row.description, row.member_only = data.name, data.description, data.member_only
     row.current_version += 1
     await db.flush()
     db.add(Version(id=uid('gtv_'), template_id=row.id, version=row.current_version,
