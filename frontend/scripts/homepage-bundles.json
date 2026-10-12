@@ -59,7 +59,9 @@
         "styles/home-selection-geometry-p4332.css",
         "styles/home-learning-entry-p4515.css",
         "styles/learning-weekly-open-gate.css",
-        "styles/close-button.css"
+        "styles/close-button.css",
+        "styles/graph-question-drawer.css",
+        "styles/question-materials.css"
       ]
     },
     {
@@ -118,6 +120,10 @@
         "src/canvas/89-canvas-runtime.js",
         "src/graph/graph-session.js",
         "src/graph/related-canvas-controller.js",
+        "src/117-question-answer-set.js",
+        "src/118-question-materials.js",
+        "src/119-question-analysis.js",
+        "src/graph/question-drawer-controller.js",
         "src/10-graph-editor.js",
         "src/19-home-toolbar-registry.js",
         "src/21-home-package-service.js",
