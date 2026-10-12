@@ -35,7 +35,7 @@ def data():
             await db.flush()
             db.add(QuestionMaterialRevision(material_id=d.material,revision=1,snapshot={'id':d.material,'revision':1,'title':'material','text':'version one','images':[{'id':d.asset,'url':'/api/v1/question-assets/'+d.asset,'alt':'material image'}]}))
             for k in ('q','public','both','multi','match'):
-                question = Question(id=getattr(d,k),bank_id=d.public_bank if k in ('public','both') else d.bank,title='card '+k,type={'multi':'multiple_choice','match':'matching'}.get(k,'single_choice'),scope='public' if k in ('public','both') else 'internal',options=[{'id':'A','text':'a','correct':True,'trap':'leak'},{'id':'B','text':'b'},{'id':'C','text':'c'}],correct_answer='A',correct_answer_ids=['A','B'] if k=='multi' else [],analysis='SECRET ANALYSIS',stem_parts=[{'text':'visible stem','clue':'answer clue'}],key_path={'answer':'A'},clues=[{'text':'secret clue'}],reasoning_steps=[{'content':'secret reasoning'}],translations={'correctAnswer':'A'},content_metadata={'answer':'A','_mixedContent':{'images':[{'id':d.asset}], 'material':{'id':d.material,'revision':1}, **({'matching':{'left':[{'id':'l1','text':'one'},{'id':'l2','text':'two'}],'right':[{'id':'r1','text':'一'},{'id':'r2','text':'二'}],'correctPairs':{'l1':'r1','l2':'r2'}}} if k=='match' else {})}})
+                question = Question(id=getattr(d,k),bank_id=d.public_bank if k in ('public','both') else d.bank,title=prefix+' card '+k,type={'multi':'multiple_choice','match':'matching'}.get(k,'single_choice'),scope='public' if k in ('public','both') else 'internal',options=[{'id':'A','text':'a','correct':True,'trap':'leak'},{'id':'B','text':'b'},{'id':'C','text':'c'}],correct_answer='A',correct_answer_ids=['A','B'] if k=='multi' else [],analysis='SECRET ANALYSIS',stem_parts=[{'text':'visible stem','clue':'answer clue'}],key_path={'answer':'A'},clues=[{'text':'secret clue'}],reasoning_steps=[{'content':'secret reasoning'}],translations={'correctAnswer':'A'},content_metadata={'answer':'A','_mixedContent':{'images':[{'id':d.asset}], 'material':{'id':d.material,'revision':1}, **({'matching':{'left':[{'id':'l1','text':'one'},{'id':'l2','text':'two'}],'right':[{'id':'r1','text':'一'},{'id':'r2','text':'二'}],'correctPairs':{'l1':'r1','l2':'r2'}}} if k=='match' else {})}})
                 db.add(question)
             db.add(ExamPaper(id=d.paper,owner_id=d.other,name='paid paper',status='published'))
             db.add(PaperRelease(id=d.release,paper_id=d.paper,version=1,status='published',name='paid',subject='PMP',publisher_id=d.other,access_level='member',enabled_modes=['practice_mode'],allowed_roles=['student']))
@@ -89,7 +89,8 @@ def test_role_search_binding_revision_and_crossbank_frozen_material(data):
     d=data
     with TestClient(app) as c:
         login(c,d,'teacher');file=create_card(c)
-        result=c.get('/api/v1/graph-questions/search',params={'fileId':file,'nodeId':'n','q':'card','subject':'PMP'})
+        # fixture 唯一前缀作搜索词：全套并发 seed 下不受其他模块同词题目挤占首页。
+        result=c.get('/api/v1/graph-questions/search',params={'fileId':file,'nodeId':'n','q':d.q.rsplit('-',1)[0],'subject':'PMP'})
         assert result.status_code==200,result.text
         assert d.q in {q['id'] for q in result.json()['questions']}
         assert result.json()['pageSize']==20
