@@ -21,13 +21,19 @@ async def upload(data: AssetInput, db: DB, user: Editor):
     return {'asset': await service.upload_asset(db, user, data)}
 
 @router.get('/question-assets/{asset_id}/content')
-async def asset_content(asset_id: str, db: DB, user: Reader):
-    asset = await service.authorized_asset(db, user, asset_id)
+async def asset_content(asset_id: str, db: DB, user: Reader, fileId: str | None = None, nodeId: str | None = None, bindingId: str | None = None, sourceVersion: str | None = None, attemptId: str | None = None):
+    context = (fileId, nodeId, bindingId, sourceVersion)
+    if (attemptId is not None or any(value is not None for value in context)) and not all(context):
+        service.fail('GRAPH_CONTEXT_REQUIRED', '卡片资源需要完整上下文', 422)
+    asset = await service.authorized_asset(db, user, asset_id, graph_context=(*context, attemptId) if any(context) else None)
     return {'asset': service.asset_payload(asset), 'mimeType': asset.mime_type, 'dataBase64': base64.b64encode(asset.data).decode('ascii')}
 
 @router.get('/question-assets/{asset_id}')
-async def asset_bytes(asset_id: str, db: DB, user: Reader):
-    asset = await service.authorized_asset(db, user, asset_id)
+async def asset_bytes(asset_id: str, db: DB, user: Reader, fileId: str | None = None, nodeId: str | None = None, bindingId: str | None = None, sourceVersion: str | None = None, attemptId: str | None = None):
+    context = (fileId, nodeId, bindingId, sourceVersion)
+    if (attemptId is not None or any(value is not None for value in context)) and not all(context):
+        service.fail('GRAPH_CONTEXT_REQUIRED', '卡片资源需要完整上下文', 422)
+    asset = await service.authorized_asset(db, user, asset_id, graph_context=(*context, attemptId) if any(context) else None)
     return Response(asset.data, media_type=asset.mime_type, headers={'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff'})
 
 @router.get('/question-materials')

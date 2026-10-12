@@ -58,3 +58,6 @@ api_router.include_router(graph_assets.router)
 
 from app.api.v1 import graph_imports
 api_router.include_router(graph_imports.router)
+
+from app.api.v1 import graph_questions
+api_router.include_router(graph_questions.router)

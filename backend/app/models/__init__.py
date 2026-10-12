@@ -135,3 +135,4 @@ from app.models.question_material import QuestionAsset, QuestionMaterial, Questi
 from app.models.teacher_assistant import TeacherAssistantSession, TeacherAssistantUpload, TeacherAssistantJob
 
 from app.models.graph_asset import GraphAsset
+from app.models.graph_question import GraphQuestionBinding, GraphQuestionAttempt

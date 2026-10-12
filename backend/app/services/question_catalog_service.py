@@ -341,3 +341,28 @@ def catalog_revision(banks: list[dict], questions: list[dict]) -> str:
         separators=(",", ":"),
     )
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+async def search_graph_questions(db, user, file_id, node_id, query, subject, page):
+    """Bounded cross-bank summaries for teachers only; no full snapshots or answers."""
+    from app.models.graph_question import GraphQuestionBinding
+    from app.services.graph_question_service import require_editor
+    require_editor(user)
+    term = query.strip()
+    # Escape SQL wildcard characters: the search term is literal text.
+    pattern = '%' + term.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_') + '%'
+    title_hit = Question.title.ilike(pattern, escape='\\')
+    knowledge_hit = or_(cast(Question.concepts, String).ilike(pattern, escape='\\'), cast(Question.tags, String).ilike(pattern, escape='\\'))
+    stem_hit = cast(Question.stem_parts, String).ilike(pattern, escape='\\')
+    stmt = select(Question, QuestionBank.name).join(QuestionBank, QuestionBank.id == Question.bank_id).where(
+        func.coalesce(Question.lifecycle['deletedAt'].astext, '') == '',
+        func.coalesce(Question.lifecycle['status'].astext, 'active') == 'active')
+    if term:
+        stmt = stmt.where(or_(title_hit, knowledge_hit, stem_hit))
+    if subject:
+        stmt = stmt.where(func.coalesce(Question.subject, QuestionBank.subject) == subject)
+    total = await db.scalar(select(func.count()).select_from(stmt.subquery()))
+    ranked = case((func.lower(Question.title) == term.lower(), 0), (title_hit, 1), (knowledge_hit, 2), else_=3)
+    rows = (await db.execute(stmt.order_by(ranked, Question.id).limit(20).offset((page - 1) * 20))).all()
+    associated = set((await db.scalars(select(GraphQuestionBinding.question_id).where(GraphQuestionBinding.file_id == file_id, GraphQuestionBinding.node_id == node_id, GraphQuestionBinding.owner_id == user.username, GraphQuestionBinding.status == 'active'))).all())
+    return {'page': page, 'pageSize': 20, 'total': total, 'questions': [{'id': row.id, 'title': row.title, 'type': row.type, 'bankId': row.bank_id, 'bankName': name, 'subject': row.subject, 'stem': ' '.join(str(p.get('text', '')) if isinstance(p, dict) else str(p) for p in row.stem_parts or [])[:300], 'alreadyLinked': row.id in associated} for row, name in rows]}

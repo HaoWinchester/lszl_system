@@ -541,6 +541,27 @@ async def inventory_question_references(
                 )
             )
 
+    from app.models.graph_question import GraphQuestionBinding, GraphQuestionAttempt
+    for binding in (await db.scalars(select(GraphQuestionBinding).order_by(GraphQuestionBinding.id))).all():
+        references.append(_reference(
+            container_type='graph_question_binding', container_id=binding.id,
+            question_id=binding.question_id, repair_action='preserve_historical_snapshot',
+            storage_key=None, reference_path=f'graph_question_bindings/{binding.id}'))
+        course_snapshot.append({'kind': 'graphQuestionBinding', 'id': binding.id,
+            'questionId': binding.question_id, 'sourceVersion': binding.source_version,
+            'status': binding.status, 'snapshotHash': _sha256(binding.snapshot)})
+
+    for attempt in (await db.scalars(select(GraphQuestionAttempt).order_by(GraphQuestionAttempt.id))).all():
+        question_id = attempt.snapshot.get('id')
+        if question_id:
+            references.append(_reference(
+                container_type='graph_question_attempt', container_id=attempt.id,
+                question_id=question_id, repair_action='preserve_historical_snapshot',
+                storage_key=None, reference_path=f'graph_question_attempts/{attempt.id}'))
+            course_snapshot.append({'kind': 'graphQuestionAttempt', 'id': attempt.id,
+                'questionId': question_id, 'sourceVersion': attempt.source_version,
+                'snapshotHash': _sha256(attempt.snapshot)})
+
     deduplicated = {reference.reference_id: reference for reference in references}
     sorted_references = sorted(
         deduplicated.values(),

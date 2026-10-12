@@ -81,18 +81,23 @@ async def save_material(db, user, data, material_id=None, *, commit=True, new_id
 
 
 async def delete_material(db, user, material_id, revision):
+    from app.services import teaching_content_revision_service
+    await teaching_content_revision_service.acquire_lock(db)
     row = await owned_material(db, user, material_id, lock=True)
     if revision != row.revision:
         fail('MATERIAL_REVISION_CONFLICT', '材料已更新，请刷新后重试', 409, currentRevision=row.revision)
     question = await db.scalar(select(Question.id).where(Question.content_metadata['_mixedContent']['material']['id'].astext == material_id).limit(1))
     release = await db.scalar(select(PaperReleaseQuestion.release_id).where(PaperReleaseQuestion.snapshot['material']['id'].astext == material_id).limit(1))
-    if question or release:
+    from app.models.graph_question import GraphQuestionBinding, GraphQuestionAttempt
+    attempt = await db.scalar(select(GraphQuestionAttempt.id).where(GraphQuestionAttempt.snapshot['material']['id'].astext == material_id).limit(1))
+    binding = await db.scalar(select(GraphQuestionBinding.id).where(GraphQuestionBinding.snapshot['material']['id'].astext == material_id).limit(1))
+    if question or release or binding or attempt:
         fail('MATERIAL_REFERENCED', '材料已被题目或发布版本引用，不能删除', 409)
     await db.delete(row)
     await db.commit()
 
 
-async def freeze_question_resources(db, user, snapshot):
+async def freeze_question_resources(db, user, snapshot, *, exact_revision=False):
     """Resolve every requested version through server-owned immutable resources."""
     if snapshot.get('images'):
         snapshot['images'] = await canonical_images(db, user, snapshot['images'])
@@ -101,17 +106,21 @@ async def freeze_question_resources(db, user, snapshot):
         if not isinstance(material, dict) or not isinstance(material.get('revision'), int):
             fail('MATERIAL_INVALID', '材料引用必须包含 id 和 revision')
         row = await owned_material(db, user, str(material.get('id') or ''))
-        revision = await db.get(QuestionMaterialRevision, (row.id, row.revision))
+        revision = await db.get(QuestionMaterialRevision, (row.id, material['revision'] if exact_revision else row.revision))
         if revision is None:
             fail('MATERIAL_REVISION_NOT_FOUND', '材料版本不存在', 404)
         snapshot['material'] = deepcopy(revision.snapshot)
     return snapshot
 
 
-async def authorized_asset(db, user, asset_id):
+async def authorized_asset(db, user, asset_id, *, graph_context=None):
     row = await db.get(QuestionAsset, asset_id)
     if row is None:
         fail('ASSET_NOT_FOUND', '图片不存在或无权访问', 404)
+    if graph_context is not None:
+        from app.services import graph_question_service
+        await graph_question_service.authorized_asset(db, user, asset_id, *graph_context)
+        return row
     if user.role == 'admin' or (user.role == 'teacher' and row.owner_id == user.username):
         return row
     # Only releases actually referencing this asset grant learner access.
