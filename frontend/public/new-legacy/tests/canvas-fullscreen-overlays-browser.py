@@ -14,6 +14,15 @@ with sync_playwright() as pw:
   if mode=='graph':
    page.locator('.graph-mode-trigger').click();page.locator('[data-graph-mode-option="professional"]').click()
   expect(page.locator(trigger)).to_be_enabled();page.locator(full).click();page.wait_for_function('!!document.fullscreenElement')
+  # The home surface is itself fullscreen; settings initially belongs to body.
+  page.locator('[data-uc-canvas-settings]').click();settings=page.locator('.uc-settings-backdrop')
+  expect(settings).to_be_visible();assert settings.evaluate('el=>document.fullscreenElement.contains(el)'),mode+': settings outside fullscreen surface'
+  before=page.locator(view).evaluate("el=>getComputedStyle(el).getPropertyValue('--uc-canvas-bg')")
+  settings.get_by_role('button',name='浅粉色',exact=True).click()
+  page.evaluate('document.exitFullscreen()');page.wait_for_function('!document.fullscreenElement && document.querySelector(".uc-settings-backdrop")?.parentNode===document.body');expect(settings).to_be_visible();assert settings.evaluate('el=>el.parentNode===document.body')
+  settings.get_by_role('button',name='取消',exact=True).click();expect(settings).to_be_hidden()
+  assert page.locator(view).evaluate("el=>getComputedStyle(el).getPropertyValue('--uc-canvas-bg')")==before
+  page.locator(full).click();page.wait_for_function('!!document.fullscreenElement')
   page.locator(trigger).click();toolbar=page.locator('.canvas-ink-toolbar');toolbar.locator('[data-ink-tool=eraser]').dblclick();toolbar.get_by_role('button',name='文字',exact=True).click()
   rect=page.locator(view).bounding_box();x=rect['x']+rect['width']*.72;y=rect['y']+rect['height']*.60;page.mouse.click(x,y)
   editor=page.get_by_role('textbox',name='画布文字内容');expect(editor).to_be_visible();assert editor.evaluate('el=>document.fullscreenElement.contains(el)');box=editor.bounding_box();assert abs(box['x']-x)<2 and abs(box['y']-y)<2

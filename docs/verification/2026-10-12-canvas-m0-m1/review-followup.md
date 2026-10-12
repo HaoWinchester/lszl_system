@@ -27,3 +27,20 @@ Reviewed shared mountOverlay registration, explicit disposal during close and th
 ## Other verification and limits
 
 `node --test frontend/scripts/canvas-m1-regressions.test.mjs` passed after settings source changes. Scoped git diff --check passed. No source changes or release/branch operations were performed by reviewer; only disposable fixture documents and these reports were written. No further confirmed important regression found in the narrow follow-up. Safari/browser zoom 125%, release parity and user UAT remain outside this review’s proven coverage.
+
+## Additional fullscreen host correction — final review
+
+The parent’s subsequent real homepage click test identified an omission in the previous review coverage: settings originally mounted under body could remain there when its configured surface and fullscreenElement were the same stage. The earlier no-blocker result did not establish this homepage settings case.
+
+Re-reviewed the minimal shared mountOverlay correction: restore the original marker only while neither standard nor WebKit fullscreen is active; otherwise move into the actual fullscreen host. This is the correct distinction. For color windows whose original parent already equals stage, it leaves their host and position coordinate frame unchanged. Ink editors keep their body home, fixed positioning and existing relocation callback. Related canvas mounting/disposal is unchanged.
+
+Final independent checks against synced disposable `5189`:
+
+- Own real-browser settings test on home, workspace and recall: enter fullscreen, open settings, click pink swatch, exit fullscreen, wait for restoration under body, click Cancel. All three passed.
+- Final expanded `canvas-fullscreen-overlays-browser.py`: all three pages passed settings clicks/restoration/cancel plus ink position, IME, save, exit restoration and reopen/cancel.
+- Complete `workspace-theme-color-browser.py`: passed ordinary/fullscreen swatch clicks, selection retention, server/reload, group-color undo and document-background isolation.
+- Shared DOM interaction Node tests: 3/3 passed; scoped diff check passed.
+
+An initial expanded test run failed because it asserted parent restoration immediately after fullscreenElement became null, before the asynchronous fullscreenchange listener ran. Waiting for both fullscreen exit and parent restoration retained the same required outcome; independent own tests and the final suite passed that condition.
+
+**Final scoped conclusion: the additional confirmed fullscreen-host defect is fixed; no remaining confirmed blocker in reviewed M0/M1 changes. User UAT acceptance remains required.**

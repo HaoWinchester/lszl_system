@@ -34,7 +34,7 @@
     element.parentNode.insertBefore(marker,element);
     function sync(){
       const host=overlayHost(home);
-      if(host===home&&marker.parentNode){
+      if(!doc.fullscreenElement&&!doc.webkitFullscreenElement&&marker.parentNode){
         if(element.parentNode!==marker.parentNode)marker.parentNode.insertBefore(element,marker.nextSibling);
       }else if(element.parentNode!==host)host.appendChild(element);
       if(onMove)onMove(host);
