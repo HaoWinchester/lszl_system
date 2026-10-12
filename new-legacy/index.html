@@ -20,6 +20,7 @@
 <link rel="stylesheet" href="styles/canvas-color-picker.css"/>
 <link rel="stylesheet" href="styles/home-graph-components.css"/>
 <link rel="stylesheet" href="styles/graph-question-drawer.css"/>
+<link rel="stylesheet" href="styles/graph-template-center.css"/>
 <link rel="stylesheet" href="styles/question-materials.css"/>
 <link rel="stylesheet" href="styles/home-canvas-performance.css"/>
 <link rel="stylesheet" href="styles/home-selection-p4326.css"/>
@@ -208,7 +209,7 @@
 <div class="modal-backdrop" id="templateModal">
 <div class="modal">
 <h2>选择模板</h2>
-<p>选择模板会替换当前图谱。需要保留当前内容时，请先导出学习包。</p>
+<p>模板加载会创建独立的新图谱。</p>
 <div class="template-grid">
 <div class="template-card" data-template="blank"><h3>空白图谱</h3><div>从零开始，让学员自行添加知识点和关系。</div></div>
 <div class="template-card" data-template="pmp"><h3>PMP 示例</h3><div>内置项目管理常见知识点，可继续扩展成课程图谱。</div></div>
@@ -438,6 +439,7 @@
 <script defer src="src/118-question-materials.js"></script>
 <script defer src="src/119-question-analysis.js"></script>
 <script defer src="src/graph/question-drawer-controller.js"></script>
+<script defer src="src/graph/template-center-controller.js"></script>
 <script defer src="src/10-graph-editor.js"></script>
 <script defer src="src/19-home-toolbar-registry.js"></script>
 <script defer src="src/21-home-package-service.js"></script>

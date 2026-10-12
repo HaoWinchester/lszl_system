@@ -562,6 +562,17 @@ async def inventory_question_references(
                 'questionId': question_id, 'sourceVersion': attempt.source_version,
                 'snapshotHash': _sha256(attempt.snapshot)})
 
+    from app.models.graph_template import GraphTemplateVersion
+    for version in (await db.scalars(select(GraphTemplateVersion).order_by(GraphTemplateVersion.id))).all():
+        course_snapshot.append({'kind': 'graphTemplateVersion', 'id': version.id,
+                                'version': version.version, 'snapshotHash': _sha256(version.bindings)})
+        for node_id, sources in version.bindings.items():
+            for source in sources:
+                references.append(_reference(
+                    container_type='graph_template_version', container_id=version.id,
+                    question_id=source['questionId'], repair_action='preserve_historical_snapshot',
+                    storage_key=None, reference_path=f'graph_template_versions/{version.id}/{node_id}'))
+
     deduplicated = {reference.reference_id: reference for reference in references}
     sorted_references = sorted(
         deduplicated.values(),

@@ -737,7 +737,7 @@ window.KGHomeToolbarActions={
   fitView,
   zoomIn:()=>zoomAtCenterStep(1),
   zoomOut:()=>zoomAtCenterStep(-1),
-  openTemplate:()=>$('templateModal').classList.add('show'),
+  openTemplate:()=>window.KGGraphTemplateCenter.open(),
   toggleFocus:toggleFocusMode,
   togglePointerMode:()=>toggleGraphPointerMode(),
   toggleFlowMode:()=>toggleFlowMode(),
@@ -813,7 +813,6 @@ $('flashSwipeSpeed').addEventListener('input',e=>setFlashSwipeSpeed(e.target.val
 $('flashImportFile').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{await importFlashcardFile(f)}catch(err){alert('闪卡导入失败：'+(err.message||err))}e.target.value=''});
 
 $('cancelTemplateBtn').onclick=()=>$('templateModal').classList.remove('show');
-document.querySelectorAll('.template-card').forEach(card=>card.addEventListener('click',()=>{const kind=card.dataset.template;if(confirm('使用模板会替换当前图谱。确定继续吗？')){state=templateState(kind);normalizeState();if(window.KGGraphKernel&&window.KGGraphKernel.resetSession)window.KGGraphKernel.resetSession();$('templateModal').classList.remove('show');fitView(true);showStatus('模板已载入。')}}));
 for(const id of ['nodeModal','linkModal','graphModal','templateModal','flashcardModal']){
   const modal=$(id);if(modal){window.KGCanvasDomInteraction.mountOverlay(modal);modal.addEventListener('wheel',event=>event.stopPropagation(),{passive:true})}
 }

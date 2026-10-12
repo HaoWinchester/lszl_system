@@ -91,7 +91,11 @@ async def delete_material(db, user, material_id, revision):
     from app.models.graph_question import GraphQuestionBinding, GraphQuestionAttempt
     attempt = await db.scalar(select(GraphQuestionAttempt.id).where(GraphQuestionAttempt.snapshot['material']['id'].astext == material_id).limit(1))
     binding = await db.scalar(select(GraphQuestionBinding.id).where(GraphQuestionBinding.snapshot['material']['id'].astext == material_id).limit(1))
-    if question or release or binding or attempt:
+    from app.models.graph_template import GraphTemplateVersion
+    versions = (await db.scalars(select(GraphTemplateVersion))).all()
+    template = any((source.get('snapshot', {}).get('material') or {}).get('id') == material_id
+                   for version in versions for sources in version.bindings.values() for source in sources)
+    if question or release or binding or attempt or template:
         fail('MATERIAL_REFERENCED', '材料已被题目或发布版本引用，不能删除', 409)
     await db.delete(row)
     await db.commit()

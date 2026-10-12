@@ -2769,6 +2769,7 @@ cardsLayer.addEventListener('pointerout',e=>{
   clearTimeout(hoverLargeGraphTimer);
   if(hoverDetailNodeId===id||hoverLargeGraphNodeId===id)scheduleHoverDetailHide();
 });
+detailPanel.addEventListener('wheel',e=>e.stopPropagation(),{passive:true});
 detailPanel.addEventListener('pointerenter',()=>clearTimeout(hoverDetailTimer));
 detailPanel.addEventListener('pointerleave',()=>scheduleHoverDetailHide());
 

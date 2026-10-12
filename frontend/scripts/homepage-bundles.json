@@ -61,6 +61,7 @@
         "styles/learning-weekly-open-gate.css",
         "styles/close-button.css",
         "styles/graph-question-drawer.css",
+        "styles/graph-template-center.css",
         "styles/question-materials.css"
       ]
     },
@@ -124,6 +125,7 @@
         "src/118-question-materials.js",
         "src/119-question-analysis.js",
         "src/graph/question-drawer-controller.js",
+        "src/graph/template-center-controller.js",
         "src/10-graph-editor.js",
         "src/19-home-toolbar-registry.js",
         "src/21-home-package-service.js",

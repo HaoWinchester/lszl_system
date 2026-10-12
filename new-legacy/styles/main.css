@@ -500,6 +500,13 @@ input[type=file]{display:none}
 /* 详情窗口可拖拽、按钮折叠与移动端顶部显示 */
 .detail-panel{
   cursor:default;
+  box-sizing:border-box;
+  max-height:calc(100dvh - 160px);
+  overflow:auto;
+}
+/* 长备注滚动后底部做题按钮可能与小地图 dock(z-index:42) 重叠，面板显示时提升到其上 */
+.detail-panel.show{
+  z-index:43;
 }
 .detail-panel .detail-top{
   cursor:move;

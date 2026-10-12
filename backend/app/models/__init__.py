@@ -136,3 +136,4 @@ from app.models.teacher_assistant import TeacherAssistantSession, TeacherAssista
 
 from app.models.graph_asset import GraphAsset
 from app.models.graph_question import GraphQuestionBinding, GraphQuestionAttempt
+from app.models.graph_template import GraphTemplate, GraphTemplateVersion, GraphTemplateLoad
