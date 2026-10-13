@@ -22,13 +22,20 @@
     graph.mindmap={...(graph.mindmap||{}),themeId,schemaVersion:1};return theme;
   }
   function controls(host,{getGraph,getSelectedIds,runLayout,runTheme}){
-    const panel=document.createElement('div');panel.dataset.mindmapControls='true';panel.style.cssText='padding:12px 84px 12px 12px;box-sizing:border-box;width:100%;min-width:0;flex:0 0 auto;max-height:35vh;overflow:auto;background:white;color:#0f172a;display:flex;gap:8px;flex-wrap:wrap;align-items:center';
-    const graph=getGraph();panel.innerHTML='<label>作用范围 <select data-mm-scope><option value="all">整个当前图谱</option><option value="selected">仅选区</option></select></label><label>根节点 <select data-mm-root><option value="">已有层级根节点</option></select></label><label>布局 <select data-mm-direction><option value="right">向右</option><option value="left">向左</option><option value="bilateral">左右展开</option><option value="down">向下树形</option></select></label><button data-mm-layout>应用布局</button><label><input type="checkbox" data-mm-override>覆盖手工样式</label><span data-mm-status role="status"></span>';
+    const panel=document.createElement('div');panel.dataset.mindmapControls='true';
+    const graph=getGraph();panel.innerHTML='<div class="mm-row mm-layout-row"><label class="mm-field">作用范围 <select data-mm-scope><option value="all">整个当前图谱</option><option value="selected">仅选区</option></select></label><label class="mm-field">根节点 <select data-mm-root><option value="">已有层级根节点</option></select></label><label class="mm-field">布局 <select data-mm-direction><option value="right">向右</option><option value="left">向左</option><option value="bilateral">左右展开</option><option value="down">向下树形</option></select></label><button type="button" class="mm-apply" data-mm-layout>应用布局</button><label class="mm-field mm-override"><input type="checkbox" data-mm-override>覆盖手工样式</label><span data-mm-status role="status"></span></div><div class="mm-row mm-theme-row"></div>';
+    const themeRow=panel.querySelector('.mm-theme-row');themeRow.prepend(Object.assign(document.createElement('span'),{className:'mm-caption',textContent:'主题'}));
     const root=panel.querySelector('[data-mm-root]');for(const n of graph.nodes){const o=document.createElement('option');o.value=n.id;o.textContent=global.KGGraphModel.contentOf(n).title;root.append(o)}root.value=graph.mindmap?.rootIds?.[0]||'';
     const scope=()=>{if(panel.querySelector('[data-mm-scope]').value==='all')return undefined;const ids=getSelectedIds();if(!ids.length)throw new Error('请先选择节点');return ids};
     const execute=work=>{try{work();panel.querySelector('[data-mm-status]').textContent='已应用'}catch(e){panel.querySelector('[data-mm-status]').textContent=e.message}};
     panel.querySelector('[data-mm-layout]').onclick=()=>execute(()=>runLayout({rootIds:root.value?[root.value]:[],direction:panel.querySelector('[data-mm-direction]').value,scopeIds:scope()}));
-    for(const t of presets){const b=document.createElement('button');b.dataset.mmTheme=t.id;b.textContent=t.name;b.style.cssText=`background:${t.fillColor};color:${t.textColor};border:1px solid ${t.borderColor};border-radius:${t.id==='capsule'?'999px':t.cardStyle==='rounded'?'12px':'2px'};padding:8px 12px`;b.onclick=()=>execute(()=>runTheme({themeId:t.id,scopeIds:scope(),override:panel.querySelector('[data-mm-override]').checked}));panel.append(b)}host.append(panel);return panel;
+    for(const t of presets){
+      const b=document.createElement('button');b.type='button';b.dataset.mmTheme=t.id;b.className='mm-theme-chip';b.textContent=t.name;
+      // 芯片自带主题预览色（背景/文字/描边由主题数据注入）。
+      b.style.cssText=`--chip-bg:${t.fillColor};--chip-fg:${t.textColor};--chip-border:${t.borderColor}`+(t.id==='capsule'?';--chip-radius:999px':'');
+      b.onclick=()=>execute(()=>runTheme({themeId:t.id,scopeIds:scope(),override:panel.querySelector('[data-mm-override]').checked}));themeRow.append(b);
+    }
+    host.append(panel);return panel;
   }
   global.KGGraphMindmapThemes=Object.freeze({presets,apply,controls});if(typeof module!=='undefined')module.exports=global.KGGraphMindmapThemes;
 })(typeof window!=='undefined'?window:globalThis);

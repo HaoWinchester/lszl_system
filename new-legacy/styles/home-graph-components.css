@@ -752,3 +752,28 @@
 .knowledge-card .card-body:has(.graph-card-image){display:flex;flex-direction:column}
 .knowledge-card .card-body:has(.graph-card-image) .node-title{height:auto;flex:1 1 auto;min-height:0;max-height:52%;box-sizing:border-box;overflow:auto}
 .knowledge-card .card-body .graph-card-image{flex:0 1 auto;min-height:0;max-height:48%;width:100%;box-sizing:border-box}
+
+/* —— 布局与主题面板（.kg-mindmap-panel + [data-mindmap-controls]）——
+   正式图谱面板（#mindmapBtn）与相关画布临时面板共用内部控件样式；
+   测试选择器：[data-formal-mindmap-panel]、[data-mm-scope]/[data-mm-root]/
+   [data-mm-direction]/[data-mm-layout]/[data-mm-override]/[data-mm-status]/[data-mm-theme]。 */
+.kg-mindmap-panel{position:fixed;z-index:1100;left:80px;top:100px;max-width:680px;background:#fff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 12px 36px #0f172a1f,0 2px 8px #0f172a12;padding:16px 18px;box-sizing:border-box}
+.kg-mindmap-panel-close{position:absolute;top:12px;right:12px;padding:6px 12px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;color:#475569;font:12px/1.3 system-ui,-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;cursor:pointer;transition:background .12s ease,border-color .12s ease}
+.kg-mindmap-panel-close:hover{background:#eef2f7;border-color:#cbd5e1;color:#1e293b}
+[data-mindmap-controls]{box-sizing:border-box;width:100%;min-width:0;max-height:40vh;overflow:auto;color:#0f172a;display:flex;flex-direction:column;gap:12px;font:13px/1.5 system-ui,-apple-system,'PingFang SC','Microsoft YaHei',sans-serif}
+[data-mindmap-controls] .mm-row{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}
+[data-mindmap-controls] .mm-theme-row{padding-top:12px;border-top:1px dashed #e2e8f0}
+[data-mindmap-controls] .mm-caption{flex-basis:100%;font-size:12px;font-weight:600;color:#94a3b8;letter-spacing:.06em}
+[data-mindmap-controls] .mm-field{display:inline-flex;align-items:center;gap:6px;color:#475569;font-size:13px;white-space:nowrap}
+[data-mindmap-controls] select{padding:6px 10px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#0f172a;font:13px system-ui,-apple-system,'PingFang SC',sans-serif;cursor:pointer;transition:border-color .12s ease,box-shadow .12s ease}
+[data-mindmap-controls] select:hover{border-color:#94a3b8}
+[data-mindmap-controls] select:focus-visible{outline:2px solid #1d4ed8;outline-offset:-1px}
+[data-mindmap-controls] .mm-apply{padding:7px 16px;border:1px solid #1d4ed8;border-radius:8px;background:#1d4ed8;color:#fff;font:600 13px system-ui,-apple-system,'PingFang SC',sans-serif;cursor:pointer;transition:background .12s ease}
+[data-mindmap-controls] .mm-apply:hover{background:#1e40af}
+[data-mindmap-controls] .mm-override input{accent-color:#1d4ed8}
+[data-mindmap-controls] [data-mm-status]{color:#16a34a;font-size:12px;min-height:1.2em}
+[data-mindmap-controls] .mm-theme-chip{background:var(--chip-bg,#f1f5f9);color:var(--chip-fg,#0f172a);border:1.5px solid var(--chip-border,#cbd5e1);border-radius:var(--chip-radius,10px);padding:7px 14px;font:600 13px/1.3 system-ui,-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;cursor:pointer;box-shadow:0 1px 2px #0f172a14;transition:transform .12s ease,box-shadow .12s ease}
+[data-mindmap-controls] .mm-theme-chip:hover{transform:translateY(-1px);box-shadow:0 4px 12px #0f172a1f}
+[data-mindmap-controls] .mm-theme-chip:active{transform:none;box-shadow:0 1px 2px #0f172a14}
+/* 正式面板右上角有关闭按钮，内部控件右侧留出避让空间（相关画布临时面板无此按钮，不受影响）。 */
+.kg-mindmap-panel [data-mindmap-controls]{padding-right:104px}

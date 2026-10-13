@@ -4086,8 +4086,8 @@ function closeMindmapControls(){if(formalMindmapCleanup){const cleanup=formalMin
 function openMindmapControls(){
   if(!canWriteGraph())return false;
   closeMindmapControls();
-  const host=document.createElement('section');host.dataset.formalMindmapPanel='true';host.dataset.stageUi='true';host.style.cssText='position:fixed;z-index:1100;left:80px;top:100px;max-width:650px;box-shadow:0 8px 30px #0003;border:1px solid #cbd5e1;background:white';
-  const close=document.createElement('button');close.textContent='关闭布局与主题';close.onclick=closeMindmapControls;host.append(close);
+  const host=document.createElement('section');host.dataset.formalMindmapPanel='true';host.dataset.stageUi='true';host.className='kg-mindmap-panel';
+  const close=document.createElement('button');close.textContent='关闭布局与主题';close.className='kg-mindmap-panel-close';close.onclick=closeMindmapControls;host.append(close);
   window.KGGraphMindmapThemes.controls(host,{getGraph:()=>state,getSelectedIds:()=>[...new Set([...selectedNodeIds,state.selectedNodeId].filter(Boolean))],runLayout:applyMindmapLayout,runTheme:applyMindmapTheme});
   const unmount=window.KGCanvasDomInteraction.mountOverlay(host);formalMindmapCleanup=()=>{unmount();host.remove()};return true;
 }
