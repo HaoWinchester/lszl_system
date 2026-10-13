@@ -28,7 +28,8 @@
     efficient:Object.freeze({
       read:true,editGraph:true,nodeDrag:true,nodeEdit:true,nodeResize:true,textEdit:true,textDrag:true,
       boxSelect:true,multiSelect:true,selectionBoundsMove:true,connections:true,nodeToolbar:true,
-      edgeSelect:true,edgeMove:false,edgeAdvanced:false,edgeToolbar:false,edgeLabelEdit:true,contextMenu:true,contextMenuAdvanced:false
+      // 高效模式允许调整关系线：选中曲线后显示端点/路径控制点（用户反馈控制点不显示）
+      edgeSelect:true,edgeMove:false,edgeAdvanced:true,edgeToolbar:true,edgeLabelEdit:true,contextMenu:true,contextMenuAdvanced:false
     }),
     professional:Object.freeze({
       read:true,editGraph:true,nodeDrag:true,nodeEdit:true,nodeResize:true,textEdit:true,textDrag:true,

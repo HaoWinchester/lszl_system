@@ -3946,7 +3946,13 @@ $('saveGraphBtn').onclick=async()=>{
   updateGraphInfoModal();
   $('graphModal').classList.remove('show');
 };
-function requestGraphMetaEdit(){if(!graphModeAllows('editGraph'))return false;if(typeof authRequire==='function'&&!authRequire('登录后才能编辑图谱标题。'))return;openGraphModal()}
+// 图谱标题/文件名是文件级属性，与交互模式无关：登录且账号有编辑权即可改名（阅读模式也能重命名）。
+function canRenameGraphFile(){
+  if(document.body.classList.contains('auth-readonly'))return false;
+  if(window.KGRolePermissions&&window.KGRolePermissions.can&&window.KGRolePermissions.can('editGraph')===false)return false;
+  return true;
+}
+function requestGraphMetaEdit(){if(!canRenameGraphFile())return false;if(typeof authRequire==='function'&&!authRequire('登录后才能编辑图谱标题。'))return;openGraphModal()}
 let graphTitleEditTimer=null,graphTitleInput=null;
 function closeInlineGraphTitleEdit(commit=false){
   if(!graphTitleInput)return;
@@ -3959,7 +3965,7 @@ function closeInlineGraphTitleEdit(commit=false){
   if(commit)saveGraphTitle(value);
 }
 function openInlineGraphTitleEdit(){
-  if(!graphModeAllows('editGraph'))return false;
+  if(!canRenameGraphFile())return false;
   if(typeof authRequire==='function'&&!authRequire('登录后才能编辑图谱标题。'))return;
   if(graphTitleInput)return;
   const display=$('graphMetaDisplay'),titleEl=$('appTitle');
@@ -3996,7 +4002,8 @@ if(graphMetaDisplay){
     e.preventDefault();e.stopPropagation();
     clearTimeout(graphTitleEditTimer);
     if(graphTitleInput)closeInlineGraphTitleEdit(false);
-    requestGraphMetaEdit();
+    // 双击直接进入行内改名（用户预期：双击改文件名），不再绕道文件信息弹窗。
+    openInlineGraphTitleEdit();
   });
   graphMetaDisplay.addEventListener('keydown',e=>{
     if(e.key==='Enter'||e.key===' '){e.preventDefault();openInlineGraphTitleEdit()}

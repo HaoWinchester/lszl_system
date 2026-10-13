@@ -8,7 +8,8 @@
     const ink=global.KGCanvasInk.create({
       viewport:stage,world,placement:'right',trigger:()=>document.getElementById('homeInkBtn'),
       getViewport:()=>state.viewport,getStrokes:()=>state.strokes||[],
-      isReadonly:()=>!canWriteGraph(),
+      // 画笔批注是轻量编辑：阅读模式也允许（登录+账号权限即可），与改名/文件级操作一致。
+      isReadonly:()=>document.body.classList.contains('auth-readonly')||!!(window.KGRolePermissions&&window.KGRolePermissions.can&&window.KGRolePermissions.can('editGraph')===false),
       history:ensureGraphHistoryController(),showHistory:true,
       change:(strokes,label)=>ensureGraphHistoryController().run(label,()=>{state.strokes=strokes;save()}),
       persistText:()=>{const graph=state;return window.KGGraphFileAutosave.saveAcknowledged({force:true},()=>state===graph)},
@@ -27,7 +28,7 @@
           if(label&&history)history.run(label,()=>{state.tables=next;save()});
           else{state.tables=next;save()}
         },
-        isReadonly:()=>!canWriteGraph(),
+        isReadonly:()=>document.body.classList.contains('auth-readonly')||!!(window.KGRolePermissions&&window.KGRolePermissions.can&&window.KGRolePermissions.can('editGraph')===false),
         getLastWorldPoint:()=>(lastGraphPointerWorldPosition&&Number.isFinite(lastGraphPointerWorldPosition.x))?{...lastGraphPointerWorldPosition}:null,
         onStatus:showStatus
       });
