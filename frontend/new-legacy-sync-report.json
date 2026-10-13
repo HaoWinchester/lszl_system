@@ -1,15 +1,12 @@
 {
   "schemaVersion": 1,
   "fromVersion": "v9.0-p4.1.321",
-  "toVersion": "v9.0-p4.1.321",
+  "toVersion": "v9.0-p4.1.322",
   "changes": {
-    "added": [
-      "assets/landing/miniapp-qr.png"
-    ],
+    "added": [],
     "changed": [
-      "landing.html",
-      "src/landing.js",
-      "styles/landing.css"
+      "VERSION",
+      "content-prep-studio/dist/content-prep.html"
     ],
     "removed": []
   },
