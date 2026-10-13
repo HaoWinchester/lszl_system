@@ -9169,6 +9169,19 @@ body.qw-selection-toolbar-motion .uc-selection-bounds,.stage.graph-card-dragging
 .graph-text-element.group-dragging{opacity:.9;transition:none!important}
 
 /* Temporary editor controls stay inside the session overlay. */
+.related-canvas-backdrop .related-canvas-info{left:18px;top:76px;width:min(380px,calc(100% - 36px));padding:20px;box-sizing:border-box;overflow:auto}
+.related-canvas-detail .detail-top{margin-bottom:16px}
+.related-canvas-detail .detail-name{overflow-wrap:anywhere}
+.related-canvas-detail .detail-grid>div:not(.label){white-space:pre-wrap;overflow-wrap:anywhere}
+.related-canvas-edit{margin-top:16px;border-top:1px solid #e2e8f0;padding-top:12px}
+.related-canvas-edit summary{cursor:pointer;color:#475569;font-weight:650}
+.related-canvas-edit form{margin-top:12px}
+@media(max-width:760px){
+  .related-canvas-backdrop .related-canvas-header{flex-direction:column;align-items:stretch;gap:10px;padding:12px}
+  .related-canvas-backdrop .related-canvas-header-actions{flex:0 1 auto;justify-content:flex-start;gap:6px}
+  .related-canvas-backdrop .related-canvas-header-actions button{padding:6px 9px;font-size:12px}
+  .related-canvas-backdrop .related-canvas-info{left:12px;top:90px;width:calc(100% - 24px);max-height:40%;padding:14px}
+}
 .related-canvas-backdrop .related-canvas-info label{display:block;margin-bottom:12px;font-size:13px;color:#334155}
 .related-canvas-backdrop .related-canvas-info input:not([type=color]),.related-canvas-backdrop .related-canvas-info textarea{display:block;width:100%;margin-top:5px;box-sizing:border-box}
 .related-canvas-backdrop .related-canvas-info textarea{min-height:80px;resize:vertical}

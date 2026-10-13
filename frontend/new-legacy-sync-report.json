@@ -1,10 +1,14 @@
 {
   "schemaVersion": 1,
   "fromVersion": "v9.0-p4.1.322",
-  "toVersion": "v9.0-p4.1.322",
+  "toVersion": "v9.0-p4.1.323",
   "changes": {
     "added": [],
-    "changed": [],
+    "changed": [
+      "VERSION",
+      "content-prep-studio/dist/content-prep.html",
+      "tests/graph-temporary-canvas-browser.py"
+    ],
     "removed": []
   },
   "incompatible": []
