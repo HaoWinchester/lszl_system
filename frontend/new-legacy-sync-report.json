@@ -1,12 +1,19 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.318",
+  "fromVersion": "v9.0-p4.1.319",
   "toVersion": "v9.0-p4.1.319",
   "changes": {
     "added": [],
     "changed": [
-      "VERSION",
-      "content-prep-studio/dist/content-prep.html"
+      "knowledge-recall.html",
+      "landing.html",
+      "question-workspace.html",
+      "src/19-home-toolbar-registry.js",
+      "src/86-knowledge-recall.js",
+      "src/canvas/95-home-canvas-tools.js",
+      "src/canvas/table-model.js",
+      "src/landing.js",
+      "tests/canvas-table-browser.py"
     ],
     "removed": []
   },
