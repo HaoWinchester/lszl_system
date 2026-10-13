@@ -9185,6 +9185,31 @@ body.qw-selection-toolbar-motion .uc-selection-bounds,.stage.graph-card-dragging
 .knowledge-card .card-body:has(.graph-card-image){display:flex;flex-direction:column}
 .knowledge-card .card-body:has(.graph-card-image) .node-title{height:auto;flex:1 1 auto;min-height:0;max-height:52%;box-sizing:border-box;overflow:auto}
 .knowledge-card .card-body .graph-card-image{flex:0 1 auto;min-height:0;max-height:48%;width:100%;box-sizing:border-box}
+
+/* —— 布局与主题面板（.kg-mindmap-panel + [data-mindmap-controls]）——
+   正式图谱面板（#mindmapBtn）与相关画布临时面板共用内部控件样式；
+   测试选择器：[data-formal-mindmap-panel]、[data-mm-scope]/[data-mm-root]/
+   [data-mm-direction]/[data-mm-layout]/[data-mm-override]/[data-mm-status]/[data-mm-theme]。 */
+.kg-mindmap-panel{position:fixed;z-index:1100;left:80px;top:100px;max-width:680px;background:#fff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 12px 36px #0f172a1f,0 2px 8px #0f172a12;padding:16px 18px;box-sizing:border-box}
+.kg-mindmap-panel-close{position:absolute;top:12px;right:12px;padding:6px 12px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;color:#475569;font:12px/1.3 system-ui,-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;cursor:pointer;transition:background .12s ease,border-color .12s ease}
+.kg-mindmap-panel-close:hover{background:#eef2f7;border-color:#cbd5e1;color:#1e293b}
+[data-mindmap-controls]{box-sizing:border-box;width:100%;min-width:0;max-height:40vh;overflow:auto;color:#0f172a;display:flex;flex-direction:column;gap:12px;font:13px/1.5 system-ui,-apple-system,'PingFang SC','Microsoft YaHei',sans-serif}
+[data-mindmap-controls] .mm-row{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}
+[data-mindmap-controls] .mm-theme-row{padding-top:12px;border-top:1px dashed #e2e8f0}
+[data-mindmap-controls] .mm-caption{flex-basis:100%;font-size:12px;font-weight:600;color:#94a3b8;letter-spacing:.06em}
+[data-mindmap-controls] .mm-field{display:inline-flex;align-items:center;gap:6px;color:#475569;font-size:13px;white-space:nowrap}
+[data-mindmap-controls] select{padding:6px 10px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#0f172a;font:13px system-ui,-apple-system,'PingFang SC',sans-serif;cursor:pointer;transition:border-color .12s ease,box-shadow .12s ease}
+[data-mindmap-controls] select:hover{border-color:#94a3b8}
+[data-mindmap-controls] select:focus-visible{outline:2px solid #1d4ed8;outline-offset:-1px}
+[data-mindmap-controls] .mm-apply{padding:7px 16px;border:1px solid #1d4ed8;border-radius:8px;background:#1d4ed8;color:#fff;font:600 13px system-ui,-apple-system,'PingFang SC',sans-serif;cursor:pointer;transition:background .12s ease}
+[data-mindmap-controls] .mm-apply:hover{background:#1e40af}
+[data-mindmap-controls] .mm-override input{accent-color:#1d4ed8}
+[data-mindmap-controls] [data-mm-status]{color:#16a34a;font-size:12px;min-height:1.2em}
+[data-mindmap-controls] .mm-theme-chip{background:var(--chip-bg,#f1f5f9);color:var(--chip-fg,#0f172a);border:1.5px solid var(--chip-border,#cbd5e1);border-radius:var(--chip-radius,10px);padding:7px 14px;font:600 13px/1.3 system-ui,-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;cursor:pointer;box-shadow:0 1px 2px #0f172a14;transition:transform .12s ease,box-shadow .12s ease}
+[data-mindmap-controls] .mm-theme-chip:hover{transform:translateY(-1px);box-shadow:0 4px 12px #0f172a1f}
+[data-mindmap-controls] .mm-theme-chip:active{transform:none;box-shadow:0 1px 2px #0f172a14}
+/* 正式面板右上角有关闭按钮，内部控件右侧留出避让空间（相关画布临时面板无此按钮，不受影响）。 */
+.kg-mindmap-panel [data-mindmap-controls]{padding-right:104px}
 /* style: styles/home-canvas-performance.css */
 /* V9.0-P4.3.6 · 首页画布独立关系线、轮廓悬浮与稳定便签阴影 */
 .stage .edge-visible{
@@ -9675,16 +9700,68 @@ button[aria-label="关闭"]:not(.engagement-close):focus-visible{
   outline-offset:2px;
 }
 /* style: styles/graph-question-drawer.css */
-.graph-question-drawer{position:fixed;inset:0 0 0 auto;width:440px;max-width:40vw;height:100dvh;z-index:2147483100;background:var(--panel-bg,#fff);color:var(--text,#172033);box-shadow:-6px 0 24px #17203326;display:flex;flex-direction:column;pointer-events:auto}.graph-question-drawer[hidden]{display:none}.graph-question-drawer header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px;border-bottom:1px solid #dce2ea}.graph-question-drawer header strong{overflow-wrap:anywhere}.graph-question-drawer button{min-height:36px;padding:6px 10px;cursor:pointer}.gqd-scroll{flex:1;min-height:0;overflow:auto;padding:16px;overscroll-behavior:contain}.gqd-question{padding:18px 0;border-bottom:1px solid #dce2ea}.gqd-question h3{font-size:16px}.gqd-option{display:block;padding:10px 0;white-space:pre-wrap;overflow-wrap:anywhere}.gqd-option input{margin-right:8px}.gqd-option small{display:block}.gqd-analysis{background:#f1f5f9;padding:12px;margin-top:12px}.graph-question-drawer .qm-text{white-space:pre-wrap}.graph-question-drawer img{max-width:100%;height:auto}.graph-question-drawer form label{display:block;margin:10px 0}.graph-question-drawer form input{display:block;width:100%;box-sizing:border-box;padding:8px}.gqd-pagination{display:flex;align-items:center;justify-content:space-between;margin:12px 0}@media(max-width:700px){.graph-question-drawer{width:100%;max-width:100vw}.graph-question-drawer header{padding-top:max(12px,env(safe-area-inset-top))}.gqd-scroll{padding-bottom:max(20px,env(safe-area-inset-bottom))}}
+.graph-question-drawer{position:fixed;inset:0 0 0 auto;width:440px;max-width:40vw;height:100dvh;z-index:2147483100;background:var(--panel-bg,#fff);color:var(--text,#172033);box-shadow:-6px 0 24px #17203326;display:flex;flex-direction:column;pointer-events:auto}.graph-question-drawer[hidden]{display:none}.graph-question-drawer header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px;border-bottom:1px solid #dce2ea}.graph-question-drawer header strong{overflow-wrap:anywhere}.graph-question-drawer button{min-height:36px;padding:6px 10px;cursor:pointer}.gqd-scroll{flex:1;min-height:0;overflow:auto;padding:16px;overscroll-behavior:contain}.gqd-question{padding:18px 0;border-bottom:1px solid #dce2ea}.gqd-question h3{font-size:16px}.gqd-option{display:block;padding:10px 0;white-space:pre-wrap;overflow-wrap:anywhere}.gqd-option input{margin-right:8px}.gqd-option small{display:block}.gqd-analysis{background:#f1f5f9;padding:12px;margin-top:12px}.graph-question-drawer .qm-text{white-space:pre-wrap}.graph-question-drawer img{max-width:100%;height:auto}.graph-question-drawer form label{display:block;margin:10px 0}.graph-question-drawer form input{display:block;width:100%;box-sizing:border-box;padding:8px}.gqd-pagination{display:flex;align-items:center;justify-content:space-between;margin:12px 0}.graph-question-drawer .gqd-header-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+/* 全屏做题：整屏覆盖，题目区居中限宽，排版与抽屉一致（.gqd-fs-fallback 为不支持 Fullscreen API 的降级） */
+.graph-question-drawer.is-fullscreen{inset:0;width:100%;max-width:100vw;box-shadow:none}
+.graph-question-drawer.is-fullscreen .gqd-scroll{display:flex;flex-direction:column;align-items:center;padding:28px 24px}
+.graph-question-drawer.is-fullscreen .gqd-scroll>*{width:100%;max-width:860px;flex-shrink:0}
+.graph-question-drawer.is-fullscreen [data-status]{min-height:1.4em}
+.graph-question-drawer.is-fullscreen .gqd-question{padding:24px 0}
+.graph-question-drawer.is-fullscreen .gqd-question h3{font-size:19px;margin:0 0 10px}
+.graph-question-drawer.is-fullscreen .qm-text{font-size:15px;line-height:1.7}
+.graph-question-drawer.is-fullscreen .gqd-option{padding:8px 12px;border:1px solid #dce2ea;border-radius:8px;margin:8px 0}
+.graph-question-drawer.is-fullscreen .gqd-option:hover{border-color:#b8c4d6}
+.graph-question-drawer.is-fullscreen .gqd-analysis{border-radius:10px}@media(max-width:700px){.graph-question-drawer{width:100%;max-width:100vw}.graph-question-drawer header{padding-top:max(12px,env(safe-area-inset-top))}.gqd-scroll{padding-bottom:max(20px,env(safe-area-inset-bottom))}}
 /* style: styles/graph-template-center.css */
-.graph-template-center{width:min(760px,90vw);max-height:85vh;overflow:auto;padding:24px;border:1px solid #cbd5e1;border-radius:16px;color:#0f172a;background:#fff;box-sizing:border-box}
-.graph-template-center::backdrop{background:rgba(15,23,42,.45)}
-.graph-template-center article{border:1px solid #cbd5e1;border-radius:10px;padding:16px;margin:12px 0}
-.graph-template-center button,.graph-template-center a{margin:8px 8px 0 0}
-.template-center-actions{position:sticky;bottom:0;background:#fff;padding:12px 0}
-.template-publication-form{display:grid;gap:12px;padding:16px;background:#f8fafc;border:1px solid #cbd5e1}
-.template-publication-form input:not([type=checkbox]),.template-publication-form textarea{width:100%;box-sizing:border-box;padding:8px;font:inherit}
-@media(max-width:700px){.graph-template-center{width:100vw;max-width:100vw;max-height:100dvh;height:100dvh;margin:0;padding:16px;border-radius:0}}
+/* KGGraphTemplateCenter · 模板中心弹层视觉。
+   结构约定（测试在用）：#graphTemplateCenter、article[data-template-id]、
+   [data-template-load]、[data-template-publish]、[role=status]、
+   .template-publication-form、.template-center-actions（最后一个按钮为关闭）。 */
+
+.graph-template-center{width:min(720px,92vw);max-height:86vh;overflow:auto;padding:0;border:none;border-radius:20px;color:#0f172a;background:#fff;box-sizing:border-box;box-shadow:0 24px 64px #0f172a2e,0 4px 16px #0f172a14}
+.graph-template-center::backdrop{background:rgba(15,23,42,.5)}
+/* 头部留白：标题 + 说明 */
+.graph-template-center>h2{margin:0;padding:24px 28px 4px;font-size:20px;line-height:1.3;letter-spacing:.01em}
+.graph-template-center>p:not([role=status]){margin:0;padding:0 28px;color:#64748b;font-size:13px;line-height:1.6}
+.graph-template-center>[role=status]{margin:14px 28px 0;padding:0;color:#475569;font-size:13px}
+/* 模板卡片：圆角 + 阴影 + hover 抬升 */
+.graph-template-center article{border:1px solid #e2e8f0;border-radius:14px;padding:16px 18px;margin:14px 28px;background:#fff;box-shadow:0 1px 3px #0f172a0d;transition:box-shadow .15s ease,transform .15s ease,border-color .15s ease}
+.graph-template-center article:hover{border-color:#cbd5e1;box-shadow:0 8px 24px #0f172a14;transform:translateY(-1px)}
+.template-card-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.graph-template-center article h3{margin:0;font-size:16px;line-height:1.4;overflow-wrap:anywhere}
+/* 免费/会员徽章：会员金色、免费绿色、下架灰色 */
+.template-badge{display:inline-flex;align-items:center;flex-shrink:0;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:600;line-height:1.5;white-space:nowrap}
+.template-badge-free{background:#ecfdf5;color:#047857;border:1px solid #a7f3d0}
+.template-badge-member{background:linear-gradient(135deg,#fef3c7,#fde68a);color:#92400e;border:1px solid #fcd34d}
+.template-badge-off{background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0}
+.template-card-body{margin-top:2px}
+.template-card-body p{margin:6px 0 0;color:#475569;font-size:13px;line-height:1.65;overflow-wrap:anywhere}
+.template-card-body a{color:#1d4ed8;font-weight:600;text-decoration:none}
+.template-card-body a:hover{text-decoration:underline}
+/* 卡片操作区：加载为主按钮，其余次级 */
+.template-card-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.graph-template-center button,.graph-template-center a{margin:0}
+.graph-template-center article button,.template-publication-form button{padding:7px 14px;border:1px solid #cbd5e1;border-radius:9px;background:#fff;color:#1e293b;font:13px/1.3 system-ui,-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;cursor:pointer;transition:background .12s ease,border-color .12s ease,box-shadow .12s ease}
+.graph-template-center article button:hover:not(:disabled),.template-publication-form button:hover:not(:disabled){background:#f1f5f9;border-color:#94a3b8}
+.graph-template-center article button:disabled{opacity:.45;cursor:default}
+.graph-template-center article .template-load-primary,.template-publication-form .template-submit-primary{background:#1d4ed8;border-color:#1d4ed8;color:#fff;font-weight:600}
+.graph-template-center article .template-load-primary:hover:not(:disabled),.template-publication-form .template-submit-primary:hover:not(:disabled){background:#1e40af;border-color:#1e40af}
+.graph-template-center article .template-load-primary:disabled{background:#93b4f5;border-color:#93b4f5;color:#fff}
+/* 底部操作条：吸底 */
+.template-center-actions{position:sticky;bottom:0;display:flex;justify-content:flex-end;gap:10px;margin-top:8px;padding:14px 28px;background:#fff;border-top:1px solid #f1f5f9;border-radius:0 0 20px 20px}
+.template-center-actions button{padding:8px 18px;border:1px solid #cbd5e1;border-radius:9px;background:#fff;color:#1e293b;font:13px system-ui;cursor:pointer}
+.template-center-actions button:hover:not(:disabled){background:#f1f5f9}
+.template-center-actions button:disabled{opacity:.5;cursor:default}
+/* 发布表单：浅底卡片 + 字段留白 */
+.template-publication-form{display:grid;gap:14px;margin:14px 28px;padding:18px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px}
+.template-publication-form .template-field{display:grid;gap:6px}
+.template-publication-form .template-field span{font-size:12px;font-weight:600;color:#475569;letter-spacing:.02em}
+.template-publication-form input:not([type=checkbox]),.template-publication-form textarea{width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid #cbd5e1;border-radius:9px;background:#fff;font:13px/1.5 inherit;color:#0f172a}
+.template-publication-form input:focus-visible,.template-publication-form textarea:focus-visible{outline:2px solid #1d4ed8;outline-offset:-1px}
+.template-publication-form textarea{min-height:88px;resize:vertical}
+.template-publication-form .template-member-toggle{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:#334155;width:fit-content}
+.template-publication-form .template-form-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:2px}
+@media(max-width:700px){.graph-template-center{width:100vw;max-width:100vw;max-height:100dvh;height:100dvh;margin:0;border-radius:0}.graph-template-center>h2{padding:18px 18px 2px}.graph-template-center>p:not([role=status]),.graph-template-center>[role=status],.graph-template-center article,.template-publication-form{margin-left:14px;margin-right:14px}.template-center-actions{padding:12px 14px;border-radius:0}}
 /* style: styles/question-materials.css */
 .qm-text{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.9}.qm-case{border:1px solid #d8e1ee;border-radius:12px;background:#f7f9fc;margin-bottom:16px;overflow:hidden}.qm-case summary{cursor:pointer;font-weight:650;padding:14px 18px;color:#174778}.qm-case-body{padding:0 18px 18px;max-height:55vh;overflow:auto;overscroll-behavior:contain}.qm-image{margin:14px 0;max-width:100%}.qm-image button{font:inherit}.qm-zoom{display:block;max-width:100%;padding:0;background:white;border:1px solid #dce5f0;border-radius:8px;cursor:zoom-in}.qm-image img{max-width:100%;height:auto;display:block}.qm-image figcaption{font-size:13px;color:#52657b;margin-top:6px}.qm-image [data-qm-retry]{padding:10px;color:#a03924;border:1px solid #e6b1a4;background:#fff5f1;border-radius:6px}.qm-image-dialog{max-width:94vw;max-height:92vh;border:0;border-radius:12px;padding:16px}.qm-image-dialog::backdrop{background:#102338b3}.qm-image-dialog img{display:block;max-width:88vw;max-height:80vh;object-fit:contain}.qm-image-dialog button{display:block;margin:0 0 12px auto;padding:8px 18px}.qm-matching{width:100%}.qm-help{font-size:14px;color:#52657b;line-height:1.6}.qm-pairs,.qm-candidates{display:grid;gap:12px}.qm-pair{position:relative}.qm-target{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px;align-items:center;width:100%;text-align:left;padding:16px;border:1px solid #cbd9ea;border-radius:10px;background:#f7faff;color:#16344f;font:inherit;line-height:1.7;cursor:pointer}.qm-target b{font-weight:500}.qm-target span{border:1px dashed #a4bad6;border-radius:6px;padding:10px 14px;background:white;min-height:44px;overflow-wrap:anywhere}.qm-target[aria-pressed=true]{outline:3px solid #3482cc;outline-offset:2px}.qm-target:disabled{opacity:1;cursor:default}.qm-clear{margin:6px 0 0 auto;display:block;border:0;color:#486585;background:transparent;cursor:pointer;padding:4px 10px}.qm-candidates{border-top:1px dashed #ccd9e8;padding-top:18px;margin-top:20px}.qm-candidate{font:inherit;text-align:left;line-height:1.6;padding:12px 16px;border:1px solid #c6d9ef;border-radius:9px;background:white;color:#183b63;cursor:grab;box-shadow:0 2px 5px #1933510b}.qm-candidate small{display:block;color:#64748b}.qm-status{min-height:22px;color:#24588e;font-size:13px}.qm-pair-feedback{font-size:14px;line-height:1.6;margin:6px 0}.qm-pair.is-correct .qm-target{border-color:#3c9868}.qm-pair.is-wrong .qm-target{border-color:#cf6858}.qm-pair.is-wrong .qm-pair-feedback{color:#a13324}.qm-matching button:focus-visible,.qm-image button:focus-visible{outline:3px solid #3482cc;outline-offset:3px}.qm-editor{border:1px solid #d8e1ee;border-radius:10px;padding:16px;margin:16px 0}.qm-editor label{display:block;margin:10px 0}.qm-editor input,.qm-editor textarea,.qm-editor select{width:100%;box-sizing:border-box;padding:9px;font:inherit}.qm-editor-row{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:10px;margin:10px 0;align-items:start}.qm-editor-actions{display:flex;gap:10px;flex-wrap:wrap}.qm-editor button{padding:8px 12px;cursor:pointer}.qm-editor-error{color:#a13324;white-space:pre-wrap}.qm-case-layout{display:grid;grid-template-columns:minmax(260px,.9fr) minmax(0,1.1fr);gap:24px}.qm-case-layout>.qm-question-materials{grid-column:1;grid-row:1 / span 20;min-width:0}.qm-case-layout>:not(.qm-question-materials){grid-column:2;min-width:0}.qm-question-materials:empty{display:none}@media(max-width:760px){.qm-case-layout{display:block}.qm-target{grid-template-columns:1fr;gap:8px;padding:12px}.qm-case-body{max-height:40vh}.qm-editor-row{grid-template-columns:1fr 1fr}.qm-editor-row select{grid-column:1 / -1}.qm-case summary{padding:12px}.qm-case-body{padding:0 12px 12px}}
 

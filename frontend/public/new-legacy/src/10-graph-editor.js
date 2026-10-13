@@ -3676,7 +3676,10 @@ stage.addEventListener('pointerdown',e=>{
   const touchPan=e.pointerType==='touch';
   const rightPan=e.button===2;
   const panRequested=touchPan||rightPan||isCanvasPanMode()||currentGraphInteractionMode()==='reading';
-  if(panRequested)hideGraphTransientMenus();
+  // 阅读模式 pan 分支不再吞掉工具栏子菜单的 pointerdown：否则「只看相关」「主干/骨架」
+  // 等子菜单项在 pointerdown 时被 hideGraphTransientMenus 折叠，click 永远不会触发
+  //（专业/高效模式走 isUI 早退不受影响）。工具栏内部交互仍由自身处理器接管。
+  if(panRequested&&!e.target.closest?.('.floating-toolbox'))hideGraphTransientMenus();
   if(!panRequested){
     if(e.button!==0)return;
     if(isUI(e.target))return;
@@ -4086,8 +4089,8 @@ function closeMindmapControls(){if(formalMindmapCleanup){const cleanup=formalMin
 function openMindmapControls(){
   if(!canWriteGraph())return false;
   closeMindmapControls();
-  const host=document.createElement('section');host.dataset.formalMindmapPanel='true';host.dataset.stageUi='true';host.style.cssText='position:fixed;z-index:1100;left:80px;top:100px;max-width:650px;box-shadow:0 8px 30px #0003;border:1px solid #cbd5e1;background:white';
-  const close=document.createElement('button');close.textContent='关闭布局与主题';close.onclick=closeMindmapControls;host.append(close);
+  const host=document.createElement('section');host.dataset.formalMindmapPanel='true';host.dataset.stageUi='true';host.className='kg-mindmap-panel';
+  const close=document.createElement('button');close.textContent='关闭布局与主题';close.className='kg-mindmap-panel-close';close.onclick=closeMindmapControls;host.append(close);
   window.KGGraphMindmapThemes.controls(host,{getGraph:()=>state,getSelectedIds:()=>[...new Set([...selectedNodeIds,state.selectedNodeId].filter(Boolean))],runLayout:applyMindmapLayout,runTheme:applyMindmapTheme});
   const unmount=window.KGCanvasDomInteraction.mountOverlay(host);formalMindmapCleanup=()=>{unmount();host.remove()};return true;
 }
