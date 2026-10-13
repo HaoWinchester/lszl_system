@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
   "fromVersion": "v9.0-p4.1.320",
-  "toVersion": "v9.0-p4.1.320",
+  "toVersion": "v9.0-p4.1.321",
   "changes": {
     "added": [],
     "changed": [
-      "landing.html",
-      "src/landing.js"
+      "VERSION",
+      "content-prep-studio/dist/content-prep.html"
     ],
     "removed": []
   },
