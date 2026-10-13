@@ -1,11 +1,12 @@
 {
   "schemaVersion": 1,
   "fromVersion": "v9.0-p4.1.316",
-  "toVersion": "v9.0-p4.1.316",
+  "toVersion": "v9.0-p4.1.317",
   "changes": {
     "added": [],
     "changed": [
-      "tests/canvas-table-browser.py"
+      "VERSION",
+      "content-prep-studio/dist/content-prep.html"
     ],
     "removed": []
   },
