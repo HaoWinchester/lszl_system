@@ -1,11 +1,12 @@
 {
   "schemaVersion": 1,
   "fromVersion": "v9.0-p4.1.318",
-  "toVersion": "v9.0-p4.1.318",
+  "toVersion": "v9.0-p4.1.319",
   "changes": {
     "added": [],
     "changed": [
-      "src/canvas/95-home-canvas-tools.js"
+      "VERSION",
+      "content-prep-studio/dist/content-prep.html"
     ],
     "removed": []
   },
