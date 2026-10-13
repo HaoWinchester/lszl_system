@@ -384,8 +384,9 @@
       <button class="landing-contact-modal-close" id="landingMiniappModalClose" type="button" aria-label="关闭小程序二维码弹窗">×</button>
       <p class="landing-contact-modal-title">小程序扫码</p>
       <p class="landing-contact-modal-subtitle">微信扫一扫，随时随地刷题与复习。</p>
-      <img class="landing-contact-modal-qrcode" src="assets/landing/miniapp-qr.png" alt="平台小程序二维码" onerror="this.style.display='none';document.getElementById('landingMiniappQrPlaceholder').style.display='flex'"/>
-      <div id="landingMiniappQrPlaceholder" style="display:none;width:220px;height:220px;margin:0 auto;border:2px dashed #cbd5e1;border-radius:16px;align-items:center;justify-content:center;text-align:center;color:#64748b;font:14px/1.6 system-ui,sans-serif;padding:16px">小程序二维码待配置<br/>（放置于 assets/landing/miniapp-qr.png）</div>
+      <div id="landingMiniappQrSlot" style="min-height:220px;display:flex;align-items:center;justify-content:center">
+        <div id="landingMiniappQrPlaceholder" style="width:220px;height:220px;border:2px dashed #cbd5e1;border-radius:16px;display:flex;align-items:center;justify-content:center;text-align:center;color:#64748b;font:14px/1.6 system-ui,sans-serif;padding:16px">小程序二维码待配置<br/>（放置于 assets/landing/miniapp-qr.png）</div>
+      </div>
       <p class="landing-contact-modal-tip">使用微信「扫一扫」对准二维码即可打开小程序。</p>
     </section>
   </div>
