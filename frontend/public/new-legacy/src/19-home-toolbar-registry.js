@@ -43,7 +43,7 @@
 
   let activeMode = "efficient";
   const MODE_TOOL_IDS = Object.freeze({
-    reading: new Set(["homeCaptureBtn", "focusBtn", "flowModeBtn", "relationViewMenuBtn", "largeGraphLinesBtn", "largeGraphRelatedBtn"]),
+    reading: new Set(["homeInkBtn", "homeCaptureBtn", "focusBtn", "flowModeBtn", "relationViewMenuBtn", "largeGraphLinesBtn", "largeGraphRelatedBtn"]),
     efficient: new Set(["templateBtn", "addBtn", "addTextElementBtn", "addTableBtn", "mindmapBtn", "focusBtn", "flashcardBtn", "homeInkBtn", "homeCaptureBtn", "pointerModeBtn", "flowModeBtn", "relationViewMenuBtn", "largeGraphLinesBtn", "largeGraphRelatedBtn", "importFile"]),
     professional: null
   });

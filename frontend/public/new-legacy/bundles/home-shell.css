@@ -9491,9 +9491,10 @@ body.question-workspace-page.qw-selection-bounds-dragging.qw-selection-toolbar-m
 body[data-graph-interaction-mode="reading"] .graph-mode-indicator{display:none!important}
 body[data-graph-interaction-mode="reading"] .node-style-toolbar,
 body[data-graph-interaction-mode="reading"] .uc-edge-toolbar,
-body[data-graph-interaction-mode="reading"] .edge-control-layer,
 body[data-graph-interaction-mode="reading"] .node-growth-layer{display:none!important}
-body[data-graph-interaction-mode="efficient"] .edge-control-layer,
+/* 高效模式允许调整关系线：选中曲线后显示端点与路径控制点（edge-control-layer 不再隐藏，
+   与 27-home-interaction-modes 的 edgeAdvanced:true 能力一致）；uc-edge-toolbar 仍隐藏，
+   高效模式沿用自绘的边快速样式面板。 */
 body[data-graph-interaction-mode="efficient"] .uc-edge-toolbar{display:none!important}
 
 /* 高效模式节点工具栏：保留高频样式、尺寸、对齐和更多操作。 */
