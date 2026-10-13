@@ -221,6 +221,9 @@ def main():
         page.wait_for_function('KGHomeTables.tables.length===1')
         created=json.loads(page.evaluate('JSON.stringify(KGHomeTables.tables[0])'))
         assert created['rows']==5 and created['cols']==4,created
+        # 粘贴建表必须携带单元格内容与合并区（回归：曾只建结构丢内容）
+        assert created['cells'].get('0,0')=='中文' and created['cells'].get('2,2')=='00123',created['cells']
+        assert created['merges'] and created['merges'][0]['rowSpan']==2,created['merges']
         assert page.locator('.kg-canvas-table-wrap').count()==1
         page.evaluate('''()=>{
           const dt=new DataTransfer();dt.setData('text/plain','just a sentence');
