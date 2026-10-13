@@ -3676,7 +3676,10 @@ stage.addEventListener('pointerdown',e=>{
   const touchPan=e.pointerType==='touch';
   const rightPan=e.button===2;
   const panRequested=touchPan||rightPan||isCanvasPanMode()||currentGraphInteractionMode()==='reading';
-  if(panRequested)hideGraphTransientMenus();
+  // 阅读模式 pan 分支不再吞掉工具栏子菜单的 pointerdown：否则「只看相关」「主干/骨架」
+  // 等子菜单项在 pointerdown 时被 hideGraphTransientMenus 折叠，click 永远不会触发
+  //（专业/高效模式走 isUI 早退不受影响）。工具栏内部交互仍由自身处理器接管。
+  if(panRequested&&!e.target.closest?.('.floating-toolbox'))hideGraphTransientMenus();
   if(!panRequested){
     if(e.button!==0)return;
     if(isUI(e.target))return;
