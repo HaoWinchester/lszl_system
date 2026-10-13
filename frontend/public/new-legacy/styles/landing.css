@@ -269,6 +269,12 @@
 .landing-product-copy li { position: relative; padding-left: 19px; color: #415750; font-size: 13px; }
 .landing-product-copy li::before { position: absolute; top: 7px; left: 0; width: 7px; height: 7px; border: 2px solid var(--landing-accent); border-radius: 50%; content: ""; }
 .landing-product-link { display: inline-flex; margin-top: 30px; align-items: center; gap: 15px; border-bottom: 1px solid rgba(21, 60, 52, 0.4); font-size: 13px; font-weight: 850; line-height: 2; transition: border-color 180ms ease, color 180ms ease; }
+
+/* 做题模式面板下方的小程序扫码入口 */
+.landing-miniapp { display: flex; align-items: center; gap: 16px; margin-top: 26px; padding: 14px 18px; border: 1px solid rgba(21, 60, 52, 0.14); border-radius: 16px; background: rgba(255, 255, 255, 0.72); }
+.landing-miniapp-qr { width: 112px; height: 112px; border-radius: 12px; background: #fff; box-shadow: 0 6px 18px rgba(15, 23, 42, 0.12); flex: 0 0 auto; }
+.landing-miniapp-tip { margin: 0; font-size: 13px; line-height: 1.8; color: #33443d; }
+.landing-miniapp-tip strong { font-size: 14px; color: #12332b; }
 .landing-product-link span { color: var(--landing-accent); transition: transform 220ms cubic-bezier(.22,.75,.24,1); }
 .landing-product-link:hover { border-bottom-color: var(--landing-accent); color: var(--landing-accent-deep); }
 .landing-product-link:hover span { transform: translate(4px, -4px); }

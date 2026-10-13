@@ -47,61 +47,6 @@
     trigger.setAttribute('aria-expanded', String(Boolean(expanded)));
   }
 
-  const miniappModal = document.getElementById('landingMiniappModal');
-  const miniappModalClose = document.getElementById('landingMiniappModalClose');
-
-  let miniappQrChecked = false;
-
-  function ensureMiniappQr() {
-    // 图片存在才插入 <img>，避免占位期间产生 404 资源错误。
-    if (miniappQrChecked) return;
-    miniappQrChecked = true;
-    const slot = document.getElementById('landingMiniappQrSlot');
-    if (!slot) return;
-    fetch('assets/landing/miniapp-qr.png', { method: 'HEAD' })
-      .then((response) => {
-        if (!response.ok) return;
-        const img = document.createElement('img');
-        img.className = 'landing-contact-modal-qrcode';
-        img.src = 'assets/landing/miniapp-qr.png';
-        img.alt = '平台小程序二维码';
-        slot.replaceChildren(img);
-      })
-      .catch(() => {});
-  }
-
-  function openMiniappModal() {
-    if (!miniappModal) return;
-    ensureMiniappQr();
-    miniappModal.hidden = false;
-    miniappModal.setAttribute('aria-hidden', 'false');
-    miniappModal.querySelector('.landing-contact-modal')?.focus();
-    document.documentElement.style.overflow = 'hidden';
-    document.body.style.overflow = 'hidden';
-  }
-
-  function closeMiniappModal() {
-    if (!miniappModal) return;
-    miniappModal.hidden = true;
-    miniappModal.setAttribute('aria-hidden', 'true');
-    document.documentElement.style.overflow = '';
-    document.body.style.overflow = '';
-  }
-
-  document.querySelectorAll('[data-open-miniapp]').forEach((trigger) => {
-    trigger.addEventListener('click', (event) => {
-      event.preventDefault();
-      openMiniappModal();
-    });
-  });
-  miniappModalClose?.addEventListener('click', closeMiniappModal);
-  miniappModal?.addEventListener('click', (event) => {
-    if (event.target === miniappModal) closeMiniappModal();
-  });
-  document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && miniappModal && !miniappModal.hidden) closeMiniappModal();
-  });
-
   function openContactModal() {
     if (!contactModal) return;
     contactModal.hidden = false;
