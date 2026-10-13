@@ -9,7 +9,10 @@
       viewport:stage,world,placement:'right',trigger:()=>document.getElementById('homeInkBtn'),
       getViewport:()=>state.viewport,getStrokes:()=>state.strokes||[],
       // 画笔批注是轻量编辑：阅读模式也允许（登录+账号权限即可），与改名/文件级操作一致。
-      isReadonly:()=>document.body.classList.contains('auth-readonly')||!!(window.KGRolePermissions&&window.KGRolePermissions.can&&window.KGRolePermissions.can('editGraph')===false),
+      // 切文件过渡期（isSwitching）仍保持禁用，防止笔迹落进切换前后的错误文件。
+      isReadonly:()=>document.body.classList.contains('auth-readonly')
+        ||!!(window.KGRolePermissions&&window.KGRolePermissions.can&&window.KGRolePermissions.can('editGraph')===false)
+        ||!!window.KGGraphFileTabs?.isSwitching?.(),
       history:ensureGraphHistoryController(),showHistory:true,
       change:(strokes,label)=>ensureGraphHistoryController().run(label,()=>{state.strokes=strokes;save()}),
       persistText:()=>{const graph=state;return window.KGGraphFileAutosave.saveAcknowledged({force:true},()=>state===graph)},
@@ -28,7 +31,9 @@
           if(label&&history)history.run(label,()=>{state.tables=next;save()});
           else{state.tables=next;save()}
         },
-        isReadonly:()=>document.body.classList.contains('auth-readonly')||!!(window.KGRolePermissions&&window.KGRolePermissions.can&&window.KGRolePermissions.can('editGraph')===false),
+        isReadonly:()=>document.body.classList.contains('auth-readonly')
+          ||!!(window.KGRolePermissions&&window.KGRolePermissions.can&&window.KGRolePermissions.can('editGraph')===false)
+          ||!!window.KGGraphFileTabs?.isSwitching?.(),
         getLastWorldPoint:()=>(lastGraphPointerWorldPosition&&Number.isFinite(lastGraphPointerWorldPosition.x))?{...lastGraphPointerWorldPosition}:null,
         onStatus:showStatus
       });
