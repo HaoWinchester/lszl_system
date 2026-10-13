@@ -348,6 +348,51 @@
       const hit=findCell(event.target);
       if(hit&&editingCell===hit.cell)editingCell=null;
     });
+    // —— 行高自适应增长：单元格文本换行超过当前行高时按内容实际高度增长（只增不减，
+    //     用户手动调小后不被强制回弹；随内容同一次 transient 提交，不单独进历史） ——
+    // 注意不能用 td.scrollHeight：.kg-canvas-table{height:100%} 会把 wrap 富余高度摊到各行，
+    // 空单元格也会报出被拉伸后的高度，造成全表行高反馈式膨胀。Range 取内容行框高度不受拉伸影响。
+    function measureRowGrowth(wrap,table){
+      if(!wrap||!table)return null;
+      const heights=[...table.rowHeights];
+      const doc=wrap.ownerDocument;
+      wrap.querySelectorAll('tbody td').forEach(td=>{
+        const r=Number(td.dataset.row),c=Number(td.dataset.column);
+        if(!(r>=0)||r>=heights.length)return;
+        const range=doc.createRange();range.selectNodeContents(td);
+        // needed = 内容行框高度 + td 上下 padding 12px + border-collapse 边框 2px。
+        const needed=Math.ceil(range.getBoundingClientRect().height)+14;
+        const merge=(table.merges||[]).find(m=>m.row===r&&m.column===c);
+        if(merge&&merge.rowSpan>1){
+          const last=merge.row+merge.rowSpan-1;
+          let sum=0;for(let i=merge.row;i<=last&&i<heights.length;i++)sum+=heights[i];
+          if(needed>sum)heights[Math.min(last,heights.length-1)]+=needed-sum;
+        }else if(needed>heights[r])heights[r]=needed;
+      });
+      for(let i=0;i<heights.length;i++)if(heights[i]!==table.rowHeights[i])return heights;
+      return null;
+    }
+    // 不重建 DOM（保住输入焦点）地把新行高写回 wrap：tr 高度、wrap 总高与行边界把手位置。
+    function applyRowHeightsToDom(wrap,heights){
+      if(!wrap||!Array.isArray(heights))return;
+      wrap.querySelectorAll('tbody tr').forEach((tr,index)=>{if(heights[index])tr.style.height=heights[index]+'px'});
+      let total=0;for(const h of heights)total+=Number(h)||0;
+      wrap.style.height=total+'px';
+      let top=0;
+      wrap.querySelectorAll('.kg-canvas-table-boundary-row').forEach(handle=>{
+        top+=Number(heights[Number(handle.dataset.boundaryIndex)-1])||0;
+        handle.style.top=top+'px';
+      });
+    }
+    // 对指定表的 DOM 逐行测量并按需增长行高（transient 写回，不进历史）。
+    function fitTableRows(tableId){
+      const wrap=layer.querySelector(`.kg-canvas-table-wrap[data-table-id="${tableId}"]`);
+      const table=tableById(tableId);
+      if(!wrap||!table||readonly())return;
+      const growth=measureRowGrowth(wrap,table);
+      if(!growth)return;
+      if(mutate(getTables().map(item=>item.id===tableId?{...item,rowHeights:growth}:item),null,{transient:true}))applyRowHeightsToDom(wrap,growth);
+    }
     // 单元格文本入库：contenteditable 末尾可能残留一个表现换行符，入库前去掉。
     function commitCellText(hit){
       const table=tableById(hit.tableId);if(!table)return;
@@ -359,13 +404,15 @@
         hit.cell.textContent=text;placeCaretEnd(hit.cell);
         status(`单元格内容不能超过 ${max} 字符`);
       }
+      // 输入导致内容换行时，同一笔 transient 提交里一并增长行高，避免文字溢出格边界。
+      const growth=measureRowGrowth(hit.wrap,table);
       const tables=getTables().map(item=>{
         if(item.id!==hit.tableId)return item;
         const cells={...item.cells},key=`${hit.row},${hit.column}`;
         if(text)cells[key]=text;else delete cells[key];
-        return {...item,cells};
+        return {...item,cells,rowHeights:growth||item.rowHeights};
       });
-      mutate(tables,null,{transient:true});
+      if(mutate(tables,null,{transient:true})&&growth)applyRowHeightsToDom(hit.wrap,growth);
     }
     listen(layer,'input',event=>{
       const hit=findCell(event.target);
@@ -554,6 +601,7 @@
           const next=model().paste(table,{row:origin.row,column:origin.column},grid);
           if(mutate(withTableReplaced(table,next),'粘贴表格数据')){
             anchor={row:origin.row,column:origin.column};focusCellPos=null;
+            fitTableRows(table.id); // 粘贴内容换行超行高时按需增长（transient，不进历史）
             status('已粘贴剪贴板表格数据。');return true;
           }
           return true; // 已识别为表格粘贴但被拒绝（超限/冲突）：不落回页面语义
@@ -592,6 +640,7 @@
         if(!mutate([...getTables(),created],label||'插入表格'))return false;
         selectTable(id);anchor={row:0,column:0};focusCellPos=null;
         render({force:true});
+        fitTableRows(id); // 粘贴自带内容时按需增长行高（transient，不进历史）
         return true;
       }catch(error){status(error?.message||'插入表格失败');return false}
     }

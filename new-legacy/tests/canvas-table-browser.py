@@ -221,8 +221,9 @@ def main():
         page.wait_for_function('KGHomeTables.tables.length===1')
         created=json.loads(page.evaluate('JSON.stringify(KGHomeTables.tables[0])'))
         assert created['rows']==5 and created['cols']==4,created
-        # 粘贴建表必须携带单元格内容与合并区（回归：曾只建结构丢内容）
-        assert created['cells'].get('0,0')=='中文' and created['cells'].get('2,2')=='00123',created['cells']
+        # 粘贴建表必须携带单元格内容与合并区（回归：曾只建结构丢内容）。
+        # Excel HTML 中 (2,0) 是 colspan=2 rowspan=2 合并区，'首尾空格 ' 在 (2,2)、'00123' 在 (3,2)。
+        assert created['cells'].get('0,0')=='中文' and created['cells'].get('2,2')=='首尾空格 ' and created['cells'].get('3,2')=='00123',created['cells']
         assert created['merges'] and created['merges'][0]['rowSpan']==2,created['merges']
         assert page.locator('.kg-canvas-table-wrap').count()==1
         page.evaluate('''()=>{
