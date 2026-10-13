@@ -581,6 +581,14 @@
       const id=nextId();
       try{
         const created=factory.create({id,rows,cols,x:Math.round(point.x),y:Math.round(point.y)});
+        // 粘贴网格携带内容：写入非空单元格与合并区（插入面板路径无 cells，不受影响）。
+        if(Array.isArray(grid.cells)){
+          for(let r=0;r<Math.min(rows,grid.cells.length);r++)for(let c=0;c<Math.min(cols,grid.cells[r]?.length||0);c++){
+            const value=grid.cells[r][c];
+            if(value)created.cells[`${r},${c}`]=String(value).slice(0,LIMITS.MAX_CELL_CHARS);
+          }
+        }
+        if(Array.isArray(grid.merges))for(const m of grid.merges)created.merges.push({row:m.row,column:m.column,rowSpan:m.rowSpan,columnSpan:m.columnSpan});
         if(!mutate([...getTables(),created],label||'插入表格'))return false;
         selectTable(id);anchor={row:0,column:0};focusCellPos=null;
         render({force:true});
