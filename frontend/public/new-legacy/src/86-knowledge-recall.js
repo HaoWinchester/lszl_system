@@ -1692,7 +1692,8 @@
     });
     window.KGRecallInk=inkController;
     // 可编辑表格：state.tables 读写 + saveProgress 持久化；历史由控制器内部命令栈承载。
-    tableController=window.KGCanvasTableController?.create?.({
+    // 表格功能暂时下线（ENABLED=false）：入口隐藏、控制器不启动，已存数据保留。
+    tableController=(window.KGCanvasTableModel?.ENABLED===false)?null:window.KGCanvasTableController?.create?.({
       trigger:$('krTableBtn'),viewport,world,
       getViewport:()=>state.transform,
       getTables:()=>state.tables||[],

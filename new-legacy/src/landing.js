@@ -47,6 +47,40 @@
     trigger.setAttribute('aria-expanded', String(Boolean(expanded)));
   }
 
+  const miniappModal = document.getElementById('landingMiniappModal');
+  const miniappModalClose = document.getElementById('landingMiniappModalClose');
+
+  function openMiniappModal() {
+    if (!miniappModal) return;
+    miniappModal.hidden = false;
+    miniappModal.setAttribute('aria-hidden', 'false');
+    miniappModal.querySelector('.landing-contact-modal')?.focus();
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeMiniappModal() {
+    if (!miniappModal) return;
+    miniappModal.hidden = true;
+    miniappModal.setAttribute('aria-hidden', 'true');
+    document.documentElement.style.overflow = '';
+    document.body.style.overflow = '';
+  }
+
+  document.querySelectorAll('[data-open-miniapp]').forEach((trigger) => {
+    trigger.addEventListener('click', (event) => {
+      event.preventDefault();
+      openMiniappModal();
+    });
+  });
+  miniappModalClose?.addEventListener('click', closeMiniappModal);
+  miniappModal?.addEventListener('click', (event) => {
+    if (event.target === miniappModal) closeMiniappModal();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && miniappModal && !miniappModal.hidden) closeMiniappModal();
+  });
+
   function openContactModal() {
     if (!contactModal) return;
     contactModal.hidden = false;

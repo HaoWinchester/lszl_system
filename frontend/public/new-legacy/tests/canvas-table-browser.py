@@ -6,7 +6,16 @@ Excel HTML 样本粘贴（起始格 + 空画布新建）、编辑态 Delete 不�
 运行：先启动 new-legacy/tests/helpers/graph_template_server.py（端口 5195），再
   python3 new-legacy/tests/canvas-table-browser.py --base-url http://127.0.0.1:5195
 """
-import argparse,json,time
+import argparse,json,sys
+# 表格功能暂时下线（ENABLED=false，入口已隐藏）：本 UI 测试同步停用，恢复功能时移除本守卫。
+sys.path.insert(0, str(__import__('pathlib').Path(__file__).resolve().parents[1] / 'src'))
+import importlib.util as _ilu
+_spec=_ilu.spec_from_file_location('tblmodel', __import__('pathlib').Path(__file__).resolve().parents[1] / 'src/canvas/table-model.js')
+# Node 模块无法在 Python 加载；改为检查同步产物中的开关标记
+_marker=(__import__('pathlib').Path(__file__).resolve().parents[2] / 'frontend/public/new-legacy/src/canvas/table-model.js').read_text(encoding='utf-8')
+if 'ENABLED=false' in _marker:
+    print('SKIP: table feature disabled (ENABLED=false)')
+    sys.exit(0),time
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 ROOT=Path(__file__).resolve().parents[2]

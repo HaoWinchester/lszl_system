@@ -21,7 +21,8 @@
     function sync(){if(previous!==state.strokes){previous=state.strokes;ink.render()}else ink.refreshControls()}
     global.KGHomeInk=Object.assign(ink,{sync});
     // 可编辑表格：共享控制器渲染 state.tables，写入经图谱历史（单次操作一次撤销）+ 自动保存。
-    if(global.KGCanvasTableController&&!global.KGHomeTables){
+    if(global.KGCanvasTableModel?.ENABLED===false){/* 表格功能暂时下线 */}
+    else if(global.KGCanvasTableController&&!global.KGHomeTables){
       const tablesController=global.KGCanvasTableController.create({
         viewport:stage,world,
         getViewport:()=>state.viewport,

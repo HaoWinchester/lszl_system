@@ -1,6 +1,9 @@
 'use strict';
 (function(global){
   // TableV1 限额：与 backend/app/schemas/canvas_table.py 保持同一语义。
+  // 表格功能暂时下线（问题较多待打磨）：三页入口与渲染均停用，已存数据保留不删。
+  // 恢复功能时改回 true 即可。
+  const ENABLED=false;
   const LIMITS=Object.freeze({
     MAX_ROWS:100,MAX_COLS:50,
     MAX_CELLS_PER_TABLE:5000,MAX_CELLS_PER_CANVAS:20000,
@@ -149,7 +152,7 @@
     return clean;
   }
 
-  const api=Object.freeze({LIMITS,create,normalize,cellCount,merge,split,paste,sanitizeCollection});
+  const api=Object.freeze({LIMITS,ENABLED,create,normalize,cellCount,merge,split,paste,sanitizeCollection});
   global.KGCanvasTableModel=api;
   if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);

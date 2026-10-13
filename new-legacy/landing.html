@@ -36,6 +36,7 @@
 
       <div class="landing-nav-wrap" id="landingNavigation" data-landing-nav>
         <nav class="landing-nav" aria-label="主要导航">
+          <a href="/practice-mode.html">做题模式</a>
           <a href="#why-huanpu">为什么选择本平台</a>
           <a href="#learning-loop">备考闭环</a>
           <a href="#product-tour">产品体验</a>
@@ -43,6 +44,7 @@
           <button class="landing-contact-btn" type="button" data-open-contact>联系我们</button>
         </nav>
         <div class="landing-header-actions">
+          <button class="landing-contact-btn" type="button" data-open-miniapp>小程序扫码</button>
           <a class="landing-login-link" href="/login">登录</a>
           <a class="landing-button landing-button-dark landing-header-cta" href="/graph">
             <span>进入知识图谱</span>
@@ -374,6 +376,17 @@
       <p class="landing-contact-modal-subtitle">账号问题、课程问题、学习问题可在二维码备注中说明。</p>
       <img class="landing-contact-modal-qrcode" src="assets/%E5%AE%A2%E6%9C%8D%E4%BA%8C%E7%BB%B4%E7%A0%81/1.jpg" alt="客服联系二维码"/>
       <p class="landing-contact-modal-tip">添加后请说明课程阶段与问题截图，客服会尽快协助处理。</p>
+    </section>
+  </div>
+
+  <div aria-hidden="true" class="landing-contact-modal-backdrop" id="landingMiniappModal" hidden>
+    <section class="landing-contact-modal" aria-label="小程序扫码" role="dialog" aria-modal="true">
+      <button class="landing-contact-modal-close" id="landingMiniappModalClose" type="button" aria-label="关闭小程序二维码弹窗">×</button>
+      <p class="landing-contact-modal-title">小程序扫码</p>
+      <p class="landing-contact-modal-subtitle">微信扫一扫，随时随地刷题与复习。</p>
+      <img class="landing-contact-modal-qrcode" src="assets/landing/miniapp-qr.png" alt="平台小程序二维码" onerror="this.style.display='none';document.getElementById('landingMiniappQrPlaceholder').style.display='flex'"/>
+      <div id="landingMiniappQrPlaceholder" style="display:none;width:220px;height:220px;margin:0 auto;border:2px dashed #cbd5e1;border-radius:16px;align-items:center;justify-content:center;text-align:center;color:#64748b;font:14px/1.6 system-ui,sans-serif;padding:16px">小程序二维码待配置<br/>（放置于 assets/landing/miniapp-qr.png）</div>
+      <p class="landing-contact-modal-tip">使用微信「扫一扫」对准二维码即可打开小程序。</p>
     </section>
   </div>
 
