@@ -1,13 +1,11 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.324",
+  "fromVersion": "v9.0-p4.1.325",
   "toVersion": "v9.0-p4.1.325",
   "changes": {
     "added": [],
     "changed": [
-      "VERSION",
-      "src/10-graph-editor.js",
-      "tests/graph-zoom-performance.test.js"
+      "content-prep-studio/dist/content-prep.html"
     ],
     "removed": []
   },
