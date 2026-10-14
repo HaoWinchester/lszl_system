@@ -1,10 +1,14 @@
 {
   "schemaVersion": 1,
   "fromVersion": "v9.0-p4.1.326",
-  "toVersion": "v9.0-p4.1.326",
+  "toVersion": "v9.0-p4.1.327",
   "changes": {
     "added": [],
-    "changed": [],
+    "changed": [
+      "VERSION",
+      "content-prep-studio/dist/content-prep.html",
+      "tests/practice-answer-sheet-browser.py"
+    ],
     "removed": []
   },
   "incompatible": []

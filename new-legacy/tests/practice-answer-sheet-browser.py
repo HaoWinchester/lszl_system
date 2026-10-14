@@ -487,23 +487,26 @@ with sync_playwright() as playwright:
       window.__revengeStats={active:1,pending:1,needsRemediation:0,verificationDue:0,mastered:0};
       window.KGPracticeMode.showLobby();
     }""")
-    page.wait_for_timeout(100)
-    # 大屏布局：试卷、题量、顺序和挑战/学霸都在左栏，右栏只保留复仇。
+    page.wait_for_timeout(500)
+    # 批准的新大厅：设置区在上，普通/挑战/学霸/复仇四种模式在下方同排。
     lobby_geometry = page.evaluate("""()=>{
       const rect=selector=>{const value=document.querySelector(selector).getBoundingClientRect();return {x:value.x,y:value.y,width:value.width,height:value.height,right:value.right}};
       return {
         setup:rect('.practice-setup-card'),order:rect('.practice-order-options'),
+        ordinary:rect('.practice-mode-card.ordinary'),
         challenge:rect('.practice-mode-card.challenge'),scholar:rect('.practice-mode-card.scholar'),
         revenge:rect('.practice-mode-card.revenge'),
         orderInsideSetup:document.querySelector('.practice-setup-card').contains(document.querySelector('[name="practiceOrder"]'))
       };
     }""")
     assert lobby_geometry["orderInsideSetup"], lobby_geometry
-    assert lobby_geometry["order"]["right"] < lobby_geometry["revenge"]["x"], lobby_geometry
-    assert lobby_geometry["challenge"]["x"] < lobby_geometry["scholar"]["x"], lobby_geometry
-    assert lobby_geometry["scholar"]["right"] < lobby_geometry["revenge"]["x"], lobby_geometry
-    assert abs(lobby_geometry["setup"]["y"] - lobby_geometry["revenge"]["y"]) < 2, lobby_geometry
-    assert lobby_geometry["challenge"]["y"] > lobby_geometry["setup"]["y"] + lobby_geometry["setup"]["height"], lobby_geometry
+    assert lobby_geometry["setup"]["x"] <= lobby_geometry["order"]["x"], lobby_geometry
+    assert lobby_geometry["order"]["right"] <= lobby_geometry["setup"]["right"], lobby_geometry
+    modes=[lobby_geometry[key] for key in ['ordinary','challenge','scholar','revenge']]
+    assert max(card['y'] for card in modes)-min(card['y'] for card in modes)<2,lobby_geometry
+    assert modes[0]['y']>lobby_geometry['setup']['y']+lobby_geometry['setup']['height'],lobby_geometry
+    assert all(first['right']<second['x'] for first,second in zip(modes,modes[1:])),lobby_geometry
+    page.locator('.practice-revenge-options summary').click()
     # 普通练习选择 60 题，复仇只有 1 题时仍自动发送 count=1。
     page.locator('label:has([name="practiceCount"][value="60"])').click()
     assert page.locator('#practiceRevengeActiveCount').inner_text() == '1'
@@ -548,6 +551,7 @@ with sync_playwright() as playwright:
     # 14 题默认 10，20 禁用，可切换为全部 14 题。
     page.evaluate("""()=>{window.__revengeStats={active:14,pending:1,needsRemediation:1,verificationDue:12,mastered:3};window.KGPracticeMode.showLobby();window.__writes=[]}""")
     page.wait_for_timeout(100)
+    assert page.locator('#practiceRevengeVerificationCount').is_visible()
     assert page.locator('#practiceRevengeActiveCount').inner_text() == '14'
     assert page.locator('#practiceRevengeVerificationCount').inner_text() == '12'
     assert page.locator('[name="practiceRevengeCount"][value="10"]').is_checked()
