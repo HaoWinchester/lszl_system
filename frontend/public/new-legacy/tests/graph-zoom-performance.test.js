@@ -31,3 +31,19 @@ test('percentage updates do not synchronously measure canvas layout',()=>{
   vm.createContext(context);vm.runInContext(fn+'updateCanvasZoomControls()',context);
   assert.equal(percent.textContent,'50%');assert.equal(slider.value,'50');assert.equal(measures,0);
 });
+
+test('endpoint binding targets and live marquee update their scale without waiting for another zoom',()=>{
+  const source=read('src/10-graph-editor.js');let syncs=0;
+  const classes=new Set(),card={classList:{add:c=>classes.add(c),remove:c=>classes.delete(c),toggle:(c,on)=>on?classes.add(c):classes.delete(c)}};
+  const context={edgeEndpointBindTargetId:'',cardElementByNodeId:()=>card,ensureGraphViewportController:()=>({syncControlScale:()=>syncs++}),Set,state:{selectedNodeId:'n',selectedElementId:null},selectedNodeIds:new Set(['n']),selectedTextElementIds:new Set(),selectedLinkIds:new Set(),textElementDomByIdValue:()=>null,updateCardQuickActions:()=>{},updateNodeGrowthHandles:()=>{}};
+  vm.createContext(context);
+  vm.runInContext(source.slice(source.indexOf('function clearEdgeEndpointBindTarget(){'),source.indexOf('function beginEdgeEndpointDrag(')),context);
+  vm.runInContext('setEdgeEndpointBindTarget({id:"n"})',context);
+  assert(classes.has('edge-endpoint-bind-target'));assert(syncs>0,'bind target must receive current scale');
+  syncs=0;vm.runInContext('clearEdgeEndpointBindTarget()',context);
+  assert(!classes.has('edge-endpoint-bind-target'));assert(syncs>0,'cleared target must release its scale override');
+  syncs=0;
+  vm.runInContext(source.slice(source.indexOf('function refreshBoxSelectionElementClasses('),source.indexOf('function applyBoxSelectionMove(')),context);
+  vm.runInContext('refreshBoxSelectionElementClasses(new Set(),new Set())',context);
+  assert(classes.has('multi-selected'));assert(syncs>0,'live marquee must immediately receive current scale');
+});

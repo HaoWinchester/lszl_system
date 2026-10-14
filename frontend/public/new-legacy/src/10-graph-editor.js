@@ -893,9 +893,9 @@ function finishEdgeMoveDrag(event,cancelled=false){
   if(!cancelled&&drag.moved){suppressEdgeClickId=drag.linkId;suppressEdgeClickUntil=performance.now()+400;save();renderSelectedEdgeControls();renderSelectedEdgeQuickStylePanel();showStatus('关系线已独立移动，两个端点已解除节点绑定；可拖动端点重新绑定。')}else if(cancelled&&drag.moved)showStatus('已取消移动关系线。');
   if(drag.moved){event.preventDefault();event.stopPropagation()}return drag.moved;
 }
-function clearEdgeEndpointBindTarget(){if(edgeEndpointBindTargetId)cardElementByNodeId(edgeEndpointBindTargetId)?.classList.remove('edge-endpoint-bind-target');edgeEndpointBindTargetId=''}
+function clearEdgeEndpointBindTarget(){if(edgeEndpointBindTargetId)cardElementByNodeId(edgeEndpointBindTargetId)?.classList.remove('edge-endpoint-bind-target');edgeEndpointBindTargetId='';ensureGraphViewportController()?.syncControlScale()}
 function edgeEndpointTargetFromClient(clientX,clientY){const element=document.elementFromPoint(clientX,clientY),card=element&&element.closest&&element.closest('.knowledge-card[data-node-id]');if(!card||!cardsLayer.contains(card))return null;const node=nodeById(card.dataset.nodeId);return node&&!isNodeFullyLocked(node)?node:null}
-function setEdgeEndpointBindTarget(node){const id=node&&String(node.id)||'';if(id===edgeEndpointBindTargetId)return;clearEdgeEndpointBindTarget();if(id){edgeEndpointBindTargetId=id;cardElementByNodeId(id)?.classList.add('edge-endpoint-bind-target')}}
+function setEdgeEndpointBindTarget(node){const id=node&&String(node.id)||'';if(id===edgeEndpointBindTargetId)return;clearEdgeEndpointBindTarget();if(id){edgeEndpointBindTargetId=id;cardElementByNodeId(id)?.classList.add('edge-endpoint-bind-target');ensureGraphViewportController()?.syncControlScale()}}
 function beginEdgeEndpointDrag(event,linkId,side){
   if(!graphModeAllows('edgeAdvanced'))return false;
   if(isCanvasPanMode()||document.body.classList.contains('auth-readonly')||event.button!==0)return;
@@ -1700,6 +1700,7 @@ function refreshBoxSelectionElementClasses(previousNodes,previousText){
   const nodeIds=new Set([...(previousNodes||[]),...selectedNodeIds]);for(const id of nodeIds){const card=cardElementByNodeId(id);if(!card)continue;card.classList.toggle('multi-selected',selectedNodeIds.has(id));card.classList.toggle('active',state.selectedNodeId===id)}
   const multiTotal=selectedNodeIds.size+selectedTextElementIds.size+selectedLinkIds.size;
   const textIds=new Set([...(previousText||[]),...selectedTextElementIds]);for(const id of textIds){const element=textElementDomByIdValue(id);if(!element)continue;const selected=state.selectedElementId===id||selectedTextElementIds.has(id);element.classList.toggle('active',selected);element.classList.toggle('multi-selected',selected&&multiTotal>1)}
+  ensureGraphViewportController()?.syncControlScale();
   updateCardQuickActions();updateNodeGrowthHandles();
 }
 function applyBoxSelectionMove(point){
