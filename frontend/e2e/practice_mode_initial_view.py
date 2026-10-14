@@ -13,7 +13,10 @@ with sync_playwright() as playwright:
         page.goto(BASE + "/practice-mode.html", wait_until="networkidle")
         page.locator(".practice-app").wait_for(state="visible")
 
-        assert page.locator("#practiceLobbyTitle").inner_text() == "选择练习模式"
+        assert page.locator("#practiceLobbyTitle").inner_text() == "开始练习"
+        assert page.locator(".practice-mode-card").count() == 4
+        page.locator(".practice-lobby-sidebar").wait_for(state="visible")
+        page.locator("#practiceRecentPanel").wait_for(state="visible")
         page.locator("#practicePaperLibrary").wait_for(state="attached")
         page.locator("#practiceHistoryOpenBtn").wait_for(state="visible")
         assert page.locator("iframe").count() == 0
