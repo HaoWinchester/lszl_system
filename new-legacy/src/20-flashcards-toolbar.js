@@ -871,14 +871,13 @@ function updateCanvasStatusChipPosition(){
 function updateCanvasZoomControls(){
   const percent=$('canvasZoomPercentBtn'),slider=$('canvasZoomSlider');
   const value=zoomPercentValue();
-  if(percent)percent.textContent=value+'%';
+  if(percent&&percent.textContent!==value+'%')percent.textContent=value+'%';
   if(slider){
     const min=Math.round(graphMinZoom()*100),max=Math.round(graphMaxZoom()*100);
     if(slider.min!==String(min))slider.min=String(min);
     if(slider.max!==String(max))slider.max=String(max);
     if(document.activeElement!==slider)slider.value=String(clamp(value,min,max));
   }
-  updateCanvasStatusChipPosition();
 }
 window.updateCanvasZoomControls=updateCanvasZoomControls;
 function showCanvasZoomSlider(show=true){
@@ -1065,10 +1064,14 @@ function initCanvasZoomDock(){
   document.addEventListener('fullscreenchange',()=>{updateCanvasFullscreenButton();setTimeout(()=>updateCanvasZoomControls(),80)});
   document.addEventListener('webkitfullscreenchange',()=>{updateCanvasFullscreenButton();setTimeout(()=>updateCanvasZoomControls(),80)});
   window.addEventListener('resize',()=>setTimeout(updateCanvasZoomControls,40));
-  if(typeof ResizeObserver==='function')new ResizeObserver(()=>updateCanvasStatusChipPosition()).observe(dock);
+  if(typeof ResizeObserver==='function'){
+    const observer=new ResizeObserver(()=>updateCanvasStatusChipPosition());
+    observer.observe(dock);observer.observe($('stage'));
+  }else window.addEventListener('resize',updateCanvasStatusChipPosition);
   document.addEventListener('keydown',e=>{if(e.key==='Escape')showCanvasZoomSlider(false)});
   document.addEventListener('keydown',handleCanvasZoomShortcut);
   updateCanvasZoomControls();
+  updateCanvasStatusChipPosition();
   updateCanvasFullscreenButton();
 }
 function selectedNodesForFitView(){

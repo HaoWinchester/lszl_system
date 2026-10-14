@@ -5,11 +5,21 @@
     const stage=options.stage,world=options.world;
     const getViewport=()=>typeof options.getViewport==='function'?options.getViewport():{x:0,y:0,scale:1};
     const minScale=Number(options.minScale)||.01,maxScale=Number(options.maxScale)||4;
-    let applyCount=0;
+    let applyCount=0,scaleTargets=new Set();
     const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
+    function syncControlScale(scale=getViewport().scale){
+      const inverse=String(1/clamp(Number(scale)||1,minScale,maxScale));
+      // Only selection chrome needs fixed screen dimensions. Updating an
+      // inherited property on world invalidates every card on every frame.
+      const targets=new Set(world?.querySelectorAll?.('.knowledge-card.active,.knowledge-card.multi-selected,.knowledge-card.node-free-resize-mode,.knowledge-card.edge-endpoint-bind-target,.graph-text-element.active,.graph-text-element.multi-selected')||[]);
+      scaleTargets.forEach(element=>{if(!targets.has(element))element.style.removeProperty('--graph-ui-inverse-scale')});
+      targets.forEach(element=>element.style.setProperty('--graph-ui-inverse-scale',inverse));
+      scaleTargets=targets;
+    }
     function apply(viewport=getViewport(),meta={}){
       if(!world)return false;
       const x=Number(viewport.x)||0,y=Number(viewport.y)||0,scale=clamp(Number(viewport.scale)||1,minScale,maxScale);
+      syncControlScale(scale);
       world.style.transform=`translate(${x}px, ${y}px) scale(${scale})`;applyCount++;
       if(meta.hideTransient&&typeof options.hideTransient==='function')options.hideTransient();
       if(typeof options.onApply==='function')options.onApply({x,y,scale,source:meta.source||'apply'});
@@ -26,7 +36,7 @@
       return{scale:next,x:clientX-rect.left-point.x*next,y:clientY-rect.top-point.y*next};
     }
     function getDiagnostics(){return{applyCount,fullRedrawCount:0}}
-    return Object.freeze({apply,screenToWorld,viewportForScaleAt,getDiagnostics,minScale,maxScale});
+    return Object.freeze({apply,syncControlScale,screenToWorld,viewportForScaleAt,getDiagnostics,minScale,maxScale});
   }
   global.KGGraphViewportController=Object.freeze({create});
 })(typeof window!=='undefined'?window:globalThis);

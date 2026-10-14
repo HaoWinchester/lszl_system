@@ -1,6 +1,7 @@
 /* V9.0-P4.3.32 — 首页图元几何选框：固定屏幕 1px、单选四角手柄、多选逐图元无手柄。 */
 .stage{--home-selection-blue:#1d6fd8}
-.stage .world{
+.stage .knowledge-card,
+.stage .graph-text-element{
   --home-selection-blue:#1d6fd8;
   --home-selection-stroke:calc(1px * var(--graph-ui-inverse-scale,1));
   --home-selection-handle:calc(8px * var(--graph-ui-inverse-scale,1));

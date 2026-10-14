@@ -4,6 +4,8 @@ import asyncio
 import json
 from uuid import uuid4
 
+import pytest
+
 from fastapi.testclient import TestClient
 from sqlalchemy import delete, func, select
 
@@ -682,7 +684,11 @@ def test_question_revision_change_requires_explicit_reset_and_viewer_is_read_onl
         asyncio.run(cleanup())
 
 
-def test_free_student_cannot_save_more_than_thirty_recall_nodes() -> None:
+@pytest.mark.parametrize('role,node_count,limit,status', [
+    ('student', 31, 30, 422),
+    ('teacher', 495, None, 200),
+])
+def test_recall_node_quota_applies_only_to_free_students(role, node_count, limit, status) -> None:
     suffix = uuid4().hex[:10]
     teacher = f"recall-limit-teacher-{suffix}"
     student = f"recall-limit-student-{suffix}"
@@ -715,19 +721,23 @@ def test_free_student_cannot_save_more_than_thirty_recall_nodes() -> None:
     asyncio.run(seed())
     try:
         with TestClient(app) as client:
-            _login(client, student)
+            _login(client, teacher if role == 'teacher' else student)
             session = client.get(f"/api/v1/recall/session/{question_id}").json()
-            assert session["nodeLimit"] == 30
+            assert session["nodeLimit"] == limit
             body = _graph_payload(session)
             body["nodes"] = [
                 {"instanceId": f"node-{index}", "dataId": f"personal:{index}", "title": str(index), "custom": True}
-                for index in range(31)
+                for index in range(node_count)
             ]
             body["customNodes"] = {
-                f"personal:{index}": {"title": str(index)} for index in range(31)
+                f"personal:{index}": {"title": str(index)} for index in range(node_count)
             }
             response = client.put(f"/api/v1/recall/progress/{question_id}", json=body)
-            assert response.status_code == 422
-            assert response.json()["detail"]["code"] == "recall_node_limit"
+            assert response.status_code == status, response.text
+            if status == 422:
+                assert response.json()["detail"]["code"] == "recall_node_limit"
+            else:
+                saved = client.get(f"/api/v1/recall/session/{question_id}").json()
+                assert len(saved['progress']['nodes']) == node_count
     finally:
         asyncio.run(cleanup())
