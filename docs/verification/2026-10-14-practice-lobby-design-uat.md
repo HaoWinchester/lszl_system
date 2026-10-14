@@ -20,4 +20,12 @@
 
 ## UAT 发布
 
-候选版本：`v9.0-p4.1.327`。发布与实际在线验证结果在部署完成后补录。仅合入并推送 `uat`，不合入 `main`；自动化自检不代替用户 UAT 业务验收。
+发布版本：`v9.0-p4.1.327`，上一版本 `v9.0-p4.1.325`。`bash deploy/update-uat.sh` 完整门禁通过、退出码0；1046项后端测试、333项前端契约、扩展契约、练习/答题卡/报告、画布、题库、会员、多题资产及源/发布视觉回归均通过。练习大厅桌面/手机视觉差异0.000%。
+
+源与候选新增4个文件（预览模块与3个测试），1115→1119，无旧文件缺失。已检查实际后端容器 `/app/frontend/new-legacy-releases/current.json`：active版本327、site1119个文件、admin-console/practice-mode/新预览模块均存在。Docker按 `backend/Dockerfile` 打包 `frontend/new-legacy-runtime`，以容器实际指针作为运行证据。
+
+公共HTTPS健康、29项小程序路由/13张表、教师助手worker和隔离转换器就绪检查通过。实际UAT HTML按本地后端既有bootstrap渲染规则校验（正常访客首屏/账号注入），CSS与3个控制模块逐字节匹配发布site。
+
+真实UAT只读业务验证：教师经验/真实目录、搜索/会员筛选、帮助、历史/收藏/报告/账号设置、390px无全页溢出及经验展开、游客四模式登录入口、退出后清空个人预览与经验；页面JavaScript错误0。未在UAT创建学习数据或试卷。证据：`artifacts/practice-lobby-redesign/uat-smoke-results.json`、`uat-desktop.png`、`uat-mobile.png`、`uat-deploy.log`。
+
+仅合入并推送 `uat`；`main`仍为 `4086a6e5`，功能分支保留。本次开发自检及UAT部署完成，等待用户本人业务验收；自动化通过不代替UAT验收。
