@@ -22,7 +22,7 @@
     remediationPending:false,verification:null,entryStartingMode:'',revengeRulePinned:false,showPreviousWrong:true,
     session:null,report:null,reviewing:false,answerSheet:null,pendingSelections:{},pendingMatches:{},casePositions:{},submitting:false,pendingRequestKey:'',resumeLookupToken:0,
     draft:null,saveError:false,coverageOverrides:{},reportNextPractice:null,revengeState:null,saves:null,reconciling:false,paperProgress:null,revengeSummary:null,
-    markedQuestions:new Set(),showAnswers:false
+    markedQuestions:new Set(),showAnswers:false,instantFeedback:true
   };
 
   function clone(value){try{return JSON.parse(JSON.stringify(value))}catch(error){return value}}
@@ -206,7 +206,7 @@
   }
   function runtimeState(){
     const remainingMs=state.mode==='scholar'?Math.max(0,state.deadline-Date.now()):undefined;
-    const runtime={currentIndex:Math.max(0,state.index),health:Math.max(0,Number(state.health)||0),streak:Math.max(0,Number(state.streak)||0),maxStreak:Math.max(0,Number(state.maxStreak)||0),experience:Math.max(0,Number(state.experience)||0),durationMs:elapsed(),languageMode:languageMode(),autoExplain:autoExplainEnabled(),order:text(state.order||'paper'),showAnswers:!!state.showAnswers,markedQuestionIds:[...state.markedQuestions].map(text)};
+    const runtime={currentIndex:Math.max(0,state.index),health:Math.max(0,Number(state.health)||0),streak:Math.max(0,Number(state.streak)||0),maxStreak:Math.max(0,Number(state.maxStreak)||0),experience:Math.max(0,Number(state.experience)||0),durationMs:elapsed(),languageMode:languageMode(),autoExplain:autoExplainEnabled(),order:text(state.order||'paper'),showAnswers:!!state.showAnswers,instantFeedback:state.instantFeedback!==false,markedQuestionIds:[...state.markedQuestions].map(text)};
     runtime.pendingSelections=clone(state.pendingSelections);runtime.pendingMatches=clone(state.pendingMatches);
     if(remainingMs!==undefined)runtime.remainingMs=Math.round(remainingMs);
     if(state.mode==='revenge'&&state.revengeState)runtime.revengeState=clone(state.revengeState);
@@ -217,6 +217,7 @@
     // 交卷后 / 复盘页才消费服务器冻结结果（state.session.answers 已被完成态覆盖）。
     const draftView=state.reviewing?null:(state.draft?.viewAnswers?.()||null);
     const base=state.session?normalizedSession(state.session):{mode:state.mode,questions:draftQuestions(),answers:{}};
+    base.runtimeState={...base.runtimeState,instantFeedback:state.instantFeedback!==false};
     if(draftView&&!state.reviewing)return {...base,answers:draftView,reviewOnly:false};
     return {...base,reviewOnly:state.reviewing};
   }
@@ -567,7 +568,7 @@
       try{
         const api=practiceApi(),session=await api.getSession(sessionId),report=await api.getReport(sessionId);
         state.session=normalizedSession(session);state.questions=sessionQuestions(state.session);state.report=clone(report);state.mode=session.mode;state.active=false;state.reviewing=false;state.lastSettings={paperId:session.paperId,count:state.questions.length,order:text(session.runtimeState?.order||'paper'),mode:session.mode};
-        state.markedQuestions=new Set();state.showAnswers=false;
+        state.markedQuestions=new Set();state.showAnswers=false;state.instantFeedback=true;
         closeHistoryDrawer();renderFrozenReport();setView('result');return true;
       }catch(error){showToast('成绩报告暂时无法打开，请稍后重试。');return false}
     });
@@ -660,13 +661,13 @@
   }
   // runtimeState.autoExplain 按旧契约继续上报（后端白名单仍接受该字段），
   // 仅普通练习读取解析开关；挑战/学霸作答期间禁止展示解析。
-  function modePolicy(){return global.KGPracticeModePolicy.forMode(state.mode,{reviewOnly:state.reviewing})}
+  function modePolicy(){return global.KGPracticeModePolicy.forMode(state.mode,{reviewOnly:state.reviewing,instantFeedback:state.instantFeedback})}
   function shouldShowExplanation(){return state.mode==='revenge'||(modePolicy().canExplain&&(state.reviewing||autoExplainEnabled()))}
   function autoExplainEnabled(){
     try{return global.KGActivitySchemaV1?.getPracticeAutoExplain?.()!==false}catch(error){return true}
   }
   // 显示答案是会话内状态（runtimeState.showAnswers），不是跨卷全局偏好。
-  function showAnswersEnabled(){return state.mode==='practice'&&!state.reviewing&&state.showAnswers===true}
+  function showAnswersEnabled(){return state.mode==='practice'&&!state.reviewing&&modePolicy().showCorrectness&&state.showAnswers===true}
   function currentPracticeQuestion(){
     return state.verification?.active?state.verification.question:state.questions[state.index];
   }
@@ -814,6 +815,7 @@
     const practiceAnswered=savedAnswer?{selected:answerSelectedIds(savedAnswer),correct:savedAnswer.correct===true}:null;
     state.locked=false;dom.feedback.hidden=true;hideRemediation();dom.questionCard.classList.remove('is-timeout');
     if($('practiceExplanationPanel')){$('practiceExplanationPanel').hidden=true;global.KGQuestionComments?.teardownSource?.('danmaku');}
+    if(!modePolicy().showCorrectness){const head=$('practiceExplanationHead'),body=$('practiceExplanationBody');if(head){head.textContent='';head.className='practice-explanation-head';}if(body)body.innerHTML='';dom.feedback.textContent='';}
     const view=questionLanguageView(question);
     if(view){
       dom.questionStem.innerHTML=escapeHTML(languageText(view.stem))+englishLine(view.stem);
@@ -877,10 +879,14 @@
     const navMode=state.active;
     const toggle=$('practiceExplanationToggle'),input=$('practiceAutoExplain');
     if(toggle)toggle.hidden=state.mode!=='practice'||state.reviewing;
-    if(input)input.checked=autoExplainEnabled();
+    if(input){input.checked=autoExplainEnabled();input.disabled=!modePolicy().showCorrectness;}
     const showAnswersToggle=$('practiceShowAnswersToggle'),showAnswersInput=$('practiceShowAnswers');
     if(showAnswersToggle)showAnswersToggle.hidden=state.mode!=='practice'||state.reviewing;
-    if(showAnswersInput)showAnswersInput.checked=showAnswersEnabled();
+    if(showAnswersInput){showAnswersInput.checked=state.showAnswers===true;showAnswersInput.disabled=!modePolicy().showCorrectness;}
+    const instantToggle=$('practiceInstantFeedbackToggle'),instantInput=$('practiceInstantFeedback'),hint=$('practiceInstantFeedbackHint');
+    if(instantToggle)instantToggle.hidden=state.mode!=='practice'||state.reviewing;
+    if(instantInput)instantInput.checked=state.instantFeedback!==false;
+    if(hint)hint.hidden=state.mode!=='practice'||state.reviewing||modePolicy().showCorrectness;
     if(dom.previousWrongToggle)dom.previousWrongToggle.hidden=state.mode!=='revenge'||state.reviewing||!!state.verification?.active;
     if(dom.showPreviousWrong)dom.showPreviousWrong.checked=state.showPreviousWrong;
     dom.questionNav.hidden=!navMode;
@@ -926,8 +932,10 @@
   function revealOptionResult(selectedIds,correctIds){
     const selected=new Set(Array.isArray(selectedIds)?selectedIds.map(text):[text(selectedIds)].filter(Boolean)),correct=new Set(Array.isArray(correctIds)?correctIds.map(text):[text(correctIds)].filter(Boolean));
     dom.options.querySelectorAll('[data-option-id]').forEach(button=>{
-      button.classList.remove('is-correct','is-wrong','is-pending');
+      button.classList.remove('is-correct','is-wrong','is-pending','is-selected');
       const optionId=text(button.dataset.optionId);
+      button.setAttribute('aria-pressed',selected.has(optionId)?'true':'false');
+      if(!modePolicy().showCorrectness){if(selected.has(optionId))button.classList.add('is-selected');return;}
       if(correct.has(optionId))button.classList.add('is-correct');
       else if(selected.has(optionId))button.classList.add('is-wrong');
     });
@@ -1014,14 +1022,14 @@
       const beforeSeconds=state.mode==='scholar'?remainingSeconds():0;
       if(state.mode==='scholar')setScholarSeconds(Math.min(SCHOLAR_MAX_SECONDS,beforeSeconds+20));
       const gainedSeconds=state.mode==='scholar'?Math.max(0,remainingSeconds()-beforeSeconds):0;
-      if(state.streak>=3)showStreakPop('连胜 ×'+state.streak+(bonus?' · +'+bonus+' 经验':'')+(healed?' · +1 ♥':''));
-      showFeedback('正确'+(state.mode==='scholar'?(gainedSeconds?' · +'+gainedSeconds+' 秒':' · 时间已满'):'')+' · +'+(10+bonus)+' 经验','success');
+      if(modePolicy().showCorrectness&&state.streak>=3)showStreakPop('连胜 ×'+state.streak+(bonus?' · +'+bonus+' 经验':'')+(healed?' · +1 ♥':''));
+      if(modePolicy().showCorrectness)showFeedback('正确'+(state.mode==='scholar'?(gainedSeconds?' · +'+gainedSeconds+' 秒':' · 时间已满'):'')+' · +'+(10+bonus)+' 经验','success');
     }else{
       state.streak=0;hideStreakPop();if(state.mode!=='practice')state.health=Math.max(0,state.health-1);
       if(state.mode==='scholar'){
         const after=Math.max(0,remainingSeconds()-20);setScholarSeconds(after>0?after:(state.health>0?40:0));
         showFeedback('错误 · -20 秒 · -1 ♥','danger');
-      }else showFeedback(state.mode==='practice'?'回答错误':'失误 · -1 ♥','danger');
+      }else if(modePolicy().showCorrectness)showFeedback(state.mode==='practice'?'回答错误':'失误 · -1 ♥','danger');
     }
     renderHealth();
     state.feedbackTimer=global.setTimeout(advanceAfterAnswer,FEEDBACK_DELAY);
@@ -1176,6 +1184,7 @@
     state.pendingSelections=clone(runtime.pendingSelections||{});state.pendingMatches=clone(runtime.pendingMatches||{});
     state.markedQuestions=new Set(Array.isArray(runtime.markedQuestionIds)?runtime.markedQuestionIds.map(text):[]);
     state.showAnswers=state.mode==='practice'&&runtime.showAnswers===true;
+    state.instantFeedback=runtime.instantFeedback!==false;
     // 服务端已冻结题序；题目、答题卡和 currentIndex 共用该顺序，不能再次洗牌。
     state.order=['paper','random'].includes(runtime.order)?runtime.order:(state.order||'paper');
     state.index=Math.max(0,Math.min(state.questions.length-1,Number(runtime.currentIndex)||0));
@@ -1252,7 +1261,7 @@
         if(state.order==='random')questions=shuffle(questions);
         if(state.retiredNavigation)questions=prioritizeRetiredQuestion(questions,state.retiredNavigation.questionId);
         state.questions=questions.slice(0,count);state.pendingSelections={};state.pendingMatches={};
-        state.markedQuestions=new Set();state.showAnswers=false;
+        state.markedQuestions=new Set();state.showAnswers=false;state.instantFeedback=true;
         state.index=0;state.maxHealth=state.mode==='challenge'?challengeInitialHealth(state.questions.length):state.mode==='scholar'?scholarInitialHealth(state.questions.length):MAX_HEALTH;state.health=state.maxHealth;state.challengeFailedShown=false;state.streak=0;state.maxStreak=0;state.experience=0;state.correct=0;state.answered=0;state.startedAt=Date.now();state.endedAt=0;state.locked=false;state.active=true;state.completed=false;state.abandonedRecorded=false;
         createDraft(null);
         if(state.mode==='challenge'||state.mode==='scholar')showToast('答完全部题目将自动交卷；做错的题（含中途退出时已答的）都会记入复仇模式。');
@@ -1594,6 +1603,7 @@
     const autoExplain=$('practiceAutoExplain');
     autoExplain?.addEventListener('change',()=>{global.KGActivitySchemaV1?.setPracticeAutoExplain?.(autoExplain.checked);renderQuestion()});
     // 显示答案开关（会话态，随保存落库）；标记按钮只改本地状态与答题卡。
+    $('practiceInstantFeedback')?.addEventListener('change',event=>{state.instantFeedback=event.target.checked===true;hideStreakPop();state.draft?.markDirty?.();renderQuestion();renderSaveStatus()});
     $('practiceShowAnswers')?.addEventListener('change',event=>{state.showAnswers=event.target.checked===true;renderQuestion()});
     $('practiceMarkToggle')?.addEventListener('click',()=>toggleQuestionMark());
     // 标记区工具：评论直开底部讨论抽屉；弹幕开关切换本机偏好并同步按钮文案。

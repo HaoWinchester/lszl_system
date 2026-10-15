@@ -4,7 +4,7 @@
   const RUNTIME_FIELDS = Object.freeze([
     'currentIndex', 'health', 'streak', 'maxStreak', 'experience',
     'remainingMs', 'durationMs', 'languageMode', 'autoExplain',
-    'order', 'showAnswers', 'markedQuestionIds', 'pendingSelections', 'pendingMatches',
+    'order', 'instantFeedback', 'showAnswers', 'markedQuestionIds', 'pendingSelections', 'pendingMatches',
   ])
 
   function clone(value, fallback) {
@@ -20,6 +20,7 @@
     const runtimeState = source.runtimeState && typeof source.runtimeState === 'object'
       ? clone(source.runtimeState, {})
       : {}
+    runtimeState.instantFeedback = runtimeState.instantFeedback !== false
     const maximumIndex = Math.max(0, questions.length - 1)
     const requestedIndex = Number(runtimeState.currentIndex)
     runtimeState.currentIndex = Number.isInteger(requestedIndex)

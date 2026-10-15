@@ -45,6 +45,7 @@ RUNTIME_FIELDS = RUNTIME_INTEGER_FIELDS | {
     "revengeState",
     "order",
     "showAnswers",
+    "instantFeedback",
     "markedQuestionIds",
     "pendingSelections",
     "pendingMatches",
@@ -1254,6 +1255,10 @@ def _validated_runtime_state(data: dict, *, question_count: int) -> dict:
                 field="order",
             )
         state["order"] = raw["order"]
+    if "instantFeedback" in raw:
+        if not isinstance(raw["instantFeedback"], bool):
+            raise _error(422, "INVALID_RUNTIME_STATE_VALUE", "instantFeedback 必须是布尔值", field="instantFeedback")
+        state["instantFeedback"] = raw["instantFeedback"]
     if "showAnswers" in raw:
         if not isinstance(raw["showAnswers"], bool):
             raise _error(

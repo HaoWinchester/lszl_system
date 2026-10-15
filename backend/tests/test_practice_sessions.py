@@ -1668,6 +1668,7 @@ def test_session_runtime_state_accepts_order_show_answers_and_marked_question_id
                 "durationMs": 5000,
                 "order": "random",
                 "showAnswers": True,
+                "instantFeedback": False,
                 "markedQuestionIds": ["q1", "q2", "q1", "q3"],
             }
             saved = client.patch(
@@ -1680,6 +1681,7 @@ def test_session_runtime_state_accepts_order_show_answers_and_marked_question_id
             assert saved_session["runtimeState"]["markedQuestionIds"] == ["q1", "q2", "q3"]
             assert saved_session["runtimeState"]["order"] == "random"
             assert saved_session["runtimeState"]["showAnswers"] is True
+            assert saved_session["runtimeState"]["instantFeedback"] is False
 
             # pause → enter resumed 链路字段存活
             assert client.post(
@@ -1702,11 +1704,13 @@ def test_session_runtime_state_accepts_order_show_answers_and_marked_question_id
             assert body["session"]["id"] == started["id"]
             assert body["session"]["runtimeState"]["order"] == "random"
             assert body["session"]["runtimeState"]["showAnswers"] is True
+            assert body["session"]["runtimeState"]["instantFeedback"] is False
             assert body["session"]["runtimeState"]["markedQuestionIds"] == ["q1", "q2", "q3"]
 
             for field, value in {
                 "order": "weakest",
                 "showAnswers": 1,
+                "instantFeedback": 0,
                 "markedQuestionIds": "q1",
                 "markedQuestionIds": [42],
                 "markedQuestionIds": [""],
@@ -4023,3 +4027,42 @@ def test_experience_summary_ignores_forged_old_events_and_keeps_delta_dates(clie
     assert daily[now_utc().astimezone().date().isoformat()] == 10
     assert client.delete('/api/v1/learning/practice/sessions').status_code == 200
     assert client.get('/api/v1/learning/practice/experience-summary').json()['totalExperience'] == 20
+
+
+@pytest.mark.parametrize("value", [False, True])
+def test_instant_feedback_runtime_boolean(value):
+    assert practice_session_service._validated_runtime_state(
+        {"runtimeState": {"instantFeedback": value}}, question_count=10
+    )["instantFeedback"] is value
+
+
+@pytest.mark.parametrize("value", [0, 1, "false", None, [], {}])
+def test_instant_feedback_runtime_rejects_non_boolean(value):
+    with pytest.raises(practice_session_service.PracticeSessionError) as caught:
+        practice_session_service._validated_runtime_state(
+            {"runtimeState": {"instantFeedback": value}}, question_count=10
+        )
+    assert caught.value.status_code == 422
+
+
+@pytest.mark.parametrize("instant_feedback", [False, True])
+def test_instant_feedback_does_not_change_authoritative_grading(client, practice_ids, instant_feedback):
+    started = client.post('/api/v1/learning/practice/sessions/start', json={
+        'paperId': practice_ids['paper'], 'releaseId': practice_ids['release'],
+        'mode': 'practice', 'count': 10, 'order': 'paper',
+    })
+    assert started.status_code == 200, started.text
+    session = started.json()['session']
+    qids = [ref['questionId'] for ref in session['questions']]
+    completed = client.post(f"/api/v1/learning/practice/sessions/{session['id']}/complete", json={
+        'revision': session['revision'],
+        'runtimeState': {'instantFeedback': instant_feedback},
+        'answers': {qids[0]: {'selectedAnswer': 'A', 'selectionIndex': 1},
+                    qids[1]: {'selectedAnswer': 'B', 'selectionIndex': 2}},
+    })
+    assert completed.status_code == 200, completed.text
+    result = completed.json()['session']
+    assert result['runtimeState']['instantFeedback'] is instant_feedback
+    assert result['stats']['correct'] == 1
+    assert result['stats']['wrong'] == 1
+    assert result['stats']['experience'] == 10
