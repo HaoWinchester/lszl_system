@@ -739,6 +739,7 @@ window.KGHomeToolbarActions={
   zoomIn:()=>zoomAtCenterStep(1),
   zoomOut:()=>zoomAtCenterStep(-1),
   openTemplate:()=>window.KGGraphTemplateCenter.open(),
+  openGraphQuestionBatch:()=>openGraphQuestionBatch(),
   toggleFocus:toggleFocusMode,
   togglePointerMode:()=>toggleGraphPointerMode(),
   toggleFlowMode:()=>toggleFlowMode(),

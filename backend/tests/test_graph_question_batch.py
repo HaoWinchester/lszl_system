@@ -113,3 +113,27 @@ def test_matches_text_values_not_json_field_names_and_splits_keywords(data):
         r=preview(c,file,ids=['n','nested']);assert r.status_code==200,r.text
         a,b=r.json()['cards'];assert not a['questions']
         assert d.q in {q['id'] for q in b['questions']}
+
+
+def test_capacity_and_resource_failure_leave_no_partial_bindings(data,monkeypatch):
+    from app.models.graph_question import GraphQuestionBinding
+    from app.services import graph_question_service as service
+    from fastapi import HTTPException
+    d=data
+    with TestClient(app) as c:
+        login(c,d,'teacher');file=setup_graph(c,d)
+        async def fill():
+            async with AsyncSessionLocal() as db:
+                for i in range(100):db.add(GraphQuestionBinding(id=d.q+str(i),owner_id=d.teacher,file_id=file,node_id='n',question_id='capacity-'+str(i),question_revision=1,source_version='capacity',order_index=i,created_by=d.teacher,snapshot={'title':'existing','options':[]}))
+                await db.commit()
+        asyncio.run(fill());r=preview(c,file,ids=['n']);assert r.status_code==200,r.text
+        assert r.json()['cards'][0]['existingCount']==100 and not r.json()['cards'][0]['questions']
+        # A later frozen-resource failure must roll back an earlier inserted grant.
+        file=setup_graph(c,d);r=preview(c,file);assert r.status_code==200,r.text;p=r.json()
+        original=service.freeze_source
+        async def fail_later(db,qid):
+            if qid==d.multi:raise HTTPException(409,detail='资源版本已变化')
+            return await original(db,qid)
+        monkeypatch.setattr(service,'freeze_source',fail_later)
+        assert apply(c,file,p).status_code==409
+        assert c.get(path(file)).json()['bindings']==[]
