@@ -19,6 +19,14 @@
 
 ## 发布状态
 
-待完整门禁通过后合入并推送 `uat`，使用 `bash deploy/update-uat.sh` 部署。部署前 UAT 实际容器版本 327、site 1119 文件；首候选 1127 文件，无旧文件缺失、关键页面存在。
+2026-10-15 已合入并推送 `uat`，部署提交 `8f23e3488ab854c97e52494862da3447046aa2a6`，已用远端引用核对。标准 `bash deploy/update-uat.sh` 退出 0，总耗时 70 秒；复用同输入的成功完整验证。运行地址：<https://uat.aihuanpu.com>。
+
+- 容器实际 `/app/frontend/new-legacy-releases/current.json` 与公网版本均为 **v9.0-p4.1.329**，上一版本 327。site 文件 1119 → 1127，无旧文件缺失，admin-console 与新增 edge-bundle 模块存在。
+- 应用与 PostgreSQL 健康正常；小程序 29 路由/13 张表就绪、教师助手 worker/隔离转换器检查通过；历史试卷回填通过。远端 `.deploy-state/git-commit` 与部署提交一致。
+- 公网 5 张业务页的版本均为 329，管理页游客请求返回预期 403；18 个关键 JS/CSS 与本地不可变 site 字节及 SHA-256 一致。
+- Chrome 公网访客冒烟覆盖图谱、练习大厅、多题、回忆四页，页面 JavaScript 错误 0；大厅四模式仍存在。公网核验不创建业务测试数据。
+- 本地证据：`artifacts/uat-canvas-deploy-329.log`、`artifacts/uat-canvas-public-smoke.json`、`artifacts/uat-canvas-329-inventory.json`、`frontend/new-legacy-releases/v9.0-p4.1.329/validation.json`、各专项 `uat-canvas-*.log`。
+
+部署后同步报告与本记录提交至 uat；运行代码基线仍准确记录上述部署提交。功能分支保留。
 
 尚未用户 UAT 验收；main 保持 `4086a6e5`。
