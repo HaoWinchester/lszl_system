@@ -235,11 +235,40 @@ function invalidateGraphIndexCache(){graphIndexCache=null;graphIndexStateRef=nul
 function linkEndpointPointKey(side){return side==='from'?'fromPoint':'toPoint'}
 function linkEndpointNode(link,side,nodeMap=null){const id=side==='from'?link&&link.from:link&&link.to;return id?(nodeMap?nodeMap.get(id):nodeById(id)):null}
 function linkEndpointFreePoint(link,side){return normalizedEdgePoint(link&&link[linkEndpointPointKey(side)])}
-function linkRenderPoints(link,nodeMap=null,options={}){
+function rawLinkRenderPoints(link,nodeMap=null,options={}){
   if(!link)return null;
   const aNode=linkEndpointNode(link,'from',nodeMap),bNode=linkEndpointNode(link,'to',nodeMap),freeA=linkEndpointFreePoint(link,'from'),freeB=linkEndpointFreePoint(link,'to');
   const ca=aNode?nodeCenter(aNode,options):freeA,cb=bNode?nodeCenter(bNode,options):freeB;if(!ca||!cb)return null;
   const a=aNode?nodeOutlinePoint(aNode,cb,link.fromPort,options):ca,b=bNode?nodeOutlinePoint(bNode,ca,link.toPort,options):cb;return{a,b,ca,cb,aNode,bNode};
+}
+// 多线汇总自动重叠：端点收拢覆盖（render-only，见 graph/edge-bundle.js）。
+// 仅在主图谱索引上生效；临时相关画布（独立 nodeMap / ignoreGather）与显式端口不受影响。
+function linkRenderPoints(link,nodeMap=null,options={}){
+  const points=rawLinkRenderPoints(link,nodeMap,options);if(!points)return null;
+  if(options.ignoreGather||nodeMap!==mainGraphNodeMap())return points;
+  const override=currentEdgeBundlePlan()?.endpoints?.get(String(link?.id));
+  return{...points,mainGraph:true,a:override?.from||points.a,b:override?.to||points.b};
+}
+let edgeBundleMemo={time:0,plan:null};
+function mainGraphNodeMap(){if(typeof getGraphIndex!=='function')return null;try{return getGraphIndex().nodeMap}catch(_){return null}}
+function currentEdgeBundlePlan(){
+  if(typeof window==='undefined'||!window.KGGraphEdgeBundle?.plan)return null;
+  if(typeof isLargeGraphMode==='function'&&isLargeGraphMode())return null;
+  const links=(typeof state!=='undefined'&&state&&Array.isArray(state.links))?state.links:null;
+  if(!links||links.length>600)return null;
+  const now=typeof Date!=='undefined'&&Date.now?Date.now():0;
+  if(edgeBundleMemo.plan&&now-edgeBundleMemo.time<16)return edgeBundleMemo.plan;
+  const items=[];
+  const hasExplicitPort=value=>!!value&&value!=='auto'; // 'auto' 是归一化默认值，等同于未指定端口
+  for(const candidate of links){
+    if(!candidate?.id)continue;
+    const points=rawLinkRenderPoints(candidate);if(!points)continue;
+    items.push({id:String(candidate.id),fromId:candidate.from,toId:candidate.to,a:points.a,b:points.b,ca:points.ca,cb:points.cb,
+      hasFromPort:hasExplicitPort(candidate.fromPort),hasToPort:hasExplicitPort(candidate.toPort),pathStyle:pathStyleForLink(candidate),
+      hasStoredWaypoints:normalizedEdgePoints(candidate.waypoints,12).length>0});
+  }
+  edgeBundleMemo={time:now,plan:window.KGGraphEdgeBundle.plan(items)};
+  return edgeBundleMemo.plan;
 }
 function setLinkFreeEndpoint(link,side,point){if(!link)return;const key=linkEndpointPointKey(side),clean=normalizedEdgePoint(point);if(side==='from')link.from='';else link.to='';if(clean)link[key]=clean;else delete link[key]}
 function bindLinkEndpoint(link,side,nodeId){if(!link)return false;const node=nodeById(nodeId);if(!node)return false;const other=side==='from'?link.to:link.from;if(other&&other===node.id)return false;if(side==='from')link.from=node.id;else link.to=node.id;delete link[linkEndpointPointKey(side)];return true}
@@ -327,7 +356,11 @@ function linkPathGeometry(link,a,b,points=null){
   const fixedStart=window.KGGraphEdgeGeometry.portDirection(link?.fromPort),fixedEnd=window.KGGraphEdgeGeometry.portDirection(link?.toPort);
   const detour=fixedStart||fixedEnd?null:overlappingProjectionWaypoints(start,end,points,direction);
   if(style==='elbow'){
-    const stored=normalizedEdgePoints(link&&link.waypoints,12),waypoints=stored.length?stored:(detour||defaultElbowWaypoints(start,end,direction)),samples=[start,...waypoints,end];
+    const stored=normalizedEdgePoints(link&&link.waypoints,12),derived=!stored.length&&!detour;
+    let waypoints=stored.length?stored:(detour||defaultElbowWaypoints(start,end,direction));
+    // 多线汇总：自动派生的折线中间段吸附到共享通道坐标，使近似平行的主干段完全重合（不回写持久数据）。
+    if(derived&&points?.mainGraph){const channel=currentEdgeBundlePlan()?.channels?.get(String(link?.id));if(Number.isFinite(channel)){const axis=Math.abs(end.x-start.x)>=Math.abs(end.y-start.y)?'x':'y';waypoints=waypoints.map(p=>({...p,[axis]:channel}))}}
+    const samples=[start,...waypoints,end];
     return{style,d:edgePathFromPoints(samples),samples,bounds:edgeGeometryBounds(samples),endpoints:[start,end],controls:waypoints.map((point,index)=>({kind:'waypoint',index,x:point.x,y:point.y})),derivedWaypoints:!stored.length};
   }
   const stored=normalizedEdgePoints(link&&link.curveControls,2),controls=stored.length===2?stored:defaultCurveControls(start,end,direction);

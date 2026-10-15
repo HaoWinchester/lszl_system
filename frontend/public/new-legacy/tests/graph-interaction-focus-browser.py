@@ -224,7 +224,8 @@ def main():
             assert ctx.request.put(base+'/api/v1/files/current',data={'fileId':files[1]['id']}).ok
             reload()
             page.evaluate("state.selectedLinkId='ab';state.selectedNodeId=null;selectedNodeIds.clear();refreshSelectionUI()");page.wait_for_timeout(200)
-            page.locator('[data-uc-edge-panel="line"]').click();page.locator('[data-uc-edge-path="elbow"]').click()
+            # 与快速面板 onPathStyle 同一入口；避免浮动面板点击引发祖先滚动干扰坐标。
+            page.evaluate('applyPathStyle("elbow")')
             def elbow_waypoints():
                 return page.evaluate('''()=>{const link=state.links.find(l=>l.id==='ab');return{stored:(link.waypoints||[]).map(p=>({...p})),controls:edgeDomById.get('ab').geometry.controls.map(p=>({x:p.x,y:p.y})),style:link.pathStyle}}''')
             seeded=elbow_waypoints();assert seeded['style']=='elbow' and len(seeded['controls'])==2,seeded

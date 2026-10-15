@@ -75,6 +75,7 @@
         "src/graph/graph-model.js",
         "src/graph/xmind-import-controller.js",
         "src/graph/edge-geometry.js",
+        "src/graph/edge-bundle.js",
         "src/graph/card-style-registry.js",
         "src/graph/graph-persistence.js",
         "src/graph/history-controller.js",
