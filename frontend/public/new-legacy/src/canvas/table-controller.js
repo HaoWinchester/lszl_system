@@ -19,6 +19,8 @@
   const model=()=>global.KGCanvasTableModel;
   const clipboard=()=>global.KGCanvasTableClipboard;
   const LIMITS=Object.freeze({MIN_SIZE:28,MOVE_BAR:16,HANDLE:9,GRID_MAX:10,ROWS_MAX:100,COLS_MAX:50});
+  // 表格功能暂时下线的总开关兜底：即使页面漏掉 gate，所有入口在这里再次短路。
+  const disabled=()=>model()?.ENABLED===false;
 
   // —— 纯函数（Node 单测覆盖） ——
 
@@ -611,7 +613,7 @@
       return false;
     }
     listen(doc,'paste',event=>{
-      if(readonly()||drag)return;
+      if(disabled()||readonly()||drag)return;
       if(global.KGCanvasDomInteraction?.isEditingTarget?.(event))return; // 编辑态：文本优先
       if(!selectedTableId&&getTables().length>0)return; // 既有页面粘贴语义优先
       // 只接管表格状数据（≥2 格）；1×1 纯文本/图谱片段放行页面语义（卡牌复制粘贴不受影响）。
@@ -645,6 +647,7 @@
       }catch(error){status(error?.message||'插入表格失败');return false}
     }
     function insert(rows,cols){
+      if(disabled())return false;
       if(readonly()){status('当前画布只读，不能插入表格');return false}
       const r=clampGridCount(rows,LIMITS.ROWS_MAX),c=clampGridCount(cols,LIMITS.COLS_MAX);
       if(!r||!c){status(`请输入 1 以上的行列数（最大 ${LIMITS.ROWS_MAX} 行 × ${LIMITS.COLS_MAX} 列）`);return false}
@@ -706,6 +709,7 @@
       });
     }
     function openInsertPanel(anchorEl){
+      if(disabled())return;
       if(readonly()){status('当前画布只读，不能插入表格');return}
       buildInsertPanel();
       if(!unmountInsertPanel&&global.KGCanvasDomInteraction?.mountOverlay)unmountInsertPanel=global.KGCanvasDomInteraction.mountOverlay(insertPanel,options.overlayHost||doc.body);

@@ -5825,7 +5825,8 @@
     });
     global.KGWorkspaceInk=state.ink;
     // 可编辑表格：workspace.tables 经 65 store 直写；历史并入 kernel 命令栈（与卡牌/笔迹共用撤销）。
-    state.tablesController=global.KGCanvasTableController?.create?.({
+    // 表格功能暂时下线（ENABLED=false）：入口隐藏、控制器不启动，已存数据保留。
+    state.tablesController=(global.KGCanvasTableModel?.ENABLED===false)?null:global.KGCanvasTableController?.create?.({
       viewport:state.viewport,world:state.world,
       getViewport:()=>({x:state.panX,y:state.panY,scale:state.zoom}),
       getTables:()=>state.workspace?.tables||[],

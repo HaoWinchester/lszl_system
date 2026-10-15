@@ -84,3 +84,21 @@ test('共享控制器源码不直接请求业务 API，三页接入均复用同�
     assert.ok(text.includes('KGCanvasTableController'),`${page} 未接入共享表格控制器`);
   }
 });
+
+test('表格功能下线（ENABLED=false）：三页控制器均不启动，控制器入口全部短路',()=>{
+  assert.equal(model.ENABLED,false,'下线开关必须保持 false（恢复功能时才改回 true）');
+  const controllerSource=fs.readFileSync(path.join(__dirname,'../src/canvas/table-controller.js'),'utf8');
+  // 防御兜底：插入面板/插入/粘贴三大入口在 disabled() 时短路，页面漏 gate 也不可唤醒。
+  assert.match(controllerSource,/function openInsertPanel\(anchorEl\)\{\s*if\(disabled\(\)\)return;/);
+  assert.match(controllerSource,/function insert\(rows,cols\)\{\s*if\(disabled\(\)\)return false;/);
+  assert.match(controllerSource,/listen\(doc,'paste',event=>\{\s*if\(disabled\(\)\|\|readonly\(\)\|\|drag\)return;/);
+  // 三页接入都必须在创建控制器前检查 ENABLED（下线时不启动控制器）。
+  for(const [page,marker] of [
+    ['../src/canvas/95-home-canvas-tools.js','KGCanvasTableModel?.ENABLED===false'],
+    ['../src/86-knowledge-recall.js','KGCanvasTableModel?.ENABLED===false)?null'],
+    ['../src/77-multi-question-workspace.js','KGCanvasTableModel?.ENABLED===false)?null'],
+  ]){
+    const text=fs.readFileSync(path.join(__dirname,page),'utf8');
+    assert.ok(text.includes(marker),`${page} 缺少下线 gate：${marker}`);
+  }
+});
