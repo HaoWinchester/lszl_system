@@ -3,7 +3,10 @@
   "fromVersion": "v9.0-p4.1.322",
   "toVersion": "v9.0-p4.1.322",
   "changes": {
-    "added": [],
+    "added": [
+      "tests/help-card-auto-close-browser.py",
+      "tests/help-card-auto-close.test.js"
+    ],
     "changed": [],
     "removed": []
   },
