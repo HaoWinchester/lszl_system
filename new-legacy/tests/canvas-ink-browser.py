@@ -127,7 +127,19 @@ def check_page(context,base,kind):
     page.mouse.down(button='right');page.mouse.up(button='right')
     expect(tool.locator('[data-ink-tool=select]')).to_have_attribute('aria-pressed','true')
     record(kind+': double right-click within 400ms exits pen mode')
-    tool.locator('[data-ink-tool=pen]').click()
+    # 非绘画态悬浮红框提醒保留；画笔激活时写画经过卡牌不再闪红框。
+    # has_touch 的测试环境匹配不到 (hover:hover)，媒体查询不成立时跳过该视觉断言。
+    if page.evaluate('matchMedia("(hover:hover) and (pointer:fine)").matches'):
+        hover_x=before['x']+before['width']/2;hover_y=before['y']+before['height']/2
+        page.mouse.move(hover_x,hover_y);page.wait_for_timeout(120)
+        assert page.locator(card).evaluate('el=>getComputedStyle(el).outlineWidth')=='2px','red hover outline must stay outside pen mode'
+        tool.locator('[data-ink-tool=pen]').click()
+        page.mouse.move(hover_x,hover_y);page.wait_for_timeout(120)
+        assert page.locator(card).evaluate('el=>getComputedStyle(el).outlineStyle')=='none','pen mode must not flash the red hover outline'
+        record(kind+': red hover outline suppressed only while pen mode is active')
+        tool.locator('[data-ink-tool=pen]').click()  # 恢复 pen，继续后续绘制用例
+    else:
+        tool.locator('[data-ink-tool=pen]').click()
 
     # Native touch events exercise the same pointer lifecycle (fixed width).
     box=page.locator(card).bounding_box()

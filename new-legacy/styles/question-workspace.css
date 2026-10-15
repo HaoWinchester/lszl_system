@@ -3111,6 +3111,10 @@ body.qw-selection-toolbar-motion [data-node-id].show-connectors .qw-card-connect
     outline:2px solid #ef4444;
     outline-offset:1px;
   }
+  /* 画笔激活时写画经过卡牌不再闪红框（红框仅保留非绘画态的悬浮提醒）。 */
+  .question-workspace-page .canvas-ink-drawing .qw-question-card:hover:not(.is-selected):not(.is-dragging):not(.is-group-dragging):not(.is-resizing){
+    outline:none;
+  }
 }
 
 /* P2.2.37 · 多题画布框选关系线 */

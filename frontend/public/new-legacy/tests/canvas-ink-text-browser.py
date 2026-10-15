@@ -63,7 +63,7 @@ with sync_playwright() as pw:
     page.evaluate("()=>{strokes=[{id:'resize',tool:'text',color:'#ef4444',width:20,points:[[50,40]],text:'清晰 mixed 中文',boxWidth:200,boxHeight:100}];ink.reset();ink.setTool('text');ink.render()}")
     resize_text=page.locator('.canvas-ink-layer text');resize_text.click(position={'x':5,'y':5},force=True)
     # 轻量化拖拽框：把手仅透明命中区（无可见小方块），拖动文字时外框暂时隐藏，松手恢复。
-    assert page.locator('.canvas-ink-layer [data-ink-resize-handle]').evaluate_all('(els)=>els.every(el=>getComputedStyle(el).fill==="rgba(0, 0, 0, 0)"&&getComputedStyle(el).strokeWidth==="0px")')
+    assert page.locator('.canvas-ink-layer [data-ink-resize-handle]').evaluate_all('(els)=>els.every(el=>getComputedStyle(el).fill==="rgba(0, 0, 0, 0)"&&getComputedStyle(el).stroke==="none")')
     page.mouse.move(250,190);page.mouse.down();page.mouse.move(280,220,steps=3)
     assert page.evaluate('getComputedStyle(document.querySelector(".canvas-ink-text-box")).opacity')=='0'
     page.mouse.up()
