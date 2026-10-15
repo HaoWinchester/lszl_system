@@ -5,8 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth import get_current_user
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.graph_question import BindingInput, RevisionInput, AttemptInput
-from app.services import graph_question_service as service, question_catalog_service as catalog
+from app.schemas.graph_question import BindingInput, RevisionInput, AttemptInput, BatchPreviewInput, BatchApplyInput
+from app.services import graph_question_service as service, question_catalog_service as catalog, graph_question_batch_service as batch
 router = APIRouter(prefix='/graph-questions', tags=['graph-questions'])
 DB = Annotated[AsyncSession, Depends(get_db)]
 Reader = Annotated[User, Depends(get_current_user)]
@@ -40,3 +40,12 @@ async def submit(file_id: str, node_id: str, binding_id: str, data: AttemptInput
 @router.get('/attempts/{attempt_id}/analysis')
 async def analysis(attempt_id: str, db: DB, user: Reader):
     return await service.history(db, user, attempt_id)
+
+
+@router.post('/files/{file_id}/batch-preview')
+async def batch_preview(file_id: str, data: BatchPreviewInput, db: DB, user: Reader):
+    return await batch.preview(db, user, file_id, data)
+
+@router.post('/files/{file_id}/batch-apply')
+async def batch_apply(file_id: str, data: BatchApplyInput, db: DB, user: Reader):
+    return await batch.apply(db, user, file_id, data)

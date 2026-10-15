@@ -99,11 +99,9 @@ async def list_bindings(db, user, file_id, node_id):
     return {'bindings': [binding_payload(r) for r in rows]}
 
 
-async def set_bindings(db, user, file_id, node_id, data):
-    require_editor(user)
-    await teaching_content_revision_service.acquire_lock(db)
-    file, content = await card(db, user, file_id, node_id, lock=True, expected=data.expected_file_revision)
-    ids = list(dict.fromkeys(data.question_ids))
+async def write_card_bindings(db, user, file_id, node_id, question_ids):
+    """Write within a caller-owned teaching lock/file lock transaction; never commit."""
+    ids = list(dict.fromkeys(question_ids))
     rows = (await db.scalars(select(Binding).where(Binding.file_id == file_id, Binding.node_id == node_id).with_for_update())).all()
     existing = {r.question_id: r for r in rows}
     for row in rows:
@@ -122,6 +120,13 @@ async def set_bindings(db, user, file_id, node_id, data):
             row.source_version = uid('gqv_')
             row.status = 'active'
         row.order_index = index
+
+
+async def set_bindings(db, user, file_id, node_id, data):
+    require_editor(user)
+    await teaching_content_revision_service.acquire_lock(db)
+    file, content = await card(db, user, file_id, node_id, lock=True, expected=data.expected_file_revision)
+    await write_card_bindings(db, user, file_id, node_id, data.question_ids)
     file.revision += 1
     content.revision = file.revision
     revision = file.revision
