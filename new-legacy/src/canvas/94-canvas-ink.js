@@ -47,7 +47,7 @@
     const doc=viewport.ownerDocument,ns='http://www.w3.org/2000/svg';
     const layer=doc.createElementNS(ns,'svg');layer.classList.add('canvas-ink-layer');layer.setAttribute('aria-hidden','true');world.append(layer);
     const toolbar=doc.createElement('div');toolbar.className='canvas-ink-toolbar';toolbar.dataset.canvasUi='true';toolbar.setAttribute('role','group');toolbar.setAttribute('aria-label','画笔工具');
-    toolbar.innerHTML='<div class="canvas-ink-tools"><button type="button" data-ink-tool="select" title="选择（Esc）" aria-label="选择"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3l13.5 7.8-6.1 1.6-2.7 5.9z"/></svg></button><button type="button" data-ink-tool="pen" aria-label="画笔" title="画笔"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 4 5 5M4 20l5-1L20 8a2 2 0 0 0-5-5L4 14z"/></svg></button><button type="button" data-ink-tool="highlighter" aria-label="荧光笔" title="荧光笔"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 15 5 5 7-10-8-8-10 7 5 5M5 15l4 4-4 3-3-3zM2 23h16"/></svg></button><button type="button" data-ink-tool="text" aria-label="文字" title="文字"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7V5h14v2M12 5v14M9 19h6"/></svg></button><button type="button" data-ink-tool="eraser" aria-label="橡皮擦" title="橡皮擦：单击擦除一笔；双击此按钮清空全部笔迹，可撤销"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 3 7 7-11 11H6l-4-4zM8 11l7 7M10 21h12"/></svg></button><span class="canvas-ink-divider"></span><button type="button" data-ink-action="undo" aria-label="撤销笔迹" title="撤销笔迹（Ctrl/Command+Z）">↶</button><button type="button" data-ink-action="redo" aria-label="重做笔迹" title="重做笔迹（Ctrl/Command+Shift+Z）">↷</button></div><div class="canvas-ink-options" hidden><div class="canvas-ink-colors" aria-label="笔迹颜色"></div><label class="canvas-ink-width">粗细 <input type="range" aria-label="笔迹粗细" step="1"><output></output></label><svg class="canvas-ink-preview" viewBox="0 0 180 52" aria-label="笔触预览"><path d="M 12 32 Q 45 10 80 26 T 168 24" fill="none" stroke-linecap="round"/></svg><small>Esc / 右击画布退出绘画 · 空格拖动平移</small></div>';
+    toolbar.innerHTML='<div class="canvas-ink-tools"><button type="button" data-ink-tool="select" title="选择（Esc）" aria-label="选择"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3l13.5 7.8-6.1 1.6-2.7 5.9z"/></svg></button><button type="button" data-ink-tool="pen" aria-label="画笔" title="画笔"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 4 5 5M4 20l5-1L20 8a2 2 0 0 0-5-5L4 14z"/></svg></button><button type="button" data-ink-tool="highlighter" aria-label="荧光笔" title="荧光笔"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 15 5 5 7-10-8-8-10 7 5 5M5 15l4 4-4 3-3-3zM2 23h16"/></svg></button><button type="button" data-ink-tool="text" aria-label="文字" title="文字"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7V5h14v2M12 5v14M9 19h6"/></svg></button><button type="button" data-ink-tool="eraser" aria-label="橡皮擦" title="橡皮擦：单击擦除一笔；双击此按钮清空全部笔迹，可撤销"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 3 7 7-11 11H6l-4-4zM8 11l7 7M10 21h12"/></svg></button><span class="canvas-ink-divider"></span><button type="button" data-ink-action="undo" aria-label="撤销笔迹" title="撤销笔迹（Ctrl/Command+Z）">↶</button><button type="button" data-ink-action="redo" aria-label="重做笔迹" title="重做笔迹（Ctrl/Command+Shift+Z）">↷</button></div><div class="canvas-ink-options" hidden><div class="canvas-ink-colors" aria-label="笔迹颜色"></div><label class="canvas-ink-width">粗细 <input type="range" aria-label="笔迹粗细" step="1"><output></output></label><svg class="canvas-ink-preview" viewBox="0 0 180 52" aria-label="笔触预览"><path d="M 12 32 Q 45 10 80 26 T 168 24" fill="none" stroke-linecap="round"/></svg><small>Esc / 双击右键退出绘画 · 空格拖动平移</small></div>';
     (options.toolbarHost||viewport).append(toolbar);
     const panel=toolbar.querySelector('.canvas-ink-options'),range=toolbar.querySelector('input[type=range]'),preview=toolbar.querySelector('.canvas-ink-preview path');
     const prefs={pen:{...TOOLS.pen},highlighter:{...TOOLS.highlighter},text:{...TOOLS.text}};
@@ -373,13 +373,36 @@
     listen(global,'blur',()=>{cancel();space=false;viewport.classList.remove('canvas-ink-panning')});
     // Cancel instead of mixing coordinate systems if zoom changes mid-stroke.
     listen(global,'wheel',event=>{if((active||textDrag)&&viewport.contains(event.target))cancel()},true);
-    // 画笔状态下右击画布退出绘画，回到选择模式（右键拖动平移不受影响）。
+    // 画笔状态下双击右键退出绘画；单击右键仅屏蔽菜单（右键拖动平移不受影响）。
+    let lastRightPress={t:0,x:0,y:0},suppressContextMenuUntil=0;
+    const resetRightPress=()=>{lastRightPress={t:0,x:0,y:0}};
     listen(doc,'contextmenu',event=>{
       if(destroyed||tool==='select'||space)return;
       if(!viewport.contains(event.target)||!inside(event.target))return;
       stop(event);
-      setTool('select');
-      options.onExitDraw?.();
+    },true);
+    listen(doc,'contextmenu',event=>{
+      // 双击右键退出的第二次点击：tool 已切回 select，仍需拦下浏览器菜单。
+      if(!destroyed&&Date.now()<suppressContextMenuUntil&&viewport.contains(event.target)&&inside(event.target))stop(event);
+    },true);
+    listen(global,'pointerdown',event=>{
+      if(destroyed||event.button!==2||tool==='select'||space)return;
+      if(!viewport.contains(event.target)||!inside(event.target)){resetRightPress();return}
+      const now=Date.now();
+      if(now-lastRightPress.t<=400&&Math.hypot(event.clientX-lastRightPress.x,event.clientY-lastRightPress.y)<=24){
+        resetRightPress();
+        suppressContextMenuUntil=now+400;
+        stop(event);
+        setTool('select');
+        options.onExitDraw?.();
+        return;
+      }
+      lastRightPress={t:now,x:event.clientX,y:event.clientY};
+    },true);
+    listen(global,'pointermove',event=>{
+      // 右键按住拖动（平移）超过阈值即取消双击判定，避免平移被误判为第二次右击。
+      if(!lastRightPress.t||(event.buttons&2)!==2)return;
+      if(Math.hypot(event.clientX-lastRightPress.x,event.clientY-lastRightPress.y)>24)resetRightPress();
     },true);
     // 橡皮擦长按 3 秒：由页面回调实现整套试卷笔迹清空（含确认）。
     let eraserHoldTimer=0;

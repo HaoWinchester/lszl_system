@@ -115,6 +115,20 @@ def check_page(context,base,kind):
     expect(tool.locator('[data-ink-color="#ef4444"]')).to_have_attribute('aria-pressed','true')
     record(kind+': pen/highlighter, independent color/width, draw over card without dragging')
 
+    # 产品要求：画笔模式下单击右键仅屏蔽菜单不退出；400ms 内双击右键才退出。
+    rx=before['x']+60;ry=before['y']+40
+    page.mouse.move(rx,ry)
+    page.mouse.down(button='right');page.mouse.up(button='right')
+    page.wait_for_timeout(450)
+    expect(tool.locator('[data-ink-tool=pen]')).to_have_attribute('aria-pressed','true')
+    record(kind+': single right-click keeps pen mode (menu suppressed, no exit)')
+    page.mouse.down(button='right');page.mouse.up(button='right')
+    page.wait_for_timeout(120)
+    page.mouse.down(button='right');page.mouse.up(button='right')
+    expect(tool.locator('[data-ink-tool=select]')).to_have_attribute('aria-pressed','true')
+    record(kind+': double right-click within 400ms exits pen mode')
+    tool.locator('[data-ink-tool=pen]').click()
+
     # Native touch events exercise the same pointer lifecycle (fixed width).
     box=page.locator(card).bounding_box()
     cdp=context.new_cdp_session(page)
