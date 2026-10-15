@@ -20,7 +20,15 @@
 
 ## UAT 发布
 
-待完整门禁通过后记录部署提交、容器实际 active release、公网资源校验和健康检查。
+2026-10-15 已将已验证功能快进合入并推送 uat，部署提交 `1943cc3f8f8a505cce5aac986d6bb39211acdf53`，远端引用已核对。标准 `bash deploy/update-uat.sh` 退出 0，耗时 50 秒，复用相同输入的成功 full 验证。访问地址：<https://uat.aihuanpu.com>。
+
+- 容器实际 `/app/frontend/new-legacy-releases/current.json` 指向 **v9.0-p4.1.332**，上一版本 329；site 1132 个文件，关键页面与新增模块齐全。5 个后端文件 SHA-256 与本地验证代码一致。
+- 应用与数据库健康正常；小程序 29 路由/13 张表、教师助手 worker/隔离转换器检查通过；历史试卷回填通过。远端 `.deploy-state/git-commit` 与部署提交一致。
+- 公网 5 张业务页均为 332，管理页游客返回预期 403；24 个关键 JS/CSS 与不可变 site 字节及 SHA-256 一致。OpenAPI 包含两个批量接口、默认数量为 3；未登录调用均返回 401。
+- 公网 Chrome 访客冒烟覆盖图谱、练习大厅、多题、回忆四页，JavaScript 错误 0，大厅四模式及新开关 DOM 存在。公网核验没有创建业务测试数据；有登录的完整交互已在隔离数据库完成，仍需用户本人 UAT 验收。
+- 证据：`artifacts/practice-feedback-graph-bulk/deploy-332.log`、`inventory-332.json`、`runtime-check.json`、`public-smoke.json`，及不可变候选的 `validation.json` / `validation-run.log`。
+
+部署后仅同步报告和本发布记录补充提交至 uat；运行代码准确对应上述部署提交。main 与 origin/main 保持 `0f86fabd`，功能分支 `codex/practice-feedback-graph-bulk` 保留。
 
 ## 用户验收建议
 
