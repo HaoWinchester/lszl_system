@@ -441,13 +441,15 @@
     })
   }
 
-  /* 收起抽屉时移除点击外部关闭监听，并恢复被暂停的弹幕。 */
+  /* 抽屉只释放自己暂停的条；仍打开的互动浮层独立持有触发条的暂停。 */
   function detachDrawerListeners(instance) {
     if (instance.outsideDrawerClose) {
       document.removeEventListener('pointerdown', instance.outsideDrawerClose, true)
       instance.outsideDrawerClose = null
     }
-    instance.overlay?.querySelectorAll('.q-danmaku-item.is-paused').forEach(item => item.classList.remove('is-paused'))
+    instance.overlay?.querySelectorAll('.q-danmaku-item.is-paused').forEach(item => {
+      if (item !== instance.popItem) item.classList.remove('is-paused')
+    })
   }
 
   function closeDrawer(instance) {

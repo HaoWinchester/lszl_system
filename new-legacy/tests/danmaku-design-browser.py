@@ -183,6 +183,68 @@ class DanmakuDesign(unittest.TestCase):
         self.assert_bounds()
         self.page.screenshot(path=str(ARTIFACTS/'mobile-more.png'))
 
+    def live_animation_state(self):
+        self.page.mouse.move(0,0)
+        return self.page.locator('[data-danmaku-comment-id="c1"]').evaluate("e=>({paused:e.classList.contains('is-paused'), animation:getComputedStyle(e).animationName, playState:getComputedStyle(e).animationPlayState, pop:!!document.querySelector('[data-danmaku-pop]')})")
+
+    def test_live_animation_stays_paused_through_like_and_favorite_refresh(self):
+        self.open()
+        # place() only stabilizes the initial click. Restore real production animation
+        # before actions, and move away from the chip so hover cannot hide a pause bug.
+        self.page.locator('[data-danmaku-comment-id="c1"]').evaluate("e=>e.style.removeProperty('animation')")
+        paused = dict(paused=True, animation='q-danmaku-scroll', playState='paused', pop=True)
+        self.assertEqual(self.live_animation_state(), paused)
+        for action in ['like','favorite']:
+            if action=='favorite':
+                self.page.locator('[data-qc-pop-action="more"]').click()
+            for pressed in ['true','false']:
+                self.page.locator(f'[data-qc-pop-action="{action}"]').click()
+                self.page.wait_for_function("([action,pressed])=>document.querySelector('[data-qc-pop-action='+action+']').getAttribute('aria-pressed')===pressed", arg=[action,pressed])
+                self.assertEqual(self.live_animation_state(), paused, f'{action} {pressed} must retain popover-owned pause')
+            setattr(self, 'fail_'+action, True)
+            self.page.locator(f'[data-qc-pop-action="{action}"]').click()
+            self.page.wait_for_selector('[data-danmaku-pop] [data-qc-toast]')
+            self.page.wait_for_function("!window.inst.pending.has('c1')")
+            self.assertEqual(self.live_animation_state(), paused, f'{action} error refresh must retain pause')
+            setattr(self, 'fail_'+action, False)
+        self.page.keyboard.press('Escape')
+        running = dict(paused=False,animation='q-danmaku-scroll',playState='running',pop=False)
+        self.assertEqual(self.live_animation_state(), running)
+        for dismissal in ['close','outside']:
+            self.place()
+            self.open()
+            self.page.locator('[data-danmaku-comment-id="c1"]').evaluate("e=>e.style.removeProperty('animation')")
+            self.assertEqual(self.live_animation_state(), paused)
+            if dismissal=='close':
+                self.page.locator('[data-qc-pop-action="close"]').click()
+            else:
+                self.page.mouse.click(0,0)
+            self.assertEqual(self.live_animation_state(), running, dismissal+' must release pause')
+
+    def test_async_completion_after_dismiss_or_dispose_does_not_reopen(self):
+        pending = []
+        self.page.route('**/comments/c1/like', lambda route: pending.append(route))
+        for dispose in [False, True]:
+            if dispose:
+                self.page.evaluate("KGQuestionComments.teardownSource('danmaku'); window.inst=KGQuestionComments.mountDanmaku({questionId:'q1'})")
+                self.page.wait_for_selector('[data-danmaku-comment-id="c1"]', state='attached')
+                self.place()
+            self.open()
+            self.page.locator('[data-danmaku-comment-id="c1"]').evaluate("e=>e.style.removeProperty('animation')")
+            self.page.locator('[data-qc-pop-action="like"]').click()
+            self.assertEqual(len(pending), 1)
+            if dispose:
+                self.page.evaluate("KGQuestionComments.teardownSource('danmaku')")
+            else:
+                self.page.keyboard.press('Escape')
+                self.assertEqual(self.live_animation_state(), dict(paused=False,animation='q-danmaku-scroll',playState='running',pop=False))
+            updated = dict(self.comments[0], myLike=True, likeCount=9)
+            pending.pop().fulfill(json={'comment':updated})
+            self.page.wait_for_function("!window.inst.pending.has('c1')")
+            self.assertEqual(self.page.locator('[data-danmaku-pop],.q-danmaku-item.is-paused').count(), 0)
+            if dispose:
+                self.assertEqual(self.page.locator('.q-danmaku').count(), 0)
+
     def test_like_favorite_copy_reply_and_failures(self):
         self.open()
         self.fail_like=True
