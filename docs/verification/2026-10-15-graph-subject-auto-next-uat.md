@@ -31,4 +31,15 @@
 
 ## 发布状态
 
-候选 v9.0-p4.1.333：后端全量 1068 passed（705.55 秒）、Node 334 passed、Python 契约 9 passed、4 组 UAT 发布脚本检查通过。完整浏览器及源/发布视觉门禁全部通过，总耗时 1142 秒；大厅桌面/手机源与发布差异 0.000%，自由画布桌面 0.001%、手机 0.000%（此处仍仅为打包一致性，设计对比见上节）。新旧 site 清单 1132 → 1133，无旧文件缺失，新增为大厅样式测试。UAT 部署待记录。公网核验不创建业务测试数据。
+候选 v9.0-p4.1.333：后端全量 1068 passed（705.55 秒）、Node 334 passed、Python 契约 9 passed、4 组 UAT 发布脚本检查通过。完整浏览器及源/发布视觉门禁全部通过，总耗时 1142 秒；大厅桌面/手机源与发布差异 0.000%，自由画布桌面 0.001%、手机 0.000%（此处仍仅为打包一致性，设计对比见上节）。新旧 site 清单 1132 → 1133，无旧文件缺失，新增为大厅样式测试。
+
+2026-10-16（上海时间）已合入并推送 uat，部署提交 `de208db9582cccc9f9e206b60cdb0867d2438e94`，远端引用已核对。标准 `bash deploy/update-uat.sh` 退出 0，耗时 50 秒，复用同输入 full 验证。访问地址：<https://uat.aihuanpu.com>。
+
+- 实际容器 active release 为 **v9.0-p4.1.333**，上一版本 332，site 1133 文件、关键页面齐全；5 个后端文件 SHA-256 与本地验证代码相同，远端 `.deploy-state/git-commit` 与部署提交一致。
+- 应用/数据库健康、小程序 29 路由/13 张表、教师助手 worker/隔离转换器和历史试卷回填均通过。
+- 公网 5 张业务页版本为 333，管理页游客返回 403；24 个关键 JS/CSS 与不可变 site 字节一致。OpenAPI 显式科目字段及科目列表路由存在，未登录调用返回 401。
+- Chrome 公网冒烟四页 0 JavaScript 错误；实际大厅两标签计算样式为 radius 0px、shadow none，已确认本次样式确实生效。
+- 在正式运行服务上对 UAT 真实图谱执行 `SET TRANSACTION READ ONLY` 预览：所选科目 PMP，11 张有内容卡片共 33 个候选关联。没有调用确认写入，也未创建业务测试数据。
+- 证据：`artifacts/graph-batch-subject-fix/deploy-333.log`、`runtime-check.json`、`public-smoke.json`、`uat-live-match-proof.json`、`inventory-333.json`，以及不可变候选 `validation.json` / `validation-run.log`。
+
+部署后仅补充本记录、计划及生成同步报告，运行代码对应上述部署提交。main/origin/main 保持 `0f86fabd`；功能分支 `codex/fix-graph-batch-subject-match` 保留。开发自检不替代用户本人 UAT 验收，未经明确验收通过不合入 main。
