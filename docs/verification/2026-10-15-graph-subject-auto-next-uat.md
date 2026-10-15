@@ -27,6 +27,8 @@
 - 对照与证据：`artifacts/graph-batch-subject-fix/ui-reference-vs-after-comparison.png`、`ui-recent-reference-vs-after-comparison.png`、`ui-live-before-recent.png`、`ui-live-after-recent.png`、`ui-design-comparison.json`、`ui-evidence.md`。
 - 本次实现未调用 Image 2.0 或其他生图工具；沿用已批准参考，不对原图的历史生成模型作无证据断言。
 
+后续页面交付必须同时保存批准 UI 稿、相同视口的实际截图、逐区域对照与像素差异图；明确动态数据、已有产品约束及未还原细节，控件本身不能被遮罩。源/发布包一致性检查继续保留，但不得替代设计稿对比。
+
 ## 发布状态
 
-候选 v9.0-p4.1.333，完整门禁与 UAT 部署待记录。公网核验不创建业务测试数据。
+候选 v9.0-p4.1.333：后端全量 1068 passed（705.55 秒）、Node 334 passed、Python 契约 9 passed、4 组 UAT 发布脚本检查通过。完整浏览器及源/发布视觉门禁全部通过，总耗时 1142 秒；大厅桌面/手机源与发布差异 0.000%，自由画布桌面 0.001%、手机 0.000%（此处仍仅为打包一致性，设计对比见上节）。新旧 site 清单 1132 → 1133，无旧文件缺失，新增为大厅样式测试。UAT 部署待记录。公网核验不创建业务测试数据。
