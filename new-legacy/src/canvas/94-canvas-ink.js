@@ -63,8 +63,9 @@
     function renderTextHandles(stroke){
       const box=textBox(stroke),group=doc.createElementNS(ns,'g');group.classList.add('canvas-ink-text-box');
       const border=doc.createElementNS(ns,'rect');for(const [key,value] of Object.entries({x:box.x,y:box.y,width:box.width,height:box.height,fill:'none',stroke:'#2563eb'}))border.setAttribute(key,value);border.setAttribute('stroke-dasharray','4 3');group.append(border);
-      const scale=options.getViewport().scale||options.getViewport().zoom||1,size=10/scale;
-      for(const handle of ['nw','n','ne','e','se','s','sw','w']){const el=doc.createElementNS(ns,'rect'),x=box.x+(handle.includes('w')?0:handle.includes('e')?box.width:box.width/2),y=box.y+(handle.includes('n')?0:handle.includes('s')?box.height:box.height/2);el.dataset.inkResizeHandle=handle;el.dataset.textId=stroke.id;for(const [key,value] of Object.entries({x:x-size/2,y:y-size/2,width:size,height:size,fill:'white',stroke:'#2563eb'}))el.setAttribute(key,value);el.style.pointerEvents='all';el.style.cursor=handle+'-resize';group.append(el)}layer.append(group);
+      // 轻量化：不渲染可见拖拽方块，仅保留透明命中区（悬停显示对应 resize 光标）。
+      const scale=options.getViewport().scale||options.getViewport().zoom||1,size=14/scale;
+      for(const handle of ['nw','n','ne','e','se','s','sw','w']){const el=doc.createElementNS(ns,'rect');el.classList.add('canvas-ink-handle-hit');const x=box.x+(handle.includes('w')?0:handle.includes('e')?box.width:box.width/2),y=box.y+(handle.includes('n')?0:handle.includes('s')?box.height:box.height/2);el.dataset.inkResizeHandle=handle;el.dataset.textId=stroke.id;for(const [key,value] of Object.entries({x:x-size/2,y:y-size/2,width:size,height:size,fill:'transparent',stroke:'none'}))el.setAttribute(key,value);el.style.pointerEvents='all';el.style.cursor=handle+'-resize';group.append(el)}layer.append(group);
     }
     const readonly=()=>!!options.isReadonly?.();
     const report=error=>options.onError?.(error?.message||String(error));
@@ -168,7 +169,7 @@
     }
     function cancel(){
       if(textResize){const id=textResize.pointerId;textResize=null;try{viewport.releasePointerCapture(id)}catch(_){};render()}
-      if(textDrag){const id=textDrag.pointerId;textDrag=null;try{if(viewport.hasPointerCapture(id))viewport.releasePointerCapture(id)}catch(_){};render()}
+      if(textDrag){const id=textDrag.pointerId;textDrag=null;viewport.classList.remove('canvas-ink-text-dragging');try{if(viewport.hasPointerCapture(id))viewport.releasePointerCapture(id)}catch(_){};render()}
       if(frame){global.cancelAnimationFrame(frame);frame=0}
       if(!active)return;
       const id=active.pointerId;active.el.remove();active=null;
@@ -303,7 +304,7 @@
       if(tool==='select'&&!textHit){selectedTextId=null;render();return}
       stop(event);
       try{
-        if(textHit){selectedTextId=textHit.id;Object.assign(prefs.text,{color:textHit.color,width:textHit.width,bold:!!textHit.bold});textDrag={pointerId:event.pointerId,start:location,original:normalize([textHit])[0],moved:false};render();viewport.setPointerCapture(event.pointerId);return}
+        if(textHit){selectedTextId=textHit.id;Object.assign(prefs.text,{color:textHit.color,width:textHit.width,bold:!!textHit.bold});textDrag={pointerId:event.pointerId,start:location,original:normalize([textHit])[0],moved:false};render();viewport.classList.add('canvas-ink-text-dragging');viewport.setPointerCapture(event.pointerId);return}
         if(tool==='eraser'){
           const view=options.getViewport(),location=point(event,viewport.getBoundingClientRect(),view);
           const target=new global.DOMPoint(...location),padding=16/(view.scale||view.zoom||1);
@@ -337,7 +338,7 @@
       }catch(error){cancel();report(error)}
     },true);
     listen(global,'pointermove',event=>{
-      if(textResize&&event.pointerId===textResize.pointerId){stop(event);const current=point(event,viewport.getBoundingClientRect(),options.getViewport()),drag=textResize,next=global.KGTextBoxGeometry.resize(drag.box,drag.handle,{x:current[0]-drag.start[0],y:current[1]-drag.start[1]});drag.next={...drag.original,points:[[next.x,next.y]],width:next.fontSize,boxWidth:next.width,boxHeight:next.height};drag.next.boxHeight=Math.min(4000,Math.max(next.height,textLines(drag.next).length*next.fontSize*1.35));layer.replaceChildren(...getStrokes().map(item=>makeEl(item.id===drag.original.id?drag.next:item)));renderTextHandles(drag.next);return}
+      if(textResize&&event.pointerId===textResize.pointerId){stop(event);const current=point(event,viewport.getBoundingClientRect(),options.getViewport()),drag=textResize,next=global.KGTextBoxGeometry.resize(drag.box,drag.handle,{x:current[0]-drag.start[0],y:current[1]-drag.start[1]});const natural=textBox({...drag.original,points:[[next.x,next.y]],width:next.fontSize,boxWidth:next.width,boxHeight:next.height});const clamped=global.KGTextBoxGeometry.clampToTextBounds(next,natural);drag.next={...drag.original,points:[[clamped.x,clamped.y]],width:clamped.fontSize,boxWidth:clamped.width,boxHeight:clamped.height};drag.next.boxHeight=Math.min(4000,Math.max(clamped.height,textLines(drag.next).length*clamped.fontSize*1.35));layer.replaceChildren(...getStrokes().map(item=>makeEl(item.id===drag.original.id?drag.next:item)));renderTextHandles(drag.next);return}
       if(textDrag&&event.pointerId===textDrag.pointerId){
         stop(event);if(readonly()){cancel();return}
         const current=point(event,viewport.getBoundingClientRect(),options.getViewport()),dx=current[0]-textDrag.start[0],dy=current[1]-textDrag.start[1],scale=options.getViewport().scale||options.getViewport().zoom||1;

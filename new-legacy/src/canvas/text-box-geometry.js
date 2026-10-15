@@ -6,5 +6,9 @@
     const h=clamp(start.height+(handle.includes('s')?delta.y||0:handle.includes('n')?-(delta.y||0):0),limits.minHeight??24,limits.maxHeight??4000);
     return {x:handle.includes('w')?start.x+start.width-w:start.x,y:handle.includes('n')?start.y+start.height-h:start.y,width:w,height:h,fontSize:clamp(start.fontSize*Math.sqrt(w*h/(start.width*start.height)),6,288)};
   }
-  const api=Object.freeze({resize});global.KGTextBoxGeometry=api;if(typeof module!=='undefined')module.exports=api;
+  // 拖拽框限制在文字最大边界内：宽高不得超过文字实际排版尺寸加容差（左上角锚定）。
+  function clampToTextBounds(box,natural,tolerance=8){
+    return {...box,width:clamp(box.width,40,natural.width+tolerance),height:clamp(box.height,24,natural.height+tolerance)};
+  }
+  const api=Object.freeze({resize,clampToTextBounds});global.KGTextBoxGeometry=api;if(typeof module!=='undefined')module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);

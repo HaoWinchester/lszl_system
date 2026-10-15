@@ -62,6 +62,12 @@ with sync_playwright() as pw:
     # Every edge changes geometry and font from a frozen start; each gesture is one undo.
     page.evaluate("()=>{strokes=[{id:'resize',tool:'text',color:'#ef4444',width:20,points:[[50,40]],text:'清晰 mixed 中文',boxWidth:200,boxHeight:100}];ink.reset();ink.setTool('text');ink.render()}")
     resize_text=page.locator('.canvas-ink-layer text');resize_text.click(position={'x':5,'y':5},force=True)
+    # 轻量化拖拽框：把手仅透明命中区（无可见小方块），拖动文字时外框暂时隐藏，松手恢复。
+    assert page.locator('.canvas-ink-layer [data-ink-resize-handle]').evaluate_all('(els)=>els.every(el=>getComputedStyle(el).fill==="rgba(0, 0, 0, 0)"&&getComputedStyle(el).strokeWidth==="0px")')
+    page.mouse.move(250,190);page.mouse.down();page.mouse.move(280,220,steps=3)
+    assert page.evaluate('getComputedStyle(document.querySelector(".canvas-ink-text-box")).opacity')=='0'
+    page.mouse.up()
+    assert page.evaluate('getComputedStyle(document.querySelector(".canvas-ink-text-box")).opacity')=='1'
     for side in ['n','s','e','w']:
         old=page.evaluate('JSON.parse(JSON.stringify(strokes[0]))');handle=page.locator('[data-ink-resize-handle='+side+']');box=handle.bounding_box();dx=32 if side in ['e','w'] else 0;dy=24 if side in ['n','s'] else 0
         page.mouse.move(box['x']+box['width']/2,box['y']+box['height']/2);page.mouse.down();page.mouse.move(box['x']+box['width']/2+dx,box['y']+box['height']/2+dy,steps=5);page.mouse.up()

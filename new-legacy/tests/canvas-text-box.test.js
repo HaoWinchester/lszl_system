@@ -9,6 +9,13 @@ test('snapshot area resize scales font, clamps four edges and preserves start',(
  assert.equal(G.resize(start,'se',{x:1e5,y:1e5}).fontSize,288);
  assert.deepEqual(start,{x:10,y:20,width:200,height:100,fontSize:20});
 });
+test('clampToTextBounds keeps the box within the text natural bounds plus tolerance',()=>{
+ const box={x:5,y:6,width:300,height:200,fontSize:20};
+ assert.deepEqual(G.clampToTextBounds(box,{width:120,height:60},8),{...box,width:128,height:68});
+ assert.deepEqual(G.clampToTextBounds(box,{width:400,height:300},8),box);
+ assert.equal(G.clampToTextBounds({...box,width:20},{width:400,height:300}).width,40);
+ assert.equal(G.clampToTextBounds({...box,height:5},{width:400,height:300}).height,24);
+});
 test('failed commit retains editable draft and retries; cancel restores original',async()=>{
  let fail=true;const s=S.create({original:'old',persist:async()=>!fail});s.update('new');assert.equal(await s.commit(),false);assert.equal(s.state().status,'failed');assert.equal(s.state().draft,'new');fail=false;assert.equal(await s.commit(),true);assert.equal(s.state().status,'committed');assert.equal(s.cancel(),'old');
 });

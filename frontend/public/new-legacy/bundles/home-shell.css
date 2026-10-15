@@ -8253,6 +8253,9 @@ body.qw-selection-toolbar-motion .uc-selection-bounds,.stage.graph-card-dragging
 .canvas-ink-toolbar button[type] *,.canvas-ink-entry[type] *{cursor:inherit!important}
 
 .canvas-ink-text-selected{filter:none;outline:none}
+/* 轻量化文字选择框：仅虚线边框；拖动文字时暂时隐藏，松手恢复。 */
+.canvas-ink-text-box rect.canvas-ink-handle-hit{fill:transparent;stroke:none}
+.canvas-ink-text-dragging .canvas-ink-text-box{opacity:0;pointer-events:none}
 .canvas-ink-text-actions{position:fixed;z-index:131;display:flex;gap:6px;background:white;padding:4px;border:1px solid #cbd5e1;border-radius:6px}
 .canvas-ink-text-actions button{padding:5px 12px;border:1px solid #cbd5e1;background:white;border-radius:4px;cursor:pointer}
 .canvas-ink-toolbar [data-ink-bold]{margin-top:8px;font-weight:700}
