@@ -28,4 +28,13 @@
 
 ## 发布
 
-335候选标准 full 门禁已通过（939秒）：后端1068、前端335、Python契约9、部署脚本4、扩展契约10及完整浏览器回归通过。334候选因审查发现暂停回归而主动中止，未promote，未部署；UAT仍保留333。本地active已由333提升为335；即将执行UAT标准部署并核对容器指针与公网结果。正式环境与 main 不变；开发自检不替代用户 UAT 验收。
+335候选标准 full 门禁已通过（939秒）：后端1068、前端335、Python契约9、部署脚本4、扩展契约10及完整浏览器回归通过。334候选因审查发现暂停回归而主动中止，未promote，未部署；UAT仍保留333。本地和UAT容器实际active均为335，previousVersion为333。标准update-uat.sh部署成功（38秒），部署提交为 `eb81438586e415879a025cd643360216b22d881d`。远端deploy-state与此提交一致。正式环境与 main 不变；开发自检不替代用户 UAT 验收。
+
+
+- 发布地址：https://uat.aihuanpu.com/practice-mode.html
+- 容器site文件数1137；与旧active1133相比仅新增4个测试文件，无文件删除，admin-console等关键页面均在。
+- 公网健康status/db均ok；10项JS/CSS/SVG资源与本地实际active逐字节一致。
+- Chrome访问4个游客页面版本均335，页面错误0；1440桌面和390手机以只读合成GET留言预览真实公网弹幕模块、CSS和SVG，操作格radius0、shadow none、transform none，更多不越界，Esc正常关闭。所有UAT写请求本地阻止；业务持久化已在隔离真实数据库验证。
+- 公网检查：`python3 artifacts/danmaku-image-design/public-smoke.py`；结果`artifacts/danmaku-image-design/public-smoke.json`，截图同目录`uat-v9.0-p4.1.335-1440.png`和`uat-v9.0-p4.1.335-390.png`。
+- 发布记录：`artifacts/danmaku-image-design/deploy-335.log`，候选验收：`frontend/new-legacy-releases/v9.0-p4.1.335/validation.json`及`validation-run.log`。
+- main及origin/main保持`0f86fabdeca98379ec50753b793b74a915671677`。保留main、uat和功能分支，等待用户本人UAT验收；未合入main。
