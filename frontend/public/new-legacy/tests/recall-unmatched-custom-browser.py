@@ -86,23 +86,10 @@ with sync_playwright() as pw:
     page.locator('#krRevealKeywordsBtn').click()
     page.locator('.kr-keyword-token').filter(has_text='分析影响').first.click()
     expect(page.locator('.kr-node')).to_have_count(2)
+    # 需求 2026-10-15：移除「转为自定义卡牌」入口（含撤销按钮），已存自定义卡牌编辑保留。
     page.locator('.kr-node button').first.click()
-    page.locator('#krConvertPersonalBtn').click()
-    expect(page.locator('#krPersonalTitle')).to_be_visible()
-    assert page.evaluate("KGLearningProgress.flush('deep_recall')")
-    converted=context.request.get(BASE+'/api/v1/recall/session/ink-question-1?releaseId=ink-release').json()['progress']
-    assert converted['edges']==[historic_edge]
-    assert converted['nodes'][1]['parentId']=='historical-root'
-    page.locator('#krUndoPersonalBtn').click()
-    expect(page.locator('#krConvertPersonalBtn')).to_be_visible()
-    assert page.evaluate("KGLearningProgress.flush('deep_recall')")
-    restored=context.request.get(BASE+'/api/v1/recall/session/ink-question-1?releaseId=ink-release').json()['progress']['nodes'][0]
-    assert restored['dataId']=='impact' and not restored.get('custom')
-    undone=context.request.get(BASE+'/api/v1/recall/session/ink-question-1?releaseId=ink-release').json()['progress']
-    assert undone['edges']==[historic_edge]
-    assert undone['nodes'][1]['parentId']=='historical-root'
-    page.locator('#krConvertPersonalBtn').click()
-    expect(page.locator('#krUndoPersonalBtn')).to_be_visible()
+    expect(page.locator('#krConvertPersonalBtn')).to_have_count(0)
+    expect(page.locator('#krUndoPersonalBtn')).to_have_count(0)
     page.locator('.kr-guide-close').click()
     page.locator('#krNextQuestionBtn').click()
     expect(page.locator('#krQuestionPosition')).to_have_text('题目 2 / 2',timeout=30000)
@@ -110,7 +97,7 @@ with sync_playwright() as pw:
     expect(page.locator('#krQuestionPosition')).to_have_text('题目 1 / 2',timeout=30000)
     expect(page.locator('.kr-node')).to_have_count(2)
     page.locator('.kr-node button').first.click()
-    expect(page.locator('#krPersonalTitle')).to_be_visible()
+    expect(page.locator('#krPersonalTitle')).to_have_count(0)  # 未转换的历史卡牌不再提供个人编辑器
     expect(page.locator('#krUndoPersonalBtn')).to_have_count(0)
     page.locator('.kr-guide-close').click()
     with page.expect_response(lambda response:'/reset' in response.url and response.request.method=='POST'):

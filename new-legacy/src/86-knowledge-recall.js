@@ -17,7 +17,6 @@
   let isDragging=false,dragStart=null,worldStart=null,panPointerId=null,panButton=0,rightPanStart=null,contextMenuSuppressUntil=0,contextMenu=null,customOpen=false,lastViewportSize=null;
   let canvasRuntime=null,inkController=null,tableController=null,recallViewportRestored=false,recallTransitionBusy=false;
   let progressSaveTimer=0,questionSessionToken=0,cardClickTimer=0,searchTimer=0,nodeSearchTimer=0;
-  let customConversionUndo=null;
   let associationRuntime={subject:'',library:null,nodeCache:new Map(),resolveCache:new Map()};
   let nodeDrag=null,suppressNodeClickUntil=0;
   let recallAdapter=null,recallSession=null,keywordsRevealed=false;
@@ -296,7 +295,6 @@
     return next;
   }
   function applyServerSession(session,{history=false}={}){
-    customConversionUndo=null;
     recallSession=cloneValue(session);
     if(history){
       recallSession.permissions={...(recallSession.permissions||{}),canWrite:false,canReveal:false,readOnly:true};
@@ -402,7 +400,6 @@
   function flushProgress(){return writeProgressNow()}
   function cancelProgressSave(){if(progressSaveTimer){clearTimeout(progressSaveTimer);progressSaveTimer=0}}
   function loadProgress(raw=null){
-    customConversionUndo=null;
     inkController?.cancel();
     recallViewportRestored=false;if(isTeacherDraftPreview())return false;
     try{
@@ -427,7 +424,6 @@
     const versionReset=recallSession?.versionState==='mismatch'&&recallSession?.permissions?.canReset;
     if(isRecallReadonly()&&!versionReset){notifyRecallReadonly();return}
     if(!confirm('确定清除这道题已回忆的全部知识点和笔迹吗？'))return;
-    customConversionUndo=null;
     cancelProgressSave();if(!recallAdapter)return;
     setRecallTransitionBusy(true);
     try{
@@ -1085,8 +1081,8 @@
     const editingMarkup=readOnly?'':`<div class="kr-guide-actions"><button class="secondary" id="krMoreChoicesBtn" type="button"${choicePage.canRotate?'':' disabled aria-disabled="true"'}>换一组</button></div><div class="kr-custom-form" id="krCustomForm"><input id="krCustomInput" placeholder="输入你想到的知识点，例如：发起人" maxlength="30"/><button id="krCustomSaveBtn" type="button">生成</button></div>`;
     guide.innerHTML=`<div class="kr-guide-head"><div><h2>${escapeHTML(display?.title?.zh||d.title||node.title)}${englishLine(display?.title)}</h2><p>${escapeHTML(display?.prompt?.zh||d.prompt||'你还能从这里继续回忆到什么？')}${englishLine(display?.prompt)}</p>${d.hint?`<p><strong>轻提示：</strong>${escapeHTML(display?.hint?.zh||d.hint)}${englishLine(display?.hint)}</p>`:''}</div><button class="kr-guide-close" title="关闭" type="button">×</button></div>${choiceMarkup}${editingMarkup}`;
     if(!readOnly){
-      const personalMarkup=node.custom?`<div class="kr-personal-editor"><label for="krPersonalTitle">卡牌标题</label><input id="krPersonalTitle" maxlength="120" value="${escapeHTML(d.title||node.title)}"/><label for="krPersonalContent">我的回忆内容</label><textarea id="krPersonalContent" rows="3" placeholder="写下你对这个知识点的理解">${escapeHTML(d.hint||'')}</textarea><button type="button" id="krPersonalSaveBtn">保存我的回忆</button></div>`:`<button type="button" class="secondary" id="krConvertPersonalBtn">转为自定义卡牌</button>`;
-      guide.insertAdjacentHTML('beforeend',personalMarkup+(customConversionUndo?.instanceId===instanceId&&node.dataId===customConversionUndo.personalId?'<button type="button" class="secondary" id="krUndoPersonalBtn">撤销转为自定义</button>':''));
+      const personalMarkup=node.custom?`<div class="kr-personal-editor"><label for="krPersonalTitle">卡牌标题</label><input id="krPersonalTitle" maxlength="120" value="${escapeHTML(d.title||node.title)}"/><label for="krPersonalContent">我的回忆内容</label><textarea id="krPersonalContent" rows="3" placeholder="写下你对这个知识点的理解">${escapeHTML(d.hint||'')}</textarea><button type="button" id="krPersonalSaveBtn">保存我的回忆</button></div>`:'';
+      guide.insertAdjacentHTML('beforeend',personalMarkup);
       const personalSave=$('krPersonalSaveBtn');
       if(personalSave)personalSave.onclick=()=>{
         const title=String($('krPersonalTitle')?.value||'').trim();
@@ -1094,20 +1090,6 @@
         state.customNodes[node.dataId]={...d,title,hint:String($('krPersonalContent')?.value||'')};
         state.nodes.filter(item=>item.dataId===node.dataId).forEach(item=>{item.title=title});
         saveProgress();renderGraphOnly();openNodeGuide(instanceId,null,{countOpen:false});
-      };
-      const convert=$('krConvertPersonalBtn');
-      if(convert)convert.onclick=()=>{
-        const id=DeepRecallFlow.personalNodeId(question.id);
-        customConversionUndo={instanceId,personalId:id,node:cloneValue(node)};
-        state.customNodes[id]={title:node.sourceKeyword||rootConfig(node.rootKey)?.title||node.title,prompt:'写下你对这个关键词的理解，再继续联想。',hint:'',choices:[]};
-        node.dataId=id;node.title=state.customNodes[id].title;node.custom=true;node.matchSource='manual-conversion';
-        saveProgress();renderGraphOnly();openNodeGuide(instanceId,null,{countOpen:false});
-      };
-      const undo=$('krUndoPersonalBtn');
-      if(undo)undo.onclick=()=>{
-        delete state.customNodes[customConversionUndo.personalId];
-        Object.keys(node).forEach(key=>{delete node[key]});Object.assign(node,customConversionUndo.node);
-        customConversionUndo=null;saveProgress();renderGraphOnly();openNodeGuide(instanceId,null,{countOpen:false});
       };
     }
     guide.querySelector('.kr-guide-close').onclick=closeGuide;

@@ -797,7 +797,16 @@ bindUnifiedCanvasColorPicker();
 $('mAddBtn').onclick=addAtCenter;$('mFlashcardBtn').onclick=()=>openFlashcards('current');$('mFitBtn').onclick=fitView;$('mZoomInBtn').onclick=()=>zoomAtCenterStep(1);$('mZoomOutBtn').onclick=()=>zoomAtCenterStep(-1);$('mGraphBtn').onclick=openGraphModal;$('mFocusBtn').onclick=toggleFocusMode;$('mSizeBtn').onclick=toggleNodeSize;$('mLineStyleBtn').onclick=toggleLineStyle;$('mLineColorPicker').oninput=e=>applyLineColor(e.target.value);
 $('mEditBtn').onclick=()=>{if(state.selectedNodeId)return openNodeModal(state.selectedNodeId);if(state.selectedLinkId)return openLinkModal(state.selectedLinkId);showStatus('请先选择一个知识点或关系线。')};
 $('mLinkBtn').onclick=()=>{if(state.selectedNodeId){const n=nodeById(state.selectedNodeId);if(typeof isNodeFullyLocked==='function'&&isNodeFullyLocked(n)){showStatus('该节点已锁定，不能建立关系；请先解锁。');return}const connection=typeof ensureGraphConnectionController==='function'?ensureGraphConnectionController():null;if(state.linkSourceId===state.selectedNodeId){if(connection)connection.cancel();else state.linkSourceId=null}else if(connection)connection.setSource(state.selectedNodeId);else state.linkSourceId=state.selectedNodeId;showStatus(state.linkSourceId?`“${n.title}”已设为连线起点，请单击另一个知识点建立关系。`:'已取消连线起点。');render({mode:'selection'});return}if(state.selectedLinkId){openLinkModal(state.selectedLinkId);return}showStatus('请先点击一个知识点作为连线起点。')};
-$('hideHelpBtn').onclick=()=>$('helpCard').classList.add('hide');
+// 说明弹窗 10 秒自动关闭（需求 2026-10-15）：手动关闭即取消；引导演示期间顺延，避免遮挡引导步骤。
+let helpAutoCloseTimer=0;
+function clearHelpAutoClose(){if(helpAutoCloseTimer){clearTimeout(helpAutoCloseTimer);helpAutoCloseTimer=0}}
+$('hideHelpBtn').onclick=()=>{clearHelpAutoClose();$('helpCard').classList.add('hide')};
+helpAutoCloseTimer=setTimeout(function helpAutoCloseTick(){
+  const help=$('helpCard');
+  if(!help||help.classList.contains('hide')){helpAutoCloseTimer=0;return}
+  if(help.classList.contains('guided-tour-temporary-hidden')||document.body.classList.contains('guided-tour-active')){helpAutoCloseTimer=setTimeout(helpAutoCloseTick,10000);return}
+  helpAutoCloseTimer=0;help.classList.add('hide');
+},10000);
 $('closeFlashcardBtn').onclick=closeFlashcards;
 $('flashToolsToggle').onclick=toggleFlashTools;
 $('flashCurrentBtn').onclick=()=>{flashMode='current';currentFlashIndex=0;setFlashToolsExpanded(false);renderFlashcards()};

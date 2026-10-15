@@ -8,7 +8,7 @@ ROOT=Path(__file__).resolve().parents[2]
 OUT=ROOT/'artifacts/graph-interaction-focus-fixes'
 
 def main():
-    parser=argparse.ArgumentParser();parser.add_argument('--output-dir',type=Path);parser.add_argument('--base-url',required=True);parser.add_argument('--section',choices=['all','tabs','card','focus','edges','curves','elbow','cancel-history','ports'],default='all');args=parser.parse_args()
+    parser=argparse.ArgumentParser();parser.add_argument('--output-dir',type=Path);parser.add_argument('--base-url',required=True);parser.add_argument('--section',choices=['all','tabs','card','focus','edges','curves','elbow','cancel-history','ports','lock'],default='all');args=parser.parse_args()
     base=args.base_url.rstrip('/');assert urlparse(base).hostname in ('localhost','127.0.0.1')
     out=args.output_dir or OUT;out.mkdir(parents=True,exist_ok=True)
     with sync_playwright() as pw:
@@ -285,6 +285,28 @@ def main():
             assert snapshot()['binding']==':b'
             page.evaluate('''()=>finishEdgeEndpointDrag({pointerId:772,preventDefault(){},stopPropagation(){}},true)''');check_cancelled(before)
             print('PASS cancel history: card, selection-bounds, curve-handle, whole-edge and endpoint cancellation retain prior redo and next undo',flush=True)
+        if args.section in ('all','lock'):
+            # 用户反馈：专业模式锁定卡牌后切高效模式，解锁图标必须保留且可点。
+            assert ctx.request.put(base+'/api/v1/files/current',data={'fileId':files[1]['id']}).ok
+            reload()
+            card=page.locator('.knowledge-card[data-node-id="a"]');box=card.bounding_box()
+            def select_a():
+                page.mouse.click(box['x']+box['width']/2,box['y']+box['height']/2);page.wait_for_timeout(300)
+            def switch_mode(mode):
+                page.locator('.graph-mode-trigger').click();page.locator('[data-graph-mode-option="'+mode+'"]').click();page.wait_for_function('!KGGraphFileTabs.isSwitching()');page.wait_for_timeout(200)
+            toolbar=page.locator('.node-style-toolbar');lock=toolbar.locator('[data-node-toolbar-action="lock"]')
+            select_a();expect(toolbar).to_be_visible();expect(lock).to_be_visible()
+            lock.click();page.wait_for_timeout(200)
+            expect(lock).to_have_attribute('aria-pressed','true')
+            switch_mode('professional');switch_mode('efficient')
+            # 高效模式（历史上 CSS 隐藏 lock 按钮）重新选中锁定卡牌：解锁图标保留且可解锁。
+            select_a();expect(lock).to_be_visible()
+            expect(lock).to_have_attribute('aria-pressed','true')
+            expect(lock).to_have_attribute('aria-label','解锁节点')
+            lock.click();page.wait_for_timeout(300)
+            expect(lock).to_have_attribute('aria-pressed','false')
+            flush()
+            print('PASS lock: unlock icon persists across professional→efficient switch and unlock works',flush=True)
         assert not errors,errors
         browser.close()
 if __name__=='__main__':main()
