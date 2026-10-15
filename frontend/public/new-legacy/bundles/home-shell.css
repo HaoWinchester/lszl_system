@@ -7898,6 +7898,14 @@ g.is-batch-selected .edge-visible{
 }
 /* style: styles/unified-canvas-runtime.css */
 /* V9.0-P4.3.0 unified canvas runtime */
+/* Viewport grid values belong to the surface. Inheriting animated values into
+   thousands of card descendants forces a full style pass on every zoom frame. */
+@property --uc-canvas-grid-size{syntax:"<length>";inherits:false;initial-value:24px}
+@property --uc-canvas-grid-major-size{syntax:"<length>";inherits:false;initial-value:96px}
+@property --uc-canvas-grid-x{syntax:"<length>";inherits:false;initial-value:0px}
+@property --uc-canvas-grid-y{syntax:"<length>";inherits:false;initial-value:0px}
+@property --uc-canvas-grid-major-x{syntax:"<length>";inherits:false;initial-value:0px}
+@property --uc-canvas-grid-major-y{syntax:"<length>";inherits:false;initial-value:0px}
 .uc-canvas-surface{--uc-canvas-bg:#f4f6f8;--uc-canvas-pattern-ink:rgba(71,85,105,.13);--uc-canvas-pattern-major-ink:rgba(71,85,105,.20);--uc-canvas-grid-size:24px;--uc-canvas-grid-major-size:96px;--uc-canvas-grid-x:0px;--uc-canvas-grid-y:0px;--uc-canvas-grid-major-x:0px;--uc-canvas-grid-major-y:0px;background-color:var(--uc-canvas-bg)!important;background-position:var(--uc-canvas-grid-x) var(--uc-canvas-grid-y),var(--uc-canvas-grid-major-x) var(--uc-canvas-grid-major-y)!important;background-attachment:local!important;transition:background-color .16s ease,color .16s ease}
 .uc-canvas-surface[data-canvas-pattern="dots"]{background-image:radial-gradient(circle,var(--uc-canvas-pattern-ink) 1.15px,transparent 1.2px)!important;background-size:var(--uc-canvas-grid-size) var(--uc-canvas-grid-size)!important}
 .uc-canvas-surface[data-canvas-pattern="grid"]{background-image:linear-gradient(var(--uc-canvas-pattern-ink) 1px,transparent 1px),linear-gradient(90deg,var(--uc-canvas-pattern-ink) 1px,transparent 1px),linear-gradient(var(--uc-canvas-pattern-major-ink) 1px,transparent 1px),linear-gradient(90deg,var(--uc-canvas-pattern-major-ink) 1px,transparent 1px)!important;background-size:var(--uc-canvas-grid-size) var(--uc-canvas-grid-size),var(--uc-canvas-grid-size) var(--uc-canvas-grid-size),var(--uc-canvas-grid-major-size) var(--uc-canvas-grid-major-size),var(--uc-canvas-grid-major-size) var(--uc-canvas-grid-major-size)!important;background-position:var(--uc-canvas-grid-x) var(--uc-canvas-grid-y),var(--uc-canvas-grid-x) var(--uc-canvas-grid-y),var(--uc-canvas-grid-major-x) var(--uc-canvas-grid-major-y),var(--uc-canvas-grid-major-x) var(--uc-canvas-grid-major-y)!important}
@@ -9172,6 +9180,19 @@ body.qw-selection-toolbar-motion .uc-selection-bounds,.stage.graph-card-dragging
 .graph-text-element.group-dragging{opacity:.9;transition:none!important}
 
 /* Temporary editor controls stay inside the session overlay. */
+.related-canvas-backdrop .related-canvas-info{left:18px;top:76px;width:min(380px,calc(100% - 36px));padding:20px;box-sizing:border-box;overflow:auto}
+.related-canvas-detail .detail-top{margin-bottom:16px}
+.related-canvas-detail .detail-name{overflow-wrap:anywhere}
+.related-canvas-detail .detail-grid>div:not(.label){white-space:pre-wrap;overflow-wrap:anywhere}
+.related-canvas-edit{margin-top:16px;border-top:1px solid #e2e8f0;padding-top:12px}
+.related-canvas-edit summary{cursor:pointer;color:#475569;font-weight:650}
+.related-canvas-edit form{margin-top:12px}
+@media(max-width:760px){
+  .related-canvas-backdrop .related-canvas-header{flex-direction:column;align-items:stretch;gap:10px;padding:12px}
+  .related-canvas-backdrop .related-canvas-header-actions{flex:0 1 auto;justify-content:flex-start;gap:6px}
+  .related-canvas-backdrop .related-canvas-header-actions button{padding:6px 9px;font-size:12px}
+  .related-canvas-backdrop .related-canvas-info{left:12px;top:90px;width:calc(100% - 24px);max-height:40%;padding:14px}
+}
 .related-canvas-backdrop .related-canvas-info label{display:block;margin-bottom:12px;font-size:13px;color:#334155}
 .related-canvas-backdrop .related-canvas-info input:not([type=color]),.related-canvas-backdrop .related-canvas-info textarea{display:block;width:100%;margin-top:5px;box-sizing:border-box}
 .related-canvas-backdrop .related-canvas-info textarea{min-height:80px;resize:vertical}
@@ -9544,7 +9565,8 @@ body[data-graph-interaction-mode="efficient"] .edge-hit{cursor:pointer}
 /* style: styles/home-selection-geometry-p4332.css */
 /* V9.0-P4.3.32 — 首页图元几何选框：固定屏幕 1px、单选四角手柄、多选逐图元无手柄。 */
 .stage{--home-selection-blue:#1d6fd8}
-.stage .world{
+.stage .knowledge-card,
+.stage .graph-text-element{
   --home-selection-blue:#1d6fd8;
   --home-selection-stroke:calc(1px * var(--graph-ui-inverse-scale,1));
   --home-selection-handle:calc(8px * var(--graph-ui-inverse-scale,1));

@@ -273,7 +273,7 @@ function currentEdgeBundlePlan(){
 function setLinkFreeEndpoint(link,side,point){if(!link)return;const key=linkEndpointPointKey(side),clean=normalizedEdgePoint(point);if(side==='from')link.from='';else link.to='';if(clean)link[key]=clean;else delete link[key]}
 function bindLinkEndpoint(link,side,nodeId){if(!link)return false;const node=nodeById(nodeId);if(!node)return false;const other=side==='from'?link.to:link.from;if(other&&other===node.id)return false;if(side==='from')link.from=node.id;else link.to=node.id;delete link[linkEndpointPointKey(side)];return true}
 function linkGeometryMidpoint(link){const dom=edgeDomById.get(String(link&&link.id||'')),samples=dom&&dom.geometry&&dom.geometry.samples;if(samples&&samples.length===2)return{x:(samples[0].x+samples[1].x)/2,y:(samples[0].y+samples[1].y)/2};if(samples&&samples.length)return samples[Math.floor(samples.length/2)];const points=linkRenderPoints(link,getGraphIndex().nodeMap);return points?{x:(points.ca.x+points.cb.x)/2,y:(points.ca.y+points.cb.y)/2}:null}
-function applyTransform(){const scale=Math.max(.01,Number(state.viewport.scale)||1);world.style.setProperty('--graph-ui-inverse-scale',String(1/scale));updateSelectedEdgeControlScale(scale);updateEdgeHoverFeedbackWidth(scale);const controller=ensureGraphViewportController();if(controller)return controller.apply(state.viewport);world.style.transform=`translate(${state.viewport.x}px, ${state.viewport.y}px) scale(${scale})`;updateCardQuickActionsPosition();updateSelectedEdgeQuickStylePosition();updateEdgeInlineLabelEditorPosition();if(typeof updateCanvasZoomControls==='function')updateCanvasZoomControls()}
+function applyTransform(){const scale=Math.max(.01,Number(state.viewport.scale)||1);updateSelectedEdgeControlScale(scale);updateEdgeHoverFeedbackWidth(scale);const controller=ensureGraphViewportController();if(controller)return controller.apply(state.viewport);world.style.transform=`translate(${state.viewport.x}px, ${state.viewport.y}px) scale(${scale})`;updateCardQuickActionsPosition();updateSelectedEdgeQuickStylePosition();updateEdgeInlineLabelEditorPosition();if(typeof updateCanvasZoomControls==='function')updateCanvasZoomControls()}
 function screenToWorld(clientX,clientY){const controller=ensureGraphViewportController();if(controller)return controller.screenToWorld(clientX,clientY,state.viewport);const r=stage.getBoundingClientRect();return{x:(clientX-r.left-state.viewport.x)/state.viewport.scale,y:(clientY-r.top-state.viewport.y)/state.viewport.scale}}
 function pathStyleForLink(link){
   const style=link&&link.pathStyle;
@@ -566,7 +566,7 @@ async function openRelatedCanvasModal(showMessage=true){
     if(!graph.nodes.length)return false;
     closeRelatedCanvasModal();
     const session=window.KGGraphSession.create({kind:'temporary',graph});
-    relatedCanvasController=window.KGRelatedCanvasController.create({session,model:window.KGGraphModel,nodeDims,idFactory:uid,renderCard:(n,context)=>renderCardElement(n,null,context),renderRelation:createGraphRelationPresentation,layoutEndpoints:(link,map)=>linkRenderPoints(link,map,{ignoreGather:true}),ensureMarkers:ensureGraphEdgeMarkers,onClose:()=>closeRelatedCanvasModal(true),readOnly:window.KGHomeInteractionModes?.getMode?.()==='reading'});
+    relatedCanvasController=window.KGRelatedCanvasController.create({session,initialNodeId:ids[0],renderImages:n=>graphImagesMarkup(n,true),model:window.KGGraphModel,nodeDims,idFactory:uid,renderCard:(n,context)=>renderCardElement(n,null,context),renderRelation:createGraphRelationPresentation,layoutEndpoints:(link,map)=>linkRenderPoints(link,map,{ignoreGather:true}),ensureMarkers:ensureGraphEdgeMarkers,onClose:()=>closeRelatedCanvasModal(true),readOnly:window.KGHomeInteractionModes?.getMode?.()==='reading'});
     relatedCanvasModalEl=relatedCanvasController.overlay;
     nodeStyleToolbarController?.hide();
     if(showMessage)showStatus(`已打开临时相关画布：${graph.nodes.length} 张卡片；关闭即丢弃修改。`);
@@ -926,9 +926,9 @@ function finishEdgeMoveDrag(event,cancelled=false){
   if(!cancelled&&drag.moved){suppressEdgeClickId=drag.linkId;suppressEdgeClickUntil=performance.now()+400;save();renderSelectedEdgeControls();renderSelectedEdgeQuickStylePanel();showStatus('关系线已独立移动，两个端点已解除节点绑定；可拖动端点重新绑定。')}else if(cancelled&&drag.moved)showStatus('已取消移动关系线。');
   if(drag.moved){event.preventDefault();event.stopPropagation()}return drag.moved;
 }
-function clearEdgeEndpointBindTarget(){if(edgeEndpointBindTargetId)cardElementByNodeId(edgeEndpointBindTargetId)?.classList.remove('edge-endpoint-bind-target');edgeEndpointBindTargetId=''}
+function clearEdgeEndpointBindTarget(){if(edgeEndpointBindTargetId)cardElementByNodeId(edgeEndpointBindTargetId)?.classList.remove('edge-endpoint-bind-target');edgeEndpointBindTargetId='';ensureGraphViewportController()?.syncControlScale()}
 function edgeEndpointTargetFromClient(clientX,clientY){const element=document.elementFromPoint(clientX,clientY),card=element&&element.closest&&element.closest('.knowledge-card[data-node-id]');if(!card||!cardsLayer.contains(card))return null;const node=nodeById(card.dataset.nodeId);return node&&!isNodeFullyLocked(node)?node:null}
-function setEdgeEndpointBindTarget(node){const id=node&&String(node.id)||'';if(id===edgeEndpointBindTargetId)return;clearEdgeEndpointBindTarget();if(id){edgeEndpointBindTargetId=id;cardElementByNodeId(id)?.classList.add('edge-endpoint-bind-target')}}
+function setEdgeEndpointBindTarget(node){const id=node&&String(node.id)||'';if(id===edgeEndpointBindTargetId)return;clearEdgeEndpointBindTarget();if(id){edgeEndpointBindTargetId=id;cardElementByNodeId(id)?.classList.add('edge-endpoint-bind-target');ensureGraphViewportController()?.syncControlScale()}}
 function beginEdgeEndpointDrag(event,linkId,side){
   if(!graphModeAllows('edgeAdvanced'))return false;
   if(isCanvasPanMode()||document.body.classList.contains('auth-readonly')||event.button!==0)return;
@@ -1740,6 +1740,7 @@ function refreshBoxSelectionElementClasses(previousNodes,previousText){
   const nodeIds=new Set([...(previousNodes||[]),...selectedNodeIds]);for(const id of nodeIds){const card=cardElementByNodeId(id);if(!card)continue;card.classList.toggle('multi-selected',selectedNodeIds.has(id));card.classList.toggle('active',state.selectedNodeId===id)}
   const multiTotal=selectedNodeIds.size+selectedTextElementIds.size+selectedLinkIds.size;
   const textIds=new Set([...(previousText||[]),...selectedTextElementIds]);for(const id of textIds){const element=textElementDomByIdValue(id);if(!element)continue;const selected=state.selectedElementId===id||selectedTextElementIds.has(id);element.classList.toggle('active',selected);element.classList.toggle('multi-selected',selected&&multiTotal>1)}
+  ensureGraphViewportController()?.syncControlScale();
   updateCardQuickActions();updateNodeGrowthHandles();
 }
 function applyBoxSelectionMove(point){
@@ -1943,7 +1944,7 @@ function fitTextElementToContent(item,options={}){
   const x=preserveCenter?Math.round(geometry.x+(geometry.width-size.width)/2):geometry.x,y=preserveCenter?Math.round(geometry.y+(geometry.height-size.height)/2):geometry.y;
   model.updateTextElementGeometry(item,{x,y,width:size.width,height:size.height,manualSize:false});return true;
 }
-function renderCards(){const editing=nodeInlineTextEditorController?.current(),frag=document.createDocumentFragment(),nextCardDom=new Map(),nextTextDom=new Map(),relationState=cardRelationState();for(const n of state.nodes){const card=editing?.nodeId===n.id&&editing.entityType==='node'?cardElementByNodeId(n.id)||renderCardElement(n,relationState):renderCardElement(n,relationState);nextCardDom.set(n.id,card);frag.appendChild(card)}for(const item of state.elements||[]){const el=editing?.nodeId===item.id&&editing.entityType==='text-element'?textElementDomByIdValue(item.id)||renderTextElement(item):renderTextElement(item);nextTextDom.set(item.id,el);frag.appendChild(el)}cardDomById=nextCardDom;textElementDomById=nextTextDom;cardsLayer.replaceChildren(frag);updateNodeGrowthHandles()}
+function renderCards(){const editing=nodeInlineTextEditorController?.current(),frag=document.createDocumentFragment(),nextCardDom=new Map(),nextTextDom=new Map(),relationState=cardRelationState();for(const n of state.nodes){const card=editing?.nodeId===n.id&&editing.entityType==='node'?cardElementByNodeId(n.id)||renderCardElement(n,relationState):renderCardElement(n,relationState);nextCardDom.set(n.id,card);frag.appendChild(card)}for(const item of state.elements||[]){const el=editing?.nodeId===item.id&&editing.entityType==='text-element'?textElementDomByIdValue(item.id)||renderTextElement(item):renderTextElement(item);nextTextDom.set(item.id,el);frag.appendChild(el)}cardDomById=nextCardDom;textElementDomById=nextTextDom;cardsLayer.replaceChildren(frag);ensureGraphViewportController()?.syncControlScale();updateNodeGrowthHandles()}
 function replaceCardDomForNode(id){
   if(nodeInlineTextEditorController?.current()?.nodeId===id){const node=nodeById(id),card=cardElementByNodeId(id);if(node&&card)card.style.cssText=renderCardElement(node,cardRelationState()).style.cssText;return false;}
   const node=nodeById(id),old=cardElementByNodeId(id);if(!node||!old)return false;
@@ -1976,6 +1977,7 @@ function refreshCardClasses(){
   }
   const multiTotal=selectedNodeIds.size+selectedTextElementIds.size+selectedLinkIds.size;
   for(const el of cardsLayer.querySelectorAll('.graph-text-element')){const item=textElementById(el.dataset.textElementId);if(!item){el.remove();continue}const selected=state.selectedElementId===item.id||selectedTextElementIds.has(item.id);el.classList.toggle('active',selected);el.classList.toggle('multi-selected',selected&&multiTotal>1)}
+  ensureGraphViewportController()?.syncControlScale();
   updateLargeGraphRelatedButton();
   updateCardQuickActions();
   updateNodeGrowthHandles();
@@ -3373,7 +3375,7 @@ function renderDetails(){
   const nodeColor=safeColor(n.color),nodeRelation=relatedScopeRelationForNode(n.id),anchor=nodeById(currentRelatedScopeAnchorId()),relationInfo=nodeRelation?`<div class="label">局部关系</div><div>${nodeRelation.relatedCount} 个相关知识点 ｜ ${nodeRelation.linkCount} 条关系${largeGraphRelatedFocusEnabled?` ｜ 只看相关中心：${escapeHTML(anchor?anchor.title:n.title)}`:''}</div>`:'';
   const scopeButtons=largeGraphRelatedFocusEnabled?`<button id="setScopeCenterBtn">以当前卡牌为中心</button><button id="fitScopeFromDetailBtn">适配相关</button>${isRelatedGatherActive()?'<button id="exitGatherLayoutBtn">退出聚拢</button>':''}`:'';
   const locked=isNodeFullyLocked(n),lockedAttr=locked?' disabled aria-disabled="true"':'';
-  detailPanel.innerHTML=`${tools}<div class="detail-top"><div class="detail-mini-icon" style="background:${nodeColor}">${escapeHTML((n.title||'?').slice(0,1))}</div><div><div class="detail-name">${escapeHTML(n.title||'未命名知识点')}</div><div class="detail-title">${escapeHTML(n.category||'未填写分类')} ${n.level?`｜${escapeHTML(n.level)}`:''}</div></div></div><div class="detail-grid">${relationInfo}<div class="label">关键词</div><div>${escapeHTML(n.keywords||'—')}</div><div class="label">说明</div><div>${escapeHTML(n.summary||'—')}</div><div class="label">学习提示</div><div>${escapeHTML(n.notes||'—')}</div></div>${graphImagesMarkup(n,true)}<button id="graphPracticeBtn" type="button" class="primary">做题</button><div class="detail-actions"><button id="editFromDetailBtn" class="primary"${lockedAttr}>编辑知识点</button>${scopeButtons}<button id="toggleSourceBtn"${lockedAttr}>${state.linkSourceId===n.id?'取消起点':'设为连线起点'}</button><button id="deleteNodeFromDetailBtn" class="danger"${lockedAttr}>删除知识点</button></div>`;
+  detailPanel.innerHTML=`${tools}${window.KGGraphNodeDetailView.render(n,{relationMarkup:relationInfo,imagesMarkup:graphImagesMarkup(n,true)})}<button id="graphPracticeBtn" type="button" class="primary">做题</button><div class="detail-actions"><button id="editFromDetailBtn" class="primary"${lockedAttr}>编辑知识点</button>${scopeButtons}<button id="toggleSourceBtn"${lockedAttr}>${state.linkSourceId===n.id?'取消起点':'设为连线起点'}</button><button id="deleteNodeFromDetailBtn" class="danger"${lockedAttr}>删除知识点</button></div>`;
   detailPanel.classList.add('show');bindDetailBasics();const practice=$('graphPracticeBtn');practice.disabled=!window.KGGraphFileEditorStoreBridge?.fragmentSource?.().fileId;practice.onclick=()=>{graphQuestionDrawer=graphQuestionDrawer||window.KGGraphQuestionDrawer.create({getContext:()=>relatedCanvasController?null:window.KGGraphFileEditorStoreBridge.fragmentSource()});graphQuestionDrawer.open(n)};$('editFromDetailBtn').onclick=()=>openNodeModal(n.id);const setScopeBtn=$('setScopeCenterBtn');if(setScopeBtn)setScopeBtn.onclick=()=>setRelatedScopeCenter(n.id);const fitScopeBtn=$('fitScopeFromDetailBtn');if(fitScopeBtn)fitScopeBtn.onclick=()=>fitRelatedScopeToView(true);const exitGatherBtn=$('exitGatherLayoutBtn');if(exitGatherBtn)exitGatherBtn.onclick=()=>clearRelatedGatherLayout({render:true,message:true});$('toggleSourceBtn').onclick=()=>{if(isNodeFullyLocked(n)){showStatus('该节点已锁定，不能建立关系；请先解锁。');return}const connection=ensureGraphConnectionController();if(state.linkSourceId===n.id){if(connection)connection.cancel();else state.linkSourceId=null}else if(connection)connection.setSource(n.id);else state.linkSourceId=n.id;showStatus(state.linkSourceId?`“${n.title}”已设为连线起点。`:'已取消连线起点。');render({mode:'selection'})};$('deleteNodeFromDetailBtn').onclick=()=>deleteNode(n.id);
 }
 function closeDetailPanel(){hoverDetailNodeId=null;clearTimeout(hoverDetailTimer);resetDetailPanelPosition();clearSelection()}
@@ -4120,6 +4122,7 @@ function graphHasVisibleNode(){
   return state.nodes.some(node=>{const p=visualPositionForNode(node),d=nodeDims(node),left=vx+p.x*scale,top=vy+p.y*scale,right=left+d.w*scale,bottom=top+d.h*scale;return right>8&&bottom>8&&left<r.width-8&&top<r.height-8});
 }
 function recoverMobileGraphViewport(){
+  if(relatedCanvasModalEl||relatedCanvasOpening)return false;
   const r=stage.getBoundingClientRect();
   if(r.width>650||r.width<1||r.height<1||!state.nodes.length||graphHasVisibleNode())return false;
   const bounds=boundsForNodes(state.nodes);if(!bounds)return false;

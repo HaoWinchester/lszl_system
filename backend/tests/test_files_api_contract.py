@@ -11,6 +11,25 @@ def login(client: TestClient, username: str) -> None:
     assert response.status_code == 200, response.text
 
 
+def test_teacher_can_save_and_reopen_large_graph_without_student_card_quota() -> None:
+    with TestClient(app) as client:
+        login(client, "老师")
+        nodes = [{"id": f"n-{i}", "title": str(i), "x": i * 10, "y": 100} for i in range(495)]
+        created = client.post("/api/v1/files", json={"name": "teacher-large-graph", "graphData": {"nodes": nodes, "links": []}})
+        assert created.status_code == 200, created.text
+        record = created.json()["file"]
+        try:
+            nodes.append({"id": "n-495", "title": "新增卡牌"})
+            saved = client.put(f"/api/v1/files/{record['id']}", json={"graphData": {"nodes": nodes, "links": []}, "expectedRevision": record["revision"]})
+            assert saved.status_code == 200, saved.text
+            reopened = client.get(f"/api/v1/files/{record['id']}")
+            assert reopened.status_code == 200, reopened.text
+            assert len(reopened.json()["graphData"]["nodes"]) == 496
+        finally:
+            client.delete(f"/api/v1/files/{record['id']}")
+            client.delete(f"/api/v1/files/{record['id']}/permanent")
+
+
 def test_save_uses_expected_revision_and_returns_structured_conflict() -> None:
     with TestClient(app) as client:
         login(client, "学生")

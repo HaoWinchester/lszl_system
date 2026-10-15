@@ -19,12 +19,27 @@
     const inkButton=readOnly()?'':'<button data-action="ink" aria-label="画笔" title="画笔（在临时画布上书写标注，关闭即丢弃）"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 4 5 5M4 20l5-1L20 8a2 2 0 0 0-5-5L4 14z"></path></svg></button>';
     const editButtons=readOnly()?'':'<button data-action="add">新增卡片</button><button data-action="connect">连线</button><button data-action="delete">删除</button>'+inkButton+'<button data-action="undo">撤销</button><button data-action="redo">重做</button>';
     const overlay=document.createElement('div');overlay.className='related-canvas-backdrop';overlay.dataset.stageUi='true';
-    overlay.innerHTML='<section class="related-canvas-dialog" role="dialog" aria-modal="true" aria-label="临时相关画布"><header class="related-canvas-header"><div><strong>临时相关画布</strong><span>'+(readOnly()?'只读查看：仅供演示浏览，不提供编辑':'修改仅在本次视图中有效，关闭即丢弃；题目功能不可用')+'</span></div><div class="related-canvas-header-actions">'+editButtons+'<button data-action="fit">适应</button><button data-action="fullscreen">全屏</button><button class="related-canvas-close" data-action="close" aria-label="退出临时画布"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"></path></svg></button></div></header><div class="related-canvas-body"><div class="related-canvas-viewport"><div class="related-canvas-stage"><svg class="related-canvas-edges"></svg><div class="related-canvas-cards"></div></div></div></div></section>';
-    const body=overlay.querySelector('.related-canvas-body'),stage=overlay.querySelector('.related-canvas-stage'),cards=overlay.querySelector('.related-canvas-cards'),svg=overlay.querySelector('.related-canvas-edges'),viewportEl=overlay.querySelector('.related-canvas-viewport');
+    overlay.innerHTML='<section class="related-canvas-dialog" role="dialog" aria-modal="true" aria-label="临时相关画布"><header class="related-canvas-header"><div><strong>临时相关画布</strong><span>'+(readOnly()?'只读查看：仅供演示浏览，不提供编辑':'修改仅在本次视图中有效，关闭即丢弃；题目功能不可用')+'</span></div><div class="related-canvas-header-actions">'+editButtons+'<button data-action="fit">适应</button><button data-action="fullscreen">全屏</button><button class="related-canvas-close" data-action="close" aria-label="退出临时画布"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"></path></svg></button></div></header><div class="related-canvas-body"><div class="related-canvas-viewport"><div class="related-canvas-stage"><svg class="related-canvas-edges"></svg><div class="related-canvas-cards"></div></div></div></div><section class="related-canvas-info"><div class="related-canvas-detail"></div><p class="related-canvas-empty"></p></section></section>';
+    const body=overlay.querySelector('.related-canvas-body'),stage=overlay.querySelector('.related-canvas-stage'),cards=overlay.querySelector('.related-canvas-cards'),svg=overlay.querySelector('.related-canvas-edges'),viewportEl=overlay.querySelector('.related-canvas-viewport'),info=overlay.querySelector('.related-canvas-info'),detail=overlay.querySelector('.related-canvas-detail');
     cards.style.pointerEvents='none';
     const viewport={x:0,y:0,scale:1};
     function applyViewport(){stage.style.width='10000px';stage.style.height='10000px';stage.style.transform=`translate(${viewport.x}px,${viewport.y}px) scale(${viewport.scale})`}
-    function fit(){let x=Infinity,y=Infinity,right=-Infinity,bottom=-Infinity;for(const n of graph().nodes){const g=model.geometryOf(n),d=nodeDims(n);x=Math.min(x,g.x);y=Math.min(y,g.y);right=Math.max(right,g.x+d.w);bottom=Math.max(bottom,g.y+d.h)}if(!Number.isFinite(x))return;viewport.scale=Math.max(.05,Math.min(1.15,(body.clientWidth-120)/Math.max(1,right-x),(body.clientHeight-120)/Math.max(1,bottom-y)));viewport.x=body.clientWidth/2-(x+right)/2*viewport.scale;viewport.y=body.clientHeight/2-(y+bottom)/2*viewport.scale;applyViewport()}
+    function fit(){
+      info.style.top=`${body.offsetTop+12}px`;
+      let x=Infinity,y=Infinity,right=-Infinity,bottom=-Infinity;
+      for(const n of graph().nodes){const g=model.geometryOf(n),d=nodeDims(n);x=Math.min(x,g.x);y=Math.min(y,g.y);right=Math.max(right,g.x+d.w);bottom=Math.max(bottom,g.y+d.h)}
+      if(!Number.isFinite(x))return;
+      const narrow=body.clientWidth<=760,left=narrow?0:Math.min(info.offsetWidth+36,body.clientWidth*.45),top=narrow?Math.min(info.offsetHeight+24,body.clientHeight*.48):0;
+      const width=Math.max(100,body.clientWidth-left),height=Math.max(100,body.clientHeight-top);
+      viewport.scale=Math.max(.05,Math.min(1.15,(width-80)/Math.max(1,right-x),(height-80)/Math.max(1,bottom-y)));
+      viewport.x=left+width/2-(x+right)/2*viewport.scale;viewport.y=top+height/2-(y+bottom)/2*viewport.scale;applyViewport();
+    }
+    function details(){
+      const n=node(graph().selectedNodeId);info.hidden=!n;if(!n)return;
+      const links=graph().links.filter(l=>l.from===n.id||l.to===n.id),related=new Set(links.flatMap(l=>[l.from,l.to]).filter(id=>id!==n.id));
+      detail.innerHTML=global.KGGraphNodeDetailView.render(n,{relationMarkup:`<div class="label">局部关系</div><div>${related.size} 个相关知识点 ｜ ${links.length} 条关系</div>`,imagesMarkup:options.renderImages?.(n)||''});
+      info.querySelector('.related-canvas-empty').textContent=links.length?'':'此卡片没有一跳关联内容，可在此查看详情。';
+    }
     const selection=global.KGGraphSelectionController.create({getState:graph,getNodeSet:()=>nodeIds,setNodeSet:value=>nodeIds=value,getLinkSet:()=>linkIds,setLinkSet:value=>linkIds=value,onChange:()=>renderer.render()});
     const connection=global.KGGraphConnectionController.create({getState:graph,getNode:node,relationExists:(a,b)=>graph().links.some(l=>l.from===a&&l.to===b),createLink:(from,to)=>({id:idFactory('l'),from,to,type:'',color:'#64748b',lineStyle:'solid',pathStyle:'curve'}),addLink:link=>session.history.run('临时连线',()=>graph().links.push(link)),onChange:()=>renderer.render('full',{persist:true})});
     // 画笔（本次视图内书写标注，不持久化）：局部笔迹数组随弹层关闭丢弃，undo/redo 独立于图形历史。
@@ -56,8 +71,8 @@
         if(label){label.classList.add('related-canvas-label');label.style.pointerEvents='none';svg.append(label)}
       }
     }
-    function renderCards(){cards.replaceChildren();for(const n of graph().nodes){const card=renderCard(n,{state:graph(),selectedNodeIds:nodeIds,position:model.geometryOf(n)});card.classList.add('related-canvas-card');card.style.pointerEvents='auto';card.querySelectorAll('.node-size-tools,.graph-node-resize-layer').forEach(el=>el.remove());card.addEventListener('pointerdown',e=>{if(e.button!==0)return;e.preventDefault();if(readOnly())return;if(connection.source()){connection.connectTo(n.id);return}selection.selectNodes([n.id]);const g=model.geometryOf(n);drag={id:n.id,pointerId:e.pointerId,x:e.clientX,y:e.clientY,start:g};body.setPointerCapture(e.pointerId)});cards.append(card)}}
-    const renderer=global.KGGraphRenderer.create({renderCards,renderEdges,renderDetails:()=>{},applyViewport,persist:()=>session.persist()});
+    function renderCards(){cards.replaceChildren();for(const n of graph().nodes){const card=renderCard(n,{state:graph(),selectedNodeIds:nodeIds,position:model.geometryOf(n)});card.classList.add('related-canvas-card');card.style.pointerEvents='auto';card.querySelectorAll('.node-size-tools,.graph-node-resize-layer').forEach(el=>el.remove());card.addEventListener('pointerdown',e=>{if(e.button!==0)return;e.preventDefault();if(readOnly()){selection.selectNodes([n.id]);return}if(connection.source()){connection.connectTo(n.id);return}selection.selectNodes([n.id]);const g=model.geometryOf(n);drag={id:n.id,pointerId:e.pointerId,x:e.clientX,y:e.clientY,start:g};body.setPointerCapture(e.pointerId)});cards.append(card)}}
+    const renderer=global.KGGraphRenderer.create({renderCards,renderEdges,renderDetails:details,applyViewport,persist:()=>session.persist()});
     function mutate(label,work){session.history.run(label,work);renderer.render('full',{persist:true})}
     function remove(){const s=graph();if(s.selectedNodeId)mutate('临时删除卡片',()=>{const id=s.selectedNodeId;s.nodes=s.nodes.filter(n=>n.id!==id);s.links=s.links.filter(l=>l.from!==id&&l.to!==id);s.selectedNodeId=null});else if(s.selectedLinkId)mutate('临时删除连线',()=>{s.links=s.links.filter(l=>l.id!==s.selectedLinkId);s.selectedLinkId=null})}
     function action(name){
@@ -72,7 +87,7 @@
       else if(name==='undo'||name==='redo'){session.history[name]();renderer.render()}
       else if(name==='delete')remove();
       else if(name==='connect')connection.setSource(graph().selectedNodeId);
-      else if(name==='add'){const id=idFactory('n');mutate('临时新增卡片',()=>graph().nodes.push(model.normalizeNode({id,title:'临时新卡片',x:(body.clientWidth/2-viewport.x)/viewport.scale,y:(body.clientHeight/2-viewport.y)/viewport.scale})));selection.selectNodes([id])}
+      else if(name==='add'){const id=idFactory('n');mutate('临时新增卡片',()=>{const nodes=graph().nodes,x=nodes.length?Math.max(...nodes.map(n=>model.geometryOf(n).x+nodeDims(n).w))+48:0,y=nodes.length?Math.min(...nodes.map(n=>model.geometryOf(n).y)):0;nodes.push(model.normalizeNode({id,title:'临时新卡片',x,y}))});selection.selectNodes([id]);fit()}
     }
     overlay.addEventListener('click',e=>{const button=e.target.closest('[data-action]');if(button)action(button.dataset.action);e.stopPropagation()});
     overlay.addEventListener('pointerdown',e=>e.stopPropagation());
@@ -100,9 +115,10 @@
     // keydown 挂 window 捕获：必须先于画笔内核的 window 级 ESC 处理（ink 晚于弹层注册），否则
     // ink 会先把工具切回 select，导致弹层把「退出绘画」误判成「关闭弹层」。
     global.addEventListener('keydown',key,true);for(const type of ['copy','cut','paste'])document.addEventListener(type,clipboard,true);
-    if(!readOnly())global.KGGraphMindmapThemes.controls(overlay.querySelector('section'),{getGraph:graph,getSelectedIds:()=>[...new Set([...nodeIds,graph().selectedNodeId].filter(Boolean))],runLayout:settings=>mutate('临时布局',()=>global.KGGraphMindmapLayout.apply(graph(),{...settings,model,endpoints:options.layoutEndpoints})),runTheme:settings=>mutate('临时主题',()=>global.KGGraphMindmapThemes.apply(graph(),{...settings,model}))});
     (options.host||document.body).append(overlay);const unmount=global.KGCanvasDomInteraction.mountOverlay(overlay);document.body.classList.add('related-canvas-open');
-    graph().selectedNodeId=graph().nodes[0]?.id||null;renderer.render();fit();
+    graph().selectedNodeId=node(options.initialNodeId)?.id||graph().nodes[0]?.id||null;
+    global.KGGraphMindmapLayout.apply(graph(),{rootIds:[graph().selectedNodeId,...graph().nodes.map(n=>n.id)].filter(Boolean),direction:'right',model,endpoints:options.layoutEndpoints});
+    renderer.render();fit();
     function close(){
       if(closed)return;closed=true;
       if(drag){try{body.releasePointerCapture(drag.pointerId)}catch{}drag=null}

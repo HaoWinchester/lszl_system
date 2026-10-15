@@ -24,6 +24,7 @@
   }
 
   function request(path, options = {}) {
+    const owner = global.KGAuthCore?.currentUser?.()?.username
     const separator = path.startsWith('/') || path.startsWith('?') ? '' : '/'
     return fetch(API_ROOT + separator + path, {
       credentials: 'include',
@@ -35,6 +36,7 @@
         throw new Error('UNAUTHENTICATED')
       }
       const payload = await response.json().catch(() => ({}))
+      if (owner !== global.KGAuthCore?.currentUser?.()?.username) throw new Error('UNAUTHENTICATED')
       if (!response.ok) throw new Error(text(payload.detail) || 'REQUEST_FAILED')
       return payload
     })
@@ -68,6 +70,7 @@
     const payload = await request(encodeURIComponent(id) + '/toggle', { method: 'POST' })
     remember(id, payload.favorited)
     countCache.delete(id)
+    document.dispatchEvent(new CustomEvent('kg:question-favorites-changed', { detail: { questionId: id } }))
     return { questionId: id, favorited: !!payload.favorited }
   }
 
@@ -129,6 +132,8 @@
   const drawerState = { search: '', items: [], nextCursor: null, controls: null, loading: false }
 
   const boundControls = new Set()
+  let detailRequest = 0
+  let listRequest = 0
 
   function bindControls(controls) {
     if (!controls) return
@@ -181,6 +186,8 @@
   }
 
   async function loadFirstPage() {
+    listRequest++
+    drawerState.loading = false
     drawerState.items = []
     drawerState.nextCursor = null
     await fetchPage(true)
@@ -194,17 +201,18 @@
     const controls = drawerState.controls
     if (!controls || drawerState.loading) return
     drawerState.loading = true
+    const requestId = ++listRequest
     syncControls()
     try {
       const payload = await fetchList(reset ? null : drawerState.nextCursor, 50, drawerState.search)
+      if (requestId !== listRequest) return
       const items = payload.favorites || []
       items.forEach(item => remember(item.questionId, true))
       drawerState.items = reset ? items : drawerState.items.concat(items)
       drawerState.nextCursor = payload.nextCursor || null
       renderDrawerList()
     } finally {
-      drawerState.loading = false
-      syncControls()
+      if (requestId === listRequest) { drawerState.loading = false; syncControls() }
     }
   }
 
@@ -272,8 +280,11 @@
   async function openDetail(questionId) {
     const controls = drawerState.controls
     if (!controls || !controls.detail) return
+    const requestId = ++detailRequest
+    const owner = global.KGAuthCore?.currentUser?.()?.username
     try {
       const detail = await request('detail?question_id=' + encodeURIComponent(questionId))
+      if (requestId !== detailRequest || owner !== global.KGAuthCore?.currentUser?.()?.username) return
       controls.detail.innerHTML = detailMarkup(detail)
       global.KGQuestionMaterials?.bindMedia(controls.detail)
       controls.detail.hidden = false
@@ -285,6 +296,7 @@
   }
 
   function closeDetail() {
+    detailRequest++
     const controls = drawerState.controls
     if (!controls || !controls.detail) return
     controls.detail.hidden = true
@@ -312,7 +324,10 @@
     return { total: drawerState.items.length }
   }
 
-  document.addEventListener('kg-auth-session-change', () => { cache.clear(); countCache.clear(); drawerState.items = [] })
+  global.addEventListener('kg-auth-session-change', () => {
+    listRequest++; cache.clear(); countCache.clear(); drawerState.items = []; drawerState.nextCursor = null; drawerState.loading = false
+    closeDetail(); renderDrawerList(); syncControls()
+  })
 
-  global.KGQuestionFavorites = Object.freeze({ status, isFavorited, toggle, count, questionCount, counts, renderList, fetchList, openDetail, closeDetail })
+  global.KGQuestionFavorites = Object.freeze({ status, isFavorited, toggle, count, questionCount, counts, configure: bindControls, renderList, fetchList, openDetail, closeDetail })
 })(window);

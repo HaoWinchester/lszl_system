@@ -73,6 +73,7 @@
       "retainStyleArtifact": true,
       "scripts": [
         "src/graph/graph-model.js",
+        "src/graph/node-detail-view.js",
         "src/graph/xmind-import-controller.js",
         "src/graph/edge-geometry.js",
         "src/graph/edge-bundle.js",

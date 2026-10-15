@@ -9,7 +9,8 @@ def main():
     with sync_playwright() as pw:
         browser=pw.chromium.launch(channel='chrome');ctx=browser.new_context(viewport={'width':1440,'height':1000})
         assert ctx.request.post(base+'/api/v1/auth/login',data={'username':'ink-browser','password':'ink-browser-test'}).ok
-        graph={'nodes':[{'id':i,'title':i,'x':x,'y':y,'cardStyle':'rounded'} for i,x,y in [('a',400,300),('b',750,300),('c',750,550),('d',1000,550),('isolated',350,650)]],'links':[{'id':'ab','from':'a','to':'b','type':'先决条件','arrowStyle':'both','lineStyle':'dashed','strokeWidth':6,'color':'#db2777','pathStyle':'curve','fromPort':'left','toPort':'top','curveControls':[{'x':300,'y':100},{'x':850,'y':120}]},{'id':'bc','from':'b','to':'c'},{'id':'cd','from':'c','to':'d'}]}
+        graph={'nodes':[{'id':i,'title':i,'x':x,'y':y,'cardStyle':'rounded'} for i,x,y in [('a',400,300),('b',20000,300),('c',22000,550),('d',25000,550),('isolated',350,650)]],'links':[{'id':'ab','from':'a','to':'b','type':'先决条件','arrowStyle':'both','lineStyle':'dashed','strokeWidth':6,'color':'#db2777','pathStyle':'curve','fromPort':'left','toPort':'top','curveControls':[{'x':300,'y':100},{'x':850,'y':120}]},{'id':'bc','from':'b','to':'c'},{'id':'cd','from':'c','to':'d'}]}
+        graph['nodes'][0].update(category='知识领域', level='重点', keywords='章程,变更控制', summary='整合项目整体协调', notes='把它看成总控台')
         files=[]
         for data in [graph,{'nodes':[],'links':[]}]:
             r=ctx.request.post(base+'/api/v1/files',data={'name':'临时'+uuid.uuid4().hex[:6],'graphData':data});assert r.ok;files.append(r.json()['file'])
@@ -25,12 +26,18 @@ def main():
             assert page.evaluate('openRelatedCanvasModal(false)') is True
             expect(page.locator('.related-canvas-backdrop')).to_be_visible();page.wait_for_timeout(100);writes.clear()
         open_selected(['a','c']);assert page.locator('.related-canvas-card').count()==4
+        expect(page.locator('.related-canvas-detail .detail-name')).to_have_text('a')
+        expect(page.locator('.related-canvas-detail')).to_contain_text('章程,变更控制')
+        expect(page.locator('.related-canvas-detail')).to_contain_text('把它看成总控台')
+        assert page.locator('.related-canvas-backdrop [data-mindmap-controls]').count()==0
+        page.screenshot(path=str(out/'temporary-details-gather-desktop.png'))
+        assert page.evaluate('(()=>{const ns=relatedCanvasController.session.getState().nodes;return Math.max(...ns.map(n=>n.x))-Math.min(...ns.map(n=>n.x))})()')<2000
         assert page.evaluate('relatedCanvasController.session.getState().nodes[0].x')==400
         assert page.evaluate('JSON.stringify(state.viewport)')==view
         expect(page.locator('.related-canvas-label')).to_contain_text('先决条件')
         edge=page.locator('.related-canvas-edge[data-link-id="ab"]');assert edge.get_attribute('marker-end') and edge.get_attribute('marker-start');assert edge.get_attribute('stroke-dasharray')=='24 12'
         expected=page.evaluate('(()=>{const l=relatedCanvasController.session.getState().links[0],m=new Map(relatedCanvasController.session.getState().nodes.map(n=>[n.id,n])),p=linkRenderPoints(l,m,{ignoreGather:true});return linkPathGeometry(l,p.a,p.b,p).d})()');assert edge.get_attribute('d')==expected
-        assert '300 100' in expected and '850 120' in expected
+        assert page.evaluate('relatedCanvasController.session.getState().links[0].curveControls.length')==2
         assert page.locator('.related-canvas-backdrop [data-question-id]').count()==0
         # 临时编辑表单已按需求移除；顶部画笔按钮开关局部画笔（笔迹不持久化，关闭即丢弃）。
         assert page.locator('.related-canvas-backdrop form').count()==0
@@ -61,8 +68,19 @@ def main():
         assert not writes,writes
         saved=ctx.request.get(base+'/api/v1/files/'+files[0]['id']).json()['graphData'];assert len(saved['nodes'])==5 and saved['nodes'][0]['title']=='a'
         page.screenshot(path=str(out/'temporary.png'));page.locator('[data-action="close"]').click()
+        open_selected(['b']);expect(page.locator('.related-canvas-detail .detail-name')).to_have_text('b');page.locator('.related-canvas-card[data-node-id="a"]').click();expect(page.locator('.related-canvas-detail .detail-name')).to_have_text('a');page.locator('[data-action="close"]').click()
         open_selected(['a']);assert page.locator('.related-canvas-card').count()==2;page.locator('[data-action="close"]').click()
-        open_selected(['isolated']);assert page.locator('.related-canvas-card').count()==1;page.locator('[data-action="close"]').click()
+        open_selected(['isolated']);assert page.locator('.related-canvas-card').count()==1;expect(page.locator('.related-canvas-empty')).to_contain_text('没有一跳关联')
+        page.locator('[data-action="close"]').click()
+        page.set_viewport_size({'width':390,'height':844});page.wait_for_timeout(200);page.evaluate('recoverMobileGraphViewport()');page.wait_for_function('!fitViewAnimationFrame&&!graphSmoothZoomFrame')
+        mobile_before=page.evaluate('JSON.stringify(saveableState())')
+        open_selected(['a']);expect(page.locator('.related-canvas-detail')).to_contain_text('把它看成总控台')
+        page.locator('.related-canvas-card[data-node-id="b"]').click();expect(page.locator('.related-canvas-detail .detail-name')).to_have_text('b')
+        page.screenshot(path=str(out/'temporary-details-mobile.png'));page.locator('[data-action="close"]').click()
+        mobile_after=page.evaluate('JSON.stringify(saveableState())')
+        assert mobile_after==mobile_before,[(k,json.loads(mobile_before).get(k),v) for k,v in json.loads(mobile_after).items() if json.loads(mobile_before).get(k)!=v]
+        page.set_viewport_size({'width':1440,'height':1000});page.wait_for_timeout(200)
+        before=page.evaluate('JSON.stringify(saveableState())');view=page.evaluate('JSON.stringify(state.viewport)')
         # While a save waits, a newly typed formal draft must remain visible, even on success.
         page.evaluate("()=>{window.savedPersist=persistCurrentGraphNow;window.persistCurrentGraphNow=()=>new Promise(resolve=>window.finishDelayedSave=resolve);window.openResult=null;selectedNodeIds=new Set(['a']);state.selectedNodeId='a';openRelatedCanvasModal(false).then(ok=>window.openResult=ok)}")
         page.wait_for_function('!!window.finishDelayedSave');page.evaluate("startNodeInlineEdit('a')");page.evaluate('()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))')

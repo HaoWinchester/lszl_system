@@ -27,7 +27,7 @@ test('related canvas supports read-only mode and a local ink tool',()=>{
   assert.match(controller,/const readOnly=\(\)=>!!options\.readOnly/);
   assert.match(controller,/readOnly\(\)\?'':'<button data-action="add">新增卡片<\/button>/);
   assert.match(controller,/只读查看：仅供演示浏览/);
-  assert.match(controller,/if\(readOnly\(\)\)return;if\(connection\.source\(\)\)/);
+  assert.match(controller,/if\(readOnly\(\)\)\{selection\.selectNodes\(\[n\.id\]\);return\}if\(connection\.source\(\)\)/);
   assert.match(controller,/if\(readOnly\(\)&&name!=='fit'&&name!=='fullscreen'\)return/);
   // 临时编辑表单整体移除。
   assert.ok(!controller.includes('应用临时修改'),'临时编辑表单应已移除');

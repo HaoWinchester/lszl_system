@@ -229,6 +229,8 @@ def main():
             def elbow_waypoints():
                 return page.evaluate('''()=>{const link=state.links.find(l=>l.id==='ab');return{stored:(link.waypoints||[]).map(p=>({...p})),controls:edgeDomById.get('ab').geometry.controls.map(p=>({x:p.x,y:p.y})),style:link.pathStyle}}''')
             seeded=elbow_waypoints();assert seeded['style']=='elbow' and len(seeded['controls'])==2,seeded
+            # 前序曲线测试保留 125% 缩放，屏幕像素需换算为画布坐标。
+            drag_scale=page.evaluate('state.viewport.scale')
             handle=page.locator('.edge-control-handle[data-edge-control-index="0"] .edge-control-hit');box=handle.bounding_box();assert box,'elbow handle visible'
             x=box['x']+box['width']/2;y=box['y']+box['height']/2
             page.mouse.move(x,y);page.mouse.down();assert page.evaluate('!!edgeControlDrag')
@@ -236,7 +238,7 @@ def main():
             dragged=elbow_waypoints()
             origin=seeded['stored'][0] if seeded['stored'] else seeded['controls'][0]
             # a→b 整体水平主导 → 默认折线中间段垂直 → 只允许水平拖动（y 锁定）。
-            assert abs(dragged['stored'][0]['x']-(origin['x']+36))<1e-6,dragged
+            assert abs(dragged['stored'][0]['x']-(origin['x']+36/drag_scale))<1e-6,(drag_scale,origin,dragged)
             assert abs(dragged['stored'][0]['y']-origin['y'])<1e-6,dragged
             flush();reload()
             assert elbow_waypoints()['stored']==dragged['stored']

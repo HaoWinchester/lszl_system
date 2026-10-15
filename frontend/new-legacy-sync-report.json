@@ -1,13 +1,14 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.322",
-  "toVersion": "v9.0-p4.1.322",
+  "fromVersion": "v9.0-p4.1.328",
+  "toVersion": "v9.0-p4.1.329",
   "changes": {
-    "added": [
-      "tests/help-card-auto-close-browser.py",
-      "tests/help-card-auto-close.test.js"
+    "added": [],
+    "changed": [
+      "VERSION",
+      "content-prep-studio/dist/content-prep.html",
+      "tests/graph-interaction-focus-browser.py"
     ],
-    "changed": [],
     "removed": []
   },
   "incompatible": []

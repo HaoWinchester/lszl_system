@@ -9,11 +9,13 @@ console.log('paper-presentation-ok');
 const fs=require('node:fs'),path=require('node:path');
 const controller=fs.readFileSync(path.join(__dirname,'../src/100-practice-mode.js'),'utf8');
 const vm=require('node:vm');
-const context={global:{KGPaperPresentation:presentation},state:{selectedPaperId:''},paperAccess:()=>({allowed:true}),escapeHTML:String,vipBadge:()=>'',Number};
+const context={global:{KGPaperPresentation:presentation},state:{selectedPaperId:''},paperAccess:()=>({allowed:true}),paperCoverage:row=>row.coverage,coverageText:()=>'',escapeHTML:String,vipBadge:()=>'',Number};
 vm.createContext(context);
 vm.runInContext(controller.slice(controller.indexOf('  function paperCardMarkup('),controller.indexOf('  function syncSelectedPaperCards(')),context);
 assert.match(context.paperCardMarkup({id:'new',publishedAt:Date.now(),name:'新卷'}),/practice-paper-latest/);
 assert.doesNotMatch(context.paperCardMarkup({id:'old',publishedAt:Date.now()-4*day,name:'旧卷'}),/practice-paper-latest/);
+assert.match(context.paperCardMarkup({id:'progress',coverage:{completedCount:3,totalCount:10}}),/--paper-progress:30%/);
+assert.match(context.paperCardMarkup({id:'progress',coverage:{completedCount:50,totalCount:10}}),/--paper-progress:100%/);
 
 const prompts=[];
 global.KGAuthCore={currentUser:()=>null};
