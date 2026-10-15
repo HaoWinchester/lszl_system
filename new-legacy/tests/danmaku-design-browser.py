@@ -118,6 +118,7 @@ class DanmakuDesign(unittest.TestCase):
         self.page.screenshot(path=str(ARTIFACTS/'desktop-normal.png'))
         normal = chip.evaluate('e=>getComputedStyle(e).backgroundColor')
         chip.hover()
+        self.page.wait_for_function("normal=>getComputedStyle(document.querySelector('[data-danmaku-comment-id=\"c1\"]')).backgroundColor!==normal", arg=normal)
         self.assertNotEqual(chip.evaluate('e=>getComputedStyle(e).backgroundColor'), normal)
         self.page.screenshot(path=str(ARTIFACTS/'desktop-hover.png'))
         pop = self.open()
