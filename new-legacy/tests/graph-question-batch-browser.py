@@ -66,6 +66,7 @@ with sync_playwright() as pw:
     page.unroute('**/batch-preview');button.click();expect(modal.locator('[data-batch-status]')).to_be_empty();expect(modal.locator('[data-batch-preview-card]')).to_have_count(0)
     page.set_viewport_size({'width':800,'height':844});page.wait_for_timeout(200)
     box=modal.bounding_box();assert box['x']>=0 and box['x']+box['width']<=801,box
+    assert modal.get_by_role('button',name='预览匹配',exact=True).evaluate("b=>{const r=b.getBoundingClientRect();return document.elementFromPoint(r.right-8,r.top+r.height/2)?.closest('[role=dialog]')===b.closest('[role=dialog]')}"),'floating navigation covers batch controls'
     page.screenshot(path=str(OUT/'batch-tablet.png'))
     # Existing phone policy forces read-only mode: changing to phone closes edits.
     page.set_viewport_size({'width':390,'height':844});expect(modal).to_be_hidden();expect(button).to_be_hidden()
