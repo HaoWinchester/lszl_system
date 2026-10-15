@@ -213,6 +213,8 @@ python3 new-legacy/tests/practice-answer-sheet-browser.py
 python3 new-legacy/tests/practice-result-report-browser.py
 python3 new-legacy/tests/practice-instant-feedback-browser.py
 python3 new-legacy/tests/practice-lobby-fidelity-browser.py
+python3 new-legacy/tests/danmaku-design-browser.py
+python3 new-legacy/tests/run-danmaku-api-browser.py --output-dir "$VALIDATION_ROOT/danmaku-api"
 fi
 if new_legacy_validation_group_enabled "$VALIDATION_PROFILE" canvas-e2e; then
   deployment_timing_stage canvas-browser

@@ -22,42 +22,38 @@
 }
 .q-comments-count { font-size: 12px; font-weight: 400; color: var(--learn-muted-foreground, #71717a); }
 
-/* 弹幕条：解析区内嵌横向滚动层 */
-.q-danmaku {
-  position: relative;
-  height: 40px;
-  margin-bottom: 8px;
-  overflow: hidden;
-  background: linear-gradient(180deg, rgb(109 93 252 / .07), rgb(109 93 252 / .02));
-  border-radius: var(--learn-radius-control, 8px);
+/* 弹幕是视口层，只有条和互动浮层接收指针，空白处仍可操作题目。 */
+.q-danmaku { position:fixed; inset:72px 0 145px; z-index:180; pointer-events:none; }
+.q-danmaku-track { position:relative; height:100%; pointer-events:none; }
+.q-danmaku .q-danmaku-item {
+  box-sizing:border-box; position:absolute; left:100%; top:calc(12% + var(--q-danmaku-lane,0) * 17%);
+  display:inline-flex; align-items:center; gap:8px; height:44px; max-width:calc(100vw - 24px);
+  margin:0; padding:6px 12px 6px 9px; border:1px solid #dedfe8; border-radius:14px;
+  background:rgb(255 255 255 / .96); color:#15162b;
+  font-family:inherit; font-size:13.5px; font-weight:400; line-height:1.5; white-space:nowrap;
+  box-shadow:0 3px 12px rgb(39 35 75 / .07); pointer-events:auto; cursor:pointer;
+  animation:q-danmaku-scroll 18s linear infinite; animation-delay:var(--q-danmaku-delay,0s); will-change:transform;
+  outline:none; text-align:left; text-transform:none; letter-spacing:normal;
 }
-.q-danmaku-track { position: relative; height: 100%; }
-.q-danmaku-item {
-  position: absolute;
-  left: 100%;
-  top: 50%;
-  transform: translateY(-50%);
-  white-space: nowrap;
-  padding: 3px 10px;
-  background: rgb(255 255 255 / .95);
-  border: 1px solid var(--learn-border, #e4e4e7);
-  border-radius: 999px;
-  font-size: 12px;
-  color: var(--learn-card-foreground, #3f3f46);
-  animation: q-danmaku-scroll 18s linear infinite;
-  animation-delay: var(--q-danmaku-delay, 0s);
-  will-change: transform;
+.q-danmaku .q-danmaku-item:is(:hover,:focus-visible,.is-paused) {
+  animation-play-state:paused; background:#f5f2ff; border-color:#a58aff; box-shadow:0 4px 14px rgb(73 43 131 / .08);
 }
-/* 多条弹幕分行，避免同屏重叠 */
-.q-danmaku-item:nth-child(2n) { margin-top: -22px; }
+.q-danmaku .q-danmaku-item:focus-visible { outline:2px solid #a58aff; outline-offset:2px; }
+.q-danmaku .q-danmaku-content { min-width:0; overflow:hidden; text-overflow:ellipsis; }
+.q-danmaku .q-comment-avatar { width:30px; height:30px; background:#9770ed; color:#fff; font-size:15px; font-weight:400; }
+.q-danmaku .q-danmaku-pause { display:none; flex-shrink:0; width:18px; height:18px; align-items:center; justify-content:center; border-radius:50%; padding:0; background:#e9e1ff; color:#7651ee; }
+.q-danmaku .q-danmaku-item:is(:hover,:focus-visible,.is-paused) .q-danmaku-pause { display:inline-flex; }
+.q-danmaku .q-danmaku-like { display:inline-flex; align-items:center; flex-shrink:0; gap:5px; color:#72758a; font-size:12px; line-height:1; white-space:nowrap; }
+.q-danmaku .q-danmaku-like.is-liked { color:#7651ee; }
+.q-danmaku .kg-icon { display:block; flex-shrink:0; }
 @keyframes q-danmaku-scroll {
-  from { transform: translate(0, -50%); }
-  to { transform: translate(calc(-100% - 100vw), -50%); }
+  from { transform:translate(0,-50%); }
+  to { transform:translate(calc(-100% - 100vw),-50%); }
 }
-@media (prefers-reduced-motion: reduce) {
-  .q-danmaku-item { animation: none; position: static; display: inline-block; margin: 6px 6px 0 0; }
-  .q-danmaku { height: auto; padding: 6px 8px; }
-  .q-danmaku-track { display: flex; flex-wrap: wrap; overflow-x: auto; }
+@media(prefers-reduced-motion:reduce) {
+  .q-danmaku { max-height:25vh; inset:80px 12px auto; overflow:auto; }
+  .q-danmaku-track { display:flex; flex-wrap:wrap; gap:8px; }
+  .q-danmaku .q-danmaku-item { animation:none; position:static; transform:none; flex-shrink:0; }
 }
 
 /* 留言列表 */
@@ -174,12 +170,6 @@
 .practice-review-card .q-comments { margin: 10px 0 0; }
 
 
-/* Viewport overlay owns only its moving targets; blank space passes through. */
-.q-danmaku { position:fixed; inset:72px 0 145px; height:auto; margin:0; z-index:180; pointer-events:none; background:none; border-radius:0; }
-.q-danmaku-track { pointer-events:none; }
-.q-danmaku-item { top:calc(12% + var(--q-danmaku-lane,0) * 17%); pointer-events:auto; cursor:pointer; box-shadow:0 2px 8px rgb(24 24 27 / .09); font:inherit; font-size:13px; }
-.q-danmaku-item:nth-child(2n) { margin-top:0; }
-.q-danmaku-item:is(:hover,:focus-visible,.is-paused) { animation-play-state:paused; outline:2px solid var(--learn-ring, #6d5dfc); }
 /* 讨论抽屉：桌面端为右侧整高浅色面板（与做题页卡片体系一致），移动端为底部弹层。 */
 .q-comments-drawer {
   position:fixed; left:auto; right:0; top:0; bottom:0; width:min(430px,100vw);
@@ -245,21 +235,36 @@
 /* 标记区「评论」按钮直开时的不可见宿主：只承载折叠条 DOM，不展示。 */
 .q-comments-standalone-host { display:none; }
 
-/* 弹幕互动面板：白底圆角浮层 + 点赞/回复/不喜欢/更多，与做题页浮层体系一致。 */
-.q-danmaku-pop { position:fixed; z-index:250; width:250px; padding:12px 14px 10px; background:var(--learn-card, #fff); color:var(--learn-foreground, #27272a); border:1px solid var(--learn-border, #e4e4e7); border-radius:16px; box-shadow:var(--learn-shadow-float, 0 4px 12px rgb(24 24 27 / .08)), 0 10px 30px rgb(24 24 27 / .1); pointer-events:auto; }
-.q-danmaku-pop::before { content:''; position:absolute; top:-5px; left:50%; width:12px; height:12px; transform:translateX(-50%) rotate(45deg); background:var(--learn-card, #fff); border-left:1px solid var(--learn-border, #e4e4e7); border-top:1px solid var(--learn-border, #e4e4e7); border-radius:2px; }
-.q-danmaku-pop-text { display:flex; gap:10px; align-items:baseline; justify-content:space-between; margin:0 0 10px; color:var(--learn-foreground, #27272a); font-size:13px; line-height:1.5; }
-.q-danmaku-like { display:inline-block; margin-left:6px; color:#e11d48; font-size:11px; font-weight:700; white-space:nowrap; }
-.q-danmaku-like.is-liked { color:#e11d48; }
-.q-danmaku-pop-actions { display:flex; align-items:stretch; justify-content:space-between; gap:4px; }
-.q-danmaku-pop-actions button { flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; padding:4px 2px; border:0; border-radius:10px; background:transparent; color:var(--learn-muted-foreground, #52525b); font-size:11px; cursor:pointer; }
-.q-danmaku-pop-actions button:hover { background:var(--learn-secondary, #f4f4f5); color:var(--learn-foreground, #18181b); }
-.q-danmaku-pop-actions button.is-liked { color:#e11d48; }
-.q-danmaku-pop-icon { font-size:15px; line-height:1; font-style:normal; }
-.q-danmaku-pop-extra { display:flex; gap:8px; margin-top:8px; padding-top:8px; border-top:1px solid var(--learn-border, #e4e4e7); }
-.q-danmaku-pop-extra[hidden] { display:none; }
-.q-danmaku-pop-extra button { flex:1; padding:6px 8px; border:0; border-radius:9px; background:var(--learn-secondary, #f4f4f5); color:var(--learn-secondary-foreground, #3f3f46); font-size:12px; cursor:pointer; }
-.q-danmaku-pop-extra button:hover { background:var(--learn-accent, #f1efff); color:var(--learn-accent-foreground, #4c3fd1); }
+/* 弹幕互动：组件尺寸按批准稿约 3× 导出换算，按钮保留 44px 点击区。 */
+.q-danmaku .q-danmaku-pop {
+  box-sizing:border-box; position:fixed; z-index:250; width:286px; max-width:calc(100vw - 16px); max-height:calc(100vh - 16px);
+  overflow:auto; padding:14px 14px 12px; background:#fff; color:#15162b; border:1px solid #dedfe8; border-radius:16px;
+  box-shadow:0 7px 24px rgb(39 35 75 / .09),0 2px 6px rgb(39 35 75 / .04); pointer-events:auto;
+  font-family:inherit; font-size:14px; font-weight:400; line-height:1.5;
+}
+.q-danmaku .q-danmaku-pop::before {
+  content:''; position:fixed; top:var(--q-pop-arrow-y); left:var(--q-pop-arrow-x); width:13px; height:13px;
+  transform:translate(-50%,-50%) rotate(45deg); background:#fff; border-left:1px solid #dedfe8; border-top:1px solid #dedfe8; border-radius:2px;
+}
+.q-danmaku .q-danmaku-pop[data-placement="top"]::before { transform:translate(-50%,-50%) rotate(225deg); }
+.q-danmaku .q-danmaku-pop-head { display:flex; align-items:center; gap:10px; min-height:34px; }
+.q-danmaku .q-danmaku-pop-head .q-comment-avatar { width:34px; height:34px; font-size:16px; }
+.q-danmaku .q-danmaku-pop-meta { display:flex; flex:1; min-width:0; flex-direction:column; gap:0; }
+.q-danmaku .q-danmaku-pop-author { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#17182b; font-weight:500; font-size:14px; }
+.q-danmaku .q-danmaku-pop-meta time { color:#9597a7; font-size:11px; line-height:1.4; }
+.q-danmaku .q-danmaku-pop button { box-sizing:border-box; font-family:inherit; font-weight:400; text-transform:none; letter-spacing:normal; cursor:pointer; box-shadow:none; outline:none; }
+.q-danmaku .q-danmaku-pop .q-danmaku-pop-close { display:grid; place-items:center; flex-shrink:0; width:44px; height:44px; min-width:44px; margin:-5px -8px -5px 0; padding:0; border:0; border-radius:10px; background:transparent; color:#858898; }
+.q-danmaku .q-danmaku-pop-text { display:block; margin:14px 0 16px; color:#15162b; font-size:14px; line-height:1.5; overflow-wrap:anywhere; white-space:pre-wrap; }
+.q-danmaku .q-danmaku-pop-actions { display:flex; align-items:stretch; gap:0; border-top:1px solid #e6e7ee; padding-top:12px; }
+.q-danmaku .q-danmaku-pop-actions button { display:flex; flex:1; min-width:44px; min-height:44px; flex-direction:column; align-items:center; justify-content:center; gap:4px; margin:0; padding:0 2px; border:0; border-radius:0; background:transparent; color:#676b7e; font-size:12px; line-height:1.5; }
+.q-danmaku .q-danmaku-pop-actions button+button { border-left:1px solid #e9e9f0; }
+.q-danmaku .q-danmaku-pop-actions button.is-liked { color:#7651ee; }
+.q-danmaku .q-danmaku-pop button:is(:hover,:focus-visible) { background:#f5f2ff; color:#7651ee; }
+.q-danmaku .q-danmaku-pop button:focus-visible { outline:2px solid #a58aff; outline-offset:-2px; border-radius:8px; }
+.q-danmaku .q-danmaku-pop-extra { display:flex; gap:8px; margin-top:12px; padding-top:10px; border-top:1px solid #e6e7ee; }
+.q-danmaku .q-danmaku-pop-extra[hidden] { display:none; }
+.q-danmaku .q-danmaku-pop-extra button { flex:1; min-height:44px; padding:6px 8px; border:0; border-radius:9px; background:#f6f5fa; color:#676b7e; font-size:12px; }
+.q-danmaku .q-danmaku-pop-hint { margin:14px 0 0; color:#9597a7; text-align:center; font-size:11px; line-height:16px; }
 .q-comment-actions button,.q-comments.is-collapsed>button { border:1px solid var(--learn-border, #e4e4e7); border-radius:8px; background:var(--learn-card, #fff); color:var(--learn-secondary-foreground, #3f3f46); padding:5px 8px; }
 .q-comment-actions [aria-pressed=true] { background:var(--learn-accent, #f1efff); color:var(--learn-accent-foreground, #4c3fd1); }
 .q-comment-parent { display:block; color:var(--learn-muted-foreground, #71717a); margin-top:6px; }
@@ -271,10 +276,6 @@
   .q-comments-drawer .q-drawer-handle { display:block; width:44px; height:5px; flex-shrink:0; margin:10px auto 2px; border-radius:8px; background:#d4d4dc; touch-action:none; cursor:ns-resize; }
   .q-danmaku { inset:64px 0 175px; }
   .q-comment-actions button { min-height:32px; }
-}
-@media(prefers-reduced-motion:reduce) {
-  .q-danmaku { height:auto; max-height:25vh; inset:80px 12px auto; overflow:auto; padding:0; }
-  .q-danmaku-item { position:static; display:inline-block; }
 }
 .q-favorite-question { position:fixed; inset:70px 20px 30px; z-index:200; overflow:auto; padding:24px; background:var(--learn-card, #fff); border:1px solid var(--learn-border, #e4e4e7); border-radius:14px; box-shadow:var(--learn-shadow-float, 0 4px 12px rgb(24 24 27 / .08)); }
 .q-comment-thread { list-style:none; margin:0 0 8px 12px; border-left:2px solid var(--learn-border, #e4e4e7); padding-left:12px; }

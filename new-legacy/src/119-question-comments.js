@@ -86,18 +86,27 @@
 
   function danmakuMarkup(items) {
     if (!items.length) return ''
-    return `<div class="q-danmaku" aria-label="本题弹幕"><div class="q-danmaku-track">${items.map((comment, index) => `<button type="button" class="q-danmaku-item" data-danmaku-comment-id="${escapeHTML(comment.id)}" style="--q-danmaku-lane:${index % 4};--q-danmaku-delay:-${(index * (DANMAKU_DURATION_SECONDS / items.length)).toFixed(2)}s">${escapeHTML(comment.content)}${danmakuLikeTail(comment)}</button>`).join('')}</div></div>`
+    return `<div class="q-danmaku" aria-label="本题弹幕"><div class="q-danmaku-track">${items.map((comment, index) => `<button type="button" class="q-danmaku-item" data-danmaku-comment-id="${escapeHTML(comment.id)}" style="--q-danmaku-lane:${index % 4};--q-danmaku-delay:-${(index * (DANMAKU_DURATION_SECONDS / items.length)).toFixed(2)}s">${danmakuChipContent(comment)}</button>`).join('')}</div></div>`
   }
 
-  /* 点过赞的弹幕：红心计数追加在弹幕尾部，随弹幕一起滚动。 */
+  function danmakuIcon(name, fallback = '') {
+    return global.KGLearningIcons?.render(name, { size: 18 }) || `<span aria-hidden="true">${escapeHTML(fallback)}</span>`
+  }
+
+  function danmakuChipContent(comment) {
+    return `${avatarMarkup(comment.author, true)}<span class="q-danmaku-content">${escapeHTML(comment.content)}</span><span class="q-danmaku-pause" aria-hidden="true">${danmakuIcon('pause')}</span>${danmakuLikeTail(comment)}`
+  }
+
+  /* 点赞计数随弹幕滚动；统一复用公共线性图标。 */
   function danmakuLikeTail(comment) {
     const count = Number(comment.likeCount) || 0
     if (!count) return ''
-    return `<span class="q-danmaku-like${comment.myLike ? ' is-liked' : ''}" aria-label="${count} 个赞">❤ ${count}</span>`
+    return `<span class="q-danmaku-like${comment.myLike ? ' is-liked' : ''}" aria-label="${count} 个赞">${danmakuIcon('heart')}<span>${count}</span></span>`
   }
 
-  function avatarMarkup(author) {
-    const chars = [...text(author).trim() || '访']
+  function avatarMarkup(author, shortName = false) {
+    const name = text(author).trim()
+    const chars = [...(shortName ? name.replace(/^[小老阿](?=.$)/u, '') : name) || '访']
     const initial = (chars[0] || '访').toUpperCase()
     let hue = 0
     for (const char of chars) hue = (hue * 31 + char.codePointAt(0)) % 360
@@ -190,6 +199,7 @@
     if(instance.disposed)return
     if (active && active !== instance) {
       active.state.expanded = false
+      closeDanmakuPop(active)
       active.overlay?.remove()
       active.drawer?.remove()
       active.drawer = null
@@ -200,6 +210,7 @@
   }
 
   function renderOverlay(instance) {
+    closeDanmakuPop(instance)
     instance.overlay?.remove()
     instance.overlay = null
     if (active !== instance || instance.disposed || !enabled() || instance.state.overlaySuppressed) return
@@ -222,14 +233,16 @@
   }
 
   function danmakuPopMarkup(comment) {
-    return `<div class="q-danmaku-pop" data-danmaku-pop role="menu" aria-label="弹幕互动">
-      <p class="q-danmaku-pop-text">${escapeHTML(comment.content)}${danmakuLikeTail(comment)}</p>
+    return `<div class="q-danmaku-pop" data-danmaku-pop role="dialog" aria-label="弹幕互动">
+      <div class="q-danmaku-pop-head">${avatarMarkup(comment.author, true)}<div class="q-danmaku-pop-meta"><span class="q-danmaku-pop-author">${escapeHTML(comment.author)}</span><time datetime="${escapeHTML(comment.createdAt)}">${escapeHTML(formatTime(comment.createdAt))}</time></div><button type="button" class="q-danmaku-pop-close" data-qc-pop-action="close" aria-label="关闭弹幕互动">${danmakuIcon('x', '×')}</button></div>
+      <p class="q-danmaku-pop-text">${escapeHTML(comment.content)}</p>
       <div class="q-danmaku-pop-actions">
-        <button type="button" data-qc-pop-action="like" class="${comment.myLike ? 'is-liked' : ''}" aria-pressed="${!!comment.myLike}"><span class="q-danmaku-pop-icon" aria-hidden="true">❤</span><span>${Number(comment.likeCount) || 0}</span></button>
-        <button type="button" data-qc-pop-action="reply"><span class="q-danmaku-pop-icon" aria-hidden="true">💬</span><span>回复</span></button>
-        <button type="button" data-qc-pop-action="dislike"><span class="q-danmaku-pop-icon" aria-hidden="true">✕</span><span>不喜欢</span></button>
-        <button type="button" data-qc-pop-action="more"><span class="q-danmaku-pop-icon" aria-hidden="true">⋯</span><span>更多</span></button>
+        <button type="button" data-qc-pop-action="like" class="${comment.myLike ? 'is-liked' : ''}" aria-pressed="${!!comment.myLike}">${danmakuIcon('heart')}<span>点赞 ${Number(comment.likeCount) || 0}</span></button>
+        <button type="button" data-qc-pop-action="reply">${danmakuIcon('message-circle')}<span>回复</span></button>
+        <button type="button" data-qc-pop-action="dislike">${danmakuIcon('eye-off')}<span>不喜欢</span></button>
+        <button type="button" data-qc-pop-action="more" aria-expanded="false">${danmakuIcon('ellipsis')}<span>更多</span></button>
       </div>
+      <p class="q-danmaku-pop-hint">点击空白处继续播放</p>
       <div class="q-danmaku-pop-extra" data-qc-pop-extra hidden>
         <button type="button" data-qc-pop-action="favorite" aria-pressed="${!!comment.myFavorite}">${comment.myFavorite ? '已收藏' : '收藏'}</button>
         <button type="button" data-qc-pop-action="copy">复制内容</button>
@@ -247,16 +260,15 @@
     const panel = pop.firstElementChild
     panel.dataset.danmakuPopFor = comment.id
     instance.overlay.appendChild(panel)
-    // 定位：优先悬浮在弹幕上方，空间不足时放到下方，并夹在视口内。
-    const rect = item.getBoundingClientRect()
-    const width = panel.offsetWidth, height = panel.offsetHeight
-    let left = rect.left + rect.width / 2 - width / 2
-    left = Math.max(8, Math.min(global.innerWidth - width - 8, left))
-    let top = rect.top - height - 10
-    if (top < 8) top = Math.min(global.innerHeight - height - 8, rect.bottom + 10)
-    panel.style.left = left + 'px'
-    panel.style.top = top + 'px'
+    instance.popItem = item
+    positionDanmakuPop(instance)
     bindDanmakuPop(instance, item, panel)
+    instance.popResize = () => positionDanmakuPop(instance)
+    global.addEventListener('resize', instance.popResize)
+    instance.popEscape = event => {
+      if (event.key === 'Escape') { event.preventDefault(); closeDanmakuPop(instance) }
+    }
+    document.addEventListener('keydown', instance.popEscape)
     // 点击弹幕与互动面板以外的任意位置：关闭面板并恢复弹幕运动。
     instance.popOutsideClose = event => {
       if (event.target.closest('[data-danmaku-pop]') || event.target.closest('[data-danmaku-comment-id]')) return
@@ -265,37 +277,63 @@
     document.addEventListener('pointerdown', instance.popOutsideClose, true)
   }
 
+  /* 所有打开、更新、展开与 resize 共用一次测量定位，箭头随触发条夹在卡片内。 */
+  function positionDanmakuPop(instance) {
+    const panel = instance.overlay?.querySelector('[data-danmaku-pop]')
+    const item = instance.popItem
+    if (!panel || !item?.isConnected) return
+    const rect = item.getBoundingClientRect()
+    const width = panel.offsetWidth, height = panel.offsetHeight
+    const center = rect.left + rect.width / 2
+    const left = Math.max(8, Math.min(global.innerWidth - width - 8, center - width / 2))
+    const below = rect.bottom + 12
+    const above = rect.top - height - 12
+    const flip = below + height > global.innerHeight - 8 && (above >= 8 || rect.top > global.innerHeight - rect.bottom)
+    const top = Math.max(8, Math.min(global.innerHeight - height - 8, flip ? above : below))
+    panel.dataset.placement = flip ? 'top' : 'bottom'
+    panel.style.setProperty('--q-pop-arrow-left', Math.max(18, Math.min(width - 18, center - left)) + 'px')
+    panel.style.setProperty('--q-pop-arrow-x', left + Math.max(18, Math.min(width - 18, center - left)) + 'px')
+    panel.style.setProperty('--q-pop-arrow-y', (flip ? top + height - 1 : top + 1) + 'px')
+    panel.style.left = left + 'px'
+    panel.style.top = top + 'px'
+  }
+
   function refreshDanmakuPop(instance, item) {
     const panel = instance.overlay?.querySelector('[data-danmaku-pop]')
-    if (!panel) return
+    if (!panel || panel.dataset.danmakuPopFor !== item.dataset.danmakuCommentId) return
     const comment = findComment(instance, panel.dataset.danmakuPopFor)
     if (!comment) { closeDanmakuPop(instance); return }
     const replacement = document.createElement('div')
     replacement.innerHTML = danmakuPopMarkup(comment)
     const next = replacement.firstElementChild
     next.dataset.danmakuPopFor = comment.id
-    next.style.left = panel.style.left
-    next.style.top = panel.style.top
+    const expanded = !panel.querySelector('[data-qc-pop-extra]').hidden
+    next.querySelector('[data-qc-pop-extra]').hidden = !expanded
+    next.querySelector('[data-qc-pop-action="more"]').setAttribute('aria-expanded', String(expanded))
+    const toast = panel.querySelector('[data-qc-toast]')
+    if (toast) next.appendChild(toast)
+    const focusAction = panel.contains(document.activeElement) ? document.activeElement.closest('[data-qc-pop-action]')?.dataset.qcPopAction : null
     panel.replaceWith(next)
     bindDanmakuPop(instance, item, next)
+    positionDanmakuPop(instance)
+    if (focusAction) next.querySelector(`[data-qc-pop-action="${focusAction}"]`)?.focus({preventScroll:true})
   }
 
   function bindDanmakuPop(instance, item, panel) {
     panel.addEventListener('click', async event => {
       const action = event.target.closest('[data-qc-pop-action]')?.dataset.qcPopAction
       if (!action) return
+      if (action === 'close') { closeDanmakuPop(instance); return }
       const commentId = panel.dataset.danmakuPopFor
       const latest = findComment(instance, commentId)
       if (!latest) { closeDanmakuPop(instance); return }
       if (action === 'like') {
         await toggleLike(instance, commentId)
-        // 红心追加在弹幕尾部：同步弹幕数据后重挂弹幕层，再弹出的面板保持暂停。
+        // 原条就地更新，保持暂停位置；等待 API 时若已关闭，不重新打开浮层。
         const updated = findComment(instance, commentId)
         if (updated) instance.state.danmaku = instance.state.danmaku.map(row => row.id === commentId ? updated : row)
-        renderOverlay(instance)
-        const nextItem = instance.overlay?.querySelector(`[data-danmaku-comment-id="${CSS.escape(commentId)}"]`)
-        if (nextItem) showDanmakuPop(instance, nextItem)
-        else closeDanmakuPop(instance)
+        if (updated && item.isConnected) item.innerHTML = danmakuChipContent(updated)
+        refreshDanmakuPop(instance, item)
       }
       else if (action === 'favorite') { await toggleFavorite(instance, commentId); refreshDanmakuPop(instance, item) }
       else if (action === 'reply') { openReplyFromDanmaku(instance, item, commentId) }
@@ -308,6 +346,8 @@
       else if (action === 'more') {
         const extra = panel.querySelector('[data-qc-pop-extra]')
         if (extra) extra.hidden = !extra.hidden
+        panel.querySelector('[data-qc-pop-action="more"]').setAttribute('aria-expanded', String(!extra.hidden))
+        positionDanmakuPop(instance)
       }
       else if (action === 'copy') {
         try { await global.navigator.clipboard.writeText(latest.content); showToast(instance, '已复制弹幕内容') }
@@ -327,6 +367,9 @@
       document.removeEventListener('pointerdown', instance.popOutsideClose, true)
       instance.popOutsideClose = null
     }
+    if (instance.popEscape) document.removeEventListener('keydown', instance.popEscape)
+    if (instance.popResize) global.removeEventListener('resize', instance.popResize)
+    instance.popEscape = instance.popResize = instance.popItem = null
   }
 
   /* 从弹幕面板点「回复」：暂停该弹幕并展开底部讨论抽屉，定位到对应留言。 */
@@ -576,7 +619,7 @@
   function showToast(instance, message) {
     if(instance.disposed)return
     instance.state.toastMessage = text(message)
-    const host = instance.drawer || instance.root
+    const host = instance.overlay?.querySelector('[data-danmaku-pop]') || instance.drawer || instance.root
     let toast = host.querySelector('[data-qc-toast]')
     if (!toast) {
       toast = document.createElement('div')
@@ -586,8 +629,9 @@
     }
     toast.textContent = text(message)
     toast.hidden = false
+    positionDanmakuPop(instance)
     global.clearTimeout(instance.toastTimer)
-    instance.toastTimer = global.setTimeout(() => { instance.state.toastMessage=''; (instance.drawer || instance.root).querySelector('[data-qc-toast]')?.remove() }, 2400)
+    instance.toastTimer = global.setTimeout(() => { instance.state.toastMessage=''; (instance.overlay?.querySelector('[data-danmaku-pop]') || instance.drawer || instance.root).querySelector('[data-qc-toast]')?.remove(); positionDanmakuPop(instance) }, 2400)
   }
 
   function ensureInstance(anchor, markerAttr, questionId, source) {
@@ -819,7 +863,7 @@
     for(const instance of selected) {
       instance.disposed=true
       detachDrawerListeners(instance)
-      if(instance.popOutsideClose){document.removeEventListener('pointerdown',instance.popOutsideClose,true);instance.popOutsideClose=null}
+      closeDanmakuPop(instance)
       instance.overlay?.remove()
       instance.drawer?.remove()
       instance.root?.remove()
