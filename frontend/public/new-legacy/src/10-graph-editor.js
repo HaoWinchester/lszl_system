@@ -4166,6 +4166,7 @@ function openMindmapControls(){
 let graphQuestionBatchController=null;
 function openGraphQuestionBatch(){
   if(relatedCanvasController||document.body.classList.contains('auth-readonly')||window.KGHomeInteractionModes?.getMode?.()==='reading'||!['teacher','admin'].includes(window.KGRolePermissions?.currentRole?.()))return false;
+  graphQuestionDrawer?.close();
   graphQuestionBatchController=graphQuestionBatchController||window.KGGraphQuestionBatch.create({
     getContext:()=>window.KGGraphFileEditorStoreBridge.fragmentSource(),getNodes:()=>state.nodes,getSelectedIds:()=>selectedNodeIdsForClipboard(),
     flush:async()=>{if(await persistCurrentGraphNow()===false)throw new Error('图谱保存未完成，请先保存后重试。');}

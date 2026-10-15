@@ -23,9 +23,11 @@ with sync_playwright() as pw:
         for s in ['#learningEntryDismissBtn','.tour-skip','#hideHelpBtn']:
             if page.locator(s).is_visible():page.locator(s).click()
         page.wait_for_function('!!window.KGGraphFileTabs')
-    ready();button=page.get_by_role('button',name='批量添加题目',exact=True);expect(button).to_be_visible();button.click()
+    ready();page.evaluate("selectedNodeIds.clear();state.selectedNodeId='a';renderDetails()");page.locator('#graphPracticeBtn').click();drawer=page.get_by_role('complementary',name='卡片做题');expect(drawer).to_be_visible()
+    button=page.get_by_role('button',name='批量添加题目',exact=True);expect(button).to_be_visible();button.click();expect(drawer).to_be_hidden()
     modal=page.get_by_role('dialog',name='批量添加题目');expect(modal).to_be_visible()
     expect(modal.get_by_label('每张卡片新增题数')).to_have_value('3')
+    expect(modal.get_by_label('卡片范围')).to_have_value('selected');modal.get_by_label('卡片范围').select_option('all')
     expect(modal.locator('[data-batch-node] input:checked')).to_have_count(3)
     modal.get_by_role('button',name='清空选择',exact=True).click();expect(modal.get_by_role('button',name='预览匹配',exact=True)).to_be_disabled()
     modal.get_by_role('button',name='全选当前列表',exact=True).click()
@@ -37,9 +39,10 @@ with sync_playwright() as pw:
     assert len(call('get',single+'b/bindings')['bindings'])==0
     modal.locator('[data-batch-preview-card="b"] input[value="'+questions[1]+'"]').uncheck()
     modal.get_by_role('button',name='确认添加',exact=False).click();expect(modal.locator('[data-batch-status]')).to_contain_text('已添加 2 道题目')
+    expect(modal.locator('[data-batch-preview-card]')).to_have_count(0)
     assert len(call('get',single+'a/bindings')['bindings'])==2
     assert len(call('get',single+'b/bindings')['bindings'])==1
-    modal.get_by_role('button',name='关闭批量配题').click();ready()
+    modal.get_by_role('button',name='关闭批量配题').click();page.locator('#graphPracticeBtn').click();expect(drawer.locator('.gqd-question')).to_have_count(2);drawer.get_by_role('button',name='关闭做题抽屉').click();ready()
     page.evaluate("selectedNodeIds=new Set(['a']);state.selectedNodeId='a';refreshSelectionUI()")
     button.click();modal.get_by_label('卡片范围').select_option('selected');expect(modal.locator('[data-batch-node] input:checked')).to_have_count(1)
     modal.get_by_role('button',name='预览匹配',exact=True).click();expect(modal.locator('[data-batch-preview-card]')).to_have_count(1)
