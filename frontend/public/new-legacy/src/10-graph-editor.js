@@ -4161,3 +4161,14 @@ function openMindmapControls(){
   window.KGGraphMindmapThemes.controls(host,{getGraph:()=>state,getSelectedIds:()=>[...new Set([...selectedNodeIds,state.selectedNodeId].filter(Boolean))],runLayout:applyMindmapLayout,runTheme:applyMindmapTheme});
   const unmount=window.KGCanvasDomInteraction.mountOverlay(host);formalMindmapCleanup=()=>{unmount();host.remove()};return true;
 }
+
+
+let graphQuestionBatchController=null;
+function openGraphQuestionBatch(){
+  if(relatedCanvasController||document.body.classList.contains('auth-readonly')||window.KGHomeInteractionModes?.getMode?.()==='reading'||!['teacher','admin'].includes(window.KGRolePermissions?.currentRole?.()))return false;
+  graphQuestionBatchController=graphQuestionBatchController||window.KGGraphQuestionBatch.create({
+    getContext:()=>window.KGGraphFileEditorStoreBridge.fragmentSource(),getNodes:()=>state.nodes,getSelectedIds:()=>selectedNodeIdsForClipboard(),
+    flush:async()=>{if(await persistCurrentGraphNow()===false)throw new Error('图谱保存未完成，请先保存后重试。');}
+  });
+  const opened=graphQuestionBatchController.open();if(!opened)showStatus('请先保存当前图谱，再批量添加题目。');return opened;
+}

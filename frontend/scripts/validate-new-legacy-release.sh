@@ -211,6 +211,7 @@ KG_E2E_ACTIVE_RELEASE_ROOT="$VALIDATION_ROOT/releases" \
   python3 frontend/e2e/practice_resumable_report.py
 python3 new-legacy/tests/practice-answer-sheet-browser.py
 python3 new-legacy/tests/practice-result-report-browser.py
+python3 new-legacy/tests/practice-instant-feedback-browser.py
 fi
 if new_legacy_validation_group_enabled "$VALIDATION_PROFILE" canvas-e2e; then
   deployment_timing_stage canvas-browser
