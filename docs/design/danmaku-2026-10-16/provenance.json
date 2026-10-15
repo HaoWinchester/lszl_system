@@ -1,0 +1,15 @@
+{
+  "tool": "image_gen.imagegen",
+  "mode": "built-in GPT image generation",
+  "modelId": "not exposed by tool",
+  "generatedImage": "concept.png",
+  "sha256": "a63ba5ba9cb16f825ad05049be13e6d51307980517c8e986282e122066202ac9",
+  "sourcePath": "/Users/menghao/.codex/generated_images/01a13f93-1b37-78a3-992f-8b15b7ae8485/exec-6ba61df1-f6a6-4697-9812-9693e9f54afa.png",
+  "userApproved": true,
+  "approvedDate": "2026-10-16",
+  "parameters": {
+    "transparent_background": false,
+    "references": []
+  },
+  "promptFile": "prompt.txt"
+}
