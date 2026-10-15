@@ -48,8 +48,9 @@ class DanmakuDesign(unittest.TestCase):
         self.fail_like = False
         self.fail_favorite = False
         self.page.route('http://localhost/**', self.route)
-        # Same real CSS order as the question page, including global button styles.
-        html = (ROOT / 'knowledge-recall.html').read_text()
+        # Exact production practice CSS order and body attributes, including ID-specific global skin rules.
+        html = (ROOT / 'practice-mode.html').read_text()
+        self.body_attrs = re.search(r'<body([^>]*)>', html).group(1)
         self.css = re.findall(r'<link[^>]+href="([^"]+\.css)"', html)
         self.page.goto('http://localhost/test-harness')
         self.page.evaluate("window.KGAuthCore={currentUser:()=>({username:'stu',role:'student'})}; window.copied=''; Object.defineProperty(navigator,'clipboard',{value:{writeText:async value=>{window.copied=value}}})")
@@ -67,7 +68,7 @@ class DanmakuDesign(unittest.TestCase):
         url = route.request.url.removeprefix('http://localhost/')
         if url == 'test-harness':
             links = ''.join('<link rel="stylesheet" href="/'+p+'">' for p in self.css)
-            route.fulfill(content_type='text/html', body='<!doctype html><html><head><meta charset="utf-8">'+links+'<link rel="stylesheet" href="/styles/question-comments.css"></head><body><main style="padding:40px"><h1>项目经理发现项目范围发生了变化，下一步应该做什么？</h1><p>解析：首先分析影响，再决定是否变更。</p></main></body></html>')
+            route.fulfill(content_type='text/html', body='<!doctype html><html><head><meta charset="utf-8">'+links+'</head><body'+self.body_attrs+'><main style="padding:40px"><h1>项目经理发现项目范围发生了变化，下一步应该做什么？</h1><p>解析：首先分析影响，再决定是否变更。</p></main></body></html>')
         elif url.startswith('api/v1/'):
             method = route.request.method
             if url.endswith('/like'):
@@ -144,6 +145,25 @@ class DanmakuDesign(unittest.TestCase):
         self.open()
         self.page.mouse.click(20, 20)
         self.assertEqual(self.page.locator('[data-danmaku-pop],.q-danmaku-item.is-paused').count(), 0)
+
+    def test_practice_skin_keeps_flat_action_cells_in_normal_and_hover_states(self):
+        self.page.set_viewport_size({'width':390, 'height':844})
+        self.place(40,160)
+        pop = self.open()
+        for index, button in enumerate(pop.locator('.q-danmaku-pop-actions button').all()):
+            for hovered in [False, True]:
+                self.page.mouse.move(0,0)
+                if hovered:
+                    button.hover()
+                style = button.evaluate("e=>{const s=getComputedStyle(e);return {radius:s.borderRadius,top:s.borderTopWidth,right:s.borderRightWidth,bottom:s.borderBottomWidth,left:s.borderLeftWidth,shadow:s.boxShadow,transform:s.transform}}")
+                self.assertEqual(style, dict(radius='0px',top='0px',right='0px',bottom='0px',left='0px' if index==0 else '1px',shadow='none',transform='none'), f'flat action cell {index}, hover={hovered}')
+        close = pop.locator('[data-qc-pop-action="close"]')
+        close.hover()
+        self.assertEqual(close.evaluate('e=>getComputedStyle(e).boxShadow'), 'none')
+        self.assertEqual(close.evaluate('e=>getComputedStyle(e).transform'), 'none')
+        self.assertEqual(self.page.locator('[data-danmaku-comment-id="c1"]').evaluate('e=>getComputedStyle(e).borderRadius'), '14px')
+        self.page.locator('[data-qc-pop-action="more"]').click()
+        self.page.screenshot(path=str(ARTIFACTS/'practice-skin-mobile-more.png'))
 
     def test_top_bottom_more_and_resize_clamp(self):
         for x,y in [(8,8),(1080,800)]:

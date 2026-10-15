@@ -9,21 +9,21 @@
   "threshold": 24,
   "maskedPixels": 0,
   "full": {
-    "meanAbsoluteChannelError": 10.8657,
-    "pixelsOver24Of255Percent": 8.1992
+    "meanAbsoluteChannelError": 11.7457,
+    "pixelsOver24Of255Percent": 8.7543
   },
   "referenceRegions": {
     "normalChip": {
-      "meanAbsoluteChannelError": 18.661,
-      "pixelsOver24Of255Percent": 15.789
+      "meanAbsoluteChannelError": 22.0006,
+      "pixelsOver24Of255Percent": 18.0833
     },
     "activeChip": {
-      "meanAbsoluteChannelError": 24.6532,
-      "pixelsOver24Of255Percent": 21.2714
+      "meanAbsoluteChannelError": 26.1697,
+      "pixelsOver24Of255Percent": 22.1497
     },
     "popover": {
-      "meanAbsoluteChannelError": 11.2975,
-      "pixelsOver24Of255Percent": 9.4719
+      "meanAbsoluteChannelError": 11.3748,
+      "pixelsOver24Of255Percent": 9.4871
     }
   },
   "actualGeometryCss": [
@@ -32,10 +32,10 @@
       "rect": {
         "x": 68.296875,
         "y": 137.6875,
-        "width": 287.671875,
+        "width": 287.203125,
         "height": 44
       },
-      "font": "13.5px / 20.25px -apple-system, \"system-ui\", \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+      "font": "13.5px / 20.25px Inter, \"PingFang SC\", \"Microsoft YaHei\", system-ui, -apple-system, sans-serif",
       "background": "rgb(245, 242, 255)"
     },
     {
@@ -43,21 +43,21 @@
       "rect": {
         "x": 68.296875,
         "y": 80,
-        "width": 280.3125,
+        "width": 279.515625,
         "height": 44
       },
-      "font": "13.5px / 20.25px -apple-system, \"system-ui\", \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+      "font": "13.5px / 20.25px Inter, \"PingFang SC\", \"Microsoft YaHei\", system-ui, -apple-system, sans-serif",
       "background": "rgba(255, 255, 255, 0.96)"
     },
     {
       "id": "popover",
       "rect": {
-        "x": 69.125,
+        "x": 68.890625,
         "y": 193.6875,
         "width": 286,
         "height": 202.390625
       },
-      "font": "14px / 21px -apple-system, \"system-ui\", \"Segoe UI\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+      "font": "14px / 21px Inter, \"PingFang SC\", \"Microsoft YaHei\", system-ui, -apple-system, sans-serif",
       "background": "rgb(255, 255, 255)"
     }
   ],
