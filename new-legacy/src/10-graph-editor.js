@@ -946,9 +946,16 @@ function applyEdgeControlDragPoint(point){
   const drag=edgeControlDrag;if(!drag)return;const link=linkById(drag.linkId);if(!link)return;
   drag.moved=true;
   if(drag.kind==='straight-bend'){
-    link.pathStyle='elbow';link.waypoints=[{x:point.x,y:point.y}];delete link.curveControls;drag.kind='waypoint';drag.index=0;if(drag.handle)drag.handle.dataset.edgeControlKind='waypoint';
+    link.pathStyle='elbow';delete link.curveControls;drag.kind='waypoint';drag.index=0;if(drag.handle)drag.handle.dataset.edgeControlKind='waypoint';
+    // 直线拖出折点同样锁定方向：折点垂直于原直线方向滑动。
+    const base=linkRenderPoints(link,getGraphIndex().nodeMap);
+    link.waypoints=[window.KGGraphEdgeGeometry.constrainWaypointDrag(base?.a||{x:0,y:0},base?.b||{x:0,y:0},[point],0,point)];
   }else if(drag.kind==='waypoint'){
-    const points=normalizedEdgePoints(link.waypoints,12);while(points.length<=drag.index)points.push({x:point.x,y:point.y});points[drag.index]={x:point.x,y:point.y};link.waypoints=points;
+    const points=normalizedEdgePoints(link.waypoints,12);while(points.length<=drag.index)points.push({x:point.x,y:point.y});
+    // 博思白板式方向锁定：折线路径点只允许沿水平或纵向单轴拖动。
+    const current=linkRenderPoints(link,getGraphIndex().nodeMap);
+    points[drag.index]=window.KGGraphEdgeGeometry.constrainWaypointDrag(current?.a||{x:0,y:0},current?.b||{x:0,y:0},points,drag.index,point);
+    link.waypoints=points;
   }else if(drag.kind==='curve-control'){
     const current=linkRenderPoints(link,getGraphIndex().nodeMap),controls=normalizedEdgePoints(link.curveControls,2);
     if(current&&controls.length===2){const handles=window.KGGraphEdgeGeometry.curveHandles(current.a,controls,current.b);handles[drag.index]={x:point.x,y:point.y};link.curveControls=window.KGGraphEdgeGeometry.controlsFromHandles(current.a,handles,current.b)}

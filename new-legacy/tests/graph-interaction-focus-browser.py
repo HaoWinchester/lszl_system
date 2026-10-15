@@ -8,7 +8,7 @@ ROOT=Path(__file__).resolve().parents[2]
 OUT=ROOT/'artifacts/graph-interaction-focus-fixes'
 
 def main():
-    parser=argparse.ArgumentParser();parser.add_argument('--output-dir',type=Path);parser.add_argument('--base-url',required=True);parser.add_argument('--section',choices=['all','tabs','card','focus','edges','curves','cancel-history','ports'],default='all');args=parser.parse_args()
+    parser=argparse.ArgumentParser();parser.add_argument('--output-dir',type=Path);parser.add_argument('--base-url',required=True);parser.add_argument('--section',choices=['all','tabs','card','focus','edges','curves','elbow','cancel-history','ports'],default='all');args=parser.parse_args()
     base=args.base_url.rstrip('/');assert urlparse(base).hostname in ('localhost','127.0.0.1')
     out=args.output_dir or OUT;out.mkdir(parents=True,exist_ok=True)
     with sync_playwright() as pw:
@@ -219,6 +219,28 @@ def main():
             page.evaluate('restoreGraphUndoSnapshot()');restored=curve_state();aligned(restored)
             assert restored['controls']==cancelled['controls']
             print('PASS curves: real handle drag, dual-card and single-card drags, cancel, undo/redo, viewport transform, saved reload and auto reset',flush=True)
+        if args.section in ('all','elbow'):
+            # 博思白板式折线方向锁定：中间段路径点只允许沿水平/纵向单轴滑动，且随保存持久化。
+            assert ctx.request.put(base+'/api/v1/files/current',data={'fileId':files[1]['id']}).ok
+            reload()
+            page.evaluate("state.selectedLinkId='ab';state.selectedNodeId=null;selectedNodeIds.clear();refreshSelectionUI()");page.wait_for_timeout(200)
+            # 与快速面板 onPathStyle 同一入口；避免浮动面板点击引发祖先滚动干扰坐标。
+            page.evaluate('applyPathStyle("elbow")')
+            def elbow_waypoints():
+                return page.evaluate('''()=>{const link=state.links.find(l=>l.id==='ab');return{stored:(link.waypoints||[]).map(p=>({...p})),controls:edgeDomById.get('ab').geometry.controls.map(p=>({x:p.x,y:p.y})),style:link.pathStyle}}''')
+            seeded=elbow_waypoints();assert seeded['style']=='elbow' and len(seeded['controls'])==2,seeded
+            handle=page.locator('.edge-control-handle[data-edge-control-index="0"] .edge-control-hit');box=handle.bounding_box();assert box,'elbow handle visible'
+            x=box['x']+box['width']/2;y=box['y']+box['height']/2
+            page.mouse.move(x,y);page.mouse.down();assert page.evaluate('!!edgeControlDrag')
+            page.mouse.move(x+36,y-44,steps=6);page.mouse.up()
+            dragged=elbow_waypoints()
+            origin=seeded['stored'][0] if seeded['stored'] else seeded['controls'][0]
+            # a→b 整体水平主导 → 默认折线中间段垂直 → 只允许水平拖动（y 锁定）。
+            assert abs(dragged['stored'][0]['x']-(origin['x']+36))<1e-6,dragged
+            assert abs(dragged['stored'][0]['y']-origin['y'])<1e-6,dragged
+            flush();reload()
+            assert elbow_waypoints()['stored']==dragged['stored']
+            print('PASS elbow: waypoint drag is locked to a single axis and survives reload',flush=True)
         if args.section in ('all','cancel-history'):
             # 前段留下组选/边选状态；本段在干净 fixture 上自成体系验证取消与历史。
             assert ctx.request.put(base+'/api/v1/files/current',data={'fileId':files[2]['id']}).ok

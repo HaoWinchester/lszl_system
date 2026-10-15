@@ -1,7 +1,7 @@
 'use strict';
 const assert=require('node:assert/strict');
 const test=require('node:test');
-const {curveHandles,controlsFromHandles,moveRoute}=require('../src/graph/edge-geometry.js');
+const {curveHandles,controlsFromHandles,constrainWaypointDrag,moveRoute}=require('../src/graph/edge-geometry.js');
 
 const near=(a,b)=>assert.ok(Math.abs(a-b)<1e-6,`${a} differs from ${b}`);
 const nearPoint=(a,b)=>{near(a.x,b.x);near(a.y,b.y)};
@@ -45,4 +45,18 @@ test('one moved endpoint weights each manual point by its original axial positio
   const result=moveRoute(route,{x:0,y:0},{x:40,y:40});
   assert.deepEqual(result.curveControls,[{x:60,y:90},{x:180,y:110}]);
   assert.deepEqual(result.waypoints,[{x:120,y:60}]);
+});
+
+test('elbow waypoint drags are constrained to a single axis (boardmix-style)',()=>{
+  // 垂直中间段（首末路径点 x 相同）：只允许水平拖动（锁 y）。
+  const verticalTrunk=[{x:100,y:0},{x:100,y:80}];
+  assert.deepEqual(constrainWaypointDrag({x:0,y:0},{x:200,y:80},verticalTrunk,0,{x:150,y:40}),{x:150,y:0});
+  // 水平中间段：只允许纵向拖动（锁 x）。
+  const horizontalTrunk=[{x:40,y:50},{x:160,y:50}];
+  assert.deepEqual(constrainWaypointDrag({x:0,y:0},{x:200,y:100},horizontalTrunk,1,{x:180,y:90}),{x:160,y:90});
+  // 单路径点：按整体 a→b 主导轴的垂直方向锁定（水平连线 → 折点只纵向滑动）。
+  assert.deepEqual(constrainWaypointDrag({x:0,y:0},{x:300,y:20},[{x:150,y:-40}],0,{x:220,y:120}),{x:150,y:120});
+  // 越界 index / 空路径点：原样返回。
+  assert.deepEqual(constrainWaypointDrag({x:0,y:0},{x:1,y:1},[],0,{x:9,y:9}),{x:9,y:9});
+  assert.deepEqual(constrainWaypointDrag({x:0,y:0},{x:1,y:1},verticalTrunk,5,{x:9,y:9}),{x:9,y:9});
 });

@@ -16,6 +16,19 @@
     return[point(3*first.x-1.5*second.x,3*first.y-1.5*second.y),
       point(3*second.x-1.5*first.x,3*second.y-1.5*first.y)];
   }
+  // 折线拖动方向锁定（对齐博思白板）：中间段只能沿自身方向滑动——
+  // 两个以上路径点时以首末路径点构成的中间段主导轴为准；单路径点时以整体 a→b 主导轴的垂直方向为准。
+  function constrainWaypointDrag(start,end,waypoints,index,point){
+    if(!waypoints?.length||index<0||index>=waypoints.length||!point)return point;
+    let free;
+    if(waypoints.length>=2){
+      const first=waypoints[0],last=waypoints[waypoints.length-1];
+      free=Math.abs(last.x-first.x)>=Math.abs(last.y-first.y)?'y':'x';
+    }else{
+      free=Math.abs(end.x-start.x)>=Math.abs(end.y-start.y)?'y':'x';
+    }
+    return free==='x'?{x:point.x,y:waypoints[index].y}:{x:waypoints[index].x,y:point.y};
+  }
   function moveRoute(route,startDelta,endDelta){
     const deltaA=startDelta,deltaB=endDelta,before=[route.start,route.end];
     const axis=point(before[1].x-before[0].x,before[1].y-before[0].y),length2=axis.x*axis.x+axis.y*axis.y;
@@ -58,7 +71,7 @@
       ?point(center.x+Math.sign(ray.x||1)*width/2,center.y)
       :point(center.x,center.y+Math.sign(ray.y||1)*height/2);
   }
-  const api=Object.freeze({curveHandles,controlsFromHandles,moveRoute,portPoint,portDirection});
+  const api=Object.freeze({curveHandles,controlsFromHandles,constrainWaypointDrag,moveRoute,portPoint,portDirection});
   global.KGGraphEdgeGeometry=api;
   if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);

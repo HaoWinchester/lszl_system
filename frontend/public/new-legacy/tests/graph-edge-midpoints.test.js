@@ -107,7 +107,8 @@ const reloaded=JSON.parse(JSON.stringify(routeLink)),reloadPoints=context.linkRe
 assert.equal(context.linkPathGeometry(reloaded,reloadPoints.a,reloadPoints.b,reloadPoints).d,context.movedGeometry.d,'reload after whole-edge movement preserves geometry');
 context.edgeControlDrag={linkId:'detour',kind:'waypoint',index:2};
 context.applyEdgeControlDragPoint({x:350,y:130});
-assert.deepEqual(plain(routeLink.waypoints[2]),{x:350,y:130});
+// 博思白板式方向锁定：垂直中间段上的路径点只允许水平拖动（y 锁定在原值 110）。
+assert.deepEqual(plain(routeLink.waypoints[2]),{x:350,y:110});
 assert.equal(context.movedGeometry.controls.length,4,'manual corner drag retains all four controls');
 context.restoreEdgeRoute(routeLink,original);
 assert.equal(context.linkPathGeometry(routeLink,routePoints.a,routePoints.b,routePoints).d,routeGeometry.d,'cancel/restore retains original smooth geometry');
