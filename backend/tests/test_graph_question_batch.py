@@ -100,3 +100,16 @@ def test_preview_expiration(data,monkeypatch):
         original=TimestampSigner.get_timestamp
         monkeypatch.setattr(TimestampSigner,'get_timestamp',lambda self: original(self)+1000)
         assert apply(c,file,p).status_code==422
+
+
+def test_matches_text_values_not_json_field_names_and_splits_keywords(data):
+    d=data
+    async def seed():
+        async with AsyncSessionLocal() as db:
+            q=await db.get(Question,d.q);q.title='ordinary question';q.stem_parts=[{'text':d.q+' secondword','structuralOnlyNeedle':'not a keyword'}];await db.commit()
+    with TestClient(app) as c:
+        login(c,d,'teacher');asyncio.run(seed())
+        r=c.post('/api/v1/files',json={'name':'matching semantics','graphData':{'nodes':[{'id':'n','title':'structuralOnlyNeedle'},{'id':'nested','title':d.q+' no-match','keywords':'absent '+d.q}],'links':[]}});file=r.json()['file']['id']
+        r=preview(c,file,ids=['n','nested']);assert r.status_code==200,r.text
+        a,b=r.json()['cards'];assert not a['questions']
+        assert d.q in {q['id'] for q in b['questions']}

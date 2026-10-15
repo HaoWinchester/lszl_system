@@ -2,7 +2,8 @@
 import re
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from fastapi import HTTPException
-from sqlalchemy import String, case, cast, func, or_, select
+from sqlalchemy import String, case, cast, func, or_, select, literal
+from sqlalchemy.dialects.postgresql import JSONPATH
 from app.core.config import settings
 from app.models.question import Question, QuestionBank
 from app.models.graph_question import GraphQuestionBinding as Binding
@@ -25,7 +26,7 @@ def node_terms(node):
     content = node.get('content') if isinstance(node.get('content'), dict) else {}
     title = str(content.get('title') or node.get('title') or '').strip()
     keywords = content.get('keywords') or node.get('keywords') or ''
-    parts = keywords if isinstance(keywords, list) else re.split(r'[,，、;；\n]+', str(keywords))
+    parts = keywords if isinstance(keywords, list) else re.split(r'[,，、;；\s]+', str(keywords))
     terms = list(dict.fromkeys(str(t).strip()[:200] for t in [title, *parts] if str(t).strip()))[:12]
     return title, terms
 
@@ -51,12 +52,16 @@ async def candidates(db, node, existing, count, subject):
     limit = min(count, max(0, MAX_BINDINGS_PER_CARD-len(existing)))
     if not terms or not limit:
         return []
+    # Search extracted string values, never JSON field names such as "text"/"title".
+    strings = lambda column: cast(func.jsonb_path_query_array(column, cast(literal('$.** ? (@.type() == "string")'), JSONPATH)), String)
+    stem_text = cast(func.jsonb_path_query_array(Question.stem_parts, cast(literal('$[*].text'), JSONPATH)), String)
+    stem_legacy = cast(func.jsonb_path_query_array(Question.stem_parts, cast(literal('$[*] ? (@.type() == "string")'), JSONPATH)), String)
     title_hits, knowledge_hits, stem_hits = [], [], []
     for term in terms:
         pattern = '%' + term.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_') + '%'
         title_hits.append(Question.title.ilike(pattern, escape='\\'))
-        knowledge_hits.append(or_(cast(Question.concepts, String).ilike(pattern, escape='\\'), cast(Question.tags, String).ilike(pattern, escape='\\')))
-        stem_hits.append(cast(Question.stem_parts, String).ilike(pattern, escape='\\'))
+        knowledge_hits.append(or_(strings(Question.concepts).ilike(pattern, escape='\\'), strings(Question.tags).ilike(pattern, escape='\\')))
+        stem_hits.append(or_(stem_text.ilike(pattern, escape='\\'), stem_legacy.ilike(pattern, escape='\\')))
     title_hit, knowledge_hit, stem_hit = or_(*title_hits), or_(*knowledge_hits), or_(*stem_hits)
     rank = case((func.lower(Question.title) == title.lower(), 0), (knowledge_hit, 1), (title_hit, 2), else_=3)
     stmt = select(Question, QuestionBank.name, rank.label('rank')).join(QuestionBank, QuestionBank.id == Question.bank_id).where(
