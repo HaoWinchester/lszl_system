@@ -12,9 +12,10 @@
 .graph-mode-menu button:hover,.graph-mode-menu button.active{background:#f1efff;color:#5748d6}
 .graph-mode-menu button.active::after{content:'✓';margin-left:auto;font-weight:900}
 
-/* 模式切换只改变主悬浮工具栏和对象交互，不移动搜索、缩放、居中与缩略图。 */
+/* 模式切换只改变主悬浮工具栏和对象交互，不移动搜索、缩放、居中与缩略图。
+   阅读模式放行带 .readonly-context 的节点工具栏（仅「打开相关画布」入口，见 10-graph-editor）。 */
 body[data-graph-interaction-mode="reading"] .graph-mode-indicator{display:none!important}
-body[data-graph-interaction-mode="reading"] .node-style-toolbar,
+body[data-graph-interaction-mode="reading"] .node-style-toolbar:not(.readonly-context),
 body[data-graph-interaction-mode="reading"] .uc-edge-toolbar,
 body[data-graph-interaction-mode="reading"] .node-growth-layer{display:none!important}
 /* 高效模式允许调整关系线：选中曲线后显示端点与路径控制点（edge-control-layer 不再隐藏，
@@ -22,15 +23,18 @@ body[data-graph-interaction-mode="reading"] .node-growth-layer{display:none!impo
    高效模式沿用自绘的边快速样式面板。 */
 body[data-graph-interaction-mode="efficient"] .uc-edge-toolbar{display:none!important}
 
-/* 高效模式节点工具栏：保留高频样式、尺寸、对齐和更多操作。 */
+/* 高效模式节点工具栏：保留高频样式、尺寸、对齐和更多操作。
+   锁定/解锁与打开相关画布保持可见：锁定卡牌切到高效模式后仍可解锁（用户反馈）。 */
 body[data-graph-interaction-mode="efficient"] .node-style-toolbar [data-node-toolbar-panel="border"],
 body[data-graph-interaction-mode="efficient"] .node-style-toolbar [data-node-toolbar-panel="font-family"],
 body[data-graph-interaction-mode="efficient"] .node-style-toolbar [data-node-toolbar-panel="font-size"],
 body[data-graph-interaction-mode="efficient"] .node-style-toolbar [data-node-toolbar-panel="font-style"],
 body[data-graph-interaction-mode="efficient"] .node-style-toolbar [data-node-toolbar-panel="line-height"],
-body[data-graph-interaction-mode="efficient"] .node-style-toolbar [data-node-toolbar-panel="text-align"],
-body[data-graph-interaction-mode="efficient"] .node-style-toolbar [data-node-toolbar-action="lock"],
-body[data-graph-interaction-mode="efficient"] .node-style-toolbar [data-node-toolbar-action="related-canvas"]{display:none!important}
+body[data-graph-interaction-mode="efficient"] .node-style-toolbar [data-node-toolbar-panel="text-align"]{display:none!important}
+
+/* 阅读模式的只读工具栏：只保留 grip 与「打开相关画布」（JS 同步置 hidden，这里兜底）。 */
+.node-style-toolbar.readonly-context .node-toolbar-btn:not(.node-toolbar-grip):not([data-node-toolbar-action="related-canvas"]),
+.node-style-toolbar.readonly-context .node-style-toolbar-panels{display:none!important}
 
 /* 阅读模式不创建编辑命中反馈；高效模式保留框选、多选和基础关系选中。 */
 body[data-graph-interaction-mode="reading"] .edge-hit{pointer-events:none!important}

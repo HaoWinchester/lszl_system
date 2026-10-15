@@ -566,7 +566,7 @@ async function openRelatedCanvasModal(showMessage=true){
     if(!graph.nodes.length)return false;
     closeRelatedCanvasModal();
     const session=window.KGGraphSession.create({kind:'temporary',graph});
-    relatedCanvasController=window.KGRelatedCanvasController.create({session,model:window.KGGraphModel,nodeDims,idFactory:uid,renderCard:(n,context)=>renderCardElement(n,null,context),renderRelation:createGraphRelationPresentation,layoutEndpoints:(link,map)=>linkRenderPoints(link,map,{ignoreGather:true}),ensureMarkers:ensureGraphEdgeMarkers,onClose:()=>closeRelatedCanvasModal(true)});
+    relatedCanvasController=window.KGRelatedCanvasController.create({session,model:window.KGGraphModel,nodeDims,idFactory:uid,renderCard:(n,context)=>renderCardElement(n,null,context),renderRelation:createGraphRelationPresentation,layoutEndpoints:(link,map)=>linkRenderPoints(link,map,{ignoreGather:true}),ensureMarkers:ensureGraphEdgeMarkers,onClose:()=>closeRelatedCanvasModal(true),readOnly:window.KGHomeInteractionModes?.getMode?.()==='reading'});
     relatedCanvasModalEl=relatedCanvasController.overlay;
     nodeStyleToolbarController?.hide();
     if(showMessage)showStatus(`已打开临时相关画布：${graph.nodes.length} 张卡片；关闭即丢弃修改。`);
@@ -3194,6 +3194,8 @@ function handleNodeToolbarAction(action,button,event=null){
   const parts=String(action||'').split(':'),group=parts[0],value=parts[1],extra=parts.slice(2).join(':');
   const ids=nodeToolbarSelectedIds(),primary=nodeToolbarPrimaryNode(),textItem=nodeToolbarTextElement();if(!textItem&&(!ids.length||!primary))return;
   const lockedIds=!textItem?lockedNodeIdsFrom(ids):[];
+  // 阅读模式：仅放行「打开相关画布」，其余工具栏动作一律拒绝。
+  if(!graphModeAllows('nodeToolbar')&&group!=='related-canvas'){nodeStyleToolbarController?.closePanels();showStatus('阅读模式下仅可打开相关画布。');return}
   if(lockedIds.length&&group!=='lock'&&group!=='related-canvas'){
     rejectLockedNodeAction('使用此功能',ids);nodeStyleToolbarController?.closePanels();updateNodeStyleToolbarControls();return;
   }
@@ -3278,6 +3280,9 @@ function bindNodeToolbarInputs(root){
 }
 function updateNodeStyleToolbarControls(){
   if(!cardQuickActionsEl||cardQuickActionsEl.hidden)return;const textItem=nodeToolbarTextElement(),primary=nodeToolbarPrimaryNode(),ids=nodeToolbarSelectedIds(),root=cardQuickActionsEl;if(!textItem&&!primary)return;
+  // 阅读模式：工具栏仅保留 grip 与「打开相关画布」（末尾统一应用 .readonly-context 隐藏）。
+  const readonlyContext=!graphModeAllows('nodeToolbar');
+  root.classList.toggle('readonly-context',readonlyContext);
   const appearance=textItem?window.KGGraphModel.textElementAppearanceOf(textItem):window.KGGraphModel.appearanceOf(primary);root.classList.toggle('text-element-context',!!textItem);
   const fillTrigger=root.querySelector('[data-node-toolbar-panel="fill"]');
   if(fillTrigger&&!textItem)fillTrigger.style.setProperty('--toolbar-color',safeColor(appearance.headerIconColor||appearance.color,DEFAULTS.nodeColor));
@@ -3319,6 +3324,11 @@ function updateNodeStyleToolbarControls(){
     const action=btn.dataset.nodeToolbarAction||'',rawKind=action.split(':')[1],kind=!textItem&&rawKind==='fill'?activeNodeFillColorKind():rawKind,current=nodeColorValue(appearance,kind).color;
     btn.classList.toggle('active',String(btn.dataset.color).toLowerCase()===String(current).toLowerCase())
   });
+  // 阅读模式统一收口：隐藏 grip 与「打开相关画布」之外的全部按钮与面板触发器。
+  if(readonlyContext){
+    nodeStyleToolbarController?.closePanels?.();
+    root.querySelectorAll('[data-node-toolbar-panel],[data-node-toolbar-action]').forEach(btn=>{if(btn.dataset.nodeToolbarAction!=='related-canvas')btn.hidden=true});
+  }
   root.querySelectorAll('[data-align-min]').forEach(btn=>{btn.disabled=textItem||ids.length<Number(btn.dataset.alignMin||2)});const alignTrigger=root.querySelector('[data-node-toolbar-panel="align"]');if(alignTrigger)alignTrigger.disabled=textItem||ids.length<2;
 }
 function ensureCardQuickActions(){
@@ -3329,7 +3339,11 @@ function ensureCardQuickActions(){
 }
 function updateCardQuickActionsPosition(){if(nodeStyleToolbarController)nodeStyleToolbarController.position();if(nodeFloatingColorWindowController)nodeFloatingColorWindowController.reposition()}
 function updateCardQuickActions(){
-  if(!graphModeAllows('nodeToolbar')){if(nodeStyleToolbarController)nodeStyleToolbarController.hide();else if(cardQuickActionsEl)cardQuickActionsEl.classList.remove('show');return}
+  // 阅读模式放行「打开相关画布」入口：仅单选一个卡牌时显示工具栏（其余按钮由 readonly-context 隐藏）。
+  const readingEntry=!graphModeAllows('nodeToolbar')&&!document.body.classList.contains('auth-readonly')
+    &&window.KGHomeInteractionModes?.getMode?.()==='reading'
+    &&!nodeToolbarTextElement()&&nodeToolbarSelectedIds().length===1;
+  if(!graphModeAllows('nodeToolbar')&&!readingEntry){if(nodeStyleToolbarController)nodeStyleToolbarController.hide();else if(cardQuickActionsEl)cardQuickActionsEl.classList.remove('show');return}
   const ids=nodeToolbarSelectedIds(),primary=nodeToolbarPrimaryNode(),textItem=nodeToolbarTextElement();
   const filter=window.KGHomeCanvasRuntime?.selectionFilter,snapshot=filter?.snapshot?.()||{total:ids.length+(textItem?1:0),categories:[]};
   const activeType=filter?.getActiveType?.()||'',mixed=!activeType&&snapshot.categories?.length>1;
@@ -3343,6 +3357,9 @@ function updateCardQuickActions(){
   filter?.refreshPosition?.(homeSelectionAnchorRect());
   updateNodeStyleToolbarControls();
 }
+
+// 模式切换后重算卡牌工具栏（阅读模式入口/锁定图标等可见性随能力矩阵变化）。
+window.addEventListener('kg-home-interaction-mode-change',()=>{updateCardQuickActions()});
 
 let graphQuestionDrawer=null;
 function renderDetails(){

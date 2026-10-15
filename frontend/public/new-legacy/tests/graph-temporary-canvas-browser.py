@@ -32,9 +32,17 @@ def main():
         expected=page.evaluate('(()=>{const l=relatedCanvasController.session.getState().links[0],m=new Map(relatedCanvasController.session.getState().nodes.map(n=>[n.id,n])),p=linkRenderPoints(l,m,{ignoreGather:true});return linkPathGeometry(l,p.a,p.b,p).d})()');assert edge.get_attribute('d')==expected
         assert '300 100' in expected and '850 120' in expected
         assert page.locator('.related-canvas-backdrop [data-question-id]').count()==0
-        page.get_by_label('临时卡片标题').fill('临时改文');page.get_by_label('临时卡片说明').fill('临时说明');page.get_by_label('临时卡片颜色').fill('#db2777');page.get_by_role('button',name='应用临时修改').click()
-        assert page.evaluate('relatedCanvasController.session.getState().nodes[0].title')=='临时改文'
-        assert page.evaluate('KGGraphModel.appearanceOf(relatedCanvasController.session.getState().nodes[0]).color')=='#db2777'
+        # 临时编辑表单已按需求移除；顶部画笔按钮开关局部画笔（笔迹不持久化，关闭即丢弃）。
+        assert page.locator('.related-canvas-backdrop form').count()==0
+        page.locator('[data-action="ink"]').click();expect(page.locator('.related-canvas-backdrop .canvas-ink-toolbar')).to_be_visible()
+        page.locator('[data-action="ink"]').click();expect(page.locator('.related-canvas-backdrop .canvas-ink-toolbar')).to_be_hidden()
+        page.locator('[data-action="ink"]').click()
+        page.keyboard.press('Escape')  # 画笔激活时 ESC 先退出绘画而不是关闭弹层
+        expect(page.locator('.related-canvas-backdrop .canvas-ink-toolbar')).to_be_visible()
+        expect(page.locator('.related-canvas-backdrop')).to_be_visible()
+        page.keyboard.press('Escape')  # 再按一次退出绘画后关闭弹层
+        expect(page.locator('.related-canvas-backdrop')).to_have_count(0)
+        open_selected(['a','c']);assert page.locator('.related-canvas-card').count()==4
         card=page.locator('.related-canvas-card[data-node-id="a"]');r=card.bounding_box();page.mouse.move(r['x']+60,r['y']+40);page.mouse.down();page.mouse.move(r['x']+110,r['y']+70,steps=8);page.mouse.up()
         assert page.evaluate('relatedCanvasController.session.getState().nodes[0].x')!=400
         edge_point=page.locator('.related-canvas-edges path[data-link-id="ab"]').evaluate('(p)=>{const q=p.getPointAtLength(p.getTotalLength()/2),m=p.getScreenCTM();return {x:q.x*m.a+q.y*m.c+m.e,y:q.x*m.b+q.y*m.d+m.f}}')
@@ -53,9 +61,8 @@ def main():
         assert not writes,writes
         saved=ctx.request.get(base+'/api/v1/files/'+files[0]['id']).json()['graphData'];assert len(saved['nodes'])==5 and saved['nodes'][0]['title']=='a'
         page.screenshot(path=str(out/'temporary.png'));page.locator('[data-action="close"]').click()
-        open_selected(['a']);assert page.locator('.related-canvas-card').count()==2;expect(page.get_by_label('临时卡片标题')).to_have_value('a');page.locator('[data-action="close"]').click()
-        open_selected(['isolated']);assert page.locator('.related-canvas-card').count()==1;expect(page.locator('.related-canvas-empty')).to_contain_text('没有一跳关联')
-        page.locator('[data-action="close"]').click()
+        open_selected(['a']);assert page.locator('.related-canvas-card').count()==2;page.locator('[data-action="close"]').click()
+        open_selected(['isolated']);assert page.locator('.related-canvas-card').count()==1;page.locator('[data-action="close"]').click()
         # While a save waits, a newly typed formal draft must remain visible, even on success.
         page.evaluate("()=>{window.savedPersist=persistCurrentGraphNow;window.persistCurrentGraphNow=()=>new Promise(resolve=>window.finishDelayedSave=resolve);window.openResult=null;selectedNodeIds=new Set(['a']);state.selectedNodeId='a';openRelatedCanvasModal(false).then(ok=>window.openResult=ok)}")
         page.wait_for_function('!!window.finishDelayedSave');page.evaluate("startNodeInlineEdit('a')");page.evaluate('()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))')

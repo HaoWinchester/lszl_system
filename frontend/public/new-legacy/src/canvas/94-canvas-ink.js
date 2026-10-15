@@ -87,7 +87,9 @@
     function setOpen(value){opened=!!value;if(!opened){settingsOpen=false;setTool('select')}else setTool('pen');refreshControls();positionToolbar()}
 
     const getStrokes=()=>options.getStrokes?.()||[];
-    const inside=target=>!target?.closest?.('.qw-analysis-panel,[data-canvas-ui],[data-stage-ui]')&&(target===viewport||world.contains(target)||(target?.parentElement===viewport&&target.classList.contains('qw-background')));
+    // 页面适配器可用 options.isInside 覆盖命中判定（如弹层画布内含 [data-stage-ui] 祖先时）。
+    const defaultInside=target=>!target?.closest?.('.qw-analysis-panel,[data-canvas-ui],[data-stage-ui]')&&(target===viewport||world.contains(target)||(target?.parentElement===viewport&&target.classList.contains('qw-background')));
+    const inside=target=>options.isInside?options.isInside(target):defaultInside(target);
     const stop=event=>{event.preventDefault();event.stopImmediatePropagation()};
     function listen(target,type,callback,config){target.addEventListener(type,callback,config);listeners.push(()=>target.removeEventListener(type,callback,config))}
     function makePath(stroke){

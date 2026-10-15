@@ -36,6 +36,10 @@ for(const token of [
 
 const css=read('styles/home-interaction-modes-p4330.css');
 assert(css.includes('body[data-graph-interaction-mode="reading"] .edge-hit'));
-assert(css.includes('body[data-graph-interaction-mode="efficient"] .edge-control-layer'));
+// 84b4e3a2 起高效模式不再隐藏 edge-control-layer（选中曲线即可见控制点），断言随之更新。
+assert(!/efficient"\] \.edge-control-layer[^-]/.test(css),'efficient mode must not hide edge-control-layer');
+// 阅读模式放行 readonly-context 工具栏（打开相关画布入口）；高效模式保留锁定与相关画布按钮。
+assert(css.includes('.node-style-toolbar:not(.readonly-context)'));
+assert(!/efficient"\] \.node-style-toolbar \[data-node-toolbar-action="lock"\]/.test(css),'efficient mode must keep the lock button');
 assert(css.includes('body.graph-phone-reading .graph-mode-switcher'));
 console.log('v90-p4330-home-interaction-modes-ok');
