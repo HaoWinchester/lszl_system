@@ -7,6 +7,7 @@
       canAnswer:known&&!reviewOnly,
       canExplain:reviewOnly||(mode==='practice'&&showCorrectness),
       showCorrectness,
+      autoAdvance:known&&!reviewOnly&&(mode!=='practice'||!showCorrectness),
       canSubmit:!reviewOnly&&mode==='revenge',
       showHealth:!reviewOnly&&['challenge','scholar'].includes(mode),
       showTimer:!reviewOnly&&mode==='scholar',

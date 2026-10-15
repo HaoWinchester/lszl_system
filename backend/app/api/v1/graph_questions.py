@@ -11,6 +11,10 @@ router = APIRouter(prefix='/graph-questions', tags=['graph-questions'])
 DB = Annotated[AsyncSession, Depends(get_db)]
 Reader = Annotated[User, Depends(get_current_user)]
 
+@router.get('/subjects')
+async def subjects(db: DB, user: Reader):
+    return await batch.subjects(db, user)
+
 @router.get('/search')
 async def search(db: DB, user: Reader, fileId: str, nodeId: str, q: str = Query('', max_length=200), subject: str | None = Query(None, max_length=32), page: int = Query(1, ge=1, le=500)):
     service.require_editor(user)

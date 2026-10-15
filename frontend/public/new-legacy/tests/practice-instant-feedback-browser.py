@@ -80,3 +80,60 @@ for kind in ['multiple_choice', 'matching']:
     assert original in setup
     exec(compile(setup.replace(original, multiple if kind == 'multiple_choice' else matching) + check, str(fixture) + '-' + kind, 'exec'))
     print(kind + ' instant feedback browser passed')
+
+
+# Precise timer-controlled interaction: only committed answers with feedback off advance.
+for kind in ['single_choice', 'multiple_choice', 'matching']:
+    timed_setup = setup.replace('    attrs, body = body_html()', '    page.clock.install()\n    attrs, body = body_html()')
+    if kind != 'single_choice':
+        assert original in timed_setup
+        timed_setup = timed_setup.replace(original, multiple if kind == 'multiple_choice' else matching)
+    commit_actions = "    page.locator('[data-option-id=\"B\"]').click()\n" if kind == 'single_choice' else actions if kind == 'matching' else "    page.locator('[data-option-id=\"A\"]').click()\n    page.locator('[data-option-id=\"C\"]').click()\n"
+    confirm = "    page.locator('#practiceConfirmAnswerBtn').click()\n" if kind != 'single_choice' else ''
+    timed = '''
+    page.evaluate("KGPracticeMode.startPractice('practice')")
+    page.wait_for_timeout(300)
+    page.clock.pause_at(page.evaluate('Date.now()') + 10)
+    page.locator('#practiceInstantFeedback').uncheck()
+''' + commit_actions
+    if kind != 'single_choice':
+        timed += "    page.clock.run_for(600)\n    assert page.evaluate('KGPracticeMode.snapshot().index') == 0, 'unconfirmed answer advanced'\n"
+    timed += confirm + '''
+    page.clock.run_for(499)
+    assert page.evaluate('KGPracticeMode.snapshot().index') == 0, 'advanced too early'
+    page.clock.run_for(41)
+    assert page.evaluate('KGPracticeMode.snapshot().index') == 1, 'did not advance after about 0.5s'
+    assert page.locator('.is-correct,.is-wrong,.qm-pair-feedback').count() == 0
+    # Feedback on preserves manual navigation.
+    page.locator('#practiceInstantFeedback').check()
+''' + commit_actions + confirm + '''
+    page.clock.run_for(600)
+    assert page.evaluate('KGPracticeMode.snapshot().index') == 1
+    page.locator('#practiceInstantFeedback').uncheck()
+    page.locator('#practiceNextBtn').click()
+''' + commit_actions + confirm + '''
+    page.locator('#practiceNextBtn').click()
+    page.clock.run_for(600)
+    assert page.evaluate('KGPracticeMode.snapshot().index') == 3, 'stale timer skipped a question after manual navigation'
+''' + commit_actions + confirm + '''
+    page.locator('#practiceInstantFeedback').check()
+    page.locator('#practiceInstantFeedback').uncheck()
+    page.clock.run_for(600)
+    assert page.evaluate('KGPracticeMode.snapshot().index') == 3, 'toggle must cancel pending navigation'
+    page.locator('#practiceNextBtn').click()
+''' + commit_actions + confirm + '''
+    page.locator('#practiceExitBtn').click()
+    page.clock.run_for(600)
+    assert page.evaluate('KGPracticeMode.snapshot().index') == 4, 'exit dialog must cancel pending navigation'
+    page.locator('#practiceExitCancel').click()
+    page.locator('#practiceAnswerSheetMobileBtn').click()
+    page.locator('#practiceAnswerSheet [data-question-id="q10"]').click()
+''' + commit_actions + confirm + '''
+    page.clock.run_for(600)
+    assert page.evaluate('KGPracticeMode.snapshot().index') == 9, 'last question overflowed'
+    assert page.evaluate('KGPracticeMode.snapshot().active') is True
+    assert not errors, errors
+    browser.close()
+'''
+    exec(compile(timed_setup + timed, str(fixture) + '-auto-next-' + kind, 'exec'))
+    print(kind + ' feedback-off auto-next browser passed')

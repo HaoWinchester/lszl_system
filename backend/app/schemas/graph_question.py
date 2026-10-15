@@ -21,6 +21,7 @@ class AttemptInput(BaseModel):
 
 class BatchPreviewInput(BaseModel):
     model_config = ConfigDict(extra='forbid', populate_by_name=True)
+    subject: str | None = Field(default=None, min_length=1, max_length=32)
     expected_file_revision: int = Field(alias='expectedFileRevision', ge=1)
     node_ids: list[str] = Field(alias='nodeIds', min_length=1, max_length=500)
     count_per_card: int = Field(alias='countPerCard', ge=1, le=100, default=3)

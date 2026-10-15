@@ -1,10 +1,12 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.332",
-  "toVersion": "v9.0-p4.1.332",
+  "fromVersion": "v9.0-p4.1.333",
+  "toVersion": "v9.0-p4.1.333",
   "changes": {
     "added": [],
-    "changed": [],
+    "changed": [
+      "tests/practice-lobby-fidelity-browser.py"
+    ],
     "removed": []
   },
   "incompatible": []

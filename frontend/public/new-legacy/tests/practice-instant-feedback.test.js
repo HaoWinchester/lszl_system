@@ -6,6 +6,9 @@ const {KGPracticeModePolicy:policy,KGPracticeSessionCore:core,KGPracticeAnswerSh
 assert.equal(policy.forMode('practice',{instantFeedback:false}).canExplain,false);
 assert.equal(policy.forMode('practice',{instantFeedback:false}).showCorrectness,false);
 assert.equal(policy.forMode('practice').showCorrectness,true);
+assert.equal(policy.forMode('practice',{instantFeedback:false}).autoAdvance,true);
+assert.equal(policy.forMode('practice').autoAdvance,false);
+assert.equal(policy.forMode('practice',{instantFeedback:false,reviewOnly:true}).autoAdvance,false);
 for(const mode of ['challenge','scholar','revenge'])assert.equal(policy.forMode(mode,{instantFeedback:false}).showCorrectness,true);
 assert.equal(policy.forMode('practice',{instantFeedback:false,reviewOnly:true}).showCorrectness,true);
 assert.equal(core.normalizeSession({}).runtimeState.instantFeedback,true);

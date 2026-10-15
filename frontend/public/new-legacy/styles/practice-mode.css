@@ -694,7 +694,7 @@ body.practice-mode-page:not([data-practice-view="lobby"]) .practice-lobby-sideba
 #practiceLobby .practice-modes-title{grid-column:1/-1;order:1;margin:5px 0 0;font-size:16px;line-height:1.4;font-weight:650}
 #practiceLobby .practice-mode-card{position:relative;display:grid;grid-template-columns:30px minmax(0,1fr);gap:10px;padding:18px 14px;min-height:164px;border:1px solid #e0e4ef;border-radius:8px;background:#fff;box-shadow:none;overflow:visible;align-content:start}
 #practiceLobby .practice-mode-card.ordinary{order:2;border-color:#855cf7;background:#f7f4ff;box-shadow:0 0 0 1px #855cf7}#practiceLobby .practice-mode-card.challenge{order:3}#practiceLobby .practice-mode-card.scholar{order:4}#practiceLobby .practice-mode-card.revenge{order:5}
-#practiceLobby .practice-mode-card{grid-template-rows:none;grid-auto-rows:auto;min-height:180px}
+#practiceLobby .practice-mode-card{grid-template-rows:none;grid-auto-rows:auto;min-height:180px;height:auto;align-self:stretch}
 #practiceLobby .practice-mode-card>*{grid-row:auto}
 #practiceLobby .practice-mode-card .practice-mode-icon{width:30px;height:35px;border-radius:0;background:transparent;color:#5231bc;margin:0;display:grid;place-items:center}
 #practiceLobby .practice-mode-card h2{font-size:15px;line-height:1.4;margin:0 0 8px;padding-right:17px}#practiceLobby .practice-mode-card .practice-mode-purpose{font-size:11px;line-height:1.6;color:#77829a;margin:0;min-height:35px}
@@ -710,9 +710,12 @@ body.practice-mode-page:not([data-practice-view="lobby"]) .practice-lobby-sideba
 #practiceLobby .practice-lobby-help[open]{z-index:46}#practiceLobby .practice-help-content{position:absolute;right:0;top:27px;width:260px;padding:16px;border:1px solid #deddea;border-radius:9px;background:#fff;box-shadow:0 8px 30px #17203315;color:#526078}
 #practiceLobby .practice-help-content strong{font-size:13px;color:#28314a}#practiceLobby .practice-help-content p{font-size:12px;line-height:1.7;margin:8px 0 0}#practiceLobby .practice-coverage-help{right:8px;top:8px}
 #practiceLobby .practice-recent{margin-top:22px;padding:18px 20px;background:#fff;border:1px solid #e2e6ef;border-radius:10px}
+/* The skin's :not(#authModal *) carries ID specificity. Keep these reference
+   text controls flat in every state instead of inheriting global button chrome. */
+body.practice-mode-page[data-learning-skin="focus-vega"] #practiceLobby .practice-recent button{appearance:none;border-radius:0;box-shadow:none;transform:none}
 #practiceLobby .practice-recent>header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}#practiceLobby .practice-recent [role="tablist"]{display:flex;gap:22px}
 #practiceLobby .practice-recent [role="tab"]{border:0;border-radius:0;border-bottom:2px solid transparent;background:transparent;color:#526078;font-size:14px;padding:0 0 10px}
-#practiceLobby .practice-recent [role="tab"][aria-selected="true"]{color:#7651ee;border-bottom-color:#7651ee;font-weight:650}#practiceLobby .practice-recent-more{border:0;background:transparent;color:#7a859c;font-size:11px;white-space:nowrap}
+#practiceLobby .practice-recent [role="tab"][aria-selected="true"]{color:#7651ee;border-bottom-color:#7651ee;font-weight:650}#practiceLobby .practice-recent-more{border:0;background:transparent;color:#7a859c;font-size:11px;white-space:nowrap;padding:0}
 #practiceLobby .practice-recent-table-wrap{overflow-x:auto}#practiceLobby .practice-recent-table{width:100%;border-collapse:collapse;table-layout:fixed;text-align:left;font-size:12px;color:#748098}
 #practiceLobby .practice-recent-table th{padding:12px 10px;background:#f6f7fb;font-size:11px;font-weight:500}#practiceLobby .practice-recent-table td{padding:15px 10px;border-bottom:1px solid #edf0f5;overflow-wrap:anywhere;line-height:1.5}
 #practiceLobby .practice-recent-table th:nth-child(1){width:21%}#practiceLobby .practice-recent-table th:nth-child(2){width:29%}#practiceLobby .practice-recent-table th:nth-child(3){width:9%}

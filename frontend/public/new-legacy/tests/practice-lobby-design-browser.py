@@ -4,8 +4,8 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright,expect
 
 ROOT=Path(__file__).resolve().parents[2]
-OUT=ROOT/'artifacts/practice-lobby-redesign';OUT.mkdir(parents=True,exist_ok=True)
-parser=argparse.ArgumentParser();parser.add_argument('--base-url',required=True);parser.add_argument('--baseline',action='store_true');args=parser.parse_args()
+parser=argparse.ArgumentParser();parser.add_argument('--base-url',required=True);parser.add_argument('--baseline',action='store_true');parser.add_argument('--output-dir',type=Path,default=ROOT/'artifacts/practice-lobby-redesign');parser.add_argument('--source-overrides',action='store_true');args=parser.parse_args()
+OUT=args.output_dir;OUT.mkdir(parents=True,exist_ok=True)
 BASE=args.base_url.rstrip('/');assert BASE.startswith('http://127.0.0.1:'),'Requires disposable local backend'
 checks=[]
 with sync_playwright() as pw:
@@ -15,6 +15,14 @@ with sync_playwright() as pw:
         assert r.ok,(path,r.status,r.text());return r.json()
     call('post','/api/v1/auth/login',{'username':'ink-browser','password':'ink-browser-test'})
     page=ctx.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
+    if args.source_overrides:
+        # Exercise authoritative edited assets without syncing or promoting a release.
+        def source_asset(route):
+            from urllib.parse import urlparse
+            asset=ROOT/'new-legacy'/urlparse(route.request.url).path.lstrip('/')
+            if asset.is_file():route.fulfill(path=asset)
+            else:route.continue_()
+        page.route('**/styles/**',source_asset);page.route('**/src/**',source_asset)
     if args.baseline:
         original=subprocess.check_output(['git','show','c9388519:frontend/public/new-legacy/practice-mode.html'])
         page.route('**/practice-mode.html',lambda route:route.fulfill(body=original,content_type='text/html'))

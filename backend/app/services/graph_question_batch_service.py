@@ -47,6 +47,24 @@ async def active_bindings(db, file_id, node_ids):
     return result
 
 
+def normalize_subject(subject):
+    return str(subject or '').split('/', 1)[0].strip().upper()
+
+
+def eligible_questions():
+    return (
+        func.coalesce(Question.lifecycle['deletedAt'].astext, '') == '',
+        func.coalesce(Question.lifecycle['status'].astext, 'active') == 'active',
+        Question.type.in_(['single_choice', 'multiple_choice', 'matching']),
+    )
+
+
+async def subjects(db, user):
+    cards.require_editor(user)
+    values = (await db.scalars(select(func.coalesce(Question.subject, QuestionBank.subject)).join(QuestionBank, QuestionBank.id == Question.bank_id).where(*eligible_questions()).distinct())).all()
+    return {'subjects': sorted({'PMP', *(normalize_subject(value) for value in values if normalize_subject(value))})}
+
+
 async def candidates(db, node, existing, count, subject):
     title, terms = node_terms(node)
     limit = min(count, max(0, MAX_BINDINGS_PER_CARD-len(existing)))
@@ -65,12 +83,13 @@ async def candidates(db, node, existing, count, subject):
     title_hit, knowledge_hit, stem_hit = or_(*title_hits), or_(*knowledge_hits), or_(*stem_hits)
     rank = case((func.lower(Question.title) == title.lower(), 0), (knowledge_hit, 1), (title_hit, 2), else_=3)
     stmt = select(Question, QuestionBank.name, rank.label('rank')).join(QuestionBank, QuestionBank.id == Question.bank_id).where(
-        func.coalesce(Question.lifecycle['deletedAt'].astext, '') == '',
-        func.coalesce(Question.lifecycle['status'].astext, 'active') == 'active',
-        Question.type.in_(['single_choice', 'multiple_choice', 'matching']),
+        *eligible_questions(),
         or_(title_hit, knowledge_hit, stem_hit), Question.id.notin_(existing))
-    if subject:
-        stmt = stmt.where(func.coalesce(Question.subject, QuestionBank.subject) == subject)
+    # Graph metadata stores a display path (e.g. 'PMP / 项目管理'), while
+    # question banks store the first segment as their subject code.
+    subject_code = normalize_subject(subject).lower()
+    if subject_code:
+        stmt = stmt.where(func.lower(func.trim(func.coalesce(Question.subject, QuestionBank.subject))) == subject_code)
     rows = (await db.execute(stmt.order_by(rank, Question.id).limit(limit))).all()
     return [{'id': q.id, 'revision': q.revision, 'title': q.title, 'bankName': bank, 'stem': ' '.join(str(p.get('text', '')) if isinstance(p, dict) else str(p) for p in q.stem_parts or [])[:300], 'matchReason': ['标题精确匹配', '知识点／标签匹配', '标题匹配', '题干匹配'][ranked]} for q, bank, ranked in rows]
 
@@ -80,7 +99,9 @@ async def preview(db, user, file_id, data):
     ids = list(dict.fromkeys(data.node_ids))
     file, content, nodes = await load_graph(db, user, file_id, ids, data.expected_file_revision)
     existing = await active_bindings(db, file_id, ids)
-    subject = (content.graph_data.get('meta') or {}).get('subject')
+    subject = normalize_subject(data.subject if data.subject is not None else (content.graph_data.get('meta') or {}).get('subject'))
+    if data.subject is not None and not subject:
+        error('GRAPH_BATCH_SUBJECT_REQUIRED', '请选择匹配科目。')
     result, total = [], 0
     for node_id in ids:
         found = await candidates(db, nodes[node_id], existing[node_id], data.count_per_card, subject)
@@ -89,8 +110,8 @@ async def preview(db, user, file_id, data):
             error('GRAPH_BATCH_TOO_LARGE', '本次新增超过2000题，请减少卡片数量或每卡题数。')
         title, _ = node_terms(nodes[node_id])
         result.append({'nodeId': node_id, 'title': title or '未命名卡片', 'existingCount': len(existing[node_id]), 'requestedCount': data.count_per_card, 'questions': found, 'shortfall': data.count_per_card-len(found)})
-    payload = {'owner': user.username, 'file': file_id, 'revision': file.revision, 'cards': {row['nodeId']: {q['id']: q['revision'] for q in row['questions']} for row in result}}
-    return {'fileRevision': file.revision, 'previewToken': serializer().dumps(payload), 'cards': result}
+    payload = {'owner': user.username, 'subject': subject, 'file': file_id, 'revision': file.revision, 'cards': {row['nodeId']: {q['id']: q['revision'] for q in row['questions']} for row in result}}
+    return {'fileRevision': file.revision, 'subject': subject, 'previewToken': serializer().dumps(payload), 'cards': result}
 
 
 async def apply(db, user, file_id, data):

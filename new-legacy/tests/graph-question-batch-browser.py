@@ -14,7 +14,9 @@ with sync_playwright() as pw:
     term='风险响应'+uuid.uuid4().hex[:7]
     bank=call('post','/api/v1/banks',{'name':term,'subject':'PMP','visibility':'private'})['bank'];questions=[]
     for i in range(2):questions.append(call('post',f'/api/v1/banks/{bank["id"]}/questions',{'title':term+str(i),'subject':'PMP','type':'single_choice','stemParts':[{'text':term+'识别风险后先分析影响。'}],'options':[{'id':'A','text':'分析'},{'id':'B','text':'忽略'}],'correctAnswer':'A','analysis':'先分析再响应。','metadata':{'subjectFacets':[{'dimensionId':'exam-domain','valueId':'process'}]}})['question']['id'])
-    file=call('post','/api/v1/files',{'name':'批量配题回归','graphData':{'meta':{'subject':'PMP'},'nodes':[{'id':'a','title':term,'x':200,'y':200},{'id':'b','title':'关联卡片','keywords':term,'x':550,'y':200},{'id':'none','title':'未匹配'+uuid.uuid4().hex,'x':350,'y':500}],'links':[]}})['file']['id']
+    acp_bank=call('post','/api/v1/banks',{'name':term+' ACP','subject':'PMI-ACP','visibility':'private'})['bank']
+    acp_question=call('post',f'/api/v1/banks/{acp_bank["id"]}/questions',{'title':term+' ACP','subject':'PMI-ACP','type':'single_choice','stemParts':[{'text':term+'敏捷问题'}],'options':[{'id':'A','text':'分析'},{'id':'B','text':'忽略'}],'correctAnswer':'A','analysis':'分析','metadata':{}})['question']['id']
+    file=call('post','/api/v1/files',{'name':'批量配题回归','graphData':{'meta':{'subject':'PMI-ACP / 敏捷项目管理'},'nodes':[{'id':'a','title':term,'x':200,'y':200},{'id':'b','title':'关联卡片','keywords':term,'x':550,'y':200},{'id':'none','title':'未匹配'+uuid.uuid4().hex,'x':350,'y':500}],'links':[]}})['file']['id']
     single=f'/api/v1/graph-questions/files/{file}/nodes/'
     call('put',single+'a/bindings',{'expectedFileRevision':1,'questionIds':[questions[0]]});call('put','/api/v1/files/current',{'fileId':file})
     page=ctx.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
@@ -27,14 +29,24 @@ with sync_playwright() as pw:
     button=page.get_by_role('button',name='批量添加题目',exact=True);expect(button).to_be_visible();button.click();expect(drawer).to_be_hidden()
     modal=page.get_by_role('dialog',name='批量添加题目');expect(modal).to_be_visible()
     expect(modal.get_by_label('每张卡片新增题数')).to_have_value('3')
+    expect(modal.get_by_label('匹配科目')).to_have_value('PMP')
+    expect(modal.get_by_label('匹配科目').locator('option[value="PMI-ACP"]')).to_have_count(1)
     expect(modal.get_by_label('卡片范围')).to_have_value('selected');modal.get_by_label('卡片范围').select_option('all')
     expect(modal.locator('[data-batch-node] input:checked')).to_have_count(3)
     modal.get_by_role('button',name='清空选择',exact=True).click();expect(modal.get_by_role('button',name='预览匹配',exact=True)).to_be_disabled()
     modal.get_by_role('button',name='全选当前列表',exact=True).click()
     modal.get_by_label('搜索知识卡片').fill('关联卡片');expect(modal.locator('[data-batch-node]')).to_have_count(1);modal.get_by_label('搜索知识卡片').fill('')
     modal.get_by_label('每张卡片新增题数').fill('0');expect(modal.get_by_role('button',name='预览匹配',exact=True)).to_be_disabled();modal.get_by_label('每张卡片新增题数').fill('3')
-    modal.get_by_role('button',name='预览匹配',exact=True).click();expect(modal.locator('[data-batch-preview-card]')).to_have_count(3)
+    with page.expect_request('**/batch-preview') as sent:
+        modal.get_by_role('button',name='预览匹配',exact=True).click()
+    assert sent.value.post_data_json['subject']=='PMP'
+    expect(modal.locator('[data-batch-preview-card]')).to_have_count(3)
     expect(modal.locator('[data-batch-preview-card="none"]')).to_contain_text('未找到')
+    modal.get_by_label('匹配科目').select_option('PMI-ACP');expect(modal.locator('[data-batch-preview-card]')).to_have_count(0)
+    modal.get_by_role('button',name='预览匹配',exact=True).click();expect(modal.locator('[data-batch-preview-card="a"] input')).to_have_count(1)
+    assert modal.locator('[data-batch-preview-card="a"] input').get_attribute('value')==acp_question
+    modal.get_by_label('匹配科目').select_option('PMP');expect(modal.locator('[data-batch-preview-card]')).to_have_count(0)
+    modal.get_by_role('button',name='预览匹配',exact=True).click();expect(modal.locator('[data-batch-preview-card]')).to_have_count(3)
     assert len(call('get',single+'a/bindings')['bindings'])==1,'preview must not write'
     assert len(call('get',single+'b/bindings')['bindings'])==0
     modal.locator('[data-batch-preview-card="b"] input[value="'+questions[1]+'"]').uncheck()
@@ -47,6 +59,8 @@ with sync_playwright() as pw:
     button.click();modal.get_by_label('卡片范围').select_option('selected');expect(modal.locator('[data-batch-node] input:checked')).to_have_count(1)
     modal.get_by_role('button',name='预览匹配',exact=True).click();expect(modal.locator('[data-batch-preview-card]')).to_have_count(1)
     expect(modal.get_by_role('button',name='确认添加',exact=False)).to_be_disabled()
+    # Changing a subject invalidates the signed preview and cannot reuse candidates.
+    modal.get_by_label('匹配科目').dispatch_event('change');expect(modal.locator('[data-batch-preview-card]')).to_have_count(0)
     # Failed matching preserves selections and allows retry, never writes.
     page.route('**/batch-preview',lambda route:route.fulfill(status=503,json={'detail':'暂时不可用'}))
     modal.get_by_role('button',name='预览匹配',exact=True).click();expect(modal.locator('[data-batch-status]')).to_contain_text('暂时不可用')
@@ -64,6 +78,21 @@ with sync_playwright() as pw:
     try:deferred[0].fulfill(status=503,json={'detail':'late response'})
     except Exception:pass
     page.unroute('**/batch-preview');button.click();expect(modal.locator('[data-batch-status]')).to_be_empty();expect(modal.locator('[data-batch-preview-card]')).to_have_count(0)
+    # Slow subject lists must remain independent from a preview already in progress.
+    modal.get_by_role('button',name='关闭批量配题').click()
+    subject_requests=[];page.route('**/graph-questions/subjects',lambda route:subject_requests.append(route))
+    button.click();page.wait_for_timeout(200);assert subject_requests
+    modal.get_by_role('button',name='预览匹配',exact=True).click();expect(modal.locator('[data-batch-preview-card]').first).to_be_visible()
+    try:subject_requests[0].fulfill(status=200,json={'subjects':['PMP','PMI-ACP']})
+    except Exception:pass
+    expect(modal.get_by_label('匹配科目').locator('option[value="PMI-ACP"]')).to_have_count(1)
+    page.unroute('**/graph-questions/subjects');modal.get_by_role('button',name='关闭批量配题').click()
+    # Subject service failure keeps the explicit PMP fallback usable; reopening retries.
+    page.route('**/graph-questions/subjects',lambda route:route.fulfill(status=503,json={'detail':'暂时不可用'}))
+    button.click();expect(modal.locator('[data-batch-status]')).to_contain_text('科目列表读取失败')
+    expect(modal.get_by_label('匹配科目')).to_have_value('PMP')
+    page.unroute('**/graph-questions/subjects');modal.get_by_role('button',name='关闭批量配题').click();button.click()
+    expect(modal.get_by_label('匹配科目').locator('option[value="PMI-ACP"]')).to_have_count(1)
     page.set_viewport_size({'width':800,'height':844});page.wait_for_timeout(200)
     box=modal.bounding_box();assert box['x']>=0 and box['x']+box['width']<=801,box
     assert modal.get_by_role('button',name='预览匹配',exact=True).evaluate("b=>{const r=b.getBoundingClientRect();return document.elementFromPoint(r.right-8,r.top+r.height/2)?.closest('[role=dialog]')===b.closest('[role=dialog]')}"),'floating navigation covers batch controls'

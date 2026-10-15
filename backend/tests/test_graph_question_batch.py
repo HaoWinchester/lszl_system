@@ -137,3 +137,51 @@ def test_capacity_and_resource_failure_leave_no_partial_bindings(data,monkeypatc
         monkeypatch.setattr(service,'freeze_source',fail_later)
         assert apply(c,file,p).status_code==409
         assert c.get(path(file)).json()['bindings']==[]
+
+
+@pytest.mark.parametrize('subject,expected',[
+    ('PMP / 项目管理',('q','multi','match')),
+    (' pmp / 第二章 / 价值交付系统 ',('q','multi','match')),
+    ('PMP',('q','multi','match')),
+    ('PMI-ACP / 敏捷项目管理',('public',)),
+])
+def test_graph_subject_description_matches_code_without_crossing_subjects(data,subject,expected):
+    from app.models.file import FileContent
+    d=data
+    with TestClient(app) as c:
+        login(c,d,'teacher');file=setup_graph(c,d)
+        async def seed():
+            async with AsyncSessionLocal() as db:
+                body=await db.get(FileContent,file)
+                body.graph_data={**body.graph_data,'meta':{'subject':subject}}
+                other=await db.get(Question,d.public);other.subject='PMI-ACP';other.title=d.q+' knowledge'
+                await db.commit()
+        asyncio.run(seed());r=preview(c,file,ids=['n']);assert r.status_code==200,r.text
+        assert {q['id'] for q in r.json()['cards'][0]['questions']}=={getattr(d,k) for k in expected}
+
+
+
+def test_explicit_subject_picker_overrides_graph_and_lists_available_codes(data):
+    from app.models.file import FileContent
+    d=data
+    with TestClient(app) as c:
+        assert c.get('/api/v1/graph-questions/subjects').status_code==401
+        login(c,d,'teacher');file=setup_graph(c,d)
+        async def seed():
+            async with AsyncSessionLocal() as db:
+                body=await db.get(FileContent,file);body.graph_data={**body.graph_data,'meta':{'subject':'PMI-ACP / 敏捷项目管理'}}
+                q=await db.get(Question,d.public);q.subject='PMI-ACP';q.title=d.q+' knowledge'
+                await db.commit()
+        asyncio.run(seed())
+        r=c.get('/api/v1/graph-questions/subjects');assert r.status_code==200,r.text
+        assert {'PMP','PMI-ACP'}<=set(r.json()['subjects'])
+        for subject,expected in [('PMP',{d.q,d.multi,d.match}),('PMI-ACP',{d.public})]:
+            r=c.post(f'/api/v1/graph-questions/files/{file}/batch-preview',json={'expectedFileRevision':1,'nodeIds':['n'],'countPerCard':3,'subject':subject})
+            assert r.status_code==200,r.text
+            p=r.json();assert p['subject']==subject
+            assert {q['id'] for q in p['cards'][0]['questions']}==expected
+            from app.services.graph_question_batch_service import serializer
+            assert serializer().loads(p['previewToken'])['subject']==subject
+        for invalid_subject in ['', '   ', '/']:
+            r=c.post(f'/api/v1/graph-questions/files/{file}/batch-preview',json={'expectedFileRevision':1,'nodeIds':['n'],'subject':invalid_subject});assert r.status_code==422
+        login(c,d,'viewer');assert c.get('/api/v1/graph-questions/subjects').status_code==403

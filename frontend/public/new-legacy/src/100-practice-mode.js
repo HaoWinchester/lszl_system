@@ -300,7 +300,7 @@
     if(state.submitting||state.pendingRequestKey||state.reconciling)return false;
     if(state.active&&shouldAutoComplete()){finishPractice();return false}
     const index=state.questions.findIndex(question=>question.id===text(questionId));if(index<0||(!state.active&&!state.reviewing))return false;
-    global.clearTimeout(state.feedbackTimer);state.feedbackTimer=0;
+    clearFeedbackTimer();
     state.index=index;state.locked=false;dom.feedback.hidden=true;hideRemediation();clearVerification();renderQuestion();
     // 题号切题后统一关闭抽屉（无论来自答题卡跳题还是其他入口）
     if(dom.answerSheetDrawer&&!dom.answerSheetDrawer.hidden)closeAnswerSheetDrawer(true);
@@ -386,9 +386,10 @@
   function accuracy(){return state.answered?Math.round(state.correct/state.answered*100):0}
   function elapsed(){return Math.max(0,(state.endedAt||Date.now())-state.startedAt)}
   function remainingSeconds(){return Math.max(0,Math.ceil((state.deadline-Date.now())/1000))}
+  function clearFeedbackTimer(){global.clearTimeout(state.feedbackTimer);state.feedbackTimer=0}
   function clearTimers(){
     if(state.timerId)global.clearInterval(state.timerId);state.timerId=0;
-    if(state.feedbackTimer)global.clearTimeout(state.feedbackTimer);state.feedbackTimer=0;
+    clearFeedbackTimer();
     if(state.popTimer)global.clearTimeout(state.popTimer);state.popTimer=0;
   }
   function retriggerViewAnimation(el,cls){if(!el)return;el.classList.remove(cls);void el.offsetWidth;el.classList.add(cls)}
@@ -906,7 +907,7 @@
     if(shouldAutoComplete()){finishPractice();return false}
     const next=state.index+Number(delta);
     if(next<0||next>=state.questions.length)return false;
-    global.clearTimeout(state.feedbackTimer);state.feedbackTimer=0;
+    clearFeedbackTimer();
     state.index=next;state.locked=false;
     dom.feedback.hidden=true;hideRemediation();clearVerification();
     renderQuestion();
@@ -948,7 +949,7 @@
     if(!state.active||state.submitting||state.pendingRequestKey)return;
     if(shouldAutoComplete()||(state.mode==='scholar'&&state.health<=0)){finishPractice();return}
     if(state.mode==='challenge'&&state.health<=0&&!state.challengeFailedShown){state.challengeFailedShown=true;showChallengeFailDialog()}
-    if(state.mode==='practice'||state.index>=state.questions.length-1){updateQuestionNav();renderAnswerSheet();return}
+    if(!modePolicy().autoAdvance||state.index>=state.questions.length-1){updateQuestionNav();renderAnswerSheet();return}
     state.index+=1;
     renderQuestion();
   }
@@ -1283,7 +1284,7 @@
     if(dom.paperSelect)dom.paperSelect.value=settings.paperId;dom.countInputs.forEach(input=>input.checked=Number(input.value)===settings.count);dom.orderInputs.forEach(input=>input.checked=input.value===settings.order);
     startPractice(settings.mode);
   }
-  function openExitConfirm(){if(!state.active)return;dom.exitConfirm.hidden=false;dom.exitConfirm.setAttribute('aria-hidden','false')}
+  function openExitConfirm(){if(!state.active)return;if(state.mode==='practice')clearFeedbackTimer();dom.exitConfirm.hidden=false;dom.exitConfirm.setAttribute('aria-hidden','false')}
   function closeExitConfirm(){dom.exitConfirm.hidden=true;dom.exitConfirm.setAttribute('aria-hidden','true')}
   function setDrawerOpen(drawer,open,focusTarget=null){
     if(!drawer)return;
@@ -1603,7 +1604,7 @@
     const autoExplain=$('practiceAutoExplain');
     autoExplain?.addEventListener('change',()=>{global.KGActivitySchemaV1?.setPracticeAutoExplain?.(autoExplain.checked);renderQuestion()});
     // 显示答案开关（会话态，随保存落库）；标记按钮只改本地状态与答题卡。
-    $('practiceInstantFeedback')?.addEventListener('change',event=>{state.instantFeedback=event.target.checked===true;hideStreakPop();state.draft?.markDirty?.();renderQuestion();renderSaveStatus()});
+    $('practiceInstantFeedback')?.addEventListener('change',event=>{clearFeedbackTimer();state.instantFeedback=event.target.checked===true;hideStreakPop();state.draft?.markDirty?.();renderQuestion();renderSaveStatus()});
     $('practiceShowAnswers')?.addEventListener('change',event=>{state.showAnswers=event.target.checked===true;renderQuestion()});
     $('practiceMarkToggle')?.addEventListener('click',()=>toggleQuestionMark());
     // 标记区工具：评论直开底部讨论抽屉；弹幕开关切换本机偏好并同步按钮文案。
