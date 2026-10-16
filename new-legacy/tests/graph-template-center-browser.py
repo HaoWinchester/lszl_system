@@ -1,6 +1,7 @@
 """T15 actual publication/loading/role/drawer desktop/narrow/fullscreen flow."""
 import json
 from pathlib import Path
+from helpers.graph_detail_actions import open_retained_practice
 from playwright.sync_api import sync_playwright,expect
 ROOT=Path(__file__).resolve().parents[2];OUT=ROOT/'artifacts/canvas-m2-m5/t15';BASE='http://127.0.0.1:5195'
 def main():
@@ -27,10 +28,7 @@ def main():
         def practice(p,nid):
             visible_click(p,f'.knowledge-card[data-node-id="{nid}"]')
             panel=p.locator('#detailPanel');r=panel.bounding_box();assert r['y']+r['height']<=p.viewport_size['height']
-            if p.locator('#graphPracticeBtn').bounding_box()['y']>p.viewport_size['height']:
-                p.mouse.move(r['x']+r['width']/2,r['y']+r['height']/2);p.mouse.wheel(0,8000);p.wait_for_timeout(150)
-                assert panel.evaluate('(el)=>el.scrollTop')>0
-            visible_click(p,'#graphPracticeBtn')
+            open_retained_practice(p)
         def center(p):
             visible_click(p,'#templateBtn');expect(p.locator('#graphTemplateCenter')).to_be_visible();expect(p.locator('#graphTemplateCenter [role=status]')).not_to_have_text('正在加载模板…')
         def close(p):visible_click(p,'#graphTemplateCenter .template-center-actions button:last-child')

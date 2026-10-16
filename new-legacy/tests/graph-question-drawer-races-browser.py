@@ -1,6 +1,7 @@
 """Held network responses verify immutable submissions and collapsed search lifecycle."""
 import json
 from pathlib import Path
+from helpers.graph_detail_actions import open_retained_practice
 from playwright.sync_api import sync_playwright,expect,Error
 ROOT=Path(__file__).resolve().parents[2];OUT=ROOT/'artifacts/canvas-m2-m5/t14';BASE='http://127.0.0.1:5194'
 f=json.loads((OUT/'fixture.json').read_text())
@@ -12,8 +13,9 @@ with sync_playwright() as pw:
         for selector in ('#learningEntryDismissBtn','.tour-skip','#hideHelpBtn'):
             if page.locator(selector).is_visible():page.locator(selector).click()
         page.evaluate("window.raceRejections=[];window.addEventListener('unhandledrejection',event=>raceRejections.push(String(event.reason)))")
-        for selector in ('.knowledge-card[data-node-id=n]','#graphPracticeBtn'):
+        for selector in ('.knowledge-card[data-node-id=n]',):
             page.locator(selector).wait_for();r=page.locator(selector).bounding_box();page.mouse.click(r['x']+r['width']/2,r['y']+r['height']/2)
+        open_retained_practice(page)
         expect(page.locator('.gqd-question')).to_have_count(3);return ctx,page
     for index in (0,2):
         ctx,page=session('student');card=page.locator('.gqd-question').nth(index);held=[];bodies=[]

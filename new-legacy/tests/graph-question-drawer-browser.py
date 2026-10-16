@@ -1,6 +1,7 @@
 """Live T14 role/authorized-media/maintenance/error/fullscreen/mobile checks."""
 import argparse,json
 from pathlib import Path
+from helpers.graph_detail_actions import open_retained_practice
 from playwright.sync_api import sync_playwright,expect
 ROOT=Path(__file__).resolve().parents[2];OUT=ROOT/'artifacts/canvas-m2-m5/t14'
 def main():
@@ -21,7 +22,7 @@ def main():
             assert loc.evaluate('(el,p)=>el.contains(document.elementFromPoint(p.x,p.y))',{'x':x,'y':y}),(selector,r)
             page.mouse.click(x,y)
         def open_card(page,id='n'):
-            visible_click(page,'.knowledge-card[data-node-id="'+id+'"]');visible_click(page,'#graphPracticeBtn');page.locator('.graph-question-drawer').wait_for(state='visible');expect(page.locator('.graph-question-drawer [data-status]')).to_have_text('')
+            visible_click(page,'.knowledge-card[data-node-id="'+id+'"]');open_retained_practice(page);page.locator('.graph-question-drawer').wait_for(state='visible');expect(page.locator('.graph-question-drawer [data-status]')).to_have_text('')
         teacher,p=session('teacher');open_card(p);expect(p.locator('.gqd-question')).to_have_count(3);expect(p.locator('.gqd-analysis')).to_have_count(0)
         p.wait_for_function("[...document.querySelectorAll('.gqd-question img')].every(i=>i.complete&&i.naturalWidth===240)");p.screenshot(path=str(OUT/'teacher-1440.png'));(OUT/'native-bounds.json').write_text(json.dumps(p.evaluate("({scroll:[scrollX,scrollY],stage:document.querySelector('#stage').getBoundingClientRect().toJSON(),stageScroll:[document.querySelector('#stage').scrollLeft,document.querySelector('#stage').scrollTop]})")))
         bindings=teacher.request.get(base+f'/api/v1/graph-questions/files/{files["teacher"]}/nodes/n/bindings').json()['bindings'];assert 'analysis' not in bindings[0]['question'];asset=bindings[0]['question']['images'][0]['url'];assert teacher.request.get(base+asset).ok;assert teacher.request.get(base+asset.replace('nodeId=n','nodeId=empty')).status==404
@@ -39,9 +40,9 @@ def main():
         # Search failures preserve explicit error and never fabricate results.
         p.route('**/graph-questions/search?*',lambda route:route.fulfill(status=503,json={'detail':'search unavailable'}));p.locator('[data-search] form button').click();expect(p.locator('[data-search-status]')).to_contain_text('搜索失败');expect(p.locator('[data-results] label')).to_have_count(0);p.unroute('**/graph-questions/search?*')
         # Request failure must not render the empty state; switching cancels old card response.
-        p.locator('[data-close]').click();p.route('**/graph-questions/files/*/nodes/n/bindings',lambda route:route.fulfill(status=503,json={'detail':'unavailable'}));visible_click(p,'.knowledge-card[data-node-id=n]');visible_click(p,'#graphPracticeBtn');expect(p.locator('[data-status]')).to_contain_text('加载失败');expect(p.locator('[data-questions]')).to_have_count(0);p.unroute('**/graph-questions/files/*/nodes/n/bindings');p.locator('[data-retry]').click();expect(p.locator('.gqd-question')).to_have_count(4)
+        p.locator('[data-close]').click();p.route('**/graph-questions/files/*/nodes/n/bindings',lambda route:route.fulfill(status=503,json={'detail':'unavailable'}));visible_click(p,'.knowledge-card[data-node-id=n]');open_retained_practice(p);expect(p.locator('[data-status]')).to_contain_text('加载失败');expect(p.locator('[data-questions]')).to_have_count(0);p.unroute('**/graph-questions/files/*/nodes/n/bindings');p.locator('[data-retry]').click();expect(p.locator('.gqd-question')).to_have_count(4)
         p.locator('[data-close]').click();pending=[]
-        p.route('**/graph-questions/files/*/nodes/empty/bindings',lambda route:pending.append(route));visible_click(p,'.knowledge-card[data-node-id=empty]');visible_click(p,'#graphPracticeBtn');expect(p.locator('[data-status]')).to_have_text('正在加载关联题目…');p.wait_for_timeout(100);visible_click(p,'.knowledge-card[data-node-id=n]');expect(p.locator('.graph-question-drawer')).to_be_hidden()
+        p.route('**/graph-questions/files/*/nodes/empty/bindings',lambda route:pending.append(route));visible_click(p,'.knowledge-card[data-node-id=empty]');open_retained_practice(p);expect(p.locator('[data-status]')).to_have_text('正在加载关联题目…');p.wait_for_timeout(100);visible_click(p,'.knowledge-card[data-node-id=n]');expect(p.locator('.graph-question-drawer')).to_be_hidden()
         for route in pending:route.continue_()
         p.unroute('**/graph-questions/files/*/nodes/empty/bindings');p.wait_for_timeout(100);expect(p.locator('.graph-question-drawer')).to_be_hidden()
         p.evaluate('openRelatedCanvasModal(false)');p.locator('.related-canvas-backdrop').wait_for();assert p.locator('.related-canvas-backdrop [data-submit]').count()==0;assert p.locator('.related-canvas-backdrop #graphPracticeBtn').count()==0;assert p.evaluate('graphQuestionDrawer.open(nodeById("n"))') is False;p.locator('.related-canvas-close').click()
@@ -74,6 +75,6 @@ def main():
                 page.locator('.gqd-question').last.locator('[data-submit]').scroll_into_view_if_needed();assert page.locator('.gqd-question').last.locator('[data-submit]').bounding_box()['y']<844
                 page.locator('[data-close]').click()
             ctx.close()
-        viewer,page=session('viewer');page.locator('.knowledge-card[data-node-id=n]').click();page.locator('#graphPracticeBtn').click();expect(page.locator('[data-status]')).to_contain_text('加载失败');viewer.close()
+        viewer,page=session('viewer');page.locator('.knowledge-card[data-node-id=n]').click();open_retained_practice(page);expect(page.locator('[data-status]')).to_contain_text('加载失败');viewer.close()
         assert not errors,errors;teacher.close();browser.close();print('PASS live teacher/admin/student/viewer, maintenance, safe media, all3types, errors, fullscreen, mobile')
 if __name__=='__main__':main()
