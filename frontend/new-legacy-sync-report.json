@@ -1,14 +1,10 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.335",
+  "fromVersion": "v9.0-p4.1.336",
   "toVersion": "v9.0-p4.1.336",
   "changes": {
     "added": [],
-    "changed": [
-      "VERSION",
-      "content-prep-studio/dist/content-prep.html",
-      "tests/graph-question-batch-browser.py"
-    ],
+    "changed": [],
     "removed": []
   },
   "incompatible": []
