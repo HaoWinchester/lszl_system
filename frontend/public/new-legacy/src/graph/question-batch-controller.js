@@ -46,7 +46,7 @@
     async function apply(){
       if(busy||!preview||!totalChoices())return;const latest=getContext();if(!allowed()||latest?.fileId!==context.fileId||latest.revision!==preview.fileRevision){invalidate();status('图谱已变化，请重新匹配。');return;}
       busy='apply';const token=++epoch,captured=context;abort?.abort();abort=new AbortController();controls();status('正在添加题目…');
-      try{const data=await request('/api/v1/graph-questions/files/'+encodeURIComponent(captured.fileId)+'/batch-apply',{previewToken:preview.previewToken,selections:[...choices].map(([nodeId,ids])=>({nodeId,questionIds:[...ids]}))},abort.signal);if(token!==epoch)return;onRevision(captured.fileId,data.fileRevision);invalidate();status('已添加 '+data.addedCount+' 道题目，可从知识卡片的“做题”中查看。');
+      try{const data=await request('/api/v1/graph-questions/files/'+encodeURIComponent(captured.fileId)+'/batch-apply',{previewToken:preview.previewToken,selections:[...choices].map(([nodeId,ids])=>({nodeId,questionIds:[...ids]}))},abort.signal);if(token!==epoch)return;onRevision(captured.fileId,data.fileRevision);invalidate();status('已添加 '+data.addedCount+' 道题目到所选知识卡片。');
       }catch(error){if(token===epoch&&error.name!=='AbortError'){invalidate();status('添加失败：'+error.message);}}finally{if(token===epoch){busy='';controls();}}
     }
     async function loadSubjects(){

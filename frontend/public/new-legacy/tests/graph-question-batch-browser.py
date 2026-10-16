@@ -1,6 +1,7 @@
 """Actual teacher bulk matching, preview/subset/append/reload and recovery on isolated DB."""
 import argparse,json,uuid
 from pathlib import Path
+from helpers.graph_detail_actions import assert_reduced_detail_actions, open_retained_practice
 from playwright.sync_api import sync_playwright,expect
 ROOT=Path(__file__).resolve().parents[2]
 p=argparse.ArgumentParser();p.add_argument('--base-url',required=True);base=p.parse_args().base_url.rstrip('/');assert base.startswith('http://127.0.0.1:')
@@ -25,7 +26,28 @@ with sync_playwright() as pw:
         for s in ['#learningEntryDismissBtn','.tour-skip','#hideHelpBtn']:
             if page.locator(s).is_visible():page.locator(s).click()
         page.wait_for_function('!!window.KGGraphFileTabs')
-    ready();page.evaluate("selectedNodeIds.clear();state.selectedNodeId='a';renderDetails()");page.locator('#graphPracticeBtn').click();drawer=page.get_by_role('complementary',name='卡片做题');expect(drawer).to_be_visible()
+    ready();page.evaluate("selectedNodeIds.clear();state.selectedNodeId='a';renderDetails()")
+    assert_reduced_detail_actions(page)
+    page.locator('#detailActionsToggle').click()
+    expect(page.locator('#editFromDetailBtn')).to_be_visible()
+    expect(page.locator('#deleteNodeFromDetailBtn')).to_be_visible()
+    page.screenshot(path=str(OUT/'detail-actions-reduced-desktop.png'))
+    page.locator('#editFromDetailBtn').click();expect(page.locator('#nodeModal')).to_be_visible()
+    page.locator('#cancelNodeBtn').click();expect(page.locator('#nodeModal')).to_be_hidden()
+    for locked in [True, False]:
+        page.evaluate("locked=>{nodeById('a').interaction={locked};renderDetails()}",locked)
+        assert_reduced_detail_actions(page)
+        assert page.locator('#editFromDetailBtn').is_disabled()==locked
+    page.evaluate("state.selectedNodeId=null;hoverDetailNodeId='b';renderDetails()")
+    assert_reduced_detail_actions(page)
+    page.set_viewport_size({'width':390,'height':844})
+    assert_reduced_detail_actions(page)
+    page.screenshot(path=str(OUT/'detail-actions-reduced-mobile.png'))
+    page.set_viewport_size({'width':1440,'height':1000})
+    page.locator('#closeDetailBtn').click();expect(page.locator('#detailPanel')).to_be_hidden()
+    page.evaluate("state.selectedNodeId='a';renderDetails()")
+    # Remaining drawer coverage invokes the retained hidden component internally.
+    open_retained_practice(page);drawer=page.get_by_role('complementary',name='卡片做题');expect(drawer).to_be_visible()
     button=page.get_by_role('button',name='批量添加题目',exact=True);expect(button).to_be_visible();button.click();expect(drawer).to_be_hidden()
     modal=page.get_by_role('dialog',name='批量添加题目');expect(modal).to_be_visible()
     expect(modal.get_by_label('每张卡片新增题数')).to_have_value('3')
@@ -54,7 +76,7 @@ with sync_playwright() as pw:
     expect(modal.locator('[data-batch-preview-card]')).to_have_count(0)
     assert len(call('get',single+'a/bindings')['bindings'])==2
     assert len(call('get',single+'b/bindings')['bindings'])==1
-    modal.get_by_role('button',name='关闭批量配题').click();page.locator('#graphPracticeBtn').click();expect(drawer.locator('.gqd-question')).to_have_count(2);drawer.get_by_role('button',name='关闭做题抽屉').click();ready()
+    modal.get_by_role('button',name='关闭批量配题').click();open_retained_practice(page);expect(drawer.locator('.gqd-question')).to_have_count(2);drawer.get_by_role('button',name='关闭做题抽屉').click();ready()
     page.evaluate("selectedNodeIds=new Set(['a']);state.selectedNodeId='a';refreshSelectionUI()")
     button.click();modal.get_by_label('卡片范围').select_option('selected');expect(modal.locator('[data-batch-node] input:checked')).to_have_count(1)
     modal.get_by_role('button',name='预览匹配',exact=True).click();expect(modal.locator('[data-batch-preview-card]')).to_have_count(1)

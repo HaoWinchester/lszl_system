@@ -2,6 +2,7 @@
 import argparse,json
 from uuid import uuid4
 from pathlib import Path
+from helpers.graph_detail_actions import open_retained_practice
 from playwright.sync_api import sync_playwright,expect
 ROOT=Path(__file__).resolve().parents[2]
 def main():
@@ -50,10 +51,7 @@ def main():
         assert len(bindings)==1 and bindings[0]['question']['title']
         # 新卡抽屉可作答并看解析（继承授权，非会员可用）。
         page.locator(f'.knowledge-card[data-node-id="{new_id}"]').click()
-        practice=page.locator('#graphPracticeBtn')
-        page.evaluate("document.querySelector('#detailPanel').scrollTop=999999")
-        page.wait_for_timeout(200)
-        practice.click()
+        open_retained_practice(page)
         expect(page.locator('.gqd-question')).to_have_count(1)
         page.locator('.gqd-question input[value=A]').check()
         page.locator('.gqd-question [data-submit]').click()
