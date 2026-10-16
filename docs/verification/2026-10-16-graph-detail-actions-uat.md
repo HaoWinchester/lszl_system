@@ -13,4 +13,13 @@
 
 ## 发布检查
 
-336候选文件1138，旧active335为1137，唯一新增为共享测试助手；无文件删除，关键页面均在。完整full候选门禁通过，933秒：后端1068、前端335、Python契约9、部署脚本4及完整浏览器流程通过，包含新的详情操作断言和真实批量配题。即将执行标准UAT部署，随后补充容器active与公网结果；main保持不变，等待用户UAT验收。
+336候选文件1138，旧active335为1137，唯一新增为共享测试助手；无文件删除，关键页面均在。完整full候选门禁通过，933秒：后端1068、前端335、Python契约9、部署脚本4及完整浏览器流程通过，包含新的详情操作断言和真实批量配题。已合入uat并代理推送，功能部署提交为e0b57dbae22ef1204a65419cbc8adb59631fb0e9；main保持0f86fabdeca98379ec50753b793b74a915671677。标准UAT部署在SSH前置检查退出255，尚未部署；main保持不变，等待用户UAT验收。
+
+
+## 部署受阻
+
+`bash deploy/update-uat.sh` 在首次SSH前置连接阶段失败，直接证据为`ssh: connect to host 49.235.159.4 port 22: Operation timed out`（35秒、退出255），未进入rsync、镜像重建、容器重启或迁移。脚本通用“助手前置配置缺失”提示不是配置确实缺失的证据。
+
+随后对相同已配置SSH别名执行8秒直连重试，以及当前本机HTTP CONNECT/SOCKS代理尝试，均未连接成功。HTTPS公网服务正常；DNS仍解析49.235.159.4，公网页面仍v9.0-p4.1.335，公开10-graph-editor.js仍未含hidden且保留toggleSourceBtn。这次按钮修改尚未上线，不能宣称UAT完成。
+
+本地336候选已通过完整full验证，关键文件齐全，uat远程代码已就绪。恢复SSH连接后运行标准部署脚本，再执行`python3 artifacts/graph-detail-actions/public-smoke.py`核对实际公网336资源、桌面和390px详情。未合入main，保留功能分支与永久main/uat分支。
