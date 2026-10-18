@@ -126,8 +126,17 @@
     const trigger=()=>typeof options.trigger==='function'?options.trigger():options.trigger;
     if(options.trigger)toolbar.classList.add('canvas-ink-popover');
     function positionToolbar(){
-      // Popover mode docks at the bottom center via CSS; only the anchored legacy mode is JS-positioned.
-      if(options.trigger)return;
+      if(options.trigger){
+        if(!opened)return;
+        // Keep the existing bottom-center dock, moving it above visible canvas
+        // docks only when their actual rectangles overlap its controls.
+        toolbar.style.bottom='';
+        let box=toolbar.getBoundingClientRect(),bottom=parseFloat(global.getComputedStyle(toolbar).bottom)||0;
+        const docks=[...viewport.querySelectorAll('.uc-minimap-dock,.canvas-zoom-dock,.lp-canvas-zoom-dock')].filter(el=>el.getClientRects().length&&global.getComputedStyle(el).visibility!=='hidden');
+        for(const dock of docks){const r=dock.getBoundingClientRect();if(box.left<r.right&&box.right>r.left&&box.top<r.bottom&&box.bottom>r.top){bottom+=box.bottom-r.top+8;toolbar.style.bottom=Math.min(bottom,global.innerHeight-box.height-8)+'px';box=toolbar.getBoundingClientRect()}}
+        panel.style.maxHeight=Math.max(40,box.top-16)+'px';panel.style.overflowY='auto';
+        return;
+      }
       if(!opened||!trigger())return;
       const rect=trigger().getBoundingClientRect(),box=toolbar.getBoundingClientRect(),settings=panel.hidden?null:panel.getBoundingClientRect();
       const left=Math.max(8,Math.min(options.placement==='right'?rect.right+8:rect.right-box.width,global.innerWidth-box.width-8));
@@ -212,7 +221,7 @@
     function render(){
       if(destroyed||cancelStaleGesture())return;
       try{const strokes=normalize(getStrokes()).filter(item=>!erasing?.removed.has(item.id));layer.replaceChildren(...strokes.map(makeEl));const selection=strokes.find(item=>item.id===selectedId);if(selection&&!readonly()){if(selection.tool==='text')renderTextHandles(selection);else renderStrokeSelection(selection)}if(active){active.el=makeEl(active.stroke);layer.append(active.el)}}catch(error){report(error)}
-      refreshControls();
+      textSession?.relocate();refreshControls();
     }
     function strokeElement(id){return [...layer.querySelectorAll('[data-stroke-id]')].find(el=>el.dataset.strokeId===id)}
     function renderStrokeSelection(stroke){
@@ -314,7 +323,7 @@
         if(!success){session.onSaved=null;if(session.edit.state().status==='failed'){session.status.textContent='文字未保存，请点击外部重试';report(session.edit.state().error)}return false}
       }else{session.edit.cancel();if(session.applied&&!session.stale){options.setStrokes?options.setStrokes(session.before):options.change(session.before,'取消文字修改');render()}}
       const onSaved=commit?session.onSaved:null;
-      textSession=null;session.unmount.forEach(dispose=>dispose());session.editor.remove();session.status.remove();session.border.remove();refreshControls();onSaved?.();return true;
+      textSession=null;session.unmount.forEach(dispose=>dispose());session.frame.remove();session.status.remove();session.border.remove();refreshControls();onSaved?.();return true;
     }
     function openTextEditor(clientX,clientY,existing){
       if(textSession){closeTextEditor(true);return}
@@ -323,16 +332,17 @@
       const box=existing?textBox(existing):{width:40,height:24};
       const style={color:existing?existing.color:prefs.text.color,width:existing?existing.width:prefs.text.width,bold:!!(existing?existing.bold:prefs.text.bold),opacity:existing?(existing.opacity??1):prefs.text.opacity,...(existing?.boxWidth?{boxWidth:existing.boxWidth}:{}),boxHeight:Math.max(24,box.height)};
       const editor=doc.createElement('textarea');
+      const editorFrame=doc.createElement('div');editorFrame.className='canvas-ink-text-editor-viewport';editorFrame.dataset.canvasUi='true';editorFrame.append(editor);
       editor.className='canvas-ink-text-editor';editor.rows=1;editor.maxLength=TEXT_LIMIT;editor.placeholder='点击外部保存 · Enter 换行 · Esc 取消';editor.setAttribute('aria-label','画布文字内容');editor.value=existing?existing.text:'';
-      editor.style.left=(rect.left+view.x+world[0]*scale)+'px';editor.style.top=(rect.top+view.y+world[1]*scale)+'px';editor.style.width=box.width*scale+'px';
+      editor.style.position='relative';editor.style.left='0';editor.style.top='0';editor.style.width=box.width*scale+'px';
       editor.style.fontSize=style.width*scale+'px';editor.style.color=style.color;editor.style.fontWeight=style.bold?'700':'400';
       const status=doc.createElement('div');status.className='canvas-ink-text-status';status.dataset.canvasUi='true';status.setAttribute('role','status');
       const border=doc.createElement('div');border.className='canvas-ink-text-edit-border';border.dataset.canvasUi='true';border.setAttribute('aria-hidden','true');
       for(const side of ['top','right','bottom','left']){const edge=doc.createElement('div');edge.dataset.inkEditDrag=side;border.append(edge)}
       for(const side of ['nw','n','ne','e','se','s','sw','w']){const dot=doc.createElement('span');dot.className='canvas-ink-text-edit-point';dot.dataset.inkEditPoint=side;dot.dataset.inkEditDrag='point';border.append(dot)}
-      doc.body.append(editor,status,border);
+      const overlayHost=options.overlayHost||doc.body;overlayHost.append(editorFrame,status,border);
       const before=normalize(getStrokes()),id=existing?.id||'ink-'+Date.now().toString(36)+'-'+(++sequence)+'-'+Math.random().toString(36).slice(2,8);
-      const session={editor,status,border,existing,world,style,before,unmount:[],applied:false,composing:false};textSession=session;
+      const session={editor,frame:editorFrame,status,border,existing,world,style,before,unmount:[],applied:false,composing:false};textSession=session;
       session.edit=global.KGTextEditSession.create({original:{text:editor.value,...style,points:[[...world]]},persist:async draft=>{
         if(session.stale)throw new Error('画布已切换，文字草稿仍保留，请复制输入或按 Esc 关闭');
         if(!existing&&!draft.text.trim())return true;
@@ -341,11 +351,18 @@
         if(signature!==session.appliedSignature){change(existing||session.applied?getStrokes().map(item=>item.id===id?stroke:item):[...getStrokes(),stroke],existing?'编辑文字':'添加文字');session.applied=true;session.appliedSignature=signature}
         return options.persistText?await options.persistText():true;
       }});
+      function revealCaret(){
+        const s=options.getViewport().scale||options.getViewport().zoom||1,layout=textBox({text:editor.value.slice(0,editor.selectionStart),...style,boxHeight:24,points:[[...world]]});
+        const x=(8+measure.measureText(layout.lines.at(-1)||'').width)*s,y=(4+(layout.lines.length-1)*style.width*1.35)*s,line=style.width*1.35*s;
+        if(x>editorFrame.scrollLeft+editorFrame.clientWidth-12)editorFrame.scrollLeft=x-editorFrame.clientWidth+12;
+        else if(x<editorFrame.scrollLeft+8)editorFrame.scrollLeft=Math.max(0,x-8);
+        if(y+line>editorFrame.scrollTop+editorFrame.clientHeight)editorFrame.scrollTop=y+line-editorFrame.clientHeight;
+        else if(y<editorFrame.scrollTop)editorFrame.scrollTop=y;
+      }
       const resize=()=>{
         const v=options.getViewport(),s=v.scale||v.zoom||1,natural=textBox({text:editor.value,...style,boxHeight:24,points:[[...world]]});
         style.boxHeight=Math.min(4000,natural.height);
         const r=viewport.getBoundingClientRect();
-        editor.style.left=(r.left+v.x+(world[0]-8)*s)+'px';editor.style.top=(r.top+v.y+(world[1]-4)*s)+'px';
         editor.style.boxSizing='content-box';editor.style.padding=(4*s)+'px '+(8*s)+'px';
         editor.style.width=natural.width*s+'px';editor.style.fontSize=style.width*s+'px';editor.style.opacity=style.opacity;
         // Match the character wrapping used by SVG/export, and measure the live
@@ -355,10 +372,16 @@
         const css=global.getComputedStyle(editor),padding=parseFloat(css.paddingTop)+parseFloat(css.paddingBottom);
         style.boxHeight=Math.min(4000,Math.max(style.boxHeight,(editor.scrollHeight-padding)/s));editor.placeholder=placeholder;
         editor.style.height=Math.max(natural.height,style.boxHeight)*s+'px';
-        status.style.left=editor.style.left;status.style.top=(parseFloat(editor.style.top)+editor.offsetHeight+4)+'px';
-        Object.assign(border.style,{left:editor.style.left,top:editor.style.top,width:editor.offsetWidth+'px',height:editor.offsetHeight+'px'});
+        // Clip only the live presentation. The textarea retains its natural
+        // width, explicit wrapping and world geometry inside this scroll frame.
+        const width=Math.min(editor.offsetWidth,Math.max(1,global.innerWidth-16)),height=Math.min(editor.offsetHeight,Math.max(1,global.innerHeight-16));
+        const left=Math.max(8,Math.min(r.left+v.x+(world[0]-8)*s,global.innerWidth-width-8)),top=Math.max(8,Math.min(r.top+v.y+(world[1]-4)*s,global.innerHeight-height-8));
+        Object.assign(editorFrame.style,{left:left+'px',top:top+'px',width:width+'px',height:height+'px'});
+        status.style.left=left+'px';status.style.top=Math.min(global.innerHeight-status.offsetHeight-8,top+height+4)+'px';
+        Object.assign(border.style,{left:left+'px',top:top+'px',width:width+'px',height:height+'px'});
+        if(doc.activeElement===editor)revealCaret();
       };
-      const relocate=()=>{const r=viewport.getBoundingClientRect(),v=options.getViewport(),s=v.scale||v.zoom||1;editor.style.left=(r.left+v.x+world[0]*s)+'px';editor.style.top=(r.top+v.y+world[1]*s)+'px';resize()};
+      const relocate=()=>resize();
       session.resize=resize;session.relocate=relocate;
       const updateDraft=()=>{resize();session.edit.update({text:editor.value,...style,points:[[...world]]});editor.dataset.saveState='draft';status.textContent=''};
       border.addEventListener('pointerdown',event=>{
@@ -369,15 +392,18 @@
       const move=event=>{const drag=session.drag;if(!drag||event.pointerId!==drag.pointerId)return;stop(event);if(readonly()){cancel();return}const v=options.getViewport(),s=v.scale||v.zoom||1;world.splice(0,2,drag.world[0]+(event.clientX-drag.x)/s,drag.world[1]+(event.clientY-drag.y)/s);relocate();updateDraft()};
       const end=event=>{const drag=session.drag;if(!drag||event.pointerId!==drag.pointerId)return;stop(event);if(event.type!=='pointerup'){cancel();updateDraft();return}session.drag=null;border.classList.remove('is-dragging');drag.target.releasePointerCapture(drag.pointerId)};
       for(const [type,handler] of [['pointermove',move],['pointerup',end],['pointercancel',end],['lostpointercapture',end]]){border.addEventListener(type,handler);session.unmount.push(()=>border.removeEventListener(type,handler))}
-      if(global.KGCanvasDomInteraction){session.unmount.push(global.KGCanvasDomInteraction.mountOverlay(editor,doc.body,relocate),global.KGCanvasDomInteraction.mountOverlay(status,doc.body),global.KGCanvasDomInteraction.mountOverlay(border,doc.body))}
+      editorFrame.addEventListener('wheel',event=>event.stopPropagation(),{passive:true});
+      if(global.KGCanvasDomInteraction&&!options.overlayHost){session.unmount.push(global.KGCanvasDomInteraction.mountOverlay(editorFrame,doc.body,relocate),global.KGCanvasDomInteraction.mountOverlay(status,doc.body),global.KGCanvasDomInteraction.mountOverlay(border,doc.body))}
+      else{doc.addEventListener('fullscreenchange',relocate);session.unmount.push(()=>doc.removeEventListener('fullscreenchange',relocate))}
       editor.addEventListener('compositionstart',()=>{session.composing=true;session.edit.setComposing(true)});
       editor.addEventListener('compositionend',()=>{session.composing=false;session.edit.setComposing(false);if(session.deferredCommit){session.deferredCommit=false;closeTextEditor(true)}});
       editor.addEventListener('keydown',event=>{event.stopPropagation();if(event.isComposing||event.keyCode===229)return;if(event.key==='Enter'&&(event.ctrlKey||event.metaKey)){event.preventDefault();closeTextEditor(true)}else if(event.key==='Escape'){event.preventDefault();closeTextEditor(false)}});
       editor.addEventListener('input',updateDraft);
+      editor.addEventListener('keyup',revealCaret);editor.addEventListener('select',revealCaret);
       editor.addEventListener('blur',event=>{if(toolbar.contains(event.relatedTarget))return;global.setTimeout(()=>{if(textSession===session&&!toolbar.contains(doc.activeElement))closeTextEditor(true)},160)});
       editor.focus();resize();refreshControls();
     }
-    listen(global,'pointerdown',event=>{if(!textSession||textSession.editor.contains(event.target)||textSession.border.contains(event.target)||toolbar.contains(event.target))return;closeTextEditor(true);},true);
+    listen(global,'pointerdown',event=>{if(!textSession||textSession.frame.contains(event.target)||textSession.border.contains(event.target)||toolbar.contains(event.target))return;closeTextEditor(true);},true);
     function hitStroke(location,padding,textOnly=false){
       const target=new global.DOMPoint(...location),byId=new Map(getStrokes().map(stroke=>[stroke.id,stroke]));
       for(const el of [...layer.querySelectorAll('[data-stroke-id]')].reverse()){
@@ -477,11 +503,13 @@
     }
     listen(global,'keydown',handleKeyDown,true);
     listen(global,'keyup',event=>{if(event.code==='Space'){space=false;viewport.classList.remove('canvas-ink-panning')}},true);
-    listen(global,'resize',()=>{cancel();positionToolbar()});
+    listen(global,'resize',()=>{cancel();textSession?.relocate();positionToolbar()});
+    listen(doc,'click',()=>{if(opened)global.requestAnimationFrame(()=>{if(!destroyed)positionToolbar()})});
     listen(doc,'scroll',()=>{cancel();positionToolbar()},true);
     listen(global,'blur',()=>{cancel();space=false;viewport.classList.remove('canvas-ink-panning')});
     // Cancel instead of mixing coordinate systems if zoom changes mid-stroke.
     listen(global,'wheel',event=>{if((active||erasing||textDrag||textResize)&&viewport.contains(event.target))cancel()},true);
+    listen(global,'wheel',event=>{if(textSession&&viewport.contains(event.target))global.requestAnimationFrame(()=>textSession?.relocate())},{passive:true});
     // 画笔状态下双击右键退出绘画；单击右键仅屏蔽菜单（右键拖动平移不受影响）。
     let lastRightPress={t:0,x:0,y:0},suppressContextMenuUntil=0;
     const resetRightPress=()=>{lastRightPress={t:0,x:0,y:0}};

@@ -25,6 +25,15 @@ for(const toolbar of [rect(16,120,104,384),rect(880,120,104,384)]){
  assert(!overlaps(placed,toolbar));
  assert(Math.abs((placed.top+placed.bottom-button.top-button.bottom)/2)<1,'submenu stays centered beside its trigger');
 }
+{
+ const toolbar=rect(1323,135,104,430),button=rect(1332,517,40,40),shortcuts=rect(1368,555,54,205);
+ const placed=controller.placePopover({bounds:rect(0,38,1440,862),anchor:button,width:134,height:89,avoidRects:[shortcuts,toolbar],preferredSide:'right'});
+ assert(placed.right<=toolbar.left-8,'a distant shortcut bar must not detach the submenu from its toolbar');
+ assert(Math.abs((placed.top+placed.bottom-button.top-button.bottom)/2)<1,'obstacle ordering preserves trigger alignment');
+ const crowdedToolbar=rect(1163,135,104,430),crowdedButton=rect(1218,368,40,40),leftDock=rect(1101,247.5,54,205);
+ const crowded=controller.placePopover({bounds:rect(0,38,1280,682),anchor:crowdedButton,width:134,height:128,avoidRects:[leftDock,crowdedToolbar],preferredSide:'right'});
+ assert(Math.abs((crowded.top+crowded.bottom-crowdedButton.top-crowdedButton.bottom)/2)<1,'a second dock must not displace a side menu below the toolbar when a horizontal gap exists');
+}
 console.log('PASS shared popover avoids targets and clamps small/fullscreen bounds');
 
 vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../src/graph/graph-renderer.js'),'utf8'),context);

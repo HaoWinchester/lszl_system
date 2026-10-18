@@ -3497,6 +3497,12 @@ function clampDetailPanelToStage(left,top,width,height){
   const maxLeft=sr.width-width-margin,maxTop=sr.height-height-margin;
   return{x:clamp(left,margin,Math.max(margin,maxLeft)),y:clamp(top,margin,Math.max(margin,maxTop))};
 }
+function repositionDraggedDetailPanel(){
+  if(!detailPanelDragged||!detailPanel.classList.contains('show'))return;
+  const panel=detailPanel.getBoundingClientRect(),host=stage.getBoundingClientRect();
+  const next=clampDetailPanelToStage(panel.left-host.left,panel.top-host.top,panel.width,panel.height);
+  detailPanel.style.left=next.x+'px';detailPanel.style.top=next.y+'px';
+}
 detailPanel.addEventListener('pointerdown',e=>{
   if(isCanvasPanMode())return;
   if(e.button!==0||e.target.closest('button,input,textarea,select'))return;
@@ -3697,6 +3703,7 @@ function ensureGraphSearchPanel(){
   return graphSearchPanel;
 }
 function openGraphSearchPanel(){
+  hideGraphTransientMenus();
   const panel=ensureGraphSearchPanel(),input=panel.querySelector('#graphSearchInput');
   panel.classList.add('show');
   renderGraphSearchResults(input.value);
@@ -3796,12 +3803,12 @@ function setGraphPointerMode(mode,announce=false){
 }
 function toggleGraphPointerMode(){setGraphPointerMode(graphPointerMode==='pan'?'edit':'pan',true)}
 function isPanBlockedUI(target){
-  return !!(target&&target.closest&&target.closest('[data-stage-ui],[data-canvas-ui],.canvas-toolbar-left,.canvas-toolbar-right,.account-menu-shell,.account-menu,.detail-panel,.mobile-bar,.toolbar,.floating-toolbox,.modal-backdrop,.help-card'));
+  return !!(target&&target.closest&&target.closest('dialog,[role="dialog"],[data-stage-ui],[data-canvas-ui],.canvas-toolbar-left,.canvas-toolbar-right,.account-menu-shell,.account-menu,.detail-panel,.mobile-bar,.toolbar,.floating-toolbox,.modal-backdrop,.help-card'));
 }
 const activePointers=new Map();let pan=null,pinch=null,viewportDirty=false,stageTap=null;
 let stageInteractingTimer=null;
 function markStageInteracting(){if(!stage.classList.contains('is-interacting'))stage.classList.add('is-interacting');clearTimeout(stageInteractingTimer);stageInteractingTimer=setTimeout(()=>{stage.classList.remove('is-interacting');stageInteractingTimer=null},220)}
-function isUI(target){return !!(target&&target.closest&&target.closest('[data-stage-ui],[data-canvas-ui],.canvas-toolbar-left,.canvas-toolbar-right,.account-menu-shell,.account-menu,.knowledge-card,.edge-hit,.detail-panel,.mobile-bar,.toolbar,.floating-toolbox,.modal-backdrop,.help-card'))}
+function isUI(target){return !!(target&&target.closest&&target.closest('dialog,[role="dialog"],[data-stage-ui],[data-canvas-ui],.canvas-toolbar-left,.canvas-toolbar-right,.account-menu-shell,.account-menu,.knowledge-card,.edge-hit,.detail-panel,.mobile-bar,.toolbar,.floating-toolbox,.modal-backdrop,.help-card'))}
 // C-1.4.2：为画布内的悬浮 UI 建立显式事件隔离层。
 // 即使后续 DOM 结构或选择器变化，悬浮模块上的按下、双击和滚轮也不会冒泡到画布平移/缩放/新建节点逻辑。
 function bindStageUIEventGuards(){
@@ -4224,6 +4231,7 @@ function graphHasVisibleNode(){
   return state.nodes.some(node=>{const p=visualPositionForNode(node),d=nodeDims(node),left=vx+p.x*scale,top=vy+p.y*scale,right=left+d.w*scale,bottom=top+d.h*scale;return right>8&&bottom>8&&left<r.width-8&&top<r.height-8});
 }
 function recoverMobileGraphViewport(){
+  repositionDraggedDetailPanel();
   if(relatedCanvasModalEl||relatedCanvasOpening)return false;
   const r=stage.getBoundingClientRect();
   if(r.width>650||r.width<1||r.height<1||!state.nodes.length||graphHasVisibleNode())return false;
@@ -4236,6 +4244,7 @@ function scheduleMobileGraphViewportRecovery(){
   mobileGraphViewportTimer=setTimeout(()=>recoverMobileGraphViewport(),80);
 }
 window.addEventListener('resize',scheduleMobileGraphViewportRecovery,{passive:true});
+document.addEventListener('fullscreenchange',scheduleMobileGraphViewportRecovery);
 window.visualViewport?.addEventListener('resize',scheduleMobileGraphViewportRecovery,{passive:true});
 requestAnimationFrame(()=>requestAnimationFrame(()=>recoverMobileGraphViewport()));
 $('nodeModal').addEventListener('click',e=>{if(e.target===$('nodeModal'))closeNodeModal({discardNew:true})});

@@ -85,7 +85,16 @@ with sync_playwright() as pw:
     box=drawing.bounding_box();p.mouse.move(box['x']+box['width']/2,box['y']+box['height']/2);p.mouse.down();p.mouse.move(box['x']+box['width']/2+45,box['y']+box['height']/2+30,steps=5);p.mouse.up();moved=drawing.get_attribute('viewBox');assert moved!=original
     panel.get_by_role('button',name='适应视图').click();assert drawing.get_attribute('viewBox')==original
     header=panel.locator('header h3').bounding_box();old=panel.bounding_box();p.mouse.move(header['x']+20,header['y']+10);p.mouse.down();p.mouse.move(header['x']+50,header['y']+40,steps=4);p.mouse.up();assert panel.bounding_box()['x']>old['x']+20
+    # Drag the complete window to the lower-right edge, then resize with it open.
+    header=panel.locator('header h3').bounding_box();p.mouse.move(header['x']+20,header['y']+10);p.mouse.down();p.mouse.move(1430,950,steps=6);p.mouse.up()
+    for width,height in [(1440,960),(1280,720),(1024,640),(800,600),(390,600)]:
+        p.set_viewport_size({'width':width,'height':height})
+        p.wait_for_function("()=>{const r=document.querySelector('.template-preview-window').getBoundingClientRect();return r.x>=0&&r.y>=0&&r.right<=innerWidth+1&&r.bottom<=innerHeight+1}")
+        for name in ['关闭模板预览','加载为新图谱']:
+            assert panel.get_by_role('button',name=name,exact=True).evaluate('(e)=>{const r=e.getBoundingClientRect();return e.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))}')
+    p.set_viewport_size({'width':1440,'height':960})
     panel.get_by_role('button',name='全屏',exact=True).click();p.wait_for_function("document.fullscreenElement?.classList.contains('template-preview-surface')")
+    assert p.evaluate("!document.fullscreenElement.contains(document.querySelector('#graphTemplateCenter'))"), 'preview fullscreen must not reparent the template center above the drawing'
     p.screenshot(path=str(OUT/'fullscreen.png'));panel.get_by_role('button',name='退出全屏',exact=True).click();p.wait_for_function('!document.fullscreenElement')
     p.keyboard.press('Escape');expect(panel).to_have_count(0)
     assert p.evaluate('JSON.stringify({graph:state,history:KGGraphKernel.history.getState()})')==source_ui,'closing preview must preserve source selection and history'

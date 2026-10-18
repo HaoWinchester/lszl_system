@@ -20,6 +20,13 @@
    * secondary-popover lifecycle without animating layout dimensions.
    */
   const floatingToolbarInstances=new Set();
+  function getGlobalAvoidRects(root){
+    const doc=global.document,fullscreen=doc?.fullscreenElement||doc?.webkitFullscreenElement;
+    return [...(doc?.querySelectorAll?.('#kgGlobalShortcuts')||[])].filter(el=>{
+      if(el===root||el.contains?.(root)||el.hidden||(fullscreen&&!fullscreen.contains(el)))return false;
+      const style=global.getComputedStyle?.(el);return !style||style.display!=='none'&&style.visibility!=='hidden'&&style.pointerEvents!=='none';
+    }).map(el=>el.getBoundingClientRect()).filter(rect=>rect.width>0&&rect.height>0);
+  }
   function createFloatingToolbar(options={}){
     const host=options.host;
     if(!host)return null;
@@ -31,10 +38,11 @@
     function hostRect(){return host.getBoundingClientRect?.()||{left:0,top:0,width:host.clientWidth||1200,height:host.clientHeight||800,right:host.clientWidth||1200,bottom:host.clientHeight||800}}
     function obstacleBoxes(root,rect){
       const selector=String(options.avoidSelector||'.canvas-toolbar-left,.canvas-toolbar-right,#topToolbar');
-      return [...(host.querySelectorAll?.(selector)||[])].filter(element=>element!==root&&element.isConnected&&!element.hidden).map(element=>{
+      const local=[...(host.querySelectorAll?.(selector)||[])].filter(element=>element!==root&&element.isConnected&&!element.hidden).map(element=>{
         const style=global.getComputedStyle?.(element);if(style&&(style.display==='none'||style.visibility==='hidden'||style.pointerEvents==='none'))return null;
         const box=element.getBoundingClientRect();return{left:box.left-rect.left,top:box.top-rect.top,right:box.right-rect.left,bottom:box.bottom-rect.top};
       }).filter(Boolean);
+      return local.concat(getGlobalAvoidRects(root).map(box=>({left:box.left-rect.left,top:box.top-rect.top,right:box.right-rect.left,bottom:box.bottom-rect.top})));
     }
     function clampPosition(left,top,width,height,rect,root){
       const maxLeft=Math.max(pad,rect.width-width-pad),maxTop=Math.max(pad,rect.height-height-pad);
@@ -116,14 +124,21 @@
     const leftMin=bounds.left+pad,topMin=bounds.top+pad,leftMax=Math.max(leftMin,bounds.right-pad-width),topMax=Math.max(topMin,bounds.bottom-pad-height);
     const centered=alignEnd?anchor.right-width:(anchor.left+anchor.right-width)/2;
     const candidates=[],add=(left,top,placement)=>candidates.push({left:Math.max(leftMin,Math.min(left,leftMax)),top:Math.max(topMin,Math.min(top,topMax)),placement});
-    const around=rect=>{
+    const around=(rect,axis)=>{
       const vertical=()=>{add(centered,rect.bottom+gap,'below');add(centered,rect.top-height-gap,'above')};
       const horizontal=()=>{add(rect.right+gap,(anchor.top+anchor.bottom-height)/2,'right');add(rect.left-width-gap,(anchor.top+anchor.bottom-height)/2,'left')};
-      if(preferredSide==='right'){horizontal();vertical()}else{vertical();horizontal()}
+      if(axis==='horizontal')horizontal();else if(axis==='vertical')vertical();else{vertical();horizontal()}
     };
-    around(anchor);
-    const obstacles=avoidRects.filter(rect=>rect&&rect.right>bounds.left&&rect.left<bounds.right&&rect.bottom>bounds.top&&rect.top<bounds.bottom);
-    obstacles.forEach(around);
+    // Resolve the trigger's own toolbar before unrelated nearby docks, so a
+    // clear adjacent side wins over a remote gap below a shortcut bar.
+    const anchorX=(anchor.left+anchor.right)/2,anchorY=(anchor.top+anchor.bottom)/2;
+    const distance=rect=>Math.hypot(Math.max(rect.left-anchorX,anchorX-rect.right,0),Math.max(rect.top-anchorY,anchorY-rect.bottom,0));
+    const obstacles=avoidRects.filter(rect=>rect&&rect.right>bounds.left&&rect.left<bounds.right&&rect.bottom>bounds.top&&rect.top<bounds.bottom).sort((a,b)=>distance(a)-distance(b));
+    if(preferredSide==='right'){
+      for(const axis of ['horizontal','vertical'])for(const rect of [anchor,...obstacles])around(rect,axis);
+    }else{
+      around(anchor);obstacles.forEach(rect=>around(rect));
+    }
     // Corners also cover cases where no one-dimensional slide clears two objects.
     for(const left of [leftMin,leftMax])for(const top of [topMin,topMax])add(left,top,'side');
     const area=(candidate,rect)=>Math.max(0,Math.min(candidate.left+width,rect.right+gap)-Math.max(candidate.left,rect.left-gap))*Math.max(0,Math.min(candidate.top+height,rect.bottom+gap)-Math.max(candidate.top,rect.top-gap));
@@ -150,7 +165,7 @@
     panel.style.boxSizing='border-box';panel.style.maxWidth=maxWidth+'px';
     panel.style.maxHeight=maxHeight+'px';panel.style.overflowY='auto';
     const main=root?.querySelector?.(options.mainSelector||'.uc-toolbar-main');
-    const avoidRects=[...(options.getAvoidRects?.()||[])];if(main)avoidRects.push(main.getBoundingClientRect());
+    const avoidRects=[...getGlobalAvoidRects(root),...(options.getAvoidRects?.()||[])];if(main)avoidRects.push(main.getBoundingClientRect());
     const next=placePopover({bounds,anchor:trigger.getBoundingClientRect(),width:panel.offsetWidth||180,height:panel.offsetHeight||80,avoidRects,pad,gap:Number(options.gap)||8,alignEnd:!!options.alignEnd,preferredSide:options.preferredSide});
     if(root)root.dataset.panelPlacement=next.placement;panel.classList.toggle('is-above',next.placement==='above');
     panel.style.left=Math.round(next.left-offsetBox.left)+'px';panel.style.top=Math.round(next.top-offsetBox.top)+'px';return true;
@@ -204,7 +219,7 @@
     bind();return Object.freeze({open,toggle,close,reposition,isOpen:name=>activeName===String(name)&&!!panelFor(name)&&!panelFor(name).hidden,getActive:()=>activeName});
   }
   global.KGCanvasFloatingToolbarController=Object.freeze({
-    create:createFloatingToolbar,createPopover:createFloatingToolbarPopover,placePopover,positionPopoverPanel,
+    create:createFloatingToolbar,createPopover:createFloatingToolbarPopover,placePopover,positionPopoverPanel,getGlobalAvoidRects,
     repositionAll:()=>{let count=0;floatingToolbarInstances.forEach(instance=>{if(instance.position?.())count++});return count}
   });
   function createButton(className,title,html){const button=document.createElement('button');button.type='button';button.className=className;button.title=title;button.setAttribute('aria-label',title);button.innerHTML=html;return button}

@@ -74,7 +74,16 @@
       top=Math.max(pad,Math.min(top,Math.max(pad,stageRect.height-height-pad)));
       root.style.left=Math.round(left)+'px';root.style.top=Math.round(top)+'px';
       const submenu=root.querySelector('.graph-context-submenu'),wrap=root.querySelector('.graph-context-submenu-wrap');
-      if(submenu&&wrap&&!wrap.hidden){const wrapRect=wrap.getBoundingClientRect(),submenuWidth=submenu.offsetWidth||154;wrap.classList.toggle('open-left',wrapRect.right+submenuWidth>stageRect.right-pad)}
+      if(submenu&&wrap&&!wrap.hidden){
+        const wrapRect=wrap.getBoundingClientRect(),submenuWidth=submenu.offsetWidth||154,submenuHeight=submenu.offsetHeight||138;
+        wrap.classList.toggle('open-left',wrapRect.right+submenuWidth+6>stageRect.right-pad);
+        // The layer row is near the menu's bottom; its taller submenu must
+        // move upward at the canvas edge rather than inherit the row's top.
+        // Use layout offsets because the opening transform is still animating.
+        const wrapTop=stageRect.top+Math.round(top)+root.clientTop+wrap.offsetTop;
+        const submenuTop=Math.max(stageRect.top+pad,Math.min(wrapTop-6,stageRect.bottom-submenuHeight-pad));
+        submenu.style.top=Math.round(submenuTop-wrapTop)+'px';
+      }
     }
     function show(settings={}){
       ensure();context={type:'node',...(settings.context||{})};if(!configure()){hide();return false}root.hidden=false;root.classList.add('show');visible=true;position(settings.clientX,settings.clientY);

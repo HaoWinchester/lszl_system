@@ -49,7 +49,7 @@
       if(ink||readOnly())return ink;
       if(!global.KGCanvasInk)return null;
       ink=global.KGCanvasInk.create({
-        viewport:viewportEl,world:stage,
+        viewport:viewportEl,world:stage,overlayHost:overlay,
         getViewport:()=>viewport,
         getStrokes:()=>graph().strokes||[],
         setStrokes:strokes=>{graph().strokes=strokes;ink.render()},

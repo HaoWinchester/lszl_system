@@ -36,7 +36,7 @@ if args.base_url:
   page.locator('.graph-mode-trigger').click();page.locator('[data-graph-mode-option=professional]').click()
   results=[]
   def inspect(menu):
-   return page.locator('#'+menu+'Shell').evaluate('''shell=>{const panel=shell.querySelector('.floating-submenu'),toolbar=document.querySelector('#floatingToolbox'),trigger=shell.querySelector('button'),rect=el=>{const r=el.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height}};return {panel:rect(panel),toolbar:rect(toolbar),trigger:rect(trigger),host:rect(document.querySelector('#stage')),placement:shell.dataset.panelPlacement,clickable:[...panel.querySelectorAll('button')].every(button=>{const r=button.getBoundingClientRect();return document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)?.closest('button')===button})}}''')
+   return page.locator('#'+menu+'Shell').evaluate('''shell=>{const panel=shell.querySelector('.floating-submenu'),toolbar=document.querySelector('#floatingToolbox'),trigger=shell.querySelector('button'),rect=el=>{const r=el.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height}};return {panel:rect(panel),toolbar:rect(toolbar),trigger:rect(trigger),host:rect(document.querySelector('#stage')),global:rect(document.querySelector("#kgGlobalShortcuts")),placement:shell.dataset.panelPlacement,clickable:[...panel.querySelectorAll('button')].every(button=>{const r=button.getBoundingClientRect();return document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)?.closest('button')===button})}}''')
   def verify(menu):
    page.locator('#'+menu).click();page.wait_for_timeout(180);data=inspect(menu);results.append(data)
    (out/'menus.json').write_text(json.dumps(results,ensure_ascii=False,indent=2));p,t,h=data['panel'],data['toolbar'],data['host']
@@ -64,4 +64,17 @@ if args.base_url:
   page.locator('#canvasFullscreenBtn').click();page.wait_for_function('document.fullscreenElement?.id==="stage"')
   verify('relationViewMenuBtn');page.locator('#canvasFullscreenBtn').click();page.wait_for_function('!document.fullscreenElement')
   page.set_viewport_size({'width':1440,'height':900});move_toolbar(60,155);page.locator('#relationViewMenuBtn').click();page.wait_for_timeout(180);page.screenshot(path=str(out/'relation-after.png'))
+  page.locator('#relationViewMenuBtn').press('Escape');page.locator('#cardsLayer .knowledge-card').first.click();page.wait_for_timeout(200)
+  h=page.locator('#detailPanel .detail-top').bounding_box();page.mouse.move(h['x']+h['width']/2,h['y']+20);page.mouse.down();page.mouse.move(1230,740,steps=8);page.mouse.up()
+  for width,height in [(1024,640),(800,600),(390,600),(1440,900)]:
+   page.set_viewport_size({'width':width,'height':height});page.wait_for_timeout(200)
+   r=page.locator('#detailPanel').bounding_box();assert r['x']>=0 and r['y']>=0 and r['x']+r['width']<=width and r['y']+r['height']<=height,r
+   assert page.locator('#closeDetailBtn').evaluate('b=>{const r=b.getBoundingClientRect();return b.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2))}')
+  page.locator('#closeDetailBtn').click();assert not page.locator('#detailPanel').is_visible()
+  page.locator('#graphSearchBtn').click();field=page.locator('#graphSearchInput');r=field.bounding_box();field.click(position={'x':15,'y':r['height']/2});field.fill('知识')
+  assert field.evaluate('e=>document.activeElement===e');page.locator('#graphSearchCloseBtn').click();assert not page.locator('#graphSearchPanel').is_visible()
+  page.set_viewport_size({'width':800,'height':600});page.locator('#graphPrefsBtn').click();page.locator('[data-meta-submenu=preferences]').click();prefs=page.locator('#graphPrefsMenu');page.wait_for_timeout(150)
+  r=prefs.bounding_box();assert r['x']>=8 and r['x']+r['width']<=792,r
+  assert prefs.locator('.graph-prefs-close').evaluate('b=>{const r=b.getBoundingClientRect();return b.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2))}')
+  prefs.locator('.graph-prefs-close').click();assert not prefs.is_visible()
   browser.close();print('PASS actual home relation/size/line menus: three viewports, four toolbar corners, real drag, hit testing, Escape, open-menu resize, actual toggle/restore and fullscreen')

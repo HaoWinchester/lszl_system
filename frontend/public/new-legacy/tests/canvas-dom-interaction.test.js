@@ -19,3 +19,13 @@ test('active editor is protected until focus leaves it',()=>{
   const doc={activeElement:element('TEXTAREA')};const target=element();target.ownerDocument=doc;
   assert.equal(api.isEditingTarget({target}),true);doc.activeElement=element('BODY');assert.equal(api.isEditingTarget({target}),false);
 });
+test('exclusive fullscreen dialogs do not absorb unrelated or ancestor canvas overlays',()=>{
+  const own={},unrelated={},ancestor={contains:target=>target===fullscreen};
+  const dialog={contains:target=>target===own},fullscreen={closest:()=>dialog};
+  const doc={fullscreenElement:fullscreen,body:{}};const home={ownerDocument:doc};
+  assert.equal(api.overlayHost(home,unrelated),null);
+  assert.equal(api.overlayHost(home,ancestor),null);
+  assert.equal(api.overlayHost(home,own),fullscreen);
+  fullscreen.closest=()=>null;
+  assert.equal(api.overlayHost(home,unrelated),fullscreen,'canvas fullscreen still receives normal overlays');
+});

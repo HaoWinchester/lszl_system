@@ -43,6 +43,8 @@
 /* 文字工具的画布内输入框 */
 .canvas-ink-text-editor{position:fixed;z-index:130;min-width:140px;max-width:520px;padding:4px 8px;border:1.5px dashed #2563eb;border-radius:8px;background:rgba(255,255,255,.94);color:#111827;resize:none;outline:none;box-shadow:0 8px 28px #0f172a26;font-family:system-ui,-apple-system,sans-serif;line-height:1.35;overflow:hidden;white-space:pre}
 .canvas-ink-text-editor::placeholder{color:#94a3b8}
+.canvas-ink-text-editor-viewport{position:fixed;z-index:130;overflow:auto;overscroll-behavior:contain;border-radius:8px;box-shadow:0 8px 28px #0f172a26}
+.canvas-ink-text-editor-viewport .canvas-ink-text-editor{display:block;margin:0;box-shadow:none}
 
 /* 橡皮擦长按 3 秒进度指示 */
 .canvas-ink-toolbar button[data-ink-tool="eraser"]{position:relative;overflow:hidden}

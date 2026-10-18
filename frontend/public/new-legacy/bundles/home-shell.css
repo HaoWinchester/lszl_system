@@ -502,6 +502,7 @@ input[type=file]{display:none}
 .detail-panel{
   cursor:default;
   box-sizing:border-box;
+  max-width:calc(100% - 16px);
   max-height:calc(100dvh - 160px);
   overflow:auto;
 }
@@ -2293,6 +2294,7 @@ body[data-role-theme] .floating-tool-btn.primary,body[data-role-theme] button.pr
   backdrop-filter:blur(14px);
 }
 .graph-search-panel.show{display:flex}
+.graph-search-panel.show{z-index:46}
 .graph-search-head{display:flex;align-items:center;justify-content:space-between;gap:10px;color:#0f172a}
 .graph-search-head button{
   border:0;
@@ -3408,7 +3410,7 @@ g.is-batch-selected .edge-visible{
   position:fixed;
   right:18px;
   bottom:18px;
-  z-index:2147483000;
+  z-index:45;
   width:168px;
   padding:9px;
   border:1px solid rgba(15,23,42,.10);
@@ -8277,6 +8279,8 @@ body.qw-selection-toolbar-motion .uc-selection-bounds,.stage.graph-card-dragging
 /* 文字工具的画布内输入框 */
 .canvas-ink-text-editor{position:fixed;z-index:130;min-width:140px;max-width:520px;padding:4px 8px;border:1.5px dashed #2563eb;border-radius:8px;background:rgba(255,255,255,.94);color:#111827;resize:none;outline:none;box-shadow:0 8px 28px #0f172a26;font-family:system-ui,-apple-system,sans-serif;line-height:1.35;overflow:hidden;white-space:pre}
 .canvas-ink-text-editor::placeholder{color:#94a3b8}
+.canvas-ink-text-editor-viewport{position:fixed;z-index:130;overflow:auto;overscroll-behavior:contain;border-radius:8px;box-shadow:0 8px 28px #0f172a26}
+.canvas-ink-text-editor-viewport .canvas-ink-text-editor{display:block;margin:0;box-shadow:none}
 
 /* 橡皮擦长按 3 秒进度指示 */
 .canvas-ink-toolbar button[data-ink-tool="eraser"]{position:relative;overflow:hidden}
@@ -8477,7 +8481,7 @@ body.qw-selection-toolbar-motion .uc-selection-bounds,.stage.graph-card-dragging
 .kg-color-picker-swatch:hover{transform:scale(1.08)}
 .kg-color-picker-swatch.active::after{content:"";position:absolute;inset:5px;border:2px solid #fff;border-radius:50%;box-shadow:0 0 0 1px rgba(15,23,42,.7)}
 .graph-floating-color-window{
-  position:absolute;z-index:72;width:326px;max-width:calc(100% - 20px);display:none;
+  position:absolute;z-index:590;width:326px;max-width:calc(100% - 20px);display:none;
   background:rgba(255,255,255,.985);border:1px solid rgba(148,163,184,.38);border-radius:15px;
   box-shadow:0 24px 64px rgba(15,23,42,.24);backdrop-filter:blur(18px);overflow:hidden;pointer-events:auto;
 }

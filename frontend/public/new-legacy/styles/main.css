@@ -501,6 +501,7 @@ input[type=file]{display:none}
 .detail-panel{
   cursor:default;
   box-sizing:border-box;
+  max-width:calc(100% - 16px);
   max-height:calc(100dvh - 160px);
   overflow:auto;
 }
@@ -2292,6 +2293,7 @@ body[data-role-theme] .floating-tool-btn.primary,body[data-role-theme] button.pr
   backdrop-filter:blur(14px);
 }
 .graph-search-panel.show{display:flex}
+.graph-search-panel.show{z-index:46}
 .graph-search-head{display:flex;align-items:center;justify-content:space-between;gap:10px;color:#0f172a}
 .graph-search-head button{
   border:0;

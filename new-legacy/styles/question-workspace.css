@@ -3123,3 +3123,6 @@ body.qw-selection-toolbar-motion [data-node-id].show-connectors .qw-card-connect
   opacity:1;
   filter:drop-shadow(0 0 5px color-mix(in srgb,var(--qw-edge-color,#2563eb) 45%,transparent));
 }
+@media(max-width:850px){
+  .question-workspace-page .qw-bottom-right-dock{bottom:68px}
+}

@@ -142,8 +142,33 @@ def explicit_word_wrap(browser):
     draft=editor.bounding_box();editor.press('Control+Enter');saved=page.locator('.canvas-ink-text-box > rect').first.bounding_box();assert abs(draft['height']-saved['height'])<3,(draft,saved);assert page.evaluate('strokes[0].boxWidth')==120;page.close()
 def long_automatic_text(browser):
     page=setup(browser);page.evaluate('ink.openTextAt(100,100)');editor=page.locator('.canvas-ink-text-editor');editor.fill('W'*500)
-    metrics=editor.evaluate('el=>({client:el.clientHeight,scroll:el.scrollHeight,width:parseFloat(el.style.width)})');assert metrics['scroll']<=metrics['client']+1,('Long automatic draft may not be clipped',metrics)
-    draft=editor.bounding_box();editor.press('Control+Enter');page.mouse.click(110,110);saved=page.locator('.canvas-ink-text-box > rect').first.bounding_box();assert abs(draft['width']-saved['width'])<3 and abs(draft['height']-saved['height'])<3,(draft,saved);assert 'boxWidth' not in page.evaluate('strokes[0]');page.close()
+    metrics=page.locator('.canvas-ink-text-editor-viewport').evaluate('el=>({client:el.clientWidth,scroll:el.scrollWidth,width:el.getBoundingClientRect().width})');assert metrics['scroll']>metrics['client'] and metrics['width']<=1084,('Long automatic draft must scroll inside the viewport',metrics)
+    editor.press('Control+Enter');assert page.evaluate('strokes[0].text')=='W'*500;assert 'boxWidth' not in page.evaluate('strokes[0]'),'Presentation bounds must not change automatic saved wrapping';page.close()
+def viewport_drafts(browser):
+    page=setup(browser);page.locator('#view').evaluate("el=>{el.style.width='100%';el.style.height='100vh'}")
+    page.evaluate("ink.destroy();window.view={x:0,y:0,scale:1};window.ink=KGCanvasInk.create({viewport:document.querySelector('#view'),world:document.querySelector('#world'),getViewport:()=>view,getStrokes:()=>strokes,setStrokes:s=>{strokes=s;writes++}})")
+    for scale in [.25,1,2]:
+        for x,y in [(5,5),(1095,5),(1095,795),(5,795)]:
+            page.evaluate('(scale)=>view.scale=scale',scale);page.evaluate('([x,y])=>ink.openTextAt(x,y)',[x,y]);editor=page.locator('.canvas-ink-text-editor');editor.fill(('长文字 ABC '*35+'\n')*20)
+            r=page.locator('.canvas-ink-text-editor-viewport').bounding_box();assert r['x']>=0 and r['y']>=0 and r['x']+r['width']<=1100 and r['y']+r['height']<=800,r
+            editor.press('Control+Enter');saved=page.evaluate('strokes.at(-1)');assert saved['points'][0]==[x/scale,y/scale] and saved['width']==24 and 'boxWidth' not in saved,saved
+    page.evaluate('ink.openTextAt(1095,795)');page.locator('.canvas-ink-text-editor').fill('缩小窗口时保留草稿');page.set_viewport_size({'width':800,'height':600});page.wait_for_function("(()=>{const r=document.querySelector('.canvas-ink-text-editor-viewport').getBoundingClientRect();return r.right<=innerWidth&&r.bottom<=innerHeight})()");r=page.locator('.canvas-ink-text-editor-viewport').bounding_box();assert r['x']>=0 and r['y']>=0 and r['x']+r['width']<=800 and r['y']+r['height']<=600,r
+    page.locator('.canvas-ink-text-editor').press('Escape');page.close()
+def dock_avoidance(browser):
+    page=setup(browser);page.set_viewport_size({'width':1024,'height':640});page.locator('#view').evaluate("el=>{el.style.width='100%';el.style.height='100vh'}")
+    page.evaluate("""()=>{ink.destroy();const trigger=document.createElement('button');trigger.id='launch';document.body.append(trigger);const dock=document.createElement('div');dock.className='uc-minimap-dock';dock.style.cssText='position:absolute;right:12px;bottom:12px;width:260px;height:116px;z-index:360;background:white';document.querySelector('#view').append(dock);window.ink=KGCanvasInk.create({viewport:document.querySelector('#view'),world:document.querySelector('#world'),trigger,getViewport:()=>({x:0,y:0,scale:1}),getStrokes:()=>strokes,setStrokes:s=>strokes=s});ink.setOpen(true)}""")
+    page.get_by_role('button',name='笔迹设置',exact=True).click()
+    for width,height in [(1024,640),(800,600)]:
+        page.set_viewport_size({'width':width,'height':height});page.wait_for_timeout(50)
+        assert page.locator('[data-ink-close]').evaluate('e=>{const r=e.getBoundingClientRect();return e.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))}'),'Minimap must not intercept close'
+        for sel in ['.canvas-ink-toolbar','.canvas-ink-options']:
+            r=page.locator(sel).bounding_box();assert r['x']>=0 and r['y']>=0 and r['x']+r['width']<=width and r['y']+r['height']<=height,(sel,r)
+    page.get_by_role('button',name='关闭画笔工具',exact=True).click();expect(page.locator('.canvas-ink-toolbar')).to_be_hidden();page.close()
+def modal_draft_host(browser):
+    page=setup(browser);page.evaluate("""()=>{ink.destroy();const modal=document.createElement('div');modal.id='modal';modal.style.cssText='position:fixed;inset:0;z-index:10000;background:white';modal.append(document.querySelector('#view'));document.body.append(modal);window.ink=KGCanvasInk.create({viewport:document.querySelector('#view'),world:document.querySelector('#world'),overlayHost:modal,getViewport:()=>({x:0,y:0,scale:1}),getStrokes:()=>strokes,setStrokes:s=>strokes=s})}""")
+    page.get_by_role('button',name='文字',exact=True).click();page.mouse.click(800,150);editor=page.locator('.canvas-ink-text-editor');expect(editor).to_be_visible();editor.press_sequentially('Visible modal draft')
+    assert page.locator('.canvas-ink-text-editor-viewport').evaluate('e=>{const r=e.getBoundingClientRect();return e.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))}'),'Modal must not cover its own draft'
+    editor.press('Control+Enter');assert page.evaluate('strokes[0].text')=='Visible modal draft';page.close()
 def deferred_tool_exit(browser):
     for action in ['pen','close']:
         page=setup(browser);page.evaluate('ink.openTextAt(300,200)');editor=page.locator('.canvas-ink-text-editor');editor.fill('输入法草稿')
@@ -409,7 +434,7 @@ if '--base-url' in sys.argv:
 else:
     with sync_playwright() as pw:
         browser=pw.chromium.launch(headless=True,executable_path='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
-        cases={'readonly_resize':readonly_resize,'asynchronous_tool_exit':asynchronous_tool_exit,'deferred_tool_exit':deferred_tool_exit,'right_grip':right_grip,'eraser_hold_exit':eraser_hold_exit,'selection_over_control':selection_over_control,'draft_formatting':draft_formatting,'external_history':external_history,'explicit_word_wrap':explicit_word_wrap,'long_automatic_text':long_automatic_text,'eraser':eraser,'curve_eraser':curve_eraser,'selection':selection,'text':text,'public_entry':public_entry,'export_opacity':export_opacity,'responsive_controls':responsive_controls}
+        cases={'modal_draft_host':modal_draft_host,'viewport_drafts':viewport_drafts,'dock_avoidance':dock_avoidance,'readonly_resize':readonly_resize,'asynchronous_tool_exit':asynchronous_tool_exit,'deferred_tool_exit':deferred_tool_exit,'right_grip':right_grip,'eraser_hold_exit':eraser_hold_exit,'selection_over_control':selection_over_control,'draft_formatting':draft_formatting,'external_history':external_history,'explicit_word_wrap':explicit_word_wrap,'long_automatic_text':long_automatic_text,'eraser':eraser,'curve_eraser':curve_eraser,'selection':selection,'text':text,'public_entry':public_entry,'export_opacity':export_opacity,'responsive_controls':responsive_controls}
         for name in sys.argv[1:] or cases:
             cases[name](browser);print(name+': passed')
         browser.close()

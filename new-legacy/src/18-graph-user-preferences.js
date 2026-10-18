@@ -231,10 +231,13 @@
     if(!btn) return;
     const asSubmenu = !!options.asSubmenu || (launcherOpenState && activeLauncherSubmenu === "preferences" && launcherMenuEl && !launcherMenuEl.hidden);
     const anchor = options.anchor || (asSubmenu && launcherMenuEl ? launcherMenuEl.querySelector('[data-meta-submenu="preferences"]') : btn);
-    const width = Math.min(320, Math.max(280, window.innerWidth - 16));
-    menu.style.width = width + "px";
+    const preferredWidth = Math.min(320, Math.max(280, window.innerWidth - 16));
+    menu.style.width = preferredWidth + "px";
     menu.style.maxHeight = "calc(100vh - 16px)";
     menu.style.overflowY = "auto";
+    // Responsive/coarse-pointer CSS may expand this panel beyond its preferred
+    // width. Clamp the actual border box, including after an open-panel resize.
+    const width = menu.offsetWidth || preferredWidth;
     let left, top;
     if(asSubmenu && anchor && launcherMenuEl){
       const anchorRect = anchor.getBoundingClientRect();

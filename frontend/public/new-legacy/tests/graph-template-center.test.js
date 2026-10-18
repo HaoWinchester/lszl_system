@@ -81,3 +81,10 @@ test('legacy mode allows previews but prevents fake template loading into an inc
   const load=h.find(h.dialog,node=>node.dataset.templateLoad!==undefined);assert.ok(load);await load.onclick();
   assert.equal(h.calls.some(call=>call.options?.method==='POST'),false);assert.match(h.status.textContent,/在线图谱/);assert.match(h.status.textContent,/导出学习包/);
 });
+
+test('dragging and resizing keep the complete preview and its footer inside the viewport',()=>{
+  const position=controller.previewWindowPosition;
+  assert.deepEqual(position(1400,880,1120,760,1440,900),{left:320,top:140});
+  assert.deepEqual(position(320,140,390,564,390,600),{left:0,top:36});
+  assert.deepEqual(position(-40,-20,800,600,800,600),{left:0,top:0});
+});

@@ -53,7 +53,7 @@
 .kg-color-picker-swatch:hover{transform:scale(1.08)}
 .kg-color-picker-swatch.active::after{content:"";position:absolute;inset:5px;border:2px solid #fff;border-radius:50%;box-shadow:0 0 0 1px rgba(15,23,42,.7)}
 .graph-floating-color-window{
-  position:absolute;z-index:72;width:326px;max-width:calc(100% - 20px);display:none;
+  position:absolute;z-index:590;width:326px;max-width:calc(100% - 20px);display:none;
   background:rgba(255,255,255,.985);border:1px solid rgba(148,163,184,.38);border-radius:15px;
   box-shadow:0 24px 64px rgba(15,23,42,.24);backdrop-filter:blur(18px);overflow:hidden;pointer-events:auto;
 }

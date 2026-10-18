@@ -1,14 +1,19 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.350",
-  "toVersion": "v9.0-p4.1.351",
+  "fromVersion": "v9.0-p4.1.352",
+  "toVersion": "v9.0-p4.1.355",
   "changes": {
     "added": [],
     "changed": [
       "VERSION",
       "content-prep-studio/dist/content-prep.html",
-      "tests/boardmix-popover-bounds-browser.py",
-      "tests/v90-p430-unified-canvas-runtime.test.js"
+      "src/18-graph-user-preferences.js",
+      "src/20-flashcards-toolbar.js",
+      "src/39-global-shortcuts.js",
+      "src/canvas/89-canvas-runtime.js",
+      "tests/boardmix-graph-controls-browser.py",
+      "tests/boardmix-graph-controls.test.js",
+      "tests/boardmix-popover-bounds-browser.py"
     ],
     "removed": []
   },

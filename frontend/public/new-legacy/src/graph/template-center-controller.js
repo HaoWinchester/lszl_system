@@ -2,6 +2,7 @@
 (function(global){
   'use strict';
   function el(tag,text){const node=document.createElement(tag);if(text!==undefined)node.textContent=text;return node}
+  function previewWindowPosition(left,top,width,height,viewportWidth,viewportHeight){return{left:Math.max(0,Math.min(Math.max(0,viewportWidth-width),left)),top:Math.max(0,Math.min(Math.max(0,viewportHeight-height),top))}}
   function canPublish(role){return role==='teacher'||role==='admin'}
   let active=null;
   const onlineFilesRequired='当前为临时图谱模式，暂不能发布或加载模板。请先导出学习包保留内容，再联系管理员恢复在线图谱后重新打开。';
@@ -82,11 +83,14 @@
       (document.fullscreenElement||document.body).append(panel);panel.showModal();
       minus.onclick=()=>drawing?.zoom(.8);plus.onclick=()=>drawing?.zoom(1.25);fit.onclick=()=>drawing?.fit();
       full.onclick=async()=>{try{if(document.fullscreenElement===surface)await document.exitFullscreen();else await surface.requestFullscreen()}catch(error){message.textContent='当前浏览器无法全屏，请使用窗口预览。';footer.append(message)}};
-      panel.addEventListener('fullscreenchange',()=>{full.textContent=document.fullscreenElement===surface?'退出全屏':'全屏';drawing?.fit()},{signal:lifetime.signal});
+      panel.addEventListener('fullscreenchange',()=>{full.textContent=document.fullscreenElement===surface?'退出全屏':'全屏';keepWindowInView();drawing?.fit()},{signal:lifetime.signal});
       use.onclick=async()=>{if(displayedVersion===null)return;await dismiss();load(displayedVersion)};
+      function positionWindow(left,top){const position=previewWindowPosition(left,top,panel.offsetWidth,panel.offsetHeight,innerWidth,innerHeight);panel.style.margin='0';panel.style.left=position.left+'px';panel.style.top=position.top+'px'}
+      function keepWindowInView(){if(document.fullscreenElement===surface||!panel.style.left)return;const rect=panel.getBoundingClientRect();positionWindow(rect.left,rect.top)}
+      global.addEventListener('resize',keepWindowInView,{signal:lifetime.signal});
       let drag=null;
       header.addEventListener('pointerdown',event=>{if(event.target.closest('button')||document.fullscreenElement===surface||event.button!==0)return;const r=panel.getBoundingClientRect();drag={id:event.pointerId,x:event.clientX,y:event.clientY,left:r.left,top:r.top};header.setPointerCapture(event.pointerId)},{signal:lifetime.signal});
-      header.addEventListener('pointermove',event=>{if(!drag||drag.id!==event.pointerId)return;panel.style.margin='0';panel.style.left=Math.max(0,Math.min(innerWidth-panel.offsetWidth,drag.left+event.clientX-drag.x))+'px';panel.style.top=Math.max(0,Math.min(innerHeight-60,drag.top+event.clientY-drag.y))+'px'},{signal:lifetime.signal});
+      header.addEventListener('pointermove',event=>{if(!drag||drag.id!==event.pointerId)return;positionWindow(drag.left+event.clientX-drag.x,drag.top+event.clientY-drag.y)},{signal:lifetime.signal});
       header.addEventListener('pointerup',()=>{drag=null},{signal:lifetime.signal});header.addEventListener('pointercancel',()=>{drag=null},{signal:lifetime.signal});
       async function render(){try{const result=await fetchPreview(lifetime.signal);if(closed||disposed)return;displayedVersion=result.preview.version;use.disabled=!result.template.listed;title.textContent=result.template.name+' · v'+displayedVersion;drawing=global.KGTemplatePreview.mount(viewport,result.preview,{interactive:true,onScale:value=>scale.textContent=Math.round(value*100)+'%'});if(result.template.description){const description=el('p',result.template.description);description.className='template-preview-description';surface.insertBefore(description,footer)}}catch(error){if(closed||disposed)return;message.textContent=error.message;const retry=el('button','重试预览');retry.onclick=()=>{retry.remove();message.textContent='正在加载图谱…';render()};viewport.replaceChildren(message,retry)}}
       render();
@@ -125,5 +129,5 @@
     refresh().catch(error=>{if(!disposed)status.textContent=error.message});
   }
   global.KGGraphTemplateCenter={open,canPublish};
-  if(typeof module==='object'&&module.exports)module.exports={canPublish};
+  if(typeof module==='object'&&module.exports)module.exports={canPublish,previewWindowPosition};
 })(typeof window!=='undefined'?window:globalThis);
