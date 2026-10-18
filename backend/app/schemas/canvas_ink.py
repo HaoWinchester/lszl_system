@@ -28,7 +28,7 @@ def validate_strokes(value: Any) -> list[dict]:
     ids = set()
     total_points = 0
     for stroke in value:
-        if not isinstance(stroke, dict) or not _FIELDS <= set(stroke) or not set(stroke) <= (_TEXT_FIELDS | {"bold", "boxWidth", "boxHeight"}):
+        if not isinstance(stroke, dict) or not _FIELDS <= set(stroke) or not set(stroke) <= (_TEXT_FIELDS | {"bold", "boxWidth", "boxHeight", "opacity"}):
             raise ValueError("笔迹必须包含 id、tool、color、width、points 且不能有额外字段")
         stroke_id = stroke["id"]
         if not isinstance(stroke_id, str) or not stroke_id.strip() or len(stroke_id) > 100:
@@ -47,6 +47,8 @@ def validate_strokes(value: Any) -> list[dict]:
         minimum, maximum = _TOOL_WIDTH_RANGE[tool]
         if not _number(stroke["width"], minimum, maximum):
             raise ValueError("笔迹粗细超出工具允许范围")
+        if "opacity" in stroke and not _number(stroke["opacity"], 0, 1):
+            raise ValueError("笔迹透明度必须是 0–1 的有限数值")
         points = stroke["points"]
         if not isinstance(points, list) or not 1 <= len(points) <= 5000:
             raise ValueError("每笔必须包含 1–5000 个坐标点")

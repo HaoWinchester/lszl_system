@@ -50,6 +50,11 @@ async def create_file(body: dict, db: DB, user: CurrentUser):
             source=body.get("source", "created"),
             source_file_id=body.get("sourceFileId"),
         )
+    except file_service.GraphStrokesInvalid as exc:
+        raise HTTPException(status_code=422, detail={
+            "code": "GRAPH_STROKES_INVALID",
+            "message": str(exc),
+        }) from exc
     except file_service.GraphTablesInvalid as exc:
         raise HTTPException(status_code=422, detail={
             "code": "GRAPH_TABLES_INVALID",
@@ -99,7 +104,13 @@ async def stats(db: DB, user: CurrentUser):
 
 @router.post("/import-legacy", dependencies=[Depends(import_submission_guard)])
 async def import_legacy(body: dict, db: DB, user: CurrentUser):
-    return await file_service.import_legacy(db, user.username, body)
+    try:
+        return await file_service.import_legacy(db, user.username, body)
+    except file_service.GraphStrokesInvalid as exc:
+        raise HTTPException(status_code=422, detail={
+            "code": "GRAPH_STROKES_INVALID",
+            "message": str(exc),
+        }) from exc
 
 
 @router.post("/trash/empty")
@@ -214,6 +225,11 @@ async def save_file(file_id: str, body: dict, db: DB, user: CurrentUser):
             body.get("learningState"),
             body.get("expectedRevision"),
         )
+    except file_service.GraphStrokesInvalid as exc:
+        raise HTTPException(status_code=422, detail={
+            "code": "GRAPH_STROKES_INVALID",
+            "message": str(exc),
+        }) from exc
     except file_service.GraphTablesInvalid as exc:
         raise HTTPException(status_code=422, detail={
             "code": "GRAPH_TABLES_INVALID",

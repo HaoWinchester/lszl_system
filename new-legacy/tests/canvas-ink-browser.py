@@ -74,9 +74,11 @@ def check_page(context,base,kind):
     if kind=='workspace':
         for name in ('pen','highlighter'):
             page.locator('.canvas-ink-toolbar [data-ink-tool='+name+']').click(timeout=5000)
-        # 产品要求隐藏「选择」图标（Esc 仍退出绘画）；此处断言其不可见。
-        expect(page.locator('.canvas-ink-toolbar [data-ink-tool=select]')).to_be_hidden()
-        record('workspace: empty-state ink controls are unobstructed (select hidden by design)')
+        # 共享工具条同时提供显式选择入口与设置，Esc 仍退出绘画。
+        expect(page.locator('.canvas-ink-toolbar [data-ink-tool=select]')).to_be_visible()
+        page.get_by_role('button',name='笔迹设置',exact=True).click()
+        expect(page.get_by_role('slider',name='笔迹透明度',exact=True)).to_be_visible()
+        record('workspace: empty-state ink controls are unobstructed (selection and settings visible)')
         page.locator('#qwQuestionDockBtn').click()
         page.locator('[data-add-index]').first.click()
         page.keyboard.press('Escape')

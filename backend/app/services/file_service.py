@@ -34,6 +34,21 @@ class FolderNotEmpty(ValueError):
     pass
 
 
+class GraphStrokesInvalid(ValueError):
+    """Graph strokes violate the common canvas wire contract."""
+
+
+def validate_graph_strokes(graph_data: dict) -> None:
+    if "strokes" not in graph_data:
+        return
+    from app.schemas.canvas_ink import validate_strokes
+
+    try:
+        validate_strokes(graph_data["strokes"])
+    except ValueError as exc:
+        raise GraphStrokesInvalid(str(exc)) from exc
+
+
 class GraphTablesInvalid(ValueError):
     """graphData.tables 违反 TableV1 契约（画布级整体拒绝）。"""
 
@@ -259,6 +274,7 @@ async def create_file(
         if folder is None:
             return None
     graph_data = graph_data or blank_graph_data(name)
+    validate_graph_strokes(graph_data)
     validate_graph_tables(graph_data)
     await validate_graph_assets(db, owner, graph_data)
     file_id = uid("f_")
@@ -304,6 +320,7 @@ async def save_file(
     current_revision = max(1, int(f.revision or 1))
     if expected_revision is not None and expected_revision != current_revision:
         raise FileRevisionConflict(current_revision)
+    validate_graph_strokes(graph_data)
     validate_graph_tables(graph_data)
     await validate_graph_assets(db, owner, graph_data)
     c = await get_content(db, file_id)
@@ -797,6 +814,7 @@ async def import_legacy(db: AsyncSession, owner: str, payload: dict) -> dict:
     files = payload.get("files") or payload.get("contents") or []
 
     for rec in files:
+        validate_graph_strokes(rec.get("graphData") or rec.get("graph_data") or {})
         await validate_graph_assets(db, owner, rec.get("graphData") or rec.get("graph_data") or {})
 
     folder_id_map: dict[str, str] = {}

@@ -5,8 +5,7 @@
 .canvas-ink-toolbar{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);z-index:65;color:#1e293b;background:rgba(255,255,255,.98);border:1px solid #dbe2ea;border-radius:14px;padding:6px;box-shadow:0 5px 22px #0f172a17;font:13px/1.4 system-ui,sans-serif;cursor:default!important}
 .canvas-ink-toolbar *{box-sizing:border-box;cursor:auto!important}
 .canvas-ink-tools{display:flex;align-items:center;gap:4px}
-/* 选择工具保留在内部状态（Esc 退出绘画），不在工具条中展示 */
-.canvas-ink-toolbar button[data-ink-tool="select"]{display:none}
+/* Selection remains directly available alongside Esc. */
 .canvas-ink-toolbar button{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;min-width:0;padding:7px;border:0;border-radius:8px;background:transparent;color:inherit;font:20px/1 system-ui;cursor:pointer!important;box-shadow:none}
 .canvas-ink-toolbar button:hover{background:#f1f5f9}
 .canvas-ink-toolbar button[aria-pressed=true]{background:#e8efff;color:#1d4ed8;box-shadow:inset 0 0 0 1px #b8ccff}
@@ -80,3 +79,26 @@
 /* Keep drawing over question cards visually steady; selection outlines stay intact. */
 .canvas-ink-drawing .qw-question-card,
 .canvas-ink-drawing .qw-question-card:hover{box-shadow:none!important;transition:none!important}
+
+/* Common colors stay visible; the labelled settings button exposes numeric controls. */
+.canvas-ink-toolbar .canvas-ink-colors{justify-content:center;margin:0 6px;padding:0 7px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;gap:7px}
+.canvas-ink-toolbar .canvas-ink-colors button{width:18px;height:18px;border-width:2px}
+.canvas-ink-toolbar .canvas-ink-colors input[type=color]{width:22px;height:22px}
+.canvas-ink-font,.canvas-ink-opacity{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;white-space:nowrap}
+.canvas-ink-font input{width:75px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:5px;font:inherit}
+.canvas-ink-opacity input{width:112px;accent-color:#2563eb;margin:0}
+.canvas-ink-opacity output{min-width:32px;text-align:right;font-variant-numeric:tabular-nums}
+.canvas-ink-stroke-selection{pointer-events:none}
+@media(max-width:440px){.canvas-ink-tools{gap:2px}.canvas-ink-toolbar button{width:30px;height:32px;padding:5px}.canvas-ink-divider{margin:0 1px}.canvas-ink-options{max-height:calc(100dvh - 180px);overflow:auto}}
+
+@media(max-width:700px){
+  .canvas-ink-toolbar{max-width:calc(100vw - 16px);width:max-content}
+  .canvas-ink-tools{flex-wrap:wrap;justify-content:center}
+  .canvas-ink-toolbar .canvas-ink-colors{order:2;flex-basis:100%;margin:4px 0 0;padding-top:4px;border:0;border-top:1px solid #e2e8f0}
+}
+
+.canvas-ink-text-dragging .canvas-ink-stroke-selection{opacity:0}
+
+.canvas-ink-width{flex-wrap:wrap;gap:6px}
+.canvas-ink-width input[type=range]{width:120px}
+.canvas-ink-width input[type=number]{width:50px;padding:3px;border:1px solid #cbd5e1;border-radius:5px;font:inherit}

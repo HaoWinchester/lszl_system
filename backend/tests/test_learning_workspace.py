@@ -96,12 +96,12 @@ def test_workspace_crud_is_owner_isolated() -> None:
 
     created_response = client_a.post(
         "/api/v1/workspaces",
-        json={"title": "我的归纳画布", "schemaVersion": 6, "payload": {"nodes": {}, "edges": [], "groups": [], "strokes": [{"id": "ink-1", "tool": "highlighter", "color": "#ffee00", "width": 16, "points": [[1, 2], [3, 4]]}]}},
+        json={"title": "我的归纳画布", "schemaVersion": 6, "payload": {"nodes": {}, "edges": [], "groups": [], "strokes": [{"id": "ink-1", "tool": "highlighter", "color": "#ffee00", "width": 16, "opacity": 0.65, "points": [[1, 2], [3, 4]]}]}},
     )
     assert created_response.status_code == 200, created_response.text
     created = created_response.json()["workspace"]
 
-    ink = [{"id": "ink-1", "tool": "highlighter", "color": "#ffee00", "width": 16, "points": [[1, 2], [3, 4]]}]
+    ink = [{"id": "ink-1", "tool": "highlighter", "color": "#ffee00", "width": 16, "opacity": 0.65, "points": [[1, 2], [3, 4]]}]
     assert created["payload"]["strokes"] == ink
     assert client_a.get(f"/api/v1/workspaces/{created['id']}").json()["workspace"]["payload"]["strokes"] == ink
     invalid = client_a.put(f"/api/v1/workspaces/{created['id']}", json={"payload": {"strokes": [{**ink[0], "width": 99}]}})

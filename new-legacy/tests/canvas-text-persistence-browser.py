@@ -32,7 +32,7 @@ with sync_playwright() as p:
             assert card.evaluate(decoration)==before_hover,(mode,before_hover,card.evaluate(decoration))
             page.evaluate(controller+'.setTool("select")')
         page.locator(trigger).click();toolbar=page.locator('.canvas-ink-toolbar');toolbar.get_by_role('button',name='橡皮擦',exact=True).dblclick();toolbar.get_by_role('button',name='文字',exact=True).click()
-        expect(toolbar.get_by_role('slider',name='文字字号')).to_have_count(0);expect(page.get_by_role('button',name='保存画布文字')).to_have_count(0)
+        expect(toolbar.get_by_role('spinbutton',name='文字字号',exact=True)).to_be_visible();expect(page.get_by_role('button',name='保存画布文字')).to_have_count(0)
         page.mouse.click(230,280);editor=page.get_by_role('textbox',name='画布文字内容');expect(editor).to_be_visible()
         editor.fill('短文字');short=editor.bounding_box()['height'];editor.fill('一\n二\n三\n四\n');assert editor.bounding_box()['height']>short*2
         editor.fill('短文字');assert abs(editor.bounding_box()['height']-short)<1
