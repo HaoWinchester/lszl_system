@@ -1,10 +1,17 @@
 {
   "schemaVersion": 1,
   "fromVersion": "v9.0-p4.1.336",
-  "toVersion": "v9.0-p4.1.336",
+  "toVersion": "v9.0-p4.1.337",
   "changes": {
     "added": [],
-    "changed": [],
+    "changed": [
+      "VERSION",
+      "src/00-config-state.js",
+      "src/10-graph-editor.js",
+      "src/graph/edge-geometry.js",
+      "tests/graph-fixed-ports.test.js",
+      "tests/template-preview-browser.py"
+    ],
     "removed": []
   },
   "incompatible": []

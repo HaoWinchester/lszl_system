@@ -265,7 +265,7 @@ function currentEdgeBundlePlan(){
     const points=rawLinkRenderPoints(candidate);if(!points)continue;
     items.push({id:String(candidate.id),fromId:candidate.from,toId:candidate.to,a:points.a,b:points.b,ca:points.ca,cb:points.cb,
       hasFromPort:hasExplicitPort(candidate.fromPort),hasToPort:hasExplicitPort(candidate.toPort),pathStyle:pathStyleForLink(candidate),
-      hasStoredWaypoints:normalizedEdgePoints(candidate.waypoints,12).length>0});
+      hasStoredWaypoints:normalizedEdgePoints(candidate.waypoints).length>0});
   }
   edgeBundleMemo={time:now,plan:window.KGGraphEdgeBundle.plan(items)};
   return edgeBundleMemo.plan;
@@ -287,7 +287,7 @@ function normalizedEdgePoint(value){
   const x=Number(value.x),y=Number(value.y);if(!Number.isFinite(x)||!Number.isFinite(y))return null;
   return{x:Math.max(-100000,Math.min(100000,x)),y:Math.max(-100000,Math.min(100000,y))};
 }
-function normalizedEdgePoints(value,max=12){
+function normalizedEdgePoints(value,max=window.KGGraphEdgeGeometry.MAX_WAYPOINTS){
   return (Array.isArray(value)?value:[]).slice(0,max).map(normalizedEdgePoint).filter(Boolean);
 }
 function defaultElbowWaypoints(a,b,direction=null){
@@ -356,12 +356,12 @@ function linkPathGeometry(link,a,b,points=null){
   const fixedStart=window.KGGraphEdgeGeometry.portDirection(link?.fromPort),fixedEnd=window.KGGraphEdgeGeometry.portDirection(link?.toPort);
   const detour=fixedStart||fixedEnd?null:overlappingProjectionWaypoints(start,end,points,direction);
   if(style==='elbow'){
-    const stored=normalizedEdgePoints(link&&link.waypoints,12),derived=!stored.length&&!detour;
+    const stored=normalizedEdgePoints(link&&link.waypoints),derived=!stored.length&&!detour;
     let waypoints=stored.length?stored:(detour||defaultElbowWaypoints(start,end,direction));
     // 多线汇总：自动派生的折线中间段吸附到共享通道坐标，使近似平行的主干段完全重合（不回写持久数据）。
     if(derived&&points?.mainGraph){const channel=currentEdgeBundlePlan()?.channels?.get(String(link?.id));if(Number.isFinite(channel)){const axis=Math.abs(end.x-start.x)>=Math.abs(end.y-start.y)?'x':'y';waypoints=waypoints.map(p=>({...p,[axis]:channel}))}}
     const samples=[start,...waypoints,end];
-    return{style,d:edgePathFromPoints(samples),samples,bounds:edgeGeometryBounds(samples),endpoints:[start,end],controls:waypoints.map((point,index)=>({kind:'waypoint',index,x:point.x,y:point.y})),derivedWaypoints:!stored.length};
+    return{style,d:edgePathFromPoints(samples),samples,bounds:edgeGeometryBounds(samples),endpoints:[start,end],waypoints,controls:window.KGGraphEdgeGeometry.segmentHandles(start,waypoints,end),derivedWaypoints:!stored.length};
   }
   const stored=normalizedEdgePoints(link&&link.curveControls,2),controls=stored.length===2?stored:defaultCurveControls(start,end,direction);
   if(stored.length!==2&&(fixedStart||fixedEnd)){
@@ -369,15 +369,15 @@ function linkPathGeometry(link,a,b,points=null){
     if(fixedStart)controls[0]={x:start.x+fixedStart.x*offset,y:start.y+fixedStart.y*offset};
     if(fixedEnd)controls[1]={x:end.x+fixedEnd.x*offset,y:end.y+fixedEnd.y*offset};
   }
-  const storedWaypoints=normalizedEdgePoints(link&&link.waypoints,12),waypoints=storedWaypoints.length?storedWaypoints:detour;
+  const storedWaypoints=normalizedEdgePoints(link&&link.waypoints),waypoints=storedWaypoints.length?storedWaypoints:detour;
   if(stored.length!==2&&waypoints){
     const route=roundedEdgeRoute([start,...waypoints,end]);
-    return{style,...route,bounds:edgeGeometryBounds(route.samples),endpoints:[start,end],controls:waypoints.map((point,index)=>({kind:'waypoint',index,x:point.x,y:point.y})),derivedWaypoints:!storedWaypoints.length};
+    return{style,...route,bounds:edgeGeometryBounds(route.samples),endpoints:[start,end],waypoints,controls:window.KGGraphEdgeGeometry.segmentHandles(start,waypoints,end),derivedWaypoints:!storedWaypoints.length};
   }
   const c1=controls[0],c2=controls[1],d=`M ${formatSvgNumber(start.x)} ${formatSvgNumber(start.y)} C ${formatSvgNumber(c1.x)} ${formatSvgNumber(c1.y)}, ${formatSvgNumber(c2.x)} ${formatSvgNumber(c2.y)}, ${formatSvgNumber(end.x)} ${formatSvgNumber(end.y)}`;
   const samples=[];for(let index=0;index<=24;index++)samples.push(cubicEdgePoint(start,c1,c2,end,index/24));
   const handles=window.KGGraphEdgeGeometry.curveHandles(start,controls,end);
-  return{style,d,samples,bounds:edgeGeometryBounds(samples),endpoints:[start,end],curveControls:controls,controls:handles.map((point,index)=>({kind:'curve-control',index,x:point.x,y:point.y})),derivedCurveControls:stored.length!==2};
+  return{style,d,samples,bounds:edgeGeometryBounds(samples),endpoints:[start,end],curveControls:controls,controls:[...handles.map((point,index)=>({kind:'curve-control',index,x:point.x,y:point.y})),{kind:'curve-midpoint',index:0,...window.KGGraphEdgeGeometry.curveMidpoint(start,controls,end)}],derivedCurveControls:stored.length!==2};
 }
 function dashArrayForLineStyle(style,strokeWidth=4){
   const width=Math.max(1,Number(strokeWidth)||4);
@@ -796,12 +796,18 @@ function toggleLargeGraphRelatedFocus(){
 }
 function renderHeader(){ const fileStore=window.KGGraphFileStore,currentFile=fileStore&&fileStore.getCurrentFileMeta?fileStore.getCurrentFileMeta():(fileStore&&fileStore.getCurrentFile?fileStore.getCurrentFile():null),currentName=currentFile&&currentFile.name||state.meta.title||'知识点关系图谱',titleEl=$('appTitle'),subtitleEl=$('appSubtitle');if(titleEl){titleEl.textContent=currentName;titleEl.title=currentName}if(subtitleEl){const subtitle=[state.meta.subject,state.meta.audience].filter(Boolean).join('｜')||'通用知识图谱工具';subtitleEl.textContent=subtitle;subtitleEl.title=subtitle} const txt=state.focusMode?'退出聚焦':'重点聚焦',focus=$('focusBtn'),mobileFocus=$('mFocusBtn');if(focus){focus.setAttribute('aria-label',txt);focus.setAttribute('title',txt);focus.dataset.tooltip=txt;focus.classList.toggle('active-toggle',!!state.focusMode)}if(mobileFocus)mobileFocus.textContent=txt; updateLargeGraphLinesButton();updateLargeGraphRelatedButton();updateFlowModeButton();updateStyleControls() }
 let edgeDomById=new Map(),cardDomById=new Map(),textElementDomById=new Map();
+let edgeControlsSurface=null;
 let edgeHoverLayer=null,edgeBaseLayer=null,edgeFeedbackLayer=null,edgeControlLayer=null,edgeHoverOverlay=null,hoveredEdgeId='',edgeSelectionPaintedIds=new Set();
 let edgeControlDrag=null,edgeControlDragFrame=0,edgeControlDragPoint=null;
 let edgeMoveDrag=null,edgeMoveDragFrame=0,edgeMoveDragPoint=null,suppressEdgeClickId='',suppressEdgeClickUntil=0;
 let edgeEndpointDrag=null,edgeEndpointDragFrame=0,edgeEndpointDragPoint=null,edgeEndpointBindTargetId='';
 function svgElement(name,className=''){
   const element=document.createElementNS('http://www.w3.org/2000/svg',name);if(className)element.setAttribute('class',className);return element;
+}
+function ensureEdgeControlsSurface(){
+  if(edgeControlsSurface?.isConnected)return edgeControlsSurface;
+  edgeControlsSurface=svgElement('svg','edge-controls-surface');edgeControlsSurface.setAttribute('viewBox','-50000 -50000 100000 100000');
+  world.appendChild(edgeControlsSurface);return edgeControlsSurface;
 }
 function selectedEdgeIdSet(){
   const ids=new Set([...selectedLinkIds].map(String).filter(id=>edgeDomById.has(id)&&linkById(id)));
@@ -846,7 +852,7 @@ function updateEdgeControlLayerGeometry(link,dom,geometry){
   edgeControlLayer.querySelector('[data-edge-endpoint-side="to"]')?.setAttribute('transform',`translate(${geometry.endpoints[1].x} ${geometry.endpoints[1].y})`);
   const handles=[...edgeControlLayer.querySelectorAll('.edge-control-handle')];
   if(handles.length!==geometry.controls.length){if(!edgeControlDrag)renderSelectedEdgeControls();return}
-  handles.forEach((handle,index)=>{const point=geometry.controls[index];handle.dataset.edgeControlKind=point.kind;handle.dataset.edgeControlIndex=String(point.index);handle.setAttribute('transform',`translate(${point.x} ${point.y})`)});
+  handles.forEach((handle,index)=>{if(edgeControlDrag?.handle===handle&&edgeControlDrag.kind==='segment')return;const point=geometry.controls[index];handle.dataset.edgeControlKind=point.kind;handle.dataset.edgeControlIndex=String(point.index);handle.setAttribute('transform',`translate(${point.x} ${point.y})`)});
 }
 function updateLinkGeometry(link,nodeMap){
   const dom=edgeDomById.get(link&&link.id);if(!dom)return false;
@@ -867,7 +873,7 @@ function restoreEdgeRoute(link,snapshot){
 }
 function captureNodeDragRoutes(nodeIds){
   const ids=new Set(nodeIds.map(String)),nodeMap=getGraphIndex().nodeMap;
-  return state.links.filter(link=>(ids.has(String(link.from))||ids.has(String(link.to)))&&(normalizedEdgePoints(link.curveControls,2).length===2||normalizedEdgePoints(link.waypoints,12).length>0)).map(link=>{
+  return state.links.filter(link=>(ids.has(String(link.from))||ids.has(String(link.to)))&&(normalizedEdgePoints(link.curveControls,2).length===2||normalizedEdgePoints(link.waypoints).length>0)).map(link=>{
     const points=linkRenderPoints(link,nodeMap);if(!points)return null;
     return{link,route:{...edgeRouteSnapshot(link),start:{...points.a},end:{...points.b}}};
   }).filter(Boolean);
@@ -884,8 +890,8 @@ function applyNodeDragRoutes(records){
 function restoreNodeDragRoutes(records){for(const {link,route} of records)restoreEdgeRoute(link,route)}
 function persistDerivedEdgeRoute(link,geometry){
   if(!link||!geometry)return;
-  const usesWaypoints=geometry.style==='elbow'||geometry.controls[0]?.kind==='waypoint';
-  if(usesWaypoints&&!normalizedEdgePoints(link.waypoints,12).length)link.waypoints=geometry.controls.map(point=>({x:point.x,y:point.y}));
+  const usesWaypoints=geometry.style==='elbow'||Array.isArray(geometry.waypoints);
+  if(usesWaypoints&&!normalizedEdgePoints(link.waypoints).length)link.waypoints=(geometry.waypoints||geometry.controls).map(point=>({x:point.x,y:point.y}));
   if(!usesWaypoints&&geometry.style==='curve'&&normalizedEdgePoints(link.curveControls,2).length!==2)link.curveControls=geometry.curveControls.map(point=>({x:point.x,y:point.y}));
 }
 function translateEdgePoint(point,dx,dy){return{x:point.x+dx,y:point.y+dy}}
@@ -896,21 +902,34 @@ function selectEdgeForDirectManipulation(linkId,event){
 }
 function consumeSuppressedEdgeClick(id){if(String(id)===suppressEdgeClickId&&performance.now()<suppressEdgeClickUntil){suppressEdgeClickId='';suppressEdgeClickUntil=0;return true}return false}
 function beginEdgeMoveDrag(event,linkId){
+  if(event.altKey)return false;
   if(!graphModeAllows('edgeMove'))return false;
   if(isCanvasPanMode()||document.body.classList.contains('auth-readonly')||event.button!==0||event.ctrlKey||event.metaKey||event.shiftKey)return false;
   const link=linkById(linkId),dom=edgeDomById.get(String(linkId));if(!link||!dom?.geometry)return false;
   const historyController=beginGraphGestureHistory('移动关系线');if(!historyController)return false;
-  edgeMoveDrag={pointerId:event.pointerId,linkId:String(linkId),handle:event.currentTarget,startClient:{x:event.clientX,y:event.clientY},startWorld:screenToWorld(event.clientX,event.clientY),original:edgeRouteSnapshot(link),geometry:{style:dom.geometry.style,endpoints:dom.geometry.endpoints.map(point=>({...point})),controls:dom.geometry.controls.map(point=>({...point})),curveControls:dom.geometry.curveControls?.map(point=>({...point}))},historyController,moved:false,history:false};
+  edgeMoveDrag={pointerId:event.pointerId,linkId:String(linkId),handle:event.currentTarget,startClient:{x:event.clientX,y:event.clientY},startWorld:screenToWorld(event.clientX,event.clientY),original:edgeRouteSnapshot(link),geometry:{style:dom.geometry.style,endpoints:dom.geometry.endpoints.map(point=>({...point})),controls:dom.geometry.controls.map(point=>({...point})),curveControls:dom.geometry.curveControls?.map(point=>({...point})),waypoints:dom.geometry.waypoints?.map(point=>({...point}))},historyController,moved:false,history:false};
   try{event.currentTarget.setPointerCapture(event.pointerId)}catch(error){}event.stopPropagation();return true;
 }
 function applyEdgeMoveDragPoint(point){
   const drag=edgeMoveDrag;if(!drag)return;const link=linkById(drag.linkId),dom=edgeDomById.get(drag.linkId);if(!link||!dom)return;
   const dx=point.x-drag.startWorld.x,dy=point.y-drag.startWorld.y;if(!drag.moved&&Math.hypot(dx,dy)<5/Math.max(.01,state.viewport.scale))return;
   if(!drag.history){drag.historyController.checkpoint('移动关系线');drag.history=true;selectEdgeForDirectManipulation(drag.linkId,{clientX:drag.startClient.x,clientY:drag.startClient.y})}
-  drag.moved=true;const geometry=drag.geometry;setLinkFreeEndpoint(link,'from',translateEdgePoint(geometry.endpoints[0],dx,dy));setLinkFreeEndpoint(link,'to',translateEdgePoint(geometry.endpoints[1],dx,dy));
-  if(geometry.style==='elbow'||geometry.controls[0]?.kind==='waypoint'){link.waypoints=geometry.controls.map(point=>translateEdgePoint(point,dx,dy));delete link.curveControls}
-  else if(geometry.style==='curve'){link.curveControls=geometry.curveControls.map(point=>translateEdgePoint(point,dx,dy));delete link.waypoints}
-  else{delete link.waypoints;delete link.curveControls}
+  drag.moved=true;const geometry=drag.geometry;
+  if(link.from||link.to){
+    if(geometry.waypoints){
+      const index=window.KGGraphEdgeGeometry.nearestSegmentIndex(drag.startWorld,[geometry.endpoints[0],...geometry.waypoints,geometry.endpoints[1]]);
+      if(index>=0)link.waypoints=window.KGGraphEdgeGeometry.moveElbowSegment(geometry.endpoints[0],geometry.endpoints[1],geometry.waypoints,index,{x:dx,y:dy});
+      delete link.curveControls;
+    }else{
+      const start=geometry.endpoints[0],end=geometry.endpoints[1],controls=geometry.curveControls||[{x:start.x+(end.x-start.x)/3,y:start.y+(end.y-start.y)/3},{x:start.x+(end.x-start.x)*2/3,y:start.y+(end.y-start.y)*2/3}];
+      link.pathStyle='curve';link.curveControls=window.KGGraphEdgeGeometry.bendCurveMidpoint({start,end,curveControls:controls},{x:dx,y:dy}).curveControls;delete link.waypoints;
+    }
+  }else{
+    setLinkFreeEndpoint(link,'from',translateEdgePoint(geometry.endpoints[0],dx,dy));setLinkFreeEndpoint(link,'to',translateEdgePoint(geometry.endpoints[1],dx,dy));
+    if(geometry.waypoints){link.waypoints=geometry.waypoints.map(point=>translateEdgePoint(point,dx,dy));delete link.curveControls}
+    else if(geometry.style==='curve'){link.curveControls=geometry.curveControls.map(point=>translateEdgePoint(point,dx,dy));delete link.waypoints}
+    else{delete link.waypoints;delete link.curveControls}
+  }
   invalidateGraphIndexCache();updateLinkGeometry(link,getGraphIndex().nodeMap);stage.classList.add('graph-edge-moving','is-interacting');hideEdgeHoverFeedback();
 }
 function scheduleEdgeMoveDrag(event){
@@ -923,7 +942,7 @@ function finishEdgeMoveDrag(event,cancelled=false){
   if(edgeMoveDragFrame){cancelAnimationFrame(edgeMoveDragFrame);edgeMoveDragFrame=0}if(edgeMoveDragPoint&&!cancelled)applyEdgeMoveDragPoint(edgeMoveDragPoint);edgeMoveDragPoint=null;
   try{drag.handle?.releasePointerCapture?.(event.pointerId)}catch(error){}edgeMoveDrag=null;stage.classList.remove('graph-edge-moving','is-interacting');
   finishGraphGestureHistory(drag,cancelled||!drag.moved);
-  if(!cancelled&&drag.moved){suppressEdgeClickId=drag.linkId;suppressEdgeClickUntil=performance.now()+400;save();renderSelectedEdgeControls();renderSelectedEdgeQuickStylePanel();showStatus('关系线已独立移动，两个端点已解除节点绑定；可拖动端点重新绑定。')}else if(cancelled&&drag.moved)showStatus('已取消移动关系线。');
+  if(!cancelled&&drag.moved){suppressEdgeClickId=drag.linkId;suppressEdgeClickUntil=performance.now()+400;save();renderSelectedEdgeControls();renderSelectedEdgeQuickStylePanel();showStatus('关系线路径已更新；拖动端点手柄可解除或重新绑定节点。')}else if(cancelled&&drag.moved)showStatus('已取消移动关系线。');
   if(drag.moved){event.preventDefault();event.stopPropagation()}return drag.moved;
 }
 function clearEdgeEndpointBindTarget(){if(edgeEndpointBindTargetId)cardElementByNodeId(edgeEndpointBindTargetId)?.classList.remove('edge-endpoint-bind-target');edgeEndpointBindTargetId='';ensureGraphViewportController()?.syncControlScale()}
@@ -964,27 +983,34 @@ function createEdgeEndpointHandle(link,side,point){
   handle.addEventListener('pointerdown',event=>beginEdgeEndpointDrag(event,link.id,side));handle.addEventListener('pointermove',scheduleEdgeEndpointDrag);handle.addEventListener('pointerup',event=>finishEdgeEndpointDrag(event,false));handle.addEventListener('pointercancel',event=>finishEdgeEndpointDrag(event,true));return handle;
 }
 function beginEdgeControlDrag(event,linkId,kind,index){
+  if(event.altKey)return false;
   if(!graphModeAllows('edgeAdvanced'))return false;
   if(isCanvasPanMode()||document.body.classList.contains('auth-readonly')||event.button===2)return;
   const link=linkById(linkId),dom=edgeDomById.get(String(linkId));if(!link||!dom?.geometry)return;const original=edgeRouteSnapshot(link);
   const historyController=beginGraphGestureHistory('调整关系线路径');if(!historyController)return false;
   historyController.checkpoint('调整关系线路径');
-  if(kind==='waypoint'&&!normalizedEdgePoints(link.waypoints,12).length)link.waypoints=dom.geometry.controls.map(point=>({x:point.x,y:point.y}));
-  if(kind==='curve-control'&&normalizedEdgePoints(link.curveControls,2).length!==2)link.curveControls=dom.geometry.curveControls.map(point=>({x:point.x,y:point.y}));
-  edgeControlDrag={pointerId:event.pointerId,linkId:String(linkId),kind,index:Number(index)||0,handle:event.currentTarget,original,historyController,moved:false};stage.classList.add('graph-edge-control-dragging','is-interacting');
+  if(kind==='segment'&&!normalizedEdgePoints(link.waypoints).length)link.waypoints=dom.geometry.waypoints.map(point=>({x:point.x,y:point.y}));
+  if((kind==='curve-control'||kind==='curve-midpoint')&&normalizedEdgePoints(link.curveControls,2).length!==2)link.curveControls=dom.geometry.curveControls.map(point=>({x:point.x,y:point.y}));
+  edgeControlDrag={pointerId:event.pointerId,linkId:String(linkId),kind,index:Number(index)||0,handle:event.currentTarget,original,startWorld:screenToWorld(event.clientX,event.clientY),geometry:cloneGraphValue(dom.geometry),historyController,moved:false};stage.classList.add('graph-edge-control-dragging','is-interacting');
   try{event.currentTarget.setPointerCapture(event.pointerId)}catch(error){}
   event.preventDefault();event.stopPropagation();
 }
 function applyEdgeControlDragPoint(point){
   const drag=edgeControlDrag;if(!drag)return;const link=linkById(drag.linkId);if(!link)return;
+  if(drag.startWorld&&!drag.moved&&Math.hypot(point.x-drag.startWorld.x,point.y-drag.startWorld.y)<2/Math.max(.01,state.viewport.scale))return;
   drag.moved=true;
   if(drag.kind==='straight-bend'){
-    link.pathStyle='elbow';delete link.curveControls;drag.kind='waypoint';drag.index=0;if(drag.handle)drag.handle.dataset.edgeControlKind='waypoint';
-    // 直线拖出折点同样锁定方向：折点垂直于原直线方向滑动。
-    const base=linkRenderPoints(link,getGraphIndex().nodeMap);
-    link.waypoints=[window.KGGraphEdgeGeometry.constrainWaypointDrag(base?.a||{x:0,y:0},base?.b||{x:0,y:0},[point],0,point)];
+    const geometry=drag.geometry,a=geometry.endpoints[0],b=geometry.endpoints[1],horizontal=Math.abs(b.x-a.x)>=Math.abs(b.y-a.y);
+    link.pathStyle='elbow';delete link.curveControls;
+    link.waypoints=horizontal?[{x:a.x,y:point.y},{x:b.x,y:point.y}]:[{x:point.x,y:a.y},{x:point.x,y:b.y}];
+  }else if(drag.kind==='segment'){
+    const geometry=drag.geometry;
+    link.waypoints=window.KGGraphEdgeGeometry.moveElbowSegment(geometry.endpoints[0],geometry.endpoints[1],geometry.waypoints,drag.index,{x:point.x-drag.startWorld.x,y:point.y-drag.startWorld.y});
+  }else if(drag.kind==='curve-midpoint'){
+    const geometry=drag.geometry;
+    link.curveControls=window.KGGraphEdgeGeometry.bendCurveMidpoint({start:geometry.endpoints[0],end:geometry.endpoints[1],curveControls:geometry.curveControls},{x:point.x-drag.startWorld.x,y:point.y-drag.startWorld.y}).curveControls;
   }else if(drag.kind==='waypoint'){
-    const points=normalizedEdgePoints(link.waypoints,12);while(points.length<=drag.index)points.push({x:point.x,y:point.y});
+    const points=normalizedEdgePoints(link.waypoints);while(points.length<=drag.index)points.push({x:point.x,y:point.y});
     // 博思白板式方向锁定：折线路径点只允许沿水平或纵向单轴拖动。
     const current=linkRenderPoints(link,getGraphIndex().nodeMap);
     points[drag.index]=window.KGGraphEdgeGeometry.constrainWaypointDrag(current?.a||{x:0,y:0},current?.b||{x:0,y:0},points,drag.index,point);
@@ -994,6 +1020,10 @@ function applyEdgeControlDragPoint(point){
     if(current&&controls.length===2){const handles=window.KGGraphEdgeGeometry.curveHandles(current.a,controls,current.b);handles[drag.index]={x:point.x,y:point.y};link.curveControls=window.KGGraphEdgeGeometry.controlsFromHandles(current.a,handles,current.b)}
   }
   updateLinkGeometry(link,getGraphIndex().nodeMap);
+  if(drag.kind==='segment'&&drag.handle){
+    const geometry=drag.geometry,handle=window.KGGraphEdgeGeometry.segmentHandles(geometry.endpoints[0],geometry.waypoints,geometry.endpoints[1]).find(p=>p.index===drag.index);
+    if(handle){const axis=handle.axis;drag.handle.setAttribute('transform',`translate(${handle.x+(axis==='x'?point.x-drag.startWorld.x:0)} ${handle.y+(axis==='y'?point.y-drag.startWorld.y:0)})`)}
+  }
 }
 function scheduleEdgeControlDrag(event){
   if(!edgeControlDrag||edgeControlDrag.pointerId!==event.pointerId)return;edgeControlDragPoint=screenToWorld(event.clientX,event.clientY);
@@ -1010,6 +1040,7 @@ function finishEdgeControlDrag(event,cancelled=false){
 }
 function createEdgeControlHandle(link,point){
   const handle=svgElement('g','edge-control-handle');handle.dataset.linkId=String(link.id);handle.dataset.edgeControlKind=point.kind;handle.dataset.edgeControlIndex=String(point.index);handle.setAttribute('transform',`translate(${point.x} ${point.y})`);
+  if(point.kind==='curve-midpoint')handle.classList.add('edge-control-primary');handle.setAttribute('aria-label',point.kind==='segment'?'拖动折线段':point.kind==='curve-midpoint'?'拖动曲线中点':'调整曲线');
   handle.appendChild(svgElement('circle','edge-control-hit'));handle.appendChild(svgElement('circle','edge-control-dot'));
   handle.addEventListener('pointerdown',event=>beginEdgeControlDrag(event,link.id,handle.dataset.edgeControlKind,Number(handle.dataset.edgeControlIndex)));
   handle.addEventListener('pointermove',scheduleEdgeControlDrag);handle.addEventListener('pointerup',event=>finishEdgeControlDrag(event,false));handle.addEventListener('pointercancel',event=>finishEdgeControlDrag(event,true));
@@ -1071,8 +1102,8 @@ function selectedEdgeQuickScreenPoint(){
   const links=selectedEditableLinks();if(!links.length)return null;
   if(links.length===1){
     const geometry=edgeDomById.get(String(links[0].id))?.geometry;
-    if(geometry?.style==='curve'&&geometry.controls.length===2&&geometry.controls[0].kind==='curve-control'){
-      const handles=geometry.controls.map(point=>({x:point.x*state.viewport.scale+state.viewport.x,y:point.y*state.viewport.scale+state.viewport.y}));
+    if(geometry?.style==='curve'&&geometry.curveControls?.length===2){
+      const handles=geometry.controls.filter(point=>point.kind==='curve-control').map(point=>({x:point.x*state.viewport.scale+state.viewport.x,y:point.y*state.viewport.scale+state.viewport.y}));
       const top=Math.min(handles[0].y,handles[1].y),bottom=Math.max(handles[0].y,handles[1].y);
       return{x:(handles[0].x+handles[1].x)/2,y:top>80?top-24:bottom+80,link:links[0]};
     }
@@ -1330,7 +1361,7 @@ function renderEdges(){
     g.appendChild(hit);g.appendChild(vis);const label=null;nextEdgeDom.set(String(link.id),{g,hit,vis,label,link,overlay:null,geometry:null});baseFrag.appendChild(g);
   }
   edgeDomById=nextEdgeDom;for(const link of state.links){if(edgeDomById.has(String(link.id)))updateLinkGeometry(link,nodeMap)}
-  edgeBaseLayer.appendChild(baseFrag);edgeGroup.replaceChildren(edgeHoverLayer,edgeBaseLayer,edgeFeedbackLayer,edgeControlLayer);edgeSelectionPaintedIds=new Set();refreshEdgeSelectionClasses({renderPanel:false});updateSelectedEdgeControlScale();
+  edgeBaseLayer.appendChild(baseFrag);edgeGroup.replaceChildren(edgeHoverLayer,edgeBaseLayer,edgeFeedbackLayer);ensureEdgeControlsSurface().replaceChildren(edgeControlLayer);edgeSelectionPaintedIds=new Set();refreshEdgeSelectionClasses({renderPanel:false});updateSelectedEdgeControlScale();
 }
 let edgeRenderPending=false,edgeGeometryRenderPending=false,pendingEdgeNodeIds=new Set(),homeEdgeDragPerformanceController=null;
 function requestEdgeRender(){if(edgeRenderPending)return;edgeRenderPending=true;requestAnimationFrame(()=>{edgeRenderPending=false;renderEdges()})}
@@ -1434,7 +1465,7 @@ function ensureGraphHistoryController(){
   if(graphKernelControllers.history)return graphKernelControllers.history;
   const factory=window.KGGraphHistoryController;
   if(!factory||typeof factory.create!=='function')return null;
-  graphKernelControllers.history=factory.create({limit:GRAPH_UNDO_LIMIT,capture:graphUndoSnapshot,restore:applyGraphHistorySnapshot,onChange:()=>window.KGHomeInk?.refreshControls?.()});
+  graphKernelControllers.history=factory.create({limit:GRAPH_UNDO_LIMIT,capture:graphUndoSnapshot,restore:applyGraphHistorySnapshot,onChange:()=>{window.KGHomeInk?.refreshControls?.();document.querySelectorAll('[data-mindmap-controls]').forEach(panel=>panel.refresh?.())}});
   return graphKernelControllers.history;
 }
 function resetGraphHistory(){window.KGHomeInk?.reset?.();const history=ensureGraphHistoryController();history?.clear?.();return true}
@@ -3484,6 +3515,15 @@ function activateLinkSource(id){
   showStatus(`“${n.title}”已设为连线起点，请单击另一个知识点建立关系。`);
   refreshSelectionUI();
 }
+function cycleOverlappingEdgeAtPointer(event){
+  if(!event.altKey||!graphModeAllows('edgeSelect')||event.target.closest?.('.uc-floating-toolbar,[data-stage-ui]'))return false;
+  const point=screenToWorld(event.clientX,event.clientY),tolerance=8/Math.max(.01,state.viewport.scale),ids=[];
+  edgeDomById.forEach((dom,id)=>{if(window.KGGraphEdgeGeometry.distanceToPolyline(point,dom.geometry?.samples||[])<=tolerance)ids.push(String(id))});
+  if(ids.length<2)return false;
+  const index=ids.indexOf(String(state.selectedLinkId)),id=ids[(index+1)%ids.length];selectLink(id,event);
+  showStatus(`已选择重叠关系线 ${ids.indexOf(id)+1}/${ids.length}；Alt + 单击切换。`);event.preventDefault();event.stopPropagation();event.stopImmediatePropagation();return true;
+}
+stage.addEventListener('click',cycleOverlappingEdgeAtPointer,true);
 function selectLink(id,event=null){
   if(!graphModeAllows('edgeSelect'))return false;
   window.KGHomeCanvasRuntime?.selectionFilter?.clear?.({reason:'direct-edge',apply:false});
@@ -4139,7 +4179,7 @@ requestAnimationFrame(()=>requestAnimationFrame(()=>recoverMobileGraphViewport()
 $('nodeModal').addEventListener('click',e=>{if(e.target===$('nodeModal'))closeNodeModal({discardNew:true})});
 ['linkModal','graphModal','templateModal','flashcardModal'].forEach(id=>{$(id).addEventListener('click',e=>{if(e.target===$(id))$(id).classList.remove('show')})});
 
-document.addEventListener('keydown',e=>{if(e.key!=='Escape'||e.defaultPrevented||isTextEditingTarget(e))return;window.KGHomeCanvasRuntime?.selectionFilter?.clear?.({reason:'escape',apply:false});window.KGHomeCanvasRuntime?.alignment?.end?.();const resize=graphKernelControllers.resize;if(resize&&resize.isActive()){e.preventDefault();resize.cancel();return}if(nodeContextMenuController&&nodeContextMenuController.isVisible()){e.preventDefault();nodeContextMenuController.hide();return}if(nodeFreeResizeModeId){e.preventDefault();exitNodeFreeResizeMode({message:true});return}if(relatedCanvasModalEl){e.preventDefault();closeRelatedCanvasModal(true);return}if(nodeFloatingColorWindowController&&nodeFloatingColorWindowController.isOpen()){e.preventDefault();nodeFloatingColorWindowController.close({cancel:true,force:true,reason:'escape'});return}if(nodeStyleToolbarController&&nodeStyleToolbarController.isVisible()){e.preventDefault();nodeStyleToolbarController.hide()}});
+document.addEventListener('keydown',e=>{if(e.key!=='Escape'||e.defaultPrevented||isTextEditingTarget(e))return;if(edgeControlDrag||edgeEndpointDrag||edgeMoveDrag){const drag=edgeControlDrag||edgeEndpointDrag||edgeMoveDrag;const event={pointerId:drag.pointerId,preventDefault(){},stopPropagation(){}};if(edgeControlDrag)finishEdgeControlDrag(event,true);else if(edgeEndpointDrag)finishEdgeEndpointDrag(event,true);else finishEdgeMoveDrag(event,true);e.preventDefault();e.stopPropagation();return;}window.KGHomeCanvasRuntime?.selectionFilter?.clear?.({reason:'escape',apply:false});window.KGHomeCanvasRuntime?.alignment?.end?.();const resize=graphKernelControllers.resize;if(resize&&resize.isActive()){e.preventDefault();resize.cancel();return}if(nodeContextMenuController&&nodeContextMenuController.isVisible()){e.preventDefault();nodeContextMenuController.hide();return}if(nodeFreeResizeModeId){e.preventDefault();exitNodeFreeResizeMode({message:true});return}if(relatedCanvasModalEl){e.preventDefault();closeRelatedCanvasModal(true);return}if(nodeFloatingColorWindowController&&nodeFloatingColorWindowController.isOpen()){e.preventDefault();nodeFloatingColorWindowController.close({cancel:true,force:true,reason:'escape'});return}if(nodeStyleToolbarController&&nodeStyleToolbarController.isVisible()){e.preventDefault();nodeStyleToolbarController.hide()}});
 
 function applyMindmapLayout(options={}){
   if(!canWriteGraph())throw new Error('当前不能编辑图谱');
@@ -4157,8 +4197,8 @@ function openMindmapControls(){
   if(!canWriteGraph())return false;
   closeMindmapControls();
   const host=document.createElement('section');host.dataset.formalMindmapPanel='true';host.dataset.stageUi='true';host.className='kg-mindmap-panel';
-  const close=document.createElement('button');close.textContent='关闭布局与主题';close.className='kg-mindmap-panel-close';close.onclick=closeMindmapControls;host.append(close);
-  window.KGGraphMindmapThemes.controls(host,{getGraph:()=>state,getSelectedIds:()=>[...new Set([...selectedNodeIds,state.selectedNodeId].filter(Boolean))],runLayout:applyMindmapLayout,runTheme:applyMindmapTheme});
+  const close=document.createElement('button');close.textContent='×';close.setAttribute('aria-label','关闭布局与主题');close.className='kg-mindmap-panel-close';close.onclick=closeMindmapControls;host.append(close);
+  window.KGGraphMindmapThemes.controls(host,{getGraph:()=>state,getSelectedIds:()=>[...new Set([...selectedNodeIds,state.selectedNodeId].filter(Boolean))],runLayout:applyMindmapLayout,runTheme:applyMindmapTheme,runUndo:()=>restoreGraphUndoSnapshot()});
   const unmount=window.KGCanvasDomInteraction.mountOverlay(host);formalMindmapCleanup=()=>{unmount();host.remove()};return true;
 }
 

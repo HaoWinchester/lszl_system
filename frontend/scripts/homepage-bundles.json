@@ -133,6 +133,7 @@
         "src/119-question-analysis.js",
         "src/graph/question-drawer-controller.js",
         "src/graph/question-batch-controller.js",
+        "src/graph/template-preview.js",
         "src/graph/template-center-controller.js",
         "src/10-graph-editor.js",
         "src/19-home-toolbar-registry.js",

@@ -42,6 +42,21 @@ def main():
         # 临时编辑表单已按需求移除；顶部画笔按钮开关局部画笔（笔迹不持久化，关闭即丢弃）。
         assert page.locator('.related-canvas-backdrop form').count()==0
         page.locator('[data-action="ink"]').click();expect(page.locator('.related-canvas-backdrop .canvas-ink-toolbar')).to_be_visible()
+        # Drawing also works on viewport blanks outside the translated stage.
+        vp=page.locator('.related-canvas-viewport');v=vp.bounding_box()
+        blank=page.evaluate('''()=>{const vp=document.querySelector('.related-canvas-viewport'),r=vp.getBoundingClientRect();for(let y=r.top+2;y<r.bottom-2;y+=10)for(let x=r.left+2;x<r.right-2;x+=10)if(document.elementFromPoint(x,y)===vp)return {x,y};return null}''')
+        assert blank,'test must exercise actual viewport blank space'
+        page.mouse.move(blank['x'],blank['y']);page.mouse.down();page.mouse.move(blank['x']+35,blank['y']+15,steps=5);page.mouse.up()
+        expect(page.locator('.related-canvas-backdrop .canvas-ink-layer path')).to_have_count(1)
+        local=page.locator('.related-canvas-backdrop .canvas-ink-toolbar')
+        local.get_by_role('button',name='文字',exact=True).click();page.mouse.click(blank['x'],blank['y']+35)
+        editor=page.get_by_role('textbox',name='画布文字内容');expect(editor).to_be_visible();editor.fill('临时空白文字');editor.press('Control+Enter');expect(editor).to_have_count(0)
+        expect(page.locator('.related-canvas-backdrop .canvas-ink-layer text')).to_contain_text('临时空白文字')
+        local.get_by_role('button',name='画笔',exact=True).click()
+        page.mouse.click(blank['x'],blank['y'],button='right');page.wait_for_timeout(100);page.mouse.click(blank['x'],blank['y'],button='right')
+        expect(local.locator('[data-ink-tool=select]')).to_have_attribute('aria-pressed','true')
+        local.get_by_role('button',name='关闭画笔工具',exact=True).click();expect(local).to_be_hidden()
+        page.locator('[data-action="ink"]').click();expect(local).to_be_visible()
         page.locator('[data-action="ink"]').click();expect(page.locator('.related-canvas-backdrop .canvas-ink-toolbar')).to_be_hidden()
         page.locator('[data-action="ink"]').click()
         page.keyboard.press('Escape')  # 画笔激活时 ESC 先退出绘画而不是关闭弹层
@@ -72,6 +87,11 @@ def main():
         open_selected(['a']);assert page.locator('.related-canvas-card').count()==2;page.locator('[data-action="close"]').click()
         open_selected(['isolated']);assert page.locator('.related-canvas-card').count()==1;expect(page.locator('.related-canvas-empty')).to_contain_text('没有一跳关联')
         page.locator('[data-action="close"]').click()
+        page.evaluate('KGHomeInteractionModes.setMode("reading")');open_selected(['a'])
+        assert page.locator('.related-canvas-backdrop [data-action="ink"]').count()==0
+        assert page.locator('.related-canvas-backdrop .canvas-ink-layer').count()==0
+        assert not writes,writes
+        page.locator('[data-action="close"]').click();page.evaluate('KGHomeInteractionModes.setMode("professional")')
         page.set_viewport_size({'width':390,'height':844});page.wait_for_timeout(200);page.evaluate('recoverMobileGraphViewport()');page.wait_for_function('!fitViewAnimationFrame&&!graphSmoothZoomFrame')
         mobile_before=page.evaluate('JSON.stringify(saveableState())')
         open_selected(['a']);expect(page.locator('.related-canvas-detail')).to_contain_text('把它看成总控台')

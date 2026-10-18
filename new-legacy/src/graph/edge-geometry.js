@@ -1,6 +1,7 @@
 'use strict';
 
 (function(global){
+  const MAX_WAYPOINTS=64;
   const point=(x,y)=>({x,y});
   function curvePoint(start,end,controls,t){
     const u=1-t,a=u*u*u,b=3*u*u*t,c=3*u*t*t,d=t*t*t;
@@ -8,6 +9,38 @@
       a*start.y+b*controls[0].y+c*controls[1].y+d*end.y);
   }
   function curveHandles(start,controls,end){return[curvePoint(start,end,controls,1/3),curvePoint(start,end,controls,2/3)]}
+  function curveMidpoint(start,controls,end){return curvePoint(start,end,controls,.5)}
+  function bendCurveMidpoint(route,delta){
+    // Both cubic controls contribute 3/8 at t=.5. Keep card attachments fixed.
+    return {...route,curveControls:route.curveControls.map(p=>point(p.x+delta.x*4/3,p.y+delta.y*4/3))};
+  }
+  function segmentHandles(start,waypoints,end){
+    const route=[start,...waypoints,end],result=[];
+    for(let index=0;index<route.length-1;index++){
+      const a=route[index],b=route[index+1];if(Math.hypot(b.x-a.x,b.y-a.y)<.001)continue;
+      result.push({kind:'segment',index,x:(a.x+b.x)/2,y:(a.y+b.y)/2,axis:Math.abs(b.x-a.x)>=Math.abs(b.y-a.y)?'y':'x'});
+    }
+    return result;
+  }
+  function moveElbowSegment(start,end,waypoints,index,delta){
+    const route=[start,...waypoints,end].map(p=>({...p}));
+    if(index<0||index>=route.length-1)return waypoints.map(p=>({...p}));
+    const a=route[index],b=route[index+1],axis=Math.abs(b.x-a.x)>=Math.abs(b.y-a.y)?'y':'x',offset=Number(delta[axis])||0;
+    if(!offset)return waypoints.map(p=>({...p}));
+    const movedA={...a,[axis]:a[axis]+offset},movedB={...b,[axis]:b[axis]+offset};
+    // Endpoints stay on their cards; an outer segment gains a short orthogonal leg.
+    if(index===0)route.splice(1,1,movedA,movedB);
+    else if(index===route.length-2)route.splice(index,1,movedA,movedB);
+    else{route[index]=movedA;route[index+1]=movedB}
+    // Remove only redundant forward corners, preserving intentional backtracks.
+    for(let i=1;i<route.length-1;){
+      const p=route[i-1],q=route[i],r=route[i+1],ax=q.x-p.x,ay=q.y-p.y,bx=r.x-q.x,by=r.y-q.y;
+      if((ax===0&&bx===0||ay===0&&by===0)&&ax*bx+ay*by>=0)route.splice(i,1);else i++;
+    }
+    const result=route.slice(1,-1);
+    // A bounded editable route must stay whole; dropping its tail creates diagonals.
+    return result.length<=MAX_WAYPOINTS?result:waypoints.map(p=>({...p}));
+  }
   function controlsFromHandles(start,handles,end){
     // At t=1/3 and 2/3, the two unknown controls have coefficients
     // [4/9, 2/9] and [2/9, 4/9]. Invert that fixed 2x2 system.
@@ -43,6 +76,24 @@
     if(route.toPoint)result.toPoint=point(route.toPoint.x+deltaB.x,route.toPoint.y+deltaB.y);
     return result;
   }
+  function distanceToPolyline(p,points){
+    let best=Infinity;
+    for(let i=1;i<points.length;i++){
+      const a=points[i-1],b=points[i],dx=b.x-a.x,dy=b.y-a.y,length=dx*dx+dy*dy;
+      const t=length?Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/length)):0;
+      best=Math.min(best,Math.hypot(p.x-a.x-t*dx,p.y-a.y-t*dy));
+    }
+    return best;
+  }
+  function nearestSegmentIndex(p,points){
+    let best=Infinity,index=-1;
+    for(let i=0;i<points.length-1;i++){
+      if(points[i].x===points[i+1].x&&points[i].y===points[i+1].y)continue;
+      const distance=distanceToPolyline(p,[points[i],points[i+1]]);
+      if(distance<best){best=distance;index=i}
+    }
+    return index;
+  }
   function portDirection(port){
     switch(port){case 'top':return point(0,-1);case 'right':return point(1,0);case 'bottom':return point(0,1);case 'left':return point(-1,0);default:return null}
   }
@@ -71,7 +122,7 @@
       ?point(center.x+Math.sign(ray.x||1)*width/2,center.y)
       :point(center.x,center.y+Math.sign(ray.y||1)*height/2);
   }
-  const api=Object.freeze({curveHandles,controlsFromHandles,constrainWaypointDrag,moveRoute,portPoint,portDirection});
+  const api=Object.freeze({MAX_WAYPOINTS,distanceToPolyline,nearestSegmentIndex,curveMidpoint,bendCurveMidpoint,segmentHandles,moveElbowSegment,curveHandles,controlsFromHandles,constrainWaypointDrag,moveRoute,portPoint,portDirection});
   global.KGGraphEdgeGeometry=api;
   if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);

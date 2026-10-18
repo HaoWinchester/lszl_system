@@ -15,8 +15,8 @@ const screenshotSources = read('assets/landing/SOURCES.md');
 const contract = JSON.parse(fs.readFileSync(CONTRACT, 'utf8'));
 
 assert.match(html, /<html[^>]*lang="zh-CN"[^>]*class="landing-page"/);
-assert.match(html, /<title>知识图谱备考平台｜刷题 · 错题归纳 · 主动回忆<\/title>/);
-assert.match(html, /<meta property="og:title" content="知识图谱备考平台｜刷题 · 错题归纳 · 主动回忆"/);
+assert.match(html, /<title>个人学习工具｜知识图谱与主动回忆<\/title>/);
+assert.match(html, /<meta property="og:title" content="个人学习工具｜知识图谱与主动回忆"/);
 assert.match(html, /<link rel="canonical" href="https:\/\/lszl\.aihuanpu\.com\/"/);
 assert.match(html, /<link rel="icon" href="data:image\/svg\+xml,/);
 assert.match(html, /<h1[^>]*>[\s\S]*把零散知识点[\s\S]*会生长的图谱[\s\S]*<\/h1>/);

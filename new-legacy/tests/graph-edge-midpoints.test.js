@@ -38,7 +38,7 @@ assert.deepEqual(plain(siblings),[{x:160,y:40},{x:160,y:40},{x:160,y:40}]);
 const stored=[{x:250,y:-100},{x:400,y:250}];
 const storedCurve=context.linkPathGeometry({pathStyle:'curve',curveControls:stored},p.a,p.b,p);
 assert.deepEqual(plain(storedCurve.curveControls),stored,'retain underlying cubic controls');
-assert.deepEqual(plain(storedCurve.controls.map(({x,y})=>({x,y}))),plain([storedCurve.samples[8],storedCurve.samples[16]]),'visible handles must lie on the cubic path');
+assert.deepEqual(plain(storedCurve.controls.filter(p=>p.kind==='curve-control').map(({x,y})=>({x,y}))),plain([storedCurve.samples[8],storedCurve.samples[16]]),'visible handles must lie on the cubic path');
 const free=context.linkRenderPoints({fromPoint:{x:7,y:8},toPoint:{x:30,y:40}});
 assert.deepEqual(plain([free.a,free.b]),[{x:7,y:8},{x:30,y:40}]);
 assert.equal(context.linkRenderPoints({from:'missing',to:'b'}),null);
@@ -66,7 +66,7 @@ for(const [first,second] of [
   const manual=[{x:-20,y:-40},{x:30,y:15}];
   const curved=context.linkPathGeometry({pathStyle:'curve',curveControls:manual},points.a,points.b,points);
   assert.deepEqual(plain(curved.curveControls),manual);
-  assert.deepEqual(plain(curved.controls.map(({x,y})=>({x,y}))),plain([curved.samples[8],curved.samples[16]]));
+  assert.deepEqual(plain(curved.controls.filter(p=>p.kind==='curve-control').map(({x,y})=>({x,y}))),plain([curved.samples[8],curved.samples[16]]));
   assert.deepEqual(plain(context.linkPathGeometry({pathStyle:'elbow',waypoints:manual},points.a,points.b,points).samples),plain([points.a,...manual,points.b]));
   assert.equal(context.linkPathGeometry({pathStyle:'straight'},points.a,points.b,points).samples.length,2,'explicit straight style remains one direct segment');
 }
@@ -97,6 +97,8 @@ Object.assign(context,{
   getGraphIndex:()=>({nodeMap:nodes}),stage:{classList:{add(){}}},hideEdgeHoverFeedback(){},
   updateLinkGeometry(link){const p=context.linkRenderPoints(link);context.movedGeometry=context.linkPathGeometry(link,p.a,p.b,p)}
 });
+// A free line retains whole-route translation; bound body dragging is covered in graph-feedback.test.js.
+routeLink.from='';routeLink.to='';routeLink.fromPoint={...routePoints.a};routeLink.toPoint={...routePoints.b};
 context.applyEdgeMoveDragPoint({x:30,y:-15});
 assert.equal(routeLink.from,'');assert.equal(routeLink.to,'');assert.equal(routeLink.waypoints.length,4);
 assert.equal(routeLink.curveControls,undefined);
@@ -109,7 +111,7 @@ context.edgeControlDrag={linkId:'detour',kind:'waypoint',index:2};
 context.applyEdgeControlDragPoint({x:350,y:130});
 // 博思白板式方向锁定：垂直中间段上的路径点只允许水平拖动（y 锁定在原值 110）。
 assert.deepEqual(plain(routeLink.waypoints[2]),{x:350,y:110});
-assert.equal(context.movedGeometry.controls.length,4,'manual corner drag retains all four controls');
+assert.equal(context.movedGeometry.waypoints.length,4,'manual corner drag retains all four controls');
 context.restoreEdgeRoute(routeLink,original);
 assert.equal(context.linkPathGeometry(routeLink,routePoints.a,routePoints.b,routePoints).d,routeGeometry.d,'cancel/restore retains original smooth geometry');
 // A real two-node group move must translate stored cubic controls without detaching either end.

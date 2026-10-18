@@ -185,3 +185,11 @@
   background:#facc15!important;
   padding:max(2px,var(--node-border-width,1px));
 }
+
+.edge-control-primary .edge-control-dot{fill:#2196f3;stroke:#fff}
+/* World alone owns the temporary zoom layer; nested card/SVG layers otherwise
+   retain a second raster scale and make text soft after a wheel gesture. */
+.stage.viewport-smooth-zooming .edge-layer,
+.stage.viewport-smooth-zooming .cards-layer{will-change:auto}
+/* Selected handles sit above cards; base strokes stay below cards. */
+.edge-controls-surface{position:absolute;left:-50000px;top:-50000px;width:100000px;height:100000px;overflow:visible;z-index:3;pointer-events:none}

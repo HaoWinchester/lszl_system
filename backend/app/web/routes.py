@@ -135,8 +135,8 @@ async def guided_learning_placement_page_alias():
 
 
 @router.get("/graph")
-async def graph_alias(request: Request):
-    return _redirect(request, "index.html", {"mode": "free"})
+async def graph_alias(request: Request, db: DB) -> Response:
+    return await active_asset("index.html", request, db)
 
 
 @router.get("/training")

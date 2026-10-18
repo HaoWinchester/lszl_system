@@ -17,7 +17,7 @@ def body_html():
 # ---------------------------------------------------------------------------
 # Task 6：折叠单实例答题卡与退出弹窗纵向等宽布局。
 #   * 答题卡默认关闭；唯一入口 #practiceAnswerSheetMobileBtn 全宽度可见；
-#   * 桌面（>=1024px）右上入口开右侧抽屉；窄屏开底部圆角抽屉；
+#   * 桌面浅色圆形悬浮入口开右侧抽屉；窄屏开底部圆角抽屉；
 #   * 题号切题 / 关闭按钮 / 遮罩 / Escape 后抽屉关闭且焦点回到入口；
 #   * 反复开关不产生第二实例；
 #   * 1280/1024/768/390px 下 #practiceExitConfirm 三按钮纵向等宽、不越界、不重叠。
@@ -228,7 +228,7 @@ with sync_playwright() as playwright:
           };
         }"""
     )
-    for stylesheet in ["styles/main.css", "styles/practice-mode.css"]:
+    for stylesheet in ["styles/main.css", "styles/practice-mode.css", "styles/focus-vega-typography.css", "styles/learning-skin.css", "styles/answer-page.css"]:
         page.add_style_tag(content=(ROOT / stylesheet).read_text(encoding="utf-8"))
     for script in ["src/111-practice-session-core.js", "src/115-practice-mode-policy.js", "src/112-practice-answer-sheet.js", "src/113-practice-result-report.js", "src/116-practice-session-save.js", "src/117-question-answer-set.js", "src/114-practice-draft-state.js", "src/118-revenge-entry-policy.js", "src/100-practice-mode.js"]:
         page.add_script_tag(content=(ROOT / script).read_text(encoding="utf-8"))
@@ -281,6 +281,26 @@ with sync_playwright() as playwright:
     assert page.locator("#practicePreviousWrongToggle").is_hidden()
     assert page.locator("#practicePreviousWrongAnswer").is_hidden()
     assert_question_progress(page, 1, 10)
+    for viewport_width in (1440, 1024, 768, 390):
+        page.set_viewport_size({"width": viewport_width, "height": 900})
+        page.locator('#practiceNextBtn').scroll_into_view_if_needed()
+        geometry = page.locator('#practiceAnswerSheetMobileBtn').evaluate("""el=>{
+          const r=el.getBoundingClientRect(),s=getComputedStyle(el),n=document.querySelector('#practiceNextBtn').getBoundingClientRect();
+          return {width:r.width,height:r.height,right:r.right,bottom:r.bottom,position:s.position,radius:parseFloat(s.borderRadius),overlap:r.left<n.right&&r.right>n.left&&r.top<n.bottom&&r.bottom>n.top};
+        }""")
+        assert geometry['position']=='fixed', geometry
+        assert abs(geometry['width']-geometry['height'])<1, geometry
+        assert geometry['radius']>=geometry['width']/2, geometry
+        assert geometry['right']<=viewport_width and geometry['bottom']<=900, geometry
+        assert not geometry['overlap'], geometry
+        assert page.locator('#practiceNextUnansweredBtn').evaluate('el=>el.scrollHeight<=el.clientHeight+1'), 'unanswered navigation text must fit'
+        output=ROOT.parent/'artifacts/learning-tool-feedback/answer';output.mkdir(parents=True,exist_ok=True)
+        page.screenshot(path=str(output/f'answer-{viewport_width}.png'))
+        assert_sheet_closed(page)
+        open_sheet(page)
+        close_via(page, 'escape')
+    page.set_viewport_size({"width":1280,"height":900})
+
 
     # 隐藏的兼容 DOM 也必须遵守模式策略，不能绕过入口提前交卷。
     before_complete = names(page).count('complete')
@@ -297,20 +317,9 @@ with sync_playwright() as playwright:
     question_card_box = page.locator("#practiceQuestionCard").bounding_box()
     game_box = page.locator("#practiceGame").bounding_box()
     assert question_card_box["width"] <= game_box["width"] + 0.5, (question_card_box, game_box)
-    sheet_gutter = (game_box["x"] + game_box["width"]) - (question_card_box["x"] + question_card_box["width"])
-    assert abs(sheet_gutter) < 1.0, (sheet_gutter, question_card_box, game_box)
-
-    # 桌面 1280px：开关与语言切换同一行（topbar 单行、无换行）且位于最右
-    # topbar 为 align-items:center 的单行 grid，按钮高度不同（34/26），用垂直中心判断是否同排
-    toggle_box = page.locator("#practiceAnswerSheetMobileBtn").bounding_box()
-    language_box = page.locator("#practiceLanguageCycle").bounding_box()
-    toggle_center_y = toggle_box["y"] + toggle_box["height"] / 2
-    language_center_y = language_box["y"] + language_box["height"] / 2
-    assert abs(toggle_center_y - language_center_y) <= 2.0, (toggle_box, language_box)
-    assert toggle_box["x"] >= language_box["x"], (toggle_box, language_box)
-    assert toggle_box["x"] + toggle_box["width"] >= language_box["x"] + language_box["width"] - 1.0, (
-        toggle_box, language_box,
-    )
+    # Readable question column uses normal page margins, not a permanently reserved drawer.
+    assert question_card_box['width'] >= min(1000, game_box['width']-150), (question_card_box, game_box)
+    assert page.locator('#practiceAnswerSheetMobileBtn').evaluate("el=>!el.closest('.practice-game-topbar')")
 
     # 桌面右上入口打开右侧抽屉；反复开关不出现第二实例
     open_sheet(page)
@@ -543,7 +552,7 @@ with sync_playwright() as playwright:
     assert page.evaluate('KGPracticeMode.snapshot().questionCount') == 1
     submit_note = page.locator('.practice-revenge-submit-note')
     assert submit_note.is_visible()
-    assert '右上角“答题卡”' in submit_note.inner_text() and '交卷' in submit_note.inner_text()
+    assert '悬浮“答题卡”' in submit_note.inner_text() and '交卷' in submit_note.inner_text()
     page.locator('#practiceExitBtn').click()
     page.locator('#practiceAbandonBtn').click()
     page.wait_for_timeout(120)

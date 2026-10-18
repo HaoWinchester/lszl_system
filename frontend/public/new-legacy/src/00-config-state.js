@@ -230,7 +230,7 @@ function sanitizeState(data={}){
     if(l.mindmapTheme)clean.mindmapTheme=JSON.parse(JSON.stringify(l.mindmapTheme));
     if(Array.isArray(l.manualAppearanceFields))clean.manualAppearanceFields=l.manualAppearanceFields.filter(k=>['color','lineStyle','strokeWidth'].includes(k));
     if(!from)clean.fromPoint=fromPoint;if(!to)clean.toPoint=toPoint;
-    const waypoints=pointList(l.waypoints,12),curveControls=pointList(l.curveControls,2);if(waypoints.length)clean.waypoints=waypoints;if(curveControls.length===2)clean.curveControls=curveControls;return clean;
+    const waypoints=pointList(l.waypoints,window.KGGraphEdgeGeometry.MAX_WAYPOINTS),curveControls=pointList(l.curveControls,2);if(waypoints.length)clean.waypoints=waypoints;if(curveControls.length===2)clean.curveControls=curveControls;return clean;
   }).filter(Boolean);
   const elementIds=new Set();
   s.elements=(Array.isArray(input.elements)?input.elements:[]).slice(0,1500).map(item=>{

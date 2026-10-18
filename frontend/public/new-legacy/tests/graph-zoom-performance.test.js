@@ -47,3 +47,16 @@ test('endpoint binding targets and live marquee update their scale without waiti
   vm.runInContext('refreshBoxSelectionElementClasses(new Set(),new Set())',context);
   assert(classes.has('multi-selected'));assert(syncs>0,'live marquee must immediately receive current scale');
 });
+
+test('translation frames reuse selected chrome and do not query or rewrite unchanged control scales',()=>{
+ let queries=0,writes=0;
+ const selected={style:{setProperty(){writes++},removeProperty(){}}};
+ const world={style:{},querySelectorAll(){queries++;return[selected]}};
+ const context={window:{}};vm.createContext(context);vm.runInContext(read('src/graph/viewport-controller.js'),context);
+ const controller=context.window.KGGraphViewportController.create({world});
+ controller.apply({x:0,y:0,scale:1});
+ for(let i=0;i<40;i++)controller.apply({x:i,y:i,scale:1});
+ assert.equal(queries,1);assert.equal(writes,1);
+ controller.apply({x:40,y:40,scale:2});assert.equal(queries,1);assert.equal(writes,2);
+ controller.syncControlScale(2);assert.equal(queries,2,'selection refresh explicitly discovers new targets');
+});

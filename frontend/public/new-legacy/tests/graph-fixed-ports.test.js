@@ -37,6 +37,16 @@ test('sanitizer and storage hydrate roundtrip preserve fixed ports and normalize
     assert.deepEqual(plain(c.sanitizeState(JSON.parse(JSON.stringify(stored))).links),plain(clean.links));
   }
 });
+
+test('an outer-segment route retains every corner through sanitizing and storage reload',()=>{
+  const {c}=environment(),start={x:0,y:0},end={x:70,y:60};
+  const before=Array.from({length:12},(_,i)=>({x:Math.ceil((i+1)/2)*10,y:Math.floor((i+1)/2)*10}));
+  const moved=geometry.moveElbowSegment(start,end,before,0,{x:0,y:-10});
+  const raw={nodes:[{id:'a'},{id:'b'}],links:[{id:'long',from:'a',to:'b',pathStyle:'elbow',waypoints:moved}]};
+  const clean=c.sanitizeState(raw),stored=c.KGGraphPersistence.toStorageState(clean);
+  const reopened=c.sanitizeState(c.KGGraphPersistence.hydrate(JSON.parse(JSON.stringify(stored))));
+  assert.equal(moved.length,13);assert.deepEqual(plain(reopened.links[0].waypoints),moved);
+});
 test('creation/controller and route cancel/rebind keep the selected endpoint ports',()=>{
   const {c,nodes}=environment();nodes.set('a',{id:'a',x:10,y:20,w:200,h:100});nodes.set('b',{id:'b',x:500,y:200,w:100,h:80});
   const s={linkSourceId:'a',links:[]};
