@@ -31,7 +31,14 @@
     if(index===0)route.splice(1,1,movedA,movedB);
     else if(index===route.length-2)route.splice(index,1,movedA,movedB);
     else{route[index]=movedA;route[index+1]=movedB}
-    return route.slice(1,-1);
+    // Remove only redundant forward corners, preserving intentional backtracks.
+    for(let i=1;i<route.length-1;){
+      const p=route[i-1],q=route[i],r=route[i+1],ax=q.x-p.x,ay=q.y-p.y,bx=r.x-q.x,by=r.y-q.y;
+      if((ax===0&&bx===0||ay===0&&by===0)&&ax*bx+ay*by>=0)route.splice(i,1);else i++;
+    }
+    const result=route.slice(1,-1);
+    // A bounded editable route must stay whole; dropping its tail creates diagonals.
+    return result.length<=64?result:waypoints.map(p=>({...p}));
   }
   function controlsFromHandles(start,handles,end){
     // At t=1/3 and 2/3, the two unknown controls have coefficients
@@ -77,6 +84,15 @@
     }
     return best;
   }
+  function nearestSegmentIndex(p,points){
+    let best=Infinity,index=-1;
+    for(let i=0;i<points.length-1;i++){
+      if(points[i].x===points[i+1].x&&points[i].y===points[i+1].y)continue;
+      const distance=distanceToPolyline(p,[points[i],points[i+1]]);
+      if(distance<best){best=distance;index=i}
+    }
+    return index;
+  }
   function portDirection(port){
     switch(port){case 'top':return point(0,-1);case 'right':return point(1,0);case 'bottom':return point(0,1);case 'left':return point(-1,0);default:return null}
   }
@@ -105,7 +121,7 @@
       ?point(center.x+Math.sign(ray.x||1)*width/2,center.y)
       :point(center.x,center.y+Math.sign(ray.y||1)*height/2);
   }
-  const api=Object.freeze({distanceToPolyline,curveMidpoint,bendCurveMidpoint,segmentHandles,moveElbowSegment,curveHandles,controlsFromHandles,constrainWaypointDrag,moveRoute,portPoint,portDirection});
+  const api=Object.freeze({distanceToPolyline,nearestSegmentIndex,curveMidpoint,bendCurveMidpoint,segmentHandles,moveElbowSegment,curveHandles,controlsFromHandles,constrainWaypointDrag,moveRoute,portPoint,portDirection});
   global.KGGraphEdgeGeometry=api;
   if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);

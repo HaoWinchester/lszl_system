@@ -28,3 +28,13 @@ test('segment dragging moves a complete orthogonal elbow segment, not a single c
  c.applyEdgeControlDragPoint({x:216,y:124});assert.deepEqual(plain(link.waypoints),[{x:216,y:40},{x:216,y:200}]);assert.equal(link.from,'a');assert.equal(link.to,'b');
  c.applyEdgeControlDragPoint({x:210,y:120});assert.deepEqual(plain(link.waypoints),[{x:210,y:40},{x:210,y:200}]);
 });
+
+test('outer segment movement beyond twelve corners renders every orthogonal segment',()=>{
+ const c=fixture(),start={x:0,y:0},end={x:70,y:60},waypoints=Array.from({length:12},(_,i)=>({x:Math.ceil((i+1)/2)*10,y:Math.floor((i+1)/2)*10}));
+ const moved=c.window.KGGraphEdgeGeometry.moveElbowSegment(start,end,waypoints,0,{x:0,y:-10});
+ assert.equal(moved.length,13);
+ const rendered=c.linkPathGeometry({pathStyle:'elbow',waypoints:moved},start,end);
+ assert.equal(rendered.waypoints.length,13);
+ const points=[start,...plain(rendered.waypoints),end];
+ for(let i=1;i<points.length;i++)assert.ok(points[i].x===points[i-1].x||points[i].y===points[i-1].y,JSON.stringify(points));
+});

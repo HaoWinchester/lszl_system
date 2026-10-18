@@ -79,7 +79,7 @@ test('elbow segment midpoint moves both adjacent bends on its perpendicular axis
  assert.deepEqual(moved,[{x:0,y:12},{x:100,y:12},{x:100,y:100}]);
  for(const [index,p] of [a,...moved,b].entries()){if(!index)continue;const prev=[a,...moved,b][index-1];assert(prev.x===p.x||prev.y===p.y)}
  assert.deepEqual(geometry.moveElbowSegment(a,b,points,1,{x:0,y:0}),points,'returning to the original pointer restores the route');
- assert.deepEqual(geometry.moveElbowSegment(a,b,points,1,{x:-100,y:0}),[{x:0,y:0},{x:0,y:100}],'overlapping segments stay valid');
+ assert.deepEqual(geometry.moveElbowSegment(a,b,points,1,{x:-100,y:0}),[{x:0,y:100}],'overlapping segments stay valid with redundant endpoint removed');
 });
 
 test('polyline hit distance includes a short segment and overlapping routes',()=>{
@@ -87,4 +87,12 @@ test('polyline hit distance includes a short segment and overlapping routes',()=
  near(distanceToPolyline({x:4,y:3},[{x:0,y:0},{x:10,y:0}]),3);
  near(distanceToPolyline({x:12,y:0},[{x:0,y:0},{x:10,y:0}]),2);
  near(distanceToPolyline({x:10,y:5},[{x:0,y:0},{x:10,y:0},{x:10,y:8}]),0);
+});
+
+test('body drags choose the segment under the pointer even near a long segment end',()=>{
+ const geometry=require('../src/graph/edge-geometry.js');
+ const start={x:0,y:0},end={x:1001,y:100},waypoints=[{x:1000,y:0},{x:1000,y:100}];
+ const index=geometry.nearestSegmentIndex({x:990,y:0},[start,...waypoints,end]);
+ assert.equal(index,0);
+ assert.deepEqual(geometry.moveElbowSegment(start,end,waypoints,index,{x:0,y:10}),[{x:0,y:10},{x:1000,y:10},{x:1000,y:100}]);
 });

@@ -265,7 +265,7 @@ function currentEdgeBundlePlan(){
     const points=rawLinkRenderPoints(candidate);if(!points)continue;
     items.push({id:String(candidate.id),fromId:candidate.from,toId:candidate.to,a:points.a,b:points.b,ca:points.ca,cb:points.cb,
       hasFromPort:hasExplicitPort(candidate.fromPort),hasToPort:hasExplicitPort(candidate.toPort),pathStyle:pathStyleForLink(candidate),
-      hasStoredWaypoints:normalizedEdgePoints(candidate.waypoints,12).length>0});
+      hasStoredWaypoints:normalizedEdgePoints(candidate.waypoints,64).length>0});
   }
   edgeBundleMemo={time:now,plan:window.KGGraphEdgeBundle.plan(items)};
   return edgeBundleMemo.plan;
@@ -356,7 +356,7 @@ function linkPathGeometry(link,a,b,points=null){
   const fixedStart=window.KGGraphEdgeGeometry.portDirection(link?.fromPort),fixedEnd=window.KGGraphEdgeGeometry.portDirection(link?.toPort);
   const detour=fixedStart||fixedEnd?null:overlappingProjectionWaypoints(start,end,points,direction);
   if(style==='elbow'){
-    const stored=normalizedEdgePoints(link&&link.waypoints,12),derived=!stored.length&&!detour;
+    const stored=normalizedEdgePoints(link&&link.waypoints,64),derived=!stored.length&&!detour;
     let waypoints=stored.length?stored:(detour||defaultElbowWaypoints(start,end,direction));
     // 多线汇总：自动派生的折线中间段吸附到共享通道坐标，使近似平行的主干段完全重合（不回写持久数据）。
     if(derived&&points?.mainGraph){const channel=currentEdgeBundlePlan()?.channels?.get(String(link?.id));if(Number.isFinite(channel)){const axis=Math.abs(end.x-start.x)>=Math.abs(end.y-start.y)?'x':'y';waypoints=waypoints.map(p=>({...p,[axis]:channel}))}}
@@ -369,7 +369,7 @@ function linkPathGeometry(link,a,b,points=null){
     if(fixedStart)controls[0]={x:start.x+fixedStart.x*offset,y:start.y+fixedStart.y*offset};
     if(fixedEnd)controls[1]={x:end.x+fixedEnd.x*offset,y:end.y+fixedEnd.y*offset};
   }
-  const storedWaypoints=normalizedEdgePoints(link&&link.waypoints,12),waypoints=storedWaypoints.length?storedWaypoints:detour;
+  const storedWaypoints=normalizedEdgePoints(link&&link.waypoints,64),waypoints=storedWaypoints.length?storedWaypoints:detour;
   if(stored.length!==2&&waypoints){
     const route=roundedEdgeRoute([start,...waypoints,end]);
     return{style,...route,bounds:edgeGeometryBounds(route.samples),endpoints:[start,end],waypoints,controls:window.KGGraphEdgeGeometry.segmentHandles(start,waypoints,end),derivedWaypoints:!storedWaypoints.length};
@@ -873,7 +873,7 @@ function restoreEdgeRoute(link,snapshot){
 }
 function captureNodeDragRoutes(nodeIds){
   const ids=new Set(nodeIds.map(String)),nodeMap=getGraphIndex().nodeMap;
-  return state.links.filter(link=>(ids.has(String(link.from))||ids.has(String(link.to)))&&(normalizedEdgePoints(link.curveControls,2).length===2||normalizedEdgePoints(link.waypoints,12).length>0)).map(link=>{
+  return state.links.filter(link=>(ids.has(String(link.from))||ids.has(String(link.to)))&&(normalizedEdgePoints(link.curveControls,2).length===2||normalizedEdgePoints(link.waypoints,64).length>0)).map(link=>{
     const points=linkRenderPoints(link,nodeMap);if(!points)return null;
     return{link,route:{...edgeRouteSnapshot(link),start:{...points.a},end:{...points.b}}};
   }).filter(Boolean);
@@ -891,7 +891,7 @@ function restoreNodeDragRoutes(records){for(const {link,route} of records)restor
 function persistDerivedEdgeRoute(link,geometry){
   if(!link||!geometry)return;
   const usesWaypoints=geometry.style==='elbow'||Array.isArray(geometry.waypoints);
-  if(usesWaypoints&&!normalizedEdgePoints(link.waypoints,12).length)link.waypoints=(geometry.waypoints||geometry.controls).map(point=>({x:point.x,y:point.y}));
+  if(usesWaypoints&&!normalizedEdgePoints(link.waypoints,64).length)link.waypoints=(geometry.waypoints||geometry.controls).map(point=>({x:point.x,y:point.y}));
   if(!usesWaypoints&&geometry.style==='curve'&&normalizedEdgePoints(link.curveControls,2).length!==2)link.curveControls=geometry.curveControls.map(point=>({x:point.x,y:point.y}));
 }
 function translateEdgePoint(point,dx,dy){return{x:point.x+dx,y:point.y+dy}}
@@ -917,9 +917,8 @@ function applyEdgeMoveDragPoint(point){
   drag.moved=true;const geometry=drag.geometry;
   if(link.from||link.to){
     if(geometry.waypoints){
-      const handles=window.KGGraphEdgeGeometry.segmentHandles(geometry.endpoints[0],geometry.waypoints,geometry.endpoints[1]);
-      const nearest=handles.reduce((best,p)=>Math.hypot(p.x-drag.startWorld.x,p.y-drag.startWorld.y)<Math.hypot(best.x-drag.startWorld.x,best.y-drag.startWorld.y)?p:best,handles[0]);
-      if(nearest)link.waypoints=window.KGGraphEdgeGeometry.moveElbowSegment(geometry.endpoints[0],geometry.endpoints[1],geometry.waypoints,nearest.index,{x:dx,y:dy});
+      const index=window.KGGraphEdgeGeometry.nearestSegmentIndex(drag.startWorld,[geometry.endpoints[0],...geometry.waypoints,geometry.endpoints[1]]);
+      if(index>=0)link.waypoints=window.KGGraphEdgeGeometry.moveElbowSegment(geometry.endpoints[0],geometry.endpoints[1],geometry.waypoints,index,{x:dx,y:dy});
       delete link.curveControls;
     }else{
       const start=geometry.endpoints[0],end=geometry.endpoints[1],controls=geometry.curveControls||[{x:start.x+(end.x-start.x)/3,y:start.y+(end.y-start.y)/3},{x:start.x+(end.x-start.x)*2/3,y:start.y+(end.y-start.y)*2/3}];
@@ -990,7 +989,7 @@ function beginEdgeControlDrag(event,linkId,kind,index){
   const link=linkById(linkId),dom=edgeDomById.get(String(linkId));if(!link||!dom?.geometry)return;const original=edgeRouteSnapshot(link);
   const historyController=beginGraphGestureHistory('调整关系线路径');if(!historyController)return false;
   historyController.checkpoint('调整关系线路径');
-  if(kind==='segment'&&!normalizedEdgePoints(link.waypoints,12).length)link.waypoints=dom.geometry.waypoints.map(point=>({x:point.x,y:point.y}));
+  if(kind==='segment'&&!normalizedEdgePoints(link.waypoints,64).length)link.waypoints=dom.geometry.waypoints.map(point=>({x:point.x,y:point.y}));
   if((kind==='curve-control'||kind==='curve-midpoint')&&normalizedEdgePoints(link.curveControls,2).length!==2)link.curveControls=dom.geometry.curveControls.map(point=>({x:point.x,y:point.y}));
   edgeControlDrag={pointerId:event.pointerId,linkId:String(linkId),kind,index:Number(index)||0,handle:event.currentTarget,original,startWorld:screenToWorld(event.clientX,event.clientY),geometry:cloneGraphValue(dom.geometry),historyController,moved:false};stage.classList.add('graph-edge-control-dragging','is-interacting');
   try{event.currentTarget.setPointerCapture(event.pointerId)}catch(error){}
@@ -1011,7 +1010,7 @@ function applyEdgeControlDragPoint(point){
     const geometry=drag.geometry;
     link.curveControls=window.KGGraphEdgeGeometry.bendCurveMidpoint({start:geometry.endpoints[0],end:geometry.endpoints[1],curveControls:geometry.curveControls},{x:point.x-drag.startWorld.x,y:point.y-drag.startWorld.y}).curveControls;
   }else if(drag.kind==='waypoint'){
-    const points=normalizedEdgePoints(link.waypoints,12);while(points.length<=drag.index)points.push({x:point.x,y:point.y});
+    const points=normalizedEdgePoints(link.waypoints,64);while(points.length<=drag.index)points.push({x:point.x,y:point.y});
     // 博思白板式方向锁定：折线路径点只允许沿水平或纵向单轴拖动。
     const current=linkRenderPoints(link,getGraphIndex().nodeMap);
     points[drag.index]=window.KGGraphEdgeGeometry.constrainWaypointDrag(current?.a||{x:0,y:0},current?.b||{x:0,y:0},points,drag.index,point);
