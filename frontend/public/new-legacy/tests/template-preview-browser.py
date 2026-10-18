@@ -5,7 +5,7 @@ from uuid import uuid4
 from playwright.sync_api import sync_playwright, expect
 ROOT=Path(__file__).resolve().parents[2]
 OUT=ROOT/'artifacts/learning-tool-feedback/template';OUT.mkdir(parents=True,exist_ok=True)
-parser=argparse.ArgumentParser();parser.add_argument('--base-url',default='http://127.0.0.1:5227');args=parser.parse_args();base=args.base_url
+parser=argparse.ArgumentParser();parser.add_argument('--base-url',default='http://127.0.0.1:5227');parser.add_argument('--legacy-mode',action='store_true');args=parser.parse_args();base=args.base_url
 with sync_playwright() as pw:
     browser=pw.chromium.launch(channel='chrome');ctx=browser.new_context(viewport={'width':1440,'height':960})
     assert ctx.request.post(base+'/api/v1/auth/login',data={'username':'ink-browser','password':'ink-browser-test'}).ok
@@ -16,6 +16,26 @@ with sync_playwright() as pw:
     p.goto(base+'/graph?fileId='+fid,wait_until='networkidle');p.wait_for_function('!KGGraphFileTabs.isSwitching()')
     for selector in ('#learningEntryDismissBtn','.tour-skip','#hideHelpBtn'):
         if p.locator(selector).is_visible():p.locator(selector).click()
+    if args.legacy_mode:
+        assert p.evaluate('__KG_DIRECT_BOOTSTRAP__.graphFilesApiCutoverEnabled') is False
+        assert p.evaluate('KGGraphFileApi.isRemote()') is False
+        mutations=[];p.on('request',lambda request:mutations.append(request.url) if request.method=='POST' and '/graph-templates' in request.url else None)
+        temporary=p.evaluate('JSON.stringify(state)')
+        p.locator('#templateBtn').click();p.locator('[data-template-publish]').click()
+        expect(p.locator('.template-publication-form')).to_have_count(0)
+        expect(p.locator('#graphTemplateCenter [role=status]')).to_contain_text('导出学习包')
+        row=p.locator('[data-template-id="'+tid+'"]');row.locator('.template-thumbnail').click()
+        expect(p.locator('.template-preview-window svg')).to_be_visible()
+        p.locator('.template-preview-window').get_by_role('button',name='加载为新图谱',exact=True).click()
+        expect(p.locator('#graphTemplateCenter [role=status]')).to_contain_text('恢复在线图谱')
+        assert mutations==[],mutations
+        assert p.evaluate('JSON.stringify(state)')==temporary
+        assert not errors,errors
+        ctx.request.patch(base+'/api/v1/graph-templates/'+tid,data={'listed':False});ctx.request.delete(base+'/api/v1/files/'+fid)
+        browser.close();print('PASS explicit legacy configuration: real preview remains available; publication/loading blocked before mutation; temporary graph preserved; recovery instructions shown')
+        raise SystemExit(0)
+    assert p.evaluate('__KG_DIRECT_BOOTSTRAP__.graphFilesApiCutoverEnabled') is True
+    assert p.evaluate('KGGraphFileApi.isRemote()') is True
     source_tab=p.locator('.graph-file-tab[data-file-id="'+fid+'"]');expect(source_tab).to_be_visible();source_tab.click()
     p.wait_for_function('(id)=>!KGGraphFileTabs.isSwitching()&&KGGraphFileRemoteAdapter.getCurrentFileMeta()?.id===id&&state.nodes.some(node=>node.id==="b")',arg=fid)
     before=ctx.request.get(base+'/api/v1/files/'+fid).json()['graphData']
@@ -80,7 +100,12 @@ with sync_playwright() as pw:
     loaded=ctx.request.post(base+'/api/v1/graph-templates/'+new_tid+'/loads',data={'version':1,'requestId':'publish-latest-'+uuid4().hex});assert loaded.ok,loaded.text()
     new_copy=loaded.json()['fileId'];copied=ctx.request.get(base+'/api/v1/files/'+new_copy).json()['graphData']
     assert next(n for n in copied['nodes'] if n['id']==loaded.json()['idMap']['b'])['geometry']==latest['geometry']
-    assert len(publications)==1;assert not errors,errors
+    assert len(publications)==1
+    p.reload(wait_until='networkidle')
+    p.wait_for_function('(id)=>!KGGraphFileTabs.isSwitching()&&KGGraphFileRemoteAdapter.getCurrentFileMeta()?.id===id&&state.nodes.some(node=>node.id==="b")',arg=fid)
+    assert p.evaluate('state.nodes.find(node=>node.id==="b").geometry')==latest['geometry'], 'default configuration must restore the saved graph after refresh'
+    assert p.evaluate('KGGraphFileApi.isRemote()') is True
+    assert not errors,errors
     ctx.request.patch(base+'/api/v1/graph-templates/'+new_tid,data={'listed':False});ctx.request.delete(base+'/api/v1/files/'+new_copy)
     ctx.request.patch(base+'/api/v1/graph-templates/'+tid,data={'listed':False});ctx.request.delete(base+'/api/v1/files/'+fid);ctx.request.delete(base+'/api/v1/files/'+copy)
     browser.close()

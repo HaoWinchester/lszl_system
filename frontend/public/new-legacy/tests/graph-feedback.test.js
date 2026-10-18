@@ -115,6 +115,27 @@ test('segment dragging moves a complete orthogonal elbow segment, not a single c
  c.applyEdgeControlDragPoint({x:216,y:124});assert.deepEqual(plain(link.waypoints),[{x:216,y:40},{x:216,y:200}]);assert.equal(link.from,'a');assert.equal(link.to,'b');
  c.applyEdgeControlDragPoint({x:210,y:120});assert.deepEqual(plain(link.waypoints),[{x:210,y:40},{x:210,y:200}]);
 });
+for(const kind of ['segment','body'])for(const vertical of [false,true])test(`a ${vertical?'vertical':'horizontal'} elbow ${kind} drag along its locked axis creates no route data or history`,()=>{
+ const link={id:'locked',from:'a',to:'b',pathStyle:'elbow'},c=endpointFixture(link,{setup(c){if(vertical)Object.assign(c.nodeById('b'),{x:100,y:300})}}),original=c.edgeRouteSnapshot(link),p=c.linkRenderPoints(link),geometry=c.linkPathGeometry(link,p.a,p.b,p);
+ const startWorld=vertical?{x:110,y:190}:{x:210,y:120},lockedPoint=vertical?{x:119,y:190}:{x:210,y:129};
+ vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'../src/graph/history-controller.js'),'utf8'),c);
+ const history=c.window.KGGraphHistoryController.create({capture:()=>c.edgeRouteSnapshot(link),restore:snapshot=>c.restoreEdgeRoute(link,snapshot)});
+ history.begin('drag');if(kind==='segment')history.checkpoint('drag');
+ Object.assign(c,{state:{viewport:{scale:1}},stage:{classList:{add(){},remove(){}}},hideEdgeHoverFeedback(){},finishGraphGestureHistory(drag,cancelled){return cancelled?history.rollback():history.commit()},translateEdgePoint:(p,x,y)=>({x:p.x+x,y:p.y+y})});
+ if(kind==='segment'){
+  link.waypoints=plain(geometry.waypoints);
+  c.edgeControlDrag={pointerId:1,linkId:link.id,kind:'segment',index:1,startWorld,geometry,moved:false,historyController:history};
+  vm.runInContext(source.slice(source.indexOf('function applyEdgeControlDragPoint('),source.indexOf('function createEdgeControlHandle(')),c);
+  Object.assign(c,{edgeControlDragFrame:0,edgeControlDragPoint:null});
+  c.applyEdgeControlDragPoint(lockedPoint);c.finishEdgeControlDrag(endpointEvent());
+ }else{
+  c.edgeMoveDrag={pointerId:1,linkId:link.id,startWorld,startClient:startWorld,geometry,moved:false,history:false,historyController:history};
+  Object.assign(c,{edgeMoveDragFrame:0,edgeMoveDragPoint:null,selectEdgeForDirectManipulation(){},performance:{now:()=>0}});
+  vm.runInContext(source.slice(source.indexOf('function applyEdgeMoveDragPoint('),source.indexOf('function clearEdgeEndpointBindTarget(')),c);
+  c.applyEdgeMoveDragPoint(lockedPoint);c.finishEdgeMoveDrag(endpointEvent());
+ }
+ assert.deepEqual(plain(c.edgeRouteSnapshot(link)),plain(original));assert.equal(history.getState().undoCount,0);
+});
 
 test('outer segment movement beyond twelve corners renders every orthogonal segment',()=>{
  const c=fixture(),start={x:0,y:0},end={x:70,y:60},waypoints=Array.from({length:12},(_,i)=>({x:Math.ceil((i+1)/2)*10,y:Math.floor((i+1)/2)*10}));

@@ -2,7 +2,7 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const vm=require('node:vm');const path=require('node:path');
 function setup(){
  let emit,mode='ok',saved=null;const deferred=[];
- const context={console:{error(){}},setTimeout,clearTimeout,CustomEvent:function(type,init){this.type=type;this.detail=init.detail},dispatchEvent(){},addEventListener(){},KGCanvasWorkspaceStore:{subscribe:fn=>{emit=fn},listWorkspaces:()=>[]},fetch:async(url,options)=>{
+ const context={console:{error(){}},setTimeout,clearTimeout,CustomEvent:function(type,init){this.type=type;this.detail=init.detail},dispatchEvent(){},addEventListener(){},KGCanvasWorkspaceStore:{currentUserId:()=>"ink-test",subscribe:fn=>{emit=fn},listWorkspaces:()=>[]},fetch:async(url,options)=>{
   if(options.method==='GET')return {ok:true,json:async()=>({workspaces:[]})};
   const body=JSON.parse(options.body);
   if(mode==='defer')return new Promise(resolve=>deferred.push({resolve,body}));
@@ -12,7 +12,7 @@ function setup(){
  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../../frontend/scripts/new-legacy-assets/canvas-workspace-adapter.js'),'utf8'),context);
  return {api:context.KGCanvasWorkspaceAdapter,write:ws=>emit({workspace:ws,reason:'canvas-ink'}),mode:v=>{mode=v},saved:()=>saved,deferred};
 }
-const first={id:'w1',title:'画布',strokes:[{id:'s1',tool:'pen',color:'#2563eb',width:3,opacity:.45,points:[[0,0],[10,20]]}]},latest={...first,strokes:[...first.strokes,{...first.strokes[0],id:'s2',opacity:0}]};
+const first={userId:'ink-test',id:'w1',title:'画布',strokes:[{id:'s1',tool:'pen',color:'#2563eb',width:3,opacity:.45,points:[[0,0],[10,20]]}]},latest={...first,strokes:[...first.strokes,{...first.strokes[0],id:'s2',opacity:0}]};
 test('workspace failed writes stay visibly unsaved and explicit retry persists ink',async()=>{
  const s=setup();await s.api.ready;s.mode('fail');s.write(first);
  await assert.rejects(s.api.flush({throwOnError:true}));

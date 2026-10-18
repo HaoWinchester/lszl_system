@@ -51,8 +51,21 @@ with sync_playwright() as pw:
  page.evaluate('selectLink("ab")');history=count();handle_drag('[data-link-id="ab"][data-edge-control-kind="curve-midpoint"]',6,-5)
  assert route()['from']=='a' and route()['to']=='b' and count()==history+1
  stable=route();history=count();handle_drag('[data-link-id="ab"][data-edge-control-kind="curve-midpoint"]',8,7,True);assert route()==stable and count()==history
+ # Four-pixel adjustments remain usable in each direction and undo as one gesture.
+ for dx,dy in [(0,-4),(0,4),(-4,0),(4,0)]:
+  before_point=page.evaluate('edgeDomById.get("ab").geometry.samples[12]');history=count();handle_drag('[data-link-id="ab"][data-edge-control-kind="curve-midpoint"]',dx,dy)
+  after_point=page.evaluate('edgeDomById.get("ab").geometry.samples[12]');assert abs(after_point['x']-before_point['x']-dx)<.001 and abs(after_point['y']-before_point['y']-dy)<.001,(dx,dy,before_point,after_point)
+  assert route()['from']=='a' and route()['to']=='b' and count()==history+1
+  page.evaluate('restoreGraphUndoSnapshot()');assert route()==stable and count()==history
  # Elbow segment midpoint preserves a horizontal/vertical route and exact undo.
- page.evaluate('applyPathStyle("elbow")');history=count();before=route();handle_drag('[data-link-id="ab"][data-edge-control-kind="segment"][data-edge-control-index="1"]',9,5)
+ page.evaluate('applyPathStyle("elbow")');history=count();before=route();unchanged_path=page.evaluate('edgeDomById.get("ab").geometry.d')
+ handle_drag('[data-link-id="ab"][data-edge-control-kind="segment"][data-edge-control-index="1"]',0,9)
+ assert page.evaluate('edgeDomById.get("ab").geometry.d')==unchanged_path
+ assert route()==before and count()==history,'dragging along a locked elbow axis must not create route data or an undo entry'
+ page.evaluate('clearSelection()');trunk_point=coord(page.evaluate('()=>{const p=edgeDomById.get("ab").geometry.waypoints;return{x:p[0].x,y:p[0].y*.25+p[1].y*.75}}'))
+ drag_to(trunk_point,0,9);assert route()==before and count()==history and page.evaluate('edgeDomById.get("ab").geometry.d')==unchanged_path,'body dragging along a locked elbow axis must also remain a no-op'
+ page.evaluate('selectLink("ab")')
+ handle_drag('[data-link-id="ab"][data-edge-control-kind="segment"][data-edge-control-index="1"]',9,5)
  after=route();assert after['from']=='a' and after['to']=='b' and count()==history+1
  samples=page.evaluate('edgeDomById.get("ab").geometry.samples')
  assert all(a['x']==b['x'] or a['y']==b['y'] for a,b in zip(samples,samples[1:])),samples

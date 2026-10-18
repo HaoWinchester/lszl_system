@@ -7,16 +7,16 @@ test('source homepage and bundled homepage register shared template center',()=>
 
 
 // Exercise the actual publication form, including persistence and request ordering.
-function publicationHarness(){
+function publicationHarness({openForm=true,templates=[]}={}){
   const vm=require('node:vm'),calls=[];
   function element(tag){return{tag,children:[],dataset:{},classList:{add(){}},setAttribute(key,value){this[key]=value},append(...nodes){for(const node of nodes){node.parent=this;this.children.push(node)}},prepend(node){node.parent=this;this.children.unshift(node)},insertBefore(node,before){node.parent=this;this.children.splice(this.children.indexOf(before),0,node)},replaceChildren(...nodes){this.children=[];this.append(...nodes)},remove(){this.parent.children=this.parent.children.filter(node=>node!==this)},focus(){},addEventListener(){},showModal(){},close(){}}}
-  const body=element('body'),state={fileId:'source',revision:1},actor={username:'teacher',role:'teacher'};
-  const context={console,AbortController,document:{body,createElement:element},KGAuthCore:{currentUser:()=>actor},KGGraphFileEditorStoreBridge:{fragmentSource:()=>({...state})},KGGraphFileRemoteAdapter:{flush:async()=>{calls.push('flush')}},KGGraphFileAutosave:{saveAcknowledged:async(options,isCurrent)=>{calls.push('save');assert.equal(options.force,true);assert.equal(isCurrent(),true);state.revision=2;return true}},fetch:async(url,options)=>{calls.push({url,options});return{ok:true,json:async()=>options.method==='POST'?{template:{id:'created'}}:{templates:[]}}}};
+  const body=element('body'),capabilities={serverFiles:true},state={fileId:'source',revision:1},actor={username:'teacher',role:'teacher'};
+  const context={console,AbortController,document:{body,createElement:element},KGAuthCore:{currentUser:()=>actor},KGTemplatePreview:{mount(){}},KGGraphFileEditorStoreBridge:{fragmentSource:()=>({...state}),isRemote:()=>capabilities.serverFiles},KGGraphFileRemoteAdapter:{flush:async()=>{calls.push('flush')}},KGGraphFileAutosave:{saveAcknowledged:async(options,isCurrent)=>{calls.push('save');assert.equal(options.force,true);assert.equal(isCurrent(),true);state.revision=2;return true}},fetch:async(url,options)=>{calls.push({url,options});return{ok:true,json:async()=>options.method==='POST'?{template:{id:'created'}}:{templates}}}};
   context.window=context;vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'../src/graph/template-center-controller.js'),'utf8'),context);
   const find=(root,predicate)=>predicate(root)?root:root.children.map(node=>find(node,predicate)).find(Boolean);
-  context.KGGraphTemplateCenter.open();const dialog=body.children[0];find(dialog,node=>node.dataset.templatePublish!==undefined).onclick();
-  const form=find(dialog,node=>node.tag==='form'),submit=find(form,node=>node.type==='submit');
-  return{context,calls,state,actor,dialog,form,submit,status:find(dialog,node=>node.role==='status'),find,send:async()=>{await new Promise(resolve=>setImmediate(resolve));form.onsubmit({preventDefault(){}});await new Promise(resolve=>setImmediate(resolve));}};
+  context.KGGraphTemplateCenter.open();const dialog=body.children[0];if(openForm)find(dialog,node=>node.dataset.templatePublish!==undefined).onclick();
+  const form=find(dialog,node=>node.tag==='form'),submit=form?find(form,node=>node.type==='submit'):null;
+  return{context,calls,capabilities,state,actor,dialog,form,submit,status:find(dialog,node=>node.role==='status'),find,send:async()=>{await new Promise(resolve=>setImmediate(resolve));form.onsubmit({preventDefault(){}});await new Promise(resolve=>setImmediate(resolve));}};
 }
 test('publication saves the current dirty graph before using its acknowledged revision',async()=>{
   const h=publicationHarness();await h.send();
@@ -58,4 +58,26 @@ test('publication preserves input when draft persistence or revision validation 
     await h.send();assert.equal(h.dialog.children.includes(h.form),true);assert.equal(h.submit.disabled,false);assert.match(h.status.textContent,kind==='revision'?/源图谱已改变/:/文字保存失败/);
     if(kind!=='revision')assert.equal(h.calls.some(call=>call.options?.method==='POST'),false);
   }
+});
+test('publication errors identify missing sources and non-JSON service failures without blaming login',async()=>{
+  for(const [failure,expected] of [
+    [{ok:false,status:404,json:async()=>({detail:{code:'GRAPH_FILE_NOT_FOUND'}})},/源图谱.*不存在/],
+    [{ok:false,status:503,json:async()=>{throw new SyntaxError('Unexpected token <')}},/503/],
+    [{ok:false,status:502,json:async()=>null},/502/],
+    [{ok:false,status:422,json:async()=>({detail:{code:'TEMPLATE_GRAPH_INVALID'}})},/图谱.*结构/],
+  ]){
+    const h=publicationHarness(),fetch=h.context.fetch;h.context.fetch=(url,options)=>options.method==='POST'?Promise.resolve(failure):fetch(url,options);
+    await h.send();assert.match(h.status.textContent,expected);assert.doesNotMatch(h.status.textContent,/检查登录|Unexpected token/);assert.equal(h.dialog.children.includes(h.form),true);
+  }
+});
+test('legacy temporary graphs are blocked before saving or publishing and explain content recovery',async()=>{
+  const h=publicationHarness();h.capabilities.serverFiles=false;await h.send();
+  assert.equal(h.calls.some(call=>call.options?.method==='POST'),false);assert.equal(h.calls.includes('save'),false);assert.match(h.status.textContent,/导出学习包/);assert.doesNotMatch(h.status.textContent,/GRAPH_FILES|cutover|登录/);
+  h.form.remove();h.find(h.dialog,node=>node.dataset.templatePublish!==undefined).onclick();assert.equal(h.find(h.dialog,node=>node.tag==='form'),undefined);assert.match(h.status.textContent,/在线图谱/);
+});
+test('legacy mode allows previews but prevents fake template loading into an incompatible file store',async()=>{
+  const h=publicationHarness({openForm:false,templates:[{id:'template',name:'可预览模板',listed:true,version:1}]});h.capabilities.serverFiles=false;
+  await new Promise(resolve=>setImmediate(resolve));
+  const load=h.find(h.dialog,node=>node.dataset.templateLoad!==undefined);assert.ok(load);await load.onclick();
+  assert.equal(h.calls.some(call=>call.options?.method==='POST'),false);assert.match(h.status.textContent,/在线图谱/);assert.match(h.status.textContent,/导出学习包/);
 });

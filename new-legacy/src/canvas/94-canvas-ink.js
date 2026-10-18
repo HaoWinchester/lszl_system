@@ -115,7 +115,7 @@
       if(settings){panel.style.right='auto';panel.style.left=(Math.max(8,Math.min(left+box.width-settings.width,global.innerWidth-settings.width-8))-left)+'px'}
     }
     function setOpen(value){
-      if(!value&&textSession){cancel();closeTextEditor(true).then(saved=>{if(saved)setOpen(false)});return}
+      if(!value&&textSession){cancel();textSession.onSaved=()=>setOpen(false);closeTextEditor(true);return}
       opened=!!value;if(!opened){settingsOpen=false;space=false;viewport.classList.remove('canvas-ink-panning');setTool('select');options.onExitDraw?.()}else setTool('pen');
       options.onOpenChange?.(opened);refreshControls();positionToolbar();
     }
@@ -167,6 +167,7 @@
     function refreshControls(){
       if(destroyed)return;
       const locked=readonly(),state=history?.getState?.()||{};
+      if(locked)stopEraserHold();
       // 只读（切题过渡/访客）不再把工具强制降回 select：工具选择保留，绘制入口由
       // pointerdown 的 readonly 拦截兜底，按钮 disabled + 光标还原表达锁定；
       // 只读解除后工具与自定义光标自动恢复（切题保持画笔状态的前提）。
@@ -226,6 +227,7 @@
       if(options.change){options.change(after,label);render()}else{apply(after);history?.push({label,undo:()=>apply(before),redo:()=>apply(after)})}refreshControls();
     }
     function cancel(){
+      stopEraserHold();
       if(erasing){const id=erasing.pointerId;erasing=null;try{if(viewport.hasPointerCapture(id))viewport.releasePointerCapture(id)}catch(_){};render()}
       if(textSession?.drag){const drag=textSession.drag;textSession.drag=null;textSession.border.classList.remove('is-dragging');textSession.world.splice(0,2,...drag.world);textSession.relocate();try{drag.target.releasePointerCapture(drag.pointerId)}catch(_){};}
       if(textResize){const id=textResize.pointerId;textResize=null;try{viewport.releasePointerCapture(id)}catch(_){};render()}
@@ -236,7 +238,10 @@
       try{if(viewport.hasPointerCapture(id))viewport.releasePointerCapture(id)}catch(_){}
     }
     function setTool(value){
-      cancel();if(value!==tool&&textSession){closeTextEditor(true).then(saved=>{if(saved)setTool(value)});return;}if(value!=='select'&&(value!=='text'||selected()?.tool!=='text'))selectedId=null;if(!TOOLS[value])settingsOpen=false;tool=(TOOLS[value]||value==='eraser')&&!readonly()?value:'select';
+      cancel();
+      // Keep the latest tool request on the draft until IME and persistence finish.
+      if(textSession){textSession.onSaved=value!==tool?()=>setTool(value):null;if(value!==tool){closeTextEditor(true);return;}}
+      if(value!=='select'&&(value!=='text'||selected()?.tool!=='text'))selectedId=null;if(!TOOLS[value])settingsOpen=false;tool=(TOOLS[value]||value==='eraser')&&!readonly()?value:'select';
       viewport.classList.toggle('canvas-ink-drawing',tool!=='select');viewport.dataset.inkTool=tool;
       if(tool!=='select')options.onDrawMode?.();
       render();
@@ -303,9 +308,10 @@
         const success=await session.edit.commit();
         if(textSession!==session)return false;
         session.editor.dataset.saveState=session.edit.state().status;
-        if(!success){if(session.edit.state().status==='failed'){session.status.textContent='文字未保存，请点击外部重试';report(session.edit.state().error)}return false}
+        if(!success){session.onSaved=null;if(session.edit.state().status==='failed'){session.status.textContent='文字未保存，请点击外部重试';report(session.edit.state().error)}return false}
       }else{session.edit.cancel();if(session.applied&&!session.stale){options.setStrokes?options.setStrokes(session.before):options.change(session.before,'取消文字修改');render()}}
-      textSession=null;session.unmount.forEach(dispose=>dispose());session.editor.remove();session.status.remove();session.border.remove();refreshControls();return true;
+      const onSaved=commit?session.onSaved:null;
+      textSession=null;session.unmount.forEach(dispose=>dispose());session.editor.remove();session.status.remove();session.border.remove();refreshControls();onSaved?.();return true;
     }
     function openTextEditor(clientX,clientY,existing){
       if(textSession){closeTextEditor(true);return}
@@ -396,7 +402,7 @@
       points.push(next);
     }
     listen(global,'pointerdown',event=>{
-      if(textSession)return;
+      if(textSession||destroyed||space||event.button!==0||event.isPrimary===false)return;
       const handle=event.target.closest?.('[data-ink-resize-handle]');if(handle&&layer.contains(handle)&&!readonly()){stop(event);const stroke=getStrokes().find(item=>item.id===handle.dataset.textId);textResize={beforeSignature:strokeStateSignature(),pointerId:event.pointerId,handle:handle.dataset.inkResizeHandle,start:point(event,viewport.getBoundingClientRect(),options.getViewport()),original:normalize([stroke])[0],box:textBox(stroke)};viewport.setPointerCapture(event.pointerId);return}
       if(destroyed||active||erasing||textDrag||textResize||space||readonly()||event.button!==0||event.isPrimary===false||!inside(event.target))return;
       const view=options.getViewport(),location=point(event,viewport.getBoundingClientRect(),view);
@@ -427,7 +433,7 @@
     listen(global,'pointermove',event=>{
       if(cancelStaleGesture())return;
       if(erasing&&event.pointerId===erasing.pointerId){stop(event);if(readonly()){cancel();return}for(const sample of event.getCoalescedEvents?.().length?event.getCoalescedEvents():[event])eraseTo(sample);return}
-      if(textResize&&event.pointerId===textResize.pointerId){stop(event);const current=point(event,viewport.getBoundingClientRect(),options.getViewport()),drag=textResize,next=global.KGTextBoxGeometry.resize(drag.box,drag.handle,{x:current[0]-drag.start[0],y:current[1]-drag.start[1]});const natural=textBox({...drag.original,points:[[next.x,next.y]],width:next.fontSize,boxWidth:next.width,boxHeight:next.height});const clamped=global.KGTextBoxGeometry.clampToTextBounds(next,natural);drag.next={...drag.original,points:[[clamped.x,clamped.y]],width:clamped.fontSize,boxWidth:clamped.width,boxHeight:clamped.height};drag.next.boxHeight=Math.min(4000,Math.max(clamped.height,textLines(drag.next).length*clamped.fontSize*1.35));layer.replaceChildren(...getStrokes().map(item=>makeEl(item.id===drag.original.id?drag.next:item)));renderTextHandles(drag.next);return}
+      if(textResize&&event.pointerId===textResize.pointerId){stop(event);if(readonly()){cancel();return}const current=point(event,viewport.getBoundingClientRect(),options.getViewport()),drag=textResize,next=global.KGTextBoxGeometry.resize(drag.box,drag.handle,{x:current[0]-drag.start[0],y:current[1]-drag.start[1]});const natural=textBox({...drag.original,points:[[next.x,next.y]],width:next.fontSize,boxWidth:next.width,boxHeight:next.height});const clamped=global.KGTextBoxGeometry.clampToTextBounds(next,natural);drag.next={...drag.original,points:[[clamped.x,clamped.y]],width:clamped.fontSize,boxWidth:clamped.width,boxHeight:clamped.height};drag.next.boxHeight=Math.min(4000,Math.max(clamped.height,textLines(drag.next).length*clamped.fontSize*1.35));layer.replaceChildren(...getStrokes().map(item=>makeEl(item.id===drag.original.id?drag.next:item)));renderTextHandles(drag.next);return}
       if(textDrag&&event.pointerId===textDrag.pointerId){
         stop(event);if(readonly()){cancel();return}
         const current=point(event,viewport.getBoundingClientRect(),options.getViewport()),dx=current[0]-textDrag.start[0],dy=current[1]-textDrag.start[1],scale=options.getViewport().scale||options.getViewport().zoom||1;
@@ -443,7 +449,7 @@
     listen(global,'pointerup',event=>{
       if(cancelStaleGesture())return;
       if(erasing&&event.pointerId===erasing.pointerId){stop(event);if(readonly()){cancel();return}eraseTo(event);const gesture=erasing;cancel();suppressClickUntil=Date.now()+400;if(gesture.removed.size)try{change(gesture.before.filter(item=>!gesture.removed.has(item.id)),'擦除笔迹')}catch(error){render();report(error)}return}
-      if(textResize&&event.pointerId===textResize.pointerId){stop(event);const drag=textResize;cancel();if(drag.next&&JSON.stringify(drag.next)!==JSON.stringify(drag.original))try{change(getStrokes().map(item=>item.id===drag.original.id?drag.next:item),'调整文本框大小');Promise.resolve(options.persistText?.()).catch(report)}catch(error){report(error)}return}
+      if(textResize&&event.pointerId===textResize.pointerId){stop(event);if(readonly()){cancel();return}const drag=textResize;cancel();if(drag.next&&JSON.stringify(drag.next)!==JSON.stringify(drag.original))try{change(getStrokes().map(item=>item.id===drag.original.id?drag.next:item),'调整文本框大小');Promise.resolve(options.persistText?.()).catch(report)}catch(error){report(error)}return}
       if(textDrag&&event.pointerId===textDrag.pointerId){stop(event);const drag=textDrag;cancel();suppressClickUntil=Date.now()+400;if(drag.moved&&drag.next)try{change(getStrokes().map(item=>item.id===drag.original.id?drag.next:item),drag.original.tool==='text'?'移动文字':'移动笔迹')}catch(error){render();report(error)}return}
       if(!active||event.pointerId!==active.pointerId)return;stop(event);addPoint(event);
       const {stroke,limited}=active;cancel();suppressClickUntil=Date.now()+400;
@@ -512,7 +518,7 @@
       if(event.button!==0||typeof options.onLongPressEraser!=='function')return;
       stopEraserHold();
       eraserHoldBtn.classList.add('canvas-ink-holding');
-      eraserHoldTimer=global.setTimeout(()=>{eraserHoldTimer=0;stopEraserHold();options.onLongPressEraser()},3000);
+      eraserHoldTimer=global.setTimeout(()=>{eraserHoldTimer=0;stopEraserHold();if(!destroyed&&!readonly())options.onLongPressEraser()},3000);
     });
     listen(global,'pointerup',stopEraserHold);
     listen(global,'pointercancel',stopEraserHold);

@@ -4,10 +4,16 @@
   function el(tag,text){const node=document.createElement(tag);if(text!==undefined)node.textContent=text;return node}
   function canPublish(role){return role==='teacher'||role==='admin'}
   let active=null;
+  const onlineFilesRequired='当前为临时图谱模式，暂不能发布或加载模板。请先导出学习包保留内容，再联系管理员恢复在线图谱后重新打开。';
+  function requireOnlineFiles(){if(global.KGGraphFileEditorStoreBridge?.isRemote?.()!==true)throw new Error(onlineFilesRequired)}
   async function request(path,options={}){
     const response=await fetch('/api/v1/graph-templates'+path,{credentials:'same-origin',...options,headers:{'Content-Type':'application/json'},body:options.body?JSON.stringify(options.body):undefined});
-    const data=await response.json();
-    if(!response.ok){const code=data.detail?.code;throw new Error(({TEMPLATE_MEMBERSHIP_REQUIRED:'此模板需要有效会员，请先开通会员。',TEMPLATE_NOT_AVAILABLE:'模板已下架，不能新加载。',TEMPLATE_NODE_QUOTA_EXCEEDED:'此模板超出当前账号的卡牌额度。',GRAPH_FILE_REVISION_CONFLICT:'源图谱已改变，请保存并重新发布。',TEMPLATE_PUBLISHER_REQUIRED:'仅教师和管理员可以发布模板。',TEMPLATE_REQUEST_ID_CONFLICT:'该加载请求已被用于其他模板或版本，请重新加载。'})[code]|| (typeof data.detail==='string'?data.detail:'模板请求失败，请检查登录或重试。'))}
+    let data;try{data=await response.json()}catch(error){throw new Error('模板服务返回异常（HTTP '+response.status+'），请稍后重试。')}
+    if(!response.ok){
+      const detail=data?.detail,code=detail?.code,messages={TEMPLATE_MEMBERSHIP_REQUIRED:'此模板需要有效会员，请先开通会员。',TEMPLATE_NOT_AVAILABLE:'模板已下架，不能新加载。',TEMPLATE_NODE_QUOTA_EXCEEDED:'此模板超出当前账号的卡牌额度。',GRAPH_FILE_NOT_FOUND:'源图谱不存在或不属于当前账号，请重新打开图谱后发布。',GRAPH_FILE_REVISION_CONFLICT:'源图谱已改变，请保存并重新发布。',TEMPLATE_GRAPH_INVALID:'源图谱结构不完整，请检查卡片和连线后重新发布。',GRAPH_TABLES_INVALID:'源图谱表格数据不完整，请修复后重新发布。',GRAPH_STROKES_INVALID:'源图谱画布数据不完整，请修复后重新发布。',TEMPLATE_PUBLISHER_REQUIRED:'仅教师和管理员可以发布模板。',TEMPLATE_READER_REQUIRED:'当前账号没有模板访问权限。',TEMPLATE_NOT_FOUND:'模板不存在或当前账号没有访问权限。',TEMPLATE_VERSION_NOT_FOUND:'模板版本不存在，请重新打开模板中心。',TEMPLATE_REQUEST_ID_CONFLICT:'该加载请求已被用于其他模板或版本，请重新加载。'};
+      const fallback=response.status===401?'登录已失效，请重新登录。':'模板请求失败（HTTP '+response.status+'），请稍后重试。';
+      throw new Error(messages[code]||(typeof detail==='string'?detail:detail?.message||fallback));
+    }
     return data;
   }
   function open(){
@@ -26,7 +32,7 @@
       const publish=el('button','发布当前图谱');publish.dataset.templatePublish='';actions.prepend(publish);publish.onclick=()=>form(null);
     }
     async function execute(action){if(busy)return;busy=true;close.disabled=true;try{await action()}catch(error){if(!disposed)status.textContent=error.message}finally{busy=false;close.disabled=false}}
-    async function refresh(){status.textContent='正在加载模板…';const data=await request('');if(disposed)return;list.replaceChildren();if(!data.templates.length)status.textContent='暂无模板，教师可发布当前图谱。';else status.textContent='点击图谱预览，可拖动、缩放或全屏查看。';
+    async function refresh(){status.textContent='正在加载模板…';const data=await request('');if(disposed)return;list.replaceChildren();if(!data.templates.length)status.textContent='暂无模板，教师可发布当前图谱。';else status.textContent='点击图谱预览，可拖动、缩放或全屏查看。';if(global.KGGraphFileEditorStoreBridge?.isRemote?.()!==true)status.textContent=onlineFilesRequired;
       for(const item of data.templates){
         const card=el('article');card.dataset.templateId=item.id;
         // 头部：标题 + 免费/会员徽章（下架状态并入徽章文案，保持“已下架”可读）。
@@ -47,6 +53,7 @@
         const receipts=new Map();
         load.onclick=()=>loadCopy(item.version);
         function loadCopy(version){return execute(async()=>{
+          requireOnlineFiles();
           if(!receipts.has(version))receipts.set(version,{requestId:global.crypto?.randomUUID?.()||'template-'+Date.now()+'-'+Math.random(),version});
           const receipt=receipts.get(version);
           status.textContent='正在创建独立图谱…';
@@ -83,7 +90,7 @@
       render();
     }
     function form(item){
-      if(busy)return;const current=context(),publisher=global.KGAuthCore?.currentUser?.();if(!canPublish(publisher?.role)){status.textContent='仅教师和管理员可以发布模板。';return}if(!current?.fileId){status.textContent='请先保存并打开一个正式图谱。';return}
+      if(busy)return;try{requireOnlineFiles()}catch(error){status.textContent=error.message;return}const current=context(),publisher=global.KGAuthCore?.currentUser?.();if(!canPublish(publisher?.role)){status.textContent='仅教师和管理员可以发布模板。';return}if(!current?.fileId){status.textContent='请先保存并打开一个正式图谱。';return}
       const publisherId=publisher.username,publisherRole=publisher.role;
       const isCurrent=()=>!disposed&&context()?.fileId===current.fileId&&global.KGAuthCore?.currentUser?.()?.username===publisherId&&global.KGAuthCore?.currentUser?.()?.role===publisherRole;
       const editor=el('form');editor.className='template-publication-form';
@@ -96,6 +103,7 @@
       const row=el('div');row.className='template-form-actions';row.append(cancel,submit);
       editor.append(nameField,descField,label,row);dialog.insertBefore(editor,list);name.focus();
       editor.onsubmit=e=>{e.preventDefault();execute(async()=>{
+        requireOnlineFiles();
         submit.disabled=true;cancel.disabled=true;status.textContent='正在保存当前图谱并发布模板…';
         if(!isCurrent())throw new Error('当前图谱或账号已变化，请重新发布。');
         if(global.KGHomeInk?.hasTextDraft?.()&&await global.KGHomeInk.commitText()===false)throw new Error('图谱文字保存失败，请重试后发布。');

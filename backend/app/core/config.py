@@ -18,9 +18,9 @@ class Settings(BaseSettings):
     APP_NAME: str = "KG Graph API"
     API_V1_PREFIX: str = "/api/v1"
     QUESTION_CATALOG_CUTOVER_ENABLED: bool = False
-    # 登录用户图谱完成关系化迁移后启用。开启时前端改走 Files API，
-    # runtime 中的旧图谱键只读保留用于审计与回滚。
-    GRAPH_FILES_API_CUTOVER_ENABLED: bool = False
+    # 正式联网模式默认使用数据库 Files API；显式 false 仅保留受控兼容/回滚。
+    # 切换前须保全旧图谱，runtime 旧键继续只读保留用于审计。
+    GRAPH_FILES_API_CUTOVER_ENABLED: bool = True
     # Content Prep 题目级校验临时关闭（2026-08 录入提速需求）：
     # true 时共享草稿同步/批量上传/单题保存跳过题目校验阻断（仅记录 warning 日志，批次内重复 ID 仍拦截）。
     # 恢复校验：删掉环境变量并重启即可，无需改代码。

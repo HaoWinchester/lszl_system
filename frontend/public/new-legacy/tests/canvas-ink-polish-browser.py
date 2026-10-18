@@ -1,5 +1,6 @@
 """Source-only Chromium regressions for common ink transactions and natural text."""
-import sys
+import sys,argparse,json,uuid
+from urllib.parse import urlparse
 from pathlib import Path
 from playwright.sync_api import sync_playwright, expect
 ROOT=Path(__file__).resolve().parents[1]
@@ -143,9 +144,120 @@ def long_automatic_text(browser):
     page=setup(browser);page.evaluate('ink.openTextAt(100,100)');editor=page.locator('.canvas-ink-text-editor');editor.fill('W'*500)
     metrics=editor.evaluate('el=>({client:el.clientHeight,scroll:el.scrollHeight,width:parseFloat(el.style.width)})');assert metrics['scroll']<=metrics['client']+1,('Long automatic draft may not be clipped',metrics)
     draft=editor.bounding_box();editor.press('Control+Enter');page.mouse.click(110,110);saved=page.locator('.canvas-ink-text-box > rect').first.bounding_box();assert abs(draft['width']-saved['width'])<3 and abs(draft['height']-saved['height'])<3,(draft,saved);assert 'boxWidth' not in page.evaluate('strokes[0]');page.close()
-with sync_playwright() as pw:
-    browser=pw.chromium.launch(headless=True,executable_path='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
-    cases={'selection_over_control':selection_over_control,'draft_formatting':draft_formatting,'external_history':external_history,'explicit_word_wrap':explicit_word_wrap,'long_automatic_text':long_automatic_text,'eraser':eraser,'curve_eraser':curve_eraser,'selection':selection,'text':text,'public_entry':public_entry,'export_opacity':export_opacity,'responsive_controls':responsive_controls}
-    for name in sys.argv[1:] or cases:
-        cases[name](browser);print(name+': passed')
-    browser.close()
+def deferred_tool_exit(browser):
+    for action in ['pen','close']:
+        page=setup(browser);page.evaluate('ink.openTextAt(300,200)');editor=page.locator('.canvas-ink-text-editor');editor.fill('输入法草稿')
+        editor.evaluate("el=>el.dispatchEvent(new CompositionEvent('compositionstart',{bubbles:true}))")
+        page.get_by_role('button',name='画笔' if action=='pen' else '关闭画笔工具',exact=True).click()
+        expect(editor).to_have_value('输入法草稿');assert page.evaluate('writes')==0
+        editor.evaluate("el=>el.dispatchEvent(new CompositionEvent('compositionend',{bubbles:true}))")
+        expect(editor).to_have_count(0)
+        assert page.evaluate('ink.tool')==('pen' if action=='pen' else 'select'),('Composition completion must finish the requested tool/close action',action,page.evaluate('ink.tool'))
+        if action=='close':expect(page.locator('.canvas-ink-toolbar')).to_be_hidden()
+        assert page.evaluate('strokes[0].text')=='输入法草稿';page.close()
+def right_grip(browser):
+    original={'id':'text','tool':'text','color':'#111827','width':24,'points':[[100,100]],'text':'Right click grip','boxWidth':200,'boxHeight':40}
+    page=setup(browser,[original]);page.evaluate("ink.setTool('text')");page.mouse.click(110,110)
+    handle=page.locator('[data-ink-resize-handle=e]');box=handle.bounding_box();x=box['x']+box['width']/2;y=box['y']+box['height']/2
+    page.mouse.move(x,y);page.mouse.down(button='right');page.mouse.move(x+20,y+15,steps=3);page.mouse.up(button='right')
+    assert page.evaluate('strokes')==[original] and page.evaluate('writes')==0,'Right button on text grip must never resize or save'
+    page.mouse.click(x,y,button='right');page.wait_for_timeout(100);page.mouse.click(x,y,button='right')
+    assert page.evaluate('ink.tool')=='select' and page.evaluate('writes')==0,'Two right clicks on a grip must exit drawing safely'
+    page.close()
+def readonly_resize(browser):
+    original={'id':'text','tool':'text','color':'#111827','width':24,'points':[[100,100]],'text':'Readonly mid-resize','boxWidth':200,'boxHeight':40}
+    page=setup(browser,[original]);page.evaluate("ink.setTool('text')");page.mouse.click(110,110);handle=page.locator('[data-ink-resize-handle=e]');box=handle.bounding_box();x=box['x']+box['width']/2;y=box['y']+box['height']/2
+    page.mouse.move(x,y);page.mouse.down();page.evaluate('locked=true');page.mouse.move(x+50,y,steps=3)
+    expect(page.locator('.canvas-ink-layer text')).to_have_attribute('font-size','24')
+    assert page.locator('[data-ink-resize-handle]').count()==0,'Readonly transition cancels preview and removes edit handles'
+    page.mouse.up();assert page.evaluate('writes')==0 and page.evaluate('strokes')==[original];page.close()
+def eraser_hold_exit(browser):
+    for route in ['escape','close','readonly','readonly-without-render','complete']:
+        page=setup(browser,[BASE]);page.evaluate('ink.destroy();window.held=0;window.ink=KGCanvasInk.create({viewport:document.querySelector("#view"),world:document.querySelector("#world"),getViewport:()=>({x:0,y:0,scale:1}),getStrokes:()=>strokes,setStrokes:s=>{strokes=s;writes++},isReadonly:()=>locked,onLongPressEraser:()=>held++})')
+        btn=page.get_by_role('button',name='橡皮擦',exact=True);b=btn.bounding_box();page.mouse.move(b['x']+10,b['y']+10);page.mouse.down()
+        if route=='escape':page.keyboard.press('Escape')
+        elif route=='close':page.get_by_role('button',name='关闭画笔工具',exact=True).evaluate('el=>el.click()')
+        elif route=='readonly':page.evaluate('locked=true;ink.render()')
+        elif route=='readonly-without-render':page.evaluate('locked=true')
+        page.wait_for_timeout(3100);page.mouse.up()
+        assert page.evaluate('held')==(1 if route=='complete' else 0),('Canceled/readonly eraser hold must not invoke whole-paper clear',route)
+        page.close()
+def asynchronous_tool_exit(browser):
+    page=setup(browser);page.evaluate('ink.destroy();window.failSave=true;window.ink=KGCanvasInk.create({viewport:document.querySelector("#view"),world:document.querySelector("#world"),getViewport:()=>({x:0,y:0,scale:1}),getStrokes:()=>strokes,setStrokes:s=>{strokes=s;writes++},persistText:()=>!failSave})');page.evaluate('ink.openTextAt(300,200)')
+    editor=page.locator('.canvas-ink-text-editor');editor.fill('失败保留');page.get_by_role('button',name='画笔',exact=True).click();expect(editor).to_have_attribute('data-save-state','failed');assert page.evaluate('ink.tool')=='text'
+    page.evaluate('failSave=false');page.get_by_role('button',name='画笔',exact=True).click();expect(editor).to_have_count(0);assert page.evaluate('ink.tool')=='pen' and page.evaluate('strokes.length')==1
+    page.close()
+    page=setup(browser);page.evaluate('ink.destroy();window.ink=KGCanvasInk.create({viewport:document.querySelector("#view"),world:document.querySelector("#world"),getViewport:()=>({x:0,y:0,scale:1}),getStrokes:()=>strokes,setStrokes:s=>{strokes=s;writes++},persistText:()=>new Promise(resolve=>window.finishSave=resolve)})');page.evaluate('ink.openTextAt(300,200)');editor=page.locator('.canvas-ink-text-editor');editor.fill('最后选择')
+    page.get_by_role('button',name='画笔',exact=True).click();page.get_by_role('button',name='荧光笔',exact=True).click();page.evaluate('finishSave(true)');expect(editor).to_have_count(0)
+    assert page.evaluate('ink.tool')=='highlighter','The last requested tool wins after one delayed save';assert page.evaluate('strokes.length')==1;page.close()
+def live_pages(base):
+    base=base.rstrip('/')
+    assert urlparse(base).hostname in ('127.0.0.1','localhost') and urlparse(base).port==5258
+    SOURCE='src/canvas/94-canvas-ink.js'
+    def override(route):
+        path=urlparse(route.request.url).path.lstrip('/')
+        if path==SOURCE:route.fulfill(path=str(ROOT/SOURCE));return
+        if path.startswith('bundles/') and path.endswith('.js'):
+            response=route.fetch();body=response.text();marker='})([['
+            if marker in body:
+                start=body.index(marker)+3;entries=json.loads(body[start:body.rindex(');')])
+                for entry in entries:
+                    if entry[0]==SOURCE:entry[1]=(ROOT/SOURCE).read_text()
+                body=body[:start]+json.dumps(entries,ensure_ascii=False)+');'
+            route.fulfill(response=response,body=body);return
+        route.continue_()
+    with sync_playwright() as p:
+        b=p.chromium.launch(channel='chrome');c=b.new_context(viewport={'width':1440,'height':1000});c.route('**/*',override)
+        assert c.request.post(base+'/api/v1/auth/login',data={'username':'ink-browser','password':'ink-browser-test'}).ok
+        r=c.request.post(base+'/api/v1/files',data={'name':'画笔退出'+uuid.uuid4().hex[:8],'graphData':{'nodes':[{'id':'a','title':'隔离画布','x':400,'y':300}],'links':[],'strokes':[]}});assert r.ok;fid=r.json()['file']['id'];assert c.request.put(base+'/api/v1/files/current',data={'fileId':fid}).ok
+        paths=[('home','/index.html','KGHomeInk'),('recall','/knowledge-recall.html?questionId=ink-question-1&bankId=ink-bank&paperId=ink-paper&releaseId=ink-release','KGRecallInk'),('workspace','/question-workspace.html?paperId=ink-paper&releaseId=ink-release','KGWorkspaceInk')]
+        for name,path,controller in paths:
+            page=c.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)));page.goto(base+path,wait_until='networkidle');page.wait_for_function('!!window.'+controller)
+            if name=='home':
+                for sel in ['#learningEntryDismissBtn','.tour-skip','#hideHelpBtn']:
+                    if page.locator(sel).is_visible():page.locator(sel).click()
+                page.evaluate('KGHomeInteractionModes.setMode("professional")');page.wait_for_function('!KGGraphFileTabs.isSwitching()')
+            for tool in ['pen','close']:
+                assert page.evaluate(controller+'.openTextAt(330,300)')
+                editor=page.locator('.canvas-ink-text-editor');message=name+'-'+tool+'-'+uuid.uuid4().hex[:5];editor.fill(message)
+                editor.evaluate("el=>el.dispatchEvent(new CompositionEvent('compositionstart',{bubbles:true}))")
+                page.get_by_role('button',name='画笔' if tool=='pen' else '关闭画笔工具',exact=True).click();expect(editor).to_have_value(message)
+                editor.evaluate("el=>el.dispatchEvent(new CompositionEvent('compositionend',{bubbles:true}))");expect(editor).to_have_count(0)
+                assert page.evaluate(controller+'.tool')==('pen' if tool=='pen' else 'select')
+                if tool=='close':expect(page.locator('.canvas-ink-toolbar')).to_be_hidden()
+                text=page.locator('.canvas-ink-layer text').filter(has_text=message);expect(text).to_be_visible()
+                page.reload(wait_until='networkidle');expect(page.locator('.canvas-ink-layer text').filter(has_text=message)).to_be_visible()
+                if name=='home':
+                    for sel in ['#learningEntryDismissBtn','.tour-skip','#hideHelpBtn']:
+                        if page.locator(sel).is_visible():page.locator(sel).click()
+            page.evaluate(controller+'.setOpen(true);'+controller+'.setTool("text")');text=page.locator('.canvas-ink-layer text').filter(has_text=message);text.click(position={'x':5,'y':5},force=True)
+            h=page.locator('[data-ink-resize-handle=e]');rect=h.bounding_box();before=page.locator('.canvas-ink-layer').inner_html();x=rect['x']+rect['width']/2;y=rect['y']+rect['height']/2
+            page.mouse.move(x,y);page.mouse.down(button='right');page.mouse.move(x+25,y+15,steps=5);page.mouse.up(button='right')
+            assert page.locator('.canvas-ink-layer').inner_html()==before,'Right drag cannot resize annotations on '+name
+            page.mouse.click(x,y,button='right');page.wait_for_timeout(100);page.mouse.click(x,y,button='right');assert page.evaluate(controller+'.tool')=='select'
+            page.get_by_role('button',name='关闭画笔工具',exact=True).click();expect(page.locator('.canvas-ink-toolbar')).to_be_hidden()
+            if name=='workspace':
+                if page.locator('.qw-question-card').count()==0:
+                    page.locator('#qwQuestionDockBtn').click();page.locator('[data-add-index]').first.click();page.keyboard.press('Escape');page.evaluate('KGMultiQuestionWorkspace.closeQuestionDrawer()')
+                card=page.locator('.qw-question-card').first;page.evaluate(controller+'.setOpen(true)');page.mouse.move(1400,950);page.wait_for_timeout(200)
+                decoration='el=>({shadow:getComputedStyle(el).boxShadow,outline:getComputedStyle(el).outline})';before_hover=card.evaluate(decoration);card.hover();page.wait_for_timeout(200)
+                assert card.evaluate(decoration)==before_hover,'Drawing across a card must not flash red outlines/shadows'
+                page.evaluate(controller+'.setOpen(false)')
+            assert not errors,errors;print('PASS '+name+': IME tool/close intent, durable reload, right-grip no mutation, right exit and X',flush=True)
+            if name=='home':
+                page.evaluate('()=>{selectedNodeIds=new Set(["a"]);state.selectedNodeId="a";refreshSelectionUI()}');assert page.evaluate('openRelatedCanvasModal(false)')
+                modal=page.locator('.related-canvas-backdrop');modal.locator('[data-action=ink]').click();toolbar=modal.locator('.canvas-ink-toolbar');toolbar.get_by_role('button',name='文字',exact=True).click()
+                target=page.evaluate('''()=>{const v=document.querySelector('.related-canvas-viewport'),r=v.getBoundingClientRect();for(let y=r.top+5;y<r.bottom-5;y+=10)for(let x=r.left+5;x<r.right-5;x+=10){const el=document.elementFromPoint(x,y);if(el===v||el?.classList.contains('related-canvas-stage'))return {x,y}}return null}''');assert target
+                page.mouse.click(target['x'],target['y']);editor=page.locator('.canvas-ink-text-editor');editor.fill('临时文字退出');editor.evaluate("el=>el.dispatchEvent(new CompositionEvent('compositionstart',{bubbles:true}))");toolbar.get_by_role('button',name='关闭画笔工具',exact=True).click();editor.evaluate("el=>el.dispatchEvent(new CompositionEvent('compositionend',{bubbles:true}))");expect(editor).to_have_count(0);expect(toolbar).to_be_hidden();expect(modal.locator('.canvas-ink-layer text')).to_contain_text('临时文字退出')
+                modal.locator('[data-action=close]').click();assert not any('临时文字退出' in s.get('text','') for s in c.request.get(base+'/api/v1/files/'+fid).json()['graphData'].get('strokes',[]));print('PASS temporary: blank text, IME X, local-only discard',flush=True)
+            page.close()
+        b.close()
+if '--base-url' in sys.argv:
+    parser=argparse.ArgumentParser();parser.add_argument('--base-url',required=True);live_pages(parser.parse_args().base_url)
+else:
+    with sync_playwright() as pw:
+        browser=pw.chromium.launch(headless=True,executable_path='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
+        cases={'readonly_resize':readonly_resize,'asynchronous_tool_exit':asynchronous_tool_exit,'deferred_tool_exit':deferred_tool_exit,'right_grip':right_grip,'eraser_hold_exit':eraser_hold_exit,'selection_over_control':selection_over_control,'draft_formatting':draft_formatting,'external_history':external_history,'explicit_word_wrap':explicit_word_wrap,'long_automatic_text':long_automatic_text,'eraser':eraser,'curve_eraser':curve_eraser,'selection':selection,'text':text,'public_entry':public_entry,'export_opacity':export_opacity,'responsive_controls':responsive_controls}
+        for name in sys.argv[1:] or cases:
+            cases[name](browser);print(name+': passed')
+        browser.close()

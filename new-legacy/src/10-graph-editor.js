@@ -912,13 +912,15 @@ function beginEdgeMoveDrag(event,linkId){
 }
 function applyEdgeMoveDragPoint(point){
   const drag=edgeMoveDrag;if(!drag)return;const link=linkById(drag.linkId),dom=edgeDomById.get(drag.linkId);if(!link||!dom)return;
-  const dx=point.x-drag.startWorld.x,dy=point.y-drag.startWorld.y;if(!drag.moved&&Math.hypot(dx,dy)<5/Math.max(.01,state.viewport.scale))return;
+  const dx=point.x-drag.startWorld.x,dy=point.y-drag.startWorld.y,geometry=drag.geometry;
+  const segmentIndex=geometry.waypoints&&(link.from||link.to)?window.KGGraphEdgeGeometry.nearestSegmentIndex(drag.startWorld,[geometry.endpoints[0],...geometry.waypoints,geometry.endpoints[1]]):-1;
+  const segment=segmentIndex>=0?window.KGGraphEdgeGeometry.segmentHandles(geometry.endpoints[0],geometry.waypoints,geometry.endpoints[1]).find(handle=>handle.index===segmentIndex):null;
+  if(!drag.moved&&(segment?Math.abs(segment.axis==='x'?dx:dy):Math.hypot(dx,dy))<5/Math.max(.01,state.viewport.scale))return;
   if(!drag.history){drag.historyController.checkpoint('移动关系线');drag.history=true;selectEdgeForDirectManipulation(drag.linkId,{clientX:drag.startClient.x,clientY:drag.startClient.y})}
-  drag.moved=true;const geometry=drag.geometry;
+  drag.moved=true;
   if(link.from||link.to){
     if(geometry.waypoints){
-      const index=window.KGGraphEdgeGeometry.nearestSegmentIndex(drag.startWorld,[geometry.endpoints[0],...geometry.waypoints,geometry.endpoints[1]]);
-      if(index>=0)link.waypoints=window.KGGraphEdgeGeometry.moveElbowSegment(geometry.endpoints[0],geometry.endpoints[1],geometry.waypoints,index,{x:dx,y:dy});
+      if(segmentIndex>=0)link.waypoints=window.KGGraphEdgeGeometry.moveElbowSegment(geometry.endpoints[0],geometry.endpoints[1],geometry.waypoints,segmentIndex,{x:dx,y:dy});
       delete link.curveControls;
     }else{
       const start=geometry.endpoints[0],end=geometry.endpoints[1],controls=geometry.curveControls||[{x:start.x+(end.x-start.x)/3,y:start.y+(end.y-start.y)/3},{x:start.x+(end.x-start.x)*2/3,y:start.y+(end.y-start.y)*2/3}];
@@ -1005,7 +1007,11 @@ function beginEdgeControlDrag(event,linkId,kind,index){
 }
 function applyEdgeControlDragPoint(point){
   const drag=edgeControlDrag;if(!drag)return;const link=linkById(drag.linkId);if(!link)return;
-  if(drag.startWorld&&!drag.moved&&Math.hypot(point.x-drag.startWorld.x,point.y-drag.startWorld.y)<2/Math.max(.01,state.viewport.scale))return;
+  if(drag.startWorld&&!drag.moved){
+    const geometry=drag.geometry,segment=drag.kind==='segment'?window.KGGraphEdgeGeometry.segmentHandles(geometry.endpoints[0],geometry.waypoints,geometry.endpoints[1]).find(handle=>handle.index===drag.index):null;
+    const distance=segment?Math.abs(point[segment.axis]-drag.startWorld[segment.axis]):Math.hypot(point.x-drag.startWorld.x,point.y-drag.startWorld.y);
+    if(distance<2/Math.max(.01,state.viewport.scale))return;
+  }
   drag.moved=true;
   if(drag.kind==='straight-bend'){
     const geometry=drag.geometry,a=geometry.endpoints[0],b=geometry.endpoints[1],horizontal=Math.abs(b.x-a.x)>=Math.abs(b.y-a.y);

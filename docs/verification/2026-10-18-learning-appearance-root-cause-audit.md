@@ -73,3 +73,24 @@
 定向源回归 42 项、模板后端 9 项、图谱控件浏览器通过；JS/Python 语法和 diff 检查通过。升级版本后首次完整前端检查发现 content-prep 的派生 HTML 尚带旧版本号，重复构建不一致；按原构建器重新生成后再同步重跑，未放宽检查。最终完整检查与本地运行核对结果在下方追加。
 
 最终冻结源重跑：前端 354 项、E2E 契约 9 项与部署脚本契约全通过；设计 5 项通过。按 manage-new-legacy update --skip-browser 打包并将本地 active 指向 v9.0-p4.1.348。public/site 均为 1,148 文件，与基线逐路径一致，admin-console 存在；本地 5173 的图谱/归纳/回忆均提供 v348，关键 JS/CSS/图谱 bundle 的 HTTP 字节与 active site 哈希一致，表格入口和“文字高清”仍无。5257 测试服务已正常退出并清理独立数据库；5173 用户预览服务保持运行。main/uat 与远端分支均未移动，本轮未推送或部署 UAT；仍等用户本地查看，不代表 UAT 人工验收。
+
+
+## 本地 v349：实际配置发布失败与博思细节复查
+
+用户在 v348 仍发布失败。直接读取用户实际 Chrome 与本地服务日志：已登录 admin、GET 模板 200、POST 发布 404；bridge 返回 graph_* 源 ID/revision，但 remote adapter 当前文件为 null，Files API 列表为空。根因是 backend 的 GRAPH_FILES_API_CUTOVER_ENABLED 默认值和 .env.example 都为 false，remote 认证下 legacy store 禁止浏览器持久化而落入 memoryStorage；发布却要求数据库 GraphFile，因而 GRAPH_FILE_NOT_FOUND 被包装成误导性的登录提示。上一轮隔离 helper 强制开启该开关，只验证了新模式，没有验证普通启动的默认配置。这是实现配置与测试覆盖遗漏，不能归咎于用户未登录或需求不清。
+
+**修复**：正式启动默认使用已有数据库 Files API，示例配置一致；不新增混合文件目录或绕过 owner/revision 校验。显式 false 仍用于受控兼容/回滚，模板预览可用，发布/加载在保存或 POST 前明确阻断并说明保全内容，避免假保存/假加载。模板错误区分缺源、无权限、结构、版本、非 JSON/空 JSON 网关响应，只在真正 401 时提示重新登录。helper 不再强制 true，浏览器新增默认启动与显式 false 两种闭环。
+
+**用户内容保全**：刷新前把实际 Chrome 的完整文件与实时 state、学习状态、模板填写内容备份到忽略的 artifacts/boardmix-local-detail-audit（不提交正文）。确认仅一份 active 文件、无文字草稿后，通过已存在的 Files API 创建新文件，不覆盖任何旧 GraphFile；保留原 sourceFileId，PUT 学习状态并 GET 对照完整 graphData/learningState。确定页面自备份以来没有新增编辑才刷新。刷新后的实际 Chrome 为 v349、isRemote=true、当前文件已在数据库，11 卡及 nodes/links/elements/tables/resources/mindmap/defaults 逐项一致；模板表单恢复，未替用户发布实际模板。又把同一实际图谱快照放入独立临时库验证发布201、预览200、加载201，卡片几何/外观和连线数保持；测试库正常清理。
+
+**博思对照**：实看原生博思画笔底部面板、右侧关闭、文字框选择反馈、连线快捷设置，以及模板中心缩略图→临时详细预览的缩放和拖动。对照中的临时连线已撤销，没有更改用户参考图谱。产品保留原主工具栏、卡片配色和现有预览结构，仅修确实复现的交互遗漏：
+
+1. 输入法选字期间请求切换工具/关闭，等待组合输入和保存完成后执行最后一次请求；保存失败保留草稿，不误切换。
+2. 右键按下缩放把手不再修改文字；仍可正常双右键退出。
+3. Esc/关闭/切只读取消橡皮长按定时器，正常长按行为保留。
+4. 文字缩放中切只读立即撤回预览且不保存。
+5. 拖折线受限方向时，按该段实际可动轴判断阈值，不再出现线未动却增加路径/撤销记录；四方向 4px 中点移动、取消及单次撤销验证。
+
+**验证**：完整 frontend 354、E2E 契约 9 与部署脚本契约通过；design 5；本轮相关源单测 51；相关后端模板/默认边界/Files API/迁移与 CLI 共 28。共享文本与 17 项画笔 browser 源场景通过；实际 home/临时画布/归纳/回忆与桌面1440、1024工具栏回归通过；连线完整交互与默认/显式关闭模板 E2E 均通过。旧 workspace-save 测试 fixture 补当前 owner，保留生产 owner 检查；旧 toolbar 测试更新为现行 aria/title/tooltip/SVG，不恢复已移除的伪元素文案。未运行本轮全量后端套件，未把自检视作用户验收。
+
+按 manage-new-legacy update --skip-browser 更新本地 active v349，public/site 与基线均为1,148个完全相同路径，admin-console存在；关键源码和 bundle 的5173 HTTP字节与 active release一致。所有本轮独立测试服务/数据库均已清理，用户5173继续运行。main/uat及远端引用未变，本轮不合并、不推送、不部署UAT。
