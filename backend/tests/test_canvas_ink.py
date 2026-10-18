@@ -59,7 +59,7 @@ def test_malformed_ink_is_rejected_by_both_consumers(changes):
     with pytest.raises(ValueError):
         request(strokes=ink)
     with pytest.raises(ValueError):
-        _workspace_values({"title": "ink", "payload": {"strokes": ink}})
+        _workspace_values({"title": "ink", "payload": {"strokes": ink}}, "ink-test-owner")
 
 
 @pytest.mark.parametrize("value", [None, {}, "ink", [None], [stroke(), stroke()]])
@@ -117,5 +117,5 @@ def test_optional_opacity_round_trips_through_both_consumers_without_changing_ol
             item = stroke(tool=tool, width=width, opacity=opacity, **({"text": "字"} if tool == "text" else {}))
             assert validate_strokes([item]) == [item]
             assert request(strokes=[item]).strokes == [item]
-            assert _workspace_values({"title": "ink", "payload": {"strokes": [item]}})[2]["strokes"] == [item]
+            assert _workspace_values({"title": "ink", "payload": {"strokes": [item]}}, "ink-test-owner")[2]["strokes"] == [item]
     assert "opacity" not in validate_strokes([stroke()])[0]
