@@ -20,9 +20,27 @@ with sync_playwright() as p:
                 if page.locator(sel).is_visible():page.locator(sel).click()
             page.locator('.graph-mode-trigger').click();page.locator('[data-graph-mode-option="professional"]').click()
         expect(page.locator(trigger)).to_be_enabled();page.wait_for_timeout(600)
+        # Pointer traversal while drawing must not animate red outlines or card shadows.
+        if mode!='home':
+            controller='KGRecallInk' if mode=='recall' else 'KGWorkspaceInk'
+            card=page.locator('#krQuestionCard' if mode=='recall' else '.qw-question-card').first
+            if mode=='workspace' and not card.count():
+                page.locator('#qwQuestionDockBtn').click();page.locator('[data-add-index]').first.click();page.keyboard.press('Escape');page.evaluate('KGMultiQuestionWorkspace.closeQuestionDrawer()')
+            page.evaluate(controller+'.setTool("pen")');page.mouse.move(1400,950);page.wait_for_timeout(250)
+            decoration='el=>({shadow:getComputedStyle(el).boxShadow,outline:getComputedStyle(el).outline})'
+            before_hover=card.evaluate(decoration);card.hover();page.wait_for_timeout(250)
+            assert card.evaluate(decoration)==before_hover,(mode,before_hover,card.evaluate(decoration))
+            page.evaluate(controller+'.setTool("select")')
         page.locator(trigger).click();toolbar=page.locator('.canvas-ink-toolbar');toolbar.get_by_role('button',name='橡皮擦',exact=True).dblclick();toolbar.get_by_role('button',name='文字',exact=True).click()
         expect(toolbar.get_by_role('slider',name='文字字号')).to_have_count(0);expect(page.get_by_role('button',name='保存画布文字')).to_have_count(0)
-        page.mouse.click(230,280);editor=page.get_by_role('textbox',name='画布文字内容');expect(editor).to_be_visible();editor.fill('画布文字回归\n第二行')
+        page.mouse.click(230,280);editor=page.get_by_role('textbox',name='画布文字内容');expect(editor).to_be_visible()
+        editor.fill('短文字');short=editor.bounding_box()['height'];editor.fill('一\n二\n三\n四\n');assert editor.bounding_box()['height']>short*2
+        editor.fill('短文字');assert abs(editor.bounding_box()['height']-short)<1
+        editor.evaluate('el=>el.setSelectionRange(1,2)');border=page.locator('[data-ink-edit-drag=top]');edge=border.bounding_box();origin=editor.bounding_box()
+        page.mouse.move(edge['x']+20,edge['y']+3);page.mouse.down();page.mouse.move(edge['x']+50,edge['y']+23,steps=5);page.mouse.up()
+        expect(editor).to_be_focused();assert editor.evaluate('el=>[el.selectionStart,el.selectionEnd]')==[1,2]
+        assert abs(editor.bounding_box()['x']-origin['x']-30)<1
+        editor.fill('画布文字回归\n第二行')
         toolbar.get_by_role('button',name='红色',exact=True).click();toolbar.get_by_role('button',name='文字加粗',exact=True).click();expect(editor).to_have_value('画布文字回归\n第二行')
         # Native deletion and IME remain inside editor, including outside clicks while composing.
         editor.press('End');editor.press('Backspace');editor.type('行');expect(editor).to_have_value('画布文字回归\n第二行')

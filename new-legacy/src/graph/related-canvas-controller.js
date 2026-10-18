@@ -52,8 +52,9 @@
         getViewport:()=>viewport,
         getStrokes:()=>inkStrokes,
         setStrokes:strokes=>{inkStrokes=strokes;ink.render()},
-        // 弹层整体带 [data-stage-ui]，默认命中判定会拒绝；此处按临时画布 stage 重新判定。
-        isInside:target=>!target?.closest?.('[data-canvas-ui]')&&(target===stage||stage.contains(target)),
+        // 弹层整体带 [data-stage-ui]，默认命中判定会拒绝；此处按临时视口判定，包含变换后 stage 外的空白。
+        isInside:target=>!target?.closest?.('[data-canvas-ui]')&&(target===viewportEl||viewportEl.contains(target)),
+        isReadonly:readOnly,onOpenChange:value=>{inkOpen=value},
         onError:error=>global.console?.warn?.('临时画布画笔：',error?.message||error)
       });
       return ink;
@@ -98,6 +99,8 @@
     // Capture before formal document shortcuts, including events whose focus remained behind the modal.
     const key=e=>{
       if(closed)return;
+      // Native text/IME keys belong to the shared draft editor, including Escape.
+      if(e.target?.closest?.('.canvas-ink-text-editor'))return;
       if(e.key==='Escape'){
         e.preventDefault();
         // 画笔激活时 ESC 先退出绘画，再按一次才关闭弹层。

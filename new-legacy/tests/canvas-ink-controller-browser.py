@@ -22,6 +22,14 @@ with sync_playwright() as pw:
     page.locator('#launch').click()
     expect(page.locator('.canvas-ink-toolbar')).to_be_visible()
     pen=page.get_by_role('button',name='画笔',exact=True)
+    close=page.get_by_role('button',name='关闭画笔工具',exact=True)
+    expect(close).to_be_visible()
+    page.mouse.move(500,400);page.mouse.down();page.mouse.move(540,420,steps=3)
+    close.evaluate('el=>el.click()');page.mouse.up()
+    assert page.evaluate('ink.tool')=='select' and page.evaluate('strokes.length')==0
+    expect(page.locator('.canvas-ink-toolbar')).to_be_hidden()
+    assert not page.locator('#view').evaluate('el=>el.classList.contains("canvas-ink-drawing")')
+    page.locator('#launch').click()
     # Boardmix 式交互：单击只切换工具，双击绘图工具才展开颜色和粗细设置。
     pen.click()
     expect(page.locator('.canvas-ink-options')).to_be_hidden()
