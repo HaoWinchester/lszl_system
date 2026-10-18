@@ -39,3 +39,29 @@ test('outer segment movement beyond twelve corners renders every orthogonal segm
  const points=[start,...plain(rendered.waypoints),end];
  for(let i=1;i<points.length;i++)assert.ok(points[i].x===points[i-1].x||points[i].y===points[i-1].y,JSON.stringify(points));
 });
+
+for(const [hasField,originalFields] of [[false,undefined],[true,undefined],[true,[]],[true,['fontSize']]]){
+ test(`cancelled color preview preserves ${hasField?JSON.stringify(originalFields):'absent'} manual fields and permits the next theme`,()=>{
+  const context={window:{},console,Math,Number,String,Array,Map,Set,nodeColorEditSession:null,nodeToolbarTextElement:()=>null,nodeToolbarSelectedIds:()=>['a'],render(){}};
+  vm.createContext(context);
+  for(const name of ['graph-model.js','mindmap-themes.js'])vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'../src/graph',name),'utf8'),context);
+  const model=context.window.KGGraphModel,themes=context.window.KGGraphMindmapThemes;
+  const graph={nodes:[model.normalizeNode({id:'a',title:'Color cancellation'})],links:[]},node=graph.nodes[0];
+  themes.apply(graph,{themeId:'blue',override:true});
+  if(!hasField)delete node.manualAppearanceFields;else node.manualAppearanceFields=originalFields?.slice();
+  const before=plain(model.appearanceOf(node));
+  Object.assign(context,{nodeById:id=>graph.nodes.find(item=>item.id===id),safeColor:model.safeColor});
+  vm.runInContext(source.slice(source.indexOf('function nodeColorLabel('),source.indexOf('function ensureNodeFloatingColorWindow(')),context);
+  context.previewNodeColorEdit('body-fill',{color:'#aa3c3c',opacity:1});
+  assert.equal(model.appearanceOf(node).fillColor,'#aa3c3c');
+  context.previewNodeColorEdit('body-fill',{color:'#336699',opacity:.5});
+  context.cancelNodeColorEdit();
+  assert.deepEqual(plain(model.appearanceOf(node)),before,'cancel restores every appearance field');
+  const restoredFields=node.manualAppearanceFields===undefined?undefined:plain(node.manualAppearanceFields);
+  const restoredOwnField=Object.hasOwn(node,'manualAppearanceFields');
+  themes.apply(graph,{themeId:'paper'});
+  assert.equal(model.appearanceOf(node).fillColor,'#fef3c7','cancel must not mark the previewed background as manually customized');
+  assert.deepEqual(restoredFields,originalFields,'cancel restores all original manual fields');
+  assert.equal(restoredOwnField,hasField,'cancel preserves whether the property originally existed');
+ });
+}

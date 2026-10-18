@@ -125,7 +125,7 @@
         clearTimeout(currentSession.blurTimer);
         currentSession.blurTimer=setTimeout(()=>{if(session===currentSession&&!document.activeElement?.closest?.('.node-style-toolbar,.node-floating-color-window'))commit()},160);
       });
-      requestAnimationFrame(()=>placeCaretAtEnd(editor));
+      requestAnimationFrame(()=>{if(session===currentSession&&document.activeElement!==editor)placeCaretAtEnd(editor)});
       if(typeof options.onStart==='function')options.onStart({nodeId:session.nodeId,entityType:session.entityType,multiline,editor});
       return true;
     }

@@ -743,6 +743,7 @@ input[type=file]{display:none}
   font-weight:950;
   box-shadow:0 10px 24px color-mix(in srgb,var(--role-primary,#7c3aed) 22%,transparent),0 0 0 1px rgba(255,255,255,.28) inset;
 }
+#upgradeMemberBtn[hidden]{display:none!important}
 .upgrade-member-btn:hover{
   box-shadow:0 13px 30px color-mix(in srgb,var(--role-primary,#7c3aed) 28%,transparent),0 0 0 1px rgba(255,255,255,.34) inset;
 }

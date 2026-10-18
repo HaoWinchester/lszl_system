@@ -734,7 +734,6 @@ initCanvasZoomDock();
 window.KGHomeToolbarActions={
   addNode:addAtCenter,
   addTextElement:()=>graphModeAllows('editGraph')&&window.KGHomeInk?.activateText?.(),
-  insertTable:event=>window.KGHomeTables?.openInsertPanel?.(event?.currentTarget||document.getElementById('addTableBtn')),
   openFlashcards:()=>openFlashcards('current'),
   fitView,
   zoomIn:()=>zoomAtCenterStep(1),

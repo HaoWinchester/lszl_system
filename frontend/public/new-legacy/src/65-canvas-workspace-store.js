@@ -353,8 +353,14 @@
         updatedAt:Number.isFinite(updatedAt)?updatedAt:payload.updatedAt
       },{userId,workspaceId:String(item?.id||payload.id||'')});
     }).filter(workspace=>workspace.id);
-    if(!rows.length)return {catalog:clone(ensureCatalog({userId})),workspaces:listWorkspaces({userId})};
     const previous=readCatalog(userId);
+    if(!rows.length){
+      // An empty authoritative response must not revive or upload stale cached bodies.
+      new Set([DEFAULT_WORKSPACE_ID,...(previous?.workspaces||[]).map(item=>item.id)]).forEach(id=>removeWorkspaceStorage(userId,id));
+      const catalog=writeCatalog(emptyCatalog(userId));
+      notify('server-hydrated',null,{workspaceIds:[],userId});
+      return {catalog:clone(catalog),workspaces:[]};
+    }
     const serverIds=new Set(rows.map(workspace=>workspace.id));
     (previous?.workspaces||[]).forEach(item=>{
       if(serverIds.has(String(item.id)))return;
