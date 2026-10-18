@@ -1,14 +1,10 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.339",
+  "fromVersion": "v9.0-p4.1.340",
   "toVersion": "v9.0-p4.1.340",
   "changes": {
     "added": [],
-    "changed": [
-      "VERSION",
-      "content-prep-studio/dist/content-prep.html",
-      "tests/graph-interaction-focus-browser.py"
-    ],
+    "changed": [],
     "removed": []
   },
   "incompatible": []
