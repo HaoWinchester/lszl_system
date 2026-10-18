@@ -66,7 +66,7 @@
       tools: [
         {id:"templateBtn", label:"模板", ariaLabel:"选择模板", tooltip:"模板", icon:"template", shortcut:"T", permission:"editGraph", action:"openTemplate", shortTip:"模板"},
         {id:"addBtn", label:"新增知识点", tooltip:"新增知识点", icon:"add", shortcut:"N", className:"primary", permission:"editGraph", action:"addNode", shortTip:"新增"},
-        {id:"addTextElementBtn", label:"新增文本框", tooltip:"新增独立文本框", icon:"textBox", permission:"editGraph", action:"addTextElement", shortTip:"文本"},
+        {id:"addTextElementBtn", label:"新增文本框", tooltip:"文字：点击画布输入", icon:"textBox", permission:"editGraph", action:"addTextElement", shortTip:"文本"},
         {id:"focusBtn", label:"重点聚焦", tooltip:"重点聚焦", icon:"focus", shortcut:"F", className:"focus-menu-btn", action:"toggleFocus", shortTip:"聚焦"},
         {id:"flashcardBtn", label:"记忆闪卡", tooltip:"记忆闪卡", icon:"flashcard", shortcut:"K", className:"flash-menu-btn", permission:"editGraph", action:"openFlashcards", shortTip:"闪卡"},
         {id:"graphQuestionBatchBtn", label:"批量添加题目", ariaLabel:"批量添加题目", tooltip:"为知识卡片批量匹配题目", icon:"question", permission:"editQuestions", action:"openGraphQuestionBatch"},
@@ -211,10 +211,10 @@
     const el = document.getElementById(tool.id);
     if(!el || el.disabled || el.hidden) return false;
     const host = el.closest('[hidden], .permission-hidden');
-    if(host) return false;
+    if(host&&host.id!=="toolbarFormatPanel") return false;
     const styleTarget = el.type === 'color' && el.parentElement ? el.parentElement : el;
     const style = window.getComputedStyle ? window.getComputedStyle(styleTarget) : null;
-    if(style && (style.display === 'none' || style.visibility === 'hidden' || style.pointerEvents === 'none')) return false;
+    if(style && (style.display === 'none' || style.visibility === 'hidden' || (style.pointerEvents === 'none'&&!el.closest('.floating-submenu')))) return false;
     return true;
   }
   function handleToolbarShortcut(event){
@@ -227,6 +227,8 @@
     if(typeof handler !== "function") return;
     event.preventDefault();
     event.stopPropagation();
+    const format=document.getElementById('toolbarFormatPanel');
+    if(format?.hidden&&format.contains(document.getElementById(tool.id))){format.hidden=false;document.getElementById('toolbarFormatBtn')?.setAttribute('aria-expanded','true')}
     handler(event, tool);
   }
   if(!window.__KGHomeToolbarShortcutBound){
@@ -255,6 +257,7 @@
         closeFloatingSubmenus(shell);
         shell.classList.toggle('menu-open',open);
         trigger.setAttribute('aria-expanded',open?'true':'false');
+        if(open)positionSubmenu(shell);
       });
       trigger.addEventListener('keydown',event=>{
         if(event.key==='Enter'||event.key===' '||event.key==='ArrowRight'){
@@ -263,6 +266,7 @@
           closeFloatingSubmenus(shell);
           shell.classList.add('menu-open');
           trigger.setAttribute('aria-expanded','true');
+          positionSubmenu(shell);
           const first=shell.querySelector('.floating-submenu button');
           if(first)first.focus();
         }
@@ -276,8 +280,16 @@
     },true);
     document.addEventListener('keydown',event=>{if(event.key==='Escape')closeFloatingSubmenus()});
   }
+  function positionSubmenu(shell){
+    window.KGCanvasFloatingToolbarController?.positionPopoverPanel?.({root:shell,host:document.getElementById('stage'),panel:shell.querySelector('.floating-submenu'),trigger:shell.querySelector('.floating-menu-trigger'),fixed:true,getAvoidRects:()=>[document.getElementById('floatingToolbox').getBoundingClientRect()]});
+  }
   function bindHandlers(){
     bindMenuShells();
+    const format=document.getElementById('toolbarFormatBtn'),panel=document.getElementById('toolbarFormatPanel');
+    if(format&&panel&&!format.dataset.bound){
+      format.dataset.bound='1';
+      format.addEventListener('click',()=>{const open=format.getAttribute('aria-expanded')!=='true';panel.hidden=!open;format.setAttribute('aria-expanded',String(open));closeFloatingSubmenus()});
+    }
     flattenTools().forEach(tool => {
       if(!tool.id || !tool.action) return;
       const el = document.getElementById(tool.id);
@@ -298,23 +310,38 @@
     bindHandlers();
   }
 
+  function bindToolbarHints(box){
+    if(box.dataset.hintsBound)return;box.dataset.hintsBound='1';
+    const host=document.getElementById('stage'),hint=document.createElement('div');
+    hint.className='home-toolbar-hint';hint.setAttribute('role','tooltip');hint.hidden=true;host.appendChild(hint);
+    let timer=0;
+    const hide=()=>{clearTimeout(timer);hint.hidden=true};
+    const show=event=>{const trigger=event.target.closest?.('[data-tooltip]');if(!trigger||!box.contains(trigger))return;hide();timer=setTimeout(()=>{if(!trigger.isConnected)return;hint.textContent=trigger.dataset.tooltip;hint.hidden=false;window.KGCanvasFloatingToolbarController?.positionPopoverPanel?.({root:host,host,panel:hint,trigger,getAvoidRects:()=>[box.getBoundingClientRect()]})},60)};
+    box.addEventListener('pointerover',show);box.addEventListener('focusin',show);
+    box.addEventListener('pointerout',hide);box.addEventListener('focusout',hide);box.addEventListener('scroll',hide,true);box.addEventListener('pointerdown',hide);
+    window.addEventListener('resize',hide);
+  }
   function renderToolbar(){
     const box = document.getElementById("floatingToolbox");
     if(!box) return;
     const visibleGroups = HOME_TOOL_GROUPS
       .map(group => ({...group, tools: visibleToolsForGroup(group)}))
       .filter(group => group.tools.some(tool => tool.type !== "file"));
+    const formatIds=new Set(['sizeMenuBtn','lineStyleMenuBtn','lineColorPicker']);
+    const formatTools=visibleGroups.flatMap(group=>group.tools).filter(tool=>formatIds.has(tool.id));
     const fileTools = HOME_TOOL_GROUPS.flatMap(group => visibleToolsForGroup(group)).filter(tool => tool.type === "file");
     box.innerHTML = `
       <button aria-label="拖动工具菜单" class="floating-toolbox-handle" id="floatingToolboxHandle" title="按住拖动菜单" type="button">${ICONS.grip}</button>
       <div class="floating-toolbox-grid">
         ${visibleGroups.map((group, groupIndex) => {
-          const html = group.tools.filter(tool => tool.type !== "file").map(renderTool).join("\n");
+          const html = group.tools.filter(tool => tool.type !== "file"&&!formatIds.has(tool.id)).map(renderTool).join("\n");
           return `${groupIndex ? '<div aria-hidden="true" class="floating-toolbox-divider"></div>' : ''}${html}`;
         }).join("\n")}
+        ${formatTools.length?`<button id="toolbarFormatBtn" type="button" class="floating-tool-btn" data-permission="editGraph" data-permission-mode="hide" aria-label="更多格式" aria-expanded="false" aria-controls="toolbarFormatPanel" data-tooltip="更多格式">${ICONS.style}</button><div id="toolbarFormatPanel" class="floating-format-panel" role="group" aria-label="专业格式" hidden>${formatTools.map(renderTool).join('')}</div>`:''}
         ${fileTools.map(renderTool).join("\n")}
       </div>
     `;
+    bindToolbarHints(box);
     box.dataset.renderedBy = "home-toolbar-registry";
     box.dataset.graphInteractionMode = activeMode;
 
@@ -323,6 +350,7 @@
       roleApi.decoratePermissionElements(box);
     }
     bindHandlers();
+    box.querySelector('.floating-toolbox-grid')?.addEventListener('scroll',()=>document.querySelectorAll('.floating-tool-menu-shell.menu-open').forEach(positionSubmenu));
     window.dispatchEvent(new Event("kg-home-toolbar-rendered"));
   }
   function setMode(mode){

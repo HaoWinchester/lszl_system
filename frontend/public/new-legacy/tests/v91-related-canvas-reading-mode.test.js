@@ -35,7 +35,8 @@ test('related canvas supports read-only mode and a local ink tool',()=>{
   // 画笔：局部实例、笔迹不持久化、ESC 先退绘画、关闭时清理。
   assert.match(controller,/data-action="ink"/);
   assert.match(controller,/isInside:target=>!target\?\.closest\?\.\('\[data-canvas-ui\]'\)/);
-  assert.match(controller,/let ink=null,inkOpen=false,inkStrokes=\[\]/);
+  assert.match(controller,/graph\(\)\.strokes=\[\]/);
+  assert.match(controller,/getStrokes:\(\)=>graph\(\)\.strokes/);
   assert.match(controller,/ink\.setTool\('select'\);e\.stopImmediatePropagation\(\);return/);
   assert.match(controller,/ink\.reset\(\{discardDraft:true\}\)/);
   // 弹层快捷键挂 window 捕获，先于画笔内核处理 ESC。

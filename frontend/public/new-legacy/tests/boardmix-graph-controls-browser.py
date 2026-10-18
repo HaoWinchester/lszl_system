@@ -1,0 +1,89 @@
+"""Graph toolbar polish, shared new text and target avoidance on a disposable DB."""
+import argparse,uuid
+from pathlib import Path
+from playwright.sync_api import sync_playwright,expect
+p=argparse.ArgumentParser();p.add_argument('--base-url',required=True);base=p.parse_args().base_url.rstrip('/');assert base.startswith('http://127.0.0.1:')
+out=Path(__file__).resolve().parents[2]/'artifacts/boardmix-interaction-polish/task-2';out.mkdir(parents=True,exist_ok=True)
+with sync_playwright() as pw:
+ browser=pw.chromium.launch(channel='chrome');ctx=browser.new_context(viewport={'width':1440,'height':1000})
+ assert ctx.request.post(base+'/api/v1/auth/login',data={'username':'ink-browser','password':'ink-browser-test'}).ok
+ graph={'nodes':[{'id':'a','title':'学习计划','x':400,'y':220},{'id':'b','title':'理解知识','x':780,'y':520}], 'links':[{'id':'ab','from':'a','to':'b','pathStyle':'curve'}], 'elements':[{'id':'old','elementType':'text','text':'历史文字','x':820,'y':120,'width':180,'height':80,'fontSize':20,'manualSize':True}], 'viewport':{'x':0,'y':0,'scale':1}}
+ r=ctx.request.post(base+'/api/v1/files',data={'name':'控件回归'+uuid.uuid4().hex[:8],'graphData':graph});assert r.ok;fid=r.json()['file']['id'];assert ctx.request.put(base+'/api/v1/files/current',data={'fileId':fid}).ok
+ page=ctx.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
+ def ready():
+  page.wait_for_function('!!window.KGHomeInk&&!KGGraphFileTabs.isSwitching()')
+  for s in ['#learningEntryDismissBtn','.tour-skip','#hideHelpBtn']:
+   if page.locator(s).is_visible():page.locator(s).click()
+ def mode(value):
+  page.locator('.graph-mode-trigger').click();page.locator('[data-graph-mode-option="'+value+'"]').click()
+ page.goto(base+'/index.html',wait_until='networkidle');ready();mode('professional')
+ page.evaluate('()=>{state.viewport={x:0,y:0,scale:1};applyTransform();state.selectedNodeId="a";selectedNodeIds.add("a");refreshSelectionUI()}')
+ # Visible text entry must activate the same shared editor, not create a native element.
+ page.locator('#addTextElementBtn').click();expect(page.locator('.canvas-ink-toolbar')).to_be_visible();expect(page.locator('button[data-ink-tool=text]')).to_have_attribute('aria-pressed','true')
+ assert page.evaluate('state.selectedNodeId') is None
+ page.mouse.click(300,720);editor=page.locator('.canvas-ink-text-editor');expect(editor).to_be_focused();editor.fill('左栏文字');page.mouse.click(1100,720);expect(editor).to_have_count(0)
+ assert page.evaluate('state.elements.length')==1
+ page.locator('button[data-ink-tool=text]').click();page.mouse.click(500,720);expect(editor).to_be_focused();editor.fill('画笔文字');page.mouse.click(1100,720);expect(editor).to_have_count(0)
+ assert page.evaluate('state.strokes.filter(s=>s.tool==="text").map(s=>s.text)')==['左栏文字','画笔文字']
+ page.locator('#addTextElementBtn').click();page.mouse.click(650,720);editor.fill('取消草稿');page.keyboard.press('Escape');expect(editor).to_have_count(0);assert page.evaluate('state.strokes.length')==2
+ page.evaluate('KGHomeInk.setOpen(false)');assert page.evaluate('persistCurrentGraphNow()')
+ page.reload(wait_until='networkidle');ready();mode('professional');assert page.evaluate('state.strokes.length')==2
+ assert page.evaluate('startTextElementInlineEdit("old")');old=page.locator('[data-node-inline-editor=true]');old.fill('历史仍可编辑');page.mouse.click(1100,720);expect(old).to_have_count(0)
+ assert page.evaluate('KGGraphFileAutosave.saveAcknowledged({force:true})')
+ assert ctx.request.get(base+'/api/v1/files/'+fid).json()['graphData']['elements'][0]['text']=='历史仍可编辑'
+ # Entering shared text preserves failed and IME-composing historical drafts.
+ def fail(route):
+  if route.request.method in ('POST','PUT','PATCH','DELETE'):route.fulfill(status=503,content_type='application/json',body='{"detail":"offline"}')
+  else:route.continue_()
+ for scenario in ['failed','composing']:
+  assert page.evaluate('startTextElementInlineEdit("old")');old.fill('历史未完成'+scenario)
+  if scenario=='failed':page.route('**/api/v1/files/**',fail)
+  else:old.dispatch_event('compositionstart')
+  page.locator('#addTextElementBtn').click();expect(old).to_have_text('历史未完成'+scenario);expect(old).to_have_attribute('contenteditable','plaintext-only')
+  if scenario=='failed':expect(old).to_have_attribute('data-save-state','failed');page.unroute('**/api/v1/files/**',fail)
+  else:old.dispatch_event('compositionend')
+  page.evaluate('nodeInlineTextEditorController.commit()');expect(old).to_have_count(0);page.evaluate('KGHomeInk.setOpen(false)')
+ # Existing professional shortcuts remain available while formats are collapsed.
+ page.locator('#stage').focus();page.keyboard.press('2');expect(page.locator('#toolbarFormatBtn')).to_have_attribute('aria-expanded','true');assert page.evaluate('state.defaults.nodeSize')=='big'
+ page.locator('#toolbarFormatBtn').click();page.locator('#addTextElementBtn').hover();expect(page.locator('.home-toolbar-hint')).to_have_text('文本');page.mouse.move(1100,720)
+ # Format expands without rebuilding the rail or losing ink/capture handlers.
+ rail=page.locator('#floatingToolbox');assert 48<=rail.bounding_box()['width']<=56
+ expect(page.locator('#sizeMenuBtn')).to_be_hidden();page.locator('#toolbarFormatBtn').click();expect(page.locator('#sizeMenuBtn')).to_be_visible()
+ page.screenshot(path=str(out/'format-expanded.png'));page.locator('#sizeMenuBtn').click();page.locator('#sizeSmallBtn').click();assert page.evaluate('state.defaults.nodeSize')=='small'
+ page.locator('#toolbarFormatBtn').click();expect(page.locator('#sizeMenuBtn')).to_be_hidden();page.locator('#homeInkBtn').click();expect(page.locator('.canvas-ink-toolbar')).to_be_visible();page.locator('#homeInkBtn').click()
+ # Names/current states and visible primary versus discoverable auxiliary controls.
+ page.evaluate('()=>{clearSelection();selectLink("ab")}')
+ primary=page.locator('[data-edge-control-kind=curve-midpoint]');aux=page.locator('[data-edge-control-kind=curve-control]').first
+ expect(primary).to_have_attribute('data-edge-control-index','2');expect(aux).to_have_attribute('tabindex','0')
+ assert float(aux.locator('.edge-control-dot').evaluate('(e)=>getComputedStyle(e).opacity'))<1
+ aux.focus();page.wait_for_timeout(200);assert float(aux.locator('.edge-control-dot').evaluate('(e)=>getComputedStyle(e).opacity'))==1
+ line=page.locator('[data-uc-edge-panel=line]');line.click();expect(page.get_by_role('button',name='曲线',exact=True)).to_have_attribute('aria-pressed','true')
+ page.get_by_role('button',name='折线',exact=True).click();expect(line).to_have_attribute('aria-label','线条类型：折线')
+ line.click();page.get_by_role('button',name='曲线',exact=True).click()
+ # A real grip drag keeps its dock after panning and a double-click resets it.
+ grip=page.locator('#edgeQuickStylePanel [data-uc-toolbar-drag]');box=grip.bounding_box();page.mouse.move(box['x']+15,box['y']+15);page.mouse.down();page.mouse.move(box['x']+75,box['y']+65,steps=8);page.mouse.up();assert page.evaluate('selectedEdgeQuickStyleToolbarController.isManual()')
+ dock=page.locator('#edgeQuickStylePanel').bounding_box();page.evaluate('()=>{state.viewport.x+=20;applyTransform()}');after=page.locator('#edgeQuickStylePanel').bounding_box();assert abs(dock['x']-after['x'])<2 and abs(dock['y']-after['y'])<2
+ grip.dblclick();assert not page.evaluate('selectedEdgeQuickStyleToolbarController.isManual()');page.evaluate('()=>{state.viewport.x=0;applyTransform()}')
+ # Deliberately dock near the selected curve; secondary panels must choose a free side.
+ for scale in [1,.5,2]:
+  page.evaluate('(scale)=>{state.viewport.scale=scale;applyTransform();selectedEdgeQuickStyleToolbarController.setPosition(500,260)}',scale)
+  for name in ['color','line','ports']:
+   trigger=page.locator('[data-uc-edge-panel='+name+']');trigger.click();panel=page.locator('[data-uc-edge-popover='+name+']');expect(panel).to_be_visible();page.wait_for_timeout(170)
+   result=panel.evaluate('''e=>{const p=e.getBoundingClientRect(),s=stage.getBoundingClientRect(),rects=selectedEdgePopoverAvoidRects();return {bounded:p.left>=s.left&&p.right<=s.right&&p.top>=s.top&&p.bottom<=s.bottom,overlap:rects.some(r=>p.left<r.right&&p.right>r.left&&p.top<r.bottom&&p.bottom>r.top)}}''')
+   assert page.evaluate('stage.scrollLeft===0&&stage.scrollTop===0'),page.evaluate('({x:stage.scrollLeft,y:stage.scrollTop})')
+   assert result['bounded'] and not result['overlap'],(scale,name,result)
+   page.screenshot(path=str(out/f'edge-{scale}-{name}.png'));page.keyboard.press('Escape')
+ page.evaluate('()=>{state.viewport.scale=1;applyTransform()}');page.evaluate('selectedEdgeQuickStyleToolbarController.closePanels()');page.wait_for_timeout(180);page.screenshot(path=str(out/'desktop.png'))
+ # Fullscreen retains real edge panel hit testing and bounded placement.
+ page.evaluate('()=>{const b=document.createElement("button");b.id="task2-fullscreen";b.style.cssText="position:fixed;top:100px;right:30px;z-index:99999";b.textContent="fullscreen";b.onclick=()=>stage.requestFullscreen();document.body.append(b)}');page.locator('#task2-fullscreen').click();page.wait_for_function('!!document.fullscreenElement')
+ line.click();popover=page.locator('[data-uc-edge-popover=line]');expect(popover).to_be_visible();page.wait_for_timeout(180)
+ assert popover.evaluate('(e)=>{const r=e.getBoundingClientRect(),s=stage.getBoundingClientRect();return r.left>=s.left&&r.right<=s.right&&r.top>=s.top&&r.bottom<=s.bottom}')
+ page.screenshot(path=str(out/'fullscreen-edge.png'));page.evaluate('document.exitFullscreen()');page.wait_for_function('!document.fullscreenElement');page.evaluate('document.getElementById("task2-fullscreen").remove()')
+ mode('reading');expect(page.locator('#addTextElementBtn')).to_have_count(0);expect(page.locator('#toolbarFormatBtn')).to_have_count(0)
+ mode('efficient');expect(page.locator('#addTextElementBtn')).to_be_visible();expect(page.locator('#toolbarFormatBtn')).to_have_count(0)
+ page.evaluate('document.body.classList.add("auth-readonly")');assert page.evaluate('KGHomeInk.activateText()') is False;page.evaluate('document.body.classList.remove("auth-readonly")')
+ page.set_viewport_size({'width':900,'height':640});mode('professional');assert rail.bounding_box()['y']+rail.bounding_box()['height']<=page.locator('#stage').bounding_box()['y']+page.locator('#stage').bounding_box()['height']-50
+
+ page.locator('#toolbarFormatBtn').click();page.locator('#sizeMenuBtn').click();expect(page.locator('#sizeSmallBtn')).to_be_visible();page.wait_for_timeout(180);page.screenshot(path=str(out/'short-viewport.png'));page.locator('#sizeDefaultBtn').click();assert page.evaluate('state.defaults.nodeSize')==''
+ assert not errors,errors;ctx.request.delete(base+'/api/v1/files/'+fid);browser.close()
+print('PASS graph shared text, native history, compact formats/modes, handles, names and target-avoiding popovers')

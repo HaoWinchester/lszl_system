@@ -49,6 +49,18 @@ def main():
         page.mouse.move(blank['x'],blank['y']);page.mouse.down();page.mouse.move(blank['x']+35,blank['y']+15,steps=5);page.mouse.up()
         expect(page.locator('.related-canvas-backdrop .canvas-ink-layer path')).to_have_count(1)
         local=page.locator('.related-canvas-backdrop .canvas-ink-toolbar')
+        # Local selection owns both deletion keys and keyboard history, even while a card stays selected.
+        paths=page.locator('.related-canvas-backdrop .canvas-ink-layer path')
+        original_path=paths.first.get_attribute('d');local_cards=page.locator('.related-canvas-card').count()
+        local.get_by_role('button',name='选择',exact=True).click()
+        for key in ['Delete','Backspace']:
+            midpoint=paths.first.evaluate('(el)=>{const p=el.getPointAtLength(el.getTotalLength()/2),s=new DOMPoint(p.x,p.y).matrixTransform(el.getScreenCTM());return {x:s.x,y:s.y}}')
+            page.mouse.click(midpoint['x'],midpoint['y']);page.keyboard.press(key)
+            expect(paths).to_have_count(0);expect(page.locator('.related-canvas-card')).to_have_count(local_cards)
+            page.keyboard.press('Control+z');expect(paths).to_have_count(1);assert paths.first.get_attribute('d')==original_path
+            page.keyboard.press('Control+Shift+z');expect(paths).to_have_count(0)
+            page.keyboard.press('Control+z');expect(paths).to_have_count(1)
+            assert not writes,writes
         local.get_by_role('button',name='文字',exact=True).click();page.mouse.click(blank['x'],blank['y']+35)
         editor=page.get_by_role('textbox',name='画布文字内容');expect(editor).to_be_visible();editor.fill('临时空白文字');editor.press('Control+Enter');expect(editor).to_have_count(0)
         expect(page.locator('.related-canvas-backdrop .canvas-ink-layer text')).to_contain_text('临时空白文字')
@@ -65,6 +77,8 @@ def main():
         page.keyboard.press('Escape')  # 再按一次退出绘画后关闭弹层
         expect(page.locator('.related-canvas-backdrop')).to_have_count(0)
         open_selected(['a','c']);assert page.locator('.related-canvas-card').count()==4
+        page.locator('[data-action=ink]').click();expect(page.locator('.related-canvas-backdrop .canvas-ink-layer [data-stroke-id]')).to_have_count(0)
+        page.locator('[data-action=ink]').click()
         card=page.locator('.related-canvas-card[data-node-id="a"]');r=card.bounding_box();page.mouse.move(r['x']+60,r['y']+40);page.mouse.down();page.mouse.move(r['x']+110,r['y']+70,steps=8);page.mouse.up()
         assert page.evaluate('relatedCanvasController.session.getState().nodes[0].x')!=400
         edge_point=page.locator('.related-canvas-edges path[data-link-id="ab"]').evaluate('(p)=>{const q=p.getPointAtLength(p.getTotalLength()/2),m=p.getScreenCTM();return {x:q.x*m.a+q.y*m.c+m.e,y:q.x*m.b+q.y*m.d+m.f}}')

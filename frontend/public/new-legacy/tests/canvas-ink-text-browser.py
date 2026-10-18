@@ -62,7 +62,8 @@ with sync_playwright() as pw:
     assert page.evaluate('strokes[0].points[0]')==[original['points'][0][0]+20,original['points'][0][1]+20]
     expect(editor).to_have_count(0)
     text.click();expect(page.get_by_role('button',name='文字加粗',exact=True)).to_have_attribute('aria-pressed','true')
-    expect(page.get_by_role('slider',name='文字字号')).to_have_count(0)
+    expect(page.get_by_role('spinbutton',name='文字字号',exact=True)).to_be_visible()
+    expect(page.get_by_role('spinbutton',name='文字字号',exact=True)).to_have_value('24')
     page.get_by_role('button',name='红色',exact=True).click()
     assert page.evaluate('strokes[0].width')==24
     assert page.evaluate('strokes[0].bold') is True
