@@ -16,18 +16,30 @@
       const applied={};for(const [key,value] of Object.entries(patch)){const defaultValue=baseline[key]??model.DEFAULT_APPEARANCE[key];if(override||(!manual.includes(key)&&current[key]===defaultValue))applied[key]=value}
       // A preset surface is explicit, while per-field provenance protects later edits.
       n.manualAppearanceFields=override?[]:[...new Set([...manual,...Object.keys(patch).filter(k=>current[k]!== (baseline[k]??model.DEFAULT_APPEARANCE[k]))])];
-      model.updateAppearance(n,{...applied,surfaceCustomized:true},{theme:true});n.mindmapTheme={id:themeId,baseline:{...current,...applied}};
+      model.updateAppearance(n,{...applied,surfaceCustomized:true},{theme:true});n.mindmapTheme={id:themeId,baseline:{...model.appearanceOf(n)}};
     }
     for(const l of graph.links||[]){if(!ids.has(l.from)||!ids.has(l.to))continue;const old=l.mindmapTheme?.baseline||{color:graph.defaults?.linkColor||'#64748b',lineStyle:graph.defaults?.linkStyle||'solid',strokeWidth:4};const manual=new Set(override?[]:l.manualAppearanceFields||[]),patch={color:themeId==='branches'?['#16a34a','#2563eb','#9333ea','#ea580c'][(branches.get(l.to)||0)%4]:theme.color,lineStyle:theme.lineStyle,strokeWidth:2};for(const [k,v] of Object.entries(patch)){if(l[k]!=null&&l[k]!==old[k]&&!override)manual.add(k);if(override||!manual.has(k))l[k]=v}l.manualAppearanceFields=[...manual];l.mindmapTheme={id:themeId,baseline:{color:l.color,lineStyle:l.lineStyle,strokeWidth:l.strokeWidth}}}
     graph.mindmap={...(graph.mindmap||{}),themeId,schemaVersion:1};return theme;
   }
-  function controls(host,{getGraph,getSelectedIds,runLayout,runTheme}){
+  function controls(host,{getGraph,getSelectedIds,runLayout,runTheme,runUndo}){
     const panel=document.createElement('div');panel.dataset.mindmapControls='true';
-    const graph=getGraph();panel.innerHTML='<div class="mm-row mm-layout-row"><label class="mm-field">作用范围 <select data-mm-scope><option value="all">整个当前图谱</option><option value="selected">仅选区</option></select></label><label class="mm-field">根节点 <select data-mm-root><option value="">已有层级根节点</option></select></label><label class="mm-field">布局 <select data-mm-direction><option value="right">向右</option><option value="left">向左</option><option value="bilateral">左右展开</option><option value="down">向下树形</option></select></label><button type="button" class="mm-apply" data-mm-layout>应用布局</button><label class="mm-field mm-override"><input type="checkbox" data-mm-override>覆盖手工样式</label><span data-mm-status role="status"></span></div><div class="mm-row mm-theme-row"></div>';
+    const graph=getGraph();panel.innerHTML=`<div class="mm-toolbar" role="toolbar" aria-label="思维导图布局与主题">
+      <details class="mm-popover" data-mm-menu="layout"><summary>布局 <span aria-hidden="true">⌄</span></summary><div class="mm-popover-body mm-layout-row">
+        <label class="mm-field">方向 <select data-mm-direction><option value="right">向右</option><option value="left">向左</option><option value="bilateral">左右展开</option><option value="down">向下树形</option></select></label>
+        <button type="button" class="mm-apply" data-mm-layout>应用布局</button>
+        <details class="mm-advanced"><summary>更多设置</summary><label class="mm-field">根节点 <select data-mm-root><option value="">已有层级根节点</option></select></label><label class="mm-field mm-override"><input type="checkbox" data-mm-override>覆盖手工样式</label></details>
+      </div></details>
+      <details class="mm-popover" data-mm-menu="theme"><summary>主题 <span aria-hidden="true">⌄</span></summary><div class="mm-popover-body mm-theme-row"></div></details>
+      <label class="mm-field mm-scope"><select data-mm-scope aria-label="布局与主题作用范围"><option value="all">全图</option><option value="selected">当前选区</option></select></label>
+      <button type="button" class="mm-undo" data-mm-undo aria-label="撤销上一步" title="撤销上一步">↶</button>
+    </div><span data-mm-status role="status" aria-live="polite"></span>`;
+    panel.querySelector('[data-mm-undo]').disabled=typeof runUndo!=='function';
+    panel.querySelector('[data-mm-undo]').onclick=()=>execute(()=>{runUndo();return '已撤销'});
+    panel.querySelectorAll('[data-mm-menu]').forEach(menu=>menu.addEventListener('toggle',()=>{if(menu.open)panel.querySelectorAll('[data-mm-menu]').forEach(other=>{if(other!==menu)other.open=false})}));
     const themeRow=panel.querySelector('.mm-theme-row');themeRow.prepend(Object.assign(document.createElement('span'),{className:'mm-caption',textContent:'主题'}));
     const root=panel.querySelector('[data-mm-root]');for(const n of graph.nodes){const o=document.createElement('option');o.value=n.id;o.textContent=global.KGGraphModel.contentOf(n).title;root.append(o)}root.value=graph.mindmap?.rootIds?.[0]||'';
     const scope=()=>{if(panel.querySelector('[data-mm-scope]').value==='all')return undefined;const ids=getSelectedIds();if(!ids.length)throw new Error('请先选择节点');return ids};
-    const execute=work=>{try{work();panel.querySelector('[data-mm-status]').textContent='已应用'}catch(e){panel.querySelector('[data-mm-status]').textContent=e.message}};
+    const execute=work=>{try{const status=work();panel.refresh();panel.querySelector('[data-mm-status]').textContent=typeof status==='string'?status:'已应用'}catch(e){panel.querySelector('[data-mm-status]').textContent=e.message}};
     panel.querySelector('[data-mm-layout]').onclick=()=>execute(()=>runLayout({rootIds:root.value?[root.value]:[],direction:panel.querySelector('[data-mm-direction]').value,scopeIds:scope()}));
     for(const t of presets){
       const b=document.createElement('button');b.type='button';b.dataset.mmTheme=t.id;b.className='mm-theme-chip';b.textContent=t.name;
@@ -35,7 +47,11 @@
       b.style.cssText=`--chip-bg:${t.fillColor};--chip-fg:${t.textColor};--chip-border:${t.borderColor}`+(t.id==='capsule'?';--chip-radius:999px':'');
       b.onclick=()=>execute(()=>runTheme({themeId:t.id,scopeIds:scope(),override:panel.querySelector('[data-mm-override]').checked}));themeRow.append(b);
     }
-    host.append(panel);return panel;
+    panel.refresh=()=>{
+      const current=getGraph();panel.querySelector('[data-mm-direction]').value=current.mindmap?.direction||'right';
+      panel.querySelectorAll('[data-mm-theme]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.mmTheme===current.mindmap?.themeId)));
+    };
+    panel.refresh();host.append(panel);return panel;
   }
   global.KGGraphMindmapThemes=Object.freeze({presets,apply,controls});if(typeof module!=='undefined')module.exports=global.KGGraphMindmapThemes;
 })(typeof window!=='undefined'?window:globalThis);

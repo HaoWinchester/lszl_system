@@ -60,3 +60,31 @@ test('elbow waypoint drags are constrained to a single axis (boardmix-style)',()
   assert.deepEqual(constrainWaypointDrag({x:0,y:0},{x:1,y:1},[],0,{x:9,y:9}),{x:9,y:9});
   assert.deepEqual(constrainWaypointDrag({x:0,y:0},{x:1,y:1},verticalTrunk,5,{x:9,y:9}),{x:9,y:9});
 });
+
+test('a nearby curve midpoint drag preserves bound endpoints and moves the actual midpoint exactly',()=>{
+  const geometry=require('../src/graph/edge-geometry.js');
+  const route={from:'parent',to:'child',start:{x:120,y:80},end:{x:260,y:140},curveControls:[{x:150,y:80},{x:230,y:140}]};
+  const old=geometry.curveMidpoint(route.start,route.curveControls,route.end);
+  const result=geometry.bendCurveMidpoint(route,{x:6,y:-4});
+  nearPoint(geometry.curveMidpoint(result.start,result.curveControls,result.end),{x:old.x+6,y:old.y-4});
+  assert.equal(result.from,'parent');assert.equal(result.to,'child');assert.deepEqual(result.start,route.start);assert.deepEqual(result.end,route.end);
+  const restored=geometry.bendCurveMidpoint(result,{x:-6,y:4});restored.curveControls.forEach((p,i)=>nearPoint(p,route.curveControls[i]));
+});
+
+test('elbow segment midpoint moves both adjacent bends on its perpendicular axis and preserves overlaps',()=>{
+ const geometry=require('../src/graph/edge-geometry.js'),a={x:0,y:0},b={x:200,y:100},points=[{x:100,y:0},{x:100,y:100}];
+ assert.deepEqual(geometry.segmentHandles(a,points,b).map(({x,y})=>({x,y})),[{x:50,y:0},{x:100,y:50},{x:150,y:100}]);
+ assert.deepEqual(geometry.moveElbowSegment(a,b,points,1,{x:7,y:30}),[{x:107,y:0},{x:107,y:100}]);
+ const moved=geometry.moveElbowSegment(a,b,points,0,{x:30,y:12});
+ assert.deepEqual(moved,[{x:0,y:12},{x:100,y:12},{x:100,y:100}]);
+ for(const [index,p] of [a,...moved,b].entries()){if(!index)continue;const prev=[a,...moved,b][index-1];assert(prev.x===p.x||prev.y===p.y)}
+ assert.deepEqual(geometry.moveElbowSegment(a,b,points,1,{x:0,y:0}),points,'returning to the original pointer restores the route');
+ assert.deepEqual(geometry.moveElbowSegment(a,b,points,1,{x:-100,y:0}),[{x:0,y:0},{x:0,y:100}],'overlapping segments stay valid');
+});
+
+test('polyline hit distance includes a short segment and overlapping routes',()=>{
+ const {distanceToPolyline}=require('../src/graph/edge-geometry.js');
+ near(distanceToPolyline({x:4,y:3},[{x:0,y:0},{x:10,y:0}]),3);
+ near(distanceToPolyline({x:12,y:0},[{x:0,y:0},{x:10,y:0}]),2);
+ near(distanceToPolyline({x:10,y:5},[{x:0,y:0},{x:10,y:0},{x:10,y:8}]),0);
+});

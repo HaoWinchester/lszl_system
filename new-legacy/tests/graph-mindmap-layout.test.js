@@ -41,3 +41,11 @@ test('hierarchy boolean survives model, storage and fragment copy; missing or tr
 test('explicit ordinary root reaches a declared parent before consuming its child shortcut',()=>{
  const g=model.normalizeGraph({nodes:['a','b','c'].map(id=>({id})),links:[{id:'ac',from:'a',to:'c'},{id:'ab',from:'a',to:'b'},{id:'bc',from:'b',to:'c',hierarchy:true}]});const r=layout.compute(g,{rootIds:['a']});assert.deepEqual(r.treeEdges.map(l=>l.id),['ab','bc']);assert.deepEqual(r.crossEdges.map(l=>l.id),['ac']);
 });
+
+test('theme provenance records the actual normalized surface, including implicit region colors',()=>{
+ const graph=fixture();themes.apply(graph,{themeId:'blue',model});
+ assert.deepEqual(graph.nodes[0].mindmapTheme.baseline,model.appearanceOf(graph.nodes[0]));
+ const restored=model.normalizeGraph(JSON.parse(JSON.stringify(graph)));themes.apply(restored,{themeId:'paper',model});
+ assert.equal(model.appearanceOf(restored.nodes[0]).fillColor,'#fef3c7');
+ assert.deepEqual(restored.nodes[0].mindmapTheme.baseline,model.appearanceOf(restored.nodes[0]));
+});
