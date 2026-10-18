@@ -96,3 +96,9 @@ test('body drags choose the segment under the pointer even near a long segment e
  assert.equal(index,0);
  assert.deepEqual(geometry.moveElbowSegment(start,end,waypoints,index,{x:0,y:10}),[{x:0,y:10},{x:1000,y:10},{x:1000,y:100}]);
 });
+
+test('a route at the editing budget keeps its whole tail when a new corner cannot fit',()=>{
+ const geometry=require('../src/graph/edge-geometry.js');
+ const points=Array.from({length:64},(_,i)=>({x:Math.ceil((i+1)/2)*10,y:Math.floor((i+1)/2)*10}));
+ assert.deepEqual(geometry.moveElbowSegment({x:0,y:0},{x:330,y:320},points,0,{x:0,y:-10}),points);
+});

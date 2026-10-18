@@ -162,7 +162,9 @@ async def preview(db, user, template_id):
 def preview_projection(graph, version):
     """Read-only drawing projection; never return publication content or assets."""
     def number(value, default=0, minimum=-100000, maximum=100000):
-        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return default
+        if isinstance(value, float) and not math.isfinite(value):
             return default
         return max(minimum, min(maximum, value))
 

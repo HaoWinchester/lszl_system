@@ -248,3 +248,5 @@ def test_preview_projection_rejects_untrusted_styles_and_nonfinite_geometry():
     assert preview['nodes']==[{'id':'n','title':'text only','x':0,'y':0,'width':136,'height':30,'fill':'#ffffff','color':'#123abc'}]
     assert preview['links']==[{'from':'n','to':'n','label':'relation','color':'#a0aec0'}]
     assert 'SECRET' not in str(preview)
+    huge=service.preview_projection({'nodes':[{'id':'huge','x':10**500,'y':-(10**500)}]},1)['nodes'][0]
+    assert huge['x']==100000 and huge['y']==-100000

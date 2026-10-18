@@ -71,3 +71,6 @@ python3 new-legacy/tests/graph-mindmap-browser.py --base-url http://127.0.0.1:51
 - Chrome 桌面真实手势已验证；未覆盖 Safari/触摸笔、所有 DPR 的量化清晰度与超大图压力。清晰度验证是停稳合成状态和截图，没有主观锐度评分或像素清晰度增益声明。
 - 根据父任务后续授权，为隔离服务执行过 `pnpm --dir frontend sync:new-legacy`；生成产物留父任务统一提交，未纳入本任务提交。
 - 未修改 template-center、related-canvas controller、共享 ink/text、practice、元信息、VERSION/release 文件。
+
+## Controller review repairs
+Task reviewer reproduced two Important defects; fixed in 11014d97: body drag chooses point-to-segment distance, not nearest midpoint; outer-segment routes simplify forward collinear corners, retain up to 64 whole waypoints, and refuse overflow rather than truncate a tail. Added uneven-length segment and actual-renderer 12→13 corner regressions. Focused Node 13/13 passed (artifacts/learning-tool-feedback/graph-review-fixes.log).

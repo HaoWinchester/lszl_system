@@ -41,18 +41,20 @@
         const preview=el('button','预览');actions.append(preview);
         let snapshot=null;
         function fetchPreview(signal){if(signal)return request('/'+encodeURIComponent(item.id),{signal});if(!snapshot)snapshot=request('/'+encodeURIComponent(item.id),{signal:lifetime.signal}).catch(error=>{snapshot=null;throw error});return snapshot}
-        preview.onclick=thumbnail.onclick=()=>showPreview(item,fetchPreview,()=>load.click());
+        preview.onclick=thumbnail.onclick=()=>showPreview(item,fetchPreview,version=>loadCopy(version));
         fetchPreview().then(result=>{if(!disposed)global.KGTemplatePreview.mount(thumbnail,result.preview)}).catch(()=>{if(!disposed)thumbnail.textContent='预览暂不可用 · 点击重试'});
         const load=el('button','加载为新图谱');load.disabled=!item.listed;load.dataset.templateLoad='';load.classList.add('template-load-primary');actions.append(load);
-        let receipt=null;
-        load.onclick=()=>execute(async()=>{
-          if(!receipt)receipt={requestId:global.crypto?.randomUUID?.()||'template-'+Date.now()+'-'+Math.random(),version:item.version};
+        const receipts=new Map();
+        load.onclick=()=>loadCopy(item.version);
+        function loadCopy(version){return execute(async()=>{
+          if(!receipts.has(version))receipts.set(version,{requestId:global.crypto?.randomUUID?.()||'template-'+Date.now()+'-'+Math.random(),version});
+          const receipt=receipts.get(version);
           status.textContent='正在创建独立图谱…';
           const result=await request('/'+encodeURIComponent(item.id)+'/loads',{method:'POST',body:receipt});if(disposed)return;
           const store=global.KGGraphFileRemoteStore||global.KGGraphFileStore;await store?.refresh?.();await global.KGGraphFileTabs?.refresh?.();
           status.textContent='已创建独立副本';const link=el('a','打开新图谱');link.href='index.html?fileId='+encodeURIComponent(result.fileId);link.dataset.templateResult=result.fileId;
           link.onclick=async e=>{if(global.KGGraphFileTabs?.openFile){e.preventDefault();finish();await global.KGGraphFileTabs.openFile(result.fileId)}};details.hidden=false;details.replaceChildren(link);load.textContent='再次查看已创建副本';
-        });
+        })}
         if(item.canMaintain){const update=el('button','更新为新版本'),toggle=el('button',item.listed?'下架':'重新上架');actions.append(update,toggle);update.onclick=()=>form(item);toggle.onclick=()=>execute(async()=>{await request('/'+encodeURIComponent(item.id),{method:'PATCH',body:{listed:!item.listed}});await refresh()})}
         list.append(card);
       }
@@ -64,20 +66,20 @@
       const header=el('header'),title=el('h3',item.name),close=el('button','×');close.type='button';close.setAttribute('aria-label','关闭模板预览');header.append(title,close);
       const viewport=el('div');viewport.className='template-preview-viewport';const message=el('p','正在加载图谱…');message.setAttribute('role','status');viewport.append(message);
       const footer=el('footer'),minus=el('button','−'),scale=el('output','100%'),plus=el('button','＋'),fit=el('button','适应视图'),full=el('button','全屏'),use=el('button','加载为新图谱');
-      minus.setAttribute('aria-label','缩小预览');plus.setAttribute('aria-label','放大预览');use.disabled=!item.listed;footer.append(minus,scale,plus,fit,full,use);surface.append(header,viewport,footer);panel.append(surface);
-      const lifetime=new AbortController();let drawing=null,closed=false;
+      minus.setAttribute('aria-label','缩小预览');plus.setAttribute('aria-label','放大预览');use.disabled=true;footer.append(minus,scale,plus,fit,full,use);surface.append(header,viewport,footer);panel.append(surface);
+      const lifetime=new AbortController();let drawing=null,closed=false,displayedVersion=null;
       async function dismiss(){if(closed)return;closed=true;lifetime.abort();drawing?.destroy();if(document.fullscreenElement===surface)await document.exitFullscreen().catch(()=>{});panel.close();panel.remove();previewFocus?.focus()}
       const previewFocus=document.activeElement;closePreview=dismiss;close.onclick=dismiss;panel.addEventListener('cancel',event=>{event.preventDefault();dismiss()});
       (document.fullscreenElement||document.body).append(panel);panel.showModal();
       minus.onclick=()=>drawing?.zoom(.8);plus.onclick=()=>drawing?.zoom(1.25);fit.onclick=()=>drawing?.fit();
       full.onclick=async()=>{try{if(document.fullscreenElement===surface)await document.exitFullscreen();else await surface.requestFullscreen()}catch(error){message.textContent='当前浏览器无法全屏，请使用窗口预览。';footer.append(message)}};
       panel.addEventListener('fullscreenchange',()=>{full.textContent=document.fullscreenElement===surface?'退出全屏':'全屏';drawing?.fit()},{signal:lifetime.signal});
-      use.onclick=async()=>{await dismiss();load()};
+      use.onclick=async()=>{if(displayedVersion===null)return;await dismiss();load(displayedVersion)};
       let drag=null;
       header.addEventListener('pointerdown',event=>{if(event.target.closest('button')||document.fullscreenElement===surface||event.button!==0)return;const r=panel.getBoundingClientRect();drag={id:event.pointerId,x:event.clientX,y:event.clientY,left:r.left,top:r.top};header.setPointerCapture(event.pointerId)},{signal:lifetime.signal});
       header.addEventListener('pointermove',event=>{if(!drag||drag.id!==event.pointerId)return;panel.style.margin='0';panel.style.left=Math.max(0,Math.min(innerWidth-panel.offsetWidth,drag.left+event.clientX-drag.x))+'px';panel.style.top=Math.max(0,Math.min(innerHeight-60,drag.top+event.clientY-drag.y))+'px'},{signal:lifetime.signal});
       header.addEventListener('pointerup',()=>{drag=null},{signal:lifetime.signal});header.addEventListener('pointercancel',()=>{drag=null},{signal:lifetime.signal});
-      async function render(){try{const result=await fetchPreview(lifetime.signal);if(closed||disposed)return;drawing=global.KGTemplatePreview.mount(viewport,result.preview,{interactive:true,onScale:value=>scale.textContent=Math.round(value*100)+'%'});if(result.template.description){const description=el('p',result.template.description);description.className='template-preview-description';surface.insertBefore(description,footer)}}catch(error){if(closed||disposed)return;message.textContent=error.message;const retry=el('button','重试预览');retry.onclick=()=>{retry.remove();message.textContent='正在加载图谱…';render()};viewport.replaceChildren(message,retry)}}
+      async function render(){try{const result=await fetchPreview(lifetime.signal);if(closed||disposed)return;displayedVersion=result.preview.version;use.disabled=!result.template.listed;title.textContent=result.template.name+' · v'+displayedVersion;drawing=global.KGTemplatePreview.mount(viewport,result.preview,{interactive:true,onScale:value=>scale.textContent=Math.round(value*100)+'%'});if(result.template.description){const description=el('p',result.template.description);description.className='template-preview-description';surface.insertBefore(description,footer)}}catch(error){if(closed||disposed)return;message.textContent=error.message;const retry=el('button','重试预览');retry.onclick=()=>{retry.remove();message.textContent='正在加载图谱…';render()};viewport.replaceChildren(message,retry)}}
       render();
     }
     function form(item){

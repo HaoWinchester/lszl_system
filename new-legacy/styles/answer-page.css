@@ -110,8 +110,8 @@ body.practice-mode-page[data-practice-view="game"] :is(button,a,select,summary):
   body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-progress-shell{height:3px}
   body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-health{gap:2px}
   body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-heart svg{width:17px;height:17px}
-  
-  
+
+
   body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-language-cycle{height:32px;min-width:30px;font-size:var(--ui-text-control);padding:0 5px}
   body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-answer-panel{padding:20px 16px;border-radius:12px}
   body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-question-card{gap:14px}

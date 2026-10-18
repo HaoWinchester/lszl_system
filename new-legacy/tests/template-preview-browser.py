@@ -18,7 +18,10 @@ with sync_playwright() as pw:
         if p.locator(selector).is_visible():p.locator(selector).click()
     before=ctx.request.get(base+'/api/v1/files/'+fid).json()['graphData']
     p.locator('#templateBtn').click();row=p.locator('[data-template-id="'+tid+'"]')
-    expect(row.locator('.template-thumbnail svg')).to_be_visible();row.locator('.template-thumbnail').click()
+    expect(row.locator('.template-thumbnail svg')).to_be_visible()
+    updated=ctx.request.post(base+'/api/v1/graph-templates/'+tid+'/versions',data={'sourceFileId':fid,'expectedFileRevision':1,'name':'预览交互验证','description':'更新后的知识体系','memberOnly':False})
+    assert updated.ok and updated.json()['template']['version']==2
+    row.locator('.template-thumbnail').click()
     panel=p.locator('.template-preview-window');drawing=panel.locator('svg');expect(drawing).to_be_visible()
     assert drawing.locator('rect').count()==3
     original=drawing.get_attribute('viewBox');panel.get_by_role('button',name='放大预览').click();assert drawing.get_attribute('viewBox')!=original
@@ -36,7 +39,11 @@ with sync_playwright() as pw:
         else:route.continue_()
     p.route('**/api/v1/graph-templates/'+tid,fail_once)
     row.get_by_role('button',name='预览',exact=True).click();expect(panel.get_by_role('button',name='重试预览')).to_be_visible();panel.get_by_role('button',name='重试预览').click();expect(drawing).to_be_visible()
-    p.screenshot(path=str(OUT/'desktop.png'));panel.get_by_role('button',name='加载为新图谱').click();expect(row.locator('[data-template-result]')).to_be_visible();copy=row.locator('[data-template-result]').get_attribute('data-template-result');assert copy!=fid
+    p.screenshot(path=str(OUT/'desktop.png'))
+    with p.expect_response('**/api/v1/graph-templates/'+tid+'/loads') as loaded:
+        panel.get_by_role('button',name='加载为新图谱').click()
+    assert loaded.value.json()['version']==2, 'loaded copy must match the displayed latest preview'
+    expect(row.locator('[data-template-result]')).to_be_visible();copy=row.locator('[data-template-result]').get_attribute('data-template-result');assert copy!=fid
     assert ctx.request.get(base+'/api/v1/files/'+fid).json()['graphData']==before
     assert 'PRIVATE NOTES' not in str(ctx.request.get(base+'/api/v1/graph-templates/'+tid).json())
     assert not errors,errors
