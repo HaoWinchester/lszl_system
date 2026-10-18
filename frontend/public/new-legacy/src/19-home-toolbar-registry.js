@@ -16,7 +16,6 @@
     add: '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
     textBox: '<span class="home-text-tool-icon" aria-hidden="true">T</span>',
     template: '<svg aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M4 10h16M10 10v10"/></svg>',
-    table: '<svg aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M4 10h16M10 5v14M16 5v14M4 15h16"/></svg>',
     focus: '<svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>',
     flow: '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3.5c3.2 2.2 6 5.2 6 9.2 0 3.5-2.6 6.3-6 7.8-3.4-1.5-6-4.3-6-7.8 0-4 2.8-7 6-9.2z"/><path d="M9 12.5h6M12 9.5v6"/></svg>',
     flashcard: '<svg aria-hidden="true" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="16" rx="3"/><path d="M8 8h8M8 12h6M8 16h4"/></svg>',

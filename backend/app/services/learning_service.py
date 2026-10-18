@@ -1798,7 +1798,7 @@ def workspace_to_dict(workspace: CanvasWorkspace) -> dict:
     }
 
 
-def _workspace_values(data: dict) -> tuple[str, int, dict]:
+def _workspace_values(data: dict, owner: str) -> tuple[str, int, dict]:
     title = str(data.get("title") or "").strip()
     if not title:
         raise ValueError("工作区名称不能为空")
@@ -1808,6 +1808,9 @@ def _workspace_values(data: dict) -> tuple[str, int, dict]:
     payload = data.get("payload")
     if not isinstance(payload, dict):
         raise ValueError("工作区 payload 必须是对象")
+    payload_owner = payload.get("userId")
+    if payload_owner not in (None, "") and payload_owner != owner:
+        raise ValueError("工作区所属用户与当前登录用户不一致，请重新打开画布")
     if "strokes" in payload:
         payload = {**payload, "strokes": validate_strokes(payload["strokes"])}
     if "tables" in payload and payload["tables"] is not None:
@@ -1838,7 +1841,7 @@ async def get_workspace(db: AsyncSession, owner: str, workspace_id: str) -> Canv
 
 
 async def create_workspace(db: AsyncSession, owner: str, data: dict) -> CanvasWorkspace:
-    title, version, payload = _workspace_values(data)
+    title, version, payload = _workspace_values(data, owner)
     requested_id = str(data.get("id") or "").strip()
     if requested_id and not WORKSPACE_ID_PATTERN.fullmatch(requested_id):
         raise ValueError("工作区 ID 格式不正确")
@@ -1871,7 +1874,7 @@ async def update_workspace(
         "title": data.get("title", workspace.title),
         "schemaVersion": data.get("schemaVersion", workspace.schema_version),
         "payload": data.get("payload", workspace.payload),
-    })
+    }, owner)
     workspace.title = title
     workspace.schema_version = version
     workspace.payload = payload

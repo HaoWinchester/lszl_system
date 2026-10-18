@@ -53,6 +53,8 @@ def main():
             recall, workspace = context.new_page(), context.new_page()
             recall.goto(base + '/knowledge-recall.html', wait_until='networkidle')
             workspace.goto(base + '/question-workspace.html', wait_until='networkidle')
+            for page in (recall, workspace):
+                assert page.locator('#krTableBtn,#qwTableBtn,#addTableBtn').count() == 0, 'Removed table tools must have no DOM entry, including buttons whose hidden attribute CSS can override'
             check_theme(recall, 'recall', 'platform')
             check_theme(workspace, 'workspace', 'platform')
             for page in (recall, workspace):

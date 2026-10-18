@@ -17,6 +17,7 @@ with sync_playwright() as pw:
  def mode(value):
   page.locator('.graph-mode-trigger').click();page.locator('[data-graph-mode-option="'+value+'"]').click()
  page.goto(base+'/index.html',wait_until='networkidle');ready();mode('professional')
+ expect(page.locator('#upgradeMemberBtn')).to_be_hidden()
  page.evaluate('()=>{state.viewport={x:0,y:0,scale:1};applyTransform();state.selectedNodeId="a";selectedNodeIds.add("a");refreshSelectionUI()}')
  # Visible text entry must activate the same shared editor, not create a native element.
  page.locator('#addTextElementBtn').click();expect(page.locator('.canvas-ink-toolbar')).to_be_visible();expect(page.locator('button[data-ink-tool=text]')).to_have_attribute('aria-pressed','true')
@@ -31,6 +32,14 @@ with sync_playwright() as pw:
  assert page.evaluate('startTextElementInlineEdit("old")');old=page.locator('[data-node-inline-editor=true]');old.fill('历史仍可编辑');page.mouse.click(1100,720);expect(old).to_have_count(0)
  assert page.evaluate('KGGraphFileAutosave.saveAcknowledged({force:true})')
  assert ctx.request.get(base+'/api/v1/files/'+fid).json()['graphData']['elements'][0]['text']=='历史仍可编辑'
+ # Deferred initial caret placement must not replace a selection the user already made.
+ page.evaluate("()=>{const raf=requestAnimationFrame;window.initialCaretFrames=[];window.requestAnimationFrame=cb=>{initialCaretFrames.push(cb);return 0};try{startTextElementInlineEdit('old')}finally{window.requestAnimationFrame=raf}}")
+ old=page.locator('[data-node-inline-editor=true]');old.focus()
+ page.evaluate("()=>{const e=document.querySelector('[data-node-inline-editor=true]'),r=document.createRange();r.selectNodeContents(e);getSelection().removeAllRanges();getSelection().addRange(r)}")
+ selected=page.evaluate('getSelection().toString()');assert selected=='历史仍可编辑'
+ page.evaluate('()=>{for(const callback of initialCaretFrames)callback(performance.now());initialCaretFrames=[]}')
+ assert page.evaluate('getSelection().toString()')==selected, 'Initial caret callback replaced the user selection'
+ page.keyboard.press('Escape')
  # Entering shared text preserves failed and IME-composing historical drafts.
  def fail(route):
   if route.request.method in ('POST','PUT','PATCH','DELETE'):route.fulfill(status=503,content_type='application/json',body='{"detail":"offline"}')

@@ -258,7 +258,7 @@
   }
   function hasWorkspaceWriteAccess(){
     const role=global.KGRolePermissions?.currentRole?.()||global.KGAuthCore?.currentUser?.()?.role;
-    return loggedIn()&&role!=='viewer';
+    return loggedIn()&&role!=='viewer'&&global.KGCanvasWorkspaceAdapter?.isReady?.()!==false;
   }
   function resolvedPolicy(){
     const base=global.KGCanvasPolicy?.presets?.synthesis?.()||{};
@@ -3997,10 +3997,13 @@
         return activateWorkspace(workspaceId,options);
       }catch(error){
         // Closing the active tab marks it closed before invoking this navigation callback.
-        if(state.workspaceId===previousId){global.KGMultiQuestionWorkspaceTabs?.reopen?.(previousId);renderWorkspaceSelector()}
-        notify(error?.message||'当前画布尚未保存，请重试后再切换。');return false;
+        if(session===state.workspaceSession){
+          if(state.workspaceId===previousId){global.KGMultiQuestionWorkspaceTabs?.reopen?.(previousId);renderWorkspaceSelector()}
+          notify(error?.message||'当前画布尚未保存，请重试后再切换。');
+        }
+        return false;
       }
-      finally{state.workspaceTransition=false;updateReadonly()}
+      finally{if(session===state.workspaceSession){state.workspaceTransition=false;updateReadonly()}}
     })();
   }
   function activateWorkspace(workspaceId,options={}){
@@ -5651,8 +5654,9 @@
       clearOptionTransientState();
       setTemporaryPanMode(false);
     });
-    global.addEventListener('kg-auth-session-change',()=>{
-      state.workspaceSession++;
+    global.addEventListener('kg-auth-session-change',async()=>{
+      const session=++state.workspaceSession,userId=store()?.currentUserId?.();
+      state.workspaceTransition=true;
       updateReadonly();
       invalidateQuestionSources();
       setDefaultHighlightColor(readHighlightColor(),false);
@@ -5661,13 +5665,26 @@
       state.kernel?.viewport?.cancelPersist?.();
       state.workspace=null;
       state.workspaceId='';
+      state.ink?.cancel();
+      state.gesture=null;
+      state.kernel?.cards?.cancelDrag?.();
       state.kernel?.history?.clear?.();
       clearCardSelection();
-      const workspace=store()?.ensure?.({activate:true});
-      if(workspace)activateWorkspace(workspace.id);
-      void rebuildQuestionSources();
-      refreshPersonalCardReferences();
-      if(byId('qwQuestionDrawer')?.classList.contains('open'))renderQuestionDock();
+      state.kernel?.cards?.clear?.({removeElements:true});
+      state.ink?.render();
+      try{
+        await (global.KGCanvasWorkspaceAdapter?.ready||Promise.resolve());
+        if(session!==state.workspaceSession||userId!==store()?.currentUserId?.())return;
+        const workspace=store()?.ensure?.({activate:true});
+        if(workspace)activateWorkspace(workspace.id);
+        void rebuildQuestionSources();
+        refreshPersonalCardReferences();
+        if(byId('qwQuestionDrawer')?.classList.contains('open'))renderQuestionDock();
+      }catch(error){
+        if(session===state.workspaceSession)notify(error?.message||'当前账号的画布加载失败，请重新打开。');
+      }finally{
+        if(session===state.workspaceSession){state.workspaceTransition=false;updateReadonly()}
+      }
     });
     global.addEventListener('kg-personal-synthesis-cards-change',event=>{
       const detail=event.detail||{};
@@ -5720,7 +5737,7 @@
       catch(error){document.body.dataset.teachingContentUnavailable='true';console.warn('原则与归纳卡加载失败，继续加载已发布试卷。',error)}
     }
     try{await (global.KGCanvasWorkspaceAdapter?.ready||Promise.resolve())}catch(error){
-      console.warn('多题工作区服务器水合失败，暂用设备缓存',error);
+      console.warn('多题工作区服务器加载失败，设备缓存仅供查看',error);
       document.body.dataset.workspaceApiUnavailable='true';
     }
     // P4.5.38：不阻塞等待 catalog ready，先初始化 UI，catalog 完成后再填充数据（性能优化）
@@ -5841,7 +5858,6 @@
       onStatus:notify
     });
     global.KGWorkspaceTables=state.tablesController;
-    byId('qwTableBtn')?.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();state.tablesController?.openInsertPanel?.(event.currentTarget||byId('qwTableBtn'))});
     global.KGCanvasCapture?.bind(byId('qwCaptureBtn'),state.viewport,{filename:()=>state.workspace?.title||'多题归纳',onError:notify});
     bind();
     loadWorkspace(state.workspaceId,{focusNodeId});

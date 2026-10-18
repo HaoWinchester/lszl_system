@@ -3168,7 +3168,13 @@ function restoreNodeColorEditSession(session=nodeColorEditSession){
     for(const [id,appearance] of session.originals){const item=textElementById(id);if(item){item.appearance={...appearance};model.syncTextElement(item);updateTextElementAppearanceDom(id)}}
     return;
   }
-  for(const [id,appearance] of session.originals){const node=nodeById(id);if(!node)continue;node.appearance={...appearance};model.syncLegacy(node)}
+  for(const [id,original] of session.originals){
+    const node=nodeById(id);if(!node)continue;
+    node.appearance={...original.appearance};
+    if(original.hasManualAppearanceFields)node.manualAppearanceFields=Array.isArray(original.manualAppearanceFields)?[...original.manualAppearanceFields]:original.manualAppearanceFields;
+    else delete node.manualAppearanceFields;
+    model.syncLegacy(node);
+  }
   render({mode:'appearance',ids:session.ids,persist:false});
 }
 function beginNodeColorEdit(kind){
@@ -3177,7 +3183,10 @@ function beginNodeColorEdit(kind){
   const ids=nodeToolbarSelectedIds();if(!ids.length)return false;
   if(nodeColorEditSession&&nodeColorEditSession.kind===kind&&nodeColorEditSession.ids.join('|')===ids.join('|'))return true;
   if(nodeColorEditSession){restoreNodeColorEditSession();nodeColorEditSession=null}
-  nodeColorEditSession={kind,entityType:'node',ids,originals:new Map(ids.map(id=>[id,{...window.KGGraphModel.appearanceOf(nodeById(id))}]))};return true;
+  nodeColorEditSession={kind,entityType:'node',ids,originals:new Map(ids.map(id=>{
+    const node=nodeById(id);
+    return[id,{appearance:{...window.KGGraphModel.appearanceOf(node)},hasManualAppearanceFields:Object.prototype.hasOwnProperty.call(node,'manualAppearanceFields'),manualAppearanceFields:Array.isArray(node.manualAppearanceFields)?[...node.manualAppearanceFields]:node.manualAppearanceFields}];
+  }))};return true;
 }
 function previewNodeColorEdit(kind,value){
   if(!beginNodeColorEdit(kind))return;const patch=nodeColorPatch(kind,value),session=nodeColorEditSession;

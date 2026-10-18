@@ -151,6 +151,76 @@ def test_workspace_preserves_the_new_legacy_stable_id() -> None:
     assert response.json()["workspace"]["schemaVersion"] == 10
 
 
+def test_workspace_create_rejects_previous_users_retry_after_account_change() -> None:
+    user_a = _name("workspace_retry_a")
+    user_b = _name("workspace_retry_b")
+    _create_student(user_a)
+    _create_student(user_b)
+    client = TestClient(app)
+    _login(client, user_a)
+    workspace_id = f"workspace-{uuid4().hex[:12]}"
+    # This request belongs to A's failed save queue; it is retried after login as B.
+    queued_request = {
+        "id": workspace_id,
+        "title": "A 的私人画布",
+        "schemaVersion": 10,
+        "payload": {"id": workspace_id, "userId": user_a, "nodes": {"private": {"id": "private"}}},
+    }
+    _login(client, user_b)
+
+    retried = client.post("/api/v1/workspaces", json=queued_request)
+
+    assert retried.status_code == 400, retried.text
+    assert client.get("/api/v1/workspaces").json()["workspaces"] == []
+    assert client.get(f"/api/v1/workspaces/{workspace_id}").status_code == 404
+
+
+def test_workspace_update_rejects_previous_users_payload_without_changing_owned_canvas() -> None:
+    user_a = _name("workspace_update_a")
+    user_b = _name("workspace_update_b")
+    _create_student(user_a)
+    _create_student(user_b)
+    client = TestClient(app)
+    _login(client, user_b)
+    created_response = client.post(
+        "/api/v1/workspaces",
+        json={"title": "B 的画布", "schemaVersion": 10, "payload": {"userId": user_b, "nodes": {"kept": {"id": "kept"}}}},
+    )
+    assert created_response.status_code == 200, created_response.text
+    original = created_response.json()["workspace"]
+    path = f"/api/v1/workspaces/{original['id']}"
+
+    updated = client.put(
+        path,
+        json={"title": "不应覆盖", "payload": {"userId": user_a, "nodes": {"private": {"id": "private"}}}},
+    )
+
+    assert updated.status_code == 400, updated.text
+    loaded = client.get(path)
+    assert loaded.status_code == 200, loaded.text
+    assert loaded.json()["workspace"] == original
+
+
+@pytest.mark.parametrize("identity", ["same-owner", "missing", "empty", "null"])
+def test_workspace_accepts_current_owner_and_legacy_payloads(identity: str) -> None:
+    username = _name("workspace_identity")
+    _create_student(username)
+    client = TestClient(app)
+    _login(client, username)
+    payload = {"nodes": {"kept": {"id": "kept"}}}
+    if identity != "missing":
+        payload["userId"] = {"same-owner": username, "empty": "", "null": None}[identity]
+
+    created = client.post("/api/v1/workspaces", json={"title": "兼容画布", "schemaVersion": 10, "payload": payload})
+
+    assert created.status_code == 200, created.text
+    path = f"/api/v1/workspaces/{created.json()['workspace']['id']}"
+    payload["nodes"]["added"] = {"id": "added"}
+    updated = client.put(path, json={"title": "已保存", "payload": payload})
+    assert updated.status_code == 200, updated.text
+    assert client.get(path).json()["workspace"]["payload"] == payload
+
+
 def test_learning_persistence_requires_authentication() -> None:
     client = TestClient(app)
     assert client.get("/api/v1/workspaces").status_code == 401

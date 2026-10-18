@@ -1682,7 +1682,6 @@
       confirm:message=>{try{return window.confirm(message)}catch(error){return false}}
     });
     window.KGRecallTables=tableController;
-    $('krTableBtn')?.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();tableController?.openInsertPanel?.(event.currentTarget||$('krTableBtn'))});
     window.KGCanvasCapture?.bind($('krCaptureBtn'),viewport,{filename:'深度回忆',onError:notifyRecallLimit});
     applyRandomHighlight();bindThemeSelect();bindCanvas();bindQuestionInteractions();bindNodeInteractions();bindQuestionDrawer();bindLanguageMode();bindNodeSearch();renderAll();initUnifiedCanvasRuntime();bindTools();
     $('krRevealKeywordsBtn')?.addEventListener('click',revealKeywords);
