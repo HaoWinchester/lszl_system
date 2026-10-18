@@ -72,8 +72,8 @@
 ### Task 6: 集成、复查、发布 UAT
 
 **Files:** new-legacy/VERSION、生成产物、docs/verification/2026-10-18-learning-tool-feedback-uat.md；不可变 release 由管理脚本生成。
-- [ ] 汇总每任务证据，任务审查及全分支复查，修复全部重要发现。
-- [ ] pnpm --dir frontend test 与 test:design；backend/.venv/bin/python -m pytest backend/tests/ -q；相关真实浏览器场景在隔离 DB 跑完。
-- [ ] 源/同步/候选文件清单核对，检查 admin-console 等关键页，无缺失旧文件；执行 node frontend/scripts/manage-new-legacy.js update new-legacy --skip-browser，浏览器验证单独完成并保留日志。
-- [ ] 提交同步生成产物；合入 uat（不丢已有内容），代理 push 并 ls-remote 核对；执行 bash deploy/update-uat.sh，公网版本/资源 hash/游客页面冒烟。
-- [ ] 记录准确版本、部署提交、测试数量和真实限制；停止等待用户 UAT 验收，main 不合入不推送。
+- [x] 汇总每任务证据，任务审查及全分支复查，修复全部重要发现。
+- [x] pnpm --dir frontend test 与 test:design；backend/.venv/bin/python -m pytest backend/tests/ -q；相关真实浏览器场景在隔离 DB 跑完。
+- [x] 源/同步/候选文件清单核对，检查 admin-console 等关键页，无缺失旧文件；执行 node frontend/scripts/manage-new-legacy.js update new-legacy --skip-browser，浏览器验证单独完成并保留日志。
+- [x] 提交同步生成产物；合入 uat（不丢已有内容），代理 push 并 ls-remote 核对；执行 bash deploy/update-uat.sh，公网版本/资源 hash/游客页面冒烟。
+- [x] 记录准确版本、部署提交、测试数量和真实限制；停止等待用户 UAT 验收，main 不合入不推送。
