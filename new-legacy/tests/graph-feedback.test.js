@@ -13,6 +13,7 @@ test('mirrored right branches share a parent attachment and mirrored curve contr
  assert.equal(shapes[0].endpoints[0].x,shapes[1].endpoints[0].x);assert.equal(shapes[0].endpoints[0].y,shapes[1].endpoints[0].y);
  shapes[0].samples.forEach((p,i)=>{assert.equal(p.x,shapes[1].samples[i].x);assert.ok(Math.abs(p.y+shapes[1].samples[i].y-80)<1e-8)});
  assert.equal(shapes[0].controls.filter(p=>p.kind==='curve-midpoint').length,1);
+ assert.equal(new Set(shapes[0].controls.map(p=>p.index)).size,shapes[0].controls.length,'every visible curve handle has a unique DOM index');
 });
 test('a short body drag bends the bound curve without detaching cards',()=>{
  const c=fixture(),link={id:'ab',from:'a',to:'b',pathStyle:'curve'},p=c.linkRenderPoints(link),geometry=c.linkPathGeometry(link,p.a,p.b,p);

@@ -74,3 +74,34 @@ python3 new-legacy/tests/graph-mindmap-browser.py --base-url http://127.0.0.1:51
 
 ## Controller review repairs
 Task reviewer reproduced two Important defects; fixed in 11014d97: body drag chooses point-to-segment distance, not nearest midpoint; outer-segment routes simplify forward collinear corners, retain up to 64 whole waypoints, and refuse overflow rather than truncate a tail. Added uneven-length segment and actual-renderer 12→13 corner regressions. Focused Node 13/13 passed (artifacts/learning-tool-feedback/graph-review-fixes.log).
+
+## 发布候选门禁补修（2026-10-18，v9.0-p4.1.339 候选，未部署）
+
+真正缺陷：新增曲线主中点沿用了 `data-edge-control-index=0`，与原 1/3 控制点冲突，使既有真实浏览器的唯一定位报 strict-mode violation。主中点现在使用 index 2；原曲线控制点仍为 0/1，中点移动逻辑不依赖 index。`graph-feedback.test.js` 先验证索引集合数量 2≠3 而失败，再因修复通过；完整浏览器也增加实际 DOM 三个索引唯一的断言。MAX_WAYPOINTS=64 与父任务后续几何修复均保留。
+
+旧测试语义差异（不是将真实失败跳过）：
+- 完整旧图谱浏览器在索引修复后确实跑到 elbow 段，失败为 `len(controls)==2`，实际三个段中点。按用户本次批准的“段中点、两转折点一起移动”改为三段手柄、主干 index 1；仍验证屏幕位移/125% 缩放换算、自由轴位移与锁定轴不变、API 保存重载，并增加第二转折点一起移动与全路径正交检查。
+- cancel-history 中正文拖动原来期望 `binding==':'`（两端解除绑定），按批准行为改为 `a:b`，另外要求曲线控制点确实发生变化；所有取消后完整 snapshot 相等、旧 redo 和下一次 undo 检查保留。显式端点解除绑定的 `:b` 断言与端口/重绑定检查全部保留。
+- 未删减 ports、curve、card、tabs、focus、lock 等任何独立保证，未跳过任何 section。
+
+最终验证在重新启动的新隔离 helper/数据库上运行；没有使用正式库：
+
+```sh
+backend/.venv/bin/python new-legacy/tests/helpers/canvas_ink_server.py --port 5237
+python3 new-legacy/tests/graph-interaction-focus-browser.py --base-url http://127.0.0.1:5237 --output-dir artifacts/learning-tool-feedback/graph/full-regression
+```
+
+完整默认 all：exit 0，tabs、card、focus、edges、ports、curves、elbow、cancel-history、lock 全部 PASS。端口检查记录的 stage.scrollLeft/scrollTop 全为 0。截图在上述 full-regression 目录。
+
+另一独立 helper 5238 用于顺序运行以下测试，避免当前文件状态相互干扰：
+
+```sh
+python3 new-legacy/tests/graph-question-batch-browser.py --base-url http://127.0.0.1:5238
+python3 new-legacy/tests/graph-feedback-live-browser.py --base-url http://127.0.0.1:5238
+python3 new-legacy/tests/graph-mindmap-browser.py --base-url http://127.0.0.1:5238
+python3 new-legacy/tests/graph-feedback-browser.py
+```
+
+全部 exit 0。question-batch 的 preview/subsets/preserved existing/API reload/scopes/recovery/mobile/role 全部通过；feedback 实际手势和 mindmap 全流程通过。source Chrome fixture 命中检查通过；本次120帧样本查询120→1、装饰写入1200→600、card mutation均0，P95均约17.6ms。
+
+原定向 Node 命令（上节八个文件）在当前源上重新执行：36 passed、0 failed。`node --check`、Python 编译和 `git diff --check` 通过。此补修仅提交图谱源、两项相关测试和本报告；同步产物由父任务最终处理。没有运行后台 pytest、版本更新、release、部署或推送。
