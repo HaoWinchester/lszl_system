@@ -191,8 +191,14 @@
       updateCursor();
       positionToolbar();
     }
+    function strokeStateSignature(){return JSON.stringify(normalize(getStrokes()))}
+    function cancelStaleGesture(){
+      const gesture=erasing||textDrag||textResize;
+      if(!gesture||gesture.beforeSignature===strokeStateSignature())return false;
+      cancel();return true;
+    }
     function render(){
-      if(destroyed)return;
+      if(destroyed||cancelStaleGesture())return;
       try{const strokes=normalize(getStrokes()).filter(item=>!erasing?.removed.has(item.id));layer.replaceChildren(...strokes.map(makeEl));const selection=strokes.find(item=>item.id===selectedId);if(selection&&!readonly()){if(selection.tool==='text')renderTextHandles(selection);else renderStrokeSelection(selection)}if(active){active.el=makeEl(active.stroke);layer.append(active.el)}}catch(error){report(error)}
       refreshControls();
     }
@@ -312,7 +318,7 @@
       session.edit=global.KGTextEditSession.create({original:{text:editor.value,...style,points:[[...world]]},persist:async draft=>{
         if(session.stale)throw new Error('画布已切换，文字草稿仍保留，请复制输入或按 Esc 关闭');
         if(!existing&&!draft.text.trim())return true;
-        const stroke={id,tool:'text',...draft};stroke.boxHeight=Math.min(4000,Math.max(24,textLines(stroke).length*stroke.width*1.35));
+        const stroke={id,tool:'text',...draft};stroke.boxHeight=Math.min(4000,Math.max(draft.boxHeight||24,textLines(stroke).length*stroke.width*1.35));
         const signature=JSON.stringify(stroke);
         if(signature!==session.appliedSignature){change(existing||session.applied?getStrokes().map(item=>item.id===id?stroke:item):[...getStrokes(),stroke],existing?'编辑文字':'添加文字');session.applied=true;session.appliedSignature=signature}
         return options.persistText?await options.persistText():true;
@@ -323,7 +329,14 @@
         const r=viewport.getBoundingClientRect();
         editor.style.left=(r.left+v.x+(world[0]-8)*s)+'px';editor.style.top=(r.top+v.y+(world[1]-4)*s)+'px';
         editor.style.boxSizing='content-box';editor.style.padding=(4*s)+'px '+(8*s)+'px';
-        editor.style.width=Math.min(4000,natural.width)*s+'px';editor.style.fontSize=style.width*s+'px';editor.style.height=style.boxHeight*s+'px';editor.style.opacity=style.opacity;
+        editor.style.width=natural.width*s+'px';editor.style.fontSize=style.width*s+'px';editor.style.opacity=style.opacity;
+        // Match the character wrapping used by SVG/export, and measure the live
+        // textarea too so browser line metrics never clip the editable draft.
+        editor.style.whiteSpace=style.boxWidth?'pre-wrap':'pre';
+        editor.style.height='0px';const placeholder=editor.placeholder;editor.placeholder='';
+        const css=global.getComputedStyle(editor),padding=parseFloat(css.paddingTop)+parseFloat(css.paddingBottom);
+        style.boxHeight=Math.min(4000,Math.max(style.boxHeight,(editor.scrollHeight-padding)/s));editor.placeholder=placeholder;
+        editor.style.height=Math.max(natural.height,style.boxHeight)*s+'px';
         status.style.left=editor.style.left;status.style.top=(parseFloat(editor.style.top)+editor.offsetHeight+4)+'px';
         Object.assign(border.style,{left:editor.style.left,top:editor.style.top,width:editor.offsetWidth+'px',height:editor.offsetHeight+'px'});
       };
@@ -374,16 +387,16 @@
     }
     listen(global,'pointerdown',event=>{
       if(textSession)return;
-      const handle=event.target.closest?.('[data-ink-resize-handle]');if(handle&&layer.contains(handle)&&!readonly()){stop(event);const stroke=getStrokes().find(item=>item.id===handle.dataset.textId);textResize={pointerId:event.pointerId,handle:handle.dataset.inkResizeHandle,start:point(event,viewport.getBoundingClientRect(),options.getViewport()),original:normalize([stroke])[0],box:textBox(stroke)};viewport.setPointerCapture(event.pointerId);return}
+      const handle=event.target.closest?.('[data-ink-resize-handle]');if(handle&&layer.contains(handle)&&!readonly()){stop(event);const stroke=getStrokes().find(item=>item.id===handle.dataset.textId);textResize={beforeSignature:strokeStateSignature(),pointerId:event.pointerId,handle:handle.dataset.inkResizeHandle,start:point(event,viewport.getBoundingClientRect(),options.getViewport()),original:normalize([stroke])[0],box:textBox(stroke)};viewport.setPointerCapture(event.pointerId);return}
       if(destroyed||active||erasing||textDrag||textResize||space||readonly()||event.button!==0||event.isPrimary===false||!inside(event.target))return;
       const view=options.getViewport(),location=point(event,viewport.getBoundingClientRect(),view);
       const textHit=(tool==='select'||tool==='text')?hitStroke(location,4/(view.scale||view.zoom||1),tool==='text'):null;
       if(tool==='select'&&!textHit){selectedId=null;suppressClickUntil=0;render();return}
       stop(event);
       try{
-        if(textHit){if(!viewport.hasAttribute('tabindex'))viewport.tabIndex=-1;viewport.focus({preventScroll:true});selectedId=textHit.id;Object.assign(prefs[textHit.tool],{color:textHit.color,width:textHit.width,bold:!!textHit.bold,opacity:textHit.opacity??TOOLS[textHit.tool].opacity});textDrag={pointerId:event.pointerId,start:location,original:normalize([textHit])[0],moved:false};render();viewport.classList.add('canvas-ink-text-dragging');viewport.setPointerCapture(event.pointerId);return}
+        if(textHit){if(!viewport.hasAttribute('tabindex'))viewport.tabIndex=-1;viewport.focus({preventScroll:true});selectedId=textHit.id;Object.assign(prefs[textHit.tool],{color:textHit.color,width:textHit.width,bold:!!textHit.bold,opacity:textHit.opacity??TOOLS[textHit.tool].opacity});textDrag={beforeSignature:strokeStateSignature(),pointerId:event.pointerId,start:location,original:normalize([textHit])[0],moved:false};render();viewport.classList.add('canvas-ink-text-dragging');viewport.setPointerCapture(event.pointerId);return}
         if(tool==='eraser'){
-          selectedId=null;erasing={pointerId:event.pointerId,before:normalize(getStrokes()),removed:new Set(),last:location};
+          selectedId=null;erasing={beforeSignature:strokeStateSignature(),pointerId:event.pointerId,before:normalize(getStrokes()),removed:new Set(),last:location};
           eraseTo(event);viewport.setPointerCapture(event.pointerId);suppressClickUntil=Date.now()+400;return;
         }
         if(tool==='text'){
@@ -399,6 +412,7 @@
       }catch(error){cancel();report(error)}
     },true);
     listen(global,'pointermove',event=>{
+      if(cancelStaleGesture())return;
       if(erasing&&event.pointerId===erasing.pointerId){stop(event);if(readonly()){cancel();return}for(const sample of event.getCoalescedEvents?.().length?event.getCoalescedEvents():[event])eraseTo(sample);return}
       if(textResize&&event.pointerId===textResize.pointerId){stop(event);const current=point(event,viewport.getBoundingClientRect(),options.getViewport()),drag=textResize,next=global.KGTextBoxGeometry.resize(drag.box,drag.handle,{x:current[0]-drag.start[0],y:current[1]-drag.start[1]});const natural=textBox({...drag.original,points:[[next.x,next.y]],width:next.fontSize,boxWidth:next.width,boxHeight:next.height});const clamped=global.KGTextBoxGeometry.clampToTextBounds(next,natural);drag.next={...drag.original,points:[[clamped.x,clamped.y]],width:clamped.fontSize,boxWidth:clamped.width,boxHeight:clamped.height};drag.next.boxHeight=Math.min(4000,Math.max(clamped.height,textLines(drag.next).length*clamped.fontSize*1.35));layer.replaceChildren(...getStrokes().map(item=>makeEl(item.id===drag.original.id?drag.next:item)));renderTextHandles(drag.next);return}
       if(textDrag&&event.pointerId===textDrag.pointerId){
@@ -414,6 +428,7 @@
       if(!frame)frame=global.requestAnimationFrame(()=>{frame=0;if(active)active.el.setAttribute('d',path(active.stroke.points))});
     },true);
     listen(global,'pointerup',event=>{
+      if(cancelStaleGesture())return;
       if(erasing&&event.pointerId===erasing.pointerId){stop(event);if(readonly()){cancel();return}eraseTo(event);const gesture=erasing;cancel();suppressClickUntil=Date.now()+400;if(gesture.removed.size)try{change(gesture.before.filter(item=>!gesture.removed.has(item.id)),'擦除笔迹')}catch(error){render();report(error)}return}
       if(textResize&&event.pointerId===textResize.pointerId){stop(event);const drag=textResize;cancel();if(drag.next&&JSON.stringify(drag.next)!==JSON.stringify(drag.original))try{change(getStrokes().map(item=>item.id===drag.original.id?drag.next:item),'调整文本框大小');Promise.resolve(options.persistText?.()).catch(report)}catch(error){report(error)}return}
       if(textDrag&&event.pointerId===textDrag.pointerId){stop(event);const drag=textDrag;cancel();suppressClickUntil=Date.now()+400;if(drag.moved&&drag.next)try{change(getStrokes().map(item=>item.id===drag.original.id?drag.next:item),drag.original.tool==='text'?'移动文字':'移动笔迹')}catch(error){render();report(error)}return}
@@ -430,7 +445,11 @@
       if((event.key==='Delete'||event.key==='Backspace')&&selected()&&!readonly()){stop(event);cancel();const id=selectedId;selectedId=null;try{change(getStrokes().filter(item=>item.id!==id),'删除笔迹')}catch(error){report(error)}return}
       if(event.key==='Escape'){if(textResize){cancel();return}setTool('select');return}
       if(event.code==='Space'&&tool!=='select'){space=true;cancel();viewport.classList.add('canvas-ink-panning');event.preventDefault()}
-      if(ownHistory&&!readonly()&&(event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='z'&&!event.altKey){stop(event);cancel();try{history?.[event.shiftKey?'redo':'undo']?.();refreshControls()}catch(error){report(error)}}
+      if((event.ctrlKey||event.metaKey)&&!event.altKey&&['z','y'].includes(event.key.toLowerCase())){
+        // Delegated page history must first cancel the same transient gesture.
+        cancel();
+        if(ownHistory&&!readonly()&&event.key.toLowerCase()==='z'){stop(event);try{history?.[event.shiftKey?'redo':'undo']?.();refreshControls()}catch(error){report(error)}}
+      }
     },true);
     listen(global,'keyup',event=>{if(event.code==='Space'){space=false;viewport.classList.remove('canvas-ink-panning')}},true);
     listen(global,'resize',()=>{cancel();positionToolbar()});

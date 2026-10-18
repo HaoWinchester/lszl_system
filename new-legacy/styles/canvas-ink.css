@@ -62,7 +62,7 @@
 .canvas-ink-text-actions button{padding:5px 12px;border:1px solid #cbd5e1;background:white;border-radius:4px;cursor:pointer}
 .canvas-ink-toolbar [data-ink-bold]{margin-top:8px;font-weight:700}
 
-.canvas-ink-text-editor{min-width:0;max-width:none;box-sizing:content-box;white-space:pre-wrap;overflow-wrap:anywhere}
+.canvas-ink-text-editor{min-width:0;max-width:none;box-sizing:content-box;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-all}
 .canvas-ink-text-status{position:fixed;z-index:131;background:white;color:#b91c1c;font:12px system-ui}
 .canvas-ink-text-editor[data-save-state=failed]{border-color:#dc2626}
 /* Formatting controls remain reachable above a tall editor. */

@@ -85,9 +85,32 @@ def responsive_controls(browser):
         box=page.locator(selector).bounding_box();assert box['x']>=0 and box['x']+box['width']<=360 and box['y']>=0 and box['y']+box['height']<=640,(selector,box)
     page.screenshot(path=str(output/'shared-ink-mobile.png'))
     page.evaluate('locked=true;ink.render()');expect(page.get_by_role('button',name='蓝色',exact=True)).to_be_disabled();expect(page.get_by_role('spinbutton',name='笔迹粗细数值',exact=True)).to_be_disabled();page.close()
+def external_history(browser):
+    other={**BASE,'id':'b','points':[[100,300],[200,300]]}
+    for route in ['keyboard','direct','render']:
+        page=setup(browser,[BASE,other])
+        page.evaluate("""()=>{ink.destroy();window.shared=KGCanvasHistoryController.create();window.ink=KGCanvasInk.create({viewport:document.querySelector('#view'),world:document.querySelector('#world'),history:shared,getViewport:()=>({x:0,y:0,scale:1}),getStrokes:()=>strokes,setStrokes:s=>{strokes=s;writes++}});const full=KGCanvasInk.normalize(strokes);shared.push({label:'create b',undo:()=>{strokes=full.slice(0,1)},redo:()=>{strokes=KGCanvasInk.normalize(full)}});document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='z'){e.preventDefault();shared.undo();ink.render()}});ink.setTool('eraser')}""")
+        page.mouse.move(150,80);page.mouse.down();page.mouse.move(150,100)
+        if route=='keyboard':page.keyboard.press('Control+z')
+        else:page.evaluate('shared.undo()'+(';ink.render()' if route=='render' else ''))
+        page.mouse.up();assert page.evaluate('strokes')==[BASE],('External undo must not resurrect b or erase restored p',route,page.evaluate('strokes'));assert page.evaluate('writes')==0
+        expect(page.locator('.canvas-ink-layer path')).to_have_count(1);page.close()
+    # A selected move must not overwrite an externally restored color/geometry.
+    page=setup(browser,[{**BASE,'color':'#ef4444'}]);page.mouse.move(150,100);page.mouse.down();page.mouse.move(180,130)
+    page.evaluate("strokes=[{id:'p',tool:'pen',color:'#2563eb',width:3,points:[[100,100],[200,100]]}]")
+    page.mouse.up();assert page.evaluate('strokes')==[BASE],'Stale selected move must not overwrite newer stroke state';assert page.evaluate('writes')==0;page.close()
+def explicit_word_wrap(browser):
+    page=setup(browser,[{'id':'text','tool':'text','color':'#111827','width':24,'points':[[100,100]],'text':'wrap','boxWidth':120}]);page.evaluate("ink.setTool('text')");page.mouse.dblclick(110,110)
+    editor=page.locator('.canvas-ink-text-editor');editor.fill('alpha beta gamma delta epsilon zeta eta theta iota kappa')
+    metrics=editor.evaluate('el=>({client:el.clientHeight,scroll:el.scrollHeight})');assert metrics['scroll']<=metrics['client']+1,('No wrapped draft text may be clipped',metrics)
+    draft=editor.bounding_box();editor.press('Control+Enter');saved=page.locator('.canvas-ink-text-box > rect').first.bounding_box();assert abs(draft['height']-saved['height'])<3,(draft,saved);assert page.evaluate('strokes[0].boxWidth')==120;page.close()
+def long_automatic_text(browser):
+    page=setup(browser);page.evaluate('ink.openTextAt(100,100)');editor=page.locator('.canvas-ink-text-editor');editor.fill('W'*500)
+    metrics=editor.evaluate('el=>({client:el.clientHeight,scroll:el.scrollHeight,width:parseFloat(el.style.width)})');assert metrics['scroll']<=metrics['client']+1,('Long automatic draft may not be clipped',metrics)
+    draft=editor.bounding_box();editor.press('Control+Enter');page.mouse.click(110,110);saved=page.locator('.canvas-ink-text-box > rect').first.bounding_box();assert abs(draft['width']-saved['width'])<3 and abs(draft['height']-saved['height'])<3,(draft,saved);assert 'boxWidth' not in page.evaluate('strokes[0]');page.close()
 with sync_playwright() as pw:
     browser=pw.chromium.launch(headless=True,executable_path='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
-    cases={'eraser':eraser,'curve_eraser':curve_eraser,'selection':selection,'text':text,'public_entry':public_entry,'export_opacity':export_opacity,'responsive_controls':responsive_controls}
+    cases={'external_history':external_history,'explicit_word_wrap':explicit_word_wrap,'long_automatic_text':long_automatic_text,'eraser':eraser,'curve_eraser':curve_eraser,'selection':selection,'text':text,'public_entry':public_entry,'export_opacity':export_opacity,'responsive_controls':responsive_controls}
     for name in sys.argv[1:] or cases:
         cases[name](browser);print(name+': passed')
     browser.close()
