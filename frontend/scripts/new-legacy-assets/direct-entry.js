@@ -34,6 +34,7 @@
         const user = snapshot?.user || null
         role = String(user?.role || 'guest')
         publishDirectAuth(user)
+        decorateMemberEntry()
         return user || {}
       })
       .catch(() => {
@@ -84,9 +85,12 @@
   })
 
   function decorateMemberEntry() {
-    if (currentRole() === 'student') return
+    if (currentRole() === 'student' && global.KGSubscription?.decorateSubscriptionElements) {
+      global.KGSubscription.decorateSubscriptionElements()
+      return
+    }
     const button = document.getElementById('upgradeMemberBtn')
-    if (button) button.hidden = true
+    if (button) button.hidden = !['guest', 'student'].includes(currentRole())
   }
 
   function consumeLoginRequest() {
