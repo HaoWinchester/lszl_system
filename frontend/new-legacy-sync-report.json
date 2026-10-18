@@ -1,10 +1,17 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.341",
-  "toVersion": "v9.0-p4.1.341",
+  "fromVersion": "v9.0-p4.1.342",
+  "toVersion": "v9.0-p4.1.343",
   "changes": {
     "added": [],
-    "changed": [],
+    "changed": [
+      "VERSION",
+      "content-prep-studio/dist/content-prep.html",
+      "src/119-question-comments.js",
+      "styles/answer-page.css",
+      "styles/question-comments.css",
+      "tests/danmaku-design-browser.py"
+    ],
     "removed": []
   },
   "incompatible": []

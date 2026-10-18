@@ -94,7 +94,7 @@
   }
 
   function danmakuChipContent(comment) {
-    return `${avatarMarkup(comment.author, true)}<span class="q-danmaku-content">${escapeHTML(comment.content)}</span><span class="q-danmaku-pause" aria-hidden="true">${danmakuIcon('pause')}</span>${danmakuLikeTail(comment)}`
+    return `<span class="q-danmaku-content">${escapeHTML(comment.content)}</span><span class="q-danmaku-pause" aria-hidden="true">${danmakuIcon('pause')}</span>${danmakuLikeTail(comment)}`
   }
 
   /* 点赞计数随弹幕滚动；统一复用公共线性图标。 */
@@ -234,7 +234,7 @@
 
   function danmakuPopMarkup(comment) {
     return `<div class="q-danmaku-pop" data-danmaku-pop role="dialog" aria-label="弹幕互动">
-      <div class="q-danmaku-pop-head">${avatarMarkup(comment.author, true)}<div class="q-danmaku-pop-meta"><span class="q-danmaku-pop-author">${escapeHTML(comment.author)}</span><time datetime="${escapeHTML(comment.createdAt)}">${escapeHTML(formatTime(comment.createdAt))}</time></div><button type="button" class="q-danmaku-pop-close" data-qc-pop-action="close" aria-label="关闭弹幕互动">${danmakuIcon('x', '×')}</button></div>
+      <div class="q-danmaku-pop-head"><div class="q-danmaku-pop-meta"><time datetime="${escapeHTML(comment.createdAt)}">${escapeHTML(formatTime(comment.createdAt))}</time></div><button type="button" class="q-danmaku-pop-close" data-qc-pop-action="close" aria-label="关闭弹幕互动">${danmakuIcon('x', '×')}</button></div>
       <p class="q-danmaku-pop-text">${escapeHTML(comment.content)}</p>
       <div class="q-danmaku-pop-actions">
         <button type="button" data-qc-pop-action="like" class="${comment.myLike ? 'is-liked' : ''}" aria-pressed="${!!comment.myLike}">${danmakuIcon('heart')}<span>点赞 ${Number(comment.likeCount) || 0}</span></button>

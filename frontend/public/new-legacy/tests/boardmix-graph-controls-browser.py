@@ -43,23 +43,34 @@ with sync_playwright() as pw:
   if scenario=='failed':expect(old).to_have_attribute('data-save-state','failed');page.unroute('**/api/v1/files/**',fail)
   else:old.dispatch_event('compositionend')
   page.evaluate('nodeInlineTextEditorController.commit()');expect(old).to_have_count(0);page.evaluate('KGHomeInk.setOpen(false)')
- # Existing professional shortcuts remain available while formats are collapsed.
- page.locator('#stage').focus();page.keyboard.press('2');expect(page.locator('#toolbarFormatBtn')).to_have_attribute('aria-expanded','true');assert page.evaluate('state.defaults.nodeSize')=='big'
- page.locator('#toolbarFormatBtn').click();page.locator('#addTextElementBtn').hover();expect(page.locator('.home-toolbar-hint')).to_have_text('文本');page.mouse.move(1100,720)
- # Format expands without rebuilding the rail or losing ink/capture handlers.
- rail=page.locator('#floatingToolbox');assert 48<=rail.bounding_box()['width']<=56
- expect(page.locator('#sizeMenuBtn')).to_be_hidden();page.locator('#toolbarFormatBtn').click();expect(page.locator('#sizeMenuBtn')).to_be_visible()
- page.screenshot(path=str(out/'format-expanded.png'));page.locator('#sizeMenuBtn').click();page.locator('#sizeSmallBtn').click();assert page.evaluate('state.defaults.nodeSize')=='small'
- page.locator('#toolbarFormatBtn').click();expect(page.locator('#sizeMenuBtn')).to_be_hidden();page.locator('#homeInkBtn').click();expect(page.locator('.canvas-ink-toolbar')).to_be_visible();page.locator('#homeInkBtn').click()
+ # Main toolbar retains original direct entries and two-column layout.
+ page.locator('#stage').focus();page.keyboard.press('2');assert page.evaluate('state.defaults.nodeSize')=='big'
+ expect(page.locator('#toolbarFormatBtn')).to_have_count(0);expect(page.locator('#toolbarFormatPanel')).to_have_count(0)
+ rail=page.locator('#floatingToolbox')
+ direct=['templateBtn','addBtn','addTextElementBtn','focusBtn','flashcardBtn','graphQuestionBatchBtn','homeInkBtn','homeCaptureBtn','mindmapBtn','sizeMenuBtn','lineStyleMenuBtn','lineColorPicker','pointerModeBtn','flowModeBtn','relationViewMenuBtn']
+ for id in direct:
+  control=page.locator('#'+id)
+  if id=='lineColorPicker':control=control.locator('..')
+  expect(control).to_be_visible()
+  assert control.evaluate('(e)=>{const r=e.getBoundingClientRect();return e.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))}'),id
+ grid=rail.locator('.floating-toolbox-grid');assert grid.evaluate('(e)=>getComputedStyle(e).gridTemplateColumns').split()==['40px','40px']
+ assert grid.evaluate('(e)=>e.scrollHeight<=e.clientHeight+1'),'all main entries fit without hidden scrolling'
+ page.locator('#addTextElementBtn').hover();expect(page.locator('.home-toolbar-hint')).to_have_text('文本');page.mouse.move(1100,720)
+ page.locator('#sizeMenuBtn').click();page.locator('#sizeSmallBtn').click();assert page.evaluate('state.defaults.nodeSize')=='small'
+ page.locator('#lineStyleMenuBtn').click();page.locator('#lineDashedBtn').click();assert page.evaluate('state.defaults.linkStyle')=='dashed'
+ page.locator('#lineColorPicker').locator('..').click();picker=page.locator('.graph-floating-color-window');expect(picker).to_be_visible();swatch=picker.locator('[data-picker-swatch]').first;color=swatch.get_attribute('data-picker-swatch');swatch.click();assert page.evaluate('currentCanvasColor()').lower()==color.lower();page.keyboard.press('Escape')
+ page.locator('#homeInkBtn').click();expect(page.locator('.canvas-ink-toolbar')).to_be_visible();page.locator('#homeInkBtn').click()
+ page.screenshot(path=str(out/'main-toolbar-restored.png'))
+ page.locator('#mindmapBtn').click();mindmap=page.locator('[data-formal-mindmap-panel]');expect(mindmap).to_be_visible();assert mindmap.bounding_box()['height']<70;page.screenshot(path=str(out/'mindmap-settings-preserved.png'));mindmap.get_by_role('button',name='关闭布局与主题').click()
  # Names/current states and visible primary versus discoverable auxiliary controls.
  page.evaluate('()=>{clearSelection();selectLink("ab")}')
  primary=page.locator('[data-edge-control-kind=curve-midpoint]');aux=page.locator('[data-edge-control-kind=curve-control]').first
  expect(primary).to_have_attribute('data-edge-control-index','2');expect(aux).to_have_attribute('tabindex','0')
  assert float(aux.locator('.edge-control-dot').evaluate('(e)=>getComputedStyle(e).opacity'))<1
  aux.focus();page.wait_for_timeout(200);assert float(aux.locator('.edge-control-dot').evaluate('(e)=>getComputedStyle(e).opacity'))==1
- line=page.locator('[data-uc-edge-panel=line]');line.click();expect(page.get_by_role('button',name='曲线',exact=True)).to_have_attribute('aria-pressed','true')
- page.get_by_role('button',name='折线',exact=True).click();expect(line).to_have_attribute('aria-label','线条类型：折线')
- line.click();page.get_by_role('button',name='曲线',exact=True).click()
+ line=page.locator('[data-uc-edge-panel=line]');line.click();expect(page.locator('[data-uc-edge-popover=line]').get_by_role('button',name='曲线',exact=True)).to_have_attribute('aria-pressed','true')
+ page.locator('[data-uc-edge-popover=line]').get_by_role('button',name='折线',exact=True).click();expect(line).to_have_attribute('aria-label','线条类型：折线')
+ line.click();page.locator('[data-uc-edge-popover=line]').get_by_role('button',name='曲线',exact=True).click()
  # A real grip drag keeps its dock after panning and a double-click resets it.
  grip=page.locator('#edgeQuickStylePanel [data-uc-toolbar-drag]');box=grip.bounding_box();page.mouse.move(box['x']+15,box['y']+15);page.mouse.down();page.mouse.move(box['x']+75,box['y']+65,steps=8);page.mouse.up();assert page.evaluate('selectedEdgeQuickStyleToolbarController.isManual()')
  dock=page.locator('#edgeQuickStylePanel').bounding_box();page.evaluate('()=>{state.viewport.x+=20;applyTransform()}');after=page.locator('#edgeQuickStylePanel').bounding_box();assert abs(dock['x']-after['x'])<2 and abs(dock['y']-after['y'])<2
@@ -84,6 +95,6 @@ with sync_playwright() as pw:
  page.evaluate('document.body.classList.add("auth-readonly")');assert page.evaluate('KGHomeInk.activateText()') is False;page.evaluate('document.body.classList.remove("auth-readonly")')
  page.set_viewport_size({'width':900,'height':640});mode('professional');assert rail.bounding_box()['y']+rail.bounding_box()['height']<=page.locator('#stage').bounding_box()['y']+page.locator('#stage').bounding_box()['height']-50
 
- page.locator('#toolbarFormatBtn').click();page.locator('#sizeMenuBtn').click();expect(page.locator('#sizeSmallBtn')).to_be_visible();page.wait_for_timeout(180);page.screenshot(path=str(out/'short-viewport.png'));page.locator('#sizeDefaultBtn').click();assert page.evaluate('state.defaults.nodeSize')==''
+ page.locator('#sizeMenuBtn').click();expect(page.locator('#sizeSmallBtn')).to_be_visible();page.wait_for_timeout(180);page.screenshot(path=str(out/'short-viewport.png'));page.locator('#sizeDefaultBtn').click();assert page.evaluate('state.defaults.nodeSize')==''
  assert not errors,errors;ctx.request.delete(base+'/api/v1/files/'+fid);browser.close()
-print('PASS graph shared text, native history, compact formats/modes, handles, names and target-avoiding popovers')
+print('PASS restored direct main toolbar, original two columns, shared text/modes, handles and target-avoiding popovers')

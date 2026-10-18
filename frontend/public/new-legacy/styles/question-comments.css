@@ -40,7 +40,6 @@
 }
 .q-danmaku:not(#authModal) .q-danmaku-track .q-danmaku-item:focus-visible { outline:2px solid #a58aff; outline-offset:2px; }
 .q-danmaku .q-danmaku-content { min-width:0; overflow:hidden; text-overflow:ellipsis; }
-.q-danmaku .q-comment-avatar { width:30px; height:30px; background:#9770ed; color:#fff; font-size:15px; font-weight:400; }
 .q-danmaku .q-danmaku-pause { display:none; flex-shrink:0; width:18px; height:18px; align-items:center; justify-content:center; border-radius:50%; padding:0; background:#e9e1ff; color:#7651ee; }
 .q-danmaku:not(#authModal) .q-danmaku-track .q-danmaku-item:is(:hover,:focus-visible,.is-paused) .q-danmaku-pause { display:inline-flex; }
 .q-danmaku .q-danmaku-like { display:inline-flex; align-items:center; flex-shrink:0; gap:5px; color:#72758a; font-size:12px; line-height:1; white-space:nowrap; }
@@ -249,9 +248,7 @@
 }
 .q-danmaku:not(#authModal) .q-danmaku-pop[data-placement="top"]::before { transform:translate(-50%,-50%) rotate(225deg); }
 .q-danmaku:not(#authModal) .q-danmaku-pop-head { display:flex; align-items:center; gap:10px; min-height:34px; }
-.q-danmaku:not(#authModal) .q-danmaku-pop-head .q-comment-avatar { width:34px; height:34px; font-size:16px; }
 .q-danmaku:not(#authModal) .q-danmaku-pop-meta { display:flex; flex:1; min-width:0; flex-direction:column; gap:0; }
-.q-danmaku:not(#authModal) .q-danmaku-pop-author { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#17182b; font-weight:500; font-size:14px; }
 .q-danmaku:not(#authModal) .q-danmaku-pop-meta time { color:#9597a7; font-size:11px; line-height:1.4; }
 .q-danmaku:not(#authModal) .q-danmaku-pop button { box-sizing:border-box; font-family:inherit; font-weight:400; text-transform:none; letter-spacing:normal; cursor:pointer; box-shadow:none; transform:none; outline:none; }
 .q-danmaku:not(#authModal) .q-danmaku-pop .q-danmaku-pop-close { display:grid; place-items:center; flex-shrink:0; width:44px; height:44px; min-width:44px; margin:-5px -8px -5px 0; padding:0; border:0; border-radius:10px; background:transparent; color:#858898; }

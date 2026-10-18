@@ -211,7 +211,7 @@
     const el = document.getElementById(tool.id);
     if(!el || el.disabled || el.hidden) return false;
     const host = el.closest('[hidden], .permission-hidden');
-    if(host&&host.id!=="toolbarFormatPanel") return false;
+    if(host) return false;
     const styleTarget = el.type === 'color' && el.parentElement ? el.parentElement : el;
     const style = window.getComputedStyle ? window.getComputedStyle(styleTarget) : null;
     if(style && (style.display === 'none' || style.visibility === 'hidden' || (style.pointerEvents === 'none'&&!el.closest('.floating-submenu')))) return false;
@@ -227,8 +227,6 @@
     if(typeof handler !== "function") return;
     event.preventDefault();
     event.stopPropagation();
-    const format=document.getElementById('toolbarFormatPanel');
-    if(format?.hidden&&format.contains(document.getElementById(tool.id))){format.hidden=false;document.getElementById('toolbarFormatBtn')?.setAttribute('aria-expanded','true')}
     handler(event, tool);
   }
   if(!window.__KGHomeToolbarShortcutBound){
@@ -285,11 +283,6 @@
   }
   function bindHandlers(){
     bindMenuShells();
-    const format=document.getElementById('toolbarFormatBtn'),panel=document.getElementById('toolbarFormatPanel');
-    if(format&&panel&&!format.dataset.bound){
-      format.dataset.bound='1';
-      format.addEventListener('click',()=>{const open=format.getAttribute('aria-expanded')!=='true';panel.hidden=!open;format.setAttribute('aria-expanded',String(open));closeFloatingSubmenus()});
-    }
     flattenTools().forEach(tool => {
       if(!tool.id || !tool.action) return;
       const el = document.getElementById(tool.id);
@@ -327,17 +320,14 @@
     const visibleGroups = HOME_TOOL_GROUPS
       .map(group => ({...group, tools: visibleToolsForGroup(group)}))
       .filter(group => group.tools.some(tool => tool.type !== "file"));
-    const formatIds=new Set(['sizeMenuBtn','lineStyleMenuBtn','lineColorPicker']);
-    const formatTools=visibleGroups.flatMap(group=>group.tools).filter(tool=>formatIds.has(tool.id));
     const fileTools = HOME_TOOL_GROUPS.flatMap(group => visibleToolsForGroup(group)).filter(tool => tool.type === "file");
     box.innerHTML = `
       <button aria-label="拖动工具菜单" class="floating-toolbox-handle" id="floatingToolboxHandle" title="按住拖动菜单" type="button">${ICONS.grip}</button>
       <div class="floating-toolbox-grid">
         ${visibleGroups.map((group, groupIndex) => {
-          const html = group.tools.filter(tool => tool.type !== "file"&&!formatIds.has(tool.id)).map(renderTool).join("\n");
+          const html = group.tools.filter(tool => tool.type !== "file").map(renderTool).join("\n");
           return `${groupIndex ? '<div aria-hidden="true" class="floating-toolbox-divider"></div>' : ''}${html}`;
         }).join("\n")}
-        ${formatTools.length?`<button id="toolbarFormatBtn" type="button" class="floating-tool-btn" data-permission="editGraph" data-permission-mode="hide" aria-label="更多格式" aria-expanded="false" aria-controls="toolbarFormatPanel" data-tooltip="更多格式">${ICONS.style}</button><div id="toolbarFormatPanel" class="floating-format-panel" role="group" aria-label="专业格式" hidden>${formatTools.map(renderTool).join('')}</div>`:''}
         ${fileTools.map(renderTool).join("\n")}
       </div>
     `;
@@ -350,7 +340,6 @@
       roleApi.decoratePermissionElements(box);
     }
     bindHandlers();
-    box.querySelector('.floating-toolbox-grid')?.addEventListener('scroll',()=>document.querySelectorAll('.floating-tool-menu-shell.menu-open').forEach(positionSubmenu));
     window.dispatchEvent(new Event("kg-home-toolbar-rendered"));
   }
   function setMode(mode){
