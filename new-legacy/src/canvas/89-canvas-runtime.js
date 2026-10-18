@@ -133,13 +133,21 @@
     }
     return{...best,width,height,right:best.left+width,bottom:best.top+height};
   }
+  const popoverMinimumStyles=new WeakMap();
   function positionPopoverPanel(options={}){
     const {panel,trigger,root}=options,host=options.host||root?.parentElement;
     if(!panel||!trigger||!host)return false;
     const bounds=options.getBounds?.()||host.getBoundingClientRect(),offsetBox=options.fixed?{left:0,top:0}:(panel.offsetParent||root).getBoundingClientRect();
-    const pad=Number(options.pad)||8;
-    panel.style.maxWidth=Math.max(1,bounds.right-bounds.left-pad*2)+'px';
-    panel.style.maxHeight=Math.max(1,bounds.bottom-bounds.top-pad*2)+'px';panel.style.overflowY='auto';
+    const pad=Number(options.pad)||8,maxWidth=Math.max(1,bounds.right-bounds.left-pad*2),maxHeight=Math.max(1,bounds.bottom-bounds.top-pad*2);
+    // CSS min-size wins over max-size. Restore the caller's minima before each
+    // measurement so a narrow host does not permanently shrink a later wide one.
+    if(!popoverMinimumStyles.has(panel))popoverMinimumStyles.set(panel,{minWidth:panel.style.minWidth,minHeight:panel.style.minHeight});
+    Object.assign(panel.style,popoverMinimumStyles.get(panel));
+    const sizing=global.getComputedStyle?.(panel);
+    panel.style.minWidth=`min(${sizing?.minWidth&&sizing.minWidth!=='auto'?sizing.minWidth:'0px'}, ${maxWidth}px)`;
+    panel.style.minHeight=`min(${sizing?.minHeight&&sizing.minHeight!=='auto'?sizing.minHeight:'0px'}, ${maxHeight}px)`;
+    panel.style.boxSizing='border-box';panel.style.maxWidth=maxWidth+'px';
+    panel.style.maxHeight=maxHeight+'px';panel.style.overflowY='auto';
     const main=root?.querySelector?.(options.mainSelector||'.uc-toolbar-main');
     const avoidRects=[...(options.getAvoidRects?.()||[])];if(main)avoidRects.push(main.getBoundingClientRect());
     const next=placePopover({bounds,anchor:trigger.getBoundingClientRect(),width:panel.offsetWidth||180,height:panel.offsetHeight||80,avoidRects,pad,gap:Number(options.gap)||8,alignEnd:!!options.alignEnd});
