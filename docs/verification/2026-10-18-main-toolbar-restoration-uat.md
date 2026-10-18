@@ -16,7 +16,7 @@
 - pnpm --dir frontend test（336 项及 E2E/部署契约）
 - pnpm --dir frontend test:design（5 项）
 
-本轮没有修改后端业务，未单独重跑后端全量；正式候选按 UAT 自动范围门禁继续验证。测试数据库服务 5255 已 SIGTERM 退出并清理，未写 UAT 业务数据。
+本轮没有修改后端业务；定向自检后，正式候选按 UAT 自动范围执行 full 门禁，包含后端全量回归。测试数据库服务 5255 已 SIGTERM 退出并清理，未写 UAT 业务数据。
 
 追加用户要求：弹幕去掉用户名；题目尽量一屏展示完整。
 
@@ -27,4 +27,15 @@
 - 新增视口检查复用现有题目/会话模拟 API 夹具、生产页面 CSS 顺序和真实题目渲染，记录在 artifacts/restore-main-toolbar/check-practice-viewport.py 与 practice-viewport.log。长题完整性、选项选择后解析、下一题操作均通过。图片已人工检查。
 - 最终 pnpm --dir frontend test（336 项及 9 项 E2E/部署契约）、test:design（5 项）、JS 语法与 diff 检查均通过。
 
-候选 v9.0-p4.1.343；本地 v342 为追加要求前的未部署候选，未覆盖不可变包。基线 v341 与候选 v343 均为 1,148 个文件，逐项路径完全相同，admin-console.html 保留。seed 仅版本/contentHash 更新；practice-mode.html 权威源逐字未变。正式打包完成，部署 UAT 后补记线上核验。main 未获合入授权，待用户本人验收。
+候选 v9.0-p4.1.343；本地 v342 为追加要求前的未部署候选，未覆盖不可变包。基线 v341 与候选 v343 均为 1,148 个文件，逐项路径完全相同，admin-console.html 保留。seed 仅版本/contentHash 更新；practice-mode.html 权威源逐字未变。正式打包与 UAT 部署均已完成。main 未获合入授权，待用户本人验收。
+
+
+最终 UAT 结果（2026-10-18，开发自检）：
+
+- 已合入并推送 uat，部署提交 e3ee8898c1a5914f307ff1ae26168632d82aef95，功能提交 a8cb8785；正式脚本部署 v9.0-p4.1.343，exit 0。
+- full 门禁 exit 0：1080 项后端、336 项前端、9 项 E2E 契约、10 项扩展契约，以及实际做题/弹幕/画布/跨域/学习资产和视觉回归均通过；门禁 1195 秒，部署总计 1289 秒。
+- https://uat.aihuanpu.com 的 6 条公共路由均返回 v343；17 个线上静态文件 SHA-256 与正式 release 完全一致，包含工具栏、共享弹幕 JS、弹幕 CSS 和答题 CSS；访客图谱及大厅加载无页面脚本异常。
+- 远端部署提交已核对；内部健康检查 status=ok、db=ok，公开 HTTPS 与版本检查通过。线上冒烟仅 GET 和访客加载，没有提交 UAT 练习/评论/图谱数据。
+- sourceHash: 58de90a09e9dacb0971e7806159f9a583c62c31d98687d3b7a629d48f36afd0c。
+- 线上证据：artifacts/restore-main-toolbar/uat-public-smoke.json、uat-deploy.log、validation-final.log。发布脚本重跑同步仅将 sync-report 记录为 v343→v343，changes 为空，未再次改变源或发布内容。
+- main 保持 b76862ed2d12d36a6c3d0b6782f5bd601f12d8a5；保留 main、uat 与功能分支。以上不等于用户 UAT 验收，等待用户本人验收后才可合入 main。
