@@ -16,6 +16,26 @@ with sync_playwright() as pw:
         page.add_script_tag(content=source)
     page.evaluate('''()=>{window.strokes=[];window.locked=false;window.fail=false;window.errors=[];window.ink=KGCanvasInk.create({viewport:document.querySelector('#view'),world:document.querySelector('#world'),getViewport:()=>({x:100,y:100,scale:2}),getStrokes:()=>strokes,setStrokes:s=>{if(fail)throw Error('save failed');strokes=s},isReadonly:()=>locked,onError:e=>errors.push(e)});}''')
     text=page.get_by_role('button',name='文字',exact=True)
+    # Editing follows the current content, including deletion of explicit blank lines.
+    text.click();page.mouse.click(408,308)
+    draft=page.locator('.canvas-ink-text-editor');assert draft.bounding_box()['height']<100,draft.bounding_box();draft.fill('短文字')
+    assert draft.bounding_box()['height']<100, draft.bounding_box()
+    draft.fill('一\n二\n三\n四\n');tall=draft.bounding_box()['height']
+    draft.fill('短文字');assert draft.bounding_box()['height']<tall/2
+    # Border drags never blur, commit or disturb the selection/composition session.
+    draft.evaluate("el=>{el.setSelectionRange(1,2);el.dispatchEvent(new CompositionEvent('compositionstart',{bubbles:true}))}")
+    border=page.locator('[data-ink-edit-drag=top]');b=border.bounding_box();origin=draft.bounding_box()
+    page.mouse.move(b['x']+20,b['y']+b['height']/2);page.mouse.down();page.mouse.move(b['x']+60,b['y']+b['height']/2+30,steps=5);page.mouse.up()
+    expect(draft).to_be_focused();expect(draft).to_have_value('短文字')
+    assert draft.evaluate('el=>[el.selectionStart,el.selectionEnd]')==[1,2]
+    assert page.evaluate('strokes.length')==0
+    assert abs(draft.bounding_box()['x']-origin['x']-40)<1
+    assert abs(draft.bounding_box()['y']-origin['y']-30)<1
+    draft.press('Control+Enter');expect(draft).to_be_visible()
+    draft.evaluate("el=>el.dispatchEvent(new CompositionEvent('compositionend',{bubbles:true}))")
+    expect(draft).to_have_count(0);assert page.evaluate('strokes[0].boxHeight')<50
+    assert page.evaluate('strokes[0].points[0]')==[170,115]
+    page.evaluate('strokes=[];ink.reset();ink.setTool("select")')
     text.click();expect(page.locator('.canvas-ink-options')).to_be_visible();page.mouse.click(408,308)
     editor=page.locator('.canvas-ink-text-editor')
     editor.fill('第一行');text.click();expect(editor).to_have_value('第一行')
@@ -50,9 +70,12 @@ with sync_playwright() as pw:
     page.get_by_role('button',name='撤销笔迹',exact=True).click();assert page.evaluate('strokes[0].color')==original['color']
     page.get_by_role('button',name='重做笔迹',exact=True).click();assert page.evaluate('strokes[0].color')=='#ef4444'
     page.mouse.dblclick(470,365);expect(editor).to_be_visible()
-    editor.fill('取消内容');editor.press('Escape');assert page.evaluate('strokes[0].text')==original['text']
+    editor.fill('取消内容');saved_point=page.evaluate('strokes[0].points[0]');border=page.locator('[data-ink-edit-drag=top]');b=border.bounding_box()
+    page.mouse.move(b['x']+20,b['y']+3);page.mouse.down();page.mouse.move(b['x']+60,b['y']+23,steps=4);page.mouse.up()
+    editor.press('Escape');assert page.evaluate('strokes[0].text')==original['text'];assert page.evaluate('strokes[0].points[0]')==saved_point
     page.mouse.dblclick(470,365);editor.fill('保留失败草稿');page.evaluate('fail=true');editor.press('Control+Enter')
     expect(editor).to_have_value('保留失败草稿');assert page.evaluate('strokes[0].text')==original['text']
+    page.get_by_role('button',name='关闭画笔工具',exact=True).click();expect(editor).to_have_value('保留失败草稿');expect(page.locator('.canvas-ink-toolbar')).to_be_visible()
     page.evaluate('fail=false');page.mouse.click(950,620);assert page.evaluate('strokes[0].text')=='保留失败草稿'
     # IME Enter must stay in editor even with the save modifier.
     page.mouse.dblclick(470,365)
@@ -78,6 +101,10 @@ with sync_playwright() as pw:
     page.evaluate('locked=true;ink.render()');page.mouse.move(510,405);page.mouse.down();page.mouse.move(550,445);page.mouse.up()
     assert page.evaluate('strokes')==moved
     assert page.locator('.canvas-ink-layer text').evaluate('el=>getComputedStyle(el).filter')=='none'
+    # Legacy saved 100px frames and larger explicit lines shrink on the next edit/save.
+    page.evaluate("()=>{locked=false;strokes=[{id:'old-tall',tool:'text',color:'#111827',width:24,points:[[50,40]],text:'一\\n二\\n三',boxWidth:200,boxHeight:400}];ink.reset();ink.setTool('text');ink.render()}")
+    page.mouse.dblclick(230,200);expect(editor).to_be_visible();editor.fill('一');assert editor.bounding_box()['height']<100
+    editor.press('Control+Enter');assert page.evaluate('strokes[0].boxHeight')<50
     output=ROOT.parent/'artifacts/uat-canvas-text-fixes';output.mkdir(parents=True,exist_ok=True)
     page.screenshot(path=str(output/'shared-text-controller.png'))
     browser.close()

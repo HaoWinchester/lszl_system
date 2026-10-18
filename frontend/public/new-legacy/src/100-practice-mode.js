@@ -225,6 +225,7 @@
     const session=answerSheetSession(),currentId=state.questions[state.index]?.id||'';
     const stats=state.answerSheet?.render?.(session,currentId,undefined,state.markedQuestions);
     if(dom.answerSheetMobileCount){dom.answerSheetMobileCount.textContent=(stats?.answered||0)+'/'+(stats?.total||state.questions.length||0)}
+    if(dom.answerSheetMobileBtn)dom.answerSheetMobileBtn.setAttribute('aria-label','答题卡，已答 '+(stats?.answered||0)+'/'+(stats?.total||state.questions.length||0)+' 题');
   }
   function mergeSessionQuestions(){
     if(!state.session)return;

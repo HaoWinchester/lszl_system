@@ -4,7 +4,12 @@
   "toVersion": "v9.0-p4.1.336",
   "changes": {
     "added": [],
-    "changed": [],
+    "changed": [
+      "src/graph/template-center-controller.js",
+      "styles/answer-page.css",
+      "tests/graph-edge-geometry.test.js",
+      "tests/template-preview-browser.py"
+    ],
     "removed": []
   },
   "incompatible": []

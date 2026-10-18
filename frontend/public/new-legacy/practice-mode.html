@@ -14,7 +14,15 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
   <meta name="color-scheme" content="light"/>
-  <title>做题模式｜项目管理学习营</title>
+  <meta name="description" content="用知识图谱、笔记与主动回忆，构建自己的知识体系。"/>
+  <meta name="keywords" content="个人学习工具,知识图谱,知识管理,笔记,主动回忆"/>
+  <meta property="og:site_name" content="个人学习工具"/>
+  <meta property="og:type" content="website"/>
+  <meta property="og:title" content="个人学习工具｜知识图谱与主动回忆"/>
+  <meta property="og:description" content="用知识图谱、笔记与主动回忆，构建自己的知识体系。"/>
+  <meta property="og:url" content="https://lszl.aihuanpu.com/practice-mode.html"/>
+  <title>个人学习工具｜知识图谱与主动回忆</title>
+  <link rel="canonical" href="https://lszl.aihuanpu.com/practice-mode.html"/>
   <link rel="stylesheet" href="styles/main.css?v=v9.0-p4.1.336"/>
   <link rel="stylesheet" href="styles/user-center.css?v=v9.0-p4.1.336"/>
 <link rel="stylesheet" href="styles/membership-ui.css?v=v9.0-p4.1.336"/>
@@ -201,7 +209,6 @@
       <section class="practice-game" id="practiceGame" hidden aria-live="polite">
         <nav class="practice-side-nav" id="practiceSideNav" aria-label="答题导航">
           <button type="button" class="practice-side-item is-active" data-practice-action="question" aria-label="回到当前题目"><span data-kg-icon="file-text" data-kg-icon-size="28" aria-hidden="true"></span><span>答题</span></button>
-          <button type="button" class="practice-side-item" data-practice-action="sheet" aria-controls="practiceAnswerSheetDrawer"><span data-kg-icon="layout-grid" data-kg-icon-size="28" aria-hidden="true"></span><span>答题卡</span></button>
           <button type="button" class="practice-side-item practice-side-comment" id="practiceCommentBtn" title="查看本题评论并参与讨论"><span data-kg-icon="message-circle-more" data-kg-icon-size="28" aria-hidden="true"></span><span>评论</span><em class="practice-side-badge" id="practiceCommentCount" hidden aria-label="本题评论数"></em></button>
           <button type="button" class="practice-side-item practice-side-danmaku practice-danmaku-toggle" id="practiceDanmakuToggle" aria-pressed="true" title="开关本题弹幕"><span data-kg-icon="zap" data-kg-icon-size="28" aria-hidden="true"></span><span data-practice-danmaku-label>弹幕开</span></button>
           <button type="button" class="practice-side-item" id="practiceFavoriteBtn" aria-pressed="false" title="收藏本题"><span data-kg-icon="star" data-kg-icon-size="28" aria-hidden="true"></span><span>收藏</span><em class="practice-side-badge" id="practiceFavoriteCount" hidden aria-label="本题收藏数"></em></button>
@@ -218,11 +225,10 @@
           <div class="practice-health" id="practiceHealth" role="img" aria-label="剩余血量"></div>
           <button type="button" class="practice-language-cycle" id="practiceLanguageCycle" title="题目显示语言：中文（点击切换）" aria-label="切换题目显示语言" aria-live="polite">中</button>
           <div class="practice-scholar-stat practice-timer" id="practiceTimer" hidden><strong>60</strong><span>秒</span></div>
-          <!-- brief Step 3：答题卡开关固定为 topbar 最右侧唯一入口 -->
-          <button type="button" class="practice-answer-sheet-mobile-btn" id="practiceAnswerSheetMobileBtn" aria-controls="practiceAnswerSheetDrawer" aria-expanded="false">答题卡 <span>0/0</span>
-          </button>
+
         </header>
-        <p class="practice-revenge-submit-note">复仇模式须交卷结算：完成作答后，请打开右上角“答题卡”，点击底部“交卷并查看成绩”。</p>
+        <button type="button" class="practice-answer-sheet-mobile-btn" id="practiceAnswerSheetMobileBtn" aria-label="答题卡，已答 0/0 题" title="打开答题卡" aria-controls="practiceAnswerSheetDrawer" aria-expanded="false"><span>0/0</span></button>
+        <p class="practice-revenge-submit-note">复仇模式须交卷结算：完成作答后，请打开悬浮“答题卡”，点击底部“交卷并查看成绩”。</p>
         <div class="practice-time-row" id="practiceTimeRow" hidden>
           <span class="practice-time-icon" data-kg-icon="timer" data-kg-icon-size="18" aria-hidden="true"></span>
           <strong class="practice-time-ms" id="practiceTimerMs">60.0</strong>
