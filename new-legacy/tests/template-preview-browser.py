@@ -9,7 +9,7 @@ parser=argparse.ArgumentParser();parser.add_argument('--base-url',default='http:
 with sync_playwright() as pw:
     browser=pw.chromium.launch(channel='chrome');ctx=browser.new_context(viewport={'width':1440,'height':960})
     assert ctx.request.post(base+'/api/v1/auth/login',data={'username':'ink-browser','password':'ink-browser-test'}).ok
-    graph={'nodes':[{'id':'a','x':0,'y':140,'w':136,'h':142,'title':'个人知识体系','fillColor':'#eff6ff','content':{'notes':'PRIVATE NOTES'}},{'id':'b','x':300,'y':0,'title':'知识归纳'},{'id':'c','x':300,'y':280,'title':'主动回忆'}], 'links':[{'id':'ab','from':'a','to':'b'},{'id':'ac','from':'a','to':'c'}]}
+    graph={'nodes':[{'id':'a','geometry':{'x':0,'y':140,'width':600,'height':80},'title':'个人知识体系','fillColor':'#eff6ff','content':{'notes':'PRIVATE NOTES'}},{'id':'b','x':300,'y':0,'title':'知识归纳'},{'id':'c','x':300,'y':280,'title':'主动回忆'}], 'links':[{'id':'ab','from':'a','to':'b'},{'id':'ac','from':'a','to':'c'}]}
     response=ctx.request.post(base+'/api/v1/files',data={'name':'preview-'+uuid4().hex[:8],'graphData':graph});assert response.ok,response.text();fid=response.json()['file']['id']
     response=ctx.request.post(base+'/api/v1/graph-templates',data={'sourceFileId':fid,'expectedFileRevision':1,'name':'预览交互验证','description':'建立自己的知识体系','memberOnly':False});assert response.ok,response.text();tid=response.json()['template']['id']
     p=ctx.new_page();errors=[];p.on('pageerror',lambda e:errors.append(str(e)))
@@ -24,6 +24,8 @@ with sync_playwright() as pw:
     row.locator('.template-thumbnail').click()
     panel=p.locator('.template-preview-window');drawing=panel.locator('svg');expect(drawing).to_be_visible()
     assert drawing.locator('rect').count()==3
+    assert drawing.locator('rect').first.get_attribute('width')=='600'
+    assert drawing.locator('rect').first.get_attribute('height')=='80'
     original=drawing.get_attribute('viewBox');panel.get_by_role('button',name='放大预览').click();assert drawing.get_attribute('viewBox')!=original
     box=drawing.bounding_box();p.mouse.move(box['x']+box['width']/2,box['y']+box['height']/2);p.mouse.down();p.mouse.move(box['x']+box['width']/2+45,box['y']+box['height']/2+30,steps=5);p.mouse.up();moved=drawing.get_attribute('viewBox');assert moved!=original
     panel.get_by_role('button',name='适应视图').click();assert drawing.get_attribute('viewBox')==original

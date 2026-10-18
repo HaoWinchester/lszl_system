@@ -184,12 +184,14 @@ def preview_projection(graph, version):
         ids.add(identity)
         style = node.get('style') if isinstance(node.get('style'), dict) else {}
         content = node.get('content') if isinstance(node.get('content'), dict) else {}
-        nodes.append({'id': identity, 'title': text(node.get('title') or content.get('title')),
-                      'x': number(node.get('x')), 'y': number(node.get('y')),
-                      'width': number(node.get('w', node.get('width')), 136, 40, 1000),
-                      'height': number(node.get('h', node.get('height')), 142, 30, 1000),
-                      'fill': color(node.get('fillColor') or node.get('bodyFillColor') or style.get('bg', style.get('background')), '#ffffff'),
-                      'color': color(node.get('textColor') or node.get('bodyTextColor') or style.get('color'), '#243247')})
+        geometry = node.get('geometry') if isinstance(node.get('geometry'), dict) else {}
+        appearance = node.get('appearance') if isinstance(node.get('appearance'), dict) else {}
+        nodes.append({'id': identity, 'title': text(content.get('title', node.get('title'))),
+                      'x': number(geometry.get('x', node.get('x'))), 'y': number(geometry.get('y', node.get('y'))),
+                      'width': number(geometry.get('width', node.get('w', node.get('width'))), 136, 40, 1000),
+                      'height': number(geometry.get('height', node.get('h', node.get('height'))), 142, 30, 1000),
+                      'fill': color(appearance.get('bodyFillColor') or appearance.get('fillColor') or node.get('bodyFillColor') or node.get('fillColor') or style.get('bg', style.get('background')), '#ffffff'),
+                      'color': color(appearance.get('bodyTextColor') or appearance.get('textColor') or node.get('bodyTextColor') or node.get('textColor') or style.get('color'), '#243247')})
     links = []
     for link in graph.get('links', [])[:1000]:
         if not isinstance(link, dict) or link.get('from') not in ids or link.get('to') not in ids:

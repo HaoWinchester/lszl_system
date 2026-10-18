@@ -1,6 +1,7 @@
 'use strict';
 
 (function(global){
+  const MAX_WAYPOINTS=64;
   const point=(x,y)=>({x,y});
   function curvePoint(start,end,controls,t){
     const u=1-t,a=u*u*u,b=3*u*u*t,c=3*u*t*t,d=t*t*t;
@@ -38,7 +39,7 @@
     }
     const result=route.slice(1,-1);
     // A bounded editable route must stay whole; dropping its tail creates diagonals.
-    return result.length<=64?result:waypoints.map(p=>({...p}));
+    return result.length<=MAX_WAYPOINTS?result:waypoints.map(p=>({...p}));
   }
   function controlsFromHandles(start,handles,end){
     // At t=1/3 and 2/3, the two unknown controls have coefficients
@@ -121,7 +122,7 @@
       ?point(center.x+Math.sign(ray.x||1)*width/2,center.y)
       :point(center.x,center.y+Math.sign(ray.y||1)*height/2);
   }
-  const api=Object.freeze({distanceToPolyline,nearestSegmentIndex,curveMidpoint,bendCurveMidpoint,segmentHandles,moveElbowSegment,curveHandles,controlsFromHandles,constrainWaypointDrag,moveRoute,portPoint,portDirection});
+  const api=Object.freeze({MAX_WAYPOINTS,distanceToPolyline,nearestSegmentIndex,curveMidpoint,bendCurveMidpoint,segmentHandles,moveElbowSegment,curveHandles,controlsFromHandles,constrainWaypointDrag,moveRoute,portPoint,portDirection});
   global.KGGraphEdgeGeometry=api;
   if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);

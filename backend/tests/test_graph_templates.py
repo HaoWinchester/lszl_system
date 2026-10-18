@@ -250,3 +250,11 @@ def test_preview_projection_rejects_untrusted_styles_and_nonfinite_geometry():
     assert 'SECRET' not in str(preview)
     huge=service.preview_projection({'nodes':[{'id':'huge','x':10**500,'y':-(10**500)}]},1)['nodes'][0]
     assert huge['x']==100000 and huge['y']==-100000
+
+
+def test_preview_uses_canonical_card_geometry_and_appearance_before_legacy_aliases():
+    node={'id':'resized','title':'stale','x':999,'y':999,'w':136,'h':142,
+          'content':{'title':'知识归纳'},'geometry':{'x':10,'y':20,'width':600,'height':80},
+          'appearance':{'fillColor':'#eff6ff','textColor':'#123456'}}
+    projected=service.preview_projection({'nodes':[node]},1)['nodes'][0]
+    assert projected=={'id':'resized','title':'知识归纳','x':10,'y':20,'width':600,'height':80,'fill':'#eff6ff','color':'#123456'}
