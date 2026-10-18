@@ -33,7 +33,7 @@ function load({ remoteActive }) {
     context,
     { filename: '23-graph-file-editor-store-bridge.js' }
   );
-  return { bridge: context.KGGraphFileEditorStoreBridge, calls };
+  return { bridge: context.KGGraphFileEditorStoreBridge, calls, context, remote };
 }
 
 (async () => {
@@ -52,6 +52,15 @@ function load({ remoteActive }) {
   assert.strictEqual(created.id, 'remote-created');
   assert.deepStrictEqual(remote.calls.slice(-3), [['remote-create', '远端新图谱'], ['remote-open', 'remote-created'], ['adopt', 'remote-created']], 'remote create must never fall through to the local store');
   assert.strictEqual(remote.calls.some(call => call[0].startsWith('local-')), false);
+
+  let listed={id:'remote-created',revision:2},acknowledged={id:'remote-created',revision:3};
+  remote.remote.getCurrentFileMeta=()=>listed;
+  remote.context.KGGraphFileRemoteAdapter.getCurrentFileMeta=()=>acknowledged;
+  assert.strictEqual(remote.bridge.fragmentSource().revision,3,'publication and question binding must use the same file acknowledged revision after a queued save');
+  acknowledged={id:'remote-created',revision:1};
+  assert.strictEqual(remote.bridge.fragmentSource().revision,2,'a refreshed server index must not be replaced by an older adapter revision');
+  acknowledged={id:'old-file',revision:99};
+  assert.strictEqual(remote.bridge.fragmentSource().fileId,'remote-created','an adapter for another tab must not replace the selected source');
 
   const local = load({ remoteActive: false });
   await local.bridge.initialize();

@@ -959,7 +959,13 @@ function beginEdgeEndpointDrag(event,linkId,side){
 function applyEdgeEndpointDragPoint(payload){
   const drag=edgeEndpointDrag;if(!drag||!payload)return;const link=linkById(drag.linkId);if(!link)return;
   if(!drag.moved&&Math.hypot(payload.clientX-drag.startClient.x,payload.clientY-drag.startClient.y)<3)return;
-  if(!drag.history){drag.historyController.checkpoint('调整关系线端点');persistDerivedEdgeRoute(link,edgeDomById.get(drag.linkId)?.geometry);drag.history=true}
+  if(!drag.history){
+    drag.historyController.checkpoint('调整关系线端点');
+    const geometry=edgeDomById.get(drag.linkId)?.geometry;
+    // An automatic cubic follows its new target; only edited curves retain stored controls.
+    if(!geometry?.derivedCurveControls)persistDerivedEdgeRoute(link,geometry);
+    drag.history=true;
+  }
   drag.moved=true;setLinkFreeEndpoint(link,drag.side,payload.world);invalidateGraphIndexCache();const target=edgeEndpointTargetFromClient(payload.clientX,payload.clientY),otherId=drag.side==='from'?link.to:link.from;
   if(target&&target.id!==otherId){drag.targetId=target.id;setEdgeEndpointBindTarget(target)}else{drag.targetId='';clearEdgeEndpointBindTarget()}
   updateLinkGeometry(link,getGraphIndex().nodeMap);
@@ -972,10 +978,12 @@ function finishEdgeEndpointDrag(event,cancelled=false){
   const drag=edgeEndpointDrag;if(!drag||drag.pointerId!==event.pointerId)return;
   if(edgeEndpointDragFrame){cancelAnimationFrame(edgeEndpointDragFrame);edgeEndpointDragFrame=0}if(edgeEndpointDragPoint&&!cancelled)applyEdgeEndpointDragPoint(edgeEndpointDragPoint);edgeEndpointDragPoint=null;
   const link=linkById(drag.linkId);let bound=false;if(link&&!cancelled&&drag.moved&&drag.targetId)bound=bindLinkEndpoint(link,drag.side,drag.targetId);
+  // A different bound card defines a new curve; same-card and free endpoint edits keep their manual shape.
+  if(bound&&drag.original[drag.side]&&drag.original[drag.side]!==drag.targetId&&pathStyleForLink(link)==='curve')delete link.curveControls;
   if(!cancelled&&drag.moved){invalidateGraphIndexCache();if(link)updateLinkGeometry(link,getGraphIndex().nodeMap)}
   clearEdgeEndpointBindTarget();try{drag.handle?.releasePointerCapture?.(event.pointerId)}catch(error){}edgeEndpointDrag=null;stage.classList.remove('graph-edge-endpoint-dragging','is-interacting');
   finishGraphGestureHistory(drag,cancelled||!drag.moved);
-  if(!cancelled&&drag.moved){save();renderSelectedEdgeControls();renderSelectedEdgeQuickStylePanel();showStatus(bound?'关系线端点已重新绑定到节点。':'关系线端点已移动，当前保持未绑定状态。')}else if(cancelled)showStatus('已取消调整关系线端点。');event.preventDefault();event.stopPropagation();
+  if(!cancelled&&drag.moved){save();renderDetails();renderSelectedEdgeControls();renderSelectedEdgeQuickStylePanel();showStatus(bound?'关系线端点已重新绑定到节点。':'关系线端点已移动，当前保持未绑定状态。')}else if(cancelled)showStatus('已取消调整关系线端点。');event.preventDefault();event.stopPropagation();
 }
 function createEdgeEndpointHandle(link,side,point){
   const handle=svgElement('g','edge-endpoint-handle');handle.dataset.linkId=String(link.id);handle.dataset.edgeEndpointSide=side;handle.setAttribute('transform',`translate(${point.x} ${point.y})`);

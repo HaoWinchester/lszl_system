@@ -55,8 +55,13 @@
 .canvas-ink-toolbar button[type] *,.canvas-ink-entry[type] *{cursor:inherit!important}
 
 .canvas-ink-text-selected{filter:none;outline:none}
-/* 轻量化文字选择框：仅虚线边框；拖动文字时暂时隐藏，松手恢复。 */
+/* Edge grips appear on hover; the larger transparent hit area stays easy to catch. */
 .canvas-ink-text-box rect.canvas-ink-handle-hit{fill:transparent;stroke:none}
+.canvas-ink-text-handle-dot{fill:#fff;stroke:#3b82f6;opacity:0;pointer-events:none}
+.canvas-ink-text-box:hover .canvas-ink-text-handle-dot,
+.canvas-ink-text-box.is-interacting .canvas-ink-text-handle-dot{opacity:1}
+.canvas-ink-text-box:hover .canvas-ink-text-outline,
+.canvas-ink-text-box.is-interacting .canvas-ink-text-outline{stroke-dasharray:none}
 .canvas-ink-text-dragging .canvas-ink-text-box{opacity:0;pointer-events:none}
 .canvas-ink-text-actions{position:fixed;z-index:131;display:flex;gap:6px;background:white;padding:4px;border:1px solid #cbd5e1;border-radius:6px}
 .canvas-ink-text-actions button{padding:5px 12px;border:1px solid #cbd5e1;background:white;border-radius:4px;cursor:pointer}
@@ -71,7 +76,21 @@
 
 /* The four border hit areas move the live draft without stealing textarea focus. */
 .canvas-ink-text-edit-border{position:fixed;z-index:132;pointer-events:none}
-.canvas-ink-text-edit-border [data-ink-edit-drag]{position:absolute;pointer-events:auto;cursor:move;touch-action:none}
+.canvas-ink-text-edit-border [data-ink-edit-drag]{position:absolute;pointer-events:auto;cursor:grab!important;touch-action:none}
+.canvas-ink-text-edit-border.is-dragging [data-ink-edit-drag]{cursor:grabbing!important}
+.canvas-ink-text-edit-point{position:absolute;width:8px;height:8px;box-sizing:border-box;border:1.5px solid #3b82f6;border-radius:1px;background:#fff;transform:translate(-50%,-50%);opacity:0;pointer-events:none}
+.canvas-ink-text-edit-border:hover .canvas-ink-text-edit-point,
+.canvas-ink-text-edit-border.is-dragging .canvas-ink-text-edit-point{opacity:1}
+.canvas-ink-text-edit-border:hover::before,
+.canvas-ink-text-edit-border.is-dragging::before{content:'';position:absolute;inset:0;border:1px solid #3b82f6;pointer-events:none}
+.canvas-ink-text-edit-point[data-ink-edit-point=nw]{left:0;top:0}
+.canvas-ink-text-edit-point[data-ink-edit-point=n]{left:50%;top:0}
+.canvas-ink-text-edit-point[data-ink-edit-point=ne]{left:100%;top:0}
+.canvas-ink-text-edit-point[data-ink-edit-point=e]{left:100%;top:50%}
+.canvas-ink-text-edit-point[data-ink-edit-point=se]{left:100%;top:100%}
+.canvas-ink-text-edit-point[data-ink-edit-point=s]{left:50%;top:100%}
+.canvas-ink-text-edit-point[data-ink-edit-point=sw]{left:0;top:100%}
+.canvas-ink-text-edit-point[data-ink-edit-point=w]{left:0;top:50%}
 .canvas-ink-text-edit-border [data-ink-edit-drag=top]{left:0;top:-3px;width:100%;height:8px}
 .canvas-ink-text-edit-border [data-ink-edit-drag=bottom]{left:0;bottom:-3px;width:100%;height:8px}
 .canvas-ink-text-edit-border [data-ink-edit-drag=left]{left:-3px;top:5px;width:8px;height:calc(100% - 10px)}

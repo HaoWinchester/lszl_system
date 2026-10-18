@@ -83,7 +83,9 @@
       render();
     }
     function form(item){
-      if(busy)return;const current=context();if(!current?.fileId){status.textContent='请先保存并打开一个正式图谱。';return}
+      if(busy)return;const current=context(),publisher=global.KGAuthCore?.currentUser?.();if(!canPublish(publisher?.role)){status.textContent='仅教师和管理员可以发布模板。';return}if(!current?.fileId){status.textContent='请先保存并打开一个正式图谱。';return}
+      const publisherId=publisher.username,publisherRole=publisher.role;
+      const isCurrent=()=>!disposed&&context()?.fileId===current.fileId&&global.KGAuthCore?.currentUser?.()?.username===publisherId&&global.KGAuthCore?.currentUser?.()?.role===publisherRole;
       const editor=el('form');editor.className='template-publication-form';
       const nameField=el('label');nameField.className='template-field';nameField.append(el('span','模板名称'));
       const name=el('input');name.name='name';name.required=true;name.maxLength=200;name.value=item?.name||'知识图谱模板';name.placeholder='给模板起个名字';name.setAttribute('aria-label','模板名称');nameField.append(name);
@@ -93,7 +95,22 @@
       const submit=el('button',item?'发布新版本':'直接发布');submit.type='submit';submit.classList.add('template-submit-primary');const cancel=el('button','取消编辑');cancel.type='button';cancel.className='template-cancel';cancel.onclick=()=>editor.remove();
       const row=el('div');row.className='template-form-actions';row.append(cancel,submit);
       editor.append(nameField,descField,label,row);dialog.insertBefore(editor,list);name.focus();
-      editor.onsubmit=e=>{e.preventDefault();execute(async()=>{submit.disabled=true;await global.KGGraphFileRemoteAdapter?.flush?.();const latest=context();if(latest?.fileId!==current.fileId)throw new Error('当前图谱已切换，请重新发布。');await request(item?'/'+encodeURIComponent(item.id)+'/versions':'',{method:'POST',body:{sourceFileId:latest.fileId,expectedFileRevision:latest.revision,name:name.value,description:description.value,memberOnly:member.checked}});editor.remove();await refresh();status.textContent=item?'新版本已发布，旧副本保留。':'模板已直接发布。'}).finally(()=>{submit.disabled=false})};
+      editor.onsubmit=e=>{e.preventDefault();execute(async()=>{
+        submit.disabled=true;cancel.disabled=true;status.textContent='正在保存当前图谱并发布模板…';
+        if(!isCurrent())throw new Error('当前图谱或账号已变化，请重新发布。');
+        if(global.KGHomeInk?.hasTextDraft?.()&&await global.KGHomeInk.commitText()===false)throw new Error('图谱文字保存失败，请重试后发布。');
+        const inline=global.ensureNodeInlineTextEditorController?.();
+        if(inline?.isEditing()){await inline.commit();if(inline.isEditing())throw new Error('图谱文字保存失败，请重试后发布。')}
+        const autosave=global.KGGraphFileAutosave;
+        if(!autosave?.saveAcknowledged)throw new Error('图谱保存服务尚未就绪，请刷新后重试。');
+        if(await autosave.saveAcknowledged({force:true,reason:'template-publication'},isCurrent)===false)throw new Error(isCurrent()?'图谱保存失败，未发布模板，请重试。':'当前图谱或账号已变化，请重新发布。');
+        await global.KGGraphFileRemoteAdapter?.flush?.();
+        if(!isCurrent())throw new Error('当前图谱或账号已变化，请重新发布。');
+        const latest=context();
+        await request(item?'/'+encodeURIComponent(item.id)+'/versions':'',{method:'POST',body:{sourceFileId:latest.fileId,expectedFileRevision:latest.revision,name:name.value,description:description.value,memberOnly:member.checked}});
+        editor.remove();const success=item?'新版本已发布，旧副本保留。':'模板已直接发布。';
+        try{await refresh();status.textContent=success}catch(error){status.textContent=success+'模板列表刷新失败，请关闭后重新打开查看。'}
+      }).finally(()=>{submit.disabled=false;cancel.disabled=false})};
     }
     refresh().catch(error=>{if(!disposed)status.textContent=error.message});
   }

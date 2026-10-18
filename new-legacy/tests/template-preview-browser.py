@@ -16,6 +16,8 @@ with sync_playwright() as pw:
     p.goto(base+'/graph?fileId='+fid,wait_until='networkidle');p.wait_for_function('!KGGraphFileTabs.isSwitching()')
     for selector in ('#learningEntryDismissBtn','.tour-skip','#hideHelpBtn'):
         if p.locator(selector).is_visible():p.locator(selector).click()
+    source_tab=p.locator('.graph-file-tab[data-file-id="'+fid+'"]');expect(source_tab).to_be_visible();source_tab.click()
+    p.wait_for_function('(id)=>!KGGraphFileTabs.isSwitching()&&KGGraphFileRemoteAdapter.getCurrentFileMeta()?.id===id&&state.nodes.some(node=>node.id==="b")',arg=fid)
     before=ctx.request.get(base+'/api/v1/files/'+fid).json()['graphData']
     p.locator('#templateBtn').click();row=p.locator('[data-template-id="'+tid+'"]')
     expect(row.locator('.template-thumbnail svg')).to_be_visible()
@@ -48,7 +50,38 @@ with sync_playwright() as pw:
     expect(row.locator('[data-template-result]')).to_be_visible();copy=row.locator('[data-template-result]').get_attribute('data-template-result');assert copy!=fid
     assert ctx.request.get(base+'/api/v1/files/'+fid).json()['graphData']==before
     assert 'PRIVATE NOTES' not in str(ctx.request.get(base+'/api/v1/graph-templates/'+tid).json())
-    assert not errors,errors
+    # Real dirty editor -> failed save -> retry -> durable publication of the latest graph.
+    p.locator('#graphTemplateCenter .template-center-actions button:last-child').click()
+    source_tab.click()
+    p.wait_for_function('(id)=>!KGGraphFileTabs.isSwitching()&&KGGraphFileRemoteAdapter.getCurrentFileMeta()?.id===id&&state.nodes.some(node=>node.id==="b")',arg=fid)
+    p.locator('.graph-mode-trigger').click();p.locator('[data-graph-mode-option="professional"]').click()
+    card=p.locator('.knowledge-card[data-node-id="b"]');box=card.bounding_box()
+    p.mouse.move(box['x']+box['width']/2,box['y']+12);p.mouse.down();p.mouse.move(box['x']+box['width']/2+70,box['y']+62,steps=8);p.mouse.up()
+    p.wait_for_function('KGGraphFileAutosave.isDirty()')
+    latest=p.evaluate('JSON.parse(JSON.stringify(state.nodes.find(n=>n.id==="b")))')
+    assert ctx.request.get(base+'/api/v1/files/'+fid).json()['graphData']==before, 'dirty edit must not already be saved by the test'
+    publications=[]
+    p.on('request',lambda request:publications.append(request.url) if request.method=='POST' and request.url.endswith('/graph-templates') else None)
+    def fail_save(route):
+        if route.request.method=='PUT':route.fulfill(status=503,json={'detail':'模拟保存失败'})
+        else:route.continue_()
+    p.route('**/api/v1/files/'+fid,fail_save)
+    p.locator('#templateBtn').click();p.locator('[data-template-publish]').click()
+    form=p.locator('.template-publication-form');form.locator('[name=name]').fill('最新画布发布回归');form.locator('[name=description]').fill('保留输入并重试')
+    form.get_by_role('button',name='直接发布',exact=True).click()
+    expect(p.locator('#graphTemplateCenter [role=status]')).to_contain_text('保存失败')
+    assert publications==[];expect(form).to_be_visible();expect(form.locator('[name=name]')).to_have_value('最新画布发布回归')
+    p.unroute('**/api/v1/files/'+fid,fail_save)
+    with p.expect_response(lambda response:response.request.method=='POST' and response.url.endswith('/graph-templates')) as published:
+        form.get_by_role('button',name='直接发布',exact=True).click()
+    assert published.value.ok,published.value.text();new_tid=published.value.json()['template']['id'];expect(form).to_have_count(0)
+    saved=ctx.request.get(base+'/api/v1/files/'+fid).json();assert saved['meta']['revision']>1
+    saved_node=next(n for n in saved['graphData']['nodes'] if n['id']=='b');assert saved_node['geometry']==latest['geometry']
+    loaded=ctx.request.post(base+'/api/v1/graph-templates/'+new_tid+'/loads',data={'version':1,'requestId':'publish-latest-'+uuid4().hex});assert loaded.ok,loaded.text()
+    new_copy=loaded.json()['fileId'];copied=ctx.request.get(base+'/api/v1/files/'+new_copy).json()['graphData']
+    assert next(n for n in copied['nodes'] if n['id']==loaded.json()['idMap']['b'])['geometry']==latest['geometry']
+    assert len(publications)==1;assert not errors,errors
+    ctx.request.patch(base+'/api/v1/graph-templates/'+new_tid,data={'listed':False});ctx.request.delete(base+'/api/v1/files/'+new_copy)
     ctx.request.patch(base+'/api/v1/graph-templates/'+tid,data={'listed':False});ctx.request.delete(base+'/api/v1/files/'+fid);ctx.request.delete(base+'/api/v1/files/'+copy)
     browser.close()
-print('PASS real template thumbnail/detail, pan/zoom/fit/window drag/fullscreen/narrow/retry/copy isolation')
+print('PASS real template thumbnail/detail, pan/zoom/fit/window drag/fullscreen/narrow/retry/copy isolation; dirty publication save failure/retry/latest persisted graph')

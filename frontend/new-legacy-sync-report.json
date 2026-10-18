@@ -1,14 +1,11 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.345",
-  "toVersion": "v9.0-p4.1.346",
+  "fromVersion": "v9.0-p4.1.348",
+  "toVersion": "v9.0-p4.1.348",
   "changes": {
     "added": [],
     "changed": [
-      "VERSION",
-      "content-prep-studio/dist/content-prep.html",
-      "src/graph/context-menu-controller.js",
-      "tests/multi-question-local-answer.test.js"
+      "content-prep-studio/dist/content-prep.html"
     ],
     "removed": []
   },

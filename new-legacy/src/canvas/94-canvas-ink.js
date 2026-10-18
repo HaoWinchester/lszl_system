@@ -87,10 +87,15 @@
     const textBox=stroke=>textLayout(stroke,measure);
     function renderTextHandles(stroke){
       const content=textBox(stroke),box={...content,x:content.x-8,y:content.y-4,width:content.width+16,height:content.height+8},group=doc.createElementNS(ns,'g');group.classList.add('canvas-ink-text-box');
-      const border=doc.createElementNS(ns,'rect');for(const [key,value] of Object.entries({x:box.x,y:box.y,width:box.width,height:box.height,fill:'none',stroke:'#2563eb'}))border.setAttribute(key,value);border.setAttribute('stroke-dasharray','4 3');group.append(border);
-      // 轻量化：不渲染可见拖拽方块，仅保留透明命中区（悬停显示对应 resize 光标）。
       const scale=options.getViewport().scale||options.getViewport().zoom||1,size=14/scale;
-      for(const handle of ['nw','n','ne','e','se','s','sw','w']){const el=doc.createElementNS(ns,'rect');el.classList.add('canvas-ink-handle-hit');const x=box.x+(handle.includes('w')?0:handle.includes('e')?box.width:box.width/2),y=box.y+(handle.includes('n')?0:handle.includes('s')?box.height:box.height/2);el.dataset.inkResizeHandle=handle;el.dataset.textId=stroke.id;for(const [key,value] of Object.entries({x:x-size/2,y:y-size/2,width:size,height:size,fill:'transparent',stroke:'none'}))el.setAttribute(key,value);el.style.pointerEvents='all';el.style.cursor=handle+'-resize';group.append(el)}layer.append(group);
+      group.classList.toggle('is-interacting',!!textResize);
+      const border=doc.createElementNS(ns,'rect');border.classList.add('canvas-ink-text-outline');for(const [key,value] of Object.entries({x:box.x,y:box.y,width:box.width,height:box.height,fill:'none',stroke:'#2563eb','stroke-width':1/scale,'stroke-dasharray':`${4/scale} ${3/scale}`}))border.setAttribute(key,value);group.append(border);
+      const edge=border.cloneNode(false);edge.classList.remove('canvas-ink-text-outline');edge.dataset.inkTextMove=stroke.id;edge.setAttribute('stroke','transparent');edge.setAttribute('stroke-width',12/scale);edge.removeAttribute('stroke-dasharray');edge.style.pointerEvents='stroke';edge.style.cursor='grab';group.append(edge);
+      for(const handle of ['nw','n','ne','e','se','s','sw','w']){
+        const el=doc.createElementNS(ns,'rect');el.classList.add('canvas-ink-handle-hit');const x=box.x+(handle.includes('w')?0:handle.includes('e')?box.width:box.width/2),y=box.y+(handle.includes('n')?0:handle.includes('s')?box.height:box.height/2);el.dataset.inkResizeHandle=handle;el.dataset.textId=stroke.id;for(const [key,value] of Object.entries({x:x-size/2,y:y-size/2,width:size,height:size,fill:'transparent',stroke:'none'}))el.setAttribute(key,value);el.style.pointerEvents='all';el.style.cursor=handle+'-resize';group.append(el);
+        const dot=doc.createElementNS(ns,'rect');dot.classList.add('canvas-ink-text-handle-dot');for(const [key,value] of Object.entries({x:x-4/scale,y:y-4/scale,width:8/scale,height:8/scale,rx:1/scale,'stroke-width':1.5/scale}))dot.setAttribute(key,value);group.append(dot);
+      }
+      layer.append(group);
     }
     const readonly=()=>!!options.isReadonly?.();
     const report=error=>options.onError?.(error?.message||String(error));
@@ -152,10 +157,12 @@
     doc.head.append(cursorStyle);
     function updateCursor(){
       // eraser 无色板偏好但也需要专属光标（固定配色）；select/只读时恢复默认光标。
-      if(destroyed||tool==='select'||!CURSOR_HOTSPOT[tool]||readonly()){cursorStyle.textContent='';return}
+      if(destroyed||readonly()){cursorStyle.textContent='';return}
+      const scope=`.canvas-ink-drawing:not(#kg-cursor-anchor):not(.canvas-ink-panning)[data-ink-tool='${tool}']`;
+      const dragging='.canvas-ink-text-dragging:not(#kg-cursor-anchor):not(.canvas-ink-panning)[data-ink-tool]';
       const art=cursorArt(tool,TOOLS[tool]?prefs[tool].color:'#1e293b');
       // :not(#kg-cursor-anchor) 抬高特异性到 (1,3,1)，压过 custom-cursor.css 的 crosshair (1,2,1)!important
-      cursorStyle.textContent=`.canvas-ink-drawing:not(#kg-cursor-anchor):not(.canvas-ink-panning)[data-ink-tool='${tool}']{cursor:url("data:image/svg+xml,${encodeURIComponent(art)}") ${CURSOR_HOTSPOT[tool]}, crosshair!important}.canvas-ink-drawing:not(#kg-cursor-anchor):not(.canvas-ink-panning)[data-ink-tool='${tool}'] *{cursor:inherit!important}`;
+      cursorStyle.textContent=(CURSOR_HOTSPOT[tool]?`${scope}{cursor:url("data:image/svg+xml,${encodeURIComponent(art)}") ${CURSOR_HOTSPOT[tool]}, crosshair!important}${scope} :where(:not([data-ink-resize-handle],[data-ink-text-move],[data-ink-edit-drag],.canvas-ink-text-editor)){cursor:inherit!important}`:'')+`${dragging},${dragging} *{cursor:grabbing!important}`;
     }
     function refreshControls(){
       if(destroyed)return;
@@ -220,7 +227,7 @@
     }
     function cancel(){
       if(erasing){const id=erasing.pointerId;erasing=null;try{if(viewport.hasPointerCapture(id))viewport.releasePointerCapture(id)}catch(_){};render()}
-      if(textSession?.drag){const drag=textSession.drag;textSession.drag=null;textSession.world.splice(0,2,...drag.world);textSession.relocate();try{drag.target.releasePointerCapture(drag.pointerId)}catch(_){};}
+      if(textSession?.drag){const drag=textSession.drag;textSession.drag=null;textSession.border.classList.remove('is-dragging');textSession.world.splice(0,2,...drag.world);textSession.relocate();try{drag.target.releasePointerCapture(drag.pointerId)}catch(_){};}
       if(textResize){const id=textResize.pointerId;textResize=null;try{viewport.releasePointerCapture(id)}catch(_){};render()}
       if(textDrag){const id=textDrag.pointerId;textDrag=null;viewport.classList.remove('canvas-ink-text-dragging');try{if(viewport.hasPointerCapture(id))viewport.releasePointerCapture(id)}catch(_){};render()}
       if(frame){global.cancelAnimationFrame(frame);frame=0}
@@ -313,6 +320,7 @@
       const status=doc.createElement('div');status.className='canvas-ink-text-status';status.dataset.canvasUi='true';status.setAttribute('role','status');
       const border=doc.createElement('div');border.className='canvas-ink-text-edit-border';border.dataset.canvasUi='true';border.setAttribute('aria-hidden','true');
       for(const side of ['top','right','bottom','left']){const edge=doc.createElement('div');edge.dataset.inkEditDrag=side;border.append(edge)}
+      for(const side of ['nw','n','ne','e','se','s','sw','w']){const dot=doc.createElement('span');dot.className='canvas-ink-text-edit-point';dot.dataset.inkEditPoint=side;dot.dataset.inkEditDrag='point';border.append(dot)}
       doc.body.append(editor,status,border);
       const before=normalize(getStrokes()),id=existing?.id||'ink-'+Date.now().toString(36)+'-'+(++sequence)+'-'+Math.random().toString(36).slice(2,8);
       const session={editor,status,border,existing,world,style,before,unmount:[],applied:false,composing:false};textSession=session;
@@ -347,9 +355,10 @@
       border.addEventListener('pointerdown',event=>{
         if(event.button!==0||readonly()||session.stale)return;stop(event);
         session.drag={pointerId:event.pointerId,target:event.target,x:event.clientX,y:event.clientY,world:[...world]};event.target.setPointerCapture(event.pointerId);
+        border.classList.add('is-dragging');
       });
       const move=event=>{const drag=session.drag;if(!drag||event.pointerId!==drag.pointerId)return;stop(event);if(readonly()){cancel();return}const v=options.getViewport(),s=v.scale||v.zoom||1;world.splice(0,2,drag.world[0]+(event.clientX-drag.x)/s,drag.world[1]+(event.clientY-drag.y)/s);relocate();updateDraft()};
-      const end=event=>{const drag=session.drag;if(!drag||event.pointerId!==drag.pointerId)return;stop(event);if(event.type!=='pointerup'){cancel();updateDraft();return}session.drag=null;drag.target.releasePointerCapture(drag.pointerId)};
+      const end=event=>{const drag=session.drag;if(!drag||event.pointerId!==drag.pointerId)return;stop(event);if(event.type!=='pointerup'){cancel();updateDraft();return}session.drag=null;border.classList.remove('is-dragging');drag.target.releasePointerCapture(drag.pointerId)};
       for(const [type,handler] of [['pointermove',move],['pointerup',end],['pointercancel',end],['lostpointercapture',end]]){border.addEventListener(type,handler);session.unmount.push(()=>border.removeEventListener(type,handler))}
       if(global.KGCanvasDomInteraction){session.unmount.push(global.KGCanvasDomInteraction.mountOverlay(editor,doc.body,relocate),global.KGCanvasDomInteraction.mountOverlay(status,doc.body),global.KGCanvasDomInteraction.mountOverlay(border,doc.body))}
       editor.addEventListener('compositionstart',()=>{session.composing=true;session.edit.setComposing(true)});
@@ -393,7 +402,8 @@
       const view=options.getViewport(),location=point(event,viewport.getBoundingClientRect(),view);
       // In selection mode, annotations must not steal the card's native controls.
       const control=tool==='select'&&event.target.closest?.('button,a,input,select,textarea,[contenteditable],[role=button]');
-      const textHit=!control&&(tool==='select'||tool==='text')?hitStroke(location,4/(view.scale||view.zoom||1),tool==='text'):null;
+      const edge=event.target.closest?.('[data-ink-text-move]');
+      const textHit=!control&&(tool==='select'||tool==='text')?(edge&&layer.contains(edge)?getStrokes().find(item=>item.id===edge.dataset.inkTextMove):hitStroke(location,4/(view.scale||view.zoom||1),tool==='text')):null;
       if(tool==='select'&&!textHit){selectedId=null;suppressClickUntil=0;render();return}
       stop(event);
       try{
