@@ -108,6 +108,52 @@
     function destroy(){destroyed=true;drag=null;floatingToolbarInstances.delete(api);return true}
     const api=Object.freeze({setPosition,positionRect,positionPoint,position,resetPosition,bindDrag,isManual:()=>manual,destroy});floatingToolbarInstances.add(api);return api;
   }
+  // All rectangles are client coordinates; callers supply only relevant targets.
+  // Prefer a free adjacent side, then the least obstructed bounded fallback.
+  function placePopover({bounds,anchor,width,height,avoidRects=[],pad=8,gap=8,alignEnd=false}){
+    width=Math.min(width,Math.max(1,bounds.right-bounds.left-pad*2));
+    height=Math.min(height,Math.max(1,bounds.bottom-bounds.top-pad*2));
+    const leftMin=bounds.left+pad,topMin=bounds.top+pad,leftMax=Math.max(leftMin,bounds.right-pad-width),topMax=Math.max(topMin,bounds.bottom-pad-height);
+    const centered=alignEnd?anchor.right-width:(anchor.left+anchor.right-width)/2;
+    const candidates=[],add=(left,top,placement)=>candidates.push({left:Math.max(leftMin,Math.min(left,leftMax)),top:Math.max(topMin,Math.min(top,topMax)),placement});
+    const around=rect=>{
+      add(centered,rect.bottom+gap,'below');add(centered,rect.top-height-gap,'above');
+      add(rect.right+gap,(anchor.top+anchor.bottom-height)/2,'right');add(rect.left-width-gap,(anchor.top+anchor.bottom-height)/2,'left');
+    };
+    around(anchor);
+    const obstacles=avoidRects.filter(rect=>rect&&rect.right>bounds.left&&rect.left<bounds.right&&rect.bottom>bounds.top&&rect.top<bounds.bottom);
+    obstacles.forEach(around);
+    // Corners also cover cases where no one-dimensional slide clears two objects.
+    for(const left of [leftMin,leftMax])for(const top of [topMin,topMax])add(left,top,'side');
+    const area=(candidate,rect)=>Math.max(0,Math.min(candidate.left+width,rect.right+gap)-Math.max(candidate.left,rect.left-gap))*Math.max(0,Math.min(candidate.top+height,rect.bottom+gap)-Math.max(candidate.top,rect.top-gap));
+    let best=null,bestScore=Infinity;
+    for(const candidate of candidates){
+      const score=obstacles.reduce((sum,rect)=>sum+area(candidate,rect),0)+area(candidate,anchor);
+      if(score<bestScore){best=candidate;bestScore=score}if(score===0)break;
+    }
+    return{...best,width,height,right:best.left+width,bottom:best.top+height};
+  }
+  const popoverMinimumStyles=new WeakMap();
+  function positionPopoverPanel(options={}){
+    const {panel,trigger,root}=options,host=options.host||root?.parentElement;
+    if(!panel||!trigger||!host)return false;
+    const bounds=options.getBounds?.()||host.getBoundingClientRect(),offsetBox=options.fixed?{left:0,top:0}:(panel.offsetParent||root).getBoundingClientRect();
+    const pad=Number(options.pad)||8,maxWidth=Math.max(1,bounds.right-bounds.left-pad*2),maxHeight=Math.max(1,bounds.bottom-bounds.top-pad*2);
+    // CSS min-size wins over max-size. Restore the caller's minima before each
+    // measurement so a narrow host does not permanently shrink a later wide one.
+    if(!popoverMinimumStyles.has(panel))popoverMinimumStyles.set(panel,{minWidth:panel.style.minWidth,minHeight:panel.style.minHeight});
+    Object.assign(panel.style,popoverMinimumStyles.get(panel));
+    const sizing=global.getComputedStyle?.(panel);
+    panel.style.minWidth=`min(${sizing?.minWidth&&sizing.minWidth!=='auto'?sizing.minWidth:'0px'}, ${maxWidth}px)`;
+    panel.style.minHeight=`min(${sizing?.minHeight&&sizing.minHeight!=='auto'?sizing.minHeight:'0px'}, ${maxHeight}px)`;
+    panel.style.boxSizing='border-box';panel.style.maxWidth=maxWidth+'px';
+    panel.style.maxHeight=maxHeight+'px';panel.style.overflowY='auto';
+    const main=root?.querySelector?.(options.mainSelector||'.uc-toolbar-main');
+    const avoidRects=[...(options.getAvoidRects?.()||[])];if(main)avoidRects.push(main.getBoundingClientRect());
+    const next=placePopover({bounds,anchor:trigger.getBoundingClientRect(),width:panel.offsetWidth||180,height:panel.offsetHeight||80,avoidRects,pad,gap:Number(options.gap)||8,alignEnd:!!options.alignEnd});
+    if(root)root.dataset.panelPlacement=next.placement;panel.classList.toggle('is-above',next.placement==='above');
+    panel.style.left=Math.round(next.left-offsetBox.left)+'px';panel.style.top=Math.round(next.top-offsetBox.top)+'px';return true;
+  }
   function createFloatingToolbarPopover(options={}){
     const root=options.root;if(!root)return null;
     let activeName='',activeTrigger=null,openTimer=0,closeTimer=0,bound=false;
@@ -125,15 +171,7 @@
       panel.classList.add('is-closing');panel.__ucToolbarHideTimer=setTimeout(()=>finishHide(panel),Math.max(80,Number(options.closeDuration)||140));
     }
     function positionPanel(panel,trigger){
-      const host=options.host||root.parentElement,main=root.querySelector(options.mainSelector||'.uc-toolbar-main');if(!host||!main||!panel||!trigger)return false;
-      const hostBox=host.getBoundingClientRect(),offsetParent=panel.offsetParent||root,offsetBox=offsetParent.getBoundingClientRect(),triggerBox=trigger.getBoundingClientRect();
-      const panelWidth=panel.offsetWidth||180,panelHeight=panel.offsetHeight||80,pad=Math.max(0,Number(options.pad)||8),panelGap=Math.max(0,Number(options.gap)||8);
-      let left=triggerBox.left-offsetBox.left+triggerBox.width/2-panelWidth/2;
-      if(options.alignLastTrigger&&trigger===triggers().at(-1))left=triggerBox.right-offsetBox.left-panelWidth;
-      let globalLeft=offsetBox.left+left;if(globalLeft<hostBox.left+pad)left+=hostBox.left+pad-globalLeft;
-      globalLeft=offsetBox.left+left;if(globalLeft+panelWidth>hostBox.right-pad)left-=globalLeft+panelWidth-(hostBox.right-pad);
-      const belowTop=triggerBox.bottom+panelGap,aboveTop=triggerBox.top-panelHeight-panelGap,fitBelow=belowTop+panelHeight<=hostBox.bottom-pad,fitAbove=aboveTop>=hostBox.top+pad,above=!fitBelow&&fitAbove;
-      root.dataset.panelPlacement=above?'above':'below';panel.classList.toggle('is-above',above);panel.style.left=Math.round(left)+'px';panel.style.top=Math.round((above?aboveTop:belowTop)-offsetBox.top)+'px';return true;
+      return positionPopoverPanel({...options,root,panel,trigger,alignEnd:options.alignLastTrigger&&trigger===triggers().at(-1)});
     }
     function reposition(){const panel=panelFor(activeName),trigger=activeTrigger||triggerFor(activeName);return panel&&!panel.hidden?positionPanel(panel,trigger):false}
     function close(settings={}){
@@ -154,14 +192,18 @@
     const relatedInside=(target,element)=>!!(target&&element&&element.contains&&element.contains(target));
     function bind(){
       if(bound)return;bound=true;
+      // Native focus scrolling can move the canvas host when a positioned panel
+      // changes sides. Keep focus without changing the graph's viewport.
+      root.addEventListener('pointerdown',event=>{const button=event.target.closest?.('button');if(button&&root.contains(button)&&!button.disabled){event.preventDefault();button.focus({preventScroll:true})}});
+
       root.addEventListener('pointerover',event=>{if(!canHover())return;const trigger=event.target.closest?.(triggerSelector);if(trigger&&root.contains(trigger)&&!relatedInside(event.relatedTarget,trigger)){scheduleOpen(trigger.getAttribute(triggerAttr),trigger);return}const panel=event.target.closest?.(panelSelector);if(panel&&root.contains(panel)){clearTimeout(closeTimer);closeTimer=0}});
       root.addEventListener('pointerout',event=>{if(!canHover())return;const trigger=event.target.closest?.(triggerSelector);if(trigger&&root.contains(trigger)&&!relatedInside(event.relatedTarget,trigger)){const panel=panelFor(trigger.getAttribute(triggerAttr));if(!relatedInside(event.relatedTarget,panel))scheduleClose();return}const panel=event.target.closest?.(panelSelector);if(panel&&root.contains(panel)&&!relatedInside(event.relatedTarget,panel)&&!relatedInside(event.relatedTarget,activeTrigger))scheduleClose()});
-      root.addEventListener('keydown',event=>{if(event.key==='Escape'&&activeName){event.preventDefault();event.stopPropagation();const trigger=activeTrigger;close();trigger?.focus?.()}});
+      root.addEventListener('keydown',event=>{if(event.key==='Escape'&&activeName){event.preventDefault();event.stopPropagation();const trigger=activeTrigger;close();trigger?.focus?.({preventScroll:true})}});
     }
     bind();return Object.freeze({open,toggle,close,reposition,isOpen:name=>activeName===String(name)&&!!panelFor(name)&&!panelFor(name).hidden,getActive:()=>activeName});
   }
   global.KGCanvasFloatingToolbarController=Object.freeze({
-    create:createFloatingToolbar,createPopover:createFloatingToolbarPopover,
+    create:createFloatingToolbar,createPopover:createFloatingToolbarPopover,placePopover,positionPopoverPanel,
     repositionAll:()=>{let count=0;floatingToolbarInstances.forEach(instance=>{if(instance.position?.())count++});return count}
   });
   function createButton(className,title,html){const button=document.createElement('button');button.type='button';button.className=className;button.title=title;button.setAttribute('aria-label',title);button.innerHTML=html;return button}

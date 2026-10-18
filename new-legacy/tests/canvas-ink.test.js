@@ -37,3 +37,19 @@ test('multiline bold text survives normalization and rejects malformed style',()
  assert.equal(window.KGCanvasInk.normalize([text])[0].bold,true);
  assert.throws(()=>window.KGCanvasInk.normalize([{...text,bold:'true'}]));
 });
+
+test('optional per-stroke opacity is preserved, strict, and absent on old data',()=>{
+ const ink=window.KGCanvasInk;
+ for(const opacity of [0,.3,1])assert.equal(ink.normalize([{...stroke,opacity}])[0].opacity,opacity);
+ assert.equal(Object.hasOwn(ink.normalize([stroke])[0],'opacity'),false);
+ for(const opacity of [-.01,1.01,true,'0.3',null,NaN,Infinity])assert.throws(()=>ink.normalize([{...stroke,opacity}]));
+ for(const patch of [{unknown:1},{text:'bad'},{boxWidth:100},{bold:false}])assert.throws(()=>ink.normalize([{...stroke,...patch}]));
+});
+test('graph JSON storage and export round trip preserves explicit opacity and automatic text width',()=>{
+ for(const name of ['graph-model.js','graph-persistence.js'])vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../src/graph',name),'utf8'),{window});
+ const ink=window.KGCanvasInk.normalize([{...stroke,opacity:.45},{...stroke,id:'text',tool:'text',width:24,text:'自动宽度',opacity:0}]);
+ const exported=window.KGGraphPersistence.toStorageState({nodes:[],links:[],strokes:ink});
+ const reloaded=window.KGGraphPersistence.hydrate(JSON.parse(JSON.stringify(exported)));
+ assert.equal(JSON.stringify(reloaded.strokes),JSON.stringify(ink));
+ assert.equal(Object.hasOwn(reloaded.strokes[1],'boxWidth'),false);
+});

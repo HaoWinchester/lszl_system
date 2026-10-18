@@ -276,7 +276,7 @@
   function normalizeGraph(graph={},options={}){
     const output=graph&&typeof graph==='object'?clone(graph):{};
     output.nodes=normalizeNodes(output.nodes,options);
-    output.links=Array.isArray(output.links)?output.links.map(link=>({...link,hierarchy:link.hierarchy===true})):[];
+    output.links=Array.isArray(output.links)?output.links.map(link=>link&&typeof link==='object'?{...link,hierarchy:link.hierarchy===true}:link):[];
     output.elements=normalizeTextElements(output.elements,options);
     return output;
   }

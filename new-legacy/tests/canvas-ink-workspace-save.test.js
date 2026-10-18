@@ -12,7 +12,7 @@ function setup(){
  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../../frontend/scripts/new-legacy-assets/canvas-workspace-adapter.js'),'utf8'),context);
  return {api:context.KGCanvasWorkspaceAdapter,write:ws=>emit({workspace:ws,reason:'canvas-ink'}),mode:v=>{mode=v},saved:()=>saved,deferred};
 }
-const first={id:'w1',title:'画布',strokes:[{id:'s1'}]},latest={...first,strokes:[{id:'s1'},{id:'s2'}]};
+const first={id:'w1',title:'画布',strokes:[{id:'s1',tool:'pen',color:'#2563eb',width:3,opacity:.45,points:[[0,0],[10,20]]}]},latest={...first,strokes:[...first.strokes,{...first.strokes[0],id:'s2',opacity:0}]};
 test('workspace failed writes stay visibly unsaved and explicit retry persists ink',async()=>{
  const s=setup();await s.api.ready;s.mode('fail');s.write(first);
  await assert.rejects(s.api.flush({throwOnError:true}));

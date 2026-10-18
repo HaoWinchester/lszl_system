@@ -42,16 +42,19 @@
     }
     const selection=global.KGGraphSelectionController.create({getState:graph,getNodeSet:()=>nodeIds,setNodeSet:value=>nodeIds=value,getLinkSet:()=>linkIds,setLinkSet:value=>linkIds=value,onChange:()=>renderer.render()});
     const connection=global.KGGraphConnectionController.create({getState:graph,getNode:node,relationExists:(a,b)=>graph().links.some(l=>l.from===a&&l.to===b),createLink:(from,to)=>({id:idFactory('l'),from,to,type:'',color:'#64748b',lineStyle:'solid',pathStyle:'curve'}),addLink:link=>session.history.run('临时连线',()=>graph().links.push(link)),onChange:()=>renderer.render('full',{persist:true})});
-    // 画笔（本次视图内书写标注，不持久化）：局部笔迹数组随弹层关闭丢弃，undo/redo 独立于图形历史。
-    let ink=null,inkOpen=false,inkStrokes=[];
+    // The isolated session owns one timeline for cards and ephemeral ink; closing discards both.
+    graph().strokes=[];
+    let ink=null,inkOpen=false;
     function ensureInk(){
       if(ink||readOnly())return ink;
       if(!global.KGCanvasInk)return null;
       ink=global.KGCanvasInk.create({
         viewport:viewportEl,world:stage,
         getViewport:()=>viewport,
-        getStrokes:()=>inkStrokes,
-        setStrokes:strokes=>{inkStrokes=strokes;ink.render()},
+        getStrokes:()=>graph().strokes||[],
+        setStrokes:strokes=>{graph().strokes=strokes;ink.render()},
+        history:{getState:session.history.getState,undo:()=>action('undo'),redo:()=>action('redo')},showHistory:true,
+        change:(strokes,label)=>mutate(label,()=>{graph().strokes=strokes}),
         // 弹层整体带 [data-stage-ui]，默认命中判定会拒绝；此处按临时视口判定，包含变换后 stage 外的空白。
         isInside:target=>!target?.closest?.('[data-canvas-ui]')&&(target===viewportEl||viewportEl.contains(target)),
         isReadonly:readOnly,onOpenChange:value=>{inkOpen=value},
@@ -73,7 +76,7 @@
       }
     }
     function renderCards(){cards.replaceChildren();for(const n of graph().nodes){const card=renderCard(n,{state:graph(),selectedNodeIds:nodeIds,position:model.geometryOf(n)});card.classList.add('related-canvas-card');card.style.pointerEvents='auto';card.querySelectorAll('.node-size-tools,.graph-node-resize-layer').forEach(el=>el.remove());card.addEventListener('pointerdown',e=>{if(e.button!==0)return;e.preventDefault();if(readOnly()){selection.selectNodes([n.id]);return}if(connection.source()){connection.connectTo(n.id);return}selection.selectNodes([n.id]);const g=model.geometryOf(n);drag={id:n.id,pointerId:e.pointerId,x:e.clientX,y:e.clientY,start:g};body.setPointerCapture(e.pointerId)});cards.append(card)}}
-    const renderer=global.KGGraphRenderer.create({renderCards,renderEdges,renderDetails:details,applyViewport,persist:()=>session.persist()});
+    const renderer=global.KGGraphRenderer.create({renderCards,renderEdges,renderDetails:details,renderQuickActions:()=>ink?.render(),applyViewport,persist:()=>session.persist()});
     function mutate(label,work){session.history.run(label,work);renderer.render('full',{persist:true})}
     function remove(){const s=graph();if(s.selectedNodeId)mutate('临时删除卡片',()=>{const id=s.selectedNodeId;s.nodes=s.nodes.filter(n=>n.id!==id);s.links=s.links.filter(l=>l.from!==id&&l.to!==id);s.selectedNodeId=null});else if(s.selectedLinkId)mutate('临时删除连线',()=>{s.links=s.links.filter(l=>l.id!==s.selectedLinkId);s.selectedLinkId=null})}
     function action(name){
@@ -85,7 +88,7 @@
         const instance=ensureInk();if(!instance)return;
         inkOpen=!inkOpen;instance.setOpen(inkOpen);
       }
-      else if(name==='undo'||name==='redo'){session.history[name]();renderer.render()}
+      else if(name==='undo'||name==='redo'){ink?.cancel();session.history[name]();renderer.render()}
       else if(name==='delete')remove();
       else if(name==='connect')connection.setSource(graph().selectedNodeId);
       else if(name==='add'){const id=idFactory('n');mutate('临时新增卡片',()=>{const nodes=graph().nodes,x=nodes.length?Math.max(...nodes.map(n=>model.geometryOf(n).x+nodeDims(n).w))+48:0,y=nodes.length?Math.min(...nodes.map(n=>model.geometryOf(n).y)):0;nodes.push(model.normalizeNode({id,title:'临时新卡片',x,y}))});selection.selectNodes([id]);fit()}
@@ -108,6 +111,8 @@
         onClose();return;
       }
       if(readOnly())return;
+      // This modal captures first; shared ink owns deletion/gesture cancellation, session owns history.
+      if(ink&&inkOpen&&ink.handleKeyDown(e))return;
       if(!global.KGCanvasDomInteraction.isEditingTarget(e)){
         if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='z'){e.preventDefault();action(e.shiftKey?'redo':'undo')}
         else if(['Delete','Backspace'].includes(e.key)){e.preventDefault();remove()}
@@ -125,7 +130,7 @@
     function close(){
       if(closed)return;closed=true;
       if(drag){try{body.releasePointerCapture(drag.pointerId)}catch{}drag=null}
-      if(ink){try{ink.reset({discardDraft:true})}catch{}try{ink.destroy()}catch{}ink=null;inkOpen=false;inkStrokes=[]}
+      if(ink){try{ink.reset({discardDraft:true})}catch{}try{ink.destroy()}catch{}ink=null;inkOpen=false}
       global.removeEventListener('keydown',key,true);for(const type of ['copy','cut','paste'])document.removeEventListener(type,clipboard,true);unmount();overlay.remove();session.close();document.body.classList.remove('related-canvas-open')
     }
     return Object.freeze({session,overlay,close,renderer,selection,connection});

@@ -85,7 +85,7 @@
         if(action&&typeof options.onAction==='function'){event.preventDefault();event.stopPropagation();options.onAction(action.dataset.nodeToolbarAction,action,event)}
       });
       stage.appendChild(root);
-      popovers=global.KGGraphStylePopoverController.create({root,onOpen:(name,panel,trigger)=>{if(typeof options.onPanelOpen==='function')options.onPanelOpen(name,root,panel,trigger)}});
+      popovers=global.KGGraphStylePopoverController.create({root,getAvoidRects:()=>{const rect=options.getAnchorRect?.()||options.getAnchor?.()?.getBoundingClientRect?.();return rect?[rect]:[]},getBounds:()=>stage.getBoundingClientRect(),onOpen:(name,panel,trigger)=>{if(typeof options.onPanelOpen==='function')options.onPanelOpen(name,root,panel,trigger)}});
       if(typeof options.buildPanels==='function')options.buildPanels(root.querySelector('.node-style-toolbar-panels'),root);
       root.querySelectorAll('[data-node-style-panel]').forEach(panel=>panel.classList.add('uc-toolbar-popover'));
       root.querySelectorAll('[title]').forEach(element=>{

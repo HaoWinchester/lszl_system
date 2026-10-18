@@ -34,11 +34,11 @@ def stroke_count(page,n):
         print(page.evaluate('({url:location.href,tool:document.querySelector("[data-ink-tool][aria-pressed=true]")?.dataset.inkTool})'),flush=True)
         raise
 
-def draw(page,card,dy=0):
+def draw(page,card,dy=0,dx=0):
     page.wait_for_timeout(500)  # Card entry/focus transitions must settle before coordinates are sampled.
     box=page.locator(card).bounding_box()
     assert box,card
-    x=box['x']+min(55,box['width']/5)
+    x=box['x']+min(55,box['width']/5)+dx
     y=box['y']+min(100,box['height']/2)+dy
     page.mouse.move(x,y)
     page.mouse.down()
@@ -74,9 +74,11 @@ def check_page(context,base,kind):
     if kind=='workspace':
         for name in ('pen','highlighter'):
             page.locator('.canvas-ink-toolbar [data-ink-tool='+name+']').click(timeout=5000)
-        # 产品要求隐藏「选择」图标（Esc 仍退出绘画）；此处断言其不可见。
-        expect(page.locator('.canvas-ink-toolbar [data-ink-tool=select]')).to_be_hidden()
-        record('workspace: empty-state ink controls are unobstructed (select hidden by design)')
+        # 共享工具条同时提供显式选择入口与设置，Esc 仍退出绘画。
+        expect(page.locator('.canvas-ink-toolbar [data-ink-tool=select]')).to_be_visible()
+        page.get_by_role('button',name='笔迹设置',exact=True).click()
+        expect(page.get_by_role('slider',name='笔迹透明度',exact=True)).to_be_visible()
+        record('workspace: empty-state ink controls are unobstructed (selection and settings visible)')
         page.locator('#qwQuestionDockBtn').click()
         page.locator('[data-add-index]').first.click()
         page.keyboard.press('Escape')
@@ -233,7 +235,10 @@ def check_page(context,base,kind):
             else: route.continue_()
         page.route('**/api/v1/recall/progress/**',fail_save)
         tool.locator('[data-ink-tool=pen]').click()
-        draw(page,card,10)
+        # Isolate the retry stroke from the earlier overlapping samples so the later
+        # single-target eraser check does not also touch another complete stroke
+        # or the option A button used by the next interaction check.
+        draw(page,card,10,240)
         stroke_count(page,4)
         expect(page.locator('#krSaveRetryBtn')).to_be_visible(timeout=15000)
         assert len(persisted(context,base,kind))==3
@@ -248,7 +253,10 @@ def check_page(context,base,kind):
             else: route.continue_()
         page.route('**/api/v1/workspaces**',fail_workspace)
         tool.locator('[data-ink-tool=pen]').click()
-        draw(page,card,10)
+        # Isolate the retry stroke from the earlier overlapping samples so the later
+        # single-target eraser check does not also touch another complete stroke
+        # or the option A button used by the next interaction check.
+        draw(page,card,10,240)
         stroke_count(page,4)
         expect(page.locator('#qwWorkspaceSaveState')).to_have_class(__import__('re').compile(r'.*is-error.*'),timeout=15000)
         assert len(persisted(context,base,kind))==3

@@ -12,6 +12,11 @@ with sync_playwright() as p:
     assert c.request.post(BASE+'/api/v1/auth/login',data={'username':'ink-browser','password':'ink-browser-test'}).ok
     r=c.request.post(BASE+'/api/v1/files',data={'name':'文本'+uuid.uuid4().hex[:8],'graphData':{'nodes':[],'links':[],'strokes':[]}});assert r.ok;file_id=r.json()['file']['id']
     assert c.request.put(BASE+'/api/v1/files/current',data={'fileId':file_id}).ok
+    def persisted_strokes(mode):
+        if mode=='home':return c.request.get(BASE+'/api/v1/files/'+file_id).json()['graphData']['strokes']
+        if mode=='recall':return c.request.get(BASE+'/api/v1/recall/session/ink-question-1?releaseId=ink-release').json()['progress']['strokes']
+        data=c.request.get(BASE+'/api/v1/workspaces').json()
+        return next(w['payload']['strokes'] for w in data['workspaces'] if w['payload'].get('id')=='pmp-pattern-workspace')
     modes=[('home','/index.html','#homeInkBtn'),('recall','/knowledge-recall.html?questionId=ink-question-1&bankId=ink-bank&paperId=ink-paper&releaseId=ink-release','#krInkBtn'),('workspace','/question-workspace.html?paperId=ink-paper&releaseId=ink-release','#qwInkBtn')]
     for mode,path,trigger in modes:
         page=c.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)));page.goto(BASE+path,wait_until='networkidle')
@@ -32,7 +37,7 @@ with sync_playwright() as p:
             assert card.evaluate(decoration)==before_hover,(mode,before_hover,card.evaluate(decoration))
             page.evaluate(controller+'.setTool("select")')
         page.locator(trigger).click();toolbar=page.locator('.canvas-ink-toolbar');toolbar.get_by_role('button',name='橡皮擦',exact=True).dblclick();toolbar.get_by_role('button',name='文字',exact=True).click()
-        expect(toolbar.get_by_role('slider',name='文字字号')).to_have_count(0);expect(page.get_by_role('button',name='保存画布文字')).to_have_count(0)
+        expect(toolbar.get_by_role('spinbutton',name='文字字号',exact=True)).to_be_visible();expect(page.get_by_role('button',name='保存画布文字')).to_have_count(0)
         page.mouse.click(230,280);editor=page.get_by_role('textbox',name='画布文字内容');expect(editor).to_be_visible()
         editor.fill('短文字');short=editor.bounding_box()['height'];editor.fill('一\n二\n三\n四\n');assert editor.bounding_box()['height']>short*2
         editor.fill('短文字');assert abs(editor.bounding_box()['height']-short)<1
@@ -49,7 +54,10 @@ with sync_playwright() as p:
         text=page.locator('.canvas-ink-layer text').filter(has_text='画布文字回归');expect(text).to_be_visible();expect(text).to_have_attribute('font-weight','700');expect(text).to_have_attribute('fill','#ef4444')
         text.click(position={'x':8,'y':8},force=True);handle=page.locator('[data-ink-resize-handle=e]');expect(handle).to_be_visible()
         # Read authoritative frame/scale; real drag, one undo, redo restores dimensions/font.
-        before_font=float(text.get_attribute('font-size'));start=handle.bounding_box();left=page.locator('[data-ink-resize-handle=w]').bounding_box();width_screen=start['x']-left['x'];delta=width_screen*.5
+        before_font=float(text.get_attribute('font-size'));start=handle.bounding_box()
+        original=next(s for s in persisted_strokes(mode) if s['id']==text.get_attribute('data-stroke-id'))
+        # Handles enclose content plus padding; resize uses the authoritative content frame.
+        width_screen=text.evaluate('(el,stroke)=>{const ctx=document.createElement("canvas").getContext("2d"),m=el.getScreenCTM();return KGCanvasInk.textLayout(stroke,ctx).width*Math.hypot(m.a,m.b)}',original);delta=width_screen*.5
         page.mouse.move(start['x']+start['width']/2,start['y']+start['height']/2);page.mouse.down();page.mouse.move(start['x']+start['width']/2+delta,start['y']+start['height']/2,steps=8);page.mouse.up()
         after_font=float(text.get_attribute('font-size'));assert abs(after_font-before_font*math.sqrt(1.5))<.2,(before_font,after_font)
         toolbar.locator('[data-ink-action=undo]').click();assert abs(float(text.get_attribute('font-size'))-before_font)<.05
@@ -61,10 +69,7 @@ with sync_playwright() as p:
             else:route.continue_()
         page.route('**/api/v1/**',fail_write);page.mouse.click(1050,350);expect(editor).to_have_attribute('data-save-state','failed');expect(editor).to_have_value('保留失败草稿 mixed 中文长句自动换行\n第二行')
         page.unroute('**/api/v1/**',fail_write);page.mouse.click(1050,350);expect(editor).to_have_count(0)
-        if mode=='home':strokes=c.request.get(BASE+'/api/v1/files/'+file_id).json()['graphData']['strokes']
-        elif mode=='recall':strokes=c.request.get(BASE+'/api/v1/recall/session/ink-question-1?releaseId=ink-release').json()['progress']['strokes']
-        else:
-            data=c.request.get(BASE+'/api/v1/workspaces').json();strokes=next(w['payload']['strokes'] for w in data['workspaces'] if w['payload'].get('id')=='pmp-pattern-workspace')
+        strokes=persisted_strokes(mode)
         stroke=next(s for s in strokes if s.get('text','').startswith('保留失败草稿'));assert stroke['bold'] and stroke['color']=='#ef4444';assert stroke['boxWidth']>=40 and stroke['boxHeight']>=24 and abs(stroke['width']-after_font)<.05
         line_count=page.locator('.canvas-ink-layer text[data-stroke-id="'+stroke['id']+'"] tspan').count();assert line_count>2
         page.reload(wait_until='networkidle');

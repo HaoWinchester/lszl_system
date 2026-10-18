@@ -46,7 +46,8 @@ def test_shared_validator_clones_valid_world_coordinate_points():
     {"points": [[True, 0]]}, {"points": [["0", 0]]},
     {"points": [[float("inf"), 0]]}, {"points": [[float("nan"), 0]]},
     {"points": [[10000001, 0]]}, {"points": [[0, -10000001]]},
-    {"points": [[0, 0]] * 5001}, {"opacity": .3},
+    {"points": [[0, 0]] * 5001}, {"opacity": -1}, {"opacity": 1.01},
+    {"opacity": True}, {"opacity": "0.3"}, {"opacity": None}, {"opacity": float("nan")}, {"unknown": 1},
 ])
 def test_malformed_ink_is_rejected_by_both_consumers(changes):
     from app.schemas.canvas_ink import validate_strokes
@@ -106,3 +107,15 @@ def test_text_box_malformed_dimensions_rejected(patch):
     from app.schemas.canvas_ink import validate_strokes
     with pytest.raises(ValueError):
         validate_strokes([stroke(**{"tool":"text", "width":20, "text":"", **patch})])
+
+
+def test_optional_opacity_round_trips_through_both_consumers_without_changing_old_data():
+    from app.schemas.canvas_ink import validate_strokes
+    from app.services.learning_service import _workspace_values
+    for tool, width in (("pen", 3), ("highlighter", 16), ("text", 24)):
+        for opacity in (0, .3, 1):
+            item = stroke(tool=tool, width=width, opacity=opacity, **({"text": "字"} if tool == "text" else {}))
+            assert validate_strokes([item]) == [item]
+            assert request(strokes=[item]).strokes == [item]
+            assert _workspace_values({"title": "ink", "payload": {"strokes": [item]}})[2]["strokes"] == [item]
+    assert "opacity" not in validate_strokes([stroke()])[0]

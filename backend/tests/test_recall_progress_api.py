@@ -56,7 +56,7 @@ def test_recall_progress_persists_the_full_canvas_in_database_and_is_owner_scope
     _create_student(other)
     bank_id, question_id = _create_published_question()
     canvas = {
-        "strokes": [{"id": "ink-1", "tool": "pen", "color": "#123456", "width": 3, "points": [[1, 2], [-3, 4]]}],
+        "strokes": [{"id": "ink-1", "tool": "pen", "color": "#123456", "width": 3, "opacity": 0.45, "points": [[1, 2], [-3, 4]]}],
         "nodes": [
             {"instanceId": "root", "dataId": "scope-baseline", "x": 0, "y": 0},
             {

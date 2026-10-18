@@ -30,10 +30,10 @@ with sync_playwright() as pw:
     expect(page.locator('.canvas-ink-toolbar')).to_be_hidden()
     assert not page.locator('#view').evaluate('el=>el.classList.contains("canvas-ink-drawing")')
     page.locator('#launch').click()
-    # Boardmix 式交互：单击只切换工具，双击绘图工具才展开颜色和粗细设置。
+    # 单击切换工具；显式设置可直接展开，双击入口仍保持兼容。
     pen.click()
     expect(page.locator('.canvas-ink-options')).to_be_hidden()
-    pen.dblclick()
+    page.get_by_role('button',name='笔迹设置',exact=True).click()
     expect(page.locator('.canvas-ink-options')).to_be_visible()
     pen.click();expect(page.locator('.canvas-ink-options')).to_be_hidden()
     pen.dblclick();expect(page.locator('.canvas-ink-options')).to_be_visible()

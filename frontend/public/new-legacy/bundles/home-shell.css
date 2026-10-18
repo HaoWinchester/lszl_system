@@ -8202,6 +8202,11 @@ body.qw-selection-toolbar-motion .uc-selection-bounds,.stage.graph-card-dragging
   stroke-linecap:round;
   stroke-linejoin:round;
 }
+
+.uc-edge-toolbar-popover[data-uc-edge-popover="ports"] label{display:grid;grid-template-columns:40px 1fr;align-items:center;gap:10px;margin:8px 0;color:#475569;font-size:12px}
+.uc-edge-toolbar-popover[data-uc-edge-popover="ports"] select,
+.uc-edge-toolbar-popover [data-uc-edge-action="ports-reset"]{min-width:0;min-height:32px;padding:5px 9px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;color:#334155;font:inherit;box-shadow:none}
+.uc-edge-toolbar-popover [data-uc-edge-action="ports-reset"]{width:100%;margin-top:5px;cursor:pointer}
 /* style: styles/canvas-ink.css */
 .canvas-ink-layer{position:absolute;left:0;top:0;width:1px;height:1px;overflow:visible;pointer-events:none;z-index:50}
 /* 绘图光标由 94-canvas-ink.js 按当前工具（画笔/荧光笔/文字/橡皮擦）动态注入 */
@@ -8210,8 +8215,7 @@ body.qw-selection-toolbar-motion .uc-selection-bounds,.stage.graph-card-dragging
 .canvas-ink-toolbar{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);z-index:65;color:#1e293b;background:rgba(255,255,255,.98);border:1px solid #dbe2ea;border-radius:14px;padding:6px;box-shadow:0 5px 22px #0f172a17;font:13px/1.4 system-ui,sans-serif;cursor:default!important}
 .canvas-ink-toolbar *{box-sizing:border-box;cursor:auto!important}
 .canvas-ink-tools{display:flex;align-items:center;gap:4px}
-/* 选择工具保留在内部状态（Esc 退出绘画），不在工具条中展示 */
-.canvas-ink-toolbar button[data-ink-tool="select"]{display:none}
+/* Selection remains directly available alongside Esc. */
 .canvas-ink-toolbar button{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;min-width:0;padding:7px;border:0;border-radius:8px;background:transparent;color:inherit;font:20px/1 system-ui;cursor:pointer!important;box-shadow:none}
 .canvas-ink-toolbar button:hover{background:#f1f5f9}
 .canvas-ink-toolbar button[aria-pressed=true]{background:#e8efff;color:#1d4ed8;box-shadow:inset 0 0 0 1px #b8ccff}
@@ -8268,7 +8272,7 @@ body.qw-selection-toolbar-motion .uc-selection-bounds,.stage.graph-card-dragging
 .canvas-ink-text-actions button{padding:5px 12px;border:1px solid #cbd5e1;background:white;border-radius:4px;cursor:pointer}
 .canvas-ink-toolbar [data-ink-bold]{margin-top:8px;font-weight:700}
 
-.canvas-ink-text-editor{min-width:0;max-width:none;box-sizing:content-box;white-space:pre-wrap;overflow-wrap:anywhere}
+.canvas-ink-text-editor{min-width:0;max-width:none;box-sizing:content-box;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-all}
 .canvas-ink-text-status{position:fixed;z-index:131;background:white;color:#b91c1c;font:12px system-ui}
 .canvas-ink-text-editor[data-save-state=failed]{border-color:#dc2626}
 /* Formatting controls remain reachable above a tall editor. */
@@ -8285,6 +8289,29 @@ body.qw-selection-toolbar-motion .uc-selection-bounds,.stage.graph-card-dragging
 /* Keep drawing over question cards visually steady; selection outlines stay intact. */
 .canvas-ink-drawing .qw-question-card,
 .canvas-ink-drawing .qw-question-card:hover{box-shadow:none!important;transition:none!important}
+
+/* Common colors stay visible; the labelled settings button exposes numeric controls. */
+.canvas-ink-toolbar .canvas-ink-colors{justify-content:center;margin:0 6px;padding:0 7px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;gap:7px}
+.canvas-ink-toolbar .canvas-ink-colors button{width:18px;height:18px;border-width:2px}
+.canvas-ink-toolbar .canvas-ink-colors input[type=color]{width:22px;height:22px}
+.canvas-ink-font,.canvas-ink-opacity{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;white-space:nowrap}
+.canvas-ink-font input{width:75px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:5px;font:inherit}
+.canvas-ink-opacity input{width:112px;accent-color:#2563eb;margin:0}
+.canvas-ink-opacity output{min-width:32px;text-align:right;font-variant-numeric:tabular-nums}
+.canvas-ink-stroke-selection{pointer-events:none}
+@media(max-width:440px){.canvas-ink-tools{gap:2px}.canvas-ink-toolbar button{width:30px;height:32px;padding:5px}.canvas-ink-divider{margin:0 1px}.canvas-ink-options{max-height:calc(100dvh - 180px);overflow:auto}}
+
+@media(max-width:700px){
+  .canvas-ink-toolbar{max-width:calc(100vw - 16px);width:max-content}
+  .canvas-ink-tools{flex-wrap:wrap;justify-content:center}
+  .canvas-ink-toolbar .canvas-ink-colors{order:2;flex-basis:100%;margin:4px 0 0;padding-top:4px;border:0;border-top:1px solid #e2e8f0}
+}
+
+.canvas-ink-text-dragging .canvas-ink-stroke-selection{opacity:0}
+
+.canvas-ink-width{flex-wrap:wrap;gap:6px}
+.canvas-ink-width input[type=range]{width:120px}
+.canvas-ink-width input[type=number]{width:50px;padding:3px;border:1px solid #cbd5e1;border-radius:5px;font:inherit}
 /* style: styles/canvas-table.css */
 /* KGCanvasTableController · 三页共用可编辑表格视觉。
    表格是 world 内真实 DOM table：1px 实线边框 + 真实文字，随画布变换保持 DPR 清晰度；
@@ -9272,6 +9299,27 @@ body.qw-selection-toolbar-motion .uc-selection-bounds,.stage.graph-card-dragging
 [data-mindmap-controls] [data-mm-status]:empty{display:none}
 [data-mindmap-controls] [data-mm-status]{position:absolute;left:0;top:calc(100% + 3px);padding:2px 6px;border-radius:4px;background:#fff;pointer-events:none;white-space:nowrap}
 @media(max-width:600px){.kg-mindmap-panel{left:12px;top:90px;max-width:calc(100vw - 24px)}[data-mindmap-controls] .mm-popover>summary{padding:8px}[data-mindmap-controls] .mm-popover-body{width:310px}}
+
+/* Compact graph rail: preserve every registered action and expand professional formats. */
+#floatingToolbox{box-sizing:border-box;width:54px;padding:6px;border-radius:14px;background:#fff;backdrop-filter:none;-webkit-backdrop-filter:none;box-shadow:0 4px 18px rgba(15,23,42,.12)}
+#floatingToolbox .floating-toolbox-handle{height:18px;margin-bottom:4px;border-radius:6px}
+#floatingToolbox .floating-toolbox-grid{grid-template-columns:40px;gap:5px;max-height:calc(100dvh - 260px);overflow-x:hidden;overflow-y:auto;scrollbar-width:none;overscroll-behavior:contain;touch-action:pan-y;padding:2px 0}
+#floatingToolbox .floating-toolbox-grid::-webkit-scrollbar{display:none}
+#floatingToolbox .floating-tool-btn{height:36px;border-radius:8px;box-shadow:none}
+#floatingToolbox .floating-toolbox-divider{margin:2px 4px}
+#floatingToolbox .floating-format-panel{display:grid;grid-template-columns:40px;gap:5px;padding-top:5px;border-top:1px solid #e2e8f0}
+#floatingToolbox .floating-format-panel[hidden]{display:none}
+#floatingToolbox .floating-submenu{position:fixed;transform:none;min-width:134px}
+#floatingToolbox .floating-tool-menu-shell.menu-open .floating-submenu{transform:none}
+#floatingToolbox .floating-tool-btn[data-tooltip]::after{display:none}
+@media(min-width:601px) and (max-width:850px){body:not(.graph-phone-reading) #floatingToolbox{display:block}}
+/* Graph navigation uses the viewport transform, never native host scrolling. */
+#stage{overflow:clip}
+.home-toolbar-hint{position:absolute;z-index:580;pointer-events:none;padding:6px 9px;border-radius:7px;background:#30343b;color:#fff;box-shadow:0 4px 12px rgba(15,23,42,.15);font:650 12px/1.25 system-ui,sans-serif;white-space:nowrap}
+.home-toolbar-hint[hidden]{display:none}
+/* Invisible zoom sliders must not intercept the scrollable rail above the dock. */
+#stage .canvas-zoom-dock:not(.slider-open) .canvas-zoom-slider-popover,
+#stage .canvas-zoom-dock:not(.slider-open) .canvas-zoom-slider-popover *{pointer-events:none!important;visibility:hidden}
 /* style: styles/home-canvas-performance.css */
 /* V9.0-P4.3.6 · 首页画布独立关系线、轮廓悬浮与稳定便签阴影 */
 .stage .edge-visible{
@@ -9468,6 +9516,16 @@ body.qw-selection-toolbar-motion .uc-selection-bounds,.stage.graph-card-dragging
 .stage.viewport-smooth-zooming .cards-layer{will-change:auto}
 /* Selected handles sit above cards; base strokes stay below cards. */
 .edge-controls-surface{position:absolute;left:-50000px;top:-50000px;width:100000px;height:100000px;overflow:visible;z-index:3;pointer-events:none}
+
+/* Keep all hit areas/indices; auxiliary geometry stays discoverable by pointer or Tab. */
+.edge-control-handle[data-edge-control-kind="curve-control"] .edge-control-dot{opacity:.28;transition:opacity .12s ease}
+.stage:has(.edge-hit.selected:hover) .edge-control-handle .edge-control-dot,
+.edge-control-layer:hover .edge-control-handle .edge-control-dot,
+.edge-control-layer:focus-within .edge-control-handle .edge-control-dot,
+.stage.graph-edge-control-dragging .edge-control-handle .edge-control-dot{opacity:1}
+.edge-control-primary .edge-control-dot{stroke-width:calc(2px * var(--edge-control-inverse-scale,1))}
+.edge-control-handle:focus-visible .edge-control-dot{stroke:#0f172a;stroke-width:calc(3px * var(--edge-control-inverse-scale,1))}
+.edge-control-handle:focus{outline:none}
 /* style: styles/home-selection-p4326.css */
 /* V9.0-P4.3.26 — homepage selection parity and lightweight edge dragging. */
 .stage.home-selection-interaction-locked .uc-selection-bounds{

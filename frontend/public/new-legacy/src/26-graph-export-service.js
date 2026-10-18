@@ -102,9 +102,9 @@
     return state.links.slice();
   }
 
-  function graphBounds(nodes){
-    if(!nodes.length) return {x:-260, y:-180, width:760, height:520};
-    let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+  function graphBounds(nodes,inkBounds){
+    if(!nodes.length&&!inkBounds) return {x:-260, y:-180, width:760, height:520};
+    let minX=inkBounds?inkBounds.x:Infinity, minY=inkBounds?inkBounds.y:Infinity, maxX=inkBounds?inkBounds.x+inkBounds.width:-Infinity, maxY=inkBounds?inkBounds.y+inkBounds.height:-Infinity;
     nodes.forEach(node=>{
       const p = positionForNode(node), d = dimsForNode(node);
       minX = Math.min(minX, p.x);
@@ -373,9 +373,11 @@
 
   function renderGraphCanvas(){
     const nodes = exportNodes();
-    if(!nodes.length) throw new Error('当前图谱没有卡牌，暂时无法导出图片。');
+    const strokes=global.KGCanvasInk?.normalize(typeof state==='undefined'?[]:state.strokes)||[];
+    if(!nodes.length&&!strokes.length) throw new Error('当前图谱没有可导出的内容。');
     const links = exportLinks();
-    const bounds = graphBounds(nodes);
+    const inkBounds=strokes.length?global.KGCanvasInk.bounds(strokes,document.createElement('canvas').getContext('2d')):null;
+    const bounds = graphBounds(nodes,inkBounds);
     const scale = canvasScaleFor(bounds.width, bounds.height);
     const canvas = document.createElement('canvas');
     canvas.width = Math.max(1, Math.ceil(bounds.width * scale));
@@ -388,6 +390,7 @@
     const nodeMap = new Map(nodes.map(node=>[node.id, node]));
     drawLinks(ctx, links, nodeMap);
     nodes.forEach(node=>drawCard(ctx, node));
+    global.KGCanvasInk?.draw(ctx,strokes);
     return {canvas, bounds, scale, nodes, links};
   }
 

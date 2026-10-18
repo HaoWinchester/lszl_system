@@ -193,3 +193,13 @@
 .stage.viewport-smooth-zooming .cards-layer{will-change:auto}
 /* Selected handles sit above cards; base strokes stay below cards. */
 .edge-controls-surface{position:absolute;left:-50000px;top:-50000px;width:100000px;height:100000px;overflow:visible;z-index:3;pointer-events:none}
+
+/* Keep all hit areas/indices; auxiliary geometry stays discoverable by pointer or Tab. */
+.edge-control-handle[data-edge-control-kind="curve-control"] .edge-control-dot{opacity:.28;transition:opacity .12s ease}
+.stage:has(.edge-hit.selected:hover) .edge-control-handle .edge-control-dot,
+.edge-control-layer:hover .edge-control-handle .edge-control-dot,
+.edge-control-layer:focus-within .edge-control-handle .edge-control-dot,
+.stage.graph-edge-control-dragging .edge-control-handle .edge-control-dot{opacity:1}
+.edge-control-primary .edge-control-dot{stroke-width:calc(2px * var(--edge-control-inverse-scale,1))}
+.edge-control-handle:focus-visible .edge-control-dot{stroke:#0f172a;stroke-width:calc(3px * var(--edge-control-inverse-scale,1))}
+.edge-control-handle:focus{outline:none}
