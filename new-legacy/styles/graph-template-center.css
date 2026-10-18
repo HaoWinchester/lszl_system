@@ -70,3 +70,8 @@
 @media(max-width:600px){.template-preview-window{width:100vw;height:94dvh;border-radius:12px 12px 0 0}.template-preview-window footer{gap:5px;padding:8px}.template-preview-window footer button{padding:5px 8px}}
 
 .template-preview-surface{display:flex;flex-direction:column;width:100%;height:100%;min-height:0;background:#fff}
+
+/* Preview cards are rendered by the editor. Interaction overlays remain on the editor only. */
+.template-thumbnail .edge-visible,.template-preview-viewport .edge-visible{filter:none}
+.template-preview-object .knowledge-card,.template-preview-object .graph-text-element{pointer-events:none;transition:none;cursor:inherit}
+.template-preview-object .node-size-tools,.template-preview-object .graph-element-resize-layer{display:none!important}

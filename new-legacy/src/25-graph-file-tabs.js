@@ -280,15 +280,48 @@
     if(typeof global.showStatus==='function')global.showStatus(`已关闭“${target.name}”页签，图谱文件未删除。`);
     return true;
   }
+  function requestNewFileName(){
+    return new Promise(resolve=>{
+      const dialog=document.createElement('dialog'),returnFocus=document.activeElement,ownerKey=owner();
+      dialog.id='graphNewFileDialog';dialog.className='graph-new-file-dialog';
+      dialog.setAttribute('aria-labelledby','graphNewFileTitle');
+      dialog.innerHTML='<form><h2 id="graphNewFileTitle">新建图谱</h2><label for="graphNewFileName">图谱名称</label><input id="graphNewFileName" name="name" maxlength="100" autocomplete="off" value="新图谱文件"><p class="graph-new-file-error" role="alert"></p><footer><button type="button" data-new-file-cancel>取消</button><button type="submit" class="primary">创建图谱</button></footer></form>';
+      const input=dialog.querySelector('input'),error=dialog.querySelector('[role="alert"]');
+      let settled=false;
+      function finish(value){
+        if(settled)return;settled=true;
+        global.removeEventListener?.('kg-auth-session-change',sessionChanged);
+        if(dialog.open&&typeof dialog.close==='function')dialog.close();
+        dialog.remove();returnFocus?.focus?.();resolve(value);
+      }
+      function sessionChanged(){if(owner()!==ownerKey)finish(null)}
+      dialog.querySelector('form').addEventListener('submit',event=>{
+        event.preventDefault();const name=input.value.trim();
+        if(!name){error.textContent='请输入图谱名称。';input.focus();return}
+        finish(name.slice(0,100));
+      });
+      dialog.querySelector('[data-new-file-cancel]').addEventListener('click',()=>finish(null));
+      dialog.addEventListener('cancel',event=>{event.preventDefault();finish(null)});
+      dialog.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();finish(null)}});
+      global.addEventListener?.('kg-auth-session-change',sessionChanged);
+      document.body.appendChild(dialog);
+      if(typeof dialog.showModal==='function')dialog.showModal();else dialog.setAttribute('open','');
+      input.focus();input.select();
+    });
+  }
   async function createFileNow(){
     if(!canCreate())return null;
     const store=fileStore();if(!store)return null;
-    const input=global.prompt('请输入新图谱文件名称：','新图谱文件');
-    if(input===null)return null;
+    const ownerKey=owner(),input=await requestNewFileName();
+    if(input===null||owner()!==ownerKey||!canCreate())return null;
     const name=(String(input||'').trim()||'新图谱文件').slice(0,100);
     const blank=typeof global.templateState==='function'?global.templateState('blank'):{meta:{title:name,subject:'自定义学科',audience:'学员',description:''},nodes:[],links:[]};
     if(blank.meta)blank.meta.title=name;
-    if(!await saveBeforeSwitch())return null;
+    if(!await saveBeforeSwitch()){
+      if(typeof global.showStatus==='function')global.showStatus('当前图谱保存失败，已取消新建。请保存后重试。');
+      return null;
+    }
+    if(owner()!==ownerKey)return null;
     const previousId=store.getCurrentFileId(),file=await createStoredFile({name,graphData:blank},{makeCurrent:true});
     if(!file){if(typeof global.showStatus==='function')global.showStatus(store.getLastError&&store.getLastError()||'新建图谱失败，本地存储空间可能已满。');return null}
     markOpen(file.id);

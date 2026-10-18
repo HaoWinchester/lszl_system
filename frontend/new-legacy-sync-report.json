@@ -1,23 +1,11 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.348",
-  "toVersion": "v9.0-p4.1.349",
+  "fromVersion": "v9.0-p4.1.350",
+  "toVersion": "v9.0-p4.1.350",
   "changes": {
     "added": [],
     "changed": [
-      "VERSION",
-      "content-prep-studio/dist/content-prep.html",
-      "src/10-graph-editor.js",
-      "src/canvas/94-canvas-ink.js",
-      "src/graph/template-center-controller.js",
-      "tests/canvas-ink-polish-browser.py",
-      "tests/canvas-ink-workspace-save.test.js",
-      "tests/graph-feedback-live-browser.py",
-      "tests/graph-feedback.test.js",
-      "tests/graph-template-center.test.js",
-      "tests/helpers/canvas_ink_server.py",
-      "tests/template-preview-browser.py",
-      "tests/workspace-ink-toolbar-browser.py"
+      "tests/canvas-ink-polish-browser.py"
     ],
     "removed": []
   },

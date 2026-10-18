@@ -230,8 +230,14 @@
     }[char]));
   }
   function notify(message){
-    if(typeof showStatus==='function')showStatus(message);
-    else console.info(message);
+    if(typeof showStatus==='function'){showStatus(message);return;}
+    const statusEl=document.getElementById('status');
+    if(!statusEl){console.info(message);return;}
+    clearTimeout(notify.timer);
+    statusEl.textContent=message;
+    statusEl.setAttribute('role','status');
+    statusEl.classList.add('show');
+    notify.timer=setTimeout(()=>statusEl.classList.remove('show'),2600);
   }
   function languageMode(){return global.KGFreeModeLanguage?.mode?.()||'zh'}
   function questionDisplayView(question={}){
@@ -382,12 +388,20 @@
     state.ink?.render();
     return state.readonly;
   }
-  function canEdit(message='登录后的桌面端才能编辑多题画布。'){
+  function readonlyMessage(){
+    if(!loggedIn())return '登录后可编辑多题画布。';
+    const role=global.KGRolePermissions?.currentRole?.()||global.KGAuthCore?.currentUser?.()?.role;
+    if(role==='viewer')return '当前账号仅可查看多题画布，如需编辑请联系管理员。';
+    return state.mobile?'移动端仅支持查看多题画布。':'服务器画布尚未加载，请稍后重试。';
+  }
+  function canEdit(message='登录后可编辑多题画布。'){
     if(state.workspaceTransition)return false;
     updateReadonly();
     if(!state.readonly)return true;
-    if(!hasWorkspaceWriteAccess()){
+    if(!loggedIn()){
       try{if(typeof authOpen==='function')authOpen(message)}catch(e){}
+    }else if(!hasWorkspaceWriteAccess()){
+      notify(readonlyMessage());
     }else notify('移动端仅支持查看多题画布。');
     return false;
   }
@@ -4258,7 +4272,7 @@
     return {created,skipped};
   }
   async function addQuestionByReference(reference={},position){
-    if(!canEdit())return {created:false,reason:'readonly',message:'登录后的桌面端才能编辑多题画布。'};
+    if(!canEdit())return {created:false,reason:'readonly',message:readonlyMessage()};
     const questionId=String(reference.questionId||''),bankId=String(reference.bankId||''),paperId=String(reference.paperId||''),releaseId=String(reference.releaseId||'');
     if(!questionId)return {created:false,reason:'missing-question',message:'这条错题记录缺少题目引用，无法放入画布。'};
     const workspaceId=state.workspaceId,userId=store()?.currentUserId?.();

@@ -22,6 +22,10 @@
   let leaving = false
   let generation = 0
   let owner = store.currentUserId?.() || 'guest'
+  function canWrite() {
+    const role = global.KGRolePermissions?.currentRole?.() || global.KGAuthCore?.currentUser?.()?.role
+    return owner !== 'guest' && ['admin', 'teacher', 'student'].includes(role)
+  }
   const controllers = new Set()
   function assertOwner(expectedOwner, expectedGeneration) {
     if (owner !== expectedOwner || generation !== expectedGeneration || (store.currentUserId?.() || 'guest') !== expectedOwner) {
@@ -87,6 +91,7 @@
   }
 
   async function persistWorkspace(workspace, options = {}) {
+    if (!canWrite()) throw new Error('当前账号仅可查看画布。')
     const id = String(workspace?.id || '')
     if (!id) return null
     if (!serverReady) throw new Error('服务器画布尚未加载，已阻止保存设备缓存，请重新打开后重试。')
@@ -137,6 +142,7 @@
   }
 
   function enqueue(workspace, immediate = false) {
+    if (!canWrite()) return
     const id = String(workspace?.id || '')
     if (!id || String(workspace.userId || '') !== owner || (store.currentUserId?.() || 'guest') !== owner) return
     sequences.set(id, (sequences.get(id) || 0) + 1)
@@ -149,6 +155,7 @@
   }
 
   async function remove(id) {
+    if (!canWrite()) return
     id = String(id || '')
     if (!id) return
     const removeOwner = owner, removeGeneration = generation
@@ -172,6 +179,7 @@
   }
 
   store.subscribe?.((event) => {
+    if (!canWrite()) return
     if (event?.reason === 'server-hydrated') return
     if (hydrating) hydrationEdited = true
     const deletedId = String(event?.detail?.deletedWorkspaceId || '')

@@ -23,6 +23,7 @@
     let disposed=false,busy=false,unmount=()=>{},closePreview=()=>{};const lifetime=new AbortController();active=dialog;
     function finish(){if(busy)return;disposed=true;lifetime.abort();closePreview();unmount();dialog.close();dialog.remove();active=null}
     close.onclick=finish;dialog.addEventListener('cancel',e=>{e.preventDefault();finish()});
+    dialog.addEventListener('keydown',event=>{event.stopPropagation();if(event.key==='Escape'){event.preventDefault();finish()}});
     (document.fullscreenElement||document.body).append(dialog);
     if(global.KGCanvasDomInteraction?.mountOverlay)unmount=global.KGCanvasDomInteraction.mountOverlay(dialog);
     dialog.showModal();
@@ -77,6 +78,7 @@
       const lifetime=new AbortController();let drawing=null,closed=false,displayedVersion=null;
       async function dismiss(){if(closed)return;closed=true;lifetime.abort();drawing?.destroy();if(document.fullscreenElement===surface)await document.exitFullscreen().catch(()=>{});panel.close();panel.remove();previewFocus?.focus()}
       const previewFocus=document.activeElement;closePreview=dismiss;close.onclick=dismiss;panel.addEventListener('cancel',event=>{event.preventDefault();dismiss()});
+      panel.addEventListener('keydown',event=>{event.stopPropagation();if(event.key==='Escape'){event.preventDefault();dismiss()}});
       (document.fullscreenElement||document.body).append(panel);panel.showModal();
       minus.onclick=()=>drawing?.zoom(.8);plus.onclick=()=>drawing?.zoom(1.25);fit.onclick=()=>drawing?.fit();
       full.onclick=async()=>{try{if(document.fullscreenElement===surface)await document.exitFullscreen();else await surface.requestFullscreen()}catch(error){message.textContent='当前浏览器无法全屏，请使用窗口预览。';footer.append(message)}};

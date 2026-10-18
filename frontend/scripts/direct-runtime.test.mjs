@@ -32,7 +32,7 @@ async function workspaceHarness(requested = 'remote-existing', options = {}) {
   let saved = structuredClone(original)
   const window = {
     location:{href:'https://example.test/question-workspace.html?workspace='+requested+'&paperId=paper-1#canvas'},
-    KGAuthCore:{currentUsername:()=> username},AbortController,
+    KGAuthCore:{currentUsername:()=> username,currentUser:()=>({username,role:options.role||'admin'})},AbortController,
     KGAppStorage:{readJSON:(key,fallback)=>memory.has(key)?structuredClone(memory.get(key)):fallback,writeJSON:(key,value)=>{memory.set(key,structuredClone(value));return true},remove:key=>memory.delete(key)},
     addEventListener(type,handler){if(!listeners.has(type))listeners.set(type,new Set());listeners.get(type).add(handler)},dispatchEvent(event){for(const handler of listeners.get(event.type)||[])handler(event)},
   }
@@ -59,6 +59,15 @@ async function workspaceHarness(requested = 'remote-existing', options = {}) {
   try { await window.KGCanvasWorkspaceAdapter.ready } catch (error) { hydrationError=error }
   return {window,requests,hydrationError,saved:()=>structuredClone(saved),setUser(value){username=value;window.dispatchEvent({type:'kg-auth-session-change'})},holdRead(){const pending={};heldRead=pending;return ()=>pending.resume()},holdWrite(){const pending={};heldWrite=pending;return ()=>pending.resume()}}
 }
+
+test('readonly workspace hydration and local initialization never issue server writes',async()=>{
+  const {window,requests}=await workspaceHarness('viewer-new',{role:'viewer'})
+  const workspace=window.KGCanvasWorkspaceStore.ensure({workspaceId:'viewer-new'})
+  window.KGCanvasWorkspaceStore.write(workspace)
+  await window.KGCanvasWorkspaceAdapter.flush({throwOnError:true})
+  assert.deepEqual(requests.map(request=>request.method),['GET'])
+  assert.equal(window.KGCanvasWorkspaceAdapter.getState(workspace.id).status,'idle')
+})
 
 test('opening a server workspace ID resolves the existing client canvas before ensure can create an empty alias',async()=>{
   const {window,requests}=await workspaceHarness()

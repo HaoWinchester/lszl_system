@@ -8,7 +8,7 @@ from tests.test_files_api_contract import login
 def test_order_survives_login_and_preserves_unlisted_files_and_current():
     with TestClient(app) as client, TestClient(app) as other:
         login(client, "学生")
-        login(other, "乔治008")
+        login(other, "老师")
         files = [client.post('/api/v1/files', json={'name': f'order-{i}'}).json()['file'] for i in range(3)]
         ids = [file['id'] for file in files]
         client.put('/api/v1/files/current', json={'fileId': ids[0]})

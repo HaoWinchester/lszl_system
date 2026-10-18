@@ -2,7 +2,7 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const vm=require('node:vm');const path=require('node:path');
 function setup(){
  let emit,mode='ok',saved=null;const deferred=[];
- const context={console:{error(){}},setTimeout,clearTimeout,CustomEvent:function(type,init){this.type=type;this.detail=init.detail},dispatchEvent(){},addEventListener(){},KGCanvasWorkspaceStore:{currentUserId:()=>"ink-test",subscribe:fn=>{emit=fn},listWorkspaces:()=>[]},fetch:async(url,options)=>{
+ const context={console:{error(){}},setTimeout,clearTimeout,CustomEvent:function(type,init){this.type=type;this.detail=init.detail},dispatchEvent(){},addEventListener(){},KGRolePermissions:{currentRole:()=>"teacher"},KGCanvasWorkspaceStore:{currentUserId:()=>"ink-test",subscribe:fn=>{emit=fn},listWorkspaces:()=>[]},fetch:async(url,options)=>{
   if(options.method==='GET')return {ok:true,json:async()=>({workspaces:[]})};
   const body=JSON.parse(options.body);
   if(mode==='defer')return new Promise(resolve=>deferred.push({resolve,body}));

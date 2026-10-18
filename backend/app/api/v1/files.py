@@ -7,13 +7,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, Field, StrictStr, field_validator
 
 from app.core.import_guard import import_submission_guard, file_import_submission_guard
-from app.core.auth import CurrentUser
+from app.core.auth import CurrentUser, require_role
+from app.models.user import User
 from app.db.session import get_db
 from app.schemas.graph_fragment import FragmentPasteInput
 from app.services import file_service, graph_fragment_service as graph_fragments
 
 router = APIRouter(prefix="/files", tags=["files"])
 DB = Annotated[AsyncSession, Depends(get_db)]
+GraphWriter = Annotated[User, Depends(require_role("admin", "teacher", "student"))]
 
 
 def _nf() -> HTTPException:
@@ -39,7 +41,7 @@ async def list_files(
 
 
 @router.post("", dependencies=[Depends(file_import_submission_guard)])
-async def create_file(body: dict, db: DB, user: CurrentUser):
+async def create_file(body: dict, db: DB, user: GraphWriter):
     try:
         f = await file_service.create_file(
             db,
@@ -78,7 +80,7 @@ class FileOrderInput(BaseModel):
 
 
 @router.put("/order")
-async def reorder_files(body: FileOrderInput, db: DB, user: CurrentUser):
+async def reorder_files(body: FileOrderInput, db: DB, user: GraphWriter):
     ids = await file_service.reorder_files(db, user.username, body.fileIds)
     if ids is None:
         raise _nf()
@@ -92,6 +94,7 @@ async def get_current(db: DB, user: CurrentUser):
 
 @router.put("/current")
 async def set_current(body: dict, db: DB, user: CurrentUser):
+    # Opening position is a personal browsing preference; viewers may switch files.
     if not await file_service.set_current(db, user.username, body.get("fileId")):
         raise _nf()
     return {"ok": True}
@@ -103,7 +106,7 @@ async def stats(db: DB, user: CurrentUser):
 
 
 @router.post("/import-legacy", dependencies=[Depends(import_submission_guard)])
-async def import_legacy(body: dict, db: DB, user: CurrentUser):
+async def import_legacy(body: dict, db: DB, user: GraphWriter):
     try:
         return await file_service.import_legacy(db, user.username, body)
     except file_service.GraphStrokesInvalid as exc:
@@ -114,7 +117,7 @@ async def import_legacy(body: dict, db: DB, user: CurrentUser):
 
 
 @router.post("/trash/empty")
-async def empty_trash(db: DB, user: CurrentUser):
+async def empty_trash(db: DB, user: GraphWriter):
     return await file_service.empty_trash(db, user.username)
 
 
@@ -124,7 +127,7 @@ async def list_folders(db: DB, user: CurrentUser, status: str = Query("active"))
 
 
 @router.post("/folders")
-async def create_folder(body: dict, db: DB, user: CurrentUser):
+async def create_folder(body: dict, db: DB, user: GraphWriter):
     f = await file_service.create_folder(db, user.username, body.get("name", "新建文件夹"), body.get("parentId"))
     if not f:
         raise HTTPException(status_code=404, detail="目标文件夹不存在")
@@ -132,7 +135,7 @@ async def create_folder(body: dict, db: DB, user: CurrentUser):
 
 
 @router.patch("/folders/{folder_id}")
-async def patch_folder(folder_id: str, body: dict, db: DB, user: CurrentUser):
+async def patch_folder(folder_id: str, body: dict, db: DB, user: GraphWriter):
     if "name" in body:
         f = await file_service.rename_folder(db, user.username, folder_id, body["name"])
     elif "parentId" in body:
@@ -145,7 +148,7 @@ async def patch_folder(folder_id: str, body: dict, db: DB, user: CurrentUser):
 
 
 @router.delete("/folders/{folder_id}")
-async def delete_folder(folder_id: str, db: DB, user: CurrentUser):
+async def delete_folder(folder_id: str, db: DB, user: GraphWriter):
     ok = await file_service.delete_folder(db, user.username, folder_id)
     if not ok:
         raise _nf()
@@ -153,7 +156,7 @@ async def delete_folder(folder_id: str, db: DB, user: CurrentUser):
 
 
 @router.post("/folders/{folder_id}/restore")
-async def restore_folder(folder_id: str, db: DB, user: CurrentUser):
+async def restore_folder(folder_id: str, db: DB, user: GraphWriter):
     folder = await file_service.restore_folder(db, user.username, folder_id)
     if folder is None:
         raise _nf()
@@ -161,7 +164,7 @@ async def restore_folder(folder_id: str, db: DB, user: CurrentUser):
 
 
 @router.delete("/folders/{folder_id}/permanent")
-async def delete_folder_permanent(folder_id: str, db: DB, user: CurrentUser):
+async def delete_folder_permanent(folder_id: str, db: DB, user: GraphWriter):
     try:
         deleted = await file_service.delete_folder_permanent(db, user.username, folder_id)
     except file_service.FolderNotEmpty as exc:
@@ -177,13 +180,13 @@ async def list_tags(db: DB, user: CurrentUser):
 
 
 @router.post("/tags")
-async def create_tag(body: dict, db: DB, user: CurrentUser):
+async def create_tag(body: dict, db: DB, user: GraphWriter):
     t = await file_service.create_tag(db, user.username, body.get("name", "标签"), body.get("color", "#64748b"))
     return {"tag": file_service.tag_to_dict(t)}
 
 
 @router.patch("/tags/{tag_id}")
-async def update_tag(tag_id: str, body: dict, db: DB, user: CurrentUser):
+async def update_tag(tag_id: str, body: dict, db: DB, user: GraphWriter):
     t = await file_service.update_tag(db, user.username, tag_id, body)
     if not t:
         raise _nf()
@@ -191,14 +194,14 @@ async def update_tag(tag_id: str, body: dict, db: DB, user: CurrentUser):
 
 
 @router.delete("/tags/{tag_id}")
-async def delete_tag(tag_id: str, db: DB, user: CurrentUser):
+async def delete_tag(tag_id: str, db: DB, user: GraphWriter):
     if not await file_service.delete_tag(db, user.username, tag_id):
         raise _nf()
     return {"ok": True}
 
 
 @router.put("/{file_id}/tag")
-async def set_file_tag(file_id: str, body: dict, db: DB, user: CurrentUser):
+async def set_file_tag(file_id: str, body: dict, db: DB, user: GraphWriter):
     ok = await file_service.set_file_tag(db, user.username, file_id, body.get("tagId"))
     if not ok:
         raise _nf()
@@ -215,7 +218,7 @@ async def open_file(file_id: str, db: DB, user: CurrentUser):
 
 
 @router.put("/{file_id}")
-async def save_file(file_id: str, body: dict, db: DB, user: CurrentUser):
+async def save_file(file_id: str, body: dict, db: DB, user: GraphWriter):
     try:
         f = await file_service.save_file(
             db,
@@ -247,7 +250,7 @@ async def save_file(file_id: str, body: dict, db: DB, user: CurrentUser):
 
 
 @router.patch("/{file_id}")
-async def patch_file(file_id: str, body: dict, db: DB, user: CurrentUser):
+async def patch_file(file_id: str, body: dict, db: DB, user: GraphWriter):
     if "name" in body:
         f = await file_service.rename_file(db, user.username, file_id, body["name"])
     elif "folderId" in body:
@@ -264,14 +267,14 @@ async def patch_file(file_id: str, body: dict, db: DB, user: CurrentUser):
 
 
 @router.delete("/{file_id}")
-async def trash_file(file_id: str, db: DB, user: CurrentUser):
+async def trash_file(file_id: str, db: DB, user: GraphWriter):
     if not await file_service.trash_file(db, user.username, file_id):
         raise _nf()
     return {"ok": True}
 
 
 @router.post("/{file_id}/restore")
-async def restore_file(file_id: str, db: DB, user: CurrentUser):
+async def restore_file(file_id: str, db: DB, user: GraphWriter):
     f = await file_service.restore_file(db, user.username, file_id)
     if not f:
         raise _nf()
@@ -279,14 +282,14 @@ async def restore_file(file_id: str, db: DB, user: CurrentUser):
 
 
 @router.delete("/{file_id}/permanent")
-async def delete_permanent(file_id: str, db: DB, user: CurrentUser):
+async def delete_permanent(file_id: str, db: DB, user: GraphWriter):
     if not await file_service.delete_permanent(db, user.username, file_id):
         raise _nf()
     return {"ok": True}
 
 
 @router.post("/{file_id}/duplicate")
-async def duplicate_file(file_id: str, body: dict, db: DB, user: CurrentUser):
+async def duplicate_file(file_id: str, body: dict, db: DB, user: GraphWriter):
     f = await file_service.duplicate_file(db, user.username, file_id, body.get("name"))
     if not f:
         raise _nf()
@@ -294,6 +297,6 @@ async def duplicate_file(file_id: str, body: dict, db: DB, user: CurrentUser):
 
 
 @router.post("/{file_id}/fragments", dependencies=[Depends(import_submission_guard)])
-async def paste_fragment(file_id: str, body: FragmentPasteInput, db: DB, user: CurrentUser):
+async def paste_fragment(file_id: str, body: FragmentPasteInput, db: DB, user: GraphWriter):
     """受控跨文件片段粘贴：服务端读取来源绑定并原子合并，客户端授权字段一律忽略。"""
     return await graph_fragments.paste_fragment(db, user, file_id, body)

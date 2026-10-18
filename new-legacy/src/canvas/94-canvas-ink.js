@@ -67,6 +67,27 @@
       context.restore();
     }
   }
+  function svgStroke(stroke,doc,measure,{selected=false}={}){
+    const ns="http://www.w3.org/2000/svg";
+    if(stroke.tool!=='text'){
+      const el=doc.createElementNS(ns,'path');
+      el.setAttribute('d',path(stroke.points));el.setAttribute('fill','none');el.setAttribute('stroke',stroke.color);el.setAttribute('stroke-width',stroke.width);el.setAttribute('stroke-linecap','round');el.setAttribute('stroke-linejoin','round');el.setAttribute('opacity',stroke.opacity??TOOLS[stroke.tool].opacity);el.dataset.strokeId=stroke.id;
+      return el;
+    }
+
+    const el=doc.createElementNS(ns,'text');
+    el.setAttribute('x',stroke.points[0][0]);el.setAttribute('y',stroke.points[0][1]);
+    el.setAttribute('fill',stroke.color);el.setAttribute('font-size',stroke.width);
+    el.setAttribute('font-family','system-ui,-apple-system,sans-serif');
+    el.setAttribute('dominant-baseline','hanging');
+    el.setAttribute('opacity',stroke.opacity??TOOLS.text.opacity);el.dataset.strokeId=stroke.id;
+    el.setAttribute('font-weight',stroke.bold?'700':'400');
+    el.setAttribute('xml:space','preserve');
+    textLayout(stroke,measure).lines.forEach((line,index)=>{const span=doc.createElementNS(ns,'tspan');span.setAttribute('x',stroke.points[0][0]);span.setAttribute('y',stroke.points[0][1]+index*stroke.width*1.35);span.textContent=line||'\u00a0';el.append(span)});
+    el.classList.toggle('canvas-ink-text-selected',selected);
+    return el;
+  }
+
   function create(options){
     const {viewport,world}=options;if(!viewport||!world)return null;
     const doc=viewport.ownerDocument,ns='http://www.w3.org/2000/svg';
@@ -126,25 +147,7 @@
     const inside=target=>options.isInside?options.isInside(target):defaultInside(target);
     const stop=event=>{event.preventDefault();event.stopImmediatePropagation()};
     function listen(target,type,callback,config){target.addEventListener(type,callback,config);listeners.push(()=>target.removeEventListener(type,callback,config))}
-    function makePath(stroke){
-      const el=doc.createElementNS(ns,'path');
-      el.setAttribute('d',path(stroke.points));el.setAttribute('fill','none');el.setAttribute('stroke',stroke.color);el.setAttribute('stroke-width',stroke.width);el.setAttribute('stroke-linecap','round');el.setAttribute('stroke-linejoin','round');el.setAttribute('opacity',stroke.opacity??TOOLS[stroke.tool].opacity);el.dataset.strokeId=stroke.id;
-      return el;
-    }
-    function makeEl(stroke){
-      if(stroke.tool!=='text')return makePath(stroke);
-      const el=doc.createElementNS(ns,'text');
-      el.setAttribute('x',stroke.points[0][0]);el.setAttribute('y',stroke.points[0][1]);
-      el.setAttribute('fill',stroke.color);el.setAttribute('font-size',stroke.width);
-      el.setAttribute('font-family','system-ui,-apple-system,sans-serif');
-      el.setAttribute('dominant-baseline','hanging');
-      el.setAttribute('opacity',stroke.opacity??TOOLS.text.opacity);el.dataset.strokeId=stroke.id;
-      el.setAttribute('font-weight',stroke.bold?'700':'400');
-      el.setAttribute('xml:space','preserve');
-      textLines(stroke).forEach((line,index)=>{const span=doc.createElementNS(ns,'tspan');span.setAttribute('x',stroke.points[0][0]);span.setAttribute('y',stroke.points[0][1]+index*stroke.width*1.35);span.textContent=line||'\u00a0';el.append(span)});
-      el.classList.toggle('canvas-ink-text-selected',stroke.id===selectedId);
-      return el;
-    }
+    function makeEl(stroke){return svgStroke(stroke,doc,measure,{selected:stroke.id===selectedId})}
     // 工具光标：画笔/荧光笔/橡皮擦各显示对应形状，颜色跟随当前色板。
     const cursorStyle=doc.createElement('style');
     function cursorArt(name,color){
@@ -426,7 +429,7 @@
         const strokes=normalize(getStrokes()),remaining=LIMITS.total-strokes.reduce((sum,s)=>sum+s.points.length,0);
         if(strokes.length>=LIMITS.strokes||remaining<1)throw new Error('当前画布笔迹已达上限，请清理部分笔迹后继续');
         const pref=prefs[tool],stroke={id:'ink-'+Date.now().toString(36)+'-'+(++sequence)+'-'+Math.random().toString(36).slice(2,8),tool,color:pref.color,width:pref.width,opacity:pref.opacity,points:[]};
-        active={pointerId:event.pointerId,stroke,el:makePath(stroke),pointLimit:Math.min(remaining,LIMITS.points)};
+        active={pointerId:event.pointerId,stroke,el:makeEl(stroke),pointLimit:Math.min(remaining,LIMITS.points)};
         addPoint(event);layer.append(active.el);active.el.setAttribute('d',path(stroke.points));viewport.setPointerCapture(event.pointerId);
       }catch(error){cancel();report(error)}
     },true);
@@ -545,5 +548,5 @@
     render();
     return {activateText,openTextAt,handleKeyDown,commitText:()=>closeTextEditor(true),hasTextDraft:()=>!!textSession,render,refreshControls,cancel,reset,setTool,setOpen,destroy,clearAll,get tool(){return tool},get temporaryPan(){return space}};
   }
-  global.KGCanvasInk=Object.freeze({normalize,point,path,textLayout,bounds,draw,create});
+  global.KGCanvasInk=Object.freeze({normalize,point,path,textLayout,bounds,draw,svgStroke,create});
 })(window);
