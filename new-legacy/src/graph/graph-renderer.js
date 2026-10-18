@@ -11,7 +11,7 @@
       else if(kind==='appearance'){call('renderHeader',options);if(callbacks.updateCardAppearance&&options.ids)call('updateCardAppearance',options);else call('renderCards',options);call('renderDetails',options);call('renderQuickActions',options)}
       else if(kind==='geometry'){if(callbacks.updateCardGeometry&&options.ids)call('updateCardGeometry',options);else{call('renderEdges',options);call('renderCards',options)}call('renderDetails',options);call('renderQuickActions',options)}
       else if(kind==='selection'){call('syncModes',options);call('renderHeader',options);call('refreshCardClasses',options);call('refreshEdgeClasses',options);call('renderDetails',options);call('renderQuickActions',options)}
-      else if(kind==='edges'){call('renderEdges',options);call('renderDetails',options)}
+      else if(kind==='edges'){call('renderEdges',options);call('renderDetails',options);call('renderEdgeStylePanel',options)}
       else if(kind==='header'){call('renderHeader',options);call('renderQuickActions',options)}
       else{call('syncModes',options);call('applyViewport',options);call('renderHeader',options);call('renderEdges',options);call('renderCards',options);call('renderDetails',options);call('renderEdgeStylePanel',options);call('renderQuickActions',options)}
       if(options.persist&&typeof callbacks.persist==='function')callbacks.persist(options);

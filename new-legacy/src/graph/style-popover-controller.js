@@ -21,7 +21,7 @@
       root,host:root.parentElement,mainSelector:'.node-style-toolbar-main',
       panelSelector:'[data-node-style-panel]',triggerSelector:'[data-node-toolbar-panel]',
       panelAttribute:'data-node-style-panel',triggerAttribute:'data-node-toolbar-panel',
-      alignLastTrigger:true,hoverOpenDelay:options.hoverOpenDelay,hoverCloseDelay:options.hoverCloseDelay,
+      getAvoidRects:options.getAvoidRects,getBounds:options.getBounds,alignLastTrigger:true,hoverOpenDelay:options.hoverOpenDelay,hoverCloseDelay:options.hoverCloseDelay,
       beforeOpen:suppressTooltip,onClose:()=>{releaseTooltip();if(typeof options.onClose==='function')options.onClose()},
       onOpen:(name,panel,trigger)=>{if(typeof options.onOpen==='function')options.onOpen(name,panel,trigger)}
     });

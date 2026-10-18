@@ -822,7 +822,7 @@ function updateSelectedEdgeControlScale(scale=Number(state?.viewport?.scale)||1)
   const safeScale=Math.max(.01,Number(scale)||1),inverse=1/safeScale;if(!edgeControlLayer)return;
   edgeControlLayer.querySelectorAll('.edge-endpoint-dot').forEach(node=>node.setAttribute('r',String(5.2*inverse)));
   edgeControlLayer.querySelectorAll('.edge-endpoint-hit').forEach(node=>node.setAttribute('r',String(14*inverse)));
-  edgeControlLayer.querySelectorAll('.edge-control-dot').forEach(node=>node.setAttribute('r',String(4.8*inverse)));
+  edgeControlLayer.querySelectorAll('.edge-control-dot').forEach(node=>node.setAttribute('r',String((node.parentNode.classList.contains('edge-control-primary')?6:4.8)*inverse)));
   edgeControlLayer.querySelectorAll('.edge-control-hit').forEach(node=>node.setAttribute('r',String(12*inverse)));
   edgeControlLayer.style.setProperty('--edge-control-inverse-scale',String(inverse));
 }
@@ -1041,6 +1041,7 @@ function finishEdgeControlDrag(event,cancelled=false){
 function createEdgeControlHandle(link,point){
   const handle=svgElement('g','edge-control-handle');handle.dataset.linkId=String(link.id);handle.dataset.edgeControlKind=point.kind;handle.dataset.edgeControlIndex=String(point.index);handle.setAttribute('transform',`translate(${point.x} ${point.y})`);
   if(point.kind==='curve-midpoint')handle.classList.add('edge-control-primary');handle.setAttribute('aria-label',point.kind==='segment'?'拖动折线段':point.kind==='curve-midpoint'?'拖动曲线中点':'调整曲线');
+  handle.setAttribute('tabindex','0');handle.setAttribute('role','button');
   handle.appendChild(svgElement('circle','edge-control-hit'));handle.appendChild(svgElement('circle','edge-control-dot'));
   handle.addEventListener('pointerdown',event=>beginEdgeControlDrag(event,link.id,handle.dataset.edgeControlKind,Number(handle.dataset.edgeControlIndex)));
   handle.addEventListener('pointermove',scheduleEdgeControlDrag);handle.addEventListener('pointerup',event=>finishEdgeControlDrag(event,false));handle.addEventListener('pointercancel',event=>finishEdgeControlDrag(event,true));
@@ -1068,12 +1069,27 @@ function edgeBatchMixedValue(links,key,fallback){
   return links.every(link=>(link[key]??fallback)===first)?first:null;
 }
 
+function selectedEdgePopoverAvoidRects(){
+  const stageRect=stage.getBoundingClientRect(),scale=Number(state.viewport.scale)||1;
+  const client=point=>({x:stageRect.left-stage.scrollLeft+state.viewport.x+point.x*scale,y:stageRect.top-stage.scrollTop+state.viewport.y+point.y*scale});
+  const rects=[],nodeIds=new Set(selectedNodeIds);
+  for(const link of selectedEditableLinks()){
+    const samples=edgeDomById.get(String(link.id))?.geometry?.samples||[];
+    for(let i=1;i<samples.length;i++){
+      const a=client(samples[i-1]),b=client(samples[i]);rects.push({left:Math.min(a.x,b.x)-6,right:Math.max(a.x,b.x)+6,top:Math.min(a.y,b.y)-6,bottom:Math.max(a.y,b.y)+6});
+    }
+    if(link.from)nodeIds.add(link.from);if(link.to)nodeIds.add(link.to);
+  }
+  for(const id of nodeIds){const card=cardElementByNodeId(id);if(card)rects.push(card.getBoundingClientRect())}
+  return rects;
+}
 function ensureSelectedEdgeQuickStylePanel(){
   if(selectedEdgeQuickStyleToolbarController?.root?.()?.isConnected)return selectedEdgeQuickStyleToolbarController.root();
   const factory=window.KGCanvasEdgeToolbarController;
   if(!factory?.create)return null;
   selectedEdgeQuickStyleToolbarController=factory.create({
     host:stage,id:'edgeQuickStylePanel',className:'edge-toolbar-unified',
+    getAvoidRects:selectedEdgePopoverAvoidRects,getBounds:()=>stage.getBoundingClientRect(),
     onLineStyle:value=>{if(LINE_STYLES.has(value)&&typeof applyLineStyle==='function')applyLineStyle(value)},
     onPathStyle:value=>{if(LINE_PATH_STYLES.has(value)&&typeof applyPathStyle==='function')applyPathStyle(value)},
     onWidth:value=>{if(typeof applyLineWidth==='function')applyLineWidth(Number(value))},

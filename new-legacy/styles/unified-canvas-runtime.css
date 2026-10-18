@@ -303,3 +303,8 @@ body.qw-selection-toolbar-motion .uc-selection-bounds,.stage.graph-card-dragging
   stroke-linecap:round;
   stroke-linejoin:round;
 }
+
+.uc-edge-toolbar-popover[data-uc-edge-popover="ports"] label{display:grid;grid-template-columns:40px 1fr;align-items:center;gap:10px;margin:8px 0;color:#475569;font-size:12px}
+.uc-edge-toolbar-popover[data-uc-edge-popover="ports"] select,
+.uc-edge-toolbar-popover [data-uc-edge-action="ports-reset"]{min-width:0;min-height:32px;padding:5px 9px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;color:#334155;font:inherit;box-shadow:none}
+.uc-edge-toolbar-popover [data-uc-edge-action="ports-reset"]{width:100%;margin-top:5px;cursor:pointer}
