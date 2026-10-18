@@ -110,15 +110,16 @@
   }
   // All rectangles are client coordinates; callers supply only relevant targets.
   // Prefer a free adjacent side, then the least obstructed bounded fallback.
-  function placePopover({bounds,anchor,width,height,avoidRects=[],pad=8,gap=8,alignEnd=false}){
+  function placePopover({bounds,anchor,width,height,avoidRects=[],pad=8,gap=8,alignEnd=false,preferredSide='below'}){
     width=Math.min(width,Math.max(1,bounds.right-bounds.left-pad*2));
     height=Math.min(height,Math.max(1,bounds.bottom-bounds.top-pad*2));
     const leftMin=bounds.left+pad,topMin=bounds.top+pad,leftMax=Math.max(leftMin,bounds.right-pad-width),topMax=Math.max(topMin,bounds.bottom-pad-height);
     const centered=alignEnd?anchor.right-width:(anchor.left+anchor.right-width)/2;
     const candidates=[],add=(left,top,placement)=>candidates.push({left:Math.max(leftMin,Math.min(left,leftMax)),top:Math.max(topMin,Math.min(top,topMax)),placement});
     const around=rect=>{
-      add(centered,rect.bottom+gap,'below');add(centered,rect.top-height-gap,'above');
-      add(rect.right+gap,(anchor.top+anchor.bottom-height)/2,'right');add(rect.left-width-gap,(anchor.top+anchor.bottom-height)/2,'left');
+      const vertical=()=>{add(centered,rect.bottom+gap,'below');add(centered,rect.top-height-gap,'above')};
+      const horizontal=()=>{add(rect.right+gap,(anchor.top+anchor.bottom-height)/2,'right');add(rect.left-width-gap,(anchor.top+anchor.bottom-height)/2,'left')};
+      if(preferredSide==='right'){horizontal();vertical()}else{vertical();horizontal()}
     };
     around(anchor);
     const obstacles=avoidRects.filter(rect=>rect&&rect.right>bounds.left&&rect.left<bounds.right&&rect.bottom>bounds.top&&rect.top<bounds.bottom);
@@ -150,7 +151,7 @@
     panel.style.maxHeight=maxHeight+'px';panel.style.overflowY='auto';
     const main=root?.querySelector?.(options.mainSelector||'.uc-toolbar-main');
     const avoidRects=[...(options.getAvoidRects?.()||[])];if(main)avoidRects.push(main.getBoundingClientRect());
-    const next=placePopover({bounds,anchor:trigger.getBoundingClientRect(),width:panel.offsetWidth||180,height:panel.offsetHeight||80,avoidRects,pad,gap:Number(options.gap)||8,alignEnd:!!options.alignEnd});
+    const next=placePopover({bounds,anchor:trigger.getBoundingClientRect(),width:panel.offsetWidth||180,height:panel.offsetHeight||80,avoidRects,pad,gap:Number(options.gap)||8,alignEnd:!!options.alignEnd,preferredSide:options.preferredSide});
     if(root)root.dataset.panelPlacement=next.placement;panel.classList.toggle('is-above',next.placement==='above');
     panel.style.left=Math.round(next.left-offsetBox.left)+'px';panel.style.top=Math.round(next.top-offsetBox.top)+'px';return true;
   }

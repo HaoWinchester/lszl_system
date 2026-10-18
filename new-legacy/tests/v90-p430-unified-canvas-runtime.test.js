@@ -20,11 +20,14 @@ const minimap=read('src/canvas/87-canvas-minimap-controller.js');
 for(const token of ['centerFromPoint','minimap-drag','persistViewport','setMinimapExpanded'])assert(minimap.includes(token),token);
 const runtime=read('src/canvas/89-canvas-runtime.js');
 for(const token of ['KGUnifiedCanvasRuntime','KGCanvasAppearanceController','KGCanvasZoomDockController','KGCanvasMinimapController','KGCanvasSettingsController'])assert(runtime.includes(token),token);
-for(const htmlFile of ['index.html','question-workspace.html','question-training.html','knowledge-recall.html']){
+for(const htmlFile of ['index.html','question-workspace.html','knowledge-recall.html']){
   const html=read(htmlFile);
   assert(html.includes('styles/unified-canvas-runtime.css'),htmlFile+' css');
   for(let n=85;n<=89;n++)assert(html.includes(`src/canvas/${n}-canvas-`),htmlFile+' script '+n);
 }
+const retired=read('question-training.html');
+assert(retired.includes('redirectRetiredSingleDeep')&&retired.includes("new URL('practice-mode.html'"),'retired single-deep page redirects to the current practice page');
+assert(!retired.includes('src/canvas/89-canvas-runtime.js'),'redirect pages do not boot the retired canvas');
 const home=read('src/20-flashcards-toolbar.js');
 assert(home.includes('KGHomeGraphCanvasAdapter'));
 assert(home.includes('centerHomeGraphAt100'));

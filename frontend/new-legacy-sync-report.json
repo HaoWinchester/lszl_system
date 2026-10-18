@@ -1,11 +1,14 @@
 {
   "schemaVersion": 1,
   "fromVersion": "v9.0-p4.1.350",
-  "toVersion": "v9.0-p4.1.350",
+  "toVersion": "v9.0-p4.1.351",
   "changes": {
     "added": [],
     "changed": [
-      "tests/canvas-ink-polish-browser.py"
+      "VERSION",
+      "content-prep-studio/dist/content-prep.html",
+      "tests/boardmix-popover-bounds-browser.py",
+      "tests/v90-p430-unified-canvas-runtime.test.js"
     ],
     "removed": []
   },

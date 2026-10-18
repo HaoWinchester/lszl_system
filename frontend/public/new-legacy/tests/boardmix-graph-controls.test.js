@@ -18,6 +18,13 @@ for(const blocked of [[curve],[curve,card]]){
 const small=controller.placePopover({bounds:rect(0,0,220,160),anchor:rect(100,70,30,30),width:300,height:480,avoidRects:[]});
 assert(small.width<=204&&small.height<=144,'small canvases constrain both dimensions');
 assert(small.top>=8&&small.bottom<=152);
+for(const toolbar of [rect(16,120,104,384),rect(880,120,104,384)]){
+ const button=rect(toolbar.left+9,toolbar.top+336,40,40);
+ const placed=controller.placePopover({bounds:rect(0,80,1000,640),anchor:button,width:134,height:90,avoidRects:[toolbar],preferredSide:'right'});
+ assert(['right','left'].includes(placed.placement),'vertical toolbars open alongside the button, never below the entire toolbar');
+ assert(!overlaps(placed,toolbar));
+ assert(Math.abs((placed.top+placed.bottom-button.top-button.bottom)/2)<1,'submenu stays centered beside its trigger');
+}
 console.log('PASS shared popover avoids targets and clamps small/fullscreen bounds');
 
 vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../src/graph/graph-renderer.js'),'utf8'),context);

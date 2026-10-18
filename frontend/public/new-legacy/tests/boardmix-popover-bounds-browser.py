@@ -1,7 +1,9 @@
 """Real CSS layout regression for shared popovers inside a 320px canvas host."""
 from pathlib import Path
+import argparse,json
 from playwright.sync_api import sync_playwright
 ROOT=Path(__file__).resolve().parents[1]
+parser=argparse.ArgumentParser();parser.add_argument('--base-url');args=parser.parse_args()
 with sync_playwright() as pw:
  browser=pw.chromium.launch(channel='chrome');page=browser.new_page(viewport={'width':800,'height':600})
  page.set_content('''<div id="host" style="position:relative;width:320px;height:480px;overflow:clip"><div id="toolbar" class="uc-toolbar-shell" style="position:absolute;left:130px;top:190px"><div class="uc-toolbar-main"><button id="trigger">字号</button></div><div class="uc-toolbar-panels"><section id="panel" class="uc-toolbar-popover node-style-popover node-style-font-size-panel show"><div class="font-size-grid numeric">'''+''.join('<button class="node-style-option">'+str(n)+'</button>' for n in [12,14,16,18,20,24,28])+'''</div></section></div></div></div>''')
@@ -22,3 +24,44 @@ with sync_playwright() as pw:
  bounded(place())
  print('PASS real 320px DOM popover bounds, width restoration and inline/content-box minima')
  browser.close()
+
+if args.base_url:
+ out=ROOT.parent/'artifacts/toolbar-placement';out.mkdir(parents=True,exist_ok=True)
+ with sync_playwright() as pw:
+  browser=pw.chromium.launch(channel='chrome');context=browser.new_context(viewport={'width':1440,'height':900})
+  assert context.request.post(args.base_url+'/api/v1/auth/login',data={'username':'ink-browser','password':'ink-browser-test'}).ok
+  page=context.new_page();page.goto(args.base_url+'/graph',wait_until='networkidle')
+  for selector in ['#learningEntryDismissBtn','.tour-skip','#hideHelpBtn']:
+   if page.locator(selector).is_visible():page.locator(selector).click()
+  page.locator('.graph-mode-trigger').click();page.locator('[data-graph-mode-option=professional]').click()
+  results=[]
+  def inspect(menu):
+   return page.locator('#'+menu+'Shell').evaluate('''shell=>{const panel=shell.querySelector('.floating-submenu'),toolbar=document.querySelector('#floatingToolbox'),trigger=shell.querySelector('button'),rect=el=>{const r=el.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height}};return {panel:rect(panel),toolbar:rect(toolbar),trigger:rect(trigger),host:rect(document.querySelector('#stage')),placement:shell.dataset.panelPlacement,clickable:[...panel.querySelectorAll('button')].every(button=>{const r=button.getBoundingClientRect();return document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)?.closest('button')===button})}}''')
+  def verify(menu):
+   page.locator('#'+menu).click();page.wait_for_timeout(180);data=inspect(menu);results.append(data)
+   (out/'menus.json').write_text(json.dumps(results,ensure_ascii=False,indent=2));p,t,h=data['panel'],data['toolbar'],data['host']
+   page.screenshot(path=str(out/('menu-'+menu+'.png')))
+   assert p['left']>=h['left']+7 and p['right']<=h['right']-7 and p['top']>=h['top']+7 and p['bottom']<=h['bottom']-7,data
+   assert p['left']>=t['right']+6 or p['right']<=t['left']-6,'menu must open alongside toolbar: '+str(data)
+   assert abs((p['top']+p['bottom']-data['trigger']['top']-data['trigger']['bottom'])/2)<=p['height']/2,data
+   assert data['clickable'],data
+   page.locator('#'+menu).press('Escape');assert page.locator('#'+menu).get_attribute('aria-expanded')=='false'
+  def move_toolbar(x,y):
+   r=page.locator('#floatingToolboxHandle').bounding_box();page.mouse.move(r['x']+r['width']/2,r['y']+r['height']/2);page.mouse.down();page.mouse.move(x,y,steps=8);page.mouse.up()
+  for width,height in [(1440,900),(1280,720),(1024,768)]:
+   page.set_viewport_size({'width':width,'height':height})
+   for x,y in [(60,155),(width-65,155),(60,height-350),(width-65,height-350)]:
+    move_toolbar(x,y)
+    for menu in ['relationViewMenuBtn','sizeMenuBtn','lineStyleMenuBtn']:verify(menu)
+  # Keep an open menu attached and bounded when resize moves the toolbar itself.
+  page.set_viewport_size({'width':1440,'height':900});move_toolbar(1375,500);page.locator('#relationViewMenuBtn').click();page.set_viewport_size({'width':1024,'height':640});page.wait_for_timeout(180)
+  data=inspect('relationViewMenuBtn');assert data['panel']['right']<=data['host']['right']-7 and data['panel']['bottom']<=data['host']['bottom']-7,data
+  page.locator('#relationViewMenuBtn').press('Escape')
+  original=page.evaluate('largeGraphOverviewEnabled')
+  page.locator('#relationViewMenuBtn').click();page.locator('#largeGraphLinesBtn').click();assert page.evaluate('largeGraphOverviewEnabled') is not original
+  assert page.locator('#relationViewMenuBtn').get_attribute('aria-expanded')=='false'
+  page.locator('#relationViewMenuBtn').click();page.locator('#largeGraphLinesBtn').click();assert page.evaluate('largeGraphOverviewEnabled') is original
+  page.locator('#canvasFullscreenBtn').click();page.wait_for_function('document.fullscreenElement?.id==="stage"')
+  verify('relationViewMenuBtn');page.locator('#canvasFullscreenBtn').click();page.wait_for_function('!document.fullscreenElement')
+  page.set_viewport_size({'width':1440,'height':900});move_toolbar(60,155);page.locator('#relationViewMenuBtn').click();page.wait_for_timeout(180);page.screenshot(path=str(out/'relation-after.png'))
+  browser.close();print('PASS actual home relation/size/line menus: three viewports, four toolbar corners, real drag, hit testing, Escape, open-menu resize, actual toggle/restore and fullscreen')
