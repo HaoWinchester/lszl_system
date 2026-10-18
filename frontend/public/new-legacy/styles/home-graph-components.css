@@ -818,19 +818,10 @@
 [data-mindmap-controls] [data-mm-status]{position:absolute;left:0;top:calc(100% + 3px);padding:2px 6px;border-radius:4px;background:#fff;pointer-events:none;white-space:nowrap}
 @media(max-width:600px){.kg-mindmap-panel{left:12px;top:90px;max-width:calc(100vw - 24px)}[data-mindmap-controls] .mm-popover>summary{padding:8px}[data-mindmap-controls] .mm-popover-body{width:310px}}
 
-/* Compact graph rail: preserve every registered action and expand professional formats. */
-#floatingToolbox{box-sizing:border-box;width:54px;padding:6px;border-radius:14px;background:#fff;backdrop-filter:none;-webkit-backdrop-filter:none;box-shadow:0 4px 18px rgba(15,23,42,.12)}
-#floatingToolbox .floating-toolbox-handle{height:18px;margin-bottom:4px;border-radius:6px}
-#floatingToolbox .floating-toolbox-grid{grid-template-columns:40px;gap:5px;max-height:calc(100dvh - 260px);overflow-x:hidden;overflow-y:auto;scrollbar-width:none;overscroll-behavior:contain;touch-action:pan-y;padding:2px 0}
-#floatingToolbox .floating-toolbox-grid::-webkit-scrollbar{display:none}
-#floatingToolbox .floating-tool-btn{height:36px;border-radius:8px;box-shadow:none}
-#floatingToolbox .floating-toolbox-divider{margin:2px 4px}
-#floatingToolbox .floating-format-panel{display:grid;grid-template-columns:40px;gap:5px;padding-top:5px;border-top:1px solid #e2e8f0}
-#floatingToolbox .floating-format-panel[hidden]{display:none}
+/* Preserve the original two-column main toolbar; keep floating submenu positioning. */
 #floatingToolbox .floating-submenu{position:fixed;transform:none;min-width:134px}
 #floatingToolbox .floating-tool-menu-shell.menu-open .floating-submenu{transform:none}
 #floatingToolbox .floating-tool-btn[data-tooltip]::after{display:none}
-@media(min-width:601px) and (max-width:850px){body:not(.graph-phone-reading) #floatingToolbox{display:block}}
 /* Graph navigation uses the viewport transform, never native host scrolling. */
 #stage{overflow:clip}
 .home-toolbar-hint{position:absolute;z-index:580;pointer-events:none;padding:6px 9px;border-radius:7px;background:#30343b;color:#fff;box-shadow:0 4px 12px rgba(15,23,42,.15);font:650 12px/1.25 system-ui,sans-serif;white-space:nowrap}
