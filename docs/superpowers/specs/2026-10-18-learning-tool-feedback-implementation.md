@@ -22,52 +22,52 @@
 
 **Files:** new-legacy/src/10-graph-editor.js、src/graph/edge-geometry.js、mindmap-themes.js、viewport-controller.js、node-toolbar-controller.js；styles/home-graph-components.css、unified-canvas-runtime.css、home-canvas-performance.css；tests/graph-edge-geometry.test.js、graph-mindmap-layout.test.js、graph-mindmap-browser.py 及新定向浏览器测试。
 **Interfaces:** 沿用 KGGraphEdgeGeometry/GraphKernel 与历史 checkpoint/restore；必要的 midpoint/segment 几何纯函数统一从 edge-geometry.js 导出。不得改 template-center-controller、related-canvas-controller 或共享 ink 文件（其他任务负责）。
-- [ ] 添加能失败的几何用例：短距离中段拖动仍绑定端点、对称分支、折线段轴向/重叠与原形恢复；运行 node --test new-legacy/tests/graph-edge-geometry.test.js。
-- [ ] 复现现有 UI：1源2个向右对称节点；线中部小位移；选中框覆盖工具栏命中；记录实际根因。
-- [ ] 增量实现中点主手柄、折线段中点拖动及快捷线型切换；保留显式端点解除绑定；重复线可选择；每手势一次撤销，取消恢复。
-- [ ] 思维导图面板按短工具条+方向/主题小弹层收紧；高级根节点/手工样式保护折叠；保留原 data-mm-* 入口并更新真实浏览器用例。
-- [ ] 修复蓝框装饰和工具栏的 stacking/pointer 命中；验证缩放/全屏/多选。
-- [ ] 缩放期间不做全图重绘，必要清晰化延迟至停稳且仅必要目标；记录同数据前后指标，不仅看 diagnostics 常数。
-- [ ] 定向 Node/真实浏览器验证，报告行为、指标、未复现项；提交只包含本任务文件。
+- [x] 添加能失败的几何用例：短距离中段拖动仍绑定端点、对称分支、折线段轴向/重叠与原形恢复；运行 node --test new-legacy/tests/graph-edge-geometry.test.js。
+- [x] 复现现有 UI：1源2个向右对称节点；线中部小位移；选中框覆盖工具栏命中；记录实际根因。
+- [x] 增量实现中点主手柄、折线段中点拖动及快捷线型切换；保留显式端点解除绑定；重复线可选择；每手势一次撤销，取消恢复。
+- [x] 思维导图面板按短工具条+方向/主题小弹层收紧；高级根节点/手工样式保护折叠；保留原 data-mm-* 入口并更新真实浏览器用例。
+- [x] 修复蓝框装饰和工具栏的 stacking/pointer 命中；验证缩放/全屏/多选。
+- [x] 缩放期间不做全图重绘，必要清晰化延迟至停稳且仅必要目标；记录同数据前后指标，不仅看 diagnostics 常数。
+- [x] 定向 Node/真实浏览器验证，报告行为、指标、未复现项；提交只包含本任务文件。
 
 ### Task 2: 回忆文字与画笔交互
 
 **Files:** new-legacy/src/canvas/94-canvas-ink.js、text-box-geometry.js、text-edit-session.js、styles/canvas-ink.css、src/graph/related-canvas-controller.js（仅临时画布画笔接入）；tests/canvas-text-box.test.js、canvas-ink-text-browser.py、canvas-ink-controller-browser.py、graph-temporary-canvas-browser.py。
 **Interfaces:** 保留 KGCanvasInkController.create/getViewport/persistText/isInside/reset/destroy；复用 KGTextEditSession 的草稿和异步失败恢复，不在 UI 编辑期间提前 commit。
-- [ ] 先测短文本、删行、字号/缩放后的自然尺寸；例：单行 24px 文本的初始框不得保留 100px 高下限，删除多余换行可缩短。
-- [ ] 编辑框测量真实内容，用户显式换行保留；边框拖动保持 focus/selection/IME 与草稿；Esc 恢复，失败仍可重试。
-- [ ] 画笔面板右端增加真实关闭入口，统一退出到选择态，清理手势；右键遵循现有策略且可退出。
-- [ ] 临时画布空白绘画、文字、关闭/右键取消走同一共享实现；只读禁止写入，关闭不把临时笔迹写回正式文件。
-- [ ] 绘画状态下卡片 hover/选中装饰稳定，无红框阴影闪烁。
-- [ ] 跑共享单测和真实浏览器，涵盖编辑保持拖动、删行、保存失败、临时空白、只读；报告并提交本任务文件。
+- [x] 先测短文本、删行、字号/缩放后的自然尺寸；例：单行 24px 文本的初始框不得保留 100px 高下限，删除多余换行可缩短。
+- [x] 编辑框测量真实内容，用户显式换行保留；边框拖动保持 focus/selection/IME 与草稿；Esc 恢复，失败仍可重试。
+- [x] 画笔面板右端增加真实关闭入口，统一退出到选择态，清理手势；右键遵循现有策略且可退出。
+- [x] 临时画布空白绘画、文字、关闭/右键取消走同一共享实现；只读禁止写入，关闭不把临时笔迹写回正式文件。
+- [x] 绘画状态下卡片 hover/选中装饰稳定，无红框阴影闪烁。
+- [x] 跑共享单测和真实浏览器，涵盖编辑保持拖动、删行、保存失败、临时空白、只读；报告并提交本任务文件。
 
 ### Task 3: 分享标题与干净图谱入口
 
 **Files:** new-legacy/landing.html、index.html、practice-mode.html（仅 title/meta）；backend/app/web/routes.py；现有 web 路由测试与 new-legacy/tests/landing-page-contract.test.js，新增分享契约。
 **Interfaces:** 官网 / 保持 landing；/graph 直接返回图谱 HTML，沿既有 bootstrap 与权限逻辑提供，旧 /index.html 继续可用；保留 fileId/mode/auth 参数语义。
-- [ ] 添加 source HTML 分享元信息测试：title/og:title/og:description 不含做题/刷题；真实页面内部做题导航保留。
-- [ ] 添加 /graph 直接 200、不跳到 index.html、bootstrap 正确、fileId/auth 仍由前端消费的后端路由测试。
-- [ ] title/og 文案用“个人学习工具｜知识图谱与主动回忆”，描述“用知识图谱、笔记与主动回忆，构建自己的知识体系。”；canonical/og:url 指向官网 / 或 /graph，练习页使用真实页面 URL。
-- [ ] 复用现有页面直出封装，避免复制鉴权/bootstrap；定向 Node 与后端路由测试。
+- [x] 添加 source HTML 分享元信息测试：title/og:title/og:description 不含做题/刷题；真实页面内部做题导航保留。
+- [x] 添加 /graph 直接 200、不跳到 index.html、bootstrap 正确、fileId/auth 仍由前端消费的后端路由测试。
+- [x] title/og 文案用“个人学习工具｜知识图谱与主动回忆”，描述“用知识图谱、笔记与主动回忆，构建自己的知识体系。”；canonical/og:url 指向官网 / 或 /graph，练习页使用真实页面 URL。
+- [x] 复用现有页面直出封装，避免复制鉴权/bootstrap；定向 Node 与后端路由测试。
 
 ### Task 4: 模板图形预览
 
 **Files:** backend/app/services/graph_template_service.py、api/v1/graph_templates.py 与现有模板测试；new-legacy/src/graph/template-center-controller.js、新职责明确的 preview renderer/controller、styles/graph-template-center.css、index.html script 入口；tests/graph-template-center.test.js、graph-template-center-browser.py。
 **Interfaces:** 现有 GET /api/v1/graph-templates/{id} 返回 summary 及受控 preview（版本、卡片标题/几何/配色、允许的连线），不包含原始 graphData、题目/答案、备注、学习记录或不受控图片 URL。加载仍使用原 POST loads。
-- [ ] pytest 先验证登录/下架/维护者边界，投影字段白名单，题目答案/notes/个人数据和不可信样式不会泄露；读预览不创建文件。
-- [ ] 服务端从当前模板版本 graph_payload 构建白名单投影，有限数值/长度/数量及纯文本；沿现有权限，不信任客户端预览快照。
-- [ ] 列表缩略图与独立详情预览使用同一个只读 renderer；拖动画布、按钮/滚轮缩放、适应视图、全屏/退出、关闭后取消异步请求，错误可重试。
-- [ ] 原加载副本/会员限制/幂等不变；预览不复用可写正式编辑器，关闭不污染当前 state。
-- [ ] 补 Node 和隔离 PostgreSQL 浏览器测试，真实点图、缩放、拖动、全屏、关闭重开、下架/失败与加载副本验证。
+- [x] pytest 先验证登录/下架/维护者边界，投影字段白名单，题目答案/notes/个人数据和不可信样式不会泄露；读预览不创建文件。
+- [x] 服务端从当前模板版本 graph_payload 构建白名单投影，有限数值/长度/数量及纯文本；沿现有权限，不信任客户端预览快照。
+- [x] 列表缩略图与独立详情预览使用同一个只读 renderer；拖动画布、按钮/滚轮缩放、适应视图、全屏/退出、关闭后取消异步请求，错误可重试。
+- [x] 原加载副本/会员限制/幂等不变；预览不复用可写正式编辑器，关闭不污染当前 state。
+- [x] 补 Node 和隔离 PostgreSQL 浏览器测试，真实点图、缩放、拖动、全屏、关闭重开、下架/失败与加载副本验证。
 
 ### Task 5: 答题页轻量化（大厅冻结）
 
 **Files:** new-legacy/practice-mode.html game 区、styles/practice-mode.css game-scoped CSS、src/100-practice-mode.js（仅答题卡入口/状态）、tests/practice-answer-sheet-browser.py 与前端设计契约。
 **Interfaces:** 保留 #practiceAnswerSheetMobileBtn、#practiceAnswerSheetDrawer、进度/保存原 ID 和控制器；主入口移到 game 下 fixed 圆形按钮，aria-expanded/controls 和可读计数保持；drawer 默认 hidden。
-- [ ] 先补浏览器断言：默认收起、圆形浅色入口、桌面与390px 不遮下一题、打开/关闭/跳题/交卷可达。
-- [ ] 图标圆形入口使用现有 layout-grid，视觉计数缩小但保留可访问状态；移除重复答题卡入口并保留侧栏其他功能。
-- [ ] game 进度细化、顶栏/保存控件收紧；失败重试与冲突提示保持显著；复仇交卷提示更新位置文字。
-- [ ] 大厅 section 字节与源 baseline 一致（除文档 head 元信息）；任何新增 CSS 均不影响 lobby。运行答题卡、实时反馈、四模式续练及设计契约。
+- [x] 先补浏览器断言：默认收起、圆形浅色入口、桌面与390px 不遮下一题、打开/关闭/跳题/交卷可达。
+- [x] 图标圆形入口使用现有 layout-grid，视觉计数缩小但保留可访问状态；移除重复答题卡入口并保留侧栏其他功能。
+- [x] game 进度细化、顶栏/保存控件收紧；失败重试与冲突提示保持显著；复仇交卷提示更新位置文字。
+- [x] 大厅 section 字节与源 baseline 一致（除文档 head 元信息）；任何新增 CSS 均不影响 lobby。运行答题卡、实时反馈、四模式续练及设计契约。
 
 ### Task 6: 集成、复查、发布 UAT
 
