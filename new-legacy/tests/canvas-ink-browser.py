@@ -34,11 +34,11 @@ def stroke_count(page,n):
         print(page.evaluate('({url:location.href,tool:document.querySelector("[data-ink-tool][aria-pressed=true]")?.dataset.inkTool})'),flush=True)
         raise
 
-def draw(page,card,dy=0):
+def draw(page,card,dy=0,dx=0):
     page.wait_for_timeout(500)  # Card entry/focus transitions must settle before coordinates are sampled.
     box=page.locator(card).bounding_box()
     assert box,card
-    x=box['x']+min(55,box['width']/5)
+    x=box['x']+min(55,box['width']/5)+dx
     y=box['y']+min(100,box['height']/2)+dy
     page.mouse.move(x,y)
     page.mouse.down()
@@ -235,7 +235,10 @@ def check_page(context,base,kind):
             else: route.continue_()
         page.route('**/api/v1/recall/progress/**',fail_save)
         tool.locator('[data-ink-tool=pen]').click()
-        draw(page,card,10)
+        # Isolate the retry stroke from the earlier overlapping samples so the later
+        # single-target eraser check does not also touch another complete stroke
+        # or the option A button used by the next interaction check.
+        draw(page,card,10,240)
         stroke_count(page,4)
         expect(page.locator('#krSaveRetryBtn')).to_be_visible(timeout=15000)
         assert len(persisted(context,base,kind))==3
@@ -250,7 +253,10 @@ def check_page(context,base,kind):
             else: route.continue_()
         page.route('**/api/v1/workspaces**',fail_workspace)
         tool.locator('[data-ink-tool=pen]').click()
-        draw(page,card,10)
+        # Isolate the retry stroke from the earlier overlapping samples so the later
+        # single-target eraser check does not also touch another complete stroke
+        # or the option A button used by the next interaction check.
+        draw(page,card,10,240)
         stroke_count(page,4)
         expect(page.locator('#qwWorkspaceSaveState')).to_have_class(__import__('re').compile(r'.*is-error.*'),timeout=15000)
         assert len(persisted(context,base,kind))==3

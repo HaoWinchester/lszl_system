@@ -80,7 +80,8 @@
     const listeners=[];
     let selectedId=null,textDrag=null,textResize=null,erasing=null;
     const selected=()=>getStrokes().find(item=>item.id===selectedId);
-    const styleTool=()=>tool==='select'?selected()?.tool:tool;
+    const styleTool=()=>textSession?'text':tool==='select'?selected()?.tool:tool;
+    const currentStyle=()=>{const name=styleTool(),selection=selected();return textSession?{...TOOLS.text,...textSession.style}:selection&&(tool==='select'||tool==='text')?{...TOOLS[name],...selection}:prefs[name]};
     const measure=doc.createElement('canvas').getContext('2d');
     const textLines=stroke=>textLayout(stroke,measure).lines;
     const textBox=stroke=>textLayout(stroke,measure);
@@ -167,7 +168,7 @@
       toolbar.hidden=!opened;
       const launch=trigger();if(launch){if(!launch.querySelector('svg'))launch.innerHTML=penIcon;launch.classList.add('canvas-ink-entry');launch.setAttribute('aria-expanded',String(opened));launch.disabled=locked;const tip=locked?'当前画布只读，无法使用画笔':opened?'收起画笔工具并退出绘画':'展开画笔工具，在画布上书写或标注';if(launch.hasAttribute('data-tooltip')){launch.dataset.tooltip=tip;launch.removeAttribute('title')}else launch.title=tip;launch.querySelector('svg')?.style.setProperty('color',prefs[TOOLS[tool]?tool:'pen'].color)}
       for(const name of Object.keys(prefs)){const btn=toolbar.querySelector('button[data-ink-tool='+name+']');btn.querySelector('svg')?.style.setProperty('color',prefs[name].color);btn.title=(name==='pen'?'画笔：拖动绘制笔迹':name==='highlighter'?'荧光笔：拖动高亮标注':'文字：点击空白插入，单击选择并拖动文字，双击编辑')+(name==='text'?'；单击显示颜色、字号与加粗':'；点击设置调整粗细和透明度')}
-      const currentTool=styleTool(),pref=selected()&&tool==='select'?{...TOOLS[currentTool],...selected()}:prefs[currentTool];
+      const currentTool=styleTool(),pref=currentStyle();
       panel.hidden=!settingsOpen||!pref;
       toolbar.querySelector('[data-ink-settings]').disabled=locked||!pref;toolbar.querySelector('[data-ink-settings]').setAttribute('aria-expanded',String(!panel.hidden));
       toolbar.querySelectorAll('.canvas-ink-colors input,.canvas-ink-colors button').forEach(input=>input.disabled=locked||!pref);
@@ -244,7 +245,7 @@
       if(textSession){Object.assign(textSession.style,patch);textSession.editor.style.color=textSession.style.color;textSession.editor.style.fontWeight=textSession.style.bold?'700':'400';textSession.editor.style.fontSize=textSession.style.width*(options.getViewport().scale||options.getViewport().zoom||1)+'px';textSession.editor.dispatchEvent(new global.Event('input'))}
       refreshControls();
     }
-    bold.addEventListener('click',()=>updateTextStyle({bold:!(selected()?.bold??prefs.text.bold)}));
+    bold.addEventListener('click',()=>updateTextStyle({bold:!currentStyle()?.bold}));
     const palette=toolbar.querySelector('.canvas-ink-colors');
     toolbar.querySelector('.canvas-ink-tools').insertBefore(palette,toolbar.querySelector('[data-ink-settings]'));
     for(const [color,name] of [['#2563eb','蓝色'],['#111827','黑色'],['#ef4444','红色'],['#facc15','黄色'],['#22c55e','绿色'],['#a855f7','紫色']]){
@@ -297,7 +298,7 @@
         session.editor.dataset.saveState=session.edit.state().status;
         if(!success){if(session.edit.state().status==='failed'){session.status.textContent='文字未保存，请点击外部重试';report(session.edit.state().error)}return false}
       }else{session.edit.cancel();if(session.applied&&!session.stale){options.setStrokes?options.setStrokes(session.before):options.change(session.before,'取消文字修改');render()}}
-      textSession=null;session.unmount.forEach(dispose=>dispose());session.editor.remove();session.status.remove();session.border.remove();return true;
+      textSession=null;session.unmount.forEach(dispose=>dispose());session.editor.remove();session.status.remove();session.border.remove();refreshControls();return true;
     }
     function openTextEditor(clientX,clientY,existing){
       if(textSession){closeTextEditor(true);return}
@@ -356,7 +357,7 @@
       editor.addEventListener('keydown',event=>{event.stopPropagation();if(event.isComposing||event.keyCode===229)return;if(event.key==='Enter'&&(event.ctrlKey||event.metaKey)){event.preventDefault();closeTextEditor(true)}else if(event.key==='Escape'){event.preventDefault();closeTextEditor(false)}});
       editor.addEventListener('input',updateDraft);
       editor.addEventListener('blur',event=>{if(toolbar.contains(event.relatedTarget))return;global.setTimeout(()=>{if(textSession===session&&!toolbar.contains(doc.activeElement))closeTextEditor(true)},160)});
-      editor.focus();resize();
+      editor.focus();resize();refreshControls();
     }
     listen(global,'pointerdown',event=>{if(!textSession||textSession.editor.contains(event.target)||textSession.border.contains(event.target)||toolbar.contains(event.target))return;closeTextEditor(true);},true);
     function hitStroke(location,padding,textOnly=false){
@@ -390,7 +391,9 @@
       const handle=event.target.closest?.('[data-ink-resize-handle]');if(handle&&layer.contains(handle)&&!readonly()){stop(event);const stroke=getStrokes().find(item=>item.id===handle.dataset.textId);textResize={beforeSignature:strokeStateSignature(),pointerId:event.pointerId,handle:handle.dataset.inkResizeHandle,start:point(event,viewport.getBoundingClientRect(),options.getViewport()),original:normalize([stroke])[0],box:textBox(stroke)};viewport.setPointerCapture(event.pointerId);return}
       if(destroyed||active||erasing||textDrag||textResize||space||readonly()||event.button!==0||event.isPrimary===false||!inside(event.target))return;
       const view=options.getViewport(),location=point(event,viewport.getBoundingClientRect(),view);
-      const textHit=(tool==='select'||tool==='text')?hitStroke(location,4/(view.scale||view.zoom||1),tool==='text'):null;
+      // In selection mode, annotations must not steal the card's native controls.
+      const control=tool==='select'&&event.target.closest?.('button,a,input,select,textarea,[contenteditable],[role=button]');
+      const textHit=!control&&(tool==='select'||tool==='text')?hitStroke(location,4/(view.scale||view.zoom||1),tool==='text'):null;
       if(tool==='select'&&!textHit){selectedId=null;suppressClickUntil=0;render();return}
       stop(event);
       try{
@@ -440,17 +443,20 @@
     listen(viewport,'lostpointercapture',event=>{if((erasing&&event.pointerId===erasing.pointerId)||(textResize&&event.pointerId===textResize.pointerId)||(active&&event.pointerId===active.pointerId)||(textDrag&&event.pointerId===textDrag.pointerId))cancel()});
     listen(global,'dblclick',event=>{if(readonly()||space||!inside(event.target)||(tool!=='select'&&tool!=='text'))return;const view=options.getViewport(),hit=hitStroke(point(event,viewport.getBoundingClientRect(),view),4/(view.scale||view.zoom||1),true);if(hit){stop(event);selectedId=hit.id;openTextEditor(event.clientX,event.clientY,hit)}},true);
     listen(global,'click',event=>{if(inside(event.target)&&(Date.now()<suppressClickUntil||(tool!=='select'&&!space)))stop(event)},true);
-    listen(global,'keydown',event=>{
-      if(global.KGCanvasDomInteraction?.isEditingTarget(event)||event.target?.closest?.('input,textarea,[contenteditable]'))return;
-      if((event.key==='Delete'||event.key==='Backspace')&&selected()&&!readonly()){stop(event);cancel();const id=selectedId;selectedId=null;try{change(getStrokes().filter(item=>item.id!==id),'删除笔迹')}catch(error){report(error)}return}
-      if(event.key==='Escape'){if(textResize){cancel();return}setTool('select');return}
-      if(event.code==='Space'&&tool!=='select'){space=true;cancel();viewport.classList.add('canvas-ink-panning');event.preventDefault()}
+    function handleKeyDown(event){
+      if(destroyed)return false;
+      if(global.KGCanvasDomInteraction?.isEditingTarget(event)||event.target?.closest?.('input,textarea,[contenteditable]'))return false;
+      if((event.key==='Delete'||event.key==='Backspace')&&selected()&&!readonly()){stop(event);cancel();const id=selectedId;selectedId=null;try{change(getStrokes().filter(item=>item.id!==id),'删除笔迹')}catch(error){report(error)}return true}
+      if(event.key==='Escape'){if(textResize){cancel();return true}setTool('select');return true}
+      if(event.code==='Space'&&tool!=='select'){space=true;cancel();viewport.classList.add('canvas-ink-panning');event.preventDefault();return true}
       if((event.ctrlKey||event.metaKey)&&!event.altKey&&['z','y'].includes(event.key.toLowerCase())){
         // Delegated page history must first cancel the same transient gesture.
         cancel();
-        if(ownHistory&&!readonly()&&event.key.toLowerCase()==='z'){stop(event);try{history?.[event.shiftKey?'redo':'undo']?.();refreshControls()}catch(error){report(error)}}
+        if(ownHistory&&!readonly()&&event.key.toLowerCase()==='z'){stop(event);try{history?.[event.shiftKey?'redo':'undo']?.();refreshControls()}catch(error){report(error)}return true}
       }
-    },true);
+      return false;
+    }
+    listen(global,'keydown',handleKeyDown,true);
     listen(global,'keyup',event=>{if(event.code==='Space'){space=false;viewport.classList.remove('canvas-ink-panning')}},true);
     listen(global,'resize',()=>{cancel();positionToolbar()});
     listen(doc,'scroll',()=>{cancel();positionToolbar()},true);
@@ -521,7 +527,7 @@
       if(!activateText())return false;openTextEditor(clientX,clientY,null);return true;
     }
     render();
-    return {activateText,openTextAt,commitText:()=>closeTextEditor(true),hasTextDraft:()=>!!textSession,render,refreshControls,cancel,reset,setTool,setOpen,destroy,clearAll,get tool(){return tool},get temporaryPan(){return space}};
+    return {activateText,openTextAt,handleKeyDown,commitText:()=>closeTextEditor(true),hasTextDraft:()=>!!textSession,render,refreshControls,cancel,reset,setTool,setOpen,destroy,clearAll,get tool(){return tool},get temporaryPan(){return space}};
   }
   global.KGCanvasInk=Object.freeze({normalize,point,path,textLayout,bounds,draw,create});
 })(window);

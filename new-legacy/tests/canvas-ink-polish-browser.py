@@ -55,6 +55,18 @@ def selection(browser):
     page.mouse.click(620,115);assert page.evaluate('cardClicks')==1,'Selection miss must preserve card click'
     page.mouse.click(180,130);before=page.evaluate('JSON.stringify(strokes)');page.get_by_role('button',name='文字',exact=True).click();page.get_by_role('button',name='文字加粗',exact=True).click();assert page.evaluate('JSON.stringify(strokes)')==before,'Switching to text cannot format a regular stroke';assert page.evaluate('errors')==[]
     page.close()
+def selection_over_control(browser):
+    page=setup(browser,[{**BASE,'points':[[590,115],[690,115]]}])
+    page.locator('#card').click()
+    assert page.evaluate('cardClicks')==1,'Select mode must preserve a button underneath an existing stroke'
+    assert page.locator('.canvas-ink-stroke-selection').count()==0
+    # The same stroke remains selectable on its adjacent non-interactive segment.
+    page.mouse.click(675,115);expect(page.locator('.canvas-ink-stroke-selection')).to_have_count(1)
+    page.locator('#card').click();assert page.evaluate('cardClicks')==2,'Rapid control click must clear ink click suppression'
+    page.keyboard.press('Delete');assert page.evaluate('strokes.length')==1,'Control click must clear stale ink selection'
+    page.mouse.click(675,115);expect(page.locator('.canvas-ink-stroke-selection')).to_have_count(1)
+    page.keyboard.press('Delete');assert page.evaluate('strokes')==[]
+    page.close()
 def text(browser):
     page=setup(browser);page.get_by_role('button',name='文字',exact=True).click();font=page.get_by_role('spinbutton',name='文字字号',exact=True);expect(font).to_be_visible();font.fill('30');font.dispatch_event('change')
     page.mouse.click(300,200);editor=page.locator('.canvas-ink-text-editor');editor.fill('abcdefghijklmnop');wide=editor.bounding_box()['width'];editor.fill('hi');assert editor.bounding_box()['width']<wide/2,'Automatic text width must shrink'
@@ -64,6 +76,29 @@ def text(browser):
     page.evaluate("strokes=[{id:'fixed',tool:'text',color:'#111827',width:24,points:[[100,100]],text:'fixed',boxWidth:250,boxHeight:40}];ink.reset();ink.setTool('text')")
     page.mouse.dblclick(110,110);expect(editor).to_be_visible();editor.fill('hi');assert editor.bounding_box()['width']>=250;editor.press('Control+Enter');assert page.evaluate('strokes[0].boxWidth')==250
     page.close()
+def draft_formatting(browser):
+    for entry in ['text','select']:
+        for initial in [False,True]:
+            page=setup(browser,[{'id':'text','tool':'text','color':'#111827','width':24,'bold':initial,'opacity':.8,'points':[[100,100]],'text':'Existing draft'}])
+            page.evaluate("ink.setTool('"+entry+"')")
+            page.mouse.dblclick(110,110)
+            editor=page.locator('.canvas-ink-text-editor');expect(editor).to_be_visible()
+            settings=page.get_by_role('button',name='笔迹设置',exact=True)
+            if settings.get_attribute('aria-expanded')!='true':settings.click()
+            bold=page.get_by_role('button',name='文字加粗',exact=True)
+            expect(bold).to_have_attribute('aria-pressed',str(initial).lower())
+            for expected in [not initial,initial,not initial]:
+                bold.click();expect(bold).to_have_attribute('aria-pressed',str(expected).lower())
+                assert editor.evaluate('el=>getComputedStyle(el).fontWeight')==('700' if expected else '400')
+                expect(editor).to_have_attribute('data-save-state','draft')
+                assert page.evaluate('strokes[0].bold')==initial,'Formatting must remain in the draft'
+            page.get_by_role('button',name='红色',exact=True).click()
+            font=page.get_by_role('spinbutton',name='文字字号',exact=True);font.fill('32');font.dispatch_event('change')
+            opacity=page.get_by_role('slider',name='笔迹透明度',exact=True);opacity.fill('0.5')
+            expect(font).to_have_value('32');expect(opacity).to_have_value('0.5');expect(page.get_by_role('button',name='红色',exact=True)).to_have_attribute('aria-pressed','true')
+            editor.press('Control+Enter');expect(editor).to_have_count(0)
+            item=page.evaluate('strokes[0]');assert (item['bold'],item['width'],item['color'],item['opacity'])==(not initial,32,'#ef4444',.5)
+            page.close()
 def public_entry(browser):
     page=setup(browser);assert page.evaluate('ink.activateText()') is True;assert page.evaluate('ink.tool')=='text'
     assert page.evaluate('ink.openTextAt(300,200)') is True;editor=page.locator('.canvas-ink-text-editor');expect(editor).to_be_focused();editor.fill('入口')
@@ -110,7 +145,7 @@ def long_automatic_text(browser):
     draft=editor.bounding_box();editor.press('Control+Enter');page.mouse.click(110,110);saved=page.locator('.canvas-ink-text-box > rect').first.bounding_box();assert abs(draft['width']-saved['width'])<3 and abs(draft['height']-saved['height'])<3,(draft,saved);assert 'boxWidth' not in page.evaluate('strokes[0]');page.close()
 with sync_playwright() as pw:
     browser=pw.chromium.launch(headless=True,executable_path='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
-    cases={'external_history':external_history,'explicit_word_wrap':explicit_word_wrap,'long_automatic_text':long_automatic_text,'eraser':eraser,'curve_eraser':curve_eraser,'selection':selection,'text':text,'public_entry':public_entry,'export_opacity':export_opacity,'responsive_controls':responsive_controls}
+    cases={'selection_over_control':selection_over_control,'draft_formatting':draft_formatting,'external_history':external_history,'explicit_word_wrap':explicit_word_wrap,'long_automatic_text':long_automatic_text,'eraser':eraser,'curve_eraser':curve_eraser,'selection':selection,'text':text,'public_entry':public_entry,'export_opacity':export_opacity,'responsive_controls':responsive_controls}
     for name in sys.argv[1:] or cases:
         cases[name](browser);print(name+': passed')
     browser.close()
