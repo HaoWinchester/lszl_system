@@ -168,6 +168,7 @@ def main():
             reload()
             page.evaluate("state.selectedLinkId='ab';state.selectedNodeId=null;selectedNodeIds.clear();refreshSelectionUI()");page.wait_for_timeout(200)
             before=curve_state();aligned(before)
+            indices=page.locator('.edge-control-handle').evaluate_all('els=>els.map(e=>e.dataset.edgeControlIndex)');assert len(indices)==len(set(indices))==3,indices
             hit=page.locator('.edge-control-handle[data-edge-control-index="0"] .edge-control-hit');box=hit.bounding_box();assert box, 'curve handle visible'
             x=box['x']+box['width']/2;y=box['y']+box['height']/2
             page.mouse.move(x,y);page.mouse.down();assert page.evaluate('!!edgeControlDrag'),page.evaluate('''({x,y})=>({at:document.elementFromPoint(x,y)?.outerHTML.slice(0,300),mode:state.graphMode,readonly:document.body.classList.contains('auth-readonly')})''',{'x':x,'y':y});page.mouse.move(x+45,y-32,steps=8);page.mouse.up()
@@ -227,22 +228,27 @@ def main():
             # 与快速面板 onPathStyle 同一入口；避免浮动面板点击引发祖先滚动干扰坐标。
             page.evaluate('applyPathStyle("elbow")')
             def elbow_waypoints():
-                return page.evaluate('''()=>{const link=state.links.find(l=>l.id==='ab');return{stored:(link.waypoints||[]).map(p=>({...p})),controls:edgeDomById.get('ab').geometry.controls.map(p=>({x:p.x,y:p.y})),style:link.pathStyle}}''')
-            seeded=elbow_waypoints();assert seeded['style']=='elbow' and len(seeded['controls'])==2,seeded
+                return page.evaluate('''()=>{const link=state.links.find(l=>l.id==='ab');const geometry=edgeDomById.get('ab').geometry;return{stored:(link.waypoints||[]).map(p=>({...p})),waypoints:geometry.waypoints.map(p=>({...p})),controls:geometry.controls.map(p=>({x:p.x,y:p.y,index:p.index,kind:p.kind})),samples:geometry.samples.map(p=>({...p})),style:link.pathStyle}}''')
+            seeded=elbow_waypoints();assert seeded['style']=='elbow' and len(seeded['controls'])==3,seeded
+            assert all(p['kind']=='segment' for p in seeded['controls']),seeded
+            assert [p['index'] for p in seeded['controls']]==[0,1,2],seeded
             # 前序曲线测试保留 125% 缩放，屏幕像素需换算为画布坐标。
             drag_scale=page.evaluate('state.viewport.scale')
-            handle=page.locator('.edge-control-handle[data-edge-control-index="0"] .edge-control-hit');box=handle.bounding_box();assert box,'elbow handle visible'
+            handle=page.locator('.edge-control-handle[data-edge-control-kind="segment"][data-edge-control-index="1"] .edge-control-hit');box=handle.bounding_box();assert box,'elbow segment midpoint visible'
             x=box['x']+box['width']/2;y=box['y']+box['height']/2
             page.mouse.move(x,y);page.mouse.down();assert page.evaluate('!!edgeControlDrag')
             page.mouse.move(x+36,y-44,steps=6);page.mouse.up()
             dragged=elbow_waypoints()
-            origin=seeded['stored'][0] if seeded['stored'] else seeded['controls'][0]
+            origin=seeded['waypoints'][0]
             # a→b 整体水平主导 → 默认折线中间段垂直 → 只允许水平拖动（y 锁定）。
             assert abs(dragged['stored'][0]['x']-(origin['x']+36/drag_scale))<1e-6,(drag_scale,origin,dragged)
             assert abs(dragged['stored'][0]['y']-origin['y'])<1e-6,dragged
+            assert abs(dragged['stored'][1]['x']-(seeded['waypoints'][1]['x']+36/drag_scale))<1e-6,dragged
+            assert abs(dragged['stored'][1]['y']-seeded['waypoints'][1]['y'])<1e-6,dragged
+            assert all(a['x']==b['x'] or a['y']==b['y'] for a,b in zip(dragged['samples'],dragged['samples'][1:])),dragged
             flush();reload()
             assert elbow_waypoints()['stored']==dragged['stored']
-            print('PASS elbow: waypoint drag is locked to a single axis and survives reload',flush=True)
+            print('PASS elbow: segment midpoint drag moves both bends on one axis and survives reload',flush=True)
         if args.section in ('all','cancel-history'):
             # 前段留下组选/边选状态；本段在干净 fixture 上自成体系验证取消与历史。
             assert ctx.request.put(base+'/api/v1/files/current',data={'fileId':files[2]['id']}).ok
@@ -280,7 +286,8 @@ def main():
             page.evaluate('''()=>{const id=edgeControlDrag.pointerId;finishEdgeControlDrag({pointerId:id,preventDefault(){},stopPropagation(){}},true)}''');page.mouse.up();check_cancelled(before)
             before=seed_redo()
             page.evaluate('''()=>{const g=edgeDomById.get('ab').geometry,p=g.samples[3],rect=stage.getBoundingClientRect(),clientX=rect.left+state.viewport.x+p.x*state.viewport.scale,clientY=rect.top+state.viewport.y+p.y*state.viewport.scale,handle={setPointerCapture(){},releasePointerCapture(){}};beginEdgeMoveDrag({pointerId:771,button:0,clientX,clientY,currentTarget:handle,stopPropagation(){}},'ab');applyEdgeMoveDragPoint({x:p.x+37,y:p.y+24})}''')
-            assert snapshot()['binding']==':'
+            assert snapshot()['binding']=='a:b'
+            assert snapshot()['controls']!=before['controls'],'bound body drag must adjust the route'
             page.evaluate('''()=>finishEdgeMoveDrag({pointerId:771,preventDefault(){},stopPropagation(){}},true)''');check_cancelled(before)
             before=seed_redo()
             page.evaluate('''()=>{const p=edgeDomById.get('ab').geometry.endpoints[0],rect=stage.getBoundingClientRect(),clientX=rect.left+state.viewport.x+p.x*state.viewport.scale,clientY=rect.top+state.viewport.y+p.y*state.viewport.scale,handle={setPointerCapture(){},releasePointerCapture(){}};beginEdgeEndpointDrag({pointerId:772,button:0,clientX,clientY,currentTarget:handle,preventDefault(){},stopPropagation(){}},'ab','from');applyEdgeEndpointDragPoint({world:{x:p.x+31,y:p.y+19},clientX:clientX+31,clientY:clientY+19})}''')

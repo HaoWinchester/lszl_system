@@ -377,7 +377,7 @@ function linkPathGeometry(link,a,b,points=null){
   const c1=controls[0],c2=controls[1],d=`M ${formatSvgNumber(start.x)} ${formatSvgNumber(start.y)} C ${formatSvgNumber(c1.x)} ${formatSvgNumber(c1.y)}, ${formatSvgNumber(c2.x)} ${formatSvgNumber(c2.y)}, ${formatSvgNumber(end.x)} ${formatSvgNumber(end.y)}`;
   const samples=[];for(let index=0;index<=24;index++)samples.push(cubicEdgePoint(start,c1,c2,end,index/24));
   const handles=window.KGGraphEdgeGeometry.curveHandles(start,controls,end);
-  return{style,d,samples,bounds:edgeGeometryBounds(samples),endpoints:[start,end],curveControls:controls,controls:[...handles.map((point,index)=>({kind:'curve-control',index,x:point.x,y:point.y})),{kind:'curve-midpoint',index:0,...window.KGGraphEdgeGeometry.curveMidpoint(start,controls,end)}],derivedCurveControls:stored.length!==2};
+  return{style,d,samples,bounds:edgeGeometryBounds(samples),endpoints:[start,end],curveControls:controls,controls:[...handles.map((point,index)=>({kind:'curve-control',index,x:point.x,y:point.y})),{kind:'curve-midpoint',index:2,...window.KGGraphEdgeGeometry.curveMidpoint(start,controls,end)}],derivedCurveControls:stored.length!==2};
 }
 function dashArrayForLineStyle(style,strokeWidth=4){
   const width=Math.max(1,Number(strokeWidth)||4);
