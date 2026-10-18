@@ -109,7 +109,6 @@
         "src/23-graph-file-remote-store.js",
         "src/23-graph-file-editor-store-bridge.js",
         "src/canvas/dom-interaction.js",
-        "src/canvas/83-canvas-history-controller.js",
         "src/canvas/94-canvas-ink.js",
         "src/canvas/table-model.js",
         "src/canvas/table-clipboard.js",
