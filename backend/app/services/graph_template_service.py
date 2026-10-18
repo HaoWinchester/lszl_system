@@ -4,6 +4,8 @@ No graph/snapshot/entitlement from a load or publish body is trusted. All writes
 and resource grants are one transaction, using existing flush-only primitives.
 """
 from copy import deepcopy
+import math
+import re
 from fastapi import HTTPException
 from sqlalchemy import select, or_
 from app.core.security import uid
@@ -151,8 +153,49 @@ async def preview(db, user, template_id):
     row = await db.get(Template, template_id)
     if row is None or (not row.listed and not summary(row, user)['canMaintain']):
         fail('TEMPLATE_NOT_FOUND')
-    # Description only; no graph, image URL, question snapshots or answer keys.
-    return {'template': summary(row, user)}
+    version = await db.scalar(select(Version).where(Version.template_id == row.id, Version.version == row.current_version))
+    if version is None:
+        fail('TEMPLATE_VERSION_NOT_FOUND')
+    return {'template': summary(row, user), 'preview': preview_projection(version.graph_data, version.version)}
+
+
+def preview_projection(graph, version):
+    """Read-only drawing projection; never return publication content or assets."""
+    def number(value, default=0, minimum=-100000, maximum=100000):
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+            return default
+        return max(minimum, min(maximum, value))
+
+    def text(value, limit=200):
+        return re.sub(r'<[^>]*>', '', value)[:limit] if isinstance(value, str) else ''
+
+    def color(value, default):
+        return value if isinstance(value, str) and re.fullmatch(r'#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?', value) else default
+
+    nodes, ids = [], set()
+    for node in graph.get('nodes', [])[:500]:
+        if not isinstance(node, dict):
+            continue
+        identity = text(node.get('id'), 100)
+        if not identity or identity in ids:
+            continue
+        ids.add(identity)
+        style = node.get('style') if isinstance(node.get('style'), dict) else {}
+        content = node.get('content') if isinstance(node.get('content'), dict) else {}
+        nodes.append({'id': identity, 'title': text(node.get('title') or content.get('title')),
+                      'x': number(node.get('x')), 'y': number(node.get('y')),
+                      'width': number(node.get('w', node.get('width')), 136, 40, 1000),
+                      'height': number(node.get('h', node.get('height')), 142, 30, 1000),
+                      'fill': color(node.get('fillColor') or node.get('bodyFillColor') or style.get('bg', style.get('background')), '#ffffff'),
+                      'color': color(node.get('textColor') or node.get('bodyTextColor') or style.get('color'), '#243247')})
+    links = []
+    for link in graph.get('links', [])[:1000]:
+        if not isinstance(link, dict) or link.get('from') not in ids or link.get('to') not in ids:
+            continue
+        style = link.get('style') if isinstance(link.get('style'), dict) else {}
+        links.append({'from': link['from'], 'to': link['to'], 'label': text(link.get('label'), 80),
+                      'color': color(link.get('color') or style.get('color'), '#a0aec0')})
+    return {'version': version, 'nodes': nodes, 'links': links}
 
 
 async def load(db, user, template_id, data):

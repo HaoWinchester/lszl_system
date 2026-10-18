@@ -63,7 +63,7 @@ def test_permission_subscription_and_preview_matrix(data):
         free=publish(c,publication(source));paid=publish(c,publication(source,member=True))
         assert load(c,paid).status_code==201
         preview=c.get('/api/v1/graph-templates/'+paid['id']).json()
-        assert set(preview)=={'template'}
+        assert set(preview)=={'template','preview'}
         assert 'graphData' not in str(preview) and 'SECRET' not in str(preview)
         login(c,data,'admin');assert load(c,paid).status_code==201
         assert c.patch('/api/v1/graph-templates/'+paid['id'],json={'listed':False}).status_code==200
@@ -211,3 +211,40 @@ def test_template_only_frozen_material_and_cleanup_inventory(data):
         fid=r.json()['fileId'];nid=r.json()['idMap']['n'];bp=f'/api/v1/graph-questions/files/{fid}/nodes/{nid}/bindings';b=c.get(bp).json()['bindings'][0]
         assert b['question']['material']['text']=='version one'
         assert c.get(b['question']['material']['images'][0]['url']).content==b'frozen-test-bytes'
+
+
+def test_preview_is_bounded_public_projection_and_does_not_create_files(data):
+    with TestClient(app) as c:
+        login(c,data,'teacher')
+        graph={'nodes':[{'id':'n','title':'<b>知识点</b>','x':10,'y':20,'width':240,'height':80,'style':{'bg':'#eff6ff','color':'url(SECRET)'},'content':{'notes':'SECRET NOTES','images':[]},'questions':['SECRET ANSWER']}], 'links':[{'id':'l','from':'n','to':'n','label':'关系','style':{'color':'#123456'},'question':'SECRET'}]}
+        created=c.post('/api/v1/files',json={'name':'preview','graphData':graph})
+        assert created.status_code==200,created.text
+        source=created.json()['file']['id']
+        template=publish(c,publication(source))
+        before=c.get('/api/v1/files').json()
+        login(c,data,'student')
+        result=c.get('/api/v1/graph-templates/'+template['id'])
+        assert result.status_code==200,result.text
+        preview=result.json()['preview']
+        assert set(preview)=={'version','nodes','links'}
+        assert preview['version']==1 and len(preview['nodes'])==1
+        assert set(preview['nodes'][0])=={'id','title','x','y','width','height','fill','color'}
+        assert preview['nodes'][0]['color']=='#243247'
+        assert 'SECRET' not in str(preview) and 'notes' not in str(preview) and 'images' not in str(preview)
+        login(c,data,'teacher')
+        assert c.get('/api/v1/files').json()==before
+        assert c.patch('/api/v1/graph-templates/'+template['id'],json={'listed':False}).status_code==200
+        assert c.get('/api/v1/graph-templates/'+template['id']).status_code==200
+        login(c,data,'student')
+        assert c.get('/api/v1/graph-templates/'+template['id']).status_code==404
+        c.post('/api/v1/auth/logout')
+        assert c.get('/api/v1/graph-templates/'+template['id']).status_code==401
+
+
+def test_preview_projection_rejects_untrusted_styles_and_nonfinite_geometry():
+    graph={'nodes':[{'id':'n','title':'<script>text only</script>','x':float('nan'),'y':True,'w':float('inf'),'h':-100,'fillColor':'url(https://external)','textColor':'#123abc','content':{'notes':'SECRET'}}],
+           'links':[{'from':'n','to':'missing'},{'from':'n','to':'n','color':'var(--SECRET)','label':'<b>relation</b>'}]}
+    preview=service.preview_projection(graph,3)
+    assert preview['nodes']==[{'id':'n','title':'text only','x':0,'y':0,'width':136,'height':30,'fill':'#ffffff','color':'#123abc'}]
+    assert preview['links']==[{'from':'n','to':'n','label':'relation','color':'#a0aec0'}]
+    assert 'SECRET' not in str(preview)
