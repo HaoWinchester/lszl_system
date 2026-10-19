@@ -1,18 +1,10 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.361",
+  "fromVersion": "v9.0-p4.1.364",
   "toVersion": "v9.0-p4.1.364",
   "changes": {
     "added": [],
-    "changed": [
-      "VERSION",
-      "content-prep-studio/dist/content-prep.html",
-      "src/graph/mindmap-themes.js",
-      "src/practice/practice-answer-page.js",
-      "tests/danmaku-api-browser.py",
-      "tests/graph-mindmap-browser.py",
-      "tests/practice-side-nav-comments-browser.py"
-    ],
+    "changed": [],
     "removed": []
   },
   "incompatible": []

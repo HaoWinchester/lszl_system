@@ -13,7 +13,7 @@
 - [x] `src/100-practice-mode.js` 在离开 game 时销毁 danmaku 来源；共享评论模块清理自建宿主，防迟到请求重建。只在成功视图切换时清理，取消或保存失败继续答题。
 - [x] `src/practice/practice-answer-page.js` 统一绑定现有 `.practice-lobby-help`，复用同一 hover/focus/click/关闭逻辑。保留原帮助正文和布局，修复点击与 focus 自动打开冲突。
 - [x] `src/graph/mindmap-themes.js` 删除应用按钮，方向、根节点、作用范围 change 调用既有布局事务。打开面板不写入；无选区只提示，不移动全图；每次成功操作可撤销。更新另外两个引用旧按钮的浏览器用例。
-- [ ] 运行定向单元、实际 API 隔离库浏览器、前端及设计契约；复核 diff 保持大厅范围。执行官方 release full 门禁并核对候选文件数及关键页面。
-- [ ] 合入并推送 uat（命令级代理），部署前备份 UAT 当前代码和数据库并校验非空。标准脚本更新 UAT，核对公网版本、资源哈希、运行容器及正式环境未变化。保留功能分支、main 和 uat，等待用户业务验收。
+- [x] 运行定向单元、实际 API 隔离库浏览器、前端及设计契约；复核 diff 保持大厅范围。执行官方 release full 门禁并核对候选文件数及关键页面。
+- [x] 合入并推送 uat（命令级代理），部署前备份 UAT 当前代码和数据库并校验非空。标准脚本更新 UAT，核对公网版本、资源哈希、运行容器及正式环境未变化。保留功能分支、main 和 uat，等待用户业务验收。
 
 主要命令：`python3 new-legacy/tests/practice-side-nav-comments-browser.py`；隔离测试服务运行 `graph-mindmap-browser.py --base-url ...`；`pnpm --dir frontend test`；`pnpm --dir frontend test:design`；`node frontend/scripts/manage-new-legacy.js update new-legacy --skip-browser`；正式 full 门禁使用标准 UAT 发布脚本管理。
