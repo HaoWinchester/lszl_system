@@ -28,6 +28,31 @@ function load({authenticated=true,responses=[]}={}){
   assert.strictEqual(existing.calls.length,2,'homepage initialization must request only current metadata and its graph body');
   assert.deepStrictEqual(existing.calls.map(call=>call.url),['/api/v1/files/current','/api/v1/files/second']);
 
+  existing.context.KGGraphFileApi.save=async()=>({file:{id:'second',name:'详情名称',revision:8}});
+  await existing.context.KGGraphFileRemoteAdapter.save(first.graphData);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(existing.context.KGGraphFileRemoteAdapter.getCurrentFileMeta().learningState??null)),{flashcards:{f1:{}}},'metadata-only save acknowledgement must preserve historical learning state');
+
+  let finishOldSave,notifyOldSaveStarted;
+  const oldSaveStarted=new Promise(resolve=>{notifyOldSaveStarted=resolve});
+  existing.context.KGGraphFileApi.save=()=>new Promise(resolve=>{finishOldSave=resolve;notifyOldSaveStarted()});
+  existing.context.KGGraphFileRemoteAdapter.queueSave(first.graphData);
+  await oldSaveStarted;
+  existing.context.KGGraphFileRemoteAdapter.adoptFile({id:'other-file',revision:3,graphData:{nodes:[{id:'other'}]},learningState:{deepRecall:{other:true}}});
+  finishOldSave({file:{id:'second',revision:9}});
+  await assert.rejects(existing.context.KGGraphFileRemoteAdapter.flush(),/切换/,'old save acknowledgement must not replace a newly selected file');
+  assert.strictEqual(existing.context.KGGraphFileRemoteAdapter.getCurrentFileMeta().id,'other-file');
+  assert.strictEqual(existing.context.KGGraphFileRemoteAdapter.getLoadedGraph().nodes[0].id,'other');
+
+  existing.context.KGGraphFileRemoteAdapter.adoptFile(first);
+  const oldReopenStarted=new Promise(resolve=>{notifyOldSaveStarted=resolve});
+  existing.context.KGGraphFileRemoteAdapter.queueSave(first.graphData);
+  await oldReopenStarted;
+  existing.context.KGGraphFileRemoteAdapter.adoptFile({id:'other-file',revision:3,graphData:{nodes:[]}});
+  existing.context.KGGraphFileRemoteAdapter.adoptFile({...first,revision:12});
+  finishOldSave({file:{id:'second',revision:9}});
+  await assert.rejects(existing.context.KGGraphFileRemoteAdapter.flush(),/切换/,'reopening the same file must also discard an earlier open session acknowledgement');
+  assert.strictEqual(existing.context.KGGraphFileRemoteAdapter.getCurrentFileMeta().revision,12);
+
   const empty=load({responses:[{fileId:null}]});
   const created=await empty.context.KGGraphFileRemoteAdapter.initializeCurrent();
   assert.strictEqual(created,null,'an account without a current graph must remain empty');

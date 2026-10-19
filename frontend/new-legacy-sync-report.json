@@ -1,14 +1,10 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.358",
-  "toVersion": "v9.0-p4.1.359",
+  "fromVersion": "v9.0-p4.1.361",
+  "toVersion": "v9.0-p4.1.361",
   "changes": {
     "added": [],
-    "changed": [
-      "VERSION",
-      "content-prep-studio/dist/content-prep.html",
-      "tests/learning-theme-browser.py"
-    ],
+    "changed": [],
     "removed": []
   },
   "incompatible": []

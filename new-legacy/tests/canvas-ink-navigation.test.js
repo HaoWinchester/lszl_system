@@ -16,6 +16,7 @@ function recall(){
     isRecallReadonly:()=>context.recallTransitionBusy,
     setRecallTransitionBusy:value=>{context.recallTransitionBusy=value},
     setRecallReadonly(){},
+    commitRecallDrafts:async()=>true,
     flushProgress:()=>pending.promise,writeProgressNow:()=>pending.promise,cancelProgressSave(){},
     notifyRecallLimit:message=>notices.push(message),
     sessionQuestion:q=>q,
@@ -32,6 +33,7 @@ function recall(){
 }
 test('recall freezes editing before delayed save and rejects overlapping navigation',async()=>{
   const s=recall(),first=s.context.switchQuestion('bank','next');
+  await new Promise(resolve=>setImmediate(resolve));
   assert.equal(s.context.isRecallReadonly(),true);
   assert.equal(await s.context.switchQuestion('bank','other'),false);
   assert.equal(s.commits(),0,'new question activation must wait for the old save');

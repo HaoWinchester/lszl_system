@@ -1,6 +1,6 @@
 'use strict';
 (function(global){
-  let creating=null,unselectedFileId=null,current=null,loadedGraph=null,pendingSave=Promise.resolve(),sessionEpoch=0,initializedEpoch=-1,currentInitializer=null;
+  let creating=null,unselectedFileId=null,current=null,loadedGraph=null,pendingSave=Promise.resolve(),selectionEpoch=0,sessionEpoch=0,initializedEpoch=-1,currentInitializer=null;
   function clone(value){return value==null?value:JSON.parse(JSON.stringify(value))}
   function active(){return !!(global.KGGraphFileApi&&global.KGGraphFileApi.isRemote())}
   function normalize(file){return file&&typeof file==='object'?file:null}
@@ -15,7 +15,7 @@
   function adoptFile(file){
     const next=normalize(file);
     if(!next||!next.id||!next.graphData)return null;
-    current=clone(next);loadedGraph=clone(next.graphData);return clone(current);
+    selectionEpoch+=1;current=clone(next);loadedGraph=clone(next.graphData);return clone(current);
   }
   // Reset editor metadata and graph bodies together, before a new owner is seeded.
   function clearSession(){sessionEpoch+=1;creating=null;unselectedFileId=null;initializedEpoch=-1;currentInitializer=null;current=null;loadedGraph=null;pendingSave=Promise.resolve();global.KGGraphFileRemoteStore?.clearSession?.()}
@@ -51,18 +51,20 @@
   function getCurrentFileMeta(){return clone(current)}
   function queueSave(graphData,options={}){
     if(!active()||!current)return false;
-    const epoch=sessionEpoch,id=current.id,snapshot=clone(graphData),onSuccess=options.onSuccess;
+    const epoch=sessionEpoch,selection=selectionEpoch,id=current.id,snapshot=clone(graphData),learningState=clone(options.learningState),onSuccess=options.onSuccess;
     loadedGraph=snapshot;
     pendingSave=pendingSave.catch(()=>null).then(()=>{
-      if(epoch!==sessionEpoch||!active()||current?.id!==id)throw new Error('当前图谱已切换，请重新保存。');
-      return global.KGGraphFileApi.save(id,{graphData:snapshot,learningState:options.learningState,expectedRevision:Number(current.revision)||1});
+      if(epoch!==sessionEpoch||!active()||current?.id!==id||selection!==selectionEpoch)throw new Error('当前图谱已切换，请重新保存。');
+      return global.KGGraphFileApi.save(id,{graphData:snapshot,learningState,expectedRevision:Number(current.revision)||1});
     }).then(async payload=>{
       if(epoch!==sessionEpoch||!active())return null;
-      current=normalize(payload.file)||current;
+      if(current?.id!==id||selection!==selectionEpoch)throw new Error('当前图谱已切换，请重新保存。');
+      current={...current,...normalize(payload.file)};
+      if(learningState!==undefined)current.learningState=clone(learningState);
       if(options.name!==undefined&&current.name!==options.name){
         const renamed=await global.KGGraphFileApi.patchFile(id,{name:options.name});
-        if(epoch!==sessionEpoch||!active()||current?.id!==id)throw new Error('当前图谱已切换，请重新保存。');
-        current=normalize(renamed.file)||current;
+        if(epoch!==sessionEpoch||!active()||current?.id!==id||selection!==selectionEpoch)throw new Error('当前图谱已切换，请重新保存。');
+        current={...current,...normalize(renamed.file)};
       }
       if(typeof onSuccess==='function')onSuccess();
       return current;

@@ -388,12 +388,109 @@ def test_published_paper_grants_recall_access_to_private_bank_question() -> None
             assert body["questionId"] == question_id
             assert body["bankId"] == bank_id
             assert body["currentQuestion"]["title"] == "已发布试卷中的私有源题目"
+
+            async def seed_legacy_progress():
+                async with AsyncSessionLocal() as db:
+                    db.add(RecallProgress(
+                        owner_id=student,question_id=question_id,bank_id=bank_id,
+                        source_question_revision=1,source_content_hash="e" * 64,
+                        recall_library_hash=body["library"]["contentHash"],revision=3,
+                        nodes=[{"instanceId":"legacy-node","dataId":"personal:legacy","title":"旧版存量节点","custom":True}],
+                        edges=[],custom_nodes={"personal:legacy":{"title":"旧版存量节点"}},
+                    ))
+                    await db.commit()
+            asyncio.run(seed_legacy_progress())
+            body = client.get(f"/api/v1/recall/session/{question_id}?releaseId={release_id}").json()
+            assert body["progress"]["nodes"][0]["title"] == "旧版存量节点"
+            assert body["progressRevision"] == 3
+
+            async def remove_scoped_progress():
+                async with AsyncSessionLocal() as db:
+                    await db.execute(delete(RecallProgress).where(RecallProgress.owner_id==student,RecallProgress.question_id==question_id,RecallProgress.release_id==release_id))
+                    await db.commit()
+
+            async def race_first_write(reset_second):
+                from fastapi import HTTPException
+                from app.services import deep_recall_service
+                from app.schemas.deep_recall import RecallProgressSaveRequest, RecallProgressResetRequest
+                gate=asyncio.Event()
+                async def write(reset):
+                    async with AsyncSessionLocal() as db:
+                        user=await db.get(User,student)
+                        await gate.wait()
+                        try:
+                            if reset:
+                                await deep_recall_service.reset_progress(db,user,question_id,RecallProgressResetRequest(expectedRevision=3,targetQuestionRevision=1),release_id=release_id)
+                            else:
+                                await deep_recall_service.save_progress(db,user,question_id,RecallProgressSaveRequest.model_validate(_graph_payload(body,"并发首次派生")),release_id=release_id)
+                            return 200
+                        except HTTPException as error:
+                            await db.rollback()
+                            return error.status_code
+                operations=[asyncio.create_task(write(False)),asyncio.create_task(write(reset_second))]
+                gate.set()
+                assert sorted(await asyncio.gather(*operations)) == [200,409]
+                async with AsyncSessionLocal() as db:
+                    scoped=(await db.execute(select(RecallProgress).where(RecallProgress.owner_id==student,RecallProgress.question_id==question_id,RecallProgress.release_id==release_id))).scalars().all()
+                    assert len(scoped)==1 and scoped[0].revision==4
+                    legacy=(await db.execute(select(RecallProgress).where(RecallProgress.owner_id==student,RecallProgress.question_id==question_id,RecallProgress.release_id.is_(None)))).scalar_one()
+                    assert legacy.revision==3 and legacy.nodes[0]["title"]=="旧版存量节点"
+            for reset_second in (False,True):
+                asyncio.run(race_first_write(reset_second))
+                asyncio.run(remove_scoped_progress())
+            first_reset=client.post(f"/api/v1/recall/progress/{question_id}/reset?releaseId={release_id}",json={"expectedRevision":3,"targetQuestionRevision":1})
+            assert first_reset.status_code==200,first_reset.text
+            assert first_reset.json()["revision"]==4 and first_reset.json()["nodes"]==[]
+            asyncio.run(remove_scoped_progress())
+
+            async def set_ambiguous(enabled):
+                async with AsyncSessionLocal() as db:
+                    if enabled:
+                        db.add(PaperRelease(id=release_id+"-other",paper_id=paper_id,version=2,status="withdrawn",name="第二份同题发布",subject="PMP",publisher_id=teacher,access_level="free",enabled_modes=["deep_recall"],allowed_roles=["student"],question_count=1))
+                        await db.flush()
+                        db.add(PaperReleaseQuestion(release_id=release_id+"-other",order_index=0,bank_id=bank_id,question_id=question_id,snapshot=body["currentQuestion"]))
+                    else:
+                        await db.execute(delete(PaperReleaseQuestion).where(PaperReleaseQuestion.release_id==release_id+"-other"))
+                        await db.execute(delete(PaperRelease).where(PaperRelease.id==release_id+"-other"))
+                    await db.commit()
+            asyncio.run(set_ambiguous(True))
+            ambiguous=client.get(f"/api/v1/recall/session/{question_id}?releaseId={release_id}").json()
+            assert ambiguous["progress"]["nodes"] == []
+            assert ambiguous["progressRevision"] == 0
+            asyncio.run(set_ambiguous(False))
+
+            async def set_legacy_hash(value):
+                async with AsyncSessionLocal() as db:
+                    legacy=(await db.execute(select(RecallProgress).where(RecallProgress.owner_id==student,RecallProgress.question_id==question_id,RecallProgress.release_id.is_(None)))).scalar_one()
+                    legacy.source_content_hash=value
+                    await db.commit()
+            asyncio.run(set_legacy_hash("f" * 64))
+            incompatible=client.get(f"/api/v1/recall/session/{question_id}?releaseId={release_id}").json()
+            assert incompatible["progress"]["nodes"] == []
+            asyncio.run(set_legacy_hash("e" * 64))
+            async def set_legacy_library_hash(value):
+                async with AsyncSessionLocal() as db:
+                    legacy=(await db.execute(select(RecallProgress).where(RecallProgress.owner_id==student,RecallProgress.question_id==question_id,RecallProgress.release_id.is_(None)))).scalar_one()
+                    legacy.recall_library_hash=value
+                    await db.commit()
+            asyncio.run(set_legacy_library_hash("0" * 64))
+            outdated=client.get(f"/api/v1/recall/session/{question_id}?releaseId={release_id}").json()
+            assert outdated["versionState"]=="mismatch"
+            assert outdated["permissions"]["canWrite"] is False
+            assert outdated["progress"]["nodes"][0]["title"]=="旧版存量节点"
+            asyncio.run(set_legacy_library_hash(body["library"]["contentHash"]))
             saved = client.put(
                 f"/api/v1/recall/progress/{question_id}?releaseId={release_id}",
                 json=_graph_payload(body, "发布版本节点"),
             )
             assert saved.status_code == 200, saved.text
-            assert saved.json()["revision"] == 1
+            assert saved.json()["revision"] == 4
+            async def assert_legacy_preserved():
+                async with AsyncSessionLocal() as db:
+                    legacy=(await db.execute(select(RecallProgress).where(RecallProgress.owner_id==student,RecallProgress.question_id==question_id,RecallProgress.release_id.is_(None)))).scalar_one()
+                    assert legacy.nodes[0]["title"] == "旧版存量节点"
+                    assert legacy.revision == 3
+            asyncio.run(assert_legacy_preserved())
             resumed = client.get(
                 f"/api/v1/recall/session/{question_id}?releaseId={release_id}"
             )
@@ -409,7 +506,7 @@ def test_published_paper_grants_recall_access_to_private_bank_question() -> None
                 },
             )
             assert reset.status_code == 200, reset.text
-            assert reset.json()["revision"] == 2
+            assert reset.json()["revision"] == 5
             assert reset.json()["nodes"] == []
     finally:
         asyncio.run(cleanup())
@@ -655,6 +752,15 @@ def test_question_revision_change_requires_explicit_reset_and_viewer_is_read_onl
             assert body["historyQuestion"]["title"] == "版本一题目"
             assert body["currentQuestion"]["title"] == "版本二题目"
             assert body["progress"]["readOnly"] is True
+            overwrite = learner.put(
+                f"/api/v1/recall/progress/{question_id}",
+                json=_graph_payload(body, "不得覆盖历史图"),
+            )
+            assert overwrite.status_code == 409, overwrite.text
+            assert overwrite.json()["detail"]["code"] == "recall_history_requires_reset"
+            preserved = learner.get(f"/api/v1/recall/session/{question_id}").json()
+            assert preserved["progress"]["nodes"][0]["title"] == "旧版本节点"
+            assert preserved["progressRevision"] == body["progressRevision"]
 
             reset = learner.post(
                 f"/api/v1/recall/progress/{question_id}/reset",

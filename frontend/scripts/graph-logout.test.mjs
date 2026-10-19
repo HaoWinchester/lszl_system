@@ -64,3 +64,14 @@ test('graph ink closes and resets selection only when the authenticated account 
  account='';handlers['kg-auth-session-change']();assert.deepEqual(calls,[['reset',undefined],['open',false]]);
  calls.length=0;account='student';handlers['kg-auth-session-change']();assert.deepEqual(calls,[['reset',undefined],['open',false]],'a different account cannot inherit stale ink selection');
 })
+
+test('manual retry after a failed title save preserves the requested filename',async()=>{
+ const h=harness();h.run('00-config-state.js');h.run('24-graph-file-autosave.js');const writes=[]
+ h.c.KGGraphFileRemoteAdapter={active:()=>true,getCurrentFileMeta:()=>({id:'historical-file',name:'old'}),save:async(graph,options)=>{writes.push({title:graph.meta.title,name:options.name});if(writes.length===1)throw Error('offline')}}
+ h.c.showStatus=()=>{};h.c.renderHeader=()=>{};h.c.render=()=>{}
+ const editor=source('10-graph-editor.js');vm.runInContext(editor.slice(editor.lastIndexOf('\n',editor.indexOf('function saveGraphTitle(')),editor.indexOf('function openGraphModal(')),h.c)
+ assert.equal(await h.c.saveGraphTitle('retry title'),false)
+ assert.equal(await h.eval('saveNow({force:true,reason:"manual-save"})'),true)
+ assert.deepEqual(writes,[{title:'retry title',name:'retry title'},{title:'retry title',name:'retry title'}])
+ assert.equal(h.c.KGGraphFileAutosave.isDirty(),false)
+})

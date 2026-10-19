@@ -109,7 +109,19 @@
   async function createFile(input={},options={}){try{const payload=await api().create(input),file=normalizeFile(payload.file);if(!file)throw new Error('远端图谱文件创建失败。');await refresh();if(options.makeCurrent!==false)await setCurrentFileId(file.id);return clone(file)}catch(error){return rememberError(error)}}
   async function openFile(id){try{const epoch=sessionEpoch,payload=await api().get(id);if(epoch!==sessionEpoch||!active())return null;const meta=normalizeFile(payload.meta);if(!meta)return null;const hydrated={...meta,graphData:clone(payload.graphData),learningState:clone(payload.learningState)||{}};contentCache.set(id,hydrated);await setCurrentFileId(id);return clone(hydrated)}catch(error){return rememberError(error)}}
   async function getFile(id,owner=currentOwner(),options={}){const cached=contentCache.get(id);if(cached&&cached.owner===owner)return clone(cached);if(!getFileMeta(id,owner,{includeTrash:options.includeTrash===true}))return null;try{const payload=await api().get(id),file={...normalizeFile(payload.meta),graphData:clone(payload.graphData),learningState:clone(payload.learningState)||{}};contentCache.set(id,file);return clone(file)}catch(error){return rememberError(error)}}
-  async function saveFile(id,graphData,options={}){try{const current=getFileMeta(id,currentOwner(),{includeTrash:false});if(!current)return null;const payload=await api().save(id,{graphData,learningState:options.learningState,expectedRevision:current.revision});await refresh();const file=normalizeFile(payload.file);if(file)contentCache.set(id,{...file,graphData:clone(graphData),learningState:clone(options.learningState)||{}});return clone(file)}catch(error){return rememberError(error)}}
+  async function saveFile(id,graphData,options={}){
+    try{
+      const current=getFileMeta(id,currentOwner(),{includeTrash:false});if(!current)return null;
+      const previous=contentCache.get(id),learningState=options.learningState===undefined?previous?.learningState:clone(options.learningState);
+      const payload=await api().save(id,{graphData,learningState:options.learningState,expectedRevision:current.revision});
+      await refresh();const file=normalizeFile(payload.file);
+      // Omitted learning state stays unchanged on the server. Keep a known copy,
+      // or leave the body uncached so the next read hydrates its historical state.
+      if(file&&learningState!==undefined)contentCache.set(id,{...file,graphData:clone(graphData),learningState:clone(learningState)||{}});
+      else contentCache.delete(id);
+      return clone(file);
+    }catch(error){return rememberError(error)}
+  }
   async function patchFile(id,patch){try{const payload=await api().patchFile(id,patch);await refresh();return normalizeFile(payload.file)}catch(error){return rememberError(error)}}
   async function reorderFiles(orderedIds){
     if(!active()||reorderPending)return false;

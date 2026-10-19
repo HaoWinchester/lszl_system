@@ -6,7 +6,7 @@ from uuid import uuid4
 from urllib.parse import urlparse,parse_qs
 from playwright.sync_api import sync_playwright,expect
 ROOT=Path(__file__).resolve().parents[1]
-parser=argparse.ArgumentParser();parser.add_argument('--base-url',required=True);parser.add_argument('--source',action='store_true');parser.add_argument('--case',choices=['themes','entry','background','navigation','settings','draft-navigation','duplicate-refresh']);parser.add_argument('--out-dir');args=parser.parse_args()
+parser=argparse.ArgumentParser();parser.add_argument('--base-url',required=True);parser.add_argument('--source',action='store_true');parser.add_argument('--case',choices=['themes','entry','background','navigation','settings','draft-navigation','duplicate-refresh','historical-refresh']);parser.add_argument('--historical-workspaces');parser.add_argument('--out-dir');args=parser.parse_args()
 assert urlparse(args.base_url).hostname in ['127.0.0.1','localhost'],'Use only disposable local accounts'
 OUT=Path(args.out_dir) if args.out_dir else ROOT.parent/'artifacts/learning-state-regression';OUT.mkdir(parents=True,exist_ok=True)
 FILES=['src/canvas/97-learning-theme.js','src/86-knowledge-recall.js','src/77-multi-question-workspace.js','src/39-global-shortcuts.js','src/59b-learning-route-context.js','src/62a-learning-progress.js','src/canvas/94-canvas-ink.js','styles/unified-canvas-runtime.css','styles/knowledge-recall-patch-1.css','styles/focus-vega-learning.css','knowledge-recall.html','question-workspace.html']
@@ -114,9 +114,71 @@ with sync_playwright() as pw:
   p.goto(base+legacy,wait_until='networkidle');p.wait_for_function('(id)=>KGMultiQuestionWorkspace.activeWorkspaceId()===id',arg=canonical);expect(p.locator('.qw-question-card')).to_have_attribute('aria-label',re.compile('笔迹验证题 1'));expect(p.locator('.qw-question-card')).to_contain_text('题1/2')
   assert not errors,errors;p.screenshot(path=str(OUT/'duplicate-refresh-final.png'))
   (OUT/'duplicate-refresh.json').write_text(json.dumps({'canonical':canonical,'observations':observations,'writes':writes,'retainedRows':len(rows),'pageErrors':errors,'explicitOtherRowAndReturn':True},ensure_ascii=False,indent=2))
+ def historical_refresh(c):
+  assert urlparse(args.base_url).port==5297,'Historical copies must use the disposable 5297 server'
+  assert args.historical_workspaces,'Supply the read-only historical export; do not replace it with newly generated examples'
+  originals=json.loads(Path(args.historical_workspaces).read_text());assert originals
+  imported=[];observations=[];errors=[]
+  for row in c.request.get(args.base_url+'/api/v1/workspaces').json()['workspaces']:
+   if re.fullmatch(r'historical-copy-\d+',row['id']):assert c.request.delete(args.base_url+'/api/v1/workspaces/'+row['id']).ok
+  for i,row in enumerate(originals):
+   payload=json.loads(json.dumps(row['payload']));wid='historical-copy-'+str(i)
+   # Keep historical shape, timestamps, layout, styles and alias relationships.
+   # Only anonymize ownership, visible text and references to the fixture catalog.
+   payload['userId']='ink-browser';payload['title']='历史画布副本 '+str(i)
+   for j,node in enumerate(payload.get('nodes',{}).values()):
+    if node.get('questionId'):
+     node['questionId']='ink-question-'+str(j%2+1)
+     for key,value in [('bankId','ink-bank'),('paperId','ink-paper'),('releaseId','ink-release')]:
+      if node.get(key):node[key]=value
+    for key in ['title','stemSummary','content']:
+     if node.get(key):node[key]='历史内容 '+str(j)
+   for stroke in payload.get('strokes',[]):
+    if stroke.get('text'):stroke['text']='历史文字'
+   body={'id':wid,'title':payload['title'],'schemaVersion':row['schema_version'],'payload':payload}
+   response=c.request.post(args.base_url+'/api/v1/workspaces',data=body);assert response.ok,response.text()
+   imported.append((wid,payload))
+  p=c.new_page();p.set_default_timeout(10000);p.on('pageerror',lambda error:errors.append(str(error)))
+  base=args.base_url+'/question-workspace.html?paperId=ink-paper&releaseId=ink-release&questionId=ink-question-1&bankId=ink-bank&workspace='
+  def business(value):
+   return {key:value.get(key) for key in ['nodes','edges','groups','strokes','tables','background']}
+  def open_copy(wid):
+   p.goto(base+wid,wait_until='networkidle');p.wait_for_function('(id)=>KGMultiQuestionWorkspace?.activeWorkspaceId()===id&&KGMultiQuestionWorkspace.getState().questionCount===2',arg=wid)
+   p.wait_for_timeout(650)
+   return p.evaluate('KGMultiQuestionWorkspace.activeWorkspace()')
+  saved_copies={}
+  for wid,original in imported:
+   first=open_copy(wid)
+   assert set(first['nodes'])==set(original.get('nodes',{})),'Loading changed historical card membership'
+   expect(p.locator('.qw-question-card')).to_have_count(len(original.get('nodes',{})))
+   assert len(first['strokes'])==len(original.get('strokes',[])),'Loading lost historical handwriting'
+   p.locator('#qwWorkspaceSaveState').click();p.wait_for_function('(id)=>KGCanvasWorkspaceAdapter.getState(id).status==="saved"',arg=wid)
+   settled=p.evaluate('KGMultiQuestionWorkspace.activeWorkspace()')
+   for turn in range(3):
+    p.reload(wait_until='networkidle');p.wait_for_function('(id)=>KGMultiQuestionWorkspace?.activeWorkspaceId()===id',arg=wid);p.wait_for_timeout(650)
+    restored=p.evaluate('KGMultiQuestionWorkspace.activeWorkspace()')
+    assert business(restored)==business(settled),f'Historical business data drifted on reload: {wid}, {turn}'
+   # Make a real browser edit to the old document, then save and refresh it.
+   p.locator('#qwInkBtn').click();p.locator('[data-ink-tool=text]').click()
+   blank=p.evaluate('''()=>{const rects=[...document.querySelectorAll('.qw-question-card,.qw-synthesis-card,.canvas-ink-layer text')].map(e=>e.getBoundingClientRect());for(const y of [170,200,550,650])for(const x of [1100,1200,1000,350])if(rects.every(r=>x<r.left-20||x>r.right+20||y<r.top-20||y>r.bottom+20))return {x,y};throw Error('No blank point for the text edit')}''')
+   p.mouse.click(blank['x'],blank['y'])
+   editor=p.locator('.canvas-ink-text-editor');expect(editor).to_be_visible();editor.fill('历史副本保存验证 '+wid);editor.press('Control+Enter');expect(editor).to_have_count(0)
+   p.locator('#qwWorkspaceSaveState').click();p.wait_for_function('(id)=>KGCanvasWorkspaceAdapter.getState(id).status==="saved"',arg=wid)
+   edited=p.evaluate('KGMultiQuestionWorkspace.activeWorkspace()');assert len(edited['strokes'])==len(first['strokes'])+1
+   restored=open_copy(wid);assert business(restored)==business(edited)
+   remote=c.request.get(args.base_url+'/api/v1/workspaces/'+wid);assert remote.ok
+   assert business(remote.json()['workspace']['payload'])==business(restored)
+   saved_copies[wid]=business(restored)
+   observations.append({'copy':wid,'createdAt':original.get('createdAt'),'nodes':len(restored['nodes']),'originalStrokes':len(first['strokes']),'savedStrokes':len(restored['strokes']),'reloads':3})
+  # Reopen the old copies in reverse order in one tab, rather than testing each
+  # only in a fresh browser context. No copied sibling may overwrite another.
+  for wid,_ in reversed(imported):
+   assert business(open_copy(wid))==saved_copies[wid]
+  p.screenshot(path=str(OUT/'historical-refresh-final.png'));assert not errors,errors
+  (OUT/'historical-refresh.json').write_text(json.dumps({'historicalRows':len(originals),'observations':observations,'reverseReopen':True,'pageErrors':errors},ensure_ascii=False,indent=2))
  def settings(c):
   r=recall(c);w,_=workspace(c);old=r.evaluate('KGCanvasAppearanceController.read()');before=w.evaluate('KGMultiQuestionWorkspace.activeWorkspace().background');w.locator('[data-uc-canvas-settings]').click();w.locator('[data-uc-color="#fff1f5"]').click();w.locator('[data-uc-cancel]').click();assert w.evaluate('KGMultiQuestionWorkspace.activeWorkspace().background')==before;w.locator('[data-uc-canvas-settings]').click();w.locator('[data-uc-pattern=solid]').click();w.locator('[data-uc-color="#fff1f5"]').click();w.locator('[data-uc-confirm]').click();r.reload(wait_until='networkidle');assert r.evaluate('KGCanvasAppearanceController.read()')==old;w.reload(wait_until='networkidle');w.wait_for_function("KGMultiQuestionWorkspace?.activeWorkspace()?.background?.appearance.backgroundColor==='#fff1f5'");assert w.locator('.qw-background').evaluate('e=>getComputedStyle(e).backgroundImage')=='none','Saved scene layer must not cover an explicitly chosen solid background'
- for name,fn in [('themes',themes),('entry',entry),('background',background),('navigation',navigation),('settings',settings),('draft-navigation',draft_navigation)]+([('duplicate-refresh',duplicate_refresh)] if args.case=='duplicate-refresh' else []):
+ for name,fn in [('themes',themes),('entry',entry),('background',background),('navigation',navigation),('settings',settings),('draft-navigation',draft_navigation)]+([('duplicate-refresh',duplicate_refresh)] if args.case=='duplicate-refresh' else [])+([('historical-refresh',historical_refresh)] if args.case=='historical-refresh' else []):
   if args.case and args.case!=name:continue
   c=setup()
   try:fn(c);report.append({'case':name,'passed':True});print('PASS',name,flush=True)

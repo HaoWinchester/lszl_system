@@ -385,3 +385,35 @@ test('unload protection reports only editable unsaved drafts, pending saves, or 
   context.isRecallSessionReadonly = () => true;
   assert.equal(context.hasRecallDraft(), false);
 });
+
+
+test('opening mismatched historical progress never resets the graph and binds historical snapshots', async () => {
+  const controller = fs.readFileSync(path.join(root, 'src/86-knowledge-recall.js'), 'utf8');
+  const historic = sessionFixture({versionState:'mismatch', historyQuestion:{id:'q1',revision:6}, progress:{...graphFixture(), revision:4}});
+  let resets=0;
+  const context={question:{id:'q1',sourceReleaseId:'release-old'},recallAdapter:null,lastLibraryHash:'',
+    requestedQuestionId:()=> 'q1',renderSaveState(){},
+    window:{KGDeepRecallServerAdapter:{create:()=>({subscribe(){},loadSession:async()=>historic,getState:()=>({session:historic})})},KGLearningLoading:{hide(){}}},
+    adoptCurrentVersion:async()=>{resets++;return sessionFixture()},
+  };
+  vm.createContext(context);
+  const start=controller.indexOf('  async function loadDatabaseSessionData(');
+  vm.runInContext(controller.slice(start,controller.indexOf('  /* 失败回退',start)),context);
+  const prepared=await context.loadDatabaseSessionData('q1');
+  assert.equal(resets,0,'merely reopening must not issue destructive reset');
+  assert.equal(prepared.history,true);
+  assert.equal(prepared.latest.progress.nodes[0].instanceId,'n1');
+});
+
+test('server question hydration retains the resolved release and collection identity', () => {
+  const controller=fs.readFileSync(path.join(root,'src/86-knowledge-recall.js'),'utf8');
+  const context={question:{id:'q1',sourceReleaseId:'release-1',sourceCollectionId:'collection-1',sourcePaperId:'paper-1'},cloneValue:plain,fallbackQuestion:{}};
+  vm.createContext(context);
+  const start=controller.indexOf('  function sessionQuestion(');
+  vm.runInContext(controller.slice(start,controller.indexOf('  function applyServerSession(',start)),context);
+  const result=context.sessionQuestion({id:'q1',bankId:'bank-1',title:'frozen question'});
+  assert.equal(result.sourceReleaseId,'release-1');
+  assert.equal(result.sourceCollectionId,'collection-1');
+  assert.equal(result.sourcePaperId,'paper-1');
+  assert.equal(context.sessionQuestion({id:'other',bankId:'bank-2'}).sourceReleaseId,undefined,'unrelated questions must not inherit the previous release');
+});

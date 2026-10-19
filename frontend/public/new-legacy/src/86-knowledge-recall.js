@@ -289,6 +289,10 @@
   }
   function sessionQuestion(payload){
     const next=cloneValue(payload||fallbackQuestion);
+    // Server snapshots contain question content; retain the resolved publication scope.
+    if(String(next.id||next.sourceQuestionId||'')===String(question?.id||question?.sourceQuestionId||'')){
+      ['sourceReleaseId','sourceCollectionId','sourcePaperId'].forEach(key=>{if(!next[key]&&question?.[key])next[key]=question[key]});
+    }
     next.sourceQuestionId=String(next.id||next.sourceQuestionId||'');
     next.sourceBankId=String(next.bankId||next.sourceBankId||'');
     next.sourceCollectionId=String(next.sourceCollectionId||next.sourceBankId||'');
@@ -325,17 +329,6 @@
     setRecallReadonly(!recallSession.permissions?.canWrite);
     const reveal=$('krRevealKeywordsBtn');if(reveal){reveal.disabled=!recallSession.permissions?.canReveal;reveal.textContent='揭示关键词'}
   }
-  /* 题目更新后不再区分旧版/新版：检测到版本不一致时静默采用新版本
-   * （调用既有 resetToCurrent 清掉旧图与笔迹，联想库随新题快照走）。 */
-  async function adoptCurrentVersion(){
-    try{
-      await recallAdapter.resetToCurrent();
-      return recallAdapter.getState().session||null;
-    }catch(error){
-      notifyRecallLimit(error?.message||'新版本载入失败，请稍后重试。');
-      return null;
-    }
-  }
   /* 拉取新题会话数据（不改主状态）；提交（applyServerSession）由调用方在合适的时机执行。 */
   async function loadDatabaseSessionData(questionId=''){
     let id=String(questionId||requestedQuestionId()).trim();
@@ -358,14 +351,11 @@
     recallAdapter=window.KGDeepRecallServerAdapter?.create?.({questionId:id,releaseId,libraryHash:lastLibraryHash});
     if(!recallAdapter)throw new Error('深度回忆服务器适配器加载失败。');
     recallAdapter.subscribe(renderSaveState);renderSaveState({saveState:'loading'});
-    let session=await recallAdapter.loadSession();
-    if(session.versionState==='mismatch'){
-      window.KGLearningLoading?.hide?.();
-      const adopted=await adoptCurrentVersion();
-      if(adopted)session=adopted;
-    }
+    const session=await recallAdapter.loadSession();
+    // Opening an older graph is read-only. Clearing it requires the explicit
+    // reset action and its confirmation; loading must never mutate progress.
     const latest=recallAdapter.getState().session||session;
-    return {latest,history:false};
+    return {latest,history:latest.versionState==='mismatch'};
   }
   /* 失败回退：丢弃已拉取的新题上下文，恢复旧题的保存绑定。 */
   function restoreRecallContext(previousAdapter,previousQuestion){
