@@ -20,10 +20,12 @@ from app.db.session import get_db
 from app.schemas.auth import AuthenticatedResponse, LoginRequest, RegisterRequest, SelfProfileUpdate, WechatAccountChoice
 from app.schemas.user import UserCreate
 from app.models.user import ACTIVE
-from app.services import system_service, user_service, wechat_service, wechat_account_service
+from app.services import system_service, user_service, wechat_service, wechat_account_service, referral_service
+from app.api.v1 import referrals
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 DB = Annotated[AsyncSession, Depends(get_db)]
+router.include_router(referrals.router)
 
 SAFE_WECHAT_RETURN_PATHS = {
     "/practice-mode.html",
@@ -101,15 +103,20 @@ async def register(req: RegisterRequest, request: Request, db: DB):
         source="self-register",
     )
     try:
-        user = await user_service.create_user(db, data, actor=req.username)
-    except ValueError as e:
-        await user_service.log_action(db, "register_failed", req.username, req.username, str(e), ip, ua)
+        user = await user_service.create_user(db, data, actor=req.username, commit=False)
+        await referral_service.bind_registration(db, user, req.referral_code or '')
+        user_service.record_legal_consent(user, accepted_terms_version)
+        await user_service.log_action(db, "login_success", user.username, user.username, "注册并登录", ip, ua)
         await db.commit()
-        raise HTTPException(status_code=400, detail=str(e))
-    user_service.record_legal_consent(user, accepted_terms_version)
-    await user_service.log_action(db, "login_success", user.username, user.username, "注册并登录", ip, ua)
-    await db.commit()
-    await db.refresh(user)
+        await db.refresh(user)
+    except ValueError as exc:
+        await db.rollback()
+        await user_service.log_action(db, "register_failed", req.username, req.username, str(exc), ip, ua)
+        await db.commit()
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail="注册信息已变化，请检查用户名后重试") from exc
     login_session_id = establish_authenticated_session(request, user.username)
     return {"user": user_service.to_dict(user), "loginSessionId": login_session_id}
 

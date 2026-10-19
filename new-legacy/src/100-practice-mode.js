@@ -145,7 +145,11 @@
       answered:state.draft?.stats?.().answered||0,dirty:state.draft?.isDirty?.(),saving,error:state.saveError,conflict:state.conflict,online:global.navigator?.onLine!==false});
     panel.dataset.status=status.kind;
     const label=$('practiceSaveStatusText');if(label)label.textContent=status.text;
-    if(button){button.disabled=!!state.pendingRequestKey||state.conflict||global.navigator?.onLine===false||(!state.draft?.isDirty?.()&&!state.saveError);button.textContent=state.saveError?'重试保存':'保存进度'}
+    for(const control of [button,$('practiceMenuSaveBtn')].filter(Boolean)){
+      control.disabled=!!state.pendingRequestKey||state.conflict||state.reviewing||!state.active||!state.session||global.navigator?.onLine===false||(!state.draft?.isDirty?.()&&!state.saveError);
+      const label=control.querySelector('[data-save-label]')||control;
+      label.textContent=state.saveError?'重试保存':'保存进度';
+    }
   }
   function paperCoverage(release){return Object.hasOwn(state.coverageOverrides,release?.releaseId)?state.coverageOverrides[release.releaseId]:release?.coverage||null}
   function coverageText(release){
@@ -394,7 +398,17 @@
     if(state.popTimer)global.clearTimeout(state.popTimer);state.popTimer=0;
   }
   function retriggerViewAnimation(el,cls){if(!el)return;el.classList.remove(cls);void el.offsetWidth;el.classList.add(cls)}
+  function setToolsOpen(open){
+    const nav=$('practiceSideNav'),toggle=$('practiceSideToggle');
+    if(!nav||!toggle)return;
+    nav.hidden=!open;nav.inert=!open;
+    $('practiceGame')?.classList.toggle('practice-side-collapsed',!open);
+    toggle.setAttribute('aria-expanded',String(open));
+    toggle.title=open?'收起答题功能':'展开答题功能';
+  }
   function setView(name){
+    setToolsOpen(false);
+    state.sound?.setActive(name==='game');
     if(name!=='game')global.KGQuestionComments?.teardownSource?.('danmaku');
     dom.lobby.hidden=name!=='lobby';dom.game.hidden=name!=='game';dom.checkpoint.hidden=name!=='checkpoint';dom.result.hidden=name!=='result';
     if(name==='game')retriggerViewAnimation(dom.game,'is-entering');
@@ -967,6 +981,7 @@
     if(correct){state.correct+=1;state.experience+=5}else{
       correctIds.forEach(id=>dom.options.querySelector('[data-option-id="'+CSS.escape(text(id))+'"]')?.classList.add('is-correct'));
     }
+    void state.sound?.play(correct);
     showFeedback(correct?'验证通过 · 明日再验证':'验证未通过 · 继续补救',correct?'success':'danger');
     verification.sourceQuestion.mistakeStatus=correct?verification.sourceQuestion.mistakeStatus:'needs_remediation';
     // 保留最近复仇阶段供保存/恢复：验证通过回到待再验证；未通过回到补救面板
@@ -990,6 +1005,7 @@
     const selection=state.draft.select(question.id,selected);
     if(!selection?.accepted||!selection.answer){showToast(text(selection?.message)||'该题已作答');renderAnswerSheet();return false}
     const correct=selection.answer.correct===true;
+    void state.sound?.play(correct);
     if(question.type==='multiple_choice')question.correctOptionIds=selection.answer.correctOptionIds||question.correctOptionIds;
     else question.correctAnswer=selection.answer.correctAnswer||question.correctAnswer;
     const stats=state.draft.stats();
@@ -1606,7 +1622,7 @@
     const autoExplain=$('practiceAutoExplain');
     autoExplain?.addEventListener('change',()=>{global.KGActivitySchemaV1?.setPracticeAutoExplain?.(autoExplain.checked);renderQuestion()});
     // 显示答案开关（会话态，随保存落库）；标记按钮只改本地状态与答题卡。
-    $('practiceInstantFeedback')?.addEventListener('change',event=>{clearFeedbackTimer();state.instantFeedback=event.target.checked===true;hideStreakPop();state.draft?.markDirty?.();renderQuestion();renderSaveStatus()});
+    $('practiceInstantFeedback')?.addEventListener('change',event=>{clearFeedbackTimer();state.instantFeedback=event.target.checked===true;state.sound?.stop();hideStreakPop();state.draft?.markDirty?.();renderQuestion();renderSaveStatus()});
     $('practiceShowAnswers')?.addEventListener('change',event=>{state.showAnswers=event.target.checked===true;renderQuestion()});
     $('practiceMarkToggle')?.addEventListener('click',()=>toggleQuestionMark());
     // 标记区工具：评论直开底部讨论抽屉；弹幕开关切换本机偏好并同步按钮文案。
@@ -1621,16 +1637,14 @@
     });
     // 侧栏「收藏」按钮：切换当前题收藏（题目收藏存后端，跨设备可见）。
     $('practiceFavoriteBtn')?.addEventListener('click',()=>{void toggleCurrentQuestionFavorite()});
-    // 左侧导航栏收起/展开：桌面端滑出屏幕左侧，保留展开把手。
-    const sideToggle=$('practiceSideToggle'),sideNav=$('practiceSideNav'),gameShell=$('practiceGame');
-    sideToggle?.addEventListener('click',()=>{
-      if(!gameShell)return;
-      const collapsed=gameShell.classList.toggle('practice-side-collapsed');
-      sideToggle.setAttribute('aria-expanded',String(!collapsed));
-      sideToggle.textContent=collapsed?'»':'‹';
-      sideToggle.title=collapsed?'展开导航栏':'收起导航栏';
-      if(sideNav)sideNav.setAttribute('aria-hidden',collapsed?'true':'false');
-    });
+    // Floating tools use the same save/settings actions as their existing controls.
+    const sideToggle=$('practiceSideToggle'),sideNav=$('practiceSideNav');
+    sideToggle?.addEventListener('click',()=>setToolsOpen(sideNav?.hidden!==false));
+    $('practiceMenuSaveBtn')?.addEventListener('click',()=>saveProgress());
+    $('practiceDanmakuSettingsBtn')?.addEventListener('click',()=>global.KGQuestionComments?.openDanmakuSettings?.());
+    sideNav?.addEventListener('click',event=>{if(event.target.closest('button'))setToolsOpen(false)},true);
+    document.addEventListener('click',event=>{if(!sideNav?.contains(event.target)&&!sideToggle?.contains(event.target))setToolsOpen(false)});
+    document.addEventListener('keydown',event=>{if(event.key==='Escape'&&sideNav?.hidden===false){setToolsOpen(false);sideToggle?.focus()}});
     dom.showPreviousWrong?.addEventListener('change',()=>{
       state.showPreviousWrong=dom.showPreviousWrong.checked;
       renderPreviousWrongAnswer(state.verification?.active?state.verification.question:state.questions[state.index]);
@@ -1681,7 +1695,7 @@
         input:{revision:state.session.revision,...submissionPayload()},
         active:state.active,dirty:state.draft?.isDirty?.()===true});
     });
-    global.addEventListener('pageshow',event=>{if(event.persisted)void reconcileAfterPageShow()});
+    global.addEventListener('pageshow',event=>{if(event.persisted){state.sound?.setActive(document.body.dataset.practiceView==='game');void reconcileAfterPageShow()}});
     // 仅 dirty 时提醒离开；取消提醒不会触发保存，实际 pagehide 才尝试发送。
     global.addEventListener('beforeunload',event=>{
       if(!state.active||!state.draft?.isDirty?.())return;
@@ -1720,6 +1734,11 @@
   function snapshot(){return {sessionId:text(state.session?.id),revision:Number(state.session?.revision||0),status:text(state.session?.status),mode:state.mode,index:state.index,health:state.health,streak:state.streak,experience:state.experience,correct:state.correct,answered:state.answered,remainingSeconds:state.mode==='scholar'?remainingSeconds():null,active:state.active,reviewing:state.reviewing,view:document.body.dataset.practiceView||'',questionCount:state.questions.length}}
   async function init(){
     cacheDom();
+    state.sound?.dispose();
+    state.sound=global.KGPracticeSound?.create({
+      button:$('practiceSoundToggle'),getOwner:()=>global.KGAuthCore?.currentUser?.()?.username||'',
+      getFeedbackEnabled:()=>state.active&&!state.reviewing&&state.instantFeedback!==false&&modePolicy().showCorrectness
+    });
     global.KGQuestionFavorites?.configure?.({list:dom.favoritesList,empty:dom.favoritesEmpty,summary:dom.favoritesSummary,
       searchInput:$('practiceFavoritesSearch'),moreBtn:$('practiceFavoritesMore'),detail:$('practiceFavoriteDetail'),onToast:showToast});
     state.lobbyDashboard=global.KGPracticeLobbyDashboard?.create({

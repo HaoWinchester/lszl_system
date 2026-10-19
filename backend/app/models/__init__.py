@@ -56,10 +56,13 @@ from app.models.training import (
     RecallProgress,
     TrainingProgress,
 )
+from app.models.referral import ReferralBinding, ReferralCode
 from app.models.user import User, UserAdminLog
 from app.models.wechat_mini import WechatMiniAuthTicket, WechatMiniSession
 
 __all__ = [
+    "ReferralBinding",
+    "ReferralCode",
     "WechatAccountTicket",
     "User",
     "FeatureUsageEvent",

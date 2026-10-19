@@ -85,6 +85,15 @@ scenario = '''
     page.set_viewport_size({'width':390,'height':844})
     assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
     page.screenshot(path=str(OUT / ('ui-'+args.capture+'-mobile.png')),full_page=True)
+    # Every mobile header action must be reachable through native horizontal scroll.
+    for width in [320, 390, 768]:
+        page.set_viewport_size({'width':width,'height':844})
+        page.evaluate("document.querySelector('.practice-sidebar-nav').scrollLeft=0")
+        for action in page.locator('.practice-sidebar-nav button').all():
+            action.scroll_into_view_if_needed()
+            box=action.bounding_box()
+            assert box and box['x']>=0 and box['x']+box['width']<=width, ('unreachable header action',width,action.get_attribute('id'),box)
+
     assert not errors,errors
     browser.close()
 print('practice lobby fidelity: 5 control computed/hover skins, 4 equal mode cards, keyboard tabs, 3 action callbacks, error/retry/empty and mobile passed')

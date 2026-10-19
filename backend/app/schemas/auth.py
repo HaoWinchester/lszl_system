@@ -12,6 +12,7 @@ class LoginRequest(BaseModel):
 
 
 class RegisterRequest(BaseModel):
+    referral_code: str | None = Field(default=None, alias="referralCode", max_length=64)
     username: str = Field(min_length=2, max_length=64)
     password: str = Field(min_length=4, max_length=128)
     display_name: str | None = None

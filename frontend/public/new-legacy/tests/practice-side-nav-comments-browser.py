@@ -5,6 +5,7 @@
 2. 标记区新增「评论」「弹幕开关」按钮：与标记按钮同显隐；弹幕开关切换本机偏好文案；
    评论按钮从页面底部打开讨论抽屉（类短视频评论区，数据走后端接口）。
 """
+from helpers.practice_tools import click_tool, open_tools
 from pathlib import Path
 import json
 import re
@@ -127,19 +128,22 @@ with sync_playwright() as playwright:
         page.wait_for_timeout(250)
         assert page.evaluate('KGPracticeMode.snapshot().mode') == 'practice'
 
+        assert page.locator('#practiceSideToggle').get_attribute('aria-expanded') == 'false'
+        assert page.locator('#practiceSideNav').is_hidden(), 'tools start collapsed on desktop and mobile'
+        page.locator('#practiceSideToggle').click()
         # 标记区工具同显隐（侧栏「标记」已换成「收藏」）
         for selector in ['#practiceMarkToggle', '#practiceCommentBtn', '#practiceDanmakuToggle', '#practiceFavoriteBtn']:
             assert page.locator(selector).is_visible(), selector
         assert page.locator('#practiceDanmakuToggle').inner_text() == '弹幕开'
 
         # 弹幕开关切换本机偏好
-        page.locator('#practiceDanmakuToggle').click()
+        click_tool(page, '#practiceDanmakuToggle')
         assert page.locator('#practiceDanmakuToggle').inner_text() == '弹幕关'
-        page.locator('#practiceDanmakuToggle').click()
+        click_tool(page, '#practiceDanmakuToggle')
         assert page.locator('#practiceDanmakuToggle').inner_text() == '弹幕开'
 
         # 评论按钮：从页面底部打开讨论抽屉
-        page.locator('#practiceCommentBtn').click()
+        click_tool(page, '#practiceCommentBtn')
         page.wait_for_selector('.q-comments-drawer')
         box = page.locator('.q-comments-drawer').bounding_box()
         assert box is not None, '讨论抽屉必须真实渲染'
@@ -150,11 +154,12 @@ with sync_playwright() as playwright:
 
         # 侧栏「收藏」按钮：toggle 切换高亮（题目收藏存后端，异步响应后同步按钮态）
         assert page.locator('#practiceFavoriteBtn').get_attribute('aria-pressed') == 'false'
-        page.locator('#practiceFavoriteBtn').click()
+        click_tool(page, '#practiceFavoriteBtn')
         page.wait_for_function("document.getElementById('practiceFavoriteBtn').getAttribute('aria-pressed')==='true'")
-        page.locator('#practiceFavoriteBtn').click()
+        click_tool(page, '#practiceFavoriteBtn')
         page.wait_for_function("document.getElementById('practiceFavoriteBtn').getAttribute('aria-pressed')==='false'")
 
+        open_tools(page)
         # 侧栏角标：当前题的评论数与收藏数
         page.wait_for_function("document.getElementById('practiceCommentCount').textContent==='7'")
         assert page.locator('#practiceCommentCount').is_visible()
@@ -171,34 +176,33 @@ with sync_playwright() as playwright:
         # 弹幕层仍要在解析可见时播放（mountDanmaku 挂到视口层，不依赖内嵌面板）
         page.wait_for_selector('body > .q-danmaku .q-danmaku-item')
 
-        if viewport['width'] > 600:
-            # 左侧导航收起：滑出屏幕左侧（visibility/transform 生效），把手状态同步
-            toggle = page.locator('#practiceSideToggle')
-            assert toggle.get_attribute('aria-expanded') == 'true'
-            toggle.click()
-            assert 'practice-side-collapsed' in page.locator('#practiceGame').get_attribute('class')
-            assert toggle.get_attribute('aria-expanded') == 'false'
-            page.wait_for_timeout(400)
-            collapsed = page.evaluate("(()=>{const c=getComputedStyle(document.getElementById('practiceSideNav'));return {v:c.visibility,t:c.transform}})()")
-            assert collapsed['v'] == 'hidden', collapsed
-            assert collapsed['t'] != 'none', collapsed
-            assert toggle.inner_text() == '»'
-            toggle.click()
-            assert toggle.get_attribute('aria-expanded') == 'true'
-            page.wait_for_timeout(400)
-            expanded = page.evaluate("(()=>{const c=getComputedStyle(document.getElementById('practiceSideNav'));return {v:c.visibility,t:c.transform}})()")
-            assert expanded['v'] == 'visible', expanded
-            assert toggle.inner_text() == '‹'
-        else:
-            # 移动端导航为横向静态条，不提供收起把手
-            assert page.locator('#practiceSideToggle').is_hidden()
+        # Same collapsed circle and accessible controls on desktop and touch widths.
+        toggle = page.locator('#practiceSideToggle')
+        expect(toggle).to_be_visible()
+        expect(toggle).to_have_attribute('aria-expanded', 'false')
+        box = toggle.bounding_box()
+        assert box['width'] == box['height'] == 56
+        assert 0 <= box['x'] and box['x'] + box['width'] <= viewport['width']
+        open_tools(page)
+        navbox = page.locator('#practiceSideNav').bounding_box()
+        assert 0 <= navbox['x'] and navbox['x'] + navbox['width'] <= viewport['width']
+        page.keyboard.press('Escape')
+        expect(page.locator('#practiceSideNav')).to_be_hidden()
+        expect(toggle).to_be_focused()
+        open_tools(page)
+        page.locator('#practiceQuestionStem').click()
+        expect(page.locator('#practiceSideNav')).to_be_hidden()
+        click_tool(page, '#practiceDanmakuSettingsBtn')
+        expect(page.locator('#questionDanmakuSettings')).to_be_visible()
+        page.keyboard.press('Escape')
+        expect(page.locator('#questionDanmakuSettings')).to_have_count(0)
 
         # Cancelling exit keeps the answered view and its comments alive.
-        page.locator('#practiceExitBtn').click()
+        click_tool(page, '#practiceExitBtn')
         page.locator('#practiceExitCancel').click()
         assert page.evaluate('document.body.dataset.practiceView') == 'game'
         assert page.locator('body > .q-danmaku .q-danmaku-item').count() == 1
-        page.locator('#practiceExitBtn').click()
+        click_tool(page, '#practiceExitBtn')
         page.locator('#practiceSaveExitBtn').click()
         page.wait_for_function("document.body.dataset.practiceView==='lobby'")
         page.wait_for_timeout(100)
@@ -231,7 +235,7 @@ with sync_playwright() as playwright:
         page.wait_for_function("document.body.dataset.practiceView==='game'")
         page.locator('#practiceOptions .practice-option[data-option-id="B"]').click()
         page.wait_for_selector('body > .q-danmaku .q-danmaku-item')
-        page.locator('#practiceExitBtn').click()
+        click_tool(page, '#practiceExitBtn')
         page.locator('#practiceAbandonBtn').click()
         page.wait_for_function("document.body.dataset.practiceView==='lobby'")
         assert page.locator('body > .q-danmaku').count() == 0, 'abandon exit also clears danmaku'

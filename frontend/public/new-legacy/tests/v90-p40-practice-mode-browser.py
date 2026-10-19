@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from helpers.practice_tools import click_tool, open_tools
 from pathlib import Path
 import re
 from playwright.sync_api import sync_playwright
@@ -125,7 +126,7 @@ with sync_playwright() as p:
     assert '连胜 ×3' in page.locator('#practiceStreakPop').inner_text()
     page.locator('[data-option-id="B"]').click();page.wait_for_timeout(570)
     assert page.locator('#practiceStreakPop').is_hidden()
-    page.locator('#practiceExitBtn').click();page.wait_for_timeout(50)
+    click_tool(page, '#practiceExitBtn');page.wait_for_timeout(50)
     assert page.locator('#practiceExitConfirm').is_visible()
     t1=page.evaluate('KGPracticeMode.snapshot().remainingSeconds');page.wait_for_timeout(1150);t2=page.evaluate('KGPracticeMode.snapshot().remainingSeconds')
     assert t2<t1

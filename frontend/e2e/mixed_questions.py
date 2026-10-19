@@ -10,6 +10,8 @@ import practice_resumable_report as harness
 from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / 'new-legacy' / 'tests'))
+from helpers.practice_tools import click_tool, open_tools
 OUT = ROOT / '.superpowers/sdd/2026-09-09-mixed-question-types/browser'
 OUT.mkdir(parents=True, exist_ok=True)
 tempfile.tempdir = str(OUT)
@@ -94,7 +96,7 @@ def main():
         page.locator('[data-qm-left="l1"]').click()
         page.locator('[data-qm-right="r2"]').click()
         assert page.locator('#practiceConfirmAnswerBtn').is_disabled()
-        page.locator('#practiceExitBtn').click()
+        click_tool(page, '#practiceExitBtn')
         page.locator('#practiceSaveExitBtn').click()
         page.locator('#practiceLobby').wait_for(state='visible')
         saved=context.request.get(base+'/api/v1/learning/practice/sessions/'+sid).json()['session']

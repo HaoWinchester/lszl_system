@@ -134,18 +134,16 @@ body.practice-mode-page[data-practice-view="game"] :is(button,a,select,summary):
 /* 左侧导航：评论 / 弹幕开关（与标记同为侧栏条目，弹幕开启时高亮） */
 body.practice-mode-page[data-practice-view="game"] .practice-side-danmaku[aria-pressed="true"]{color:#1f4fd1;background:#eaf0ff;font-weight:650}
 
-/* 左侧导航收起/展开（移动端导航为横向静态条，不提供收起） */
-@media(min-width:601px){
-  body.practice-mode-page[data-practice-view="game"] .practice-side-nav{transition:transform .24s ease}
-  body.practice-mode-page[data-practice-view="game"] .practice-side-toggle{position:absolute;left:80px;top:50%;transform:translateY(-50%);z-index:30;width:24px;height:56px;padding:0;border:1px solid #edf2fb;border-left:0;border-radius:0 10px 10px 0;background:#ffffffd9;color:#5b6b8c;font-size:16px;line-height:1;cursor:pointer;transition:left .24s ease}
-  body.practice-mode-page[data-practice-view="game"] .practice-side-toggle:hover{color:#1f4fd1;background:#f0f4ff}
-  body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-game.practice-side-collapsed{padding-left:28px}
-  body.practice-mode-page[data-practice-view="game"] .practice-side-collapsed .practice-side-nav{transform:translateX(-100%);pointer-events:none;visibility:hidden}
-  body.practice-mode-page[data-practice-view="game"] .practice-side-collapsed .practice-side-toggle{left:4px}
-}
-@media(max-width:600px){
-  body.practice-mode-page .practice-side-toggle{display:none}
-}
+/* 默认收起的答题工具，桌面和触屏使用同一入口。 */
+body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-game,
+body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-game.practice-side-collapsed{padding-left:24px}
+body.practice-mode-page[data-practice-view="game"] .practice-side-nav{position:fixed;inset:auto auto max(88px,calc(env(safe-area-inset-bottom) + 88px)) max(20px,env(safe-area-inset-left));display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:240px;max-width:calc(100vw - 40px);max-height:calc(100dvh - 180px);overflow:auto;padding:10px;gap:6px;background:#fff;border:1px solid #dfe5ee;border-radius:16px;box-shadow:0 8px 28px #243b5b24;z-index:46}
+body.practice-mode-page[data-practice-view="game"] .practice-side-nav[hidden]{display:none!important}
+body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-side-item{width:100%;min-height:54px;flex-direction:row;font-size:12px;padding:8px;gap:6px}
+body.practice-mode-page[data-practice-view="game"] .practice-side-toggle{--learn-radius-control:50%;position:fixed;left:max(20px,env(safe-area-inset-left));bottom:max(20px,env(safe-area-inset-bottom));top:auto;display:grid;place-items:center;transform:none;width:56px;height:56px;padding:0;border:1px solid #535b68;border-radius:50%;background:#4b5360;color:#fff;font-size:24px;line-height:1;box-shadow:0 2px 8px #243b5b20;z-index:45;cursor:pointer}
+body.practice-mode-page[data-practice-view="game"] .practice-side-toggle:hover{background:#39414e}
+body.practice-mode-page[data-practice-view="game"] .practice-side-toggle:focus-visible{outline:3px solid #8a9ab8;outline-offset:3px}
+@media(max-width:600px){body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-game,body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-game.practice-side-collapsed{padding-left:10px}}
 
 /* 独立悬浮入口与轻量保存状态，仅作用于答题视图。 */
 body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-answer-sheet-mobile-btn{--learn-radius-control:50%;display:flex;position:fixed;right:max(20px,env(safe-area-inset-right));bottom:max(20px,env(safe-area-inset-bottom));z-index:45;width:56px;height:56px;padding:8px;gap:2px;flex-direction:column;align-items:center;justify-content:center;border:1px solid #dfe5ee;border-radius:50%;background:#f5f8ff;color:#526994;box-shadow:0 2px 8px #243b5b12;font-size:10px;line-height:1.1;white-space:nowrap}

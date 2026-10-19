@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Reuse the existing isolated practice DOM/API fixture; exercise feedback UI in Chromium."""
+from helpers.practice_tools import click_tool, open_tools
 from pathlib import Path
 fixture = Path(__file__).with_name('practice-mark-show-answers-browser.py')
 setup = fixture.read_text().split('    # ---------- 场景 1：')[0]
@@ -30,7 +31,7 @@ scenario = '''
     assert page.locator('.practice-option.is-wrong').count() == 1
     assert page.locator('#practiceExplanationPanel').is_visible()
     page.locator('#practiceInstantFeedback').uncheck()
-    page.locator('#practiceExitBtn').click()
+    click_tool(page, '#practiceExitBtn')
     page.locator('#practiceSaveExitBtn').click()
     page.wait_for_timeout(250)
     saved = page.evaluate('Object.values(window.__pausedSnapshots)[0]')
@@ -122,7 +123,7 @@ for kind in ['single_choice', 'multiple_choice', 'matching']:
     assert page.evaluate('KGPracticeMode.snapshot().index') == 3, 'toggle must cancel pending navigation'
     page.locator('#practiceNextBtn').click()
 ''' + commit_actions + confirm + '''
-    page.locator('#practiceExitBtn').click()
+    click_tool(page, '#practiceExitBtn')
     page.clock.run_for(600)
     assert page.evaluate('KGPracticeMode.snapshot().index') == 4, 'exit dialog must cancel pending navigation'
     page.locator('#practiceExitCancel').click()

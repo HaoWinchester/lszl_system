@@ -59,7 +59,7 @@
     if(!root)return false;
     if(!byId('authModal'))root.innerHTML=template();
     state.mounted=!!byId('authModal');
-    if(state.mounted){bind();renderStatus()}
+    if(state.mounted){core()?.mountReferralField?.();bind();renderStatus()}
     return state.mounted;
   }
   function message(text='',ok=false){
@@ -151,7 +151,7 @@
     setBusy(true);
     message(kind==='register'?'正在创建账号…':'正在验证账号…');
     try{
-      const result=await handler(credentials.username,credentials.password,{source:state.options.source,acceptedTermsVersion:LEGAL_CONSENT_VERSION});
+      const result=await handler(credentials.username,credentials.password,{source:state.options.source,acceptedTermsVersion:LEGAL_CONSENT_VERSION,...(kind==='register'?{referralCode:core()?.readReferralCode?.()||''}:{})});
       const ok=result===true||!!result?.ok;
       if(!ok){
         if(!String(byId('authMsg')?.textContent||'').trim()||String(byId('authMsg')?.textContent||'').includes('正在')){

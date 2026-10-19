@@ -1,5 +1,6 @@
 """Approved lobby layout, real isolated API data and all four preserved modes."""
 import argparse,json,subprocess,uuid
+from helpers.practice_tools import click_tool, open_tools
 from pathlib import Path
 from playwright.sync_api import sync_playwright,expect
 
@@ -66,13 +67,13 @@ with sync_playwright() as pw:
         choose();page.locator('#practiceCountOptions label:has([value="20"])').click();page.locator('.practice-order-options label:has([value="random"])').click()
         page.locator('[data-practice-start="'+mode+'"]').click();page.wait_for_function('(mode)=>KGPracticeMode.snapshot().active&&KGPracticeMode.snapshot().mode===mode',arg=mode)
         assert page.evaluate('KGPracticeMode.snapshot().questionCount')==20
-        page.locator('#practiceExitBtn').click();expect(page.locator('#practiceExitConfirm')).to_be_visible();page.locator('#practiceSaveExitBtn').click();page.wait_for_function('KGPracticeMode.snapshot().view==="lobby"')
+        click_tool(page, '#practiceExitBtn');expect(page.locator('#practiceExitConfirm')).to_be_visible();page.locator('#practiceSaveExitBtn').click();page.wait_for_function('KGPracticeMode.snapshot().view==="lobby"')
     expect(page.locator('#practiceRecentBody tr')).to_have_count(3);checks.append('ordinary/challenge/scholar start and save, real records preview')
     page.wait_for_timeout(500);page.screenshot(path=str(OUT/'desktop.png'),full_page=True)
     # Resume an actual ordinary attempt, create a wrong answer and settle it.
     page.locator('[data-recent-resume]').last.click();page.wait_for_function('KGPracticeMode.snapshot().active');assert page.evaluate('KGPracticeMode.snapshot().mode')=='practice'
     page.locator('[data-option-id="B"]').click();page.wait_for_timeout(700)
-    page.locator('#practiceFavoriteBtn').click();page.wait_for_timeout(350)
+    click_tool(page, '#practiceFavoriteBtn');page.wait_for_timeout(350)
     page.locator('#practiceAnswerSheetMobileBtn').click();assert page.locator('[data-answer-submit]').count()==0,'ordinary retains automatic completion';page.keyboard.press('Escape')
     for index in range(1,20):
         page.locator('#practiceNextBtn').click();page.wait_for_function('(i)=>KGPracticeMode.snapshot().index===i',arg=index);page.locator('[data-option-id="A"]').click()
@@ -80,7 +81,7 @@ with sync_playwright() as pw:
     page.locator('[data-report-lobby]').click();page.wait_for_function('KGPracticeMode.snapshot().view==="lobby"');page.wait_for_timeout(500)
     page.locator('[data-recent-report]').click();page.wait_for_function('KGPracticeMode.snapshot().view==="result"');page.locator('[data-report-lobby]').click();checks.append('preview resume, settled report and real favorites')
     page.locator('#practiceRecentFavoritesTab').click();expect(page.locator('[data-recent-favorite]')).to_have_count(1);page.locator('[data-recent-favorite]').click();expect(page.locator('#practiceFavoriteDetail')).to_be_visible();page.keyboard.press('Escape');page.locator('#practiceRecentHistoryTab').click()
-    page.locator('[data-practice-start="revenge"]').click();page.wait_for_function('KGPracticeMode.snapshot().active&&KGPracticeMode.snapshot().mode==="revenge"');page.locator('#practiceExitBtn').click();page.locator('#practiceSaveExitBtn').click();page.wait_for_function('KGPracticeMode.snapshot().view==="lobby"');checks.append('revenge mode retained with real wrong-question pool')
+    page.locator('[data-practice-start="revenge"]').click();page.wait_for_function('KGPracticeMode.snapshot().active&&KGPracticeMode.snapshot().mode==="revenge"');click_tool(page, '#practiceExitBtn');page.locator('#practiceSaveExitBtn').click();page.wait_for_function('KGPracticeMode.snapshot().view==="lobby"');checks.append('revenge mode retained with real wrong-question pool')
     # Mobile: no viewport overflow, all four modes and all help/actions remain reachable.
     page.set_viewport_size({'width':390,'height':844});page.wait_for_timeout(250)
     assert page.evaluate('document.documentElement.scrollWidth<=innerWidth'),page.evaluate('document.documentElement.scrollWidth')

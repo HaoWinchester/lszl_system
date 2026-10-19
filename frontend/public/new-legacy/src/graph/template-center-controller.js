@@ -4,6 +4,7 @@
   function el(tag,text){const node=document.createElement(tag);if(text!==undefined)node.textContent=text;return node}
   function previewWindowPosition(left,top,width,height,viewportWidth,viewportHeight){return{left:Math.max(0,Math.min(Math.max(0,viewportWidth-width),left)),top:Math.max(0,Math.min(Math.max(0,viewportHeight-height),top))}}
   function canPublish(role){return role==='teacher'||role==='admin'}
+  function selectTemplates(rows,target){return target?rows.filter(item=>item.id===target):rows}
   let active=null;
   const onlineFilesRequired='当前为临时图谱模式，暂不能发布或加载模板。请先导出学习包保留内容，再联系管理员恢复在线图谱后重新打开。';
   function requireOnlineFiles(){if(global.KGGraphFileEditorStoreBridge?.isRemote?.()!==true)throw new Error(onlineFilesRequired)}
@@ -17,25 +18,30 @@
     }
     return data;
   }
-  function open(){
+  function open(options={}){
     if(active)return;
     const dialog=el('dialog');dialog.id='graphTemplateCenter';dialog.className='graph-template-center';dialog.setAttribute('aria-label','知识图谱模板中心');
     const heading=el('h2','知识图谱模板中心'),intro=el('p','加载会创建独立的新图谱。模板更新或下架不会修改已加载的副本。'),status=el('p'),list=el('div'),actions=el('div'),close=el('button','关闭');status.setAttribute('role','status');actions.className='template-center-actions';actions.append(close);dialog.append(heading,intro,status,list,actions);
     let disposed=false,busy=false,publicationForm=null,unmount=()=>{},closePreview=()=>{};const lifetime=new AbortController();active=dialog;
-    function finish(){if(busy)return;disposed=true;lifetime.abort();closePreview();unmount();dialog.close();dialog.remove();active=null}
-    close.onclick=finish;dialog.addEventListener('cancel',e=>{e.preventDefault();finish()});
+    function finish(force=false){if(busy&&!force)return;disposed=true;lifetime.abort();closePreview();unmount();dialog.close();dialog.remove();active=null}
+    close.onclick=()=>finish();dialog.addEventListener('cancel',e=>{e.preventDefault();finish()});
     dialog.addEventListener('keydown',event=>{event.stopPropagation();if(event.key==='Escape'){event.preventDefault();finish()}});
     (document.fullscreenElement||document.body).append(dialog);
     if(global.KGCanvasDomInteraction?.mountOverlay)unmount=global.KGCanvasDomInteraction.mountOverlay(dialog);
     dialog.showModal();
     function context(){return global.KGGraphFileEditorStoreBridge?.fragmentSource?.()}
     const actor=global.KGAuthCore?.currentUser?.();
+    const openingOwner=actor?.username;
+    const isCurrent=()=>!disposed&&global.KGAuthCore?.currentUser?.()?.username===openingOwner;
+    global.addEventListener?.('kg-auth-session-change',()=>{if(global.KGAuthCore?.currentUser?.()?.username!==openingOwner)finish(true)},{signal:lifetime.signal});
     if(canPublish(actor?.role)){
       const publish=el('button','发布当前图谱');publish.dataset.templatePublish='';actions.prepend(publish);publish.onclick=()=>form(null);
     }
-    async function execute(action){if(busy)return;busy=true;close.disabled=true;try{await action()}catch(error){if(!disposed)status.textContent=error.message}finally{busy=false;close.disabled=false}}
-    async function refresh(){status.textContent='正在加载模板…';const data=await request('');if(disposed)return;list.replaceChildren();if(!data.templates.length)status.textContent='暂无模板，教师可发布当前图谱。';else status.textContent='点击图谱预览，可拖动、缩放或全屏查看。';if(global.KGGraphFileEditorStoreBridge?.isRemote?.()!==true)status.textContent=onlineFilesRequired;
-      for(const item of data.templates){
+    async function execute(action){if(busy||!isCurrent())return;busy=true;close.disabled=true;try{await action()}catch(error){if(!disposed)status.textContent=isCurrent()?error.message:'当前账号已切换，请关闭后重试。'}finally{busy=false;close.disabled=false}}
+    async function refresh(){if(!isCurrent())return;status.textContent='正在加载模板…';const data=await request('',{signal:lifetime.signal});if(!isCurrent())return;list.replaceChildren();if(!data.templates.length)status.textContent='暂无模板，教师可发布当前图谱。';else status.textContent='点击图谱预览，可拖动、缩放或全屏查看。';if(global.KGGraphFileEditorStoreBridge?.isRemote?.()!==true)status.textContent=onlineFilesRequired;
+      const visible=selectTemplates(data.templates,options.templateId);
+      if(options.templateId&&!visible.length)status.textContent='此模板不存在、已下架或当前账号无权访问。请关闭后从工具栏打开模板中心查看其他模板。';
+      for(const item of visible){
         const card=el('article');card.dataset.templateId=item.id;
         // 头部：标题 + 免费/会员徽章（下架状态并入徽章文案，保持“已下架”可读）。
         const head=el('div');head.className='template-card-head';
@@ -55,20 +61,22 @@
         const receipts=new Map();
         load.onclick=()=>loadCopy(item.version);
         function loadCopy(version){return execute(async()=>{
+          if(!isCurrent())return;
           requireOnlineFiles();
           if(!receipts.has(version))receipts.set(version,{requestId:global.crypto?.randomUUID?.()||'template-'+Date.now()+'-'+Math.random(),version});
           const receipt=receipts.get(version);
           status.textContent='正在创建独立图谱…';
-          const result=await request('/'+encodeURIComponent(item.id)+'/loads',{method:'POST',body:receipt});if(disposed)return;
-          const store=global.KGGraphFileRemoteStore||global.KGGraphFileStore;await store?.refresh?.();await global.KGGraphFileTabs?.refresh?.();
+          const result=await request('/'+encodeURIComponent(item.id)+'/loads',{method:'POST',body:receipt,signal:lifetime.signal});if(!isCurrent())return;
+          const store=global.KGGraphFileRemoteStore||global.KGGraphFileStore;await store?.refresh?.();if(!isCurrent())return;await global.KGGraphFileTabs?.refresh?.();if(!isCurrent())return;
           status.textContent='已创建独立副本';const link=el('a','打开新图谱');link.href='index.html?fileId='+encodeURIComponent(result.fileId);link.dataset.templateResult=result.fileId;
-          link.onclick=async e=>{if(global.KGGraphFileTabs?.openFile){e.preventDefault();finish();await global.KGGraphFileTabs.openFile(result.fileId)}};details.hidden=false;details.replaceChildren(link);load.textContent='再次查看已创建副本';
+          link.onclick=async e=>{if(!isCurrent()){e.preventDefault();return}if(global.KGGraphFileTabs?.openFile){e.preventDefault();finish();await global.KGGraphFileTabs.openFile(result.fileId)}};details.hidden=false;details.replaceChildren(link);load.textContent='再次查看已创建副本';
         })}
         if(item.canMaintain){const update=el('button','更新为新版本'),toggle=el('button',item.listed?'下架':'重新上架');actions.append(update,toggle);update.onclick=()=>form(item);toggle.onclick=()=>execute(async()=>{await request('/'+encodeURIComponent(item.id),{method:'PATCH',body:{listed:!item.listed}});await refresh()})}
         list.append(card);
       }
     }
     async function showPreview(item,fetchPreview,load){
+      if(!isCurrent())return;
       closePreview();
       const panel=el('dialog');panel.className='template-preview-window';panel.setAttribute('aria-label',item.name+' · 模板预览');
       const surface=el('div');surface.className='template-preview-surface';
@@ -84,7 +92,7 @@
       minus.onclick=()=>drawing?.zoom(.8);plus.onclick=()=>drawing?.zoom(1.25);fit.onclick=()=>drawing?.fit();
       full.onclick=async()=>{try{if(document.fullscreenElement===surface)await document.exitFullscreen();else await surface.requestFullscreen()}catch(error){message.textContent='当前浏览器无法全屏，请使用窗口预览。';footer.append(message)}};
       panel.addEventListener('fullscreenchange',()=>{full.textContent=document.fullscreenElement===surface?'退出全屏':'全屏';keepWindowInView();drawing?.fit()},{signal:lifetime.signal});
-      use.onclick=async()=>{if(displayedVersion===null)return;await dismiss();load(displayedVersion)};
+      use.onclick=async()=>{if(displayedVersion===null||!isCurrent())return;await dismiss();if(isCurrent())load(displayedVersion)};
       function positionWindow(left,top){const position=previewWindowPosition(left,top,panel.offsetWidth,panel.offsetHeight,innerWidth,innerHeight);panel.style.margin='0';panel.style.left=position.left+'px';panel.style.top=position.top+'px'}
       function keepWindowInView(){if(document.fullscreenElement===surface||!panel.style.left)return;const rect=panel.getBoundingClientRect();positionWindow(rect.left,rect.top)}
       global.addEventListener('resize',keepWindowInView,{signal:lifetime.signal});
@@ -130,5 +138,5 @@
     refresh().catch(error=>{if(!disposed)status.textContent=error.message});
   }
   global.KGGraphTemplateCenter={open,canPublish};
-  if(typeof module==='object'&&module.exports)module.exports={canPublish,previewWindowPosition};
+  if(typeof module==='object'&&module.exports)module.exports={canPublish,previewWindowPosition,selectTemplates};
 })(typeof window!=='undefined'?window:globalThis);

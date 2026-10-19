@@ -174,7 +174,7 @@ async def list_logs(db: AsyncSession, limit: int = 100) -> list[UserAdminLog]:
 
 
 # ---------- 写操作 ----------
-async def create_user(db: AsyncSession, data: UserCreate, actor: str = "system") -> User:
+async def create_user(db: AsyncSession, data: UserCreate, actor: str = "system", *, commit: bool = True) -> User:
     if await get_by_username(db, data.username):
         raise ValueError("用户名已存在")
     if data.role not in VALID_ROLES:
@@ -196,8 +196,11 @@ async def create_user(db: AsyncSession, data: UserCreate, actor: str = "system")
     )
     db.add(user)
     await log_action(db, "create_user", data.username, actor, f"新建用户，角色 {data.role}")
-    await db.commit()
-    await db.refresh(user)
+    if commit:
+        await db.commit()
+        await db.refresh(user)
+    else:
+        await db.flush()
     return user
 
 

@@ -4,8 +4,20 @@
   function bindHelpPopovers() {
     const helps = [...document.querySelectorAll('.practice-standard-modes .practice-lobby-help')].map(detail => {
       const summary = detail.querySelector('summary');
+      const content = detail.querySelector('.practice-help-content');
       let pinned = false;
       let closeTimer;
+      const position = () => {
+        content.style.removeProperty('top');
+        if (!detail.open || !window.matchMedia('(max-width:480px)').matches) return;
+        // Narrow screens use a fixed popup. Keep it beside the trigger rather
+        // than requiring the pointer to cross most of the screen to reach it.
+        const trigger = summary.getBoundingClientRect(), height = content.getBoundingClientRect().height;
+        const below = trigger.bottom + 8;
+        const top = below + height <= window.innerHeight - 8 ? below : trigger.top - height - 8;
+        content.style.top = Math.max(8, Math.min(window.innerHeight - height - 8, top)) + 'px';
+      };
+      const open = () => { if (!detail.open) { detail.open = true; position(); } };
       const cancelClose = () => window.clearTimeout(closeTimer);
       const close = () => { cancelClose(); pinned = false; detail.open = false; };
       const closeSoon = () => {
@@ -16,10 +28,10 @@
       };
       detail.addEventListener('pointerenter', event => {
         cancelClose();
-        if (event.pointerType !== 'touch') detail.open = true;
+        if (event.pointerType !== 'touch') open();
       });
       detail.addEventListener('pointerleave', closeSoon);
-      detail.addEventListener('focusin', () => { cancelClose(); detail.open = true; });
+      detail.addEventListener('focusin', () => { cancelClose(); open(); });
       detail.addEventListener('focusout', event => {
         if (!detail.contains(event.relatedTarget)) closeSoon();
       });
@@ -28,10 +40,11 @@
         event.preventDefault();
         cancelClose();
         pinned = !pinned;
-        detail.open = pinned;
+        if (pinned) open(); else detail.open = false;
       });
-      return {detail, close};
+      return {detail, close, position};
     });
+    window.addEventListener('resize', () => helps.forEach(help => help.position()));
     document.addEventListener('click', event => {
       helps.forEach(help => { if (!help.detail.contains(event.target)) help.close(); });
     });

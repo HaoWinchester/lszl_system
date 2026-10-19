@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from helpers.practice_tools import click_tool, open_tools
 from pathlib import Path
 import re
 import shutil
@@ -257,7 +258,7 @@ with sync_playwright() as playwright:
     page.wait_for_timeout(120)
 
     # ---------- key=save：saveAndExit 延迟响应、双击防重入、500 失败恢复 ----------
-    page.locator("#practiceExitBtn").click()
+    click_tool(page, '#practiceExitBtn')
     save_button = page.locator("#practiceSaveExitBtn")
     save_button.click()
     info = page.evaluate("window.__watchLearningLoading()")
@@ -265,7 +266,9 @@ with sync_playwright() as playwright:
     assert "正在保存做题进度…" in page.locator("[data-learning-loading-message]").inner_text()
     assert save_button.is_disabled()
     assert page.evaluate("window.__pauseCalls") == 1
-    save_button.click(force=True)
+    repeat_box = save_button.bounding_box()
+    assert repeat_box is not None
+    page.mouse.click(repeat_box["x"] + repeat_box["width"] / 2, repeat_box["y"] + repeat_box["height"] / 2)
     page.wait_for_timeout(40)
     assert page.evaluate("window.__pauseCalls") == 1, "重复点击保存必须被 pendingRequestKey 拦截"
     settle("pause", "reject", "window.__statusError(500)")
@@ -329,6 +332,7 @@ with sync_playwright() as playwright:
     )
     page.wait_for_function("document.body.dataset.practiceView === 'lobby'")
     page.locator("#practiceHistoryOpenBtn").click()
+    page.locator('[data-history-paper="paper-loading"] details summary').click()
     report_row = page.locator('[data-history-session="ps-done"]')
     report_row.wait_for()
     report_row.click()
@@ -345,6 +349,7 @@ with sync_playwright() as playwright:
     page.wait_for_function("document.body.dataset.practiceView === 'lobby'")
     page.locator("#practiceHistoryOpenBtn").click()
     page.wait_for_timeout(120)
+    page.locator('[data-history-paper="paper-loading"] details summary').click()
     page.locator('[data-history-session="ps-done"]').click()
     page.wait_for_function("window.__watchLearningLoading().visible === true && window.__watchLearningLoading().title === '正在打开成绩报告'")
     page.evaluate("""()=>{const g=window.__reloadGatePending.shift();if(g)g.reject(window.__statusError(409))}""")
@@ -363,9 +368,9 @@ with sync_playwright() as playwright:
           window.__setActiveSession(window.__baseSession());
           await window.KGPracticeMode.startPractice('challenge');
           if(document.body.dataset.practiceView!=='game')throw new Error('expected game view');
-          document.getElementById('practiceExitBtn').click();
         }"""
     )
+    click_tool(page, "#practiceExitBtn")
     abandon_button = page.locator("#practiceAbandonBtn")
     page.wait_for_function("document.getElementById('practiceHistoryDrawer').hidden")
     abandon_button.click()
@@ -374,7 +379,9 @@ with sync_playwright() as playwright:
     assert "正在结束本次练习…" in page.locator("[data-learning-loading-message]").inner_text()
     assert abandon_button.is_disabled()
     assert page.evaluate("window.__abandonCalls") == 1
-    abandon_button.click(force=True)
+    repeat_box = abandon_button.bounding_box()
+    assert repeat_box is not None
+    page.mouse.click(repeat_box["x"] + repeat_box["width"] / 2, repeat_box["y"] + repeat_box["height"] / 2)
     page.wait_for_timeout(40)
     assert page.evaluate("window.__abandonCalls") == 1, "重复点击放弃必须被 pendingRequestKey 拦截"
     settle("abandon", "reject", "window.__statusError(500)")

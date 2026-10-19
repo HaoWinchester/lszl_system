@@ -41,6 +41,8 @@
   const SCOPED_UI_BASE_KEYS = Object.freeze([
     'kg_question_discussion_danmaku_v1',
     'kg_question_danmaku_hidden_v1',
+    'kg_question_danmaku_settings_v1',
+    'kg_practice_sound_v1',
     'kg_multi_question_highlight_color_v1',
     'kg_multi_question_analysis_sections_v1',
     'kg_multi_question_paper_selection_v1',

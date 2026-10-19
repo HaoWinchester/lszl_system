@@ -8,6 +8,8 @@ import practice_resumable_report as harness
 from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / 'new-legacy' / 'tests'))
+from helpers.practice_tools import click_tool, open_tools
 OUT = ROOT / 'artifacts/answer-page-design'
 OUT.mkdir(parents=True, exist_ok=True)
 tempfile.tempdir = str(OUT)
@@ -62,7 +64,8 @@ def main():
             page.locator('[data-practice-start="challenge"]').click()
             page.locator('#practiceGame').wait_for(state='visible')
             def jump(index):
-                page.locator('[data-practice-action="sheet"]').click()
+                page.locator('#practiceAnswerSheetMobileBtn').click()
+                page.locator('[data-answer-filter="all"]').click()
                 page.locator(f'#practiceAnswerSheet [data-question-id="{qs[index]["id"]}"]').click()
             jump(5)
             page.mouse.move(0,0)
@@ -73,14 +76,14 @@ def main():
             assert material_box['x']+material_box['width'] < panel['x']
             assert abs(material_box['y']-panel['y']) < 2
             assert page.locator('#practiceQuestionType').inner_text()=='单选题'
-            assert 'linear-gradient' in page.locator('#practiceNextBtn').evaluate('(el)=>getComputedStyle(el).backgroundImage')
+            assert page.locator('#practiceNextBtn').evaluate('(el)=>{const s=getComputedStyle(el);return s.backgroundImage==="none"&&s.backgroundColor==="rgb(67, 107, 208)"&&s.color==="rgb(255, 255, 255)"}')
             assert page.locator('.practice-brand strong').inner_text()=='知识练习'
             assert page.locator('[data-practice-action="settings"], #practiceReadingSettings').count()==0
-            note=page.locator('.practice-side-note').bounding_box()
-            exit_box=page.locator('.practice-side-nav #practiceExitBtn').bounding_box()
+            assert page.locator('#practiceSideNav').is_hidden()
+            open_tools(page)
             assert page.locator('#practiceExitBtn').inner_text()=='退出'
-            assert 0 < note['y']-(exit_box['y']+exit_box['height']) < 60
-            page.locator('[data-practice-action="question"]').click()
+            assert page.locator('.practice-side-note').is_hidden()
+            click_tool(page, '[data-practice-action="question"]')
             assert page.locator('#practiceQuestionStem').evaluate('(el)=>el===document.activeElement')
             page.locator('.qm-case-body').evaluate('(el)=>el.scrollTop=100')
             prior=page.locator('.qm-case-body').evaluate('(el)=>el.scrollTop')
@@ -92,7 +95,8 @@ def main():
             assert not page.locator('.qm-case').evaluate('(el)=>el.open')
             page.locator('.qm-case summary').click()
             page.locator('#practiceMarkToggle').click()
-            page.locator('[data-practice-action="marked"]').click()
+            page.locator('#practiceAnswerSheetMobileBtn').click()
+            page.locator('[data-answer-filter="marked"]').click()
             assert page.locator('#practiceAnswerSheet [data-question-id]').count()==1
             page.locator('#practiceAnswerSheet [data-question-id]').click()
             for width in [320,390,768,900,1024,1360]:
@@ -101,12 +105,25 @@ def main():
                     print(page.evaluate("[...document.querySelectorAll('body *')].filter(el=>el.getBoundingClientRect().width&&el.getBoundingClientRect().right>innerWidth+1).map(el=>({tag:el.tagName,id:el.id,cls:el.className,right:el.getBoundingClientRect().right,width:el.getBoundingClientRect().width})).slice(-25)"), flush=True)
                     page.screenshot(path=str(OUT/'overflow.png'),full_page=True)
                 assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), width
+                tools=page.locator('#practiceSideToggle').bounding_box()
+                sheet=page.locator('#practiceAnswerSheetMobileBtn').bounding_box()
+                assert tools and sheet and abs(tools['width']-56)<=1 and abs(tools['height']-56)<=1, (width,tools)
+                assert abs(sheet['width']-56)<=1 and abs(sheet['height']-56)<=1, (width,sheet)
+                assert 16<=tools['x']<=24 and 16<=width-(sheet['x']+sheet['width'])<=24, (width,tools,sheet)
+                assert tools['x']+tools['width']<sheet['x'] and abs(tools['y']-sheet['y'])<=1, (width,tools,sheet)
+                open_tools(page)
+                menu=page.locator('#practiceSideNav').bounding_box()
+                assert menu and menu['x']>=0 and menu['x']+menu['width']<=width and menu['y']>=0, (width,menu)
+                page.keyboard.press('Escape')
+                assert page.locator('#practiceSideNav').is_hidden()
                 if width<=900:
                     assert page.locator('.qm-question-materials').bounding_box()['y']<page.locator('.practice-answer-panel').bounding_box()['y']
-                for selector, role in [('.practice-question-stem','title'),('.qm-text','body'),
-                                       ('.practice-option','body'),('.practice-nav-btn','control'),
-                                       ('.practice-brand strong','brand')]:
-                    assert page.locator(selector).first.evaluate('(el)=>getComputedStyle(el).fontSize') == list_type[role], (width, selector, list_type)
+                for selector, token in [('.practice-question-stem','--ui-text-card-title'),('.qm-text','--ui-text-body'),
+                                        ('.practice-option','--ui-text-body'),('.practice-nav-btn','--ui-text-control'),
+                                        ('.practice-brand strong','--ui-text-body')]:
+                    actual=page.locator(selector).first.evaluate('(el)=>getComputedStyle(el).fontSize')
+                    expected=page.locator(selector).first.evaluate('(el,token)=>{const probe=document.createElement("span");probe.style.fontSize="var("+token+")";el.append(probe);const value=getComputedStyle(probe).fontSize;probe.remove();return value}',token)
+                    assert actual==expected, (width,selector,actual,token,expected)
                 if width==390: page.screenshot(path=str(OUT/'mobile-case.png'),full_page=True)
             jump(0)
             assert page.locator('.qm-question-materials').is_hidden()
@@ -124,18 +141,19 @@ def main():
             assert page.locator('#practiceConfirmAnswerBtn').is_enabled()
             page.screenshot(path=str(OUT/'desktop-matching.png'),full_page=True)
             page.locator('#practiceConfirmAnswerBtn').click()
-            page.locator('#practiceExitBtn').click()
+            click_tool(page, '#practiceExitBtn')
             page.locator('#practiceSaveExitBtn').click()
             page.locator('#practiceLobby').wait_for(state='visible')
             page.reload(wait_until='networkidle')
             page.locator(f'[data-paper-id="{ids["paper"]}"]').first.click()
             page.locator('[data-practice-start="challenge"]').click()
             page.locator('#practiceGame').wait_for(state='visible')
-            page.locator('[data-practice-action="marked"]').click()
+            page.locator('#practiceAnswerSheetMobileBtn').click()
+            page.locator('[data-answer-filter="marked"]').click()
             assert page.locator('#practiceAnswerSheet [data-question-id]').count()==1
             assert not errors, errors
             browser.close()
-            print('PASS design: cases, single/multiple/matching, scroll/collapse retention, marked filter/save/reload, navigation boundaries, simplified sidebar, list typography, six viewport widths')
+            print('PASS design: cases, single/multiple/matching, scroll/collapse retention, marked filter/save/reload, navigation boundaries, floating tools, established typography tokens, six viewport widths')
     finally:
         server.close()
 

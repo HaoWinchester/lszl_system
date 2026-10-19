@@ -42,6 +42,8 @@ from playwright.sync_api import sync_playwright
 from sqlalchemy import delete, select
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO_ROOT / 'new-legacy' / 'tests'))
+from helpers.practice_tools import click_tool, open_tools
 BACKEND_ROOT = REPO_ROOT / "backend"
 ACTIVE_RELEASE_ROOT = Path(os.environ.get(
     "KG_E2E_ACTIVE_RELEASE_ROOT", str(REPO_ROOT / "frontend" / "new-legacy-releases")
@@ -125,15 +127,21 @@ class IsolatedPracticeHarness:
                 [str(BACKEND_ROOT / ".venv" / "bin" / "alembic"), "upgrade", "head"],
                 cwd=BACKEND_ROOT, env=server_env, check=True, capture_output=True, text=True,
             )
-            self.release_temp = tempfile.TemporaryDirectory(prefix="kg-task8-release-")
-            self.release_root = Path(self.release_temp.name)
-            subprocess.run(
-                [
-                    "node", str(REPO_ROOT / "frontend" / "scripts" / "manage-new-legacy.js"),
-                    "update", str(SOURCE_ROOT), "--root", str(self.release_root), "--skip-browser",
-                ],
-                cwd=REPO_ROOT, check=True, capture_output=True, text=True,
-            )
+            existing_release = os.environ.get("KG_E2E_SERVE_RELEASE_ROOT")
+            if existing_release:
+                # Read-only rerun against an already validated candidate; no sync/build.
+                self.release_root = Path(existing_release).resolve()
+                assert (self.release_root / "current.json").is_file(), self.release_root
+            else:
+                self.release_temp = tempfile.TemporaryDirectory(prefix="kg-task8-release-")
+                self.release_root = Path(self.release_temp.name)
+                subprocess.run(
+                    [
+                        "node", str(REPO_ROOT / "frontend" / "scripts" / "manage-new-legacy.js"),
+                        "update", str(SOURCE_ROOT), "--root", str(self.release_root), "--skip-browser",
+                    ],
+                    cwd=REPO_ROOT, check=True, capture_output=True, text=True,
+                )
             pointer = json.loads((self.release_root / "current.json").read_text(encoding="utf-8"))
             candidate_files = file_count(self.release_root / pointer["site"])
             active_pointer = json.loads((ACTIVE_RELEASE_ROOT / "current.json").read_text(encoding="utf-8"))
@@ -441,7 +449,7 @@ def run_matrix() -> None:
                 f"hidden={fail_dialog.get_attribute('hidden')!r}",
             )
 
-            # 答题卡跳题（单实例抽屉：topbar 最右开关 -> 单元格）
+            # 答题卡跳题（单实例抽屉：右下圆形开关 -> 单元格）
             page.locator("#practiceAnswerSheetMobileBtn").click()
             drawer = page.locator("#practiceAnswerSheetDrawer")
             page.wait_for_timeout(120)
@@ -456,7 +464,7 @@ def run_matrix() -> None:
             check_matrix(1, "sheet jump zero write requests", not writes, f"writes={writes}")
 
             # ---- matrix 2: save-and-exit -> exactly one pause with 3 whole-paper answers ----
-            page.locator("#practiceExitBtn").click()
+            click_tool(page, "#practiceExitBtn")
             page.locator("#practiceExitConfirm").wait_for(state="visible")
             page.locator("#practiceSaveExitBtn").click()
             page.locator("#practiceLobby").wait_for(state="visible")
@@ -597,7 +605,7 @@ def run_matrix() -> None:
             )
             timeout_writes = answer_state_writes(log)
             check_matrix(6, "scholar timeout zero write requests", not timeout_writes, f"writes={timeout_writes}")
-            page.locator("#practiceExitBtn").click()
+            click_tool(page, "#practiceExitBtn")
             page.locator("#practiceExitConfirm").wait_for(state="visible")
             page.locator("#practiceSaveExitBtn").click()
             page.locator("#practiceLobby").wait_for(state="visible")
@@ -629,7 +637,7 @@ def run_matrix() -> None:
                 scholar_resumed["answered"] == 1 and scholar_resumed["correct"] == 0 and scholar_resumed["health"] == 2,
                 f"snap={scholar_resumed}",
             )
-            page.locator("#practiceExitBtn").click()
+            click_tool(page, "#practiceExitBtn")
             page.locator("#practiceExitConfirm").wait_for(state="visible")
             page.locator("#practiceAbandonBtn").click()
             page.locator("#practiceLobby").wait_for(state="visible")
@@ -766,7 +774,7 @@ def run_matrix() -> None:
                 return originalFetch.call(this, input, init);
               };
             }""")
-            page.locator("#practiceExitBtn").click()
+            click_tool(page, "#practiceExitBtn")
             page.locator("#practiceExitConfirm").wait_for(state="visible")
             page.locator("#practiceSaveExitBtn").click()
             page.wait_for_timeout(250)
@@ -780,7 +788,11 @@ def run_matrix() -> None:
                 loading_state.get("present") and not loading_state.get("hidden") and loading_state.get("ariaBusy") == "true",
                 f"state={loading_state} pauseGateHits={pause_count['value']}",
             )
-            page.locator("#practiceSaveExitBtn").click(force=True)
+            # The shared loading overlay intentionally blocks the save button.
+            # A real second pointer click must leave the single in-flight pause intact.
+            repeat_box = page.locator("#practiceSaveExitBtn").bounding_box()
+            assert repeat_box is not None
+            page.mouse.click(repeat_box["x"] + repeat_box["width"] / 2, repeat_box["y"] + repeat_box["height"] / 2)
             page.wait_for_timeout(300)
             loading_state_2 = page.evaluate("() => { const b = document.querySelector(\"[data-learning-loading='true']\"); return b ? {hidden: b.hidden, ariaBusy: b.getAttribute('aria-busy')} : null; }")
             check_matrix(
@@ -811,25 +823,26 @@ def run_matrix() -> None:
                 height = 900 if viewport >= 768 else 844
                 page.set_viewport_size({"width": viewport, "height": height})
                 page.wait_for_timeout(250)
+                click_tool(page, "#practiceExitBtn")
+                page.locator("#practiceExitConfirm").wait_for(state="visible")
                 geometry = page.evaluate("""() => {
                   const open = document.getElementById('practiceAnswerSheetMobileBtn');
-                  const exit = document.getElementById('practiceExitBtn');
+                  const exit = document.getElementById('practiceSideToggle');
                   const dialog = document.querySelector('#practiceExitConfirm .practice-exit-dialog');
                   const openBox = open.getBoundingClientRect();
                   const exitBox = exit.getBoundingClientRect();
                   const buttons = dialog
                     ? [...dialog.querySelectorAll('button')].filter((b) => !b.hidden)
                     : [];
-                  const exitDialog = document.getElementById('practiceExitConfirm');
-                  const wasHidden = exitDialog.hidden;
-                  if (wasHidden) exitDialog.hidden = false;
                   const rows = buttons.map((b) => b.getBoundingClientRect());
-                  if (wasHidden) exitDialog.hidden = true;
                   const widths = rows.map((box) => Math.round(box.width));
                   const verticallyStacked = rows.every((box) => box.width > 0)
                     && rows.every((box, i) => i === 0 || box.top >= rows[i - 1].bottom - 1);
                   const equalWidth = new Set(widths).size === 1;
                   return {
+                    oppositeCorners: exitBox.left >= 16 && exitBox.left <= 24 && innerWidth-openBox.right >= 16 && innerWidth-openBox.right <= 24 && exitBox.right < openBox.left,
+                    equalSize: [openBox.width,openBox.height,exitBox.width,exitBox.height].every(value=>Math.abs(value-56)<=1),
+                    bottomAligned: Math.abs(openBox.bottom-exitBox.bottom)<=1 && innerHeight-openBox.bottom>=16 && innerHeight-openBox.bottom<=24,
                     openRight: Math.round(openBox.right),
                     exitRight: Math.round(exitBox.right),
                     bodyWidth: document.body.clientWidth,
@@ -839,12 +852,11 @@ def run_matrix() -> None:
                     drawerSingle: !!document.getElementById('practiceAnswerSheetDrawer'),
                   };
                 }""")
-                # 答题卡开关在最右一列（不与血量/计时换行重叠）：开关右缘应位于
-                # 血量计数右缘或更右，且 topbar 不溢出视口。
-                far_right = geometry["openRight"] >= geometry["exitRight"] - 2
+                # Fixed 56px circles occupy opposite bottom corners without overlap.
+                far_right = geometry["oppositeCorners"] and geometry["equalSize"] and geometry["bottomAligned"]
                 geometry_results[viewport] = geometry
                 check_matrix(
-                    10, f"{viewport}px answer sheet toggle at far right (no overlap)",
+                    10, f"{viewport}px opposite 56px bottom tools and answer-sheet entries",
                     far_right, f"openRight={geometry['openRight']} exitRight={geometry['exitRight']} body={geometry['bodyWidth']}",
                 )
                 check_matrix(
@@ -852,6 +864,7 @@ def run_matrix() -> None:
                     geometry["verticallyStacked"] and geometry["equalWidth"],
                     f"widths={geometry['widths']}",
                 )
+                page.locator("#practiceExitCancel").click()
             page.set_viewport_size({"width": 1280, "height": 900})
             check_matrix(10, "single answer sheet DOM instance", geometry_results[1280]["drawerSingle"], "")
             for viewport in (1280, 1024, 390):
@@ -859,7 +872,7 @@ def run_matrix() -> None:
                 page.wait_for_timeout(200)
                 page.screenshot(path=f"/tmp/task8-viewport-{viewport}.png")
             # ---- matrix 11: ordinary practice, zero background save, incremental XP ----
-            page.locator("#practiceExitBtn").click()
+            click_tool(page, "#practiceExitBtn")
             page.locator("#practiceAbandonBtn").click()
             page.locator("#practiceLobby").wait_for(state="visible")
             page.locator("#practiceHistoryOpenBtn").click()
@@ -900,7 +913,7 @@ def run_matrix() -> None:
             page.remove_listener("dialog", cancel_leave)
             saves = [r for r in log["rows"] if r["method"] == "POST"]
             check_matrix(11, "ordinary answers, tab hidden and cancelled close send no saves", not saves, str(saves))
-            page.locator("#practiceExitBtn").click()
+            click_tool(page, "#practiceExitBtn")
             page.locator("#practiceSaveExitBtn").click()
             page.locator("#practiceLobby").wait_for(state="visible")
             ordinary = run_async(fetch_session_row(ordinary_id))
@@ -970,7 +983,7 @@ def run_matrix() -> None:
             page.locator("#practiceNextBtn").click()
             page.locator('[data-option-id="A"]').first.click()
             page.wait_for_timeout(750)
-            page.locator("#practiceExitBtn").click()
+            click_tool(page, "#practiceExitBtn")
             page.locator("#practiceAbandonBtn").click()
             page.locator("#practiceLobby").wait_for(state="visible")
             saved = context.request.get(f"{base}/api/v1/learning/practice/sessions/{ordinary_id}").json()["session"]

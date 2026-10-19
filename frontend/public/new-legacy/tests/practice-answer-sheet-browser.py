@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from helpers.practice_tools import click_tool, open_tools
 from pathlib import Path
 import re
 
@@ -269,7 +270,7 @@ with sync_playwright() as playwright:
     assert page.locator('[data-option-id="B"]').is_disabled()
     assert page.locator('#practiceExplanationPanel').is_visible()
     assert writes(page) == []
-    page.locator('#practiceExitBtn').click()
+    click_tool(page, '#practiceExitBtn')
     page.locator('#practiceSaveExitBtn').click()
     page.wait_for_timeout(200)
     page.evaluate('KGPracticeLearningApi.listSessions=async()=>[]')
@@ -415,7 +416,7 @@ with sync_playwright() as playwright:
 
     # ---------- 保存退出：恰好一次 pause，整卷 answers、运行时状态齐全 ----------
     page.evaluate("window.__pauseFailNext=true")
-    page.locator("#practiceExitBtn").click()
+    click_tool(page, '#practiceExitBtn')
     page.locator("#practiceSaveExitBtn").click()
     page.wait_for_timeout(250)
     failed_pause_writes = [write for write in writes(page) if write["name"] == "pause"]
@@ -427,7 +428,7 @@ with sync_playwright() as playwright:
     view_after_fail = page.evaluate("document.body.dataset.practiceView")
     page.locator("#practiceExitCancel").click()
 
-    page.locator("#practiceExitBtn").click()
+    click_tool(page, '#practiceExitBtn')
     page.locator("#practiceSaveExitBtn").click()
     page.wait_for_timeout(250)
     pause_writes = [write for write in writes(page) if write["name"] == "pause"]
@@ -479,7 +480,7 @@ with sync_playwright() as playwright:
     assert page.locator("#practiceExplanationPanel").is_hidden()
     assert not page.locator("#practiceExplanationReveal").count()
 
-    page.locator("#practiceExitBtn").click()
+    click_tool(page, '#practiceExitBtn')
     page.locator("#practiceSaveExitBtn").click()
     page.wait_for_timeout(250)
     scholar_pauses = [write for write in writes(page) if write["name"] == "pause"]
@@ -553,7 +554,7 @@ with sync_playwright() as playwright:
     submit_note = page.locator('.practice-revenge-submit-note')
     assert submit_note.is_visible()
     assert '悬浮“答题卡”' in submit_note.inner_text() and '交卷' in submit_note.inner_text()
-    page.locator('#practiceExitBtn').click()
+    click_tool(page, '#practiceExitBtn')
     page.locator('#practiceAbandonBtn').click()
     page.wait_for_timeout(120)
 
@@ -570,7 +571,7 @@ with sync_playwright() as playwright:
     page.wait_for_timeout(180)
     assert writes(page)[0]["body"]["count"] == 14, writes(page)
     assert page.evaluate('KGPracticeMode.snapshot().questionCount') == 14
-    page.locator('#practiceExitBtn').click()
+    click_tool(page, '#practiceExitBtn')
     page.locator('#practiceAbandonBtn').click()
     page.wait_for_timeout(120)
 
@@ -581,7 +582,7 @@ with sync_playwright() as playwright:
     page.locator('[data-practice-start="revenge"]').click()
     page.wait_for_timeout(180)
     assert writes(page)[0]["body"]["count"] == 20, writes(page)
-    page.locator('#practiceExitBtn').click()
+    click_tool(page, '#practiceExitBtn')
     page.locator('#practiceAbandonBtn').click()
     page.wait_for_timeout(120)
 
@@ -655,7 +656,7 @@ with sync_playwright() as playwright:
     assert previous_wrong_answer.is_visible()
 
     # 结束本轮后重新开始，避免已答对题进入后续验证题夹具。
-    page.locator("#practiceExitBtn").click()
+    click_tool(page, '#practiceExitBtn')
     page.locator("#practiceAbandonBtn").click()
     page.wait_for_timeout(120)
     page.evaluate("window.__writes=[]")
@@ -712,7 +713,7 @@ with sync_playwright() as playwright:
         page.set_viewport_size({"width": viewport_width, "height": viewport_height})
         page.wait_for_timeout(80)
         assert page.locator("#practiceGame").is_visible(), page.evaluate("document.body.dataset.practiceView")
-        page.locator("#practiceExitBtn").click()
+        click_tool(page, '#practiceExitBtn')
         page.wait_for_timeout(60)
         assert not page.locator("#practiceExitConfirm").get_attribute("hidden")
         try:
@@ -725,7 +726,7 @@ with sync_playwright() as playwright:
 
     # 保存退出复仇会话：恰好一次 pause 且带上 runtimeState（含可能的复仇阶段）
     page.evaluate("window.__writes=[]")
-    page.locator("#practiceExitBtn").click()
+    click_tool(page, '#practiceExitBtn')
     page.locator("#practiceSaveExitBtn").click()
     page.wait_for_timeout(250)
     revenge_pauses = [write for write in writes(page) if write["name"] == "pause"]
@@ -848,7 +849,7 @@ with sync_playwright() as playwright:
         jump_via_sheet(page, '[data-question-id="random-q4"]')
         assert_question_progress(page, 8, 10)
         assert page.locator('#practiceQuestionStem').inner_text() == '随机来源题 4'
-        page.locator('#practiceExitBtn').click()
+        click_tool(page, '#practiceExitBtn')
         page.locator('#practiceSaveExitBtn').click()
         page.locator('#practiceLobby').wait_for(state='visible')
         saved = page.evaluate('window.__randomSaved')

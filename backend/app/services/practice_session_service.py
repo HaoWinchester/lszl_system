@@ -187,7 +187,7 @@ def _question_snapshot_for_session(
 
 
 def _public_answer(answer: dict) -> dict:
-    return {key: deepcopy(value) for key, value in answer.items() if key != "submissionIndex"}
+    return {key: deepcopy(value) for key, value in answer.items() if key not in {"submissionIndex", "acceptedAt"}}
 
 
 def _snapshot_option_ids(snapshot: dict) -> set[str]:
@@ -1584,6 +1584,22 @@ async def _apply_saved_draft(
         _assert_existing_selections_unchanged(session.answers or {}, draft)
     await _apply_runtime_patch(db, session, data)
     if draft is not None:
+        previous_answers = session.answers or {}
+        for question_id, selection in draft.items():
+            if selection.get("timedOut") is True:
+                continue
+            previous = previous_answers.get(question_id)
+            previous = previous if isinstance(previous, dict) else {}
+            # Server-owned first acceptance time is never taken from the body.
+            # Old ungraded rows without a reliable time stay undated; opening or
+            # re-saving them must not pretend the original answer happened now.
+            first_accepted = previous.get("acceptedAt") or (
+                previous.get("submittedAt") if isinstance(previous.get("correct"), bool) else None
+            )
+            if first_accepted:
+                selection["acceptedAt"] = first_accepted
+            elif question_id not in previous_ids or previous.get("draft") is True:
+                selection["acceptedAt"] = accepted_at.isoformat()
         session.answers = draft
         newly_answered = set(draft.keys()) - previous_ids
         if account_growth:
@@ -2000,6 +2016,9 @@ async def _grade_session_selection(
         "submittedAt": completion.get("completedAt") or now_utc().isoformat(),
         "submissionIndex": submission_index,
     }
+    previous = (session.answers or {}).get(ref["questionId"])
+    if isinstance(previous, dict) and previous.get("acceptedAt") and not timed_out:
+        answer["acceptedAt"] = previous["acceptedAt"]
     if timed_out:
         answer["timedOut"] = True
     if session.mode == "revenge":

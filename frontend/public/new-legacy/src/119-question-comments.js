@@ -29,6 +29,50 @@
   const MAX_CONTENT = 200
   const DANMAKU_LIMIT = 8
   const DANMAKU_DURATION_SECONDS = 18
+  const danmakuSettingsKey = () => 'kg_question_danmaku_settings_v1__' + encodeURIComponent(currentUser()?.username || 'guest')
+  let settingsDialog = null
+  function normalizeDanmakuSettings(value = {}) {
+    const number = (input, fallback, min, max) => Number.isFinite(Number(input)) ? Math.max(min, Math.min(max, Number(input))) : fallback
+    const maxCount = ['admin', 'teacher'].includes(currentUser()?.role) ? 600 : 20
+    return {count:Math.round(number(value.count, DANMAKU_LIMIT, 1, maxCount)),duration:number(value.duration,DANMAKU_DURATION_SECONDS,8,40),opacity:number(value.opacity,100,20,100)}
+  }
+  function getDanmakuSettings() {
+    try { return normalizeDanmakuSettings(global.KGDevicePreferences?.getJSON(danmakuSettingsKey(), {}) || {}) }
+    catch (_) { return normalizeDanmakuSettings() }
+  }
+  function setDanmakuSettings(value) {
+    const next = normalizeDanmakuSettings({...getDanmakuSettings(), ...value})
+    if (!global.KGDevicePreferences) throw Error('当前设备无法保存弹幕设置')
+    global.KGDevicePreferences.setJSON(danmakuSettingsKey(), next)
+    for (const instance of instances) {
+      instance.state.danmaku = pickDanmaku(instance.state.comments)
+      renderOverlay(instance)
+    }
+    return next
+  }
+  function openDanmakuSettings() {
+    if (settingsDialog) { settingsDialog.focus(); return }
+    const current = getDanmakuSettings(), owner = currentUser()?.username || ''
+    const dialog = document.createElement('dialog')
+    dialog.id = 'questionDanmakuSettings'; dialog.className = 'q-danmaku-settings'
+    const counts = [...new Set([1,2,4,8,12,20,current.count,...(['admin','teacher'].includes(currentUser()?.role)?[200,600]:[])])].sort((a,b)=>a-b)
+    dialog.innerHTML = `<form><header><h2>弹幕设置</h2><button type="button" data-qc-settings-close aria-label="关闭弹幕设置">×</button></header>
+      <label>每轮显示条数<select name="count">${counts.map(count=>`<option value="${count}">${count}${count>20?'（内部压测）':''}</option>`).join('')}</select></label>
+      <label>播放时长（秒）<input name="duration" type="number" min="8" max="40" step="1" required><small>时长越短，移动越快</small></label>
+      <label>不透明度（%）<input name="opacity" type="number" min="20" max="100" step="5" required></label>
+      <p role="status" data-qc-settings-error></p><footer><button type="button" data-qc-settings-close>取消</button><button type="submit">应用设置</button></footer></form>`
+    for (const [key,value] of Object.entries(current)) dialog.querySelector(`[name=${key}]`).value = String(value)
+    const close = () => { dialog.close(); dialog.remove(); if (settingsDialog === dialog) settingsDialog = null }
+    dialog.querySelectorAll('[data-qc-settings-close]').forEach(button=>button.addEventListener('click',close))
+    dialog.addEventListener('cancel',event=>{event.preventDefault();close()})
+    dialog.querySelector('form').addEventListener('submit',event=>{
+      event.preventDefault()
+      if ((currentUser()?.username || '') !== owner) { close(); return }
+      try { setDanmakuSettings(Object.fromEntries(new FormData(event.currentTarget))); close() }
+      catch (error) { dialog.querySelector('[data-qc-settings-error]').textContent = error.message || '设置保存失败，请重试' }
+    })
+    ;(document.fullscreenElement || document.body).append(dialog); settingsDialog = dialog; dialog.showModal()
+  }
   // 与后端 MANAGER_ROLES 对齐：可删任意留言的角色。
   const MANAGER_ROLES = new Set(['admin', 'teacher'])
 
@@ -78,15 +122,15 @@
   function pickDanmaku(comments) {
     const hidden = hiddenDanmaku()
     const eligible = comments.filter(comment => comment.danmakuEligible && !hidden.has(comment.id))
-    const mine = currentUser()?.username
     const others = eligible.filter(comment => !comment.isMine)
     const own = eligible.filter(comment => comment.isMine)
-    return others.concat(own).slice(0, DANMAKU_LIMIT)
+    return others.concat(own).slice(0, getDanmakuSettings().count)
   }
 
   function danmakuMarkup(items) {
     if (!items.length) return ''
-    return `<div class="q-danmaku" aria-label="本题弹幕"><div class="q-danmaku-track">${items.map((comment, index) => `<button type="button" class="q-danmaku-item" data-danmaku-comment-id="${escapeHTML(comment.id)}" style="--q-danmaku-lane:${index % 4};--q-danmaku-delay:-${(index * (DANMAKU_DURATION_SECONDS / items.length)).toFixed(2)}s">${danmakuChipContent(comment)}</button>`).join('')}</div></div>`
+    const settings = getDanmakuSettings()
+    return `<div class="q-danmaku" aria-label="本题弹幕" style="--q-danmaku-duration:${settings.duration}s;--q-danmaku-opacity:${settings.opacity/100}"><div class="q-danmaku-track">${items.map((comment, index) => `<button type="button" class="q-danmaku-item" data-danmaku-comment-id="${escapeHTML(comment.id)}" style="--q-danmaku-lane:${index % 2};--q-danmaku-delay:-${(index * (settings.duration / items.length)).toFixed(2)}s">${danmakuChipContent(comment)}</button>`).join('')}</div></div>`
   }
 
   function danmakuIcon(name, fallback = '') {
@@ -94,7 +138,7 @@
   }
 
   function danmakuChipContent(comment) {
-    return `<span class="q-danmaku-content">${escapeHTML(comment.content)}</span><span class="q-danmaku-pause" aria-hidden="true">${danmakuIcon('pause')}</span>${danmakuLikeTail(comment)}`
+    return `<span class="q-danmaku-content">${escapeHTML(comment.content)}</span>${danmakuLikeTail(comment)}`
   }
 
   /* 点赞计数随弹幕滚动；统一复用公共线性图标。 */
@@ -138,6 +182,8 @@
     }
     return `<div class="q-composer">
       <textarea class="q-composer-input" rows="2" maxlength="${MAX_CONTENT}" placeholder="留下你的精彩评论吧"></textarea>
+      <button type="button" class="q-emoji-toggle" data-qc-action="emoji-toggle" aria-expanded="${!!state.emojiExpanded}">表情</button>
+      <div class="q-emoji-picker" data-qc-emoji-picker ${state.emojiExpanded?'':'hidden'} aria-label="预设表情">${['😊','👍','🙋','🎉','🤔','💡','✅','👏','❤️','📚','💪','🙏'].map(emoji=>`<button type="button" data-qc-action="emoji-insert" data-qc-emoji="${emoji}" aria-label="插入${emoji}">${emoji}</button>`).join('')}</div>
       ${state.sendError ? `<p class="q-composer-error" role="alert">${escapeHTML(state.sendError)}</p>` : ''}
       <div class="q-composer-foot"><span class="q-composer-count" data-qc-count>0/${MAX_CONTENT}</span><button type="button" class="q-composer-send" data-qc-action="send" disabled>发布</button></div>
     </div>`
@@ -148,6 +194,7 @@
     const label = count ? `查看本题讨论（${count} 条）` : '还没有留言，来说点什么'
     return `<section class="q-comments is-collapsed" data-qc-block aria-label="题目讨论">
       <button type="button" data-qc-action="danmaku-toggle" aria-pressed="${enabled()}">弹幕${enabled() ? '开' : '关'}</button>
+      <button type="button" data-qc-action="danmaku-settings">弹幕设置</button>
       <button type="button" data-qc-action="favorites">我的收藏</button>
       <button type="button" class="q-comments-toggle" data-qc-action="expand" aria-expanded="false">💬 ${escapeHTML(label)}</button>
     </section>`
@@ -199,6 +246,7 @@
     if(instance.disposed)return
     if (active && active !== instance) {
       active.state.expanded = false
+      clearReplays(active)
       closeDanmakuPop(active)
       active.overlay?.remove()
       active.drawer?.remove()
@@ -210,6 +258,7 @@
   }
 
   function renderOverlay(instance) {
+    clearReplays(instance)
     closeDanmakuPop(instance)
     instance.overlay?.remove()
     instance.overlay = null
@@ -246,6 +295,8 @@
       <div class="q-danmaku-pop-extra" data-qc-pop-extra hidden>
         <button type="button" data-qc-pop-action="favorite" aria-pressed="${!!comment.myFavorite}">${comment.myFavorite ? '已收藏' : '收藏'}</button>
         <button type="button" data-qc-pop-action="copy">复制内容</button>
+        <button type="button" data-qc-pop-action="raise-hand">🙋 举手重播</button>
+        <button type="button" data-qc-pop-action="settings">弹幕设置</button>
       </div>
     </div>`
   }
@@ -353,7 +404,33 @@
         try { await global.navigator.clipboard.writeText(latest.content); showToast(instance, '已复制弹幕内容') }
         catch (_) { showToast(instance, '复制失败，请手动选择内容') }
       }
+      else if (action === 'settings') { closeDanmakuPop(instance); openDanmakuSettings() }
+      else if (action === 'raise-hand' && !instance.pending.has('raise-hand')) {
+        instance.pending.add('raise-hand')
+        try {
+          await global.navigator.clipboard.writeText(latest.content)
+          if (instance.disposed || active !== instance || !instance.overlay?.isConnected) return
+          if ((instance.replayTimers?.size || 0)+instance.overlay.querySelectorAll('[data-danmaku-replay]').length >= 20) { showToast(instance,'重播队列已满，请稍后再试'); return }
+          showToast(instance,'已复制，将在后续重播')
+          const timer = global.setTimeout(()=>{
+            instance.replayTimers.delete(timer)
+            if (instance.disposed || active !== instance || !instance.overlay?.isConnected || !enabled()) return
+            const chip=document.createElement('button');chip.type='button';chip.className='q-danmaku-item q-danmaku-replay';chip.dataset.danmakuCommentId=latest.id;chip.dataset.danmakuReplay=''
+            chip.style.setProperty('--q-danmaku-lane',String((instance.replaySequence || 0)%2));instance.replaySequence=(instance.replaySequence || 0)+1
+            chip.innerHTML=danmakuChipContent(findComment(instance,latest.id)||latest)
+            chip.addEventListener('animationend',()=>{if(instance.popItem===chip)closeDanmakuPop(instance);chip.remove()},{once:true})
+            instance.overlay.querySelector('.q-danmaku-track').append(chip)
+          },600)
+          instance.replayTimers ||= new Set();instance.replayTimers.add(timer)
+        } catch (_) { if(!instance.disposed)showToast(instance,'复制失败，请允许剪贴板访问后重试') }
+        finally { instance.pending.delete('raise-hand') }
+      }
     })
+  }
+
+  function clearReplays(instance) {
+    instance.replayTimers?.forEach(timer=>global.clearTimeout(timer))
+    instance.replayTimers?.clear()
   }
 
   function closeDanmakuPop(instance) {
@@ -454,6 +531,7 @@
 
   function closeDrawer(instance) {
     instance.state.expanded = false
+    instance.state.emojiExpanded = false
     closeDanmakuPop(instance)
     detachDrawerListeners(instance)
     renderInto(instance)
@@ -510,6 +588,20 @@
         return
       }
       if (action === 'danmaku-toggle') { remember(!enabled()); renderInto(instance); renderOverlay(instance); return }
+      if (action === 'danmaku-settings') { openDanmakuSettings(); return }
+      if (action === 'emoji-toggle') {
+        instance.state.emojiExpanded=!instance.state.emojiExpanded
+        const picker=instance.drawer?.querySelector('[data-qc-emoji-picker]')
+        if(picker)picker.hidden=!instance.state.emojiExpanded
+        event.target.closest('button').setAttribute('aria-expanded',String(instance.state.emojiExpanded));return
+      }
+      if (action === 'emoji-insert') {
+        const composer=instance.drawer?.querySelector('.q-composer-input'),emoji=event.target.closest('[data-qc-emoji]')?.dataset.qcEmoji
+        if(!composer||!emoji)return
+        const start=composer.selectionStart,end=composer.selectionEnd
+        if(composer.value.length-(end-start)+emoji.length>MAX_CONTENT){showToast(instance,'评论最多 200 字');return}
+        composer.setRangeText(emoji,start,end,'end');composer.focus();composer.dispatchEvent(new Event('input',{bubbles:true}));return
+      }
       if (action === 'favorites') { await loadFavorites(instance); return }
       if (action === 'discussion') { instance.state.favoritesMode=false; instance.state.nextCursor=instance.state.commentsCursor; renderInto(instance); return }
       if (action === 'cancel-reply') { instance.state.replyId=null; renderInto(instance); return }
@@ -824,9 +916,11 @@
       const key=favorites?'favorites':'comments'
       const ids=new Set(instance.state[key].map(c=>c.id))
       instance.state[key].push(...(payload.comments||[]).filter(c=>!ids.has(c.id)))
+      if(!favorites)instance.state.danmaku=pickDanmaku(instance.state.comments)
       instance.state[favorites?'favoritesCursor':'commentsCursor']=payload.nextCursor
       if(instance.state.favoritesMode===favorites)instance.state.nextCursor=payload.nextCursor
       renderInto(instance)
+      if(!favorites)renderOverlay(instance)
     } catch(error) { showToast(instance,text(error.message)) }
     finally { instance.pending.delete('more') }
   }
@@ -864,6 +958,7 @@
     const selected=target ? [target.__kgQuestionComments || target] : [...instances]
     for(const instance of selected) {
       instance.disposed=true
+      clearReplays(instance)
       detachDrawerListeners(instance)
       closeDanmakuPop(instance)
       instance.overlay?.remove()
@@ -884,8 +979,9 @@
     }
   })
   lifecycle.observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['hidden']})
-  global.addEventListener('kg-auth-session-change',()=>{countCache.clear();teardown()})
-  global.addEventListener('pagehide',()=>teardown())
-  global.KGQuestionComments = Object.freeze({ mountPanel, mountCard, mountCards, openPanel, mountDanmaku, teardownSource, pickDanmaku, danmakuEnabled, setDanmakuEnabled, teardown, commentCounts, commentCount })
+  function closeSettings(){if(settingsDialog){settingsDialog.close();settingsDialog.remove();settingsDialog=null}}
+  global.addEventListener('kg-auth-session-change',()=>{closeSettings();countCache.clear();teardown()})
+  global.addEventListener('pagehide',()=>{closeSettings();teardown()})
+  global.KGQuestionComments = Object.freeze({ mountPanel, mountCard, mountCards, openPanel, mountDanmaku, teardownSource, pickDanmaku, danmakuEnabled, setDanmakuEnabled, getDanmakuSettings, setDanmakuSettings, openDanmakuSettings, teardown, commentCounts, commentCount })
 })(window)
 

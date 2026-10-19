@@ -109,7 +109,7 @@ wait_for_health() {
 if new_legacy_validation_group_enabled "$VALIDATION_PROFILE" backend-tests; then
   deployment_timing_stage backend-tests
   cd "$REPO_DIR/backend"
-  .venv/bin/python -m pytest tests/ -q
+  KG_REFERRAL_BROWSER=1 .venv/bin/python -m pytest tests/ -q
 fi
 
 deployment_timing_stage frontend-contracts
@@ -214,7 +214,12 @@ python3 new-legacy/tests/practice-result-report-browser.py
 python3 new-legacy/tests/practice-instant-feedback-browser.py
 python3 new-legacy/tests/practice-lobby-fidelity-browser.py
 python3 new-legacy/tests/practice-side-nav-comments-browser.py
+python3 new-legacy/tests/practice-floating-menu-browser.py
 python3 new-legacy/tests/danmaku-design-browser.py
+python3 new-legacy/tests/danmaku-controls-browser.py
+python3 new-legacy/tests/practice-sound-browser.py
+python3 new-legacy/tests/knowledge-dashboard-browser.py
+python3 new-legacy/tests/template-center-account-browser.py
 python3 new-legacy/tests/run-danmaku-api-browser.py --output-dir "$VALIDATION_ROOT/danmaku-api"
 fi
 if new_legacy_validation_group_enabled "$VALIDATION_PROFILE" canvas-e2e; then

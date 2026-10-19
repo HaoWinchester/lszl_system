@@ -114,7 +114,7 @@
     setBusy(true);message('正在创建账号…');
     try{
       const result=typeof auth.register==='function'
-        ?await auth.register(username,password,{source:'多题归纳画布注册',acceptedTermsVersion:LEGAL_CONSENT_VERSION})
+        ?await auth.register(username,password,{source:'多题归纳画布注册',acceptedTermsVersion:LEGAL_CONSENT_VERSION,referralCode:auth.readReferralCode?.()||''})
         :{ok:false,message:'当前认证核心不支持统一注册接口。'};
       if(!result?.ok){message(result?.message||'注册失败，请重试。');return false}
       close();renderStatus();
@@ -149,6 +149,7 @@
     const modal=byId('authModal');
     if(!modal)return;
     initialized=true;
+    core()?.mountReferralField?.();
     modal.setAttribute('aria-hidden',modal.classList.contains('show')?'false':'true');
     byId('authLoginBtn')?.addEventListener('click',()=>open('登录后可以编辑多题画布、拖入题目、框选并整体移动题目卡。'));
     byId('authLogoutBtn')?.addEventListener('click',logout);

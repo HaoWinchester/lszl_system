@@ -9,7 +9,7 @@ from app.core.auth import CanvasWriter, CurrentUser
 from app.core.rate_limit import QuestionRateLimited
 from app.db.session import get_db
 from app.schemas.personal_card import PersonalCardCreate, PersonalCardUpdate
-from app.services import learning_service, personal_card_service, practice_session_service
+from app.services import knowledge_dashboard_service, learning_service, personal_card_service, practice_session_service
 from app.services.practice_client_view_service import project_practice_payload
 
 router = APIRouter(tags=["learning"])
@@ -166,6 +166,18 @@ async def append_learning_event(body: dict, db: DB, user: CurrentUser):
     except LookupError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
     return {"event": learning_service.event_to_dict(event)}
+
+
+@router.get("/learning/practice/knowledge-dashboard")
+async def knowledge_dashboard(
+    db: DB,
+    user: CurrentUser,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(100, alias="pageSize", ge=1, le=100),
+):
+    return await knowledge_dashboard_service.get_dashboard(
+        db, user.username, page=page, page_size=page_size
+    )
 
 
 @router.get("/learning/practice/overview")

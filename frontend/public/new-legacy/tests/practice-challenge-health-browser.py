@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from helpers.practice_tools import click_tool, open_tools
 from pathlib import Path
 import re
 import shutil
@@ -141,7 +142,7 @@ with sync_playwright() as playwright:
         page.wait_for_function("document.body.dataset.practiceView === 'game'")
 
     def abandon():
-        page.locator("#practiceExitBtn").click()
+        click_tool(page, '#practiceExitBtn')
         page.locator("#practiceAbandonBtn").click()
         page.wait_for_function("document.body.dataset.practiceView === 'lobby'")
 
@@ -211,7 +212,7 @@ with sync_playwright() as playwright:
     page.locator('[data-option-id="A"]').click()
     page.clock.fast_forward(600)
     assert health_count(page) == "51/54"
-    page.locator("#practiceExitBtn").click()
+    click_tool(page, '#practiceExitBtn')
     page.locator("#practiceSaveExitBtn").click()
     page.wait_for_function("document.body.dataset.practiceView === 'lobby'")
     start()
@@ -256,7 +257,7 @@ with sync_playwright() as playwright:
       KGPracticeLearningApi.pauseSession=()=>new Promise((resolve,reject)=>{window.__rejectPause=reject});
     }""")
     before_save = page.evaluate("KGPracticeMode.snapshot().answered")
-    page.locator("#practiceExitBtn").click()
+    click_tool(page, '#practiceExitBtn')
     page.locator("#practiceSaveExitBtn").click()
     page.clock.fast_forward(65000)
     assert page.evaluate("KGPracticeMode.snapshot().answered") == before_save

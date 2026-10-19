@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Exact resume/report identity, explicit restart and history recovery in actual DOM."""
+from helpers.practice_tools import click_tool, open_tools
 from pathlib import Path
 import re, shutil
 from playwright.sync_api import sync_playwright, expect
@@ -50,7 +51,7 @@ with sync_playwright() as pw:
         page.locator('[data-practice-start="practice"]').click()
         snap=page.evaluate('window.KGPracticeMode.snapshot()')
         assert snap['sessionId']=='saved' and snap['index']==4
-        page.locator('#practiceExitBtn').click();page.locator('#practiceSaveExitBtn').click()
+        click_tool(page, '#practiceExitBtn');page.locator('#practiceSaveExitBtn').click()
         # Cancellation must leave the original round resumable.
         page.once('dialog',lambda d:d.dismiss())
         page.locator('[data-practice-new="practice"]').click()
@@ -72,7 +73,7 @@ with sync_playwright() as pw:
         page.locator('#practiceHistoryOpenBtn').click();page.locator('details summary').click()
         page.locator('[data-history-resume="saved"]').click()
         assert page.evaluate('window.KGPracticeMode.snapshot().sessionId')=='saved'
-        page.locator('#practiceExitBtn').click();page.locator('#practiceSaveExitBtn').click()
+        click_tool(page, '#practiceExitBtn');page.locator('#practiceSaveExitBtn').click()
         page.evaluate('window.__failStart=true')
         page.once('dialog',lambda d:d.accept())
         page.locator('[data-practice-new="practice"]').click()
@@ -84,7 +85,7 @@ with sync_playwright() as pw:
         page.locator('[data-practice-start="practice"]').click()
         expect(page.locator('#practiceGame')).to_be_visible()
         assert page.evaluate('window.KGPracticeMode.snapshot().sessionId')=='fresh'
-        page.locator('#practiceExitBtn').click();page.locator('#practiceSaveExitBtn').click()
+        click_tool(page, '#practiceExitBtn');page.locator('#practiceSaveExitBtn').click()
         page.evaluate('window.__failHistory=true')
         page.locator('#practiceHistoryOpenBtn').click()
         expect(page.locator('#practiceHistoryEmpty')).to_contain_text('暂时无法读取')

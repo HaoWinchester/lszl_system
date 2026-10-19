@@ -7,6 +7,7 @@ Credentials stay in an ignored file and are never written to the result artifact
 import argparse
 import hashlib
 import json
+from helpers.practice_tools import click_tool, open_tools
 from pathlib import Path
 import shutil
 import uuid
@@ -112,7 +113,7 @@ with sync_playwright() as p:
         short, large = fixtures
         select_paper(large)
         enter(lambda: page.locator('[data-practice-start="challenge"]').click(), large, 'challenge')
-        page.locator('#practiceExitBtn').click()
+        click_tool(page, '#practiceExitBtn')
         page.locator('#practiceAbandonBtn').click()
         page.locator('#practiceLobby').wait_for(state='visible')
         check('entered preceding 10-question paper and exited through UI')

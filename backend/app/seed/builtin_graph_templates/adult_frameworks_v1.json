@@ -1,0 +1,1453 @@
+{
+  "schemaVersion": 1,
+  "templates": [
+    {
+      "id": "builtin-adult-management-v1",
+      "topic": "management",
+      "name": "成人管理与协作",
+      "description": "把模糊任务拆为共同目标、执行协作与复盘学习的原创练习框架。",
+      "rights": "original-framework",
+      "graphData": {
+        "meta": {
+          "title": "成人管理与协作",
+          "subject": "成人通识",
+          "contentOrigin": "original-framework",
+          "description": "把模糊任务拆为共同目标、执行协作与复盘学习的原创练习框架。"
+        },
+        "nodes": [
+          {
+            "id": "management-root",
+            "title": "成人管理与协作",
+            "x": 80,
+            "y": 500,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#e8e5f5",
+            "fillColor": "#e8e5f5",
+            "content": {
+              "title": "成人管理与协作",
+              "summary": "把模糊任务拆为共同目标、执行协作与复盘学习的原创练习框架。",
+              "notes": "使用方法：先浏览三条分支，选择一张卡片展开阅读并完成其中一个练习；将个人例子补充到加载后的副本。本模板是原创通识学习框架，不对应任何考试大纲或专业认证。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "management-g1",
+            "title": "明确共同目标",
+            "x": 460,
+            "y": 150,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#e9edfb",
+            "fillColor": "#e9edfb",
+            "content": {
+              "title": "明确共同目标",
+              "summary": "先对齐要解决的问题，再约定可观察的结果。",
+              "notes": "练习：选择一项本周任务，用“为谁解决什么问题、何时看到什么变化”写出目标；请协作者复述，找出理解差异。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "management-g1-c1",
+            "title": "区分目标与动作",
+            "x": 840,
+            "y": 30,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#e9edfb",
+            "fillColor": "#e9edfb",
+            "content": {
+              "title": "区分目标与动作",
+              "summary": "目标描述期望结果，动作描述准备做的事。",
+              "notes": "把“开三次会”改写为会后应能作出的决定。列出一个能验证结果的证据，避免只统计忙碌程度。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "management-g1-c2",
+            "title": "约定成功证据",
+            "x": 840,
+            "y": 150,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#e9edfb",
+            "fillColor": "#e9edfb",
+            "content": {
+              "title": "约定成功证据",
+              "summary": "在执行前共同约定完成条件与必要边界。",
+              "notes": "写下验收人、可检查的成果与时间点；补充成本、质量或协作方面不可牺牲的条件。条件变化时共同更新约定。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "management-g1-c3",
+            "title": "确定取舍",
+            "x": 840,
+            "y": 270,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#e9edfb",
+            "fillColor": "#e9edfb",
+            "content": {
+              "title": "确定取舍",
+              "summary": "资源有限时，让优先级和暂不投入的事项可见。",
+              "notes": "列出候选任务，分别写明预期价值、成本与未知因素；选择当前最值得验证的一项，并说明暂缓其他事项的原因。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "management-g2",
+            "title": "组织执行协作",
+            "x": 460,
+            "y": 550,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#e3f1eb",
+            "fillColor": "#e3f1eb",
+            "content": {
+              "title": "组织执行协作",
+              "summary": "把责任、依赖与反馈安排落实到具体行动。",
+              "notes": "练习：为同一目标列出下一步行动；每步写明负责人、所需输入和完成证据。检查是否有人承担责任却没有必要权限。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "management-g2-c1",
+            "title": "明确责任与权限",
+            "x": 840,
+            "y": 430,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#e3f1eb",
+            "fillColor": "#e3f1eb",
+            "content": {
+              "title": "明确责任与权限",
+              "summary": "让交付责任与决策权限相互匹配。",
+              "notes": "区分执行者、决定者和需要征求意见的人；对跨团队事项指定协调人。不要用“大家负责”替代明确的交付责任。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "management-g2-c2",
+            "title": "识别依赖与风险",
+            "x": 840,
+            "y": 550,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#e3f1eb",
+            "fillColor": "#e3f1eb",
+            "content": {
+              "title": "识别依赖与风险",
+              "summary": "在承诺之前，检查关键前提能否成立。",
+              "notes": "列出必须先到位的资源与信息；挑选最可能影响交付的前提，准备一个小规模验证与一个备用方案。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "management-g2-c3",
+            "title": "建立反馈节奏",
+            "x": 840,
+            "y": 670,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#e3f1eb",
+            "fillColor": "#e3f1eb",
+            "content": {
+              "title": "建立反馈节奏",
+              "summary": "用足够短的反馈周期及时发现偏差。",
+              "notes": "约定何时展示可检查的中间成果、遇到什么情况需要升级沟通；会议只处理决策与阻塞，把常规进度留给简洁记录。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "management-g3",
+            "title": "复盘与改进",
+            "x": 460,
+            "y": 950,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#fff0d9",
+            "fillColor": "#fff0d9",
+            "content": {
+              "title": "复盘与改进",
+              "summary": "从结果和过程提炼下一次可尝试的改变。",
+              "notes": "练习：结束一项任务后，分别记录原先预期、实际发生、可核实证据和仍不知道的原因。将复盘落到一次具体实验。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "management-g3-c1",
+            "title": "还原事实",
+            "x": 840,
+            "y": 830,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#fff0d9",
+            "fillColor": "#fff0d9",
+            "content": {
+              "title": "还原事实",
+              "summary": "先描述发生了什么，再讨论解释与责任。",
+              "notes": "把观察、推测与评价分开写；核对时间线、交付物和沟通记录，邀请参与者补充不同视角。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "management-g3-c2",
+            "title": "寻找可改变因素",
+            "x": 840,
+            "y": 950,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#fff0d9",
+            "fillColor": "#fff0d9",
+            "content": {
+              "title": "寻找可改变因素",
+              "summary": "把注意力放在能调整的机制与条件。",
+              "notes": "选择一处反复出现的困难，追问输入、权限或反馈哪里不足；避免把复杂结果全归因于某个人的态度。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "management-g3-c3",
+            "title": "设计下一次实验",
+            "x": 840,
+            "y": 1070,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#fff0d9",
+            "fillColor": "#fff0d9",
+            "content": {
+              "title": "设计下一次实验",
+              "summary": "用小范围行动检验改进设想。",
+              "notes": "写明假设、尝试动作、观察周期和停止条件；下次复盘先检查这项实验，而不是不断新增改进口号。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          }
+        ],
+        "links": [
+          {
+            "id": "management-l-g1",
+            "from": "management-root",
+            "to": "management-g1",
+            "label": "包含",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          },
+          {
+            "id": "management-l-1-1",
+            "from": "management-g1",
+            "to": "management-g1-c1",
+            "label": "思考与练习",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          },
+          {
+            "id": "management-l-1-2",
+            "from": "management-g1",
+            "to": "management-g1-c2",
+            "label": "思考与练习",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          },
+          {
+            "id": "management-l-1-3",
+            "from": "management-g1",
+            "to": "management-g1-c3",
+            "label": "思考与练习",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          },
+          {
+            "id": "management-l-g2",
+            "from": "management-root",
+            "to": "management-g2",
+            "label": "包含",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          },
+          {
+            "id": "management-l-2-1",
+            "from": "management-g2",
+            "to": "management-g2-c1",
+            "label": "思考与练习",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          },
+          {
+            "id": "management-l-2-2",
+            "from": "management-g2",
+            "to": "management-g2-c2",
+            "label": "思考与练习",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          },
+          {
+            "id": "management-l-2-3",
+            "from": "management-g2",
+            "to": "management-g2-c3",
+            "label": "思考与练习",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          },
+          {
+            "id": "management-l-g3",
+            "from": "management-root",
+            "to": "management-g3",
+            "label": "包含",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          },
+          {
+            "id": "management-l-3-1",
+            "from": "management-g3",
+            "to": "management-g3-c1",
+            "label": "思考与练习",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          },
+          {
+            "id": "management-l-3-2",
+            "from": "management-g3",
+            "to": "management-g3-c2",
+            "label": "思考与练习",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          },
+          {
+            "id": "management-l-3-3",
+            "from": "management-g3",
+            "to": "management-g3-c3",
+            "label": "思考与练习",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          }
+        ]
+      }
+    },
+    {
+      "id": "builtin-adult-logic-v1",
+      "topic": "logic",
+      "name": "逻辑思考与判断",
+      "description": "围绕问题、证据和决策展开的原创思考框架，不代替专业领域判断。",
+      "rights": "original-framework",
+      "graphData": {
+        "meta": {
+          "title": "逻辑思考与判断",
+          "subject": "成人通识",
+          "contentOrigin": "original-framework",
+          "description": "围绕问题、证据和决策展开的原创思考框架，不代替专业领域判断。"
+        },
+        "nodes": [
+          {
+            "id": "logic-root",
+            "title": "逻辑思考与判断",
+            "x": 80,
+            "y": 500,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#e8e5f5",
+            "fillColor": "#e8e5f5",
+            "content": {
+              "title": "逻辑思考与判断",
+              "summary": "围绕问题、证据和决策展开的原创思考框架，不代替专业领域判断。",
+              "notes": "使用方法：先浏览三条分支，选择一张卡片展开阅读并完成其中一个练习；将个人例子补充到加载后的副本。本模板是原创通识学习框架，不对应任何考试大纲或专业认证。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "logic-g1",
+            "title": "界定问题与概念",
+            "x": 460,
+            "y": 150,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#e9edfb",
+            "fillColor": "#e9edfb",
+            "content": {
+              "title": "界定问题与概念",
+              "summary": "把讨论对象和关键概念说清楚。",
+              "notes": "练习：选择一个最近有分歧的问题，分别写出事实问题、价值取舍与行动选择；确认大家是否在回答同一个问题。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "logic-g1-c1",
+            "title": "写出可回答的问题",
+            "x": 840,
+            "y": 30,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#e9edfb",
+            "fillColor": "#e9edfb",
+            "content": {
+              "title": "写出可回答的问题",
+              "summary": "将含糊疑问转为有边界的提问。",
+              "notes": "补全对象、范围和时间；把“为什么总是这样”改成“在什么条件下出现了什么现象”，保留可能被证据推翻的空间。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "logic-g1-c2",
+            "title": "约定概念含义",
+            "x": 840,
+            "y": 150,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#e9edfb",
+            "fillColor": "#e9edfb",
+            "content": {
+              "title": "约定概念含义",
+              "summary": "先确认词语在当前讨论中的具体指向。",
+              "notes": "对“有效”“公平”“风险”等词各给一个正例和反例；如不同参与者含义不同，记录差异并明确本次采用的定义。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "logic-g1-c3",
+            "title": "区分事实与价值",
+            "x": 840,
+            "y": 270,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#e9edfb",
+            "fillColor": "#e9edfb",
+            "content": {
+              "title": "区分事实与价值",
+              "summary": "识别可查证的陈述与需要协商的取舍。",
+              "notes": "为一段讨论标注：哪些说法需要事实证据，哪些表达偏好或原则；事实得到澄清后，价值冲突仍可能需要共同决定。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "logic-g2",
+            "title": "检查证据与论证",
+            "x": 460,
+            "y": 550,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#e3f1eb",
+            "fillColor": "#e3f1eb",
+            "content": {
+              "title": "检查证据与论证",
+              "summary": "检查结论如何从材料和前提出发。",
+              "notes": "练习：把一条观点拆为结论、理由和隐含前提；至少寻找一个反例或替代解释。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "logic-g2-c1",
+            "title": "追溯证据来源",
+            "x": 840,
+            "y": 430,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#e3f1eb",
+            "fillColor": "#e3f1eb",
+            "content": {
+              "title": "追溯证据来源",
+              "summary": "确认材料从哪里来，以及能支持多大范围的结论。",
+              "notes": "记录原始出处、时间、样本和收集方式；区分亲历记录、转述与概括。信息缺失时降低结论的确定程度。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "logic-g2-c2",
+            "title": "显露隐含前提",
+            "x": 840,
+            "y": 550,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#e3f1eb",
+            "fillColor": "#e3f1eb",
+            "content": {
+              "title": "显露隐含前提",
+              "summary": "让“所以”之间省略的条件可见。",
+              "notes": "将论证改写为“如果这些条件成立，那么……”。逐个检查必要条件，特别留意把个别经验推广到所有情况。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "logic-g2-c3",
+            "title": "寻找替代解释",
+            "x": 840,
+            "y": 670,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#e3f1eb",
+            "fillColor": "#e3f1eb",
+            "content": {
+              "title": "寻找替代解释",
+              "summary": "避免把同时发生直接当作单一因果。",
+              "notes": "为同一现象列出至少两种解释；考虑共同原因、反向影响与偶然性，再设计能区分解释的新观察。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "logic-g3",
+            "title": "作出可修正判断",
+            "x": 460,
+            "y": 950,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#fff0d9",
+            "fillColor": "#fff0d9",
+            "content": {
+              "title": "作出可修正判断",
+              "summary": "在承认不确定性的前提下选择行动。",
+              "notes": "练习：选一个需要近期决定的问题，列出选项、未知因素、不可逆后果和重新评估的时间。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "logic-g3-c1",
+            "title": "比较选项与代价",
+            "x": 840,
+            "y": 830,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#fff0d9",
+            "fillColor": "#fff0d9",
+            "content": {
+              "title": "比较选项与代价",
+              "summary": "用相同标准比较候选方案。",
+              "notes": "不要只问某方案是否有缺点；同时比较不行动的代价、机会成本与现实约束。把最重要的取舍写给参与决策的人看。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "logic-g3-c2",
+            "title": "表达不确定性",
+            "x": 840,
+            "y": 950,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#fff0d9",
+            "fillColor": "#fff0d9",
+            "content": {
+              "title": "表达不确定性",
+              "summary": "清楚说明已知、推测与未知。",
+              "notes": "把“肯定会”改成带条件的判断；说明哪些证据会让你改变看法。缺乏信息时先做可撤回的小试验。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "logic-g3-c3",
+            "title": "事后更新判断",
+            "x": 840,
+            "y": 1070,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#fff0d9",
+            "fillColor": "#fff0d9",
+            "content": {
+              "title": "事后更新判断",
+              "summary": "依据新证据调整，而非为旧结论辩护。",
+              "notes": "保留当时的信息与理由，事后区分决策过程和偶然结果；记录下一次需要采用或放弃的判断规则。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          }
+        ],
+        "links": [
+          {
+            "id": "logic-l-g1",
+            "from": "logic-root",
+            "to": "logic-g1",
+            "label": "包含",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          },
+          {
+            "id": "logic-l-1-1",
+            "from": "logic-g1",
+            "to": "logic-g1-c1",
+            "label": "思考与练习",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          },
+          {
+            "id": "logic-l-1-2",
+            "from": "logic-g1",
+            "to": "logic-g1-c2",
+            "label": "思考与练习",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          },
+          {
+            "id": "logic-l-1-3",
+            "from": "logic-g1",
+            "to": "logic-g1-c3",
+            "label": "思考与练习",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          },
+          {
+            "id": "logic-l-g2",
+            "from": "logic-root",
+            "to": "logic-g2",
+            "label": "包含",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          },
+          {
+            "id": "logic-l-2-1",
+            "from": "logic-g2",
+            "to": "logic-g2-c1",
+            "label": "思考与练习",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          },
+          {
+            "id": "logic-l-2-2",
+            "from": "logic-g2",
+            "to": "logic-g2-c2",
+            "label": "思考与练习",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          },
+          {
+            "id": "logic-l-2-3",
+            "from": "logic-g2",
+            "to": "logic-g2-c3",
+            "label": "思考与练习",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          },
+          {
+            "id": "logic-l-g3",
+            "from": "logic-root",
+            "to": "logic-g3",
+            "label": "包含",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          },
+          {
+            "id": "logic-l-3-1",
+            "from": "logic-g3",
+            "to": "logic-g3-c1",
+            "label": "思考与练习",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          },
+          {
+            "id": "logic-l-3-2",
+            "from": "logic-g3",
+            "to": "logic-g3-c2",
+            "label": "思考与练习",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          },
+          {
+            "id": "logic-l-3-3",
+            "from": "logic-g3",
+            "to": "logic-g3-c3",
+            "label": "思考与练习",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          }
+        ]
+      }
+    },
+    {
+      "id": "builtin-adult-relationships-v1",
+      "topic": "relationships",
+      "name": "人际沟通与边界",
+      "description": "用具体表达、双向倾听和清晰约定支持日常协作的原创练习框架。",
+      "rights": "original-framework",
+      "graphData": {
+        "meta": {
+          "title": "人际沟通与边界",
+          "subject": "成人通识",
+          "contentOrigin": "original-framework",
+          "description": "用具体表达、双向倾听和清晰约定支持日常协作的原创练习框架。"
+        },
+        "nodes": [
+          {
+            "id": "relationships-root",
+            "title": "人际沟通与边界",
+            "x": 80,
+            "y": 500,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#e8e5f5",
+            "fillColor": "#e8e5f5",
+            "content": {
+              "title": "人际沟通与边界",
+              "summary": "用具体表达、双向倾听和清晰约定支持日常协作的原创练习框架。",
+              "notes": "使用方法：先浏览三条分支，选择一张卡片展开阅读并完成其中一个练习；将个人例子补充到加载后的副本。本模板是原创通识学习框架，不对应任何考试大纲或专业认证。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "relationships-g1",
+            "title": "理解彼此处境",
+            "x": 460,
+            "y": 150,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#e9edfb",
+            "fillColor": "#e9edfb",
+            "content": {
+              "title": "理解彼此处境",
+              "summary": "从具体情境出发，减少对动机的猜测。",
+              "notes": "练习：回想一次沟通不顺，分别写出自己看到的行为、自己的解释，以及尚未向对方确认的内容。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "relationships-g1-c1",
+            "title": "描述可观察行为",
+            "x": 840,
+            "y": 30,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#e9edfb",
+            "fillColor": "#e9edfb",
+            "content": {
+              "title": "描述可观察行为",
+              "summary": "用具体事件替代对人格或动机的判断。",
+              "notes": "把“你从来不配合”改写为某次约定、实际发生与产生的影响；避免用“总是”“从不”概括一个人。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "relationships-g1-c2",
+            "title": "倾听并核对理解",
+            "x": 840,
+            "y": 150,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#e9edfb",
+            "fillColor": "#e9edfb",
+            "content": {
+              "title": "倾听并核对理解",
+              "summary": "给对方表达机会，再用自己的话确认。",
+              "notes": "先复述对方的关键顾虑，询问理解是否准确；确认后再表达不同意见，允许对方修正你的概括。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "relationships-g1-c3",
+            "title": "辨认需求与限制",
+            "x": 840,
+            "y": 270,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#e9edfb",
+            "fillColor": "#e9edfb",
+            "content": {
+              "title": "辨认需求与限制",
+              "summary": "让双方关心的结果和现实条件可见。",
+              "notes": "分别询问最需要解决的困难、可投入的时间和无法承诺的部分。理解对方处境不等于必须接受其全部要求。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "relationships-g2",
+            "title": "清楚表达与协商",
+            "x": 460,
+            "y": 550,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#e3f1eb",
+            "fillColor": "#e3f1eb",
+            "content": {
+              "title": "清楚表达与协商",
+              "summary": "提出可回应的请求，而非让别人猜。",
+              "notes": "练习：用“这件事对我有什么影响、我希望发生什么、你是否有其他可行安排”表达一项具体请求。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "relationships-g2-c1",
+            "title": "提出具体请求",
+            "x": 840,
+            "y": 430,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#e3f1eb",
+            "fillColor": "#e3f1eb",
+            "content": {
+              "title": "提出具体请求",
+              "summary": "明确动作、时间和可协商之处。",
+              "notes": "把“重视这件事”改写为可执行的下一步；询问对方是否愿意、是否做得到，给拒绝或提出替代方案的空间。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "relationships-g2-c2",
+            "title": "表达个人边界",
+            "x": 840,
+            "y": 550,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#e3f1eb",
+            "fillColor": "#e3f1eb",
+            "content": {
+              "title": "表达个人边界",
+              "summary": "说明自己能够承担什么，以及不能承担什么。",
+              "notes": "用简短明确的话说明可提供的帮助、时间或权限边界；如有意愿，可提出替代安排，不必以过度解释换取认同。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "relationships-g2-c3",
+            "title": "形成共同约定",
+            "x": 840,
+            "y": 670,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#e3f1eb",
+            "fillColor": "#e3f1eb",
+            "content": {
+              "title": "形成共同约定",
+              "summary": "将讨论结果转为双方都理解的安排。",
+              "notes": "核对负责人、时间、交付方式及变化时如何通知；对重要约定留下简洁记录，避免各自以为已经达成一致。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "relationships-g3",
+            "title": "处理分歧与修复",
+            "x": 460,
+            "y": 950,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#fff0d9",
+            "fillColor": "#fff0d9",
+            "content": {
+              "title": "处理分歧与修复",
+              "summary": "把分歧转成可讨论的问题，保留暂停空间。",
+              "notes": "练习：挑选一项可以安全讨论的分歧，区分需要共同解决的事务与需要尊重的个人选择。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "relationships-g3-c1",
+            "title": "暂停升级的争执",
+            "x": 840,
+            "y": 830,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#fff0d9",
+            "fillColor": "#fff0d9",
+            "content": {
+              "title": "暂停升级的争执",
+              "summary": "在无法继续有效交流时约定暂停。",
+              "notes": "说明暂停是为了恢复沟通，约定适合再次讨论的时间；避免用追问或立即回应的要求让局面持续升级。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "relationships-g3-c2",
+            "title": "承认影响与修复",
+            "x": 840,
+            "y": 950,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#fff0d9",
+            "fillColor": "#fff0d9",
+            "content": {
+              "title": "承认影响与修复",
+              "summary": "具体承认行为的影响，并协商补救。",
+              "notes": "道歉时说清自己做了什么、可能造成什么影响和准备如何改进；听取对方需要，同时不替对方决定何时原谅。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "relationships-g3-c3",
+            "title": "复查协作关系",
+            "x": 840,
+            "y": 1070,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#fff0d9",
+            "fillColor": "#fff0d9",
+            "content": {
+              "title": "复查协作关系",
+              "summary": "观察约定是否持续被尊重。",
+              "notes": "定期检查付出、权限与责任是否清晰；对反复失效的安排重新协商，必要时减少投入或寻求合适的外部支持。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          }
+        ],
+        "links": [
+          {
+            "id": "relationships-l-g1",
+            "from": "relationships-root",
+            "to": "relationships-g1",
+            "label": "包含",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          },
+          {
+            "id": "relationships-l-1-1",
+            "from": "relationships-g1",
+            "to": "relationships-g1-c1",
+            "label": "思考与练习",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          },
+          {
+            "id": "relationships-l-1-2",
+            "from": "relationships-g1",
+            "to": "relationships-g1-c2",
+            "label": "思考与练习",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          },
+          {
+            "id": "relationships-l-1-3",
+            "from": "relationships-g1",
+            "to": "relationships-g1-c3",
+            "label": "思考与练习",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          },
+          {
+            "id": "relationships-l-g2",
+            "from": "relationships-root",
+            "to": "relationships-g2",
+            "label": "包含",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          },
+          {
+            "id": "relationships-l-2-1",
+            "from": "relationships-g2",
+            "to": "relationships-g2-c1",
+            "label": "思考与练习",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          },
+          {
+            "id": "relationships-l-2-2",
+            "from": "relationships-g2",
+            "to": "relationships-g2-c2",
+            "label": "思考与练习",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          },
+          {
+            "id": "relationships-l-2-3",
+            "from": "relationships-g2",
+            "to": "relationships-g2-c3",
+            "label": "思考与练习",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          },
+          {
+            "id": "relationships-l-g3",
+            "from": "relationships-root",
+            "to": "relationships-g3",
+            "label": "包含",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          },
+          {
+            "id": "relationships-l-3-1",
+            "from": "relationships-g3",
+            "to": "relationships-g3-c1",
+            "label": "思考与练习",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          },
+          {
+            "id": "relationships-l-3-2",
+            "from": "relationships-g3",
+            "to": "relationships-g3-c2",
+            "label": "思考与练习",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          },
+          {
+            "id": "relationships-l-3-3",
+            "from": "relationships-g3",
+            "to": "relationships-g3-c3",
+            "label": "思考与练习",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          }
+        ]
+      }
+    },
+    {
+      "id": "builtin-adult-classics-v1",
+      "topic": "classics",
+      "name": "国学修身与处世",
+      "description": "以《论语》《大学》《道德经》《孙子兵法》为线索的原创阅读提问框架，不收录现代译著正文。",
+      "rights": "original-framework",
+      "graphData": {
+        "meta": {
+          "title": "国学修身与处世",
+          "subject": "国学通识",
+          "contentOrigin": "original-framework",
+          "description": "以《论语》《大学》《道德经》《孙子兵法》为线索的原创阅读提问框架，不收录现代译著正文。"
+        },
+        "nodes": [
+          {
+            "id": "classics-root",
+            "title": "国学修身与处世",
+            "x": 80,
+            "y": 500,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#e8e5f5",
+            "fillColor": "#e8e5f5",
+            "content": {
+              "title": "国学修身与处世",
+              "summary": "以《论语》《大学》《道德经》《孙子兵法》为线索的原创阅读提问框架，不收录现代译著正文。",
+              "notes": "使用方法：先浏览三条分支，选择一张卡片展开阅读并完成其中一个练习；将个人例子补充到加载后的副本。本模板是原创通识学习框架，不对应任何考试大纲或专业认证。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "classics-g1",
+            "title": "修身与相处：论语、大学",
+            "x": 460,
+            "y": 150,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#e9edfb",
+            "fillColor": "#e9edfb",
+            "content": {
+              "title": "修身与相处：论语、大学",
+              "summary": "把经典阅读与自身学习、行为和相处方式联系起来。",
+              "notes": "阅读提示：本分支提供思考问题，未逐章解释原典。阅读时核对原文语境、不同解释与自身处境，避免把一句话当成适用一切的命令。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "classics-g1-c1",
+            "title": "学习如何进入行动",
+            "x": 840,
+            "y": 30,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#e9edfb",
+            "fillColor": "#e9edfb",
+            "content": {
+              "title": "学习如何进入行动",
+              "summary": "从读懂概念走向可观察的小实践。",
+              "notes": "阅读《论语》时，记录一处关于学习或自省的讨论：它提出了什么问题？你可以尝试什么小行动？实践结果是否支持你的理解？"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "classics-g1-c2",
+            "title": "自省与共同生活",
+            "x": 840,
+            "y": 150,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#e9edfb",
+            "fillColor": "#e9edfb",
+            "content": {
+              "title": "自省与共同生活",
+              "summary": "把自我要求和对他人的尊重一起考虑。",
+              "notes": "阅读《大学》及相关讨论时，区分个人修养、家庭相处与公共责任；写出一个适用条件和一个不能直接套用的现代情境。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "classics-g1-c3",
+            "title": "比较不同解释",
+            "x": 840,
+            "y": 270,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#e9edfb",
+            "fillColor": "#e9edfb",
+            "content": {
+              "title": "比较不同解释",
+              "summary": "让注释帮助理解，而非替代独立思考。",
+              "notes": "围绕同一段原文比较两种解释，标出各自依据；分清原文、注释者意见与自己的联想，保留尚未确定的问题。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "classics-g2",
+            "title": "分寸与变化：道德经",
+            "x": 460,
+            "y": 550,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#e3f1eb",
+            "fillColor": "#e3f1eb",
+            "content": {
+              "title": "分寸与变化：道德经",
+              "summary": "围绕行动方式、关系与变化提出阅读问题。",
+              "notes": "阅读提示：先辨认文本中的对举与语境，再思考它如何挑战自己的惯常做法；本模板不把古代思想直接包装为管理定律。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "classics-g2-c1",
+            "title": "观察行动的分寸",
+            "x": 840,
+            "y": 430,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#e3f1eb",
+            "fillColor": "#e3f1eb",
+            "content": {
+              "title": "观察行动的分寸",
+              "summary": "思考什么时候需要推动，什么时候需要留出空间。",
+              "notes": "挑选一段涉及行动或治理的原文，问：它针对怎样的处境？减少干预会帮助还是伤害当前事情？需要哪些可验证的条件？"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "classics-g2-c2",
+            "title": "辨认关系与变化",
+            "x": 840,
+            "y": 550,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#e3f1eb",
+            "fillColor": "#e3f1eb",
+            "content": {
+              "title": "辨认关系与变化",
+              "summary": "检查判断是否忽略了情境的转变。",
+              "notes": "选择一组文本中的相对概念，记录它们在不同处境下如何关联；用一个现实例子检验自己的解释，不以词语相似代替论证。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "classics-g2-c3",
+            "title": "保持阅读的边界",
+            "x": 840,
+            "y": 670,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#e3f1eb",
+            "fillColor": "#e3f1eb",
+            "content": {
+              "title": "保持阅读的边界",
+              "summary": "将思想启发与事实判断分开。",
+              "notes": "写出经典带来的一个提问，再列出现代行动仍需要的信息与约束；不要用思想格言替代专业知识、事实核查或对他人的同意。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "classics-g3",
+            "title": "审势与准备：孙子兵法",
+            "x": 460,
+            "y": 950,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#fff0d9",
+            "fillColor": "#fff0d9",
+            "content": {
+              "title": "审势与准备：孙子兵法",
+              "summary": "以原典为阅读对象，审视目标、条件与行动代价。",
+              "notes": "阅读提示：兵书具有具体历史与军事语境；用于日常学习时只提炼问题意识，不将人际关系理解为必须战胜他人的竞争。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "classics-g3-c1",
+            "title": "先看目标与条件",
+            "x": 840,
+            "y": 830,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#fff0d9",
+            "fillColor": "#fff0d9",
+            "content": {
+              "title": "先看目标与条件",
+              "summary": "在行动之前检查目的与必要准备。",
+              "notes": "阅读一段涉及判断形势的原文，列出作者关注的条件；再为自己的一个任务列出信息、资源和限制，明确不能类比之处。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "classics-g3-c2",
+            "title": "检验信息与判断",
+            "x": 840,
+            "y": 950,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#fff0d9",
+            "fillColor": "#fff0d9",
+            "content": {
+              "title": "检验信息与判断",
+              "summary": "认识信息不足可能如何改变选择。",
+              "notes": "记录文本中关于了解情况的讨论；联系现代任务时，说明证据来源、未知部分及取得新信息的成本，避免凭直觉断言。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          },
+          {
+            "id": "classics-g3-c3",
+            "title": "考虑代价与退出",
+            "x": 840,
+            "y": 1070,
+            "w": 280,
+            "h": 88,
+            "size": "big",
+            "color": "#fff0d9",
+            "fillColor": "#fff0d9",
+            "content": {
+              "title": "考虑代价与退出",
+              "summary": "把行动的持续成本与停止条件写清楚。",
+              "notes": "从一段相关原文提出问题：什么情况下不应继续投入？在自己的任务中列出可撤回步骤、合作选项和需要重新决策的节点。"
+            },
+            "cardStyle": "rounded",
+            "textColor": "#203b35",
+            "fontSize": 18
+          }
+        ],
+        "links": [
+          {
+            "id": "classics-l-g1",
+            "from": "classics-root",
+            "to": "classics-g1",
+            "label": "阅读分支",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          },
+          {
+            "id": "classics-l-1-1",
+            "from": "classics-g1",
+            "to": "classics-g1-c1",
+            "label": "思考与练习",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          },
+          {
+            "id": "classics-l-1-2",
+            "from": "classics-g1",
+            "to": "classics-g1-c2",
+            "label": "思考与练习",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          },
+          {
+            "id": "classics-l-1-3",
+            "from": "classics-g1",
+            "to": "classics-g1-c3",
+            "label": "思考与练习",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          },
+          {
+            "id": "classics-l-g2",
+            "from": "classics-root",
+            "to": "classics-g2",
+            "label": "阅读分支",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          },
+          {
+            "id": "classics-l-2-1",
+            "from": "classics-g2",
+            "to": "classics-g2-c1",
+            "label": "思考与练习",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          },
+          {
+            "id": "classics-l-2-2",
+            "from": "classics-g2",
+            "to": "classics-g2-c2",
+            "label": "思考与练习",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          },
+          {
+            "id": "classics-l-2-3",
+            "from": "classics-g2",
+            "to": "classics-g2-c3",
+            "label": "思考与练习",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          },
+          {
+            "id": "classics-l-g3",
+            "from": "classics-root",
+            "to": "classics-g3",
+            "label": "阅读分支",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          },
+          {
+            "id": "classics-l-3-1",
+            "from": "classics-g3",
+            "to": "classics-g3-c1",
+            "label": "思考与练习",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          },
+          {
+            "id": "classics-l-3-2",
+            "from": "classics-g3",
+            "to": "classics-g3-c2",
+            "label": "思考与练习",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          },
+          {
+            "id": "classics-l-3-3",
+            "from": "classics-g3",
+            "to": "classics-g3-c3",
+            "label": "思考与练习",
+            "pathStyle": "curve",
+            "color": "#64748b"
+          }
+        ]
+      }
+    }
+  ]
+}

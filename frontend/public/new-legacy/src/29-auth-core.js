@@ -128,7 +128,8 @@
         register: String(raw.endpoints?.register || "/api/auth/register"),
         logout: String(raw.endpoints?.logout || "/api/auth/logout"),
         session: String(raw.endpoints?.session || "/api/auth/session"),
-        profile: String(raw.endpoints?.profile || raw.endpoints?.session || "/api/auth/session")
+        profile: String(raw.endpoints?.profile || raw.endpoints?.session || "/api/auth/session"),
+        referral: String(raw.endpoints?.referral || "/api/v1/auth/me/referral")
       },
       credentials: String(raw.credentials || "include"),
       allowLocalRegistration: raw.allowLocalRegistration !== false
@@ -326,6 +327,29 @@
     saveUsers(map);setCurrentUsername(username);logAction("用户登录",username,String(context.source||"本地登录"));
     return {ok:true,user:map[username],message:"登录成功"};
   }
+  function referralCodeFromLink(){
+    try{return new URLSearchParams(window.location.search).get('referralCode')||''}catch(_){return ''}
+  }
+  function readReferralCode(){
+    const input=typeof document!=='undefined'?document.getElementById('authReferralCode'):null;
+    return String(input?input.value:referralCodeFromLink()).trim();
+  }
+  function mountReferralField(){
+    if(typeof document==='undefined')return false;
+    if(document.getElementById('authReferralCode'))return true;
+    const password=document.getElementById('authPassword'),anchor=password?.closest('label');
+    if(!anchor)return false;
+    const label=document.createElement('label'),input=document.createElement('input');
+    label.textContent='推荐码（选填，仅注册时使用）';
+    input.id='authReferralCode';input.type='text';input.maxLength=64;input.autocomplete='off';
+    input.placeholder='无推荐码可留空';input.value=referralCodeFromLink();
+    label.appendChild(input);anchor.after(label);return true;
+  }
+  async function referralSummary({create=false}={}){
+    const config=providerConfig();
+    if(config.mode!=='remote')throw new Error('推荐码需要连接账号服务器');
+    return remoteRequest(config.endpoints.referral,{method:create?'POST':'GET'});
+  }
   async function register(username,password,context={}){
     username=cleanUsername(username);password=String(password||"");
     if(username.length<2)return {ok:false,message:"用户名至少需要 2 个字符。"};
@@ -333,7 +357,7 @@
     const config=providerConfig();
     if(config.mode==="remote"){
       try{
-        const payload=await remoteRequest(config.endpoints.register,{body:{username,password,acceptedTermsVersion:context.acceptedTermsVersion||undefined,context}});
+        const payload=await remoteRequest(config.endpoints.register,{body:{username,password,acceptedTermsVersion:context.acceptedTermsVersion||undefined,referralCode:context.referralCode??readReferralCode(),context}});
         const user=normalizeUser(payload.user?.username||payload.username||username,{...(payload.user||{}),username:payload.user?.username||payload.username||username,source:"remote"});
         const previousLoginSessionId=serverLoginSessionId(readRemoteSession()||{}),loginSessionId=serverLoginSessionId(payload);
         writeRemoteSession({user,token:payload.token||"",loginSessionId,issuedAt:Date.now()});
@@ -462,6 +486,9 @@
     authHeaders,
     login,
     register,
+    referralSummary,
+    mountReferralField,
+    readReferralCode,
     logout,
     refreshSession,
     updateProfile,

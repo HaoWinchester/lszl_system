@@ -7,6 +7,7 @@ authoritative assets without syncing or promoting a release.
 """
 import argparse
 import json
+from helpers.practice_tools import click_tool, open_tools
 from pathlib import Path
 from urllib.parse import urlparse
 from uuid import uuid4
@@ -103,7 +104,7 @@ with sync_playwright() as pw:
         page.wait_for_function('KGPracticeMode.snapshot().active')
         assert page.evaluate('KGPracticeMode.snapshot().questionCount') == 2
         expect(page.locator('.q-danmaku')).to_have_count(0)
-        page.locator('#practiceCommentBtn').click()
+        click_tool(page, '#practiceCommentBtn')
         expect(page.locator('.q-comments-drawer .q-comment')).to_have_count(11)
         expect(page.locator('.q-danmaku')).to_have_count(0)
         page.locator('.q-comments-drawer [data-qc-action="collapse"]').click()
@@ -179,17 +180,17 @@ with sync_playwright() as pw:
         page.locator('.q-comments-drawer [data-qc-action="collapse"]').click()
         checks.append('popover reply focuses actual drawer and persists correct parentId through real POST')
 
-        page.locator('#practiceDanmakuToggle').click()
+        click_tool(page, '#practiceDanmakuToggle')
         expect(page.locator('.q-danmaku')).to_have_count(0)
         assert page.evaluate('KGQuestionComments.danmakuEnabled()') is False
-        page.locator('#practiceDanmakuToggle').click()
+        click_tool(page, '#practiceDanmakuToggle')
         expect(page.locator('.q-danmaku-item')).to_have_count(8)
         open_chip()
         pop_action('dislike')
         expect(page.locator(f'[data-danmaku-comment-id="{target["id"]}"]')).to_have_count(0)
         assert target['id'] in page.evaluate("KGDevicePreferences.getString('kg_question_danmaku_hidden_v1__ink-browser')")
         assert any(c['id']==target['id'] for c in call(ctx,'get',comments_url)['comments'])
-        page.locator('#practiceDanmakuToggle').click()
+        click_tool(page, '#practiceDanmakuToggle')
         # A full page reload must preserve device toggle + hidden IDs; server has no hide mutation.
         page.reload(wait_until='networkidle')
         assert page.evaluate('KGQuestionComments.danmakuEnabled()') is False
@@ -198,15 +199,15 @@ with sync_playwright() as pw:
         page.wait_for_function('KGPracticeMode.snapshot().active&&KGPracticeMode.snapshot().index===0')
         expect(page.locator('#practiceExplanationPanel')).to_be_visible()
         expect(page.locator('.q-danmaku')).to_have_count(0)
-        page.locator('#practiceDanmakuToggle').click()
+        click_tool(page, '#practiceDanmakuToggle')
         expect(page.locator('.q-danmaku-item')).to_have_count(8)
         expect(page.locator(f'[data-danmaku-comment-id="{target["id"]}"]')).to_have_count(0)
         checks.append('actual toggle and local dislike persist across reload without deleting shared comment')
 
-        page.locator('#practiceExitBtn').click()
+        click_tool(page, '#practiceExitBtn')
         page.locator('#practiceExitCancel').click()
         expect(page.locator('.q-danmaku-item')).to_have_count(8)
-        page.locator('#practiceExitBtn').click()
+        click_tool(page, '#practiceExitBtn')
         page.route('**/sessions/*/pause', lambda route: route.fulfill(status=503, json={'detail':'intentional pause failure'}), times=1)
         with page.expect_response(lambda response: response.url.endswith('/pause') and response.status==503):
             page.locator('#practiceSaveExitBtn').click()

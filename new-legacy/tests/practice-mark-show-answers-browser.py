@@ -6,6 +6,7 @@
    关闭后恢复可作答；恢复会话后开关状态保留。
 3. 随机顺序恢复：沿用服务端冻结题序与 currentIndex，答题卡题号与显示顺序一致。
 """
+from helpers.practice_tools import click_tool, open_tools
 from pathlib import Path
 import re
 
@@ -177,7 +178,7 @@ with sync_playwright() as playwright:
     assert page.evaluate('KGPracticeMode.snapshot().answered') == answered_before + 1
 
     # 保存退出 → runtimeState 带上 order/showAnswers/markedQuestionIds
-    page.locator('#practiceExitBtn').click()
+    click_tool(page, '#practiceExitBtn')
     page.locator('#practiceSaveExitBtn').click()
     page.wait_for_timeout(250)
     snapshots = page.evaluate("window.__pausedSnapshots")

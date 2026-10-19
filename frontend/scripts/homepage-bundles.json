@@ -64,6 +64,7 @@
         "styles/graph-question-drawer.css",
         "styles/graph-question-batch.css",
         "styles/graph-template-center.css",
+        "styles/template-discovery.css",
         "styles/question-materials.css"
       ]
     },
@@ -135,6 +136,7 @@
         "src/graph/question-batch-controller.js",
         "src/graph/template-preview.js",
         "src/graph/template-center-controller.js",
+        "src/graph/template-deep-link.js",
         "src/10-graph-editor.js",
         "src/19-home-toolbar-registry.js",
         "src/21-home-package-service.js",

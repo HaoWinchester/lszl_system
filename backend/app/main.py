@@ -108,6 +108,8 @@ async def lifespan(app: FastAPI):
         logger.warning("DB connection failed: %s", e)
     if app.state.db_ok:
         await _seed_builtin_teaching_content()
+        from app.services.builtin_graph_template_seed_service import seed_builtin_graph_templates
+        await seed_builtin_graph_templates()
     yield
     await engine.dispose()
 

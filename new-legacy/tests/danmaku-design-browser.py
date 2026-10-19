@@ -131,6 +131,7 @@ class DanmakuDesign(unittest.TestCase):
         # External use references must resolve to a real loaded symbol, not a blank SVG.
         refs = pop.locator('.q-danmaku-pop-actions use').evaluate_all('els=>els.map(e=>e.getAttribute("href"))')
         self.assertEqual([r.split('#')[1] for r in refs], ['heart','message-circle','eye-off','ellipsis'])
+        self.page.wait_for_function("[...document.querySelectorAll('.q-danmaku-pop-actions svg')].every(e=>e.getBBox().width>0&&e.getBBox().height>0)",timeout=5000)
         self.assertTrue(pop.locator('.q-danmaku-pop-actions svg').evaluate_all('els=>els.every(e=>e.getBBox().width>0 && e.getBBox().height>0)'))
         for ref in refs:
             self.assertIn('<symbol', self.page.evaluate('async url=>(await fetch(url)).text()', ref.split('#')[0]))

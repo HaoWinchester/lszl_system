@@ -20,6 +20,7 @@
   <link rel="stylesheet" href="styles/support-center.css"/>
   <link rel="stylesheet" href="styles/practice-mode.css"/>
   <link rel="stylesheet" href="styles/question-comments.css"/>
+  <link rel="stylesheet" href="styles/knowledge-dashboard.css"/>
   <link rel="stylesheet" href="styles/focus-vega-typography.css"/>
   <link rel="stylesheet" href="styles/learning-skin.css"/>
   <link rel="stylesheet" href="styles/learning-loading.css"/>
@@ -85,6 +86,7 @@
             </button>
             <div class="practice-sidebar-divider"></div>
             <button type="button" class="practice-utility-btn" data-lobby-open="reports"><span data-kg-icon="file-text" data-kg-icon-size="18" aria-hidden="true"></span>学习报告</button>
+            <button type="button" class="practice-utility-btn" id="practiceKnowledgeDashboardOpen" data-knowledge-dashboard-open><span data-kg-icon="sparkles" data-kg-icon-size="18" aria-hidden="true"></span>知识星空</button>
             <button type="button" class="practice-utility-btn" data-lobby-open="account"><span data-kg-icon="settings" data-kg-icon-size="18" aria-hidden="true"></span>账号设置</button>
           </nav>
       </aside>
@@ -195,16 +197,19 @@
         </div>
       </section>
 
-      <section class="practice-game" id="practiceGame" hidden aria-live="polite">
-        <nav class="practice-side-nav" id="practiceSideNav" aria-label="答题导航">
+      <section class="practice-game practice-side-collapsed" id="practiceGame" hidden aria-live="polite">
+        <nav class="practice-side-nav" id="practiceSideNav" aria-label="答题功能" hidden inert>
           <button type="button" class="practice-side-item is-active" data-practice-action="question" aria-label="回到当前题目"><span data-kg-icon="file-text" data-kg-icon-size="28" aria-hidden="true"></span><span>答题</span></button>
           <button type="button" class="practice-side-item practice-side-comment" id="practiceCommentBtn" title="查看本题评论并参与讨论"><span data-kg-icon="message-circle-more" data-kg-icon-size="28" aria-hidden="true"></span><span>评论</span><em class="practice-side-badge" id="practiceCommentCount" hidden aria-label="本题评论数"></em></button>
           <button type="button" class="practice-side-item practice-side-danmaku practice-danmaku-toggle" id="practiceDanmakuToggle" aria-pressed="true" title="开关本题弹幕"><span data-kg-icon="zap" data-kg-icon-size="28" aria-hidden="true"></span><span data-practice-danmaku-label>弹幕开</span></button>
           <button type="button" class="practice-side-item" id="practiceFavoriteBtn" aria-pressed="false" title="收藏本题"><span data-kg-icon="star" data-kg-icon-size="28" aria-hidden="true"></span><span>收藏</span><em class="practice-side-badge" id="practiceFavoriteCount" hidden aria-label="本题收藏数"></em></button>
           <button type="button" class="practice-side-item practice-exit-btn" id="practiceExitBtn" aria-label="退出本次练习" title="退出本次练习"><span data-kg-icon="log-out" data-kg-icon-size="28" aria-hidden="true"></span><span>退出</span></button>
+          <button type="button" class="practice-side-item" id="practiceMenuSaveBtn" disabled><span data-kg-icon="save" data-kg-icon-size="28" aria-hidden="true"></span><span data-save-label>保存进度</span></button>
+          <button type="button" class="practice-side-item" id="practiceDanmakuSettingsBtn"><span data-kg-icon="settings" data-kg-icon-size="28" aria-hidden="true"></span><span>弹幕设置</span></button>
+          <button type="button" class="practice-side-item practice-sound-toggle" id="practiceSoundToggle" aria-pressed="false">音效关</button>
           <p class="practice-side-note">坚持<br/>是通往优秀<br/>最短的路</p>
         </nav>
-        <button type="button" class="practice-side-toggle" id="practiceSideToggle" aria-expanded="true" aria-controls="practiceSideNav" title="收起导航栏">‹</button>
+        <button type="button" class="practice-side-toggle" id="practiceSideToggle" aria-expanded="false" aria-controls="practiceSideNav" aria-label="答题功能" title="展开答题功能">☰</button>
         <header class="practice-game-topbar">
           <button type="button" class="practice-review-back" id="practiceReviewBackBtn" hidden>← 返回成绩单</button>
           <div class="practice-progress">
@@ -441,6 +446,8 @@
   <script defer src="src/118-revenge-entry-policy.js"></script>
   <script defer src="src/paper-presentation.js"></script>
   <script defer src="src/practice/lobby-dashboard.js"></script>
+  <script defer src="src/practice/practice-sound.js"></script>
+  <script defer src="src/practice/knowledge-dashboard.js"></script>
   <script defer src="src/100-practice-mode.js"></script>
   <script defer src="src/practice/practice-answer-page.js"></script>
 </body>

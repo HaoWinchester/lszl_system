@@ -3818,6 +3818,36 @@
       "path": "new-legacy/src/teacher/training-config/workspace-layout.js",
       "token": "kg_training_workspace_layout_v1",
       "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_practice_sound_v1__",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_question_danmaku_settings_v1__",
+      "ordinal": 1
+    },
+    {
+      "path": "frontend/scripts/new-legacy-contract.json",
+      "token": "kg_practice_sound_v1__",
+      "ordinal": 1
+    },
+    {
+      "path": "frontend/scripts/new-legacy-contract.json",
+      "token": "kg_question_danmaku_settings_v1__",
+      "ordinal": 1
+    },
+    {
+      "path": "new-legacy/src/119-question-comments.js",
+      "token": "kg_question_danmaku_settings_v1__",
+      "ordinal": 1
+    },
+    {
+      "path": "new-legacy/src/practice/practice-sound.js",
+      "token": "kg_practice_sound_v1__",
+      "ordinal": 1
     }
   ],
   "dynamicRuntimeKey": [

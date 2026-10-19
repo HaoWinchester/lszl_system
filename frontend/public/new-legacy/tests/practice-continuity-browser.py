@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Real practice DOM: coverage, explicit save/retry and report-to-next-session."""
+from helpers.practice_tools import click_tool, open_tools
 from pathlib import Path
 import re
 import shutil
@@ -91,7 +92,7 @@ with sync_playwright() as pw:
         expect(page.locator('#practiceSaveProgressBtn')).to_be_disabled()
         page.evaluate("Object.defineProperty(navigator,'onLine',{configurable:true,value:true});window.dispatchEvent(new Event('online'))")
         expect(page.locator('#practiceSaveProgressBtn')).to_be_enabled()
-        page.locator('#practiceExitBtn').click()
+        click_tool(page, '#practiceExitBtn')
         page.locator('#practiceExitCancel').click()
         assert page.evaluate('window.KGPracticeMode.snapshot().active')
         assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1')
