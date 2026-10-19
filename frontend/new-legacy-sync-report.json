@@ -1,18 +1,17 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.365",
-  "toVersion": "v9.0-p4.1.366",
+  "fromVersion": "v9.0-p4.1.366",
+  "toVersion": "v9.0-p4.1.367",
   "changes": {
     "added": [],
     "changed": [
       "VERSION",
-      "assets/icons/lucide-learning.svg",
       "content-prep-studio/dist/content-prep.html",
-      "src/107-learning-ui-icons.js",
-      "styles/answer-page.css",
-      "tests/danmaku-design.test.js",
-      "tests/practice-floating-menu-browser.py",
-      "tests/practice-sound-browser.py"
+      "src/practice/practice-answer-page.js",
+      "styles/practice-mode.css",
+      "tests/danmaku-design-browser.py",
+      "tests/practice-lobby-fidelity-browser.py",
+      "tests/practice-side-nav-comments-browser.py"
     ],
     "removed": []
   },

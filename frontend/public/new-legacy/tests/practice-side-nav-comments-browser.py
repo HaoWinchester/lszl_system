@@ -83,7 +83,7 @@ with sync_playwright() as playwright:
             "**/harness",
             lambda r: r.fulfill(
                 content_type="text/html",
-                body=f'<!doctype html><html><head><base href="http://localhost/"></head><body{attrs}>{body}</body></html>',
+                body=f'<!doctype html><html><head><meta charset="utf-8"><base href="http://localhost/"></head><body{attrs}>{body}</body></html>',
             ),
         )
         page.goto("http://localhost/harness")
@@ -118,7 +118,8 @@ with sync_playwright() as playwright:
           window.KGFreeModeLanguage={};
         }"""
         )
-        for stylesheet in ["styles/main.css", "styles/practice-mode.css", "styles/focus-vega-typography.css", "styles/learning-skin.css", "styles/question-materials.css", "styles/answer-page.css", "styles/question-comments.css"]:
+        source = (ROOT / "practice-mode.html").read_text(encoding="utf-8")
+        for stylesheet in re.findall(r'<link[^>]+href="([^"]+\.css)"', source):
             page.add_style_tag(content=(ROOT / stylesheet).read_text(encoding="utf-8"))
         for script in SCRIPTS:
             page.add_script_tag(content=(ROOT / script).read_text(encoding="utf-8"))
@@ -215,8 +216,18 @@ with sync_playwright() as playwright:
             summary.hover()
             assert help.evaluate('el=>el.open'), f'{mode} help must open on hover'
             content_box = help.locator('.practice-help-content').bounding_box()
+            if viewport['width'] <= 480:
+                trigger_box = summary.bounding_box()
+                gap = max(content_box['y'] - trigger_box['y'] - trigger_box['height'],
+                          trigger_box['y'] - content_box['y'] - content_box['height'])
+                assert 0 <= gap <= 12, f'{mode} mobile help must stay next to its trigger: {gap=}'
+                assert content_box['y'] >= 8 and content_box['y'] + content_box['height'] <= viewport['height'] - 8
             page.mouse.move(content_box['x']+content_box['width']/2, content_box['y']+20, steps=20)
+            page.wait_for_timeout(450)  # Must survive the existing pointerleave grace period.
             assert help.evaluate('el=>el.open'), 'moving into help must keep it readable'
+            evidence = ROOT.parent / 'artifacts/remaining-learning-requirements/help-hover'
+            evidence.mkdir(parents=True, exist_ok=True)
+            page.screenshot(path=str(evidence / f'{mode}-{viewport["width"]}.png'))
             page.mouse.move(1, 1)
             expect(help).not_to_have_attribute('open', '')
             summary.focus()
