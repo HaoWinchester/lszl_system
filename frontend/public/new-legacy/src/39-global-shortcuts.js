@@ -221,6 +221,13 @@
       setStatus("当前角色无“" + item.label + "”权限。");
       return;
     }
+    const routes=window.KGLearningRouteContext;
+    const mode={workspace:'multi_question_canvas',recall:'deep_recall'}[item.id];
+    if(mode&&routes?.resumeHref){
+      const currentMode={'question-workspace.html':'multi_question_canvas','knowledge-recall.html':'deep_recall'}[currentPage()];
+      if(currentMode)routes.remember(routes.parse({mode:currentMode}));
+      event.currentTarget.setAttribute('href',routes.resumeHref(item.href,mode));
+    }
   }
   function render(){
     const existing = document.getElementById("kgGlobalShortcuts");

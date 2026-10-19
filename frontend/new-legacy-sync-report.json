@@ -1,19 +1,25 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.352",
-  "toVersion": "v9.0-p4.1.355",
+  "fromVersion": "v9.0-p4.1.355",
+  "toVersion": "v9.0-p4.1.356",
   "changes": {
     "added": [],
     "changed": [
       "VERSION",
       "content-prep-studio/dist/content-prep.html",
-      "src/18-graph-user-preferences.js",
-      "src/20-flashcards-toolbar.js",
+      "knowledge-recall.html",
+      "question-workspace.html",
       "src/39-global-shortcuts.js",
-      "src/canvas/89-canvas-runtime.js",
-      "tests/boardmix-graph-controls-browser.py",
-      "tests/boardmix-graph-controls.test.js",
-      "tests/boardmix-popover-bounds-browser.py"
+      "src/59b-learning-route-context.js",
+      "src/77-multi-question-workspace.js",
+      "src/86-knowledge-recall.js",
+      "src/canvas/97-learning-theme.js",
+      "styles/focus-vega-learning.css",
+      "styles/knowledge-recall-patch-1.css",
+      "styles/learning-theme.css",
+      "styles/unified-canvas-runtime.css",
+      "tests/learning-theme-browser.py",
+      "tests/workspace-background.test.js"
     ],
     "removed": []
   },

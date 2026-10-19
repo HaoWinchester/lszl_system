@@ -418,7 +418,7 @@
       const routeApi=global.KGLearningRouteContext;
       if(routeApi){
         const current=routeApi.parse({mode:'multi_question_canvas'});
-        const active=state.questions.find(item=>String(item.paper?.releaseId||'')===String(state.releaseId||''))||state.questions[0]||null;
+        const active=state.questions.find(item=>String(item.question?.id||'')===String(current.questionId||'')&&String(item.paper?.releaseId||'')===String(state.releaseId||'')&&(!current.bankId||String(item.bank?.id||'')===String(current.bankId)))||state.questions.find(item=>String(item.paper?.releaseId||'')===String(state.releaseId||''))||state.questions[0]||null;
         routeApi.replace({...current,paperId:state.paperId,releaseId:state.releaseId,questionId:active?.question?.id||current.questionId,bankId:active?.bank?.id||current.bankId,workspaceId:String(workspaceId||''),mode:'multi_question_canvas'},{target,mode:'multi_question_canvas'});
       }else global.history?.replaceState?.({},'',target);
     }catch(e){}
@@ -982,7 +982,7 @@
         // Document settings preview is local to this surface; canceled previews never change global defaults.
         state.runtime?.appearance?.apply?.(preferences);
         const captured=global.KGLearningTheme.captureWorkspaceBackground(state.viewport,state.viewport.querySelector('.qw-background'));
-        state.workspace.background={...state.workspace.background,appearance:clone(preferences),surface:captured.surface};
+        state.workspace.background={...state.workspace.background,appearance:clone(preferences),surface:captured.surface,layer:{color:'transparent',image:'none',repeat:'repeat'}};
         applyWorkspaceBackground();
         if(!state.readonly){
           state.suppressStoreEvent=true;
@@ -5822,8 +5822,8 @@
         try{state.workspace=store().write(state.workspace,{reason:'workspace-background-updated'})}finally{state.suppressStoreEvent=false}
       }
     });
-    // 主题与深度回忆共用同一存储（kg_deep_recall_theme_v1），任一页切换双向同步。
-    const themeController=global.KGLearningTheme?.create?.({roots:()=>[document.body]});
+    // Scene controls share an implementation, while each learning mode keeps its selection.
+    const themeController=global.KGLearningTheme?.create?.({scope:'workspace',roots:()=>[document.body]});
     themeController?.init();
     applyWorkspaceBackground();
     const themeSelect=byId('qwThemeSelect');
@@ -5831,6 +5831,7 @@
       themeSelect.value=themeController?themeController.saved():'platform';
       themeSelect.addEventListener('change',()=>{if(themeController)themeController.apply(themeSelect.value);themeSelect.blur()});
       global.addEventListener('kg:deep-recall-theme-change',event=>{
+        if(event.detail?.scope!=='workspace')return;
         const next=String(event.detail?.theme||'platform');
         if(themeSelect.value!==next)themeSelect.value=next;
       });

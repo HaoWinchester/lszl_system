@@ -401,7 +401,7 @@
 /* Scene is an icon-only hover/focus palette; one click applies a scene immediately. */
 .knowledge-recall-page .kr-scene-menu{position:relative}
 .knowledge-recall-page .kr-scene-menu>summary{
-  width:36px;height:36px;min-width:36px;padding:0;border-color:var(--kr-border);border-radius:11px;
+  width:auto;height:36px;min-width:68px;padding:0 8px;gap:5px;border-color:var(--kr-border);border-radius:11px;
   background:var(--kr-control-bg);color:var(--kr-control-ink);box-shadow:none;
 }
 .knowledge-recall-page .kr-scene-menu>summary svg{
