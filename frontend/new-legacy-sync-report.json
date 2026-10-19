@@ -1,16 +1,15 @@
 {
   "schemaVersion": 1,
   "fromVersion": "v9.0-p4.1.361",
-  "toVersion": "v9.0-p4.1.361",
+  "toVersion": "v9.0-p4.1.364",
   "changes": {
     "added": [],
     "changed": [
-      "src/100-practice-mode.js",
-      "src/119-question-comments.js",
+      "VERSION",
+      "content-prep-studio/dist/content-prep.html",
       "src/graph/mindmap-themes.js",
       "src/practice/practice-answer-page.js",
-      "tests/graph-edge-bundle-browser.py",
-      "tests/graph-feedback-live-browser.py",
+      "tests/danmaku-api-browser.py",
       "tests/graph-mindmap-browser.py",
       "tests/practice-side-nav-comments-browser.py"
     ],

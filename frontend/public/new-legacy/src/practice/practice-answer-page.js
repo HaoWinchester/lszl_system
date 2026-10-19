@@ -2,23 +2,31 @@
 (function () {
   'use strict';
   function bindHelpPopovers() {
-    const helps = [...document.querySelectorAll('.practice-lobby-help')].map(detail => {
+    const helps = [...document.querySelectorAll('.practice-standard-modes .practice-lobby-help')].map(detail => {
       const summary = detail.querySelector('summary');
       let pinned = false;
-      const close = () => { pinned = false; detail.open = false; };
+      let closeTimer;
+      const cancelClose = () => window.clearTimeout(closeTimer);
+      const close = () => { cancelClose(); pinned = false; detail.open = false; };
+      const closeSoon = () => {
+        cancelClose();
+        closeTimer = window.setTimeout(() => {
+          if (!pinned && !detail.contains(document.activeElement) && !detail.matches(':hover')) detail.open = false;
+        }, 400);
+      };
       detail.addEventListener('pointerenter', event => {
+        cancelClose();
         if (event.pointerType !== 'touch') detail.open = true;
       });
-      detail.addEventListener('pointerleave', () => {
-        if (!pinned && !detail.contains(document.activeElement)) detail.open = false;
-      });
-      detail.addEventListener('focusin', () => { detail.open = true; });
+      detail.addEventListener('pointerleave', closeSoon);
+      detail.addEventListener('focusin', () => { cancelClose(); detail.open = true; });
       detail.addEventListener('focusout', event => {
-        if (!pinned && !detail.contains(event.relatedTarget) && !detail.matches(':hover')) detail.open = false;
+        if (!detail.contains(event.relatedTarget)) closeSoon();
       });
       summary.addEventListener('click', event => {
         // Focus and hover may already have opened the native details element.
         event.preventDefault();
+        cancelClose();
         pinned = !pinned;
         detail.open = pinned;
       });

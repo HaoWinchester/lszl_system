@@ -9,7 +9,7 @@ from pathlib import Path
 import json
 import re
 
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import sync_playwright, expect
 
 ROOT = Path(__file__).resolve().parents[1]
 ARGS = ["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"]
@@ -210,17 +210,18 @@ with sync_playwright() as playwright:
             summary = help.locator('summary')
             summary.hover()
             assert help.evaluate('el=>el.open'), f'{mode} help must open on hover'
-            help.locator('.practice-help-content').hover()
+            content_box = help.locator('.practice-help-content').bounding_box()
+            page.mouse.move(content_box['x']+content_box['width']/2, content_box['y']+20, steps=20)
             assert help.evaluate('el=>el.open'), 'moving into help must keep it readable'
             page.mouse.move(1, 1)
-            assert not help.evaluate('el=>el.open'), 'unpinned help closes when pointer leaves'
+            expect(help).not_to_have_attribute('open', '')
             summary.focus()
             assert help.evaluate('el=>el.open'), 'keyboard focus reveals help'
             page.keyboard.press('Escape')
             assert not help.evaluate('el=>el.open'), 'Escape dismisses focused help'
             summary.click()
             assert help.evaluate('el=>el.open'), 'first click pins help even after focus or hover'
-            page.locator('#practiceLobbyTitle').click()
+            page.mouse.click(1, 1)
             assert not help.evaluate('el=>el.open'), 'outside click dismisses pinned help'
             summary.click()
             assert help.evaluate('el=>el.open')
@@ -228,6 +229,7 @@ with sync_playwright() as playwright:
             assert not help.evaluate('el=>el.open'), 'second click closes help'
         page.evaluate("KGPracticeMode.startPractice('practice')")
         page.wait_for_function("document.body.dataset.practiceView==='game'")
+        page.locator('#practiceOptions .practice-option[data-option-id="B"]').click()
         page.wait_for_selector('body > .q-danmaku .q-danmaku-item')
         page.locator('#practiceExitBtn').click()
         page.locator('#practiceAbandonBtn').click()
