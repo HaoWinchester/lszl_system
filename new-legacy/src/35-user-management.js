@@ -295,7 +295,7 @@
     </div>
     <div class="um-subscription-summary">
       <span>到期：${escapeHTML(expiresText)}</span>
-      <span>来源：${escapeHTML(record.source||'default')}</span>
+      <span>来源：${escapeHTML(summary&&summary.sourceText||'其他来源')}</span>
       <span>更新：${escapeHTML(fmtTime(record.updatedAt))}</span>
     </div>
     <div class="um-subscription-grid">

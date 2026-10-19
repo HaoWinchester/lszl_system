@@ -140,27 +140,59 @@ def _apply_plan(sub: Subscription, plan_id: str) -> None:
         sub.expires_at = sub.expires_at + timedelta(days=_plan(plan_id).get("validDays", 0))
 
 
+async def _lock_subscription_account(db: AsyncSession, username: str) -> None:
+    # A row lock alone cannot serialize the first insert when no row exists.
+    await db.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"),
+                     {"key": f"subscription-account:{username}"})
+
+
 async def get_subscription(db: AsyncSession, username: str) -> Subscription:
-    s = await db.get(Subscription, username)
-    if not s:
-        s = Subscription(username=username, plan_id="free", status="active", source="default")
-        db.add(s)
+    subscription = await db.get(Subscription, username)
+    if subscription is None:
+        subscription = await _subscription_for_update(db, username)
         await db.commit()
-        await db.refresh(s)
-    return s
+        await db.refresh(subscription)
+    return subscription
 
 
 async def _subscription_for_update(db: AsyncSession, username: str) -> Subscription:
-    result = await db.execute(
-        select(Subscription).where(Subscription.username == username).with_for_update()
-    )
+    await _lock_subscription_account(db, username)
+    result = await db.execute(select(Subscription).where(Subscription.username == username)
+        .with_for_update().execution_options(populate_existing=True))
     subscription = result.scalar_one_or_none()
     if subscription is None:
-        subscription = Subscription(
-            username=username, plan_id="free", status="active", source="default"
-        )
+        subscription = Subscription(username=username, plan_id="free", status="active", source="default")
         db.add(subscription)
         await db.flush()
+    return subscription
+
+
+async def grant_membership_days(db: AsyncSession, username: str, *, days: int,
+                                source: str, granted_at: datetime) -> Subscription:
+    """Extend real membership without committing the caller's transaction.
+
+    All duration/recipient choices come from a server-side business operation.
+    Existing finite paid plan/payment metadata and paused status are preserved.
+    """
+    if isinstance(days, bool) or not isinstance(days, int) or days <= 0:
+        raise ValueError("赠送天数必须为正整数")
+    subscription = await _subscription_for_update(db, username)
+    plan_id = validate_plan_id(subscription.plan_id)
+    if plan_id == 'lifetime':
+        return subscription
+    was_paid = plan_id in FINITE_PAID_PLAN_IDS
+    future = was_paid and subscription.expires_at is not None and subscription.expires_at > granted_at
+    if not future:
+        subscription.started_at = granted_at
+    subscription.expires_at = (subscription.expires_at if future else granted_at) + timedelta(days=days)
+    if not was_paid:
+        subscription.plan_id = 'monthly'
+        subscription.source = source
+    if subscription.status != 'paused':
+        subscription.status = 'active'
+    note = f"推荐注册赠送 {days} 天会员" if source == 'referral' else f"赠送 {days} 天会员"
+    subscription.note = '\n'.join(value for value in (subscription.note, note) if value)
+    await db.flush()
     return subscription
 
 
@@ -178,7 +210,7 @@ async def admin_set(
     update_expires_at: bool = False,
 ) -> Subscription:
     plan_id = validate_plan_id(plan_id)
-    s = await get_subscription(db, username)
+    s = await _subscription_for_update(db, username)
     _apply_plan(s, plan_id)
     if status:
         s.status = status
@@ -199,13 +231,14 @@ async def admin_set(
 
 
 async def redeem(db: AsyncSession, username: str, code: str) -> Subscription:
-    r = await db.execute(select(RedeemCode).where(RedeemCode.code == code.strip().upper()))
+    await _lock_subscription_account(db, username)
+    r = await db.execute(select(RedeemCode).where(RedeemCode.code == code.strip().upper()).with_for_update().execution_options(populate_existing=True))
     c = r.scalar_one_or_none()
     if not c:
         raise ValueError("卡密不存在")
     if c.status != "unused":
         raise ValueError("卡密已使用或已停用")
-    s = await get_subscription(db, username)
+    s = await _subscription_for_update(db, username)
     _apply_plan(s, c.plan_id)
     s.status = "active"
     s.source = "redeem_code"
@@ -291,10 +324,14 @@ async def activate_paid_order(
     validate_amount: bool = False,
 ) -> SubscriptionOrder:
     """支付成功激活订阅（幂等：已 paid 直接返回）。"""
+    owner = (await db.execute(select(SubscriptionOrder.username).where(SubscriptionOrder.id == order_id))).scalar_one_or_none()
+    if not owner:
+        raise ValueError("订单不存在")
+    await _lock_subscription_account(db, owner)
     result = await db.execute(
         select(SubscriptionOrder)
         .where(SubscriptionOrder.id == order_id)
-        .with_for_update()
+        .with_for_update().execution_options(populate_existing=True)
     )
     o = result.scalar_one_or_none()
     if not o:
@@ -328,10 +365,14 @@ async def list_orders(db: AsyncSession, status: str | None = None) -> list[Subsc
 
 
 async def approve_order(db: AsyncSession, order_id: str, actor: str) -> SubscriptionOrder:
+    owner = (await db.execute(select(SubscriptionOrder.username).where(SubscriptionOrder.id == order_id))).scalar_one_or_none()
+    if not owner:
+        raise ValueError("订单不存在")
+    await _lock_subscription_account(db, owner)
     result = await db.execute(
         select(SubscriptionOrder)
         .where(SubscriptionOrder.id == order_id)
-        .with_for_update()
+        .with_for_update().execution_options(populate_existing=True)
     )
     o = result.scalar_one_or_none()
     if not o or o.status != "pending" or o.pay_status == "paid":
@@ -358,7 +399,7 @@ async def cancel_order(
     result = await db.execute(
         select(SubscriptionOrder)
         .where(SubscriptionOrder.id == order_id)
-        .with_for_update()
+        .with_for_update().execution_options(populate_existing=True)
     )
     o = result.scalar_one_or_none()
     if not o or o.status != "pending" or o.pay_status not in {None, "pending"}:
@@ -383,7 +424,7 @@ async def cancel_own_order(
     result = await db.execute(
         select(SubscriptionOrder)
         .where(SubscriptionOrder.id == order_id)
-        .with_for_update()
+        .with_for_update().execution_options(populate_existing=True)
     )
     order = result.scalar_one_or_none()
     if not order or order.username != username:

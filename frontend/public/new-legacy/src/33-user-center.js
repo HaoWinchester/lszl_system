@@ -95,7 +95,7 @@
     const actionText="升级会员";
     panel.innerHTML=`<div class="uc-card-icon uc-card-icon-membership">◇</div>
       <div class="uc-membership-main"><div class="uc-membership-heading"><div><h3>${escapeHTML(plan.name||"免费学员")}</h3><p>${escapeHTML(plan.description||"当前学员订阅状态。")}</p></div>${hasActivePaidMembership?"":`<button type="button" class="uc-button uc-button-primary uc-button-compact" id="ucSubscriptionRenewBtn">${escapeHTML(actionText)}</button>`}</div>
-      <div class="uc-meta-chips"><span>✓ 状态：${escapeHTML(statusText)}</span><span>▣ 有效期：${escapeHTML(expiresText)}</span><span>◷ 倒计时：${escapeHTML(countdownText)}</span><span>◇ 来源：${escapeHTML(record&&record.source||"default")}</span></div>
+      <div class="uc-meta-chips"><span>✓ 状态：${escapeHTML(statusText)}</span><span>▣ 有效期：${escapeHTML(expiresText)}</span><span>◷ 倒计时：${escapeHTML(countdownText)}</span><span>◇ 来源：${escapeHTML(summary&&summary.sourceText||"其他来源")}</span></div>
       <p class="uc-membership-note">此处展示当前订阅状态和权益有效期。</p></div>`;
     const btn=$("ucSubscriptionRenewBtn");
     if(btn)btn.addEventListener("click",openSubscriptionDetailModal);
@@ -447,12 +447,17 @@
   async function renderReferralBox(user,{create=false}={}){
     const panel=$('ucReferralBox'),owner=currentUsername(),request=++referralRequest;
     if(!panel||!owner)return;
-    const heading='<div class="uc-card-content"><h3>我的推荐码</h3><p>推荐码仅记录新注册来源，当前不提供会员奖励或返佣。</p>';
+    const heading='<div class="uc-card-content"><h3>我的推荐码</h3><p>新用户通过有效推荐码注册成功后，双方各赠 7 天会员。已有未到期会员顺延，永久会员权益保持不变。</p>';
     panel.innerHTML=heading+'<p role="status">正在读取推荐信息…</p></div>';
     const isCurrent=()=>request===referralRequest&&owner===currentUsername();
     try{
       if(typeof authCore()?.referralSummary!=='function')throw new Error('推荐信息暂不可用');
-      const result=await authCore().referralSummary({create});
+      const [result]=await Promise.all([authCore().referralSummary({create}),(async()=>{
+        const refresh=window.KGSystemDomain?.refreshSubscription;
+        if(typeof refresh!=='function')return;
+        await refresh();
+        if(isCurrent()){renderSubscriptionBox(user);subscriptionApi()?.decorateSubscriptionElements?.()}
+      })()]);
       if(!isCurrent())return;
       const code=String(result.code||''),count=Math.max(0,Math.floor(Number(result.registeredCount)||0));
       if(code&&!/^[A-F0-9]{16}$/.test(code))throw new Error('推荐信息读取失败，请重试');
@@ -477,7 +482,7 @@
       }));
     }catch(error){
       if(!isCurrent())return;
-      panel.innerHTML=heading+'<p role="status">推荐信息读取失败，请重试。</p><button type="button" class="uc-button uc-button-secondary" id="ucReferralRetry">重试</button></div>';
+      panel.innerHTML=heading+'<p role="status">推荐及会员信息读取失败，请重试。</p><button type="button" class="uc-button uc-button-secondary" id="ucReferralRetry">重试</button></div>';
       $('ucReferralRetry')?.addEventListener('click',()=>{if(isCurrent())void renderReferralBox(user,{create})});
     }
   }

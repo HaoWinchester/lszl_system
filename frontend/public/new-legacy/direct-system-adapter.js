@@ -14,6 +14,8 @@
   let orderState = Object.freeze([])
   let redeemCodeState = Object.freeze([])
   let initialization = Object.freeze({ status: 'loading', error: null })
+  let subscriptionRequest = 0
+  let subscriptionFlight = null
 
   function request(method, path, body) {
     return api.request({ method, path, body })
@@ -123,16 +125,24 @@
   }
 
   async function refreshSubscription() {
-    const payload = await request('GET', '/api/v1/subscriptions/me')
-    const subscription = payload.subscription ? normalizeSubscription(payload.subscription) : null
-    subscriptionApi.hydrateSubscriptions?.(
-      subscription?.username ? { [subscription.username]: subscription } : {},
-      { merge: true },
-    )
-    global.KGServerEntitlements = Object.freeze({
-      allExamPapers: payload.entitlements?.allExamPapers === true,
-    })
-    return subscription
+    const owner = String(auth?.currentUser?.()?.username || userProfile?.username || '')
+    if (!owner) return null
+    if (subscriptionFlight?.owner === owner && subscriptionFlight.revision === subscriptionRequest) return subscriptionFlight.promise
+    const revision = ++subscriptionRequest
+    const promise = (async () => {
+      const payload = await request('GET', '/api/v1/subscriptions/me')
+      if (revision !== subscriptionRequest || owner !== String(auth?.currentUser?.()?.username || userProfile?.username || '')
+          || (payload.subscription?.username && payload.subscription.username !== owner)) return null
+      const subscription = payload.subscription ? normalizeSubscription(payload.subscription) : null
+      subscriptionApi.hydrateSubscriptions?.(
+        subscription?.username ? { [subscription.username]: subscription } : {},
+        { merge: true },
+      )
+      global.KGServerEntitlements = Object.freeze({ allExamPapers: payload.entitlements?.allExamPapers === true })
+      return subscription
+    })()
+    subscriptionFlight = { owner, revision, promise }
+    try { return await promise } finally { if (subscriptionFlight?.promise === promise) subscriptionFlight = null }
   }
 
   async function refreshAdminSettings() {
@@ -366,6 +376,7 @@
 
   if (typeof global.addEventListener === 'function') {
     global.addEventListener('kg-auth-session-change', event => {
+      subscriptionRequest++
       const username = String(event?.detail?.username || '').trim()
       userProfile = null
       if (!username) {

@@ -343,7 +343,10 @@
     label.textContent='推荐码（选填，仅注册时使用）';
     input.id='authReferralCode';input.type='text';input.maxLength=64;input.autocomplete='off';
     input.placeholder='无推荐码可留空';input.value=referralCodeFromLink();
-    label.appendChild(input);anchor.after(label);return true;
+    const note=document.createElement('p');note.id='authReferralRewardNote';note.className='auth-note';
+    note.textContent='通过有效推荐码注册成功后，推荐人与新用户各赠 7 天会员；已有未到期会员顺延，永久会员权益保持不变。';
+    input.setAttribute('aria-describedby',note.id);
+    label.appendChild(input);anchor.after(label);label.after(note);return true;
   }
   async function referralSummary({create=false}={}){
     const config=providerConfig();

@@ -1,17 +1,18 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.366",
-  "toVersion": "v9.0-p4.1.367",
+  "fromVersion": "v9.0-p4.1.368",
+  "toVersion": "v9.0-p4.1.369",
   "changes": {
-    "added": [],
+    "added": [
+      "tests/subscription-source.test.js"
+    ],
     "changed": [
       "VERSION",
       "content-prep-studio/dist/content-prep.html",
-      "src/practice/practice-answer-page.js",
-      "styles/practice-mode.css",
-      "tests/danmaku-design-browser.py",
-      "tests/practice-lobby-fidelity-browser.py",
-      "tests/practice-side-nav-comments-browser.py"
+      "src/33-user-center.js",
+      "src/35-user-management.js",
+      "src/37-subscription-core.js",
+      "tests/referral-browser.py"
     ],
     "removed": []
   },

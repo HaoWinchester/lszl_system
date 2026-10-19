@@ -1,4 +1,4 @@
-"""Registration attribution only; no subscription or payment side effects."""
+"""Registration attribution and atomic two-sided membership reward receipt."""
 from datetime import datetime
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, String, func
 from sqlalchemy.orm import Mapped, mapped_column
@@ -20,4 +20,5 @@ class ReferralBinding(Base):
     )
     invitee_username: Mapped[str] = mapped_column(String(64), ForeignKey('users.username', ondelete='CASCADE'), primary_key=True)
     inviter_username: Mapped[str] = mapped_column(String(64), ForeignKey('users.username', ondelete='CASCADE'), nullable=False)
+    rewards_granted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

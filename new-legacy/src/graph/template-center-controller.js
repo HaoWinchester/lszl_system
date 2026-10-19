@@ -4,7 +4,6 @@
   function el(tag,text){const node=document.createElement(tag);if(text!==undefined)node.textContent=text;return node}
   function previewWindowPosition(left,top,width,height,viewportWidth,viewportHeight){return{left:Math.max(0,Math.min(Math.max(0,viewportWidth-width),left)),top:Math.max(0,Math.min(Math.max(0,viewportHeight-height),top))}}
   function canPublish(role){return role==='teacher'||role==='admin'}
-  function selectTemplates(rows,target){return target?rows.filter(item=>item.id===target):rows}
   let active=null;
   const onlineFilesRequired='当前为临时图谱模式，暂不能发布或加载模板。请先导出学习包保留内容，再联系管理员恢复在线图谱后重新打开。';
   function requireOnlineFiles(){if(global.KGGraphFileEditorStoreBridge?.isRemote?.()!==true)throw new Error(onlineFilesRequired)}
@@ -18,7 +17,7 @@
     }
     return data;
   }
-  function open(options={}){
+  function open(){
     if(active)return;
     const dialog=el('dialog');dialog.id='graphTemplateCenter';dialog.className='graph-template-center';dialog.setAttribute('aria-label','知识图谱模板中心');
     const heading=el('h2','知识图谱模板中心'),intro=el('p','加载会创建独立的新图谱。模板更新或下架不会修改已加载的副本。'),status=el('p'),list=el('div'),actions=el('div'),close=el('button','关闭');status.setAttribute('role','status');actions.className='template-center-actions';actions.append(close);dialog.append(heading,intro,status,list,actions);
@@ -39,9 +38,7 @@
     }
     async function execute(action){if(busy||!isCurrent())return;busy=true;close.disabled=true;try{await action()}catch(error){if(!disposed)status.textContent=isCurrent()?error.message:'当前账号已切换，请关闭后重试。'}finally{busy=false;close.disabled=false}}
     async function refresh(){if(!isCurrent())return;status.textContent='正在加载模板…';const data=await request('',{signal:lifetime.signal});if(!isCurrent())return;list.replaceChildren();if(!data.templates.length)status.textContent='暂无模板，教师可发布当前图谱。';else status.textContent='点击图谱预览，可拖动、缩放或全屏查看。';if(global.KGGraphFileEditorStoreBridge?.isRemote?.()!==true)status.textContent=onlineFilesRequired;
-      const visible=selectTemplates(data.templates,options.templateId);
-      if(options.templateId&&!visible.length)status.textContent='此模板不存在、已下架或当前账号无权访问。请关闭后从工具栏打开模板中心查看其他模板。';
-      for(const item of visible){
+      for(const item of data.templates){
         const card=el('article');card.dataset.templateId=item.id;
         // 头部：标题 + 免费/会员徽章（下架状态并入徽章文案，保持“已下架”可读）。
         const head=el('div');head.className='template-card-head';
@@ -138,5 +135,5 @@
     refresh().catch(error=>{if(!disposed)status.textContent=error.message});
   }
   global.KGGraphTemplateCenter={open,canPublish};
-  if(typeof module==='object'&&module.exports)module.exports={canPublish,previewWindowPosition,selectTemplates};
+  if(typeof module==='object'&&module.exports)module.exports={canPublish,previewWindowPosition};
 })(typeof window!=='undefined'?window:globalThis);

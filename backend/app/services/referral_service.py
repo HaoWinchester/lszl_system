@@ -9,12 +9,16 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.referral import ReferralBinding, ReferralCode
 from app.models.user import ACTIVE, User
+from app.core.security import now_utc
+from app.services import subscription_service
+
+REFERRAL_REWARD_DAYS = 7
 
 
 async def summary(db: AsyncSession, username: str) -> dict:
     code = (await db.execute(select(ReferralCode.code).where(ReferralCode.username == username))).scalar_one_or_none()
     count = (await db.execute(select(func.count()).select_from(ReferralBinding).where(ReferralBinding.inviter_username == username))).scalar_one()
-    return {'code': code, 'registeredCount': count, 'rewardEnabled': False}
+    return {'code': code, 'registeredCount': count, 'rewardEnabled': True, 'rewardDays': REFERRAL_REWARD_DAYS}
 
 
 async def ensure_code(db: AsyncSession, username: str) -> str:
@@ -52,3 +56,20 @@ async def bind_registration(db: AsyncSession, user: User, code: str) -> None:
         raise ValueError('该账号已绑定推荐关系')
     db.add(ReferralBinding(invitee_username=user.username, inviter_username=inviter))
     await db.flush()
+    await grant_registration_rewards(db, user.username)
+
+
+async def grant_registration_rewards(db: AsyncSession, invitee_username: str) -> bool:
+    """Issue both gifts once; caller commits registration and this receipt together."""
+    binding = (await db.execute(select(ReferralBinding)
+        .where(ReferralBinding.invitee_username == invitee_username)
+        .with_for_update().execution_options(populate_existing=True))).scalar_one_or_none()
+    if not binding or binding.rewards_granted_at is not None:
+        return False
+    granted_at = now_utc()
+    for recipient in sorted((binding.inviter_username, binding.invitee_username)):
+        await subscription_service.grant_membership_days(
+            db, recipient, days=REFERRAL_REWARD_DAYS, source='referral', granted_at=granted_at)
+    binding.rewards_granted_at = granted_at
+    await db.flush()
+    return True

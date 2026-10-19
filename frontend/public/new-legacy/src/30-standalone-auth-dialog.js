@@ -34,12 +34,13 @@
   function open(reason='该操作需要登录后才能使用。'){
     const modal=byId('authModal');
     if(!modal)return false;
+    if(modal.classList.contains('show'))return true;
     const reasonElement=byId('authReason');
     if(reasonElement)reasonElement.textContent=String(reason||'登录后可以继续操作。');
     message('');
     modal.classList.add('show');
     modal.setAttribute('aria-hidden','false');
-    setTimeout(()=>byId('authUsername')?.focus?.(),60);
+    byId('authUsername')?.focus?.();
     return true;
   }
   function close(){

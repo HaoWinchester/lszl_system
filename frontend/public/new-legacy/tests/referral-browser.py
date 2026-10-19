@@ -30,10 +30,12 @@ def install(page,target,code='0123456789ABCDEF'):
     page.evaluate('''()=>{window.KG_AUTH_CONFIG={mode:'remote',credentials:'include',endpoints:{login:'/api/v1/auth/login',register:'/api/v1/auth/register',logout:'/api/v1/auth/logout',session:'/api/v1/auth/me',profile:'/api/v1/auth/me'}}}''')
     for file in ['styles/main.css','styles/auth-dialog.css','styles/user-center.css']:
         if (ROOT/file).exists(): page.add_style_tag(content=(ROOT/file).read_text())
-    scripts=['src/29-auth-core.js','src/30-shared-auth-dialog.js' if target in TARGETS[:2] else 'src/30-standalone-auth-dialog.js','src/33-user-center.js']
+    scripts=['src/29-auth-core.js','src/34-role-permissions.js','src/37-subscription-plans.js','src/37-subscription-orders.js','src/37-subscription-redeem-codes.js','src/37-subscription-core.js','src/30-shared-auth-dialog.js' if target in TARGETS[:2] else 'src/30-standalone-auth-dialog.js','src/33-user-center.js']
     for file in scripts: page.add_script_tag(content=(ROOT/file).read_text())
     if target in TARGETS[:2]:
         page.add_script_tag(content=(ROOT.parent/'frontend/scripts/new-legacy-assets/direct-auth-adapter.js').read_text())
+    for file in ['domain-api-client.js','direct-system-adapter.js']:
+        page.add_script_tag(content=(ROOT.parent/'frontend/scripts/new-legacy-assets'/file).read_text())
     page.evaluate("document.dispatchEvent(new Event('DOMContentLoaded'))")
     page.evaluate('window.KGSharedAuthDialog?KGSharedAuthDialog.open():KGStandaloneAuthDialog.open()')
 
@@ -42,6 +44,7 @@ with sync_playwright() as playwright:
     browser=playwright.chromium.launch(headless=True)
     errors=[]
     for target in TARGETS:
+        print(target+': start',flush=True)
         context=browser.new_context(viewport={'width':390,'height':844} if target==TARGETS[0] else {'width':1280,'height':1000})
         page=context.new_page();page.set_default_timeout(10000)
         page.on('pageerror',lambda error:errors.append(str(error)))
@@ -50,10 +53,17 @@ with sync_playwright() as playwright:
         assert referral.is_visible(),target+': optional referral input must be visible'
         bounds=referral.bounding_box();assert bounds['x']>=0 and bounds['x']+bounds['width']<=page.viewport_size['width']
         assert referral.input_value()=='0123456789ABCDEF',target+': link must prefill'
+        assert '推荐人与新用户各赠 7 天会员' in page.locator('#authReferralRewardNote').inner_text()
         name='browser_'+uuid4().hex[:16]
         page.locator('#authUsername').fill(name);page.locator('#authPassword').fill('test-only-password')
         page.locator('#authLegalConsent').check()
-        page.locator('#authRegisterBtn').click()
+        assert page.locator('#authPassword').input_value()=='test-only-password',(target,'password value before submit')
+        try:
+            with page.expect_response('**/api/v1/auth/register') as invalid_response:
+                page.locator('#authRegisterBtn').click()
+        except Exception as error:
+            raise AssertionError({'page':target,'message':page.locator('#authMsg').inner_text(),'pageErrors':errors,'passwordLength':page.locator('#authPassword').input_value().__len__()}) from error
+        assert invalid_response.value.status==400,(target,invalid_response.value.status,invalid_response.value.text())
         page.wait_for_function("document.getElementById('authMsg').textContent.includes('推荐码无效')")
         assert referral.input_value()=='0123456789ABCDEF'
         assert page.locator('#authUsername').input_value()==name
@@ -62,19 +72,24 @@ with sync_playwright() as playwright:
         # Explicitly clearing a URL-prefilled code must allow normal registration.
         referral.fill('');page.locator('#authRegisterBtn').click()
         page.wait_for_function('!!KGAuthCore.currentUser()')
+        page.wait_for_load_state('networkidle')
         # Inject transport failures only; every successful request reaches API/DB.
         failures={'verb':'GET' if target==TARGETS[0] else None}
         def transient(route):
             if route.request.method==failures['verb']:
-                failures['verb']=None;route.fulfill(status=503,content_type='application/json',body='{"detail":"temporary unavailable"}')
+                route.fulfill(status=503,content_type='application/json',body='{"detail":"temporary unavailable"}')
             else:route.continue_()
         page.route('**/api/v1/auth/me/referral',transient)
         page.evaluate('KGUserCenter.open()')
         if target==TARGETS[0]:
+            page.locator('#ucReferralRetry').wait_for()
+            failures['verb']=None
             page.locator('#ucReferralRetry').click()
             page.locator('#ucReferralGenerate').wait_for()
             failures['verb']='POST'
             page.locator('#ucReferralGenerate').click()
+            page.locator('#ucReferralRetry').wait_for()
+            failures['verb']=None
             page.locator('#ucReferralRetry').click()
         else:page.locator('#ucReferralGenerate').click()
         page.wait_for_function("!!document.getElementById('ucReferralCode')?.value")
@@ -83,7 +98,8 @@ with sync_playwright() as playwright:
         link=page.locator('#ucReferralLink').input_value()
         assert link==args.base_url+'/practice-mode.html?referralCode='+code
         assert '已注册 0 人' in page.locator('#ucReferralBox').inner_text()
-        assert '当前不提供会员奖励或返佣' in page.locator('#ucReferralBox').inner_text()
+        assert '双方各赠 7 天会员' in page.locator('#ucReferralBox').inner_text()
+        page.wait_for_function("KGSubscription.subscriptionSummary(KGAuthCore.currentUser().username).subscription.planId==='free'")
         # A real visitor follows the generated link and registers, then the
         # inviter sees only an aggregate from the actual binding table.
         visitor_context=browser.new_context(viewport={'width':1280,'height':1000})
@@ -94,8 +110,15 @@ with sync_playwright() as playwright:
         visitor.locator('#authUsername').fill(child);visitor.locator('#authPassword').fill('test-only-password')
         visitor.locator('#authLegalConsent').check();visitor.locator('#authRegisterBtn').click()
         visitor.wait_for_function('!!KGAuthCore.currentUser()')
+        visitor.wait_for_function('KGServerEntitlements.allExamPapers===true')
+        assert page.evaluate('KGServerEntitlements.allExamPapers') is False, 'inviter cache begins as free until refreshed'
         page.evaluate('KGUserCenter.open()')
         page.wait_for_function("document.getElementById('ucReferralBox').textContent.includes('已注册 1 人')")
+        page.wait_for_function('KGServerEntitlements.allExamPapers===true')
+        page.wait_for_function("document.getElementById('ucSubscriptionBox').textContent.includes('来源：推荐奖励')")
+        assert 'referral' not in page.locator('#ucSubscriptionBox').inner_text()
+        assert page.evaluate("KGSubscription.subscriptionSummary(KGAuthCore.currentUser().username).subscription.source")=='referral'
+        assert page.evaluate("KGSubscription.subscriptionSummary(KGAuthCore.currentUser().username).subscription.planId")=='monthly'
         assert child not in page.locator('#ucReferralBox').inner_text()
         visitor_context.close()
         page.locator('#userCenterCloseBtn').click()
@@ -107,23 +130,26 @@ with sync_playwright() as playwright:
         page.wait_for_function("!!document.getElementById('ucReferralCode')?.value")
         assert page.locator('#ucReferralCode').input_value()==code
         if target==TARGETS[0]:
-            page.evaluate("""()=>{window.__referralSettled=0;const read=KGAuthCore.referralSummary;KGAuthCore.referralSummary=async(...args)=>{try{return await read(...args)}finally{window.__referralSettled++}}}""")
+            page.evaluate("""()=>{window.__referralSettled={};const read=KGAuthCore.referralSummary;KGAuthCore.referralSummary=async(...args)=>{const owner=KGAuthCore.currentUser().username;try{return await read(...args)}finally{window.__referralSettled[owner]=(window.__referralSettled[owner]||0)+1}}}""")
             held=[]
+            page.evaluate('window.__referralHoldReady=false')
             def delay_first(route):
                 if not held:
-                    held.append((route,route.fetch()))
+                    held.append({'route':route,'response':None})
+                    held[0]['response']=route.fetch()
+                    page.evaluate('window.__referralHoldReady=true')
                 else:route.continue_()
             page.route('**/api/v1/auth/me/referral',delay_first)
             with page.expect_request('**/api/v1/auth/me/referral'):
                 page.evaluate('KGUserCenter.open()')
-            page.wait_for_timeout(30)
+            page.wait_for_function('window.__referralHoldReady===true')
             assert len(held)==1
             other='browser_other_'+uuid4().hex[:12]
             assert page.evaluate("name=>KGAuthCore.register(name,'test-only-password',{referralCode:''})",other)['ok'] is True
             page.locator('#ucReferralGenerate').wait_for()
-            assert page.evaluate('window.__referralSettled')==1
-            held[0][0].fulfill(response=held[0][1])
-            page.wait_for_function('window.__referralSettled===2')
+            assert page.evaluate('name=>(window.__referralSettled[name]||0)',name)==0
+            held[0]['route'].fulfill(response=held[0]['response'])
+            page.wait_for_function('name=>window.__referralSettled[name]===1',arg=name)
             assert page.locator('#ucUsername').input_value()==other
             assert page.locator('#ucReferralCode').count()==0, 'late previous-owner response must be discarded'
         page.evaluate('KGAuthCore.logout()')

@@ -29,6 +29,11 @@
     trial:"试用中",
     manual:"手动开通"
   };
+  const SOURCE_LABELS = new Map([
+    ["default","默认"],["manual","管理员调整"],["redeem_code","兑换码"],
+    ["wechat_pay","微信支付"],["order","订单开通"],["referral","推荐奖励"]
+  ]);
+  function sourceLabel(source){ return SOURCE_LABELS.get(source) || "其他来源"; }
 
   function readMemory(key,fallback){return memoryRecords.has(key)?memoryRecords.get(key):fallback}
   function writeMemory(key,value){memoryRecords.set(key,value);return true}
@@ -387,12 +392,13 @@
   }
   function subscriptionSummary(username=currentUsername()){
     const sub=subscriptionFor(username);
-    if(!sub) return {subscription:null,plan:planById("free"),statusText:"未开通",expiresText:"—",expiresFullText:"—",countdownText:"—"};
+    if(!sub) return {subscription:null,plan:planById("free"),sourceText:sourceLabel(),statusText:"未开通",expiresText:"—",expiresFullText:"—",countdownText:"—"};
     const plan=planById(sub.planId);
     const unlimited=plan.durationDays === -1 || !sub.expiresAt;
     return {
       subscription:sub,
       plan,
+      sourceText:sourceLabel(sub.source),
       statusText:statusLabel(sub.status),
       expiresText:unlimited ? (plan.durationDays === -1 ? "永久有效" : "长期有效") : formatDate(sub.expiresAt),
       expiresFullText:unlimited ? (plan.durationDays === -1 ? "永久有效" : "长期有效") : formatDateTime(sub.expiresAt),
@@ -570,6 +576,7 @@
     defaultPlanBenefitItems,
     defaultPlanUsageText,
     statusLabel,
+    sourceLabel,
     normalizeSubscription
   };
 })();
