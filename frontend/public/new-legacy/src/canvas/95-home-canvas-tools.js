@@ -50,6 +50,12 @@
     global.addEventListener('kg-graph-file-transition',()=>{ink.cancel();ink.refreshControls()});
     global.addEventListener('kg-home-interaction-mode-change',()=>{if(!graphModeAllows('editGraph'))ink.setOpen(false);bind()});
     global.addEventListener('kg-graph-current-file-change',()=>{ink.reset();sync()});
+    let account=global.KGAuthCore?.currentUsername?.()||'';
+    global.addEventListener('kg-auth-session-change',()=>{
+      const next=global.KGAuthCore?.currentUsername?.()||'';
+      if(next!==account){ink.reset();ink.setOpen(false)}
+      account=next;
+    });
     bind();sync();
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();

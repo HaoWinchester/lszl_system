@@ -276,9 +276,12 @@
       if(!event.target.closest||!event.target.closest('.floating-tool-menu-shell'))closeFloatingSubmenus();
     },true);
     document.addEventListener('keydown',event=>{if(event.key==='Escape')closeFloatingSubmenus()});
+    const reposition=()=>window.requestAnimationFrame(()=>document.querySelectorAll('.floating-tool-menu-shell.menu-open').forEach(positionSubmenu));
+    window.addEventListener('resize',reposition);
+    document.addEventListener('fullscreenchange',reposition);
   }
   function positionSubmenu(shell){
-    window.KGCanvasFloatingToolbarController?.positionPopoverPanel?.({root:shell,host:document.getElementById('stage'),panel:shell.querySelector('.floating-submenu'),trigger:shell.querySelector('.floating-menu-trigger'),fixed:true,getAvoidRects:()=>[document.getElementById('floatingToolbox').getBoundingClientRect()]});
+    window.KGCanvasFloatingToolbarController?.positionPopoverPanel?.({root:shell,host:document.getElementById('stage'),panel:shell.querySelector('.floating-submenu'),trigger:shell.querySelector('.floating-menu-trigger'),preferredSide:'right',getAvoidRects:()=>[document.getElementById('floatingToolbox').getBoundingClientRect()]});
   }
   function bindHandlers(){
     bindMenuShells();

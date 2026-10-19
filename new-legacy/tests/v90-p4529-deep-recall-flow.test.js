@@ -99,8 +99,9 @@ test('learner page starts hidden and offers one explicit reveal action', () => {
   const controller = read('src/86-knowledge-recall.js');
 
   assert.match(html, /id="krRevealKeywordsBtn"[^>]*>\s*揭示关键词\s*</);
-  // Version changes are now handled by the database session adoption flow.
-  assert.match(controller, /if\(session.versionState==='mismatch'\)\{[\s\S]*?await adoptCurrentVersion\(\)/);
+  // Version changes preserve the saved graph until an explicit reset.
+  assert.match(controller, /history:latest.versionState==='mismatch'/);
+  assert.doesNotMatch(controller, /adoptCurrentVersion/);
   assert.match(html, /src\/question-keyword\/keyword-runtime-service\.js/);
   assert.match(html, /src\/recall\/deep-recall-flow-model\.js/);
   assert.match(controller, /keywordsRevealed=false/);

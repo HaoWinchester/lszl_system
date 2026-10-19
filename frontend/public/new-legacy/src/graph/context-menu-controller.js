@@ -10,7 +10,6 @@
     front:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 8 5-5 5 5M12 3v11"></path><path d="M5 18h14"></path></svg>',
     back:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 16 5 5 5-5M12 21V10"></path><path d="M5 6h14"></path></svg>',
     chevron:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg>',
-    refresh:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v5h-5"></path><path d="M4 18v-5h5"></path><path d="M6.1 9A7 7 0 0 1 18.5 6.5L20 11M4 13l1.5 4.5A7 7 0 0 0 18 15"></path></svg>'
   });
   function actionButton(action,label,icon,extra=''){
     return `<button type="button" class="graph-context-menu-item" data-graph-context-action="${action}" ${extra}>${icon}<span>${label}</span></button>`;
@@ -41,8 +40,6 @@
             ${actionButton('layer:back','置于底层',ICONS.back,'role="menuitem"')}
           </div>
         </div>
-        <div class="graph-context-separator" role="separator"></div>
-        ${actionButton('refresh','文字高清',ICONS.refresh,'role="menuitem"')}
       </div>`;
       root.addEventListener('pointerdown',event=>event.stopPropagation());
       root.addEventListener('contextmenu',event=>{event.preventDefault();event.stopPropagation()});
@@ -63,14 +60,12 @@
       const showCopy=actionAllowed('copy')&&type==='node'&&!locked;
       const showPaste=actionAllowed('paste')&&!locked;
       const showLayer=actionAllowed('layer')&&type==='node'&&!locked;
-      const showRefresh=actionAllowed('refresh');
       setVisible('copy',showCopy);
       setVisible('paste',showPaste);
-      setVisible('refresh',showRefresh);
       setEnabled('paste',canPaste&&!locked);
       const layerWrap=root.querySelector('[data-graph-context-layer-wrap]');if(layerWrap)layerWrap.hidden=!showLayer;
-      const separator=root.querySelector('.graph-context-separator');if(separator)separator.hidden=!showRefresh||!(showCopy||showPaste||showLayer);
       root.setAttribute('aria-label',type==='canvas'?'画布快捷菜单':locked?'锁定节点快捷菜单':'节点快捷菜单');
+      return showCopy||showPaste||showLayer;
     }
     function position(clientX,clientY){
       ensure();const stageRect=stage.getBoundingClientRect(),width=root.offsetWidth||172,height=root.offsetHeight||126,pad=8;
@@ -79,10 +74,19 @@
       top=Math.max(pad,Math.min(top,Math.max(pad,stageRect.height-height-pad)));
       root.style.left=Math.round(left)+'px';root.style.top=Math.round(top)+'px';
       const submenu=root.querySelector('.graph-context-submenu'),wrap=root.querySelector('.graph-context-submenu-wrap');
-      if(submenu&&wrap&&!wrap.hidden){const wrapRect=wrap.getBoundingClientRect(),submenuWidth=submenu.offsetWidth||154;wrap.classList.toggle('open-left',wrapRect.right+submenuWidth>stageRect.right-pad)}
+      if(submenu&&wrap&&!wrap.hidden){
+        const wrapRect=wrap.getBoundingClientRect(),submenuWidth=submenu.offsetWidth||154,submenuHeight=submenu.offsetHeight||138;
+        wrap.classList.toggle('open-left',wrapRect.right+submenuWidth+6>stageRect.right-pad);
+        // The layer row is near the menu's bottom; its taller submenu must
+        // move upward at the canvas edge rather than inherit the row's top.
+        // Use layout offsets because the opening transform is still animating.
+        const wrapTop=stageRect.top+Math.round(top)+root.clientTop+wrap.offsetTop;
+        const submenuTop=Math.max(stageRect.top+pad,Math.min(wrapTop-6,stageRect.bottom-submenuHeight-pad));
+        submenu.style.top=Math.round(submenuTop-wrapTop)+'px';
+      }
     }
     function show(settings={}){
-      ensure();context={type:'node',...(settings.context||{})};configure();root.hidden=false;root.classList.add('show');visible=true;position(settings.clientX,settings.clientY);
+      ensure();context={type:'node',...(settings.context||{})};if(!configure()){hide();return false}root.hidden=false;root.classList.add('show');visible=true;position(settings.clientX,settings.clientY);
       requestAnimationFrame(()=>root.querySelector('.graph-context-menu-item:not([hidden]):not(:disabled)')?.focus?.({preventScroll:true}));return root;
     }
     function hide(){if(!root)return false;visible=false;context=null;root.classList.remove('show','locked-context');root.hidden=true;return true}

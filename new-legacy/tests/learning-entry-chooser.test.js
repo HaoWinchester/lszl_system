@@ -386,6 +386,7 @@ function directEntryVm(bootstrap) {
       for (const listener of listeners.get(type) || []) listener({ type, detail });
       await Promise.resolve();
       await Promise.resolve();
+      await new Promise(resolve => setImmediate(resolve));
     },
   };
 }
@@ -405,4 +406,18 @@ test('same-user authenticated session rotation may show without reloading', asyn
   await page.dispatch('kg:auth-session-changed', { authenticated: true, username: 'learner', loginSessionId: 'login-b' });
   await page.dispatch('kg-auth-session-change', { username: 'learner', provider: 'remote' });
   assert.deepEqual(page.actions, ['show']);
+});
+
+test('fullscreen entry mounts inside the canvas without making its ancestors inert and restores prior background state', async () => {
+  const tab = createChooserDomTab(),doc=tab.document,app=doc.createElement('div'),world=doc.createElement('div'),aside=doc.createElement('aside');
+  tab.graph.remove();app.append(tab.graph);doc.body.append(app,aside);tab.graph.append(world);
+  aside.inert=true;aside.setAttribute('aria-hidden','false');let mounted=0,unmounted=0;
+  tab.window.KGCanvasDomInteraction={mountOverlay(root,_surface,onMove){mounted++;const home=root.parentNode;root.remove();tab.graph.append(root);onMove();return()=>{unmounted++;root.remove();home.append(root)}}};
+  await tab.init();const dialog=doc.querySelector('[role="dialog"]');
+  assert.equal(mounted,1);assert.equal(dialog.parentNode.parentNode,tab.graph);
+  assert.equal(app.inert,false);assert.equal(tab.graph.inert,false);assert.equal(world.inert,true);
+  assert.equal(doc.activeElement,dialog.querySelector('[data-learning-entry-choice]'));
+  doc.dispatchEvent(new DomEvent('keydown',{key:'Escape'}));
+  assert.equal(unmounted,1);assert.equal(world.inert,false);assert.equal(app.inert,false);
+  assert.equal(aside.inert,true);assert.equal(aside.getAttribute('aria-hidden'),'false');assert.equal(doc.activeElement,tab.graph);
 });

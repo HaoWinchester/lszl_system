@@ -8,7 +8,7 @@
     const home=options.stage||document.body;
     let stage=home,unmount=null;
     let root=null,picker=null,drag=null,current=null,pinned=false,outsideBound=false;
-    let outsideHandler=null;
+    let outsideHandler=null,resizeObserver=null;
     function ensure(){
       if(root&&root.isConnected)return root;
       root=document.createElement('aside');
@@ -45,6 +45,9 @@
       grip.addEventListener('pointerup',finish);grip.addEventListener('pointercancel',finish);
       stage.appendChild(root);
       if(global.KGCanvasDomInteraction)unmount=global.KGCanvasDomInteraction.mountOverlay(root,home,host=>{stage=host;if(current)requestAnimationFrame(()=>positionNear(current.anchor,current.pointer))});
+      global.addEventListener?.('resize',reposition,{passive:true});
+      global.visualViewport?.addEventListener('resize',reposition,{passive:true});
+      if(global.ResizeObserver){resizeObserver=new global.ResizeObserver(reposition);resizeObserver.observe(home);resizeObserver.observe(root)}
       bindOutsideClose();
       return root;
     }
@@ -61,8 +64,18 @@
     }
     function setPosition(left,top){
       ensure();const sr=stage.getBoundingClientRect(),width=root.offsetWidth||320,height=root.offsetHeight||420,pad=10;
-      root.style.left=Math.round(clamp(left,pad,Math.max(pad,sr.width-width-pad)))+'px';
-      root.style.top=Math.round(clamp(top,pad,Math.max(pad,sr.height-height-pad)))+'px';
+      left=clamp(left,pad,Math.max(pad,sr.width-width-pad));
+      top=clamp(top,pad,Math.max(pad,sr.height-height-pad));
+      const shared=global.KGCanvasFloatingToolbarController,avoidRects=shared?.getGlobalAvoidRects?.(root)||[];
+      if(avoidRects.length&&shared?.placePopover){
+        // An empty horizontal anchor keeps the requested position as the first
+        // candidate, then lets the common placer clear fixed global controls.
+        const gap=6,anchor={left:sr.left+left,right:sr.left+left+width,top:sr.top+top-gap,bottom:sr.top+top-gap};
+        const next=shared.placePopover({bounds:sr,anchor,width,height,avoidRects,pad,gap});
+        left=next.left-sr.left;top=next.top-sr.top;
+      }
+      root.style.left=Math.round(left)+'px';
+      root.style.top=Math.round(top)+'px';
     }
     function positionNear(anchor,pointer){
       ensure();const sr=stage.getBoundingClientRect(),ar=anchor&&typeof anchor.left==='number'?anchor:(anchor&&anchor.getBoundingClientRect?anchor.getBoundingClientRect():null),width=root.offsetWidth||286,height=root.offsetHeight||356,pad=8,gap=6;
@@ -119,7 +132,7 @@
     }
     function isOpen(){return !!(root&&!root.hidden)}
     function reposition(){if(isOpen())setPosition(parseFloat(root.style.left)||10,parseFloat(root.style.top)||10)}
-    function destroy(){if(unmount)unmount();unmount=null;if(outsideHandler)document.removeEventListener('pointerdown',outsideHandler,true);outsideBound=false;outsideHandler=null;if(picker&&picker.destroy)picker.destroy();if(root)root.remove();root=null;picker=null;current=null;drag=null}
+    function destroy(){if(unmount)unmount();unmount=null;global.removeEventListener?.('resize',reposition);global.visualViewport?.removeEventListener('resize',reposition);resizeObserver?.disconnect();resizeObserver=null;if(outsideHandler)document.removeEventListener('pointerdown',outsideHandler,true);outsideBound=false;outsideHandler=null;if(picker&&picker.destroy)picker.destroy();if(root)root.remove();root=null;picker=null;current=null;drag=null}
     return Object.freeze({ensure,open,close,isOpen,isPinned:()=>pinned,reposition,destroy,getRoot:()=>ensure()});
   }
   global.KGGraphFloatingColorWindowController=Object.freeze({create});

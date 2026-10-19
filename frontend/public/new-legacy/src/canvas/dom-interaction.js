@@ -22,9 +22,14 @@
     const doc=target.ownerDocument||global.document;
     return editable(doc?.activeElement);
   }
-  function overlayHost(surface){
+  function overlayHost(surface,element){
     const doc=surface?.ownerDocument||global.document;
-    return doc.fullscreenElement||doc.webkitFullscreenElement||surface||doc.body;
+    const fullscreen=doc.fullscreenElement||doc.webkitFullscreenElement;
+    if(fullscreen&&element){
+      const exclusive=fullscreen.closest?.('dialog,[role="dialog"]');
+      if(element===fullscreen||element.contains?.(fullscreen)||(exclusive&&!exclusive.contains(element)))return null;
+    }
+    return fullscreen||surface||doc.body;
   }
   // Keep one real DOM node and a placeholder, including when fullscreen exits.
   function mountOverlay(element,surface,onMove){
@@ -33,7 +38,7 @@
     const marker=doc.createComment('canvas-overlay-home');
     element.parentNode.insertBefore(marker,element);
     function sync(){
-      const host=overlayHost(home);
+      const host=overlayHost(home,element);if(!host)return;
       if(!doc.fullscreenElement&&!doc.webkitFullscreenElement&&marker.parentNode){
         if(element.parentNode!==marker.parentNode)marker.parentNode.insertBefore(element,marker.nextSibling);
       }else if(element.parentNode!==host)host.appendChild(element);

@@ -291,7 +291,7 @@ def login(context: BrowserContext, base: str) -> None:
 
 
 def wait_saved(page: Page) -> None:
-    page.locator("#krSaveStatus[data-state='saved']").wait_for(timeout=10_000)
+    page.locator("#krSaveStatus[data-state='saved']").wait_for(state="attached",timeout=10_000)
 
 
 def exercise(page: Page, context: BrowserContext, base: str, database_url: str) -> None:
@@ -369,9 +369,7 @@ def exercise(page: Page, context: BrowserContext, base: str, database_url: str) 
 
     run_backend_code(database_url, BUMP_CODE)
     page.reload(wait_until="networkidle")
-    version_choice = page.locator("#krVersionChoice")
-    version_choice.wait_for(state="visible")
-    page.locator("#krViewHistoryBtn").click()
+    # Opening a changed question preserves its old graph in read-only mode.
     page.locator(".kr-node").nth(2).wait_for()
     assert page.locator("body.kr-readonly").count() == 1
     assert page.locator(".kr-node").count() == 3
@@ -390,6 +388,89 @@ def exercise(page: Page, context: BrowserContext, base: str, database_url: str) 
     assert current["currentQuestion"]["revision"] == 2
     assert current["progress"]["nodes"] == []
     assert errors == [], errors
+
+
+def historical_audit(base: str, database: str, *, baseline: bool = False, source_override: bool = True, reset_fixture: bool = False) -> None:
+    """Exercise an anonymized real historical row on an already isolated server.
+
+    No build or promotion is run. Until the parent publishes the local candidate,
+    only the controller script is overridden from its authoritative source.
+    """
+    assert database.startswith('kg_pytest_'), 'historical audit only targets disposable databases'
+    def execute_sql(sql):
+        return subprocess.run(['psql','-h','/tmp','-d',database,'-v','ON_ERROR_STOP=1','-At','-c',sql],check=True,capture_output=True,text=True).stdout.strip()
+    if reset_fixture:
+        execute_sql("DELETE FROM recall_progress WHERE owner_id='ink-browser' AND release_id='ink-release' AND question_id IN ('ink-question-1','ink-question-2'); UPDATE paper_release_questions SET snapshot=jsonb_set(jsonb_set(snapshot,'{revision}','1'),'{contentHash}',to_jsonb(repeat(CASE WHEN question_id='ink-question-1' THEN '1' ELSE '2' END,64))) WHERE release_id='ink-release' AND question_id IN ('ink-question-1','ink-question-2')")
+    qid = 'ink-question-2' if baseline else 'ink-question-1'
+    scope = '?releaseId=ink-release'
+    session_path = f'/api/v1/recall/session/{qid}{scope}'
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(channel='chrome')
+        context = browser.new_context(viewport={'width':1440,'height':1000})
+        assert_ok(context.request.post(base+'/api/v1/auth/login',data={'username':'ink-browser','password':'ink-browser-test'}),'historical login')
+        initial = assert_ok(context.request.get(base+session_path),'initial session')
+        if baseline:
+            # Clone the same anonymous row into the second question, retaining its shape.
+            execute_sql("""INSERT INTO recall_progress (id,owner_id,question_id,release_id,bank_id,source_question_revision,source_content_hash,recall_library_hash,graph_schema_version,nodes,edges,strokes,tables,custom_nodes,active_keywords,choice_offsets,transform,metrics,revision)
+                  SELECT 'historical-browser-red','ink-browser','ink-question-2',release_id,bank_id,1,repeat('2',64),recall_library_hash,graph_schema_version,nodes,edges,strokes,tables,custom_nodes,active_keywords,choice_offsets,transform,metrics,11
+                  FROM recall_progress WHERE owner_id='ink-browser' AND question_id='ink-question-1' AND release_id='ink-release'""")
+            initial = assert_ok(context.request.get(base+session_path),'cloned historical session')
+        expected_nodes = len(initial['progress']['nodes'])
+        assert expected_nodes > 0
+        original_controller = subprocess.run(['git','show','HEAD:new-legacy/src/86-knowledge-recall.js'],cwd=REPO_ROOT,check=True,capture_output=True,text=True).stdout if baseline else (SOURCE_ROOT/'src/86-knowledge-recall.js').read_text()
+        if source_override:
+            context.route('**/src/86-knowledge-recall.js*',lambda route: route.fulfill(status=200,content_type='application/javascript',body=original_controller))
+        page=context.new_page()
+        page.goto(base+f'/knowledge-recall.html?questionId={qid}&bankId=ink-bank&paperId=ink-paper&releaseId=ink-release',wait_until='networkidle')
+        page.wait_for_function(f"document.querySelectorAll('.kr-node').length === {expected_nodes}")
+        if not baseline:
+            # A harmless view edit exercises a full save of existing historical nodes.
+            page.locator('#krZoomOutBtn').click()
+            wait_saved(page)
+            saved=assert_ok(context.request.get(base+session_path),'historical save')
+            assert len(saved['progress']['nodes'])==expected_nodes
+            assert saved['progressRevision']>initial['progressRevision']
+            assert execute_sql("SELECT count(*),max(revision),sum(jsonb_array_length(nodes)) FROM recall_progress WHERE owner_id='ink-browser' AND question_id='ink-question-1' AND release_id IS NULL") == f'1|11|{expected_nodes}', 'legacy row must remain untouched'
+            page.reload(wait_until='networkidle')
+            assert page.locator('.kr-node').count()==expected_nodes
+            assert execute_sql("SELECT count(*) FROM recall_progress WHERE owner_id='ink-browser' AND question_id='ink-question-1' AND release_id='ink-release'")=='1'
+            page.locator('#krNextQuestionBtn').click()
+            page.wait_for_url('**questionId=ink-question-2**')
+            assert page.locator('.kr-node').count()==0
+            page.locator('#krPrevQuestionBtn').click()
+            page.wait_for_url('**questionId=ink-question-1**')
+            page.wait_for_function(f"document.querySelectorAll('.kr-node').length === {expected_nodes}")
+            # A rejected save blocks switching and preserves both DOM and database history.
+            context.route('**/api/v1/recall/progress/ink-question-1?releaseId=ink-release',lambda route: route.fulfill(status=503,content_type='application/json',body='{"detail":"offline test"}') if route.request.method=='PUT' else route.continue_())
+            page.locator('#krZoomOutBtn').click()
+            page.locator('#krNextQuestionBtn').click()
+            page.locator('#krSaveStatus[data-state="failed"]').wait_for(state="attached")
+            assert 'questionId=ink-question-1' in page.url
+            assert page.locator('.kr-node').count()==expected_nodes
+            context.unroute('**/api/v1/recall/progress/ink-question-1?releaseId=ink-release')
+            page.locator('#krSaveRetryBtn').click()
+            wait_saved(page)
+        before=assert_ok(context.request.get(base+session_path),'before version update')
+        execute_sql("UPDATE paper_release_questions SET snapshot=jsonb_set(jsonb_set(snapshot,'{revision}','2'),'{contentHash}',to_jsonb(repeat('b',64))) WHERE release_id='ink-release' AND question_id='"+qid+"'")
+        page.reload(wait_until='networkidle')
+        after=assert_ok(context.request.get(base+session_path),'after version update')
+        assert len(after['progress']['nodes'])==expected_nodes, f"opening erased historical graph: {expected_nodes} -> {len(after['progress']['nodes'])}"
+        assert after['progressRevision']==before['progressRevision']
+        assert after['versionState']=='mismatch'
+        assert page.locator('body.kr-readonly').count()==1
+        assert page.locator('.kr-node').count()==expected_nodes
+        assert page.locator('#krResetBtn').is_enabled()
+        # Both reload and rejected direct saves preserve historical revision/content.
+        page.reload(wait_until='networkidle')
+        denied=context.request.put(base+f'/api/v1/recall/progress/{qid}{scope}',data={'expectedRevision':after['progressRevision'],'questionRevision':2,'libraryHash':(after['currentLibrary'] or after['library'])['contentHash'],'nodes':[],'edges':[],'graphSchemaVersion':3})
+        assert denied.status==409, denied.text()
+        assert assert_ok(context.request.get(base+session_path),'preserved history')['progress']==after['progress']
+        page.once('dialog',lambda dialog:dialog.dismiss())
+        page.locator('#krResetBtn').click()
+        assert page.locator('.kr-node').count()==expected_nodes
+        page.screenshot(path=str(REPO_ROOT/'artifacts/deep-recall-history-audit/history-preserved.png'))
+        print(json.dumps({'historicalNodes':expected_nodes,'historicalEdges':len(after['progress']['edges']),'revision':after['progressRevision'],'readonly':True,'explicitResetAvailable':True,'sourceOverride':source_override}),flush=True)
+        context.close();browser.close()
 
 
 def main() -> None:
@@ -413,4 +494,15 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+    parser=argparse.ArgumentParser()
+    parser.add_argument('--historical-base')
+    parser.add_argument('--historical-db')
+    parser.add_argument('--baseline',action='store_true')
+    parser.add_argument('--no-source-override','--served',dest='no_source_override',action='store_true')
+    parser.add_argument('--reset-history',action='store_true')
+    args=parser.parse_args()
+    if args.historical_base:
+        historical_audit(args.historical_base,args.historical_db,baseline=args.baseline,source_override=not args.no_source_override,reset_fixture=args.reset_history)
+    else:
+        main()

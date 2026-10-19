@@ -6,6 +6,7 @@
 
   const endpoint = '/api/v1/workspaces'
   const remoteIds = new Map()
+  const payloadIds = new Map()
   const inFlight = new Map()
   const pending = new Map()
   const timers = new Map()
@@ -22,6 +23,10 @@
   let leaving = false
   let generation = 0
   let owner = store.currentUserId?.() || 'guest'
+  function canWrite() {
+    const role = global.KGRolePermissions?.currentRole?.() || global.KGAuthCore?.currentUser?.()?.role
+    return owner !== 'guest' && ['admin', 'teacher', 'student'].includes(role)
+  }
   const controllers = new Set()
   function assertOwner(expectedOwner, expectedGeneration) {
     if (owner !== expectedOwner || generation !== expectedGeneration || (store.currentUserId?.() || 'guest') !== expectedOwner) {
@@ -82,11 +87,32 @@
       id: String(remoteId || workspace.id),
       title: String(workspace.title || '未命名画布'),
       schemaVersion: Number(workspace.schemaVersion || 10),
-      payload: workspace,
+      // Client identity is the relational row ID. Retain the original payload
+      // ID only as evidence for links created before rows became canonical.
+      payload: { ...workspace, id: payloadIds.get(String(workspace.id)) || workspace.id },
     }
   }
 
+  function resolveWorkspaceId(id, workspaces) {
+    id = String(id || '')
+    if (!id) return ''
+    // The default ID was shared by historical guest/user rows. Prefer this
+    // owner's established row before considering the bare default as an alias.
+    if (id === 'pmp-pattern-workspace') {
+      const ownDefault = requestedRemoteId({ id })
+      if (workspaces.some(item => String(item?.id || '') === ownDefault)) return ownDefault
+    }
+    if (workspaces.some(item => String(item?.id || '') === id)) return id
+    const aliases = workspaces
+      .filter(item => String(item?.payload?.id || '') === id)
+      .map(item => String(item?.id || ''))
+      .filter(Boolean)
+      .sort()
+    return aliases[0] || ''
+  }
+
   async function persistWorkspace(workspace, options = {}) {
+    if (!canWrite()) throw new Error('当前账号仅可查看画布。')
     const id = String(workspace?.id || '')
     if (!id) return null
     if (!serverReady) throw new Error('服务器画布尚未加载，已阻止保存设备缓存，请重新打开后重试。')
@@ -137,6 +163,7 @@
   }
 
   function enqueue(workspace, immediate = false) {
+    if (!canWrite()) return
     const id = String(workspace?.id || '')
     if (!id || String(workspace.userId || '') !== owner || (store.currentUserId?.() || 'guest') !== owner) return
     sequences.set(id, (sequences.get(id) || 0) + 1)
@@ -149,6 +176,7 @@
   }
 
   async function remove(id) {
+    if (!canWrite()) return
     id = String(id || '')
     if (!id) return
     const removeOwner = owner, removeGeneration = generation
@@ -166,12 +194,14 @@
       await request('DELETE', `/${encodeURIComponent(remoteId)}`)
       assertOwner(removeOwner, removeGeneration)
       remoteIds.delete(id)
+      payloadIds.delete(id)
     } catch (error) {
       if (error.code !== 'WORKSPACE_OWNER_CHANGED') console.error('[CanvasWorkspaceAdapter] delete failed:', error)
     }
   }
 
   store.subscribe?.((event) => {
+    if (!canWrite()) return
     if (event?.reason === 'server-hydrated') return
     if (hydrating) hydrationEdited = true
     const deletedId = String(event?.detail?.deletedWorkspaceId || '')
@@ -187,29 +217,33 @@
     try {
       const payload = await request('GET')
       const workspaces = Array.isArray(payload?.workspaces) ? payload.workspaces : []
-      const clientWorkspaces = workspaces.map(item => {
-        const remoteId = String(item?.id || '')
-        const clientId = String(item?.payload?.id || remoteId)
-        if (clientId && remoteId) remoteIds.set(clientId, remoteId)
-        return { ...item, id: clientId }
-      })
       if (hydrationEdited) {
         const error = new Error('加载期间产生了本地修改，已保留修改，请先保存后再刷新。')
         error.code = 'WORKSPACE_EDIT_DURING_HYDRATE'
         throw error
       }
-      // Links may contain the relational row ID while the legacy store uses
-      // payload.id. Resolve before the page calls ensure(), which creates
-      // missing IDs and otherwise risks an empty alias replacing that row.
+      // Preserve distinct rows even when old payloads share one logical ID.
+      // Legacy links and cached active IDs resolve before ensure() can create
+      // an empty alias; ordering by update time must never select another row.
       const url = global.location?.href ? new URL(global.location.href) : null
       const requestedId = url?.searchParams.get('workspace')
-      const linked = workspaces.find(item => String(item?.id || '') === requestedId)
-      const linkedClientId = String(linked?.payload?.id || linked?.id || '')
-      if (linkedClientId && linkedClientId !== requestedId) {
-        url.searchParams.set('workspace', linkedClientId)
+      const linkedId = resolveWorkspaceId(requestedId, workspaces)
+      const activeId = linkedId || resolveWorkspaceId(store.getActiveWorkspaceId?.(), workspaces)
+      if (linkedId && linkedId !== requestedId) {
+        url.searchParams.set('workspace', linkedId)
         global.history?.replaceState?.(global.history.state, '', url.href)
       }
-      store.replaceAllFromServer?.(clientWorkspaces)
+      remoteIds.clear()
+      payloadIds.clear()
+      const clientWorkspaces = workspaces.map(item => {
+        const remoteId = String(item?.id || '')
+        if (remoteId) {
+          remoteIds.set(remoteId, remoteId)
+          payloadIds.set(remoteId, String(item?.payload?.id || remoteId))
+        }
+        return { ...item, id: remoteId }
+      })
+      store.replaceAllFromServer?.(clientWorkspaces, { activeWorkspaceId: activeId })
       serverReady = true
       return clientWorkspaces
     } catch (error) {
@@ -237,7 +271,7 @@
     for (const controller of controllers) controller.abort()
     controllers.clear()
     for (const timer of timers.values()) clearTimeout(timer)
-    timers.clear(); pending.clear(); inFlight.clear(); states.clear(); sequences.clear(); remoteIds.clear()
+    timers.clear(); pending.clear(); inFlight.clear(); states.clear(); sequences.clear(); remoteIds.clear(); payloadIds.clear()
     ready = hydrate()
     ready.catch(() => {})
   }

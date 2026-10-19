@@ -2,7 +2,7 @@
  * 学习画布共享主题（深度回忆 + 多题归纳）。
  * 变量定义自 knowledge-recall.css / knowledge-recall-patch-1.css 迁入；
  * 深度回忆在 .kr-app/.kr-viewport 上应用 data-theme，多题归纳在 body 上应用，
- * 两页共用 localStorage key kg_deep_recall_theme_v1（见 src/canvas/97-learning-theme.js）。
+ * 两页复用主题样式，选择分别保存（见 src/canvas/97-learning-theme.js）。
  */
 :root{
   --kr-bg:#f5f7fb;

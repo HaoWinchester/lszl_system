@@ -9,14 +9,14 @@ test('reading mode exposes the related-canvas entry with a read-only toolbar',()
   const editor=read('src/10-graph-editor.js');
   // updateCardQuickActions：阅读模式单选卡牌时放行工具栏入口（auth-readonly 仍整体隐藏）。
   assert.match(editor,/const readingEntry=!graphModeAllows\('nodeToolbar'\)&&!document\.body\.classList\.contains\('auth-readonly'\)/);
-  assert.match(editor,/window\.KGHomeInteractionModes\?\.getMode\?\.\(\)==='reading'/);
   // updateNodeStyleToolbarControls：阅读模式统一收口隐藏（grip + related-canvas 除外）。
   assert.match(editor,/const readonlyContext=!graphModeAllows\('nodeToolbar'\)/);
   assert.match(editor,/btn\.dataset\.nodeToolbarAction!=='related-canvas'\)btn\.hidden=true/);
   // handleNodeToolbarAction：阅读模式仅放行 related-canvas 动作。
   assert.match(editor,/阅读模式下仅可打开相关画布/);
   // 打开临时画布按当前模式传只读标记。
-  assert.match(editor,/readOnly:window\.KGHomeInteractionModes\?\.getMode\?\.\(\)==='reading'/);
+  assert.match(editor,/readOnly=!canWriteGraph\(\)/,'temporary view also respects authenticated role and session restrictions');
+  assert.match(editor,/ensureMarkers:ensureGraphEdgeMarkers,onClose:[^\n]+,readOnly\}/);
   // 模式切换后重算工具栏。
   assert.match(editor,/window\.addEventListener\('kg-home-interaction-mode-change',\(\)=>\{updateCardQuickActions\(\)\}\)/);
 });

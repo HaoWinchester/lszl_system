@@ -104,6 +104,7 @@
     answerQueue:[],
     answerFlushTimer:0,
     answerFlushing:false,
+    answerFlushPromise:null,
     optionClickTimers:new Map(),
     optionFlashTimers:new Map(),
     edgeElements:new Map(),
@@ -230,8 +231,14 @@
     }[char]));
   }
   function notify(message){
-    if(typeof showStatus==='function')showStatus(message);
-    else console.info(message);
+    if(typeof showStatus==='function'){showStatus(message);return;}
+    const statusEl=document.getElementById('status');
+    if(!statusEl){console.info(message);return;}
+    clearTimeout(notify.timer);
+    statusEl.textContent=message;
+    statusEl.setAttribute('role','status');
+    statusEl.classList.add('show');
+    notify.timer=setTimeout(()=>statusEl.classList.remove('show'),2600);
   }
   function languageMode(){return global.KGFreeModeLanguage?.mode?.()||'zh'}
   function questionDisplayView(question={}){
@@ -382,12 +389,20 @@
     state.ink?.render();
     return state.readonly;
   }
-  function canEdit(message='登录后的桌面端才能编辑多题画布。'){
+  function readonlyMessage(){
+    if(!loggedIn())return '登录后可编辑多题画布。';
+    const role=global.KGRolePermissions?.currentRole?.()||global.KGAuthCore?.currentUser?.()?.role;
+    if(role==='viewer')return '当前账号仅可查看多题画布，如需编辑请联系管理员。';
+    return state.mobile?'移动端仅支持查看多题画布。':'服务器画布尚未加载，请稍后重试。';
+  }
+  function canEdit(message='登录后可编辑多题画布。'){
     if(state.workspaceTransition)return false;
     updateReadonly();
     if(!state.readonly)return true;
-    if(!hasWorkspaceWriteAccess()){
+    if(!loggedIn()){
       try{if(typeof authOpen==='function')authOpen(message)}catch(e){}
+    }else if(!hasWorkspaceWriteAccess()){
+      notify(readonlyMessage());
     }else notify('移动端仅支持查看多题画布。');
     return false;
   }
@@ -404,7 +419,7 @@
       const routeApi=global.KGLearningRouteContext;
       if(routeApi){
         const current=routeApi.parse({mode:'multi_question_canvas'});
-        const active=state.questions.find(item=>String(item.paper?.releaseId||'')===String(state.releaseId||''))||state.questions[0]||null;
+        const active=state.questions.find(item=>String(item.question?.id||'')===String(current.questionId||'')&&String(item.paper?.releaseId||'')===String(state.releaseId||'')&&(!current.bankId||String(item.bank?.id||'')===String(current.bankId)))||state.questions.find(item=>String(item.paper?.releaseId||'')===String(state.releaseId||''))||state.questions[0]||null;
         routeApi.replace({...current,paperId:state.paperId,releaseId:state.releaseId,questionId:active?.question?.id||current.questionId,bankId:active?.bank?.id||current.bankId,workspaceId:String(workspaceId||''),mode:'multi_question_canvas'},{target,mode:'multi_question_canvas'});
       }else global.history?.replaceState?.({},'',target);
     }catch(e){}
@@ -968,7 +983,7 @@
         // Document settings preview is local to this surface; canceled previews never change global defaults.
         state.runtime?.appearance?.apply?.(preferences);
         const captured=global.KGLearningTheme.captureWorkspaceBackground(state.viewport,state.viewport.querySelector('.qw-background'));
-        state.workspace.background={...state.workspace.background,appearance:clone(preferences),surface:captured.surface};
+        state.workspace.background={...state.workspace.background,appearance:clone(preferences),surface:captured.surface,layer:{color:'transparent',image:'none',repeat:'repeat'}};
         applyWorkspaceBackground();
         if(!state.readonly){
           state.suppressStoreEvent=true;
@@ -1680,13 +1695,13 @@
   }
   function optionTimerKey(nodeId,key=''){return String(nodeId||'')+':'+String(key||'')}
   function clearOptionClickTimer(nodeId,key=''){
-    const timerKey=optionTimerKey(nodeId,key),timer=state.optionClickTimers.get(timerKey);
+    const timerKey=optionTimerKey(nodeId,key),timer=state.optionClickTimers.get(timerKey)?.timer;
     if(timer)global.clearTimeout(timer);
     state.optionClickTimers.delete(timerKey);
   }
   function clearOptionTransientState(nodeId=''){
     const prefix=nodeId?String(nodeId)+':':'';
-    [...state.optionClickTimers.entries()].forEach(([key,timer])=>{if(!prefix||key.startsWith(prefix)){global.clearTimeout(timer);state.optionClickTimers.delete(key)}});
+    [...state.optionClickTimers.entries()].forEach(([key,pending])=>{if(!prefix||key.startsWith(prefix)){global.clearTimeout(pending.timer);state.optionClickTimers.delete(key)}});
     [...state.optionFlashTimers.entries()].forEach(([key,timer])=>{if(!prefix||key.startsWith(prefix)){global.clearTimeout(timer);state.optionFlashTimers.delete(key)}});
     const root=nodeId?state.cards.get(String(nodeId))?.element:state.nodeLayer;
     root?.querySelectorAll?.('.is-correct-flash,.is-wrong-flash').forEach(item=>item.classList.remove('is-correct-flash','is-wrong-flash'));
@@ -1761,7 +1776,14 @@
     global.clearTimeout(state.answerFlushTimer);
     state.answerFlushTimer=global.setTimeout(flushAnswerQueue,ANSWER_FLUSH_DELAY);
   }
-  async function flushAnswerQueue(){
+  async function flushAnswerQueue(options={}){
+    const operation=state.answerFlushPromise||sendAnswerQueue();
+    state.answerFlushPromise=operation;
+    try{await operation}
+    finally{if(state.answerFlushPromise===operation)state.answerFlushPromise=null}
+    if(options.throwOnError&&state.answerQueue.length)throw new Error('作答尚未保存，请重试后再离开。');
+  }
+  async function sendAnswerQueue(){
     if(state.answerFlushing)return;
     const queue=state.answerQueue.splice(0);
     if(!queue.length)return;
@@ -1843,10 +1865,15 @@
     if(!record)return false;
     key=String(key||'');
     clearOptionClickTimer(record.id,key);
-    const timerKey=optionTimerKey(record.id,key),timer=global.setTimeout(()=>{
-      state.optionClickTimers.delete(timerKey);handleOptionSingleChoice(record,key);
-    },OPTION_SINGLE_CLICK_DELAY);
-    state.optionClickTimers.set(timerKey,timer);return true;
+    const timerKey=optionTimerKey(record.id,key),pending={timer:null,commit:()=>{
+      if(state.optionClickTimers.get(timerKey)!==pending)return false;
+      clearOptionClickTimer(record.id,key);return handleOptionSingleChoice(record,key);
+    }};
+    pending.timer=global.setTimeout(pending.commit,OPTION_SINGLE_CLICK_DELAY);
+    state.optionClickTimers.set(timerKey,pending);return true;
+  }
+  async function flushPendingOptionChoices(){
+    for(const pending of [...state.optionClickTimers.values()])await pending.commit();
   }
   function handleOptionDoubleChoice(record,key){
     if(!record||record.node?.nodeType!=='question-reference')return false;
@@ -4258,7 +4285,7 @@
     return {created,skipped};
   }
   async function addQuestionByReference(reference={},position){
-    if(!canEdit())return {created:false,reason:'readonly',message:'登录后的桌面端才能编辑多题画布。'};
+    if(!canEdit())return {created:false,reason:'readonly',message:readonlyMessage()};
     const questionId=String(reference.questionId||''),bankId=String(reference.bankId||''),paperId=String(reference.paperId||''),releaseId=String(reference.releaseId||'');
     if(!questionId)return {created:false,reason:'missing-question',message:'这条错题记录缺少题目引用，无法放入画布。'};
     const workspaceId=state.workspaceId,userId=store()?.currentUserId?.();
@@ -5772,6 +5799,19 @@
     if(route.releaseId)state.releaseId=String(route.releaseId);
     global.KGLearningProgress?.registerAdapter?.('multi_question_canvas',{
       flush:()=>{if(state.workspace)store()?.write?.(state.workspace,{reason:'learning-context-flush'});void flushAnswerQueue();return true},
+      hasUnsavedChanges:()=>{
+        if(state.readonly)return false;
+        const remote=global.KGCanvasWorkspaceAdapter?.getState?.(state.workspaceId||state.workspace?.id);
+        return Boolean(state.ink?.hasTextDraft?.()||state.optionClickTimers.size||state.answerQueue.length||state.answerFlushing||['pending','saving','failed'].includes(remote?.status));
+      },
+      prepareLeave:async()=>{
+        if(state.readonly)return true;
+        if(state.ink?.hasTextDraft?.()&&!await state.ink.commitText())return false;
+        await flushPendingOptionChoices();
+        if(state.workspace)store()?.write?.(state.workspace,{reason:'learning-navigation'});
+        await Promise.all([global.KGCanvasWorkspaceAdapter?.flush?.({throwOnError:true}),flushAnswerQueue({throwOnError:true})]);
+        return true;
+      },
       clearTransient:()=>clearPaperTransientState()
     });
     // P4.5.37：退出/隐藏页面时把待同步作答一次性提交（keepalive 请求可存活于卸载）。
@@ -5808,8 +5848,8 @@
         try{state.workspace=store().write(state.workspace,{reason:'workspace-background-updated'})}finally{state.suppressStoreEvent=false}
       }
     });
-    // 主题与深度回忆共用同一存储（kg_deep_recall_theme_v1），任一页切换双向同步。
-    const themeController=global.KGLearningTheme?.create?.({roots:()=>[document.body]});
+    // Scene controls share an implementation, while each learning mode keeps its selection.
+    const themeController=global.KGLearningTheme?.create?.({scope:'workspace',roots:()=>[document.body]});
     themeController?.init();
     applyWorkspaceBackground();
     const themeSelect=byId('qwThemeSelect');
@@ -5817,6 +5857,7 @@
       themeSelect.value=themeController?themeController.saved():'platform';
       themeSelect.addEventListener('change',()=>{if(themeController)themeController.apply(themeSelect.value);themeSelect.blur()});
       global.addEventListener('kg:deep-recall-theme-change',event=>{
+        if(event.detail?.scope!=='workspace')return;
         const next=String(event.detail?.theme||'platform');
         if(themeSelect.value!==next)themeSelect.value=next;
       });

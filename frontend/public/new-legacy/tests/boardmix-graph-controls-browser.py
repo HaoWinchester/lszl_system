@@ -1,5 +1,5 @@
 """Graph toolbar polish, shared new text and target avoidance on a disposable DB."""
-import argparse,uuid
+import argparse,re,uuid
 from pathlib import Path
 from playwright.sync_api import sync_playwright,expect
 p=argparse.ArgumentParser();p.add_argument('--base-url',required=True);base=p.parse_args().base_url.rstrip('/');assert base.startswith('http://127.0.0.1:')
@@ -63,7 +63,9 @@ with sync_playwright() as pw:
   expect(control).to_be_visible()
   assert control.evaluate('(e)=>{const r=e.getBoundingClientRect();return e.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))}'),id
  grid=rail.locator('.floating-toolbox-grid');assert grid.evaluate('(e)=>getComputedStyle(e).gridTemplateColumns').split()==['40px','40px']
- assert grid.evaluate('(e)=>e.scrollHeight<=e.clientHeight+1'),'all main entries fit without hidden scrolling'
+ # Absolute secondary menus can extend scrollHeight even while closed. Check
+ # the actual main entries, which must fit and were hit-tested above.
+ assert grid.evaluate('''e=>{const r=e.getBoundingClientRect();return [...e.children].filter(c=>c.getBoundingClientRect().width).every(c=>{const q=c.getBoundingClientRect();return q.left>=r.left-1&&q.right<=r.right+1&&q.top>=r.top-1&&q.bottom<=r.bottom+1})}'''),'all main entries fit without hidden scrolling'
  page.locator('#addTextElementBtn').hover();expect(page.locator('.home-toolbar-hint')).to_have_text('文本');page.mouse.move(1100,720)
  page.locator('#sizeMenuBtn').click();page.locator('#sizeSmallBtn').click();assert page.evaluate('state.defaults.nodeSize')=='small'
  page.locator('#lineStyleMenuBtn').click();page.locator('#lineDashedBtn').click();assert page.evaluate('state.defaults.linkStyle')=='dashed'
@@ -105,5 +107,37 @@ with sync_playwright() as pw:
  page.set_viewport_size({'width':900,'height':640});mode('professional');assert rail.bounding_box()['y']+rail.bounding_box()['height']<=page.locator('#stage').bounding_box()['y']+page.locator('#stage').bounding_box()['height']-50
 
  page.locator('#sizeMenuBtn').click();expect(page.locator('#sizeSmallBtn')).to_be_visible();page.wait_for_timeout(180);page.screenshot(path=str(out/'short-viewport.png'));page.locator('#sizeDefaultBtn').click();assert page.evaluate('state.defaults.nodeSize')==''
+ # A manually pinned colour window must remain usable when the viewport shrinks.
+ page.set_viewport_size({'width':1280,'height':720})
+ page.evaluate('''()=>{clearSelection();const n=nodeById('a');Object.assign(n,{x:650,y:240});Object.assign(n.geometry,{x:650,y:240});state.viewport={x:0,y:0,scale:1};render()}''')
+ page.locator('.knowledge-card[data-node-id="a"]').click();page.locator('[data-node-toolbar-panel="fill"]').click();page.locator('[data-node-style-panel="fill"] .node-custom-color-btn').click()
+ picker=page.locator('.graph-floating-color-window:not([hidden])');expect(picker).to_be_visible()
+ # Opening positions the window in an animation frame. Let Playwright confirm
+ # the actual header is stable and receives pointer events before a raw drag.
+ header=picker.locator('[data-color-window-drag]');header.hover();head=header.bounding_box()
+ page.mouse.move(head['x']+40,head['y']+14);page.mouse.down();page.mouse.move(1100,400,steps=8);page.mouse.up();expect(picker).to_have_class(re.compile('manual-close'))
+ page.set_viewport_size({'width':1024,'height':640});page.wait_for_timeout(180)
+ assert picker.evaluate('''e=>{const r=e.getBoundingClientRect(),s=stage.getBoundingClientRect();return r.left>=s.left+7&&r.right<=s.right-7&&r.top>=s.top+7&&r.bottom<=s.bottom-7&&[...e.querySelectorAll('button,input')].filter(b=>!b.disabled&&b.getBoundingClientRect().width).every(b=>{const q=b.getBoundingClientRect();return b.contains(document.elementFromPoint(q.x+q.width/2,q.y+q.height/2))})}''')
+ page.keyboard.press('Escape');expect(picker).to_be_hidden()
+ # A bottom-edge context menu fits, but its taller layer submenu also needs
+ # independent vertical bounds. Exercise real right clicks and every action hit.
+ minimap=page.locator('.uc-minimap-toggle');minimap_was_open=minimap.get_attribute('aria-expanded')=='true'
+ if minimap_was_open:minimap.click()
+ for width,height in [(1440,900),(1280,720),(1024,640),(800,600)]:
+  page.set_viewport_size({'width':width,'height':height})
+  if not page.evaluate('graphModeAllows("contextMenuAdvanced")'):continue
+  for corner,(x,y) in enumerate([(150,90),(width-290,90),(150,height-240),(width-290,height-240)]):
+   page.evaluate('''([x,y])=>{clearSelection();state.viewport={x:0,y:0,scale:1};const n=nodeById('a');Object.assign(n,{x,y});Object.assign(n.geometry,{x,y});render()}''',[x,y-38])
+   card=page.locator('.knowledge-card[data-node-id="a"]');card.click(button='right',position={'x':75,'y':90})
+   menu=page.locator('.graph-context-menu');expect(menu).to_be_visible();menu.locator('[data-graph-context-action="layer"]').hover();page.wait_for_timeout(160)
+   submenu=menu.locator('.graph-context-submenu')
+   result=submenu.evaluate('''e=>{const r=e.getBoundingClientRect(),s=stage.getBoundingClientRect();return {bounded:r.left>=s.left+7&&r.right<=s.right-7&&r.top>=s.top+7&&r.bottom<=s.bottom-7,hits:[...e.querySelectorAll('button')].every(b=>{const r=b.getBoundingClientRect();return b.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))})}}''')
+   assert result['bounded'] and result['hits'],(width,height,corner,result)
+   # Alternate destinations so every real click must change the node ordering.
+   destination='back' if page.evaluate('state.nodes.at(-1).id==="a"') else 'front'
+   menu.locator('[data-graph-context-action="layer:'+destination+'"]').click();expect(menu).to_be_hidden();assert page.evaluate('side=>state.nodes.at(side==="front"?-1:0).id',destination)=='a'
+   if page.locator('#closeDetailBtn').is_visible():page.locator('#closeDetailBtn').click()
+   card.click(button='right',position={'x':75,'y':90});menu.locator('[data-graph-context-action="layer"]').hover();page.keyboard.press('Escape');expect(menu).to_be_hidden()
+ if minimap_was_open:minimap.click()
  assert not errors,errors;ctx.request.delete(base+'/api/v1/files/'+fid);browser.close()
 print('PASS restored direct main toolbar, original two columns, shared text/modes, handles and target-avoiding popovers')

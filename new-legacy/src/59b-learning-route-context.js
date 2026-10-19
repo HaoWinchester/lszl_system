@@ -72,6 +72,10 @@
     }catch(error){return null}
   }
   function clear(mode=''){try{global.sessionStorage?.removeItem(sessionKey(mode))}catch(error){}}
+  function resumeHref(target,mode){
+    const saved=read(mode);
+    return saved?buildHref(target,{...saved,mode}):target;
+  }
   function applyParams(url,context,options={}){
     const normalized=normalize(context,options);
     const set=(key,value)=>{if(value)url.searchParams.set(key,value);else if(options.removeEmpty!==false)url.searchParams.delete(key)};
@@ -127,7 +131,7 @@
     return normalize({...route,...result.context,paperId:result.paper?.paperId||result.context?.paperId,releaseId:result.paper?.releaseId||result.context?.releaseId,questionId:result.question?.id||result.context?.questionId,bankId:result.bank?.id||result.context?.bankId},options);
   }
 
-  const api=Object.freeze({SESSION_PREFIX,MODE_PAGES,normalize,parse,remember,read,clear,buildHref,replace,push,navigate,returnUrl,goBack,normalizeReturnUrl,withResolved,clone});
+  const api=Object.freeze({SESSION_PREFIX,MODE_PAGES,normalize,parse,remember,read,clear,resumeHref,buildHref,replace,push,navigate,returnUrl,goBack,normalizeReturnUrl,withResolved,clone});
   global.KGLearningRouteContext=api;
   if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);

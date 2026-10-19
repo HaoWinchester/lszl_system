@@ -668,11 +668,11 @@
   }
 
   body[data-ui-skin="focus-vega"].knowledge-recall-page .kr-scene-menu>summary{
-    width:40px;
-    min-width:40px;
+    width:auto;
+    min-width:68px;
     height:40px;
     min-height:40px;
-    padding:0;
+    padding:0 8px;
     border-color:#e4e4e7;
     border-radius:8px;
     background:#fff;

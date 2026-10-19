@@ -401,7 +401,7 @@
 /* Scene is an icon-only hover/focus palette; one click applies a scene immediately. */
 .knowledge-recall-page .kr-scene-menu{position:relative}
 .knowledge-recall-page .kr-scene-menu>summary{
-  width:36px;height:36px;min-width:36px;padding:0;border-color:var(--kr-border);border-radius:11px;
+  width:auto;height:36px;min-width:68px;padding:0 8px;gap:5px;border-color:var(--kr-border);border-radius:11px;
   background:var(--kr-control-bg);color:var(--kr-control-ink);box-shadow:none;
 }
 .knowledge-recall-page .kr-scene-menu>summary svg{
@@ -636,6 +636,12 @@
   background:var(--kr-card);
   color:var(--kr-card-ink);
   box-shadow:none;
+}
+@media(max-width:850px){
+  .knowledge-recall-page .kr-session-stats-canvas{bottom:68px}
+}
+@media(max-width:600px){
+  .knowledge-recall-page .kr-session-stats-canvas{left:8px;right:8px;max-width:calc(100% - 16px);transform:none}
 }
 .knowledge-recall-page .kr-node-search-panel[hidden]{display:none}
 .knowledge-recall-page .kr-node-search-input-row{display:flex;gap:7px;align-items:center}

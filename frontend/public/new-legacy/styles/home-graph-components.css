@@ -819,7 +819,8 @@
 @media(max-width:600px){.kg-mindmap-panel{left:12px;top:90px;max-width:calc(100vw - 24px)}[data-mindmap-controls] .mm-popover>summary{padding:8px}[data-mindmap-controls] .mm-popover-body{width:310px}}
 
 /* Preserve the original two-column main toolbar; keep floating submenu positioning. */
-#floatingToolbox .floating-submenu{position:fixed;transform:none;min-width:134px}
+#floatingToolbox{z-index:43}
+#floatingToolbox .floating-submenu{position:absolute;transform:none;min-width:134px}
 #floatingToolbox .floating-tool-menu-shell.menu-open .floating-submenu{transform:none}
 #floatingToolbox .floating-tool-btn[data-tooltip]::after{display:none}
 /* Graph navigation uses the viewport transform, never native host scrolling. */

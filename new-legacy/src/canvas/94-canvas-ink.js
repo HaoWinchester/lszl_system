@@ -67,6 +67,27 @@
       context.restore();
     }
   }
+  function svgStroke(stroke,doc,measure,{selected=false}={}){
+    const ns="http://www.w3.org/2000/svg";
+    if(stroke.tool!=='text'){
+      const el=doc.createElementNS(ns,'path');
+      el.setAttribute('d',path(stroke.points));el.setAttribute('fill','none');el.setAttribute('stroke',stroke.color);el.setAttribute('stroke-width',stroke.width);el.setAttribute('stroke-linecap','round');el.setAttribute('stroke-linejoin','round');el.setAttribute('opacity',stroke.opacity??TOOLS[stroke.tool].opacity);el.dataset.strokeId=stroke.id;
+      return el;
+    }
+
+    const el=doc.createElementNS(ns,'text');
+    el.setAttribute('x',stroke.points[0][0]);el.setAttribute('y',stroke.points[0][1]);
+    el.setAttribute('fill',stroke.color);el.setAttribute('font-size',stroke.width);
+    el.setAttribute('font-family','system-ui,-apple-system,sans-serif');
+    el.setAttribute('dominant-baseline','hanging');
+    el.setAttribute('opacity',stroke.opacity??TOOLS.text.opacity);el.dataset.strokeId=stroke.id;
+    el.setAttribute('font-weight',stroke.bold?'700':'400');
+    el.setAttribute('xml:space','preserve');
+    textLayout(stroke,measure).lines.forEach((line,index)=>{const span=doc.createElementNS(ns,'tspan');span.setAttribute('x',stroke.points[0][0]);span.setAttribute('y',stroke.points[0][1]+index*stroke.width*1.35);span.textContent=line||'\u00a0';el.append(span)});
+    el.classList.toggle('canvas-ink-text-selected',selected);
+    return el;
+  }
+
   function create(options){
     const {viewport,world}=options;if(!viewport||!world)return null;
     const doc=viewport.ownerDocument,ns='http://www.w3.org/2000/svg';
@@ -87,10 +108,15 @@
     const textBox=stroke=>textLayout(stroke,measure);
     function renderTextHandles(stroke){
       const content=textBox(stroke),box={...content,x:content.x-8,y:content.y-4,width:content.width+16,height:content.height+8},group=doc.createElementNS(ns,'g');group.classList.add('canvas-ink-text-box');
-      const border=doc.createElementNS(ns,'rect');for(const [key,value] of Object.entries({x:box.x,y:box.y,width:box.width,height:box.height,fill:'none',stroke:'#2563eb'}))border.setAttribute(key,value);border.setAttribute('stroke-dasharray','4 3');group.append(border);
-      // 轻量化：不渲染可见拖拽方块，仅保留透明命中区（悬停显示对应 resize 光标）。
       const scale=options.getViewport().scale||options.getViewport().zoom||1,size=14/scale;
-      for(const handle of ['nw','n','ne','e','se','s','sw','w']){const el=doc.createElementNS(ns,'rect');el.classList.add('canvas-ink-handle-hit');const x=box.x+(handle.includes('w')?0:handle.includes('e')?box.width:box.width/2),y=box.y+(handle.includes('n')?0:handle.includes('s')?box.height:box.height/2);el.dataset.inkResizeHandle=handle;el.dataset.textId=stroke.id;for(const [key,value] of Object.entries({x:x-size/2,y:y-size/2,width:size,height:size,fill:'transparent',stroke:'none'}))el.setAttribute(key,value);el.style.pointerEvents='all';el.style.cursor=handle+'-resize';group.append(el)}layer.append(group);
+      group.classList.toggle('is-interacting',!!textResize);
+      const border=doc.createElementNS(ns,'rect');border.classList.add('canvas-ink-text-outline');for(const [key,value] of Object.entries({x:box.x,y:box.y,width:box.width,height:box.height,fill:'none',stroke:'#2563eb','stroke-width':1/scale,'stroke-dasharray':`${4/scale} ${3/scale}`}))border.setAttribute(key,value);group.append(border);
+      const edge=border.cloneNode(false);edge.classList.remove('canvas-ink-text-outline');edge.dataset.inkTextMove=stroke.id;edge.setAttribute('stroke','transparent');edge.setAttribute('stroke-width',12/scale);edge.removeAttribute('stroke-dasharray');edge.style.pointerEvents='stroke';edge.style.cursor='grab';group.append(edge);
+      for(const handle of ['nw','n','ne','e','se','s','sw','w']){
+        const el=doc.createElementNS(ns,'rect');el.classList.add('canvas-ink-handle-hit');const x=box.x+(handle.includes('w')?0:handle.includes('e')?box.width:box.width/2),y=box.y+(handle.includes('n')?0:handle.includes('s')?box.height:box.height/2);el.dataset.inkResizeHandle=handle;el.dataset.textId=stroke.id;for(const [key,value] of Object.entries({x:x-size/2,y:y-size/2,width:size,height:size,fill:'transparent',stroke:'none'}))el.setAttribute(key,value);el.style.pointerEvents='all';el.style.cursor=handle+'-resize';group.append(el);
+        const dot=doc.createElementNS(ns,'rect');dot.classList.add('canvas-ink-text-handle-dot');for(const [key,value] of Object.entries({x:x-4/scale,y:y-4/scale,width:8/scale,height:8/scale,rx:1/scale,'stroke-width':1.5/scale}))dot.setAttribute(key,value);group.append(dot);
+      }
+      layer.append(group);
     }
     const readonly=()=>!!options.isReadonly?.();
     const report=error=>options.onError?.(error?.message||String(error));
@@ -100,8 +126,17 @@
     const trigger=()=>typeof options.trigger==='function'?options.trigger():options.trigger;
     if(options.trigger)toolbar.classList.add('canvas-ink-popover');
     function positionToolbar(){
-      // Popover mode docks at the bottom center via CSS; only the anchored legacy mode is JS-positioned.
-      if(options.trigger)return;
+      if(options.trigger){
+        if(!opened)return;
+        // Keep the existing bottom-center dock, moving it above visible canvas
+        // docks only when their actual rectangles overlap its controls.
+        toolbar.style.bottom='';
+        let box=toolbar.getBoundingClientRect(),bottom=parseFloat(global.getComputedStyle(toolbar).bottom)||0;
+        const docks=[...viewport.querySelectorAll('.uc-minimap-dock,.canvas-zoom-dock,.lp-canvas-zoom-dock')].filter(el=>el.getClientRects().length&&global.getComputedStyle(el).visibility!=='hidden');
+        for(const dock of docks){const r=dock.getBoundingClientRect();if(box.left<r.right&&box.right>r.left&&box.top<r.bottom&&box.bottom>r.top){bottom+=box.bottom-r.top+8;toolbar.style.bottom=Math.min(bottom,global.innerHeight-box.height-8)+'px';box=toolbar.getBoundingClientRect()}}
+        panel.style.maxHeight=Math.max(40,box.top-16)+'px';panel.style.overflowY='auto';
+        return;
+      }
       if(!opened||!trigger())return;
       const rect=trigger().getBoundingClientRect(),box=toolbar.getBoundingClientRect(),settings=panel.hidden?null:panel.getBoundingClientRect();
       const left=Math.max(8,Math.min(options.placement==='right'?rect.right+8:rect.right-box.width,global.innerWidth-box.width-8));
@@ -110,7 +145,7 @@
       if(settings){panel.style.right='auto';panel.style.left=(Math.max(8,Math.min(left+box.width-settings.width,global.innerWidth-settings.width-8))-left)+'px'}
     }
     function setOpen(value){
-      if(!value&&textSession){cancel();closeTextEditor(true).then(saved=>{if(saved)setOpen(false)});return}
+      if(!value&&textSession){cancel();textSession.onSaved=()=>setOpen(false);closeTextEditor(true);return}
       opened=!!value;if(!opened){settingsOpen=false;space=false;viewport.classList.remove('canvas-ink-panning');setTool('select');options.onExitDraw?.()}else setTool('pen');
       options.onOpenChange?.(opened);refreshControls();positionToolbar();
     }
@@ -121,25 +156,7 @@
     const inside=target=>options.isInside?options.isInside(target):defaultInside(target);
     const stop=event=>{event.preventDefault();event.stopImmediatePropagation()};
     function listen(target,type,callback,config){target.addEventListener(type,callback,config);listeners.push(()=>target.removeEventListener(type,callback,config))}
-    function makePath(stroke){
-      const el=doc.createElementNS(ns,'path');
-      el.setAttribute('d',path(stroke.points));el.setAttribute('fill','none');el.setAttribute('stroke',stroke.color);el.setAttribute('stroke-width',stroke.width);el.setAttribute('stroke-linecap','round');el.setAttribute('stroke-linejoin','round');el.setAttribute('opacity',stroke.opacity??TOOLS[stroke.tool].opacity);el.dataset.strokeId=stroke.id;
-      return el;
-    }
-    function makeEl(stroke){
-      if(stroke.tool!=='text')return makePath(stroke);
-      const el=doc.createElementNS(ns,'text');
-      el.setAttribute('x',stroke.points[0][0]);el.setAttribute('y',stroke.points[0][1]);
-      el.setAttribute('fill',stroke.color);el.setAttribute('font-size',stroke.width);
-      el.setAttribute('font-family','system-ui,-apple-system,sans-serif');
-      el.setAttribute('dominant-baseline','hanging');
-      el.setAttribute('opacity',stroke.opacity??TOOLS.text.opacity);el.dataset.strokeId=stroke.id;
-      el.setAttribute('font-weight',stroke.bold?'700':'400');
-      el.setAttribute('xml:space','preserve');
-      textLines(stroke).forEach((line,index)=>{const span=doc.createElementNS(ns,'tspan');span.setAttribute('x',stroke.points[0][0]);span.setAttribute('y',stroke.points[0][1]+index*stroke.width*1.35);span.textContent=line||'\u00a0';el.append(span)});
-      el.classList.toggle('canvas-ink-text-selected',stroke.id===selectedId);
-      return el;
-    }
+    function makeEl(stroke){return svgStroke(stroke,doc,measure,{selected:stroke.id===selectedId})}
     // 工具光标：画笔/荧光笔/橡皮擦各显示对应形状，颜色跟随当前色板。
     const cursorStyle=doc.createElement('style');
     function cursorArt(name,color){
@@ -152,14 +169,17 @@
     doc.head.append(cursorStyle);
     function updateCursor(){
       // eraser 无色板偏好但也需要专属光标（固定配色）；select/只读时恢复默认光标。
-      if(destroyed||tool==='select'||!CURSOR_HOTSPOT[tool]||readonly()){cursorStyle.textContent='';return}
+      if(destroyed||readonly()){cursorStyle.textContent='';return}
+      const scope=`.canvas-ink-drawing:not(#kg-cursor-anchor):not(.canvas-ink-panning)[data-ink-tool='${tool}']`;
+      const dragging='.canvas-ink-text-dragging:not(#kg-cursor-anchor):not(.canvas-ink-panning)[data-ink-tool]';
       const art=cursorArt(tool,TOOLS[tool]?prefs[tool].color:'#1e293b');
       // :not(#kg-cursor-anchor) 抬高特异性到 (1,3,1)，压过 custom-cursor.css 的 crosshair (1,2,1)!important
-      cursorStyle.textContent=`.canvas-ink-drawing:not(#kg-cursor-anchor):not(.canvas-ink-panning)[data-ink-tool='${tool}']{cursor:url("data:image/svg+xml,${encodeURIComponent(art)}") ${CURSOR_HOTSPOT[tool]}, crosshair!important}.canvas-ink-drawing:not(#kg-cursor-anchor):not(.canvas-ink-panning)[data-ink-tool='${tool}'] *{cursor:inherit!important}`;
+      cursorStyle.textContent=(CURSOR_HOTSPOT[tool]?`${scope}{cursor:url("data:image/svg+xml,${encodeURIComponent(art)}") ${CURSOR_HOTSPOT[tool]}, crosshair!important}${scope} :where(:not([data-ink-resize-handle],[data-ink-text-move],[data-ink-edit-drag],.canvas-ink-text-editor)){cursor:inherit!important}`:'')+`${dragging},${dragging} *{cursor:grabbing!important}`;
     }
     function refreshControls(){
       if(destroyed)return;
       const locked=readonly(),state=history?.getState?.()||{};
+      if(locked)stopEraserHold();
       // 只读（切题过渡/访客）不再把工具强制降回 select：工具选择保留，绘制入口由
       // pointerdown 的 readonly 拦截兜底，按钮 disabled + 光标还原表达锁定；
       // 只读解除后工具与自定义光标自动恢复（切题保持画笔状态的前提）。
@@ -201,7 +221,7 @@
     function render(){
       if(destroyed||cancelStaleGesture())return;
       try{const strokes=normalize(getStrokes()).filter(item=>!erasing?.removed.has(item.id));layer.replaceChildren(...strokes.map(makeEl));const selection=strokes.find(item=>item.id===selectedId);if(selection&&!readonly()){if(selection.tool==='text')renderTextHandles(selection);else renderStrokeSelection(selection)}if(active){active.el=makeEl(active.stroke);layer.append(active.el)}}catch(error){report(error)}
-      refreshControls();
+      textSession?.relocate();refreshControls();
     }
     function strokeElement(id){return [...layer.querySelectorAll('[data-stroke-id]')].find(el=>el.dataset.strokeId===id)}
     function renderStrokeSelection(stroke){
@@ -219,8 +239,9 @@
       if(options.change){options.change(after,label);render()}else{apply(after);history?.push({label,undo:()=>apply(before),redo:()=>apply(after)})}refreshControls();
     }
     function cancel(){
+      stopEraserHold();
       if(erasing){const id=erasing.pointerId;erasing=null;try{if(viewport.hasPointerCapture(id))viewport.releasePointerCapture(id)}catch(_){};render()}
-      if(textSession?.drag){const drag=textSession.drag;textSession.drag=null;textSession.world.splice(0,2,...drag.world);textSession.relocate();try{drag.target.releasePointerCapture(drag.pointerId)}catch(_){};}
+      if(textSession?.drag){const drag=textSession.drag;textSession.drag=null;textSession.border.classList.remove('is-dragging');textSession.world.splice(0,2,...drag.world);textSession.relocate();try{drag.target.releasePointerCapture(drag.pointerId)}catch(_){};}
       if(textResize){const id=textResize.pointerId;textResize=null;try{viewport.releasePointerCapture(id)}catch(_){};render()}
       if(textDrag){const id=textDrag.pointerId;textDrag=null;viewport.classList.remove('canvas-ink-text-dragging');try{if(viewport.hasPointerCapture(id))viewport.releasePointerCapture(id)}catch(_){};render()}
       if(frame){global.cancelAnimationFrame(frame);frame=0}
@@ -229,7 +250,10 @@
       try{if(viewport.hasPointerCapture(id))viewport.releasePointerCapture(id)}catch(_){}
     }
     function setTool(value){
-      cancel();if(value!==tool&&textSession){closeTextEditor(true).then(saved=>{if(saved)setTool(value)});return;}if(value!=='select'&&(value!=='text'||selected()?.tool!=='text'))selectedId=null;if(!TOOLS[value])settingsOpen=false;tool=(TOOLS[value]||value==='eraser')&&!readonly()?value:'select';
+      cancel();
+      // Keep the latest tool request on the draft until IME and persistence finish.
+      if(textSession){textSession.onSaved=value!==tool?()=>setTool(value):null;if(value!==tool){closeTextEditor(true);return;}}
+      if(value!=='select'&&(value!=='text'||selected()?.tool!=='text'))selectedId=null;if(!TOOLS[value])settingsOpen=false;tool=(TOOLS[value]||value==='eraser')&&!readonly()?value:'select';
       viewport.classList.toggle('canvas-ink-drawing',tool!=='select');viewport.dataset.inkTool=tool;
       if(tool!=='select')options.onDrawMode?.();
       render();
@@ -288,17 +312,24 @@
     let textSession=null;
     async function closeTextEditor(commit){
       const session=textSession;if(!session)return true;
-      if(commit){
-        if(session.composing){session.deferredCommit=true;return false}
-        session.resize();const draft={text:session.editor.value.slice(0,TEXT_LIMIT),...session.style,points:[[...session.world]]};
-        if(JSON.stringify(draft)!==JSON.stringify(session.edit.state().draft))session.edit.update(draft);
-        session.editor.dataset.saveState='committing';
-        const success=await session.edit.commit();
-        if(textSession!==session)return false;
-        session.editor.dataset.saveState=session.edit.state().status;
-        if(!success){if(session.edit.state().status==='failed'){session.status.textContent='文字未保存，请点击外部重试';report(session.edit.state().error)}return false}
-      }else{session.edit.cancel();if(session.applied&&!session.stale){options.setStrokes?options.setStrokes(session.before):options.change(session.before,'取消文字修改');render()}}
-      textSession=null;session.unmount.forEach(dispose=>dispose());session.editor.remove();session.status.remove();session.border.remove();refreshControls();return true;
+      if(commit&&session.closing)return session.closing;
+      const close=async()=>{
+        if(commit){
+          if(session.composing){session.deferredCommit=true;return false}
+          session.resize();const draft={text:session.editor.value.slice(0,TEXT_LIMIT),...session.style,points:[[...session.world]]};
+          if(JSON.stringify(draft)!==JSON.stringify(session.edit.state().draft))session.edit.update(draft);
+          session.editor.dataset.saveState='committing';
+          const success=await session.edit.commit();
+          if(textSession!==session)return false;
+          session.editor.dataset.saveState=session.edit.state().status;
+          if(!success){session.onSaved=null;if(session.edit.state().status==='failed'){session.status.textContent='文字未保存，请点击外部重试';report(session.edit.state().error)}return false}
+        }else{session.edit.cancel();if(session.applied&&!session.stale){options.setStrokes?options.setStrokes(session.before):options.change(session.before,'取消文字修改');render()}}
+        const onSaved=commit?session.onSaved:null;
+        textSession=null;session.unmount.forEach(dispose=>dispose());session.frame.remove();session.status.remove();session.border.remove();refreshControls();onSaved?.();return true;
+      };
+      if(!commit)return close();
+      session.closing=close();
+      try{return await session.closing}finally{session.closing=null}
     }
     function openTextEditor(clientX,clientY,existing){
       if(textSession){closeTextEditor(true);return}
@@ -307,15 +338,17 @@
       const box=existing?textBox(existing):{width:40,height:24};
       const style={color:existing?existing.color:prefs.text.color,width:existing?existing.width:prefs.text.width,bold:!!(existing?existing.bold:prefs.text.bold),opacity:existing?(existing.opacity??1):prefs.text.opacity,...(existing?.boxWidth?{boxWidth:existing.boxWidth}:{}),boxHeight:Math.max(24,box.height)};
       const editor=doc.createElement('textarea');
+      const editorFrame=doc.createElement('div');editorFrame.className='canvas-ink-text-editor-viewport';editorFrame.dataset.canvasUi='true';editorFrame.append(editor);
       editor.className='canvas-ink-text-editor';editor.rows=1;editor.maxLength=TEXT_LIMIT;editor.placeholder='点击外部保存 · Enter 换行 · Esc 取消';editor.setAttribute('aria-label','画布文字内容');editor.value=existing?existing.text:'';
-      editor.style.left=(rect.left+view.x+world[0]*scale)+'px';editor.style.top=(rect.top+view.y+world[1]*scale)+'px';editor.style.width=box.width*scale+'px';
+      editor.style.position='relative';editor.style.left='0';editor.style.top='0';editor.style.width=box.width*scale+'px';
       editor.style.fontSize=style.width*scale+'px';editor.style.color=style.color;editor.style.fontWeight=style.bold?'700':'400';
       const status=doc.createElement('div');status.className='canvas-ink-text-status';status.dataset.canvasUi='true';status.setAttribute('role','status');
       const border=doc.createElement('div');border.className='canvas-ink-text-edit-border';border.dataset.canvasUi='true';border.setAttribute('aria-hidden','true');
       for(const side of ['top','right','bottom','left']){const edge=doc.createElement('div');edge.dataset.inkEditDrag=side;border.append(edge)}
-      doc.body.append(editor,status,border);
+      for(const side of ['nw','n','ne','e','se','s','sw','w']){const dot=doc.createElement('span');dot.className='canvas-ink-text-edit-point';dot.dataset.inkEditPoint=side;dot.dataset.inkEditDrag='point';border.append(dot)}
+      const overlayHost=options.overlayHost||doc.body;overlayHost.append(editorFrame,status,border);
       const before=normalize(getStrokes()),id=existing?.id||'ink-'+Date.now().toString(36)+'-'+(++sequence)+'-'+Math.random().toString(36).slice(2,8);
-      const session={editor,status,border,existing,world,style,before,unmount:[],applied:false,composing:false};textSession=session;
+      const session={editor,frame:editorFrame,status,border,existing,world,style,before,unmount:[],applied:false,composing:false};textSession=session;
       session.edit=global.KGTextEditSession.create({original:{text:editor.value,...style,points:[[...world]]},persist:async draft=>{
         if(session.stale)throw new Error('画布已切换，文字草稿仍保留，请复制输入或按 Esc 关闭');
         if(!existing&&!draft.text.trim())return true;
@@ -324,11 +357,18 @@
         if(signature!==session.appliedSignature){change(existing||session.applied?getStrokes().map(item=>item.id===id?stroke:item):[...getStrokes(),stroke],existing?'编辑文字':'添加文字');session.applied=true;session.appliedSignature=signature}
         return options.persistText?await options.persistText():true;
       }});
+      function revealCaret(){
+        const s=options.getViewport().scale||options.getViewport().zoom||1,layout=textBox({text:editor.value.slice(0,editor.selectionStart),...style,boxHeight:24,points:[[...world]]});
+        const x=(8+measure.measureText(layout.lines.at(-1)||'').width)*s,y=(4+(layout.lines.length-1)*style.width*1.35)*s,line=style.width*1.35*s;
+        if(x>editorFrame.scrollLeft+editorFrame.clientWidth-12)editorFrame.scrollLeft=x-editorFrame.clientWidth+12;
+        else if(x<editorFrame.scrollLeft+8)editorFrame.scrollLeft=Math.max(0,x-8);
+        if(y+line>editorFrame.scrollTop+editorFrame.clientHeight)editorFrame.scrollTop=y+line-editorFrame.clientHeight;
+        else if(y<editorFrame.scrollTop)editorFrame.scrollTop=y;
+      }
       const resize=()=>{
         const v=options.getViewport(),s=v.scale||v.zoom||1,natural=textBox({text:editor.value,...style,boxHeight:24,points:[[...world]]});
         style.boxHeight=Math.min(4000,natural.height);
         const r=viewport.getBoundingClientRect();
-        editor.style.left=(r.left+v.x+(world[0]-8)*s)+'px';editor.style.top=(r.top+v.y+(world[1]-4)*s)+'px';
         editor.style.boxSizing='content-box';editor.style.padding=(4*s)+'px '+(8*s)+'px';
         editor.style.width=natural.width*s+'px';editor.style.fontSize=style.width*s+'px';editor.style.opacity=style.opacity;
         // Match the character wrapping used by SVG/export, and measure the live
@@ -338,28 +378,38 @@
         const css=global.getComputedStyle(editor),padding=parseFloat(css.paddingTop)+parseFloat(css.paddingBottom);
         style.boxHeight=Math.min(4000,Math.max(style.boxHeight,(editor.scrollHeight-padding)/s));editor.placeholder=placeholder;
         editor.style.height=Math.max(natural.height,style.boxHeight)*s+'px';
-        status.style.left=editor.style.left;status.style.top=(parseFloat(editor.style.top)+editor.offsetHeight+4)+'px';
-        Object.assign(border.style,{left:editor.style.left,top:editor.style.top,width:editor.offsetWidth+'px',height:editor.offsetHeight+'px'});
+        // Clip only the live presentation. The textarea retains its natural
+        // width, explicit wrapping and world geometry inside this scroll frame.
+        const width=Math.min(editor.offsetWidth,Math.max(1,global.innerWidth-16)),height=Math.min(editor.offsetHeight,Math.max(1,global.innerHeight-16));
+        const left=Math.max(8,Math.min(r.left+v.x+(world[0]-8)*s,global.innerWidth-width-8)),top=Math.max(8,Math.min(r.top+v.y+(world[1]-4)*s,global.innerHeight-height-8));
+        Object.assign(editorFrame.style,{left:left+'px',top:top+'px',width:width+'px',height:height+'px'});
+        status.style.left=left+'px';status.style.top=Math.min(global.innerHeight-status.offsetHeight-8,top+height+4)+'px';
+        Object.assign(border.style,{left:left+'px',top:top+'px',width:width+'px',height:height+'px'});
+        if(doc.activeElement===editor)revealCaret();
       };
-      const relocate=()=>{const r=viewport.getBoundingClientRect(),v=options.getViewport(),s=v.scale||v.zoom||1;editor.style.left=(r.left+v.x+world[0]*s)+'px';editor.style.top=(r.top+v.y+world[1]*s)+'px';resize()};
+      const relocate=()=>resize();
       session.resize=resize;session.relocate=relocate;
       const updateDraft=()=>{resize();session.edit.update({text:editor.value,...style,points:[[...world]]});editor.dataset.saveState='draft';status.textContent=''};
       border.addEventListener('pointerdown',event=>{
         if(event.button!==0||readonly()||session.stale)return;stop(event);
         session.drag={pointerId:event.pointerId,target:event.target,x:event.clientX,y:event.clientY,world:[...world]};event.target.setPointerCapture(event.pointerId);
+        border.classList.add('is-dragging');
       });
       const move=event=>{const drag=session.drag;if(!drag||event.pointerId!==drag.pointerId)return;stop(event);if(readonly()){cancel();return}const v=options.getViewport(),s=v.scale||v.zoom||1;world.splice(0,2,drag.world[0]+(event.clientX-drag.x)/s,drag.world[1]+(event.clientY-drag.y)/s);relocate();updateDraft()};
-      const end=event=>{const drag=session.drag;if(!drag||event.pointerId!==drag.pointerId)return;stop(event);if(event.type!=='pointerup'){cancel();updateDraft();return}session.drag=null;drag.target.releasePointerCapture(drag.pointerId)};
+      const end=event=>{const drag=session.drag;if(!drag||event.pointerId!==drag.pointerId)return;stop(event);if(event.type!=='pointerup'){cancel();updateDraft();return}session.drag=null;border.classList.remove('is-dragging');drag.target.releasePointerCapture(drag.pointerId)};
       for(const [type,handler] of [['pointermove',move],['pointerup',end],['pointercancel',end],['lostpointercapture',end]]){border.addEventListener(type,handler);session.unmount.push(()=>border.removeEventListener(type,handler))}
-      if(global.KGCanvasDomInteraction){session.unmount.push(global.KGCanvasDomInteraction.mountOverlay(editor,doc.body,relocate),global.KGCanvasDomInteraction.mountOverlay(status,doc.body),global.KGCanvasDomInteraction.mountOverlay(border,doc.body))}
+      editorFrame.addEventListener('wheel',event=>event.stopPropagation(),{passive:true});
+      if(global.KGCanvasDomInteraction&&!options.overlayHost){session.unmount.push(global.KGCanvasDomInteraction.mountOverlay(editorFrame,doc.body,relocate),global.KGCanvasDomInteraction.mountOverlay(status,doc.body),global.KGCanvasDomInteraction.mountOverlay(border,doc.body))}
+      else{doc.addEventListener('fullscreenchange',relocate);session.unmount.push(()=>doc.removeEventListener('fullscreenchange',relocate))}
       editor.addEventListener('compositionstart',()=>{session.composing=true;session.edit.setComposing(true)});
       editor.addEventListener('compositionend',()=>{session.composing=false;session.edit.setComposing(false);if(session.deferredCommit){session.deferredCommit=false;closeTextEditor(true)}});
       editor.addEventListener('keydown',event=>{event.stopPropagation();if(event.isComposing||event.keyCode===229)return;if(event.key==='Enter'&&(event.ctrlKey||event.metaKey)){event.preventDefault();closeTextEditor(true)}else if(event.key==='Escape'){event.preventDefault();closeTextEditor(false)}});
       editor.addEventListener('input',updateDraft);
+      editor.addEventListener('keyup',revealCaret);editor.addEventListener('select',revealCaret);
       editor.addEventListener('blur',event=>{if(toolbar.contains(event.relatedTarget))return;global.setTimeout(()=>{if(textSession===session&&!toolbar.contains(doc.activeElement))closeTextEditor(true)},160)});
       editor.focus();resize();refreshControls();
     }
-    listen(global,'pointerdown',event=>{if(!textSession||textSession.editor.contains(event.target)||textSession.border.contains(event.target)||toolbar.contains(event.target))return;closeTextEditor(true);},true);
+    listen(global,'pointerdown',event=>{if(!textSession||textSession.frame.contains(event.target)||textSession.border.contains(event.target)||toolbar.contains(event.target))return;closeTextEditor(true);},true);
     function hitStroke(location,padding,textOnly=false){
       const target=new global.DOMPoint(...location),byId=new Map(getStrokes().map(stroke=>[stroke.id,stroke]));
       for(const el of [...layer.querySelectorAll('[data-stroke-id]')].reverse()){
@@ -387,13 +437,14 @@
       points.push(next);
     }
     listen(global,'pointerdown',event=>{
-      if(textSession)return;
+      if(textSession||destroyed||space||event.button!==0||event.isPrimary===false)return;
       const handle=event.target.closest?.('[data-ink-resize-handle]');if(handle&&layer.contains(handle)&&!readonly()){stop(event);const stroke=getStrokes().find(item=>item.id===handle.dataset.textId);textResize={beforeSignature:strokeStateSignature(),pointerId:event.pointerId,handle:handle.dataset.inkResizeHandle,start:point(event,viewport.getBoundingClientRect(),options.getViewport()),original:normalize([stroke])[0],box:textBox(stroke)};viewport.setPointerCapture(event.pointerId);return}
       if(destroyed||active||erasing||textDrag||textResize||space||readonly()||event.button!==0||event.isPrimary===false||!inside(event.target))return;
       const view=options.getViewport(),location=point(event,viewport.getBoundingClientRect(),view);
       // In selection mode, annotations must not steal the card's native controls.
       const control=tool==='select'&&event.target.closest?.('button,a,input,select,textarea,[contenteditable],[role=button]');
-      const textHit=!control&&(tool==='select'||tool==='text')?hitStroke(location,4/(view.scale||view.zoom||1),tool==='text'):null;
+      const edge=event.target.closest?.('[data-ink-text-move]');
+      const textHit=!control&&(tool==='select'||tool==='text')?(edge&&layer.contains(edge)?getStrokes().find(item=>item.id===edge.dataset.inkTextMove):hitStroke(location,4/(view.scale||view.zoom||1),tool==='text')):null;
       if(tool==='select'&&!textHit){selectedId=null;suppressClickUntil=0;render();return}
       stop(event);
       try{
@@ -410,14 +461,14 @@
         const strokes=normalize(getStrokes()),remaining=LIMITS.total-strokes.reduce((sum,s)=>sum+s.points.length,0);
         if(strokes.length>=LIMITS.strokes||remaining<1)throw new Error('当前画布笔迹已达上限，请清理部分笔迹后继续');
         const pref=prefs[tool],stroke={id:'ink-'+Date.now().toString(36)+'-'+(++sequence)+'-'+Math.random().toString(36).slice(2,8),tool,color:pref.color,width:pref.width,opacity:pref.opacity,points:[]};
-        active={pointerId:event.pointerId,stroke,el:makePath(stroke),pointLimit:Math.min(remaining,LIMITS.points)};
+        active={pointerId:event.pointerId,stroke,el:makeEl(stroke),pointLimit:Math.min(remaining,LIMITS.points)};
         addPoint(event);layer.append(active.el);active.el.setAttribute('d',path(stroke.points));viewport.setPointerCapture(event.pointerId);
       }catch(error){cancel();report(error)}
     },true);
     listen(global,'pointermove',event=>{
       if(cancelStaleGesture())return;
       if(erasing&&event.pointerId===erasing.pointerId){stop(event);if(readonly()){cancel();return}for(const sample of event.getCoalescedEvents?.().length?event.getCoalescedEvents():[event])eraseTo(sample);return}
-      if(textResize&&event.pointerId===textResize.pointerId){stop(event);const current=point(event,viewport.getBoundingClientRect(),options.getViewport()),drag=textResize,next=global.KGTextBoxGeometry.resize(drag.box,drag.handle,{x:current[0]-drag.start[0],y:current[1]-drag.start[1]});const natural=textBox({...drag.original,points:[[next.x,next.y]],width:next.fontSize,boxWidth:next.width,boxHeight:next.height});const clamped=global.KGTextBoxGeometry.clampToTextBounds(next,natural);drag.next={...drag.original,points:[[clamped.x,clamped.y]],width:clamped.fontSize,boxWidth:clamped.width,boxHeight:clamped.height};drag.next.boxHeight=Math.min(4000,Math.max(clamped.height,textLines(drag.next).length*clamped.fontSize*1.35));layer.replaceChildren(...getStrokes().map(item=>makeEl(item.id===drag.original.id?drag.next:item)));renderTextHandles(drag.next);return}
+      if(textResize&&event.pointerId===textResize.pointerId){stop(event);if(readonly()){cancel();return}const current=point(event,viewport.getBoundingClientRect(),options.getViewport()),drag=textResize,next=global.KGTextBoxGeometry.resize(drag.box,drag.handle,{x:current[0]-drag.start[0],y:current[1]-drag.start[1]});const natural=textBox({...drag.original,points:[[next.x,next.y]],width:next.fontSize,boxWidth:next.width,boxHeight:next.height});const clamped=global.KGTextBoxGeometry.clampToTextBounds(next,natural);drag.next={...drag.original,points:[[clamped.x,clamped.y]],width:clamped.fontSize,boxWidth:clamped.width,boxHeight:clamped.height};drag.next.boxHeight=Math.min(4000,Math.max(clamped.height,textLines(drag.next).length*clamped.fontSize*1.35));layer.replaceChildren(...getStrokes().map(item=>makeEl(item.id===drag.original.id?drag.next:item)));renderTextHandles(drag.next);return}
       if(textDrag&&event.pointerId===textDrag.pointerId){
         stop(event);if(readonly()){cancel();return}
         const current=point(event,viewport.getBoundingClientRect(),options.getViewport()),dx=current[0]-textDrag.start[0],dy=current[1]-textDrag.start[1],scale=options.getViewport().scale||options.getViewport().zoom||1;
@@ -433,7 +484,7 @@
     listen(global,'pointerup',event=>{
       if(cancelStaleGesture())return;
       if(erasing&&event.pointerId===erasing.pointerId){stop(event);if(readonly()){cancel();return}eraseTo(event);const gesture=erasing;cancel();suppressClickUntil=Date.now()+400;if(gesture.removed.size)try{change(gesture.before.filter(item=>!gesture.removed.has(item.id)),'擦除笔迹')}catch(error){render();report(error)}return}
-      if(textResize&&event.pointerId===textResize.pointerId){stop(event);const drag=textResize;cancel();if(drag.next&&JSON.stringify(drag.next)!==JSON.stringify(drag.original))try{change(getStrokes().map(item=>item.id===drag.original.id?drag.next:item),'调整文本框大小');Promise.resolve(options.persistText?.()).catch(report)}catch(error){report(error)}return}
+      if(textResize&&event.pointerId===textResize.pointerId){stop(event);if(readonly()){cancel();return}const drag=textResize;cancel();if(drag.next&&JSON.stringify(drag.next)!==JSON.stringify(drag.original))try{change(getStrokes().map(item=>item.id===drag.original.id?drag.next:item),'调整文本框大小');Promise.resolve(options.persistText?.()).catch(report)}catch(error){report(error)}return}
       if(textDrag&&event.pointerId===textDrag.pointerId){stop(event);const drag=textDrag;cancel();suppressClickUntil=Date.now()+400;if(drag.moved&&drag.next)try{change(getStrokes().map(item=>item.id===drag.original.id?drag.next:item),drag.original.tool==='text'?'移动文字':'移动笔迹')}catch(error){render();report(error)}return}
       if(!active||event.pointerId!==active.pointerId)return;stop(event);addPoint(event);
       const {stroke,limited}=active;cancel();suppressClickUntil=Date.now()+400;
@@ -458,11 +509,13 @@
     }
     listen(global,'keydown',handleKeyDown,true);
     listen(global,'keyup',event=>{if(event.code==='Space'){space=false;viewport.classList.remove('canvas-ink-panning')}},true);
-    listen(global,'resize',()=>{cancel();positionToolbar()});
+    listen(global,'resize',()=>{cancel();textSession?.relocate();positionToolbar()});
+    listen(doc,'click',()=>{if(opened)global.requestAnimationFrame(()=>{if(!destroyed)positionToolbar()})});
     listen(doc,'scroll',()=>{cancel();positionToolbar()},true);
     listen(global,'blur',()=>{cancel();space=false;viewport.classList.remove('canvas-ink-panning')});
     // Cancel instead of mixing coordinate systems if zoom changes mid-stroke.
     listen(global,'wheel',event=>{if((active||erasing||textDrag||textResize)&&viewport.contains(event.target))cancel()},true);
+    listen(global,'wheel',event=>{if(textSession&&viewport.contains(event.target))global.requestAnimationFrame(()=>textSession?.relocate())},{passive:true});
     // 画笔状态下双击右键退出绘画；单击右键仅屏蔽菜单（右键拖动平移不受影响）。
     let lastRightPress={t:0,x:0,y:0},suppressContextMenuUntil=0;
     const resetRightPress=()=>{lastRightPress={t:0,x:0,y:0}};
@@ -502,7 +555,7 @@
       if(event.button!==0||typeof options.onLongPressEraser!=='function')return;
       stopEraserHold();
       eraserHoldBtn.classList.add('canvas-ink-holding');
-      eraserHoldTimer=global.setTimeout(()=>{eraserHoldTimer=0;stopEraserHold();options.onLongPressEraser()},3000);
+      eraserHoldTimer=global.setTimeout(()=>{eraserHoldTimer=0;stopEraserHold();if(!destroyed&&!readonly())options.onLongPressEraser()},3000);
     });
     listen(global,'pointerup',stopEraserHold);
     listen(global,'pointercancel',stopEraserHold);
@@ -529,5 +582,5 @@
     render();
     return {activateText,openTextAt,handleKeyDown,commitText:()=>closeTextEditor(true),hasTextDraft:()=>!!textSession,render,refreshControls,cancel,reset,setTool,setOpen,destroy,clearAll,get tool(){return tool},get temporaryPan(){return space}};
   }
-  global.KGCanvasInk=Object.freeze({normalize,point,path,textLayout,bounds,draw,create});
+  global.KGCanvasInk=Object.freeze({normalize,point,path,textLayout,bounds,draw,svgStroke,create});
 })(window);

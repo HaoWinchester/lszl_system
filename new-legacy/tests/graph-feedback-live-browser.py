@@ -25,6 +25,25 @@ with sync_playwright() as pw:
  shapes=page.evaluate('["ab","ac"].map(id=>edgeDomById.get(id).geometry)')
  for first,second in zip(shapes[0]['samples'],shapes[1]['samples']):assert abs(first['x']-second['x'])<.001 and abs(first['y']+second['y']-800)<.001
  page.screenshot(path=str(OUT/'symmetric-branches.png'))
+ # Stored upper controls must not bend a newly rebound lower branch upward.
+ original=route();history=count();select_point=coord(shapes[0]['samples'][12]);page.mouse.click(select_point['x'],select_point['y']);assert page.evaluate('state.selectedLinkId')=='ab'
+ handle_drag('[data-link-id="ab"][data-edge-control-kind="curve-midpoint"]',0,-32)
+ manual=route();assert manual['from']=='a' and manual['to']=='b' and len(manual['curveControls'])==2 and count()==history+1
+ assert page.evaluate('edgeDomById.get("ab").geometry.samples[12].y')<shapes[0]['samples'][12]['y']-30
+ endpoint_selector='[data-link-id="ab"][data-edge-endpoint-side="to"]';endpoint_box=page.locator(endpoint_selector).bounding_box();assert endpoint_box
+ target=coord({'x':860,'y':570});rebind_history=count();handle_drag(endpoint_selector,target['x']-endpoint_box['x']-endpoint_box['width']/2,target['y']-endpoint_box['y']-endpoint_box['height']/2)
+ rebound=route();assert rebound['from']=='a' and rebound['to']=='c' and rebound['curveControls'] is None and count()==rebind_history+1,(rebound,count(),rebind_history)
+ expect(page.locator('#detailPanel .detail-title')).to_have_text('学习计划 ↔ 主动回忆')
+ rebound_shape=page.evaluate('edgeDomById.get("ab").geometry');assert rebound_shape['derivedCurveControls'] is True
+ assert rebound_shape['endpoints']==[{'x':500,'y':400},{'x':760,'y':570}],rebound_shape['endpoints']
+ assert all(400<=point['y']<=570 for point in rebound_shape['samples']),rebound_shape['samples']
+ assert all(a['y']<=b['y'] for a,b in zip(rebound_shape['samples'],rebound_shape['samples'][1:])),rebound_shape['samples']
+ assert page.evaluate('KGGraphFileAutosave.saveAcknowledged({force:true})') is True
+ saved_response=ctx.request.get(base+'/api/v1/files/'+fid);assert saved_response.ok
+ saved_link=next(link for link in saved_response.json()['graphData']['links'] if link['id']=='ab');assert saved_link['from']=='a' and saved_link['to']=='c' and not saved_link.get('curveControls'),saved_link
+ page.screenshot(path=str(OUT/'rebound-down-curve.png'))
+ page.evaluate('restoreGraphUndoSnapshot()');assert route()==manual and count()==rebind_history
+ page.evaluate('restoreGraphUndoSnapshot()');assert route()==original and count()==history
  # A short middle-body drag used to detach both endpoints.
  page.evaluate('clearSelection()');original=route();history=count();middle=coord(shapes[0]['samples'][12]);drag_to(middle,7,4)
  assert route()['from']=='a' and route()['to']=='b';assert count()==history+1;assert route()!=original
@@ -32,8 +51,21 @@ with sync_playwright() as pw:
  page.evaluate('selectLink("ab")');history=count();handle_drag('[data-link-id="ab"][data-edge-control-kind="curve-midpoint"]',6,-5)
  assert route()['from']=='a' and route()['to']=='b' and count()==history+1
  stable=route();history=count();handle_drag('[data-link-id="ab"][data-edge-control-kind="curve-midpoint"]',8,7,True);assert route()==stable and count()==history
+ # Four-pixel adjustments remain usable in each direction and undo as one gesture.
+ for dx,dy in [(0,-4),(0,4),(-4,0),(4,0)]:
+  before_point=page.evaluate('edgeDomById.get("ab").geometry.samples[12]');history=count();handle_drag('[data-link-id="ab"][data-edge-control-kind="curve-midpoint"]',dx,dy)
+  after_point=page.evaluate('edgeDomById.get("ab").geometry.samples[12]');assert abs(after_point['x']-before_point['x']-dx)<.001 and abs(after_point['y']-before_point['y']-dy)<.001,(dx,dy,before_point,after_point)
+  assert route()['from']=='a' and route()['to']=='b' and count()==history+1
+  page.evaluate('restoreGraphUndoSnapshot()');assert route()==stable and count()==history
  # Elbow segment midpoint preserves a horizontal/vertical route and exact undo.
- page.evaluate('applyPathStyle("elbow")');history=count();before=route();handle_drag('[data-link-id="ab"][data-edge-control-kind="segment"][data-edge-control-index="1"]',9,5)
+ page.evaluate('applyPathStyle("elbow")');history=count();before=route();unchanged_path=page.evaluate('edgeDomById.get("ab").geometry.d')
+ handle_drag('[data-link-id="ab"][data-edge-control-kind="segment"][data-edge-control-index="1"]',0,9)
+ assert page.evaluate('edgeDomById.get("ab").geometry.d')==unchanged_path
+ assert route()==before and count()==history,'dragging along a locked elbow axis must not create route data or an undo entry'
+ page.evaluate('clearSelection()');trunk_point=coord(page.evaluate('()=>{const p=edgeDomById.get("ab").geometry.waypoints;return{x:p[0].x,y:p[0].y*.25+p[1].y*.75}}'))
+ drag_to(trunk_point,0,9);assert route()==before and count()==history and page.evaluate('edgeDomById.get("ab").geometry.d')==unchanged_path,'body dragging along a locked elbow axis must also remain a no-op'
+ page.evaluate('selectLink("ab")')
+ handle_drag('[data-link-id="ab"][data-edge-control-kind="segment"][data-edge-control-index="1"]',9,5)
  after=route();assert after['from']=='a' and after['to']=='b' and count()==history+1
  samples=page.evaluate('edgeDomById.get("ab").geometry.samples')
  assert all(a['x']==b['x'] or a['y']==b['y'] for a,b in zip(samples,samples[1:])),samples
@@ -69,5 +101,5 @@ with sync_playwright() as pw:
  assert page.locator('#world').evaluate('(e)=>getComputedStyle(e).willChange')=='auto'
  assert page.locator('#cardsLayer').evaluate('(e)=>getComputedStyle(e).willChange')=='auto'
  assert not errors,errors
- (OUT/'live-results.json').write_text(json.dumps({'base':base,'scenarios':'symmetry, body/midpoint/segment drag, endpoint unbind, undo, Esc cancel, coincident selection, compact layout/themes, group toolbar hit, fullscreen, zoom','errors':errors},ensure_ascii=False,indent=2));ctx.request.delete(base+'/api/v1/files/'+fid);browser.close()
+ (OUT/'live-results.json').write_text(json.dumps({'base':base,'scenarios':'symmetry, stored curve endpoint rebind/durable save/undo, body/midpoint/segment drag, endpoint unbind, undo, Esc cancel, coincident selection, compact layout/themes, group toolbar hit, fullscreen, zoom','errors':errors},ensure_ascii=False,indent=2));ctx.request.delete(base+'/api/v1/files/'+fid);browser.close()
 print('PASS graph feedback live gestures, compact themes, undo, selection hit, fullscreen and zoom')

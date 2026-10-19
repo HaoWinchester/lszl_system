@@ -41,7 +41,11 @@
     return adopt(file);
   }
   function fragmentSource(){
-    const store=current(),file=store?.getCurrentFileMeta?.()||store?.getCurrentFile?.()||(remoteActive()?global.KGGraphFileRemoteAdapter?.getCurrentFileMeta?.():null);
+    const store=current(),indexed=store?.getCurrentFileMeta?.()||store?.getCurrentFile?.();
+    const acknowledged=remoteActive()?global.KGGraphFileRemoteAdapter?.getCurrentFileMeta?.():null;
+    // Queued saves can acknowledge a newer revision before the file index refreshes.
+    // Never borrow metadata from a different selected tab or regress a fresh index.
+    const file=!indexed?acknowledged:(acknowledged?.id===indexed.id&&Number(acknowledged.revision)>Number(indexed.revision)?acknowledged:indexed);
     return{fileId:file?.id||null,revision:file?.revision??null};
   }
   global.KGGraphFileEditorStoreBridge={initialize,initializeCurrent,current,isRemote,openFile,createFile,adopt,fragmentSource};

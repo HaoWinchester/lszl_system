@@ -16,7 +16,7 @@
   function adapter(mode=''){return adapters.get(text(mode))||null}
   function registerAdapter(mode,implementation={}){
     mode=text(mode);if(!mode)return false;
-    adapters.set(mode,{flush:typeof implementation.flush==='function'?implementation.flush:null,clearTransient:typeof implementation.clearTransient==='function'?implementation.clearTransient:null,load:typeof implementation.load==='function'?implementation.load:null,onError:typeof implementation.onError==='function'?implementation.onError:null});
+    adapters.set(mode,{hasUnsavedChanges:typeof implementation.hasUnsavedChanges==='function'?implementation.hasUnsavedChanges:null,prepareLeave:typeof implementation.prepareLeave==='function'?implementation.prepareLeave:null,flush:typeof implementation.flush==='function'?implementation.flush:null,clearTransient:typeof implementation.clearTransient==='function'?implementation.clearTransient:null,load:typeof implementation.load==='function'?implementation.load:null,onError:typeof implementation.onError==='function'?implementation.onError:null});
     return true;
   }
   function safeCall(fn,...args){try{return fn?.(...args)}catch(error){console.warn('学习进度适配器执行失败',error);return false}}
@@ -52,6 +52,12 @@
   function flush(mode='',options={}){
     const context=global.KGLearningSession?.active?.(mode,options.userId);return safeCall(adapter(mode)?.flush,clone(context),null,options);
   }
+  async function prepareLeave(mode='',options={}){
+    const current=adapter(mode);
+    if(!current?.prepareLeave)return true;
+    const context=global.KGLearningSession?.active?.(mode,options.userId);
+    return (await current.prepareLeave(clone(context),options))!==false;
+  }
   function clearTransient(mode='',options={}){
     const context=global.KGLearningSession?.active?.(mode,options.userId);return safeCall(adapter(mode)?.clearTransient,clone(context),null,options);
   }
@@ -62,7 +68,12 @@
     return options.deletePersisted?null:global.KGLearningSession?.restart?.(normalized,options);
   }
 
-  const api=Object.freeze({registerAdapter,get,ensure,save,status,activate,flush,clearTransient,reset,normalizeContext});
+  global.addEventListener?.('beforeunload',event=>{
+    if(![...adapters.values()].some(current=>safeCall(current.hasUnsavedChanges)))return;
+    event.preventDefault();event.returnValue='';
+  });
+
+  const api=Object.freeze({registerAdapter,get,ensure,save,status,activate,flush,prepareLeave,clearTransient,reset,normalizeContext});
   global.KGLearningProgress=api;
   if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);

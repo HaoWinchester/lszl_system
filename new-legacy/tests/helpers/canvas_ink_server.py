@@ -12,7 +12,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / 'backend'))
 os.environ['LEGAL_CONSENT_REQUIRED'] = 'false'
-os.environ['GRAPH_FILES_API_CUTOVER_ENABLED'] = 'true'
+# Exercise the real configuration default; explicit false remains testable via env.
 os.environ['NEW_LEGACY_RELEASE_ROOT'] = os.environ.get('CANVAS_TEST_RELEASE_ROOT', str(ROOT / 'artifacts/canvas-ink/no-release'))
 os.environ['NEW_LEGACY_FALLBACK_SITE'] = str(ROOT / 'frontend/public/new-legacy')
 # Reuse the repository's isolation and migration lifecycle. It creates a unique
@@ -30,10 +30,13 @@ from app.services import deep_recall_service
 from app.main import app
 import uvicorn
 
-async def seed(multiple_papers=False):
+async def seed(multiple_papers=False, role_matrix=False):
     async with AsyncSessionLocal() as db:
         db.add(User(username='ink-browser', password_hash=hash_password('ink-browser-test'), role='teacher', status='active', subject='PMP'))
         db.add(User(username='ink-viewer', password_hash=hash_password('ink-browser-test'), role='viewer', status='active', subject='PMP'))
+        if role_matrix:
+            for username,role in [('ink-admin','admin'),('ink-student','student')]:
+                db.add(User(username=username,password_hash=hash_password('ink-browser-test'),role=role,status='active',subject='PMP'))
         await db.flush()
         db.add(QuestionBank(id='ink-bank', owner_id='ink-browser', name='笔迹浏览器测试题库', subject='PMP', visibility='published'))
         db.add(ExamPaper(id='ink-paper', owner_id='ink-browser', name='笔迹浏览器测试试卷', subject='PMP', status='published'))
@@ -51,6 +54,15 @@ async def seed(multiple_papers=False):
             db.add(PaperRelease(id='ink-release-2', paper_id='ink-paper-2', version=1, status='published', name='第二份跨标签页测试试卷', subject='PMP', publisher_id='ink-browser', access_level='free', enabled_modes=['multi_question_canvas'], allowed_roles=['teacher'], question_count=1))
             await db.flush()
             db.add(PaperReleaseQuestion(release_id='ink-release-2', order_index=0, bank_id='ink-bank', question_id=qid, snapshot=snapshot))
+        if role_matrix:
+            from app.models.file import GraphFile,FileContent,CurrentFile
+            for username in ['ink-admin','ink-browser','ink-student','ink-viewer']:
+                file_id='role-graph-'+username
+                data={'nodes':[{'id':'role-a','title':username+' 私有图谱','x':450,'y':300}],'links':[],'strokes':[],'viewport':{'x':0,'y':0,'scale':1}}
+                db.add(GraphFile(id=file_id,owner_id=username,name=username+' 私有图谱',node_count=1))
+                await db.flush()
+                db.add(FileContent(file_id=file_id,graph_data=data))
+                db.add(CurrentFile(owner_id=username,file_id=file_id))
         await db.commit()
         viewer=await db.get(User,'ink-viewer')
         session=await deep_recall_service.get_session(db,viewer,'ink-question-1',release_id='ink-release')
@@ -76,8 +88,9 @@ if __name__ == '__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--port',type=int,default=5189)
     parser.add_argument('--multiple-papers',action='store_true')
+    parser.add_argument('--role-matrix',action='store_true')
     args=parser.parse_args()
-    asyncio.run(seed(args.multiple_papers))
+    asyncio.run(seed(args.multiple_papers,args.role_matrix))
     try:
         DisposableServer(uvicorn.Config(app,host='127.0.0.1',port=args.port,log_level='warning')).run()
     finally:

@@ -45,7 +45,10 @@ with sync_playwright() as p:
         page.wait_for_function('!!window.KGWorkspaceInk && !!window.KGMultiQuestionWorkspace')
         ink=page.locator('#qwInkBtn');undo=page.locator('#qwUndoBtn');redo=page.locator('#qwRedoBtn')
         expect(ink).to_be_visible();expect(undo).to_be_visible();expect(redo).to_be_visible()
-        assert page.evaluate('getComputedStyle(document.querySelector("#qwInkBtn"),"::after").content')=='"画笔·文字"'
+        expect(ink).to_have_attribute('aria-label','画笔与文字工具')
+        assert '画笔' in (ink.get_attribute('title') or ink.get_attribute('data-tooltip') or '')
+        expect(ink.locator('svg')).to_have_count(1)
+        assert page.evaluate('getComputedStyle(document.querySelector("#qwInkBtn"),"::after").content') in ('none','normal','""')
         page.locator('#qwQuestionDockBtn').click()
         page.locator('[data-add-index]').first.click()
         page.keyboard.press('Escape')

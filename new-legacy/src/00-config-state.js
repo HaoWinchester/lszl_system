@@ -304,7 +304,8 @@ function persistCurrentGraphNow(options={}){
     if(remote&&remote.active&&remote.active()){
       // A preview has no server file: panning/zooming alone must not create one.
       if(!remote.getCurrentFileMeta()&&previewContentSnapshot===graphContentSnapshot(snapshot))return true;
-      return remote.save(snapshot,options).then(()=>{lastSavedSnapshot=json;return true}).catch(error=>{
+      // Title and filename share one persisted value, including retries after a failed rename.
+      return remote.save(snapshot,{...options,name:options.name??snapshot.meta?.title}).then(()=>{lastSavedSnapshot=json;return true}).catch(error=>{
         console.warn('[KGGraphFileRemoteAdapter] save failed',error);
         if(!options.silent)showStatus('保存失败：请检查网络后重试。');
         return false;

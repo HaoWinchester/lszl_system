@@ -8,12 +8,98 @@ function fixture(){
  return context;
 }
 const plain=p=>JSON.parse(JSON.stringify(p));
+function endpointFixture(link,options={}){
+ const c=fixture();if(options.setup)options.setup(c);
+ const p=c.linkRenderPoints(link),geometry=c.linkPathGeometry(link,p.a,p.b,p),side=options.side||'to',target=c.nodeById(options.targetId===undefined?(link.to==='c'?'b':'c'):options.targetId);
+ Object.assign(c,{edgeEndpointDrag:{pointerId:1,linkId:link.id,side,startClient:plain(side==='from'?p.a:p.b),history:false,moved:false,historyController:{checkpoint(){}}},edgeEndpointDragFrame:0,edgeEndpointDragPoint:null,linkById:()=>link,edgeDomById:new Map([[link.id,{geometry}]]),getGraphIndex:()=>({nodeMap:null}),edgeEndpointTargetFromClient:()=>target,setEdgeEndpointBindTarget(){},clearEdgeEndpointBindTarget(){},updateLinkGeometry(){},invalidateGraphIndexCache(){},stage:{classList:{remove(){}}},finishGraphGestureHistory(drag,cancelled){if(cancelled)c.restoreEdgeRoute(link,drag.original)},save(){},renderDetails(){},renderSelectedEdgeControls(){},renderSelectedEdgeQuickStylePanel(){},showStatus(){}});
+ vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'../src/graph/graph-persistence.js'),'utf8'),c);
+ vm.runInContext(source.slice(source.indexOf('function edgeRouteSnapshot('),source.indexOf('function translateEdgePoint(')),c);
+ vm.runInContext(source.slice(source.indexOf('function applyEdgeEndpointDragPoint('),source.indexOf('function scheduleEdgeEndpointDrag(')),c);
+ vm.runInContext(source.slice(source.indexOf('function finishEdgeEndpointDrag('),source.indexOf('function createEdgeEndpointHandle(')),c);
+ c.edgeEndpointDrag.original=c.edgeRouteSnapshot(link);
+ return c;
+}
+const endpointEvent=()=>({pointerId:1,preventDefault(){},stopPropagation(){}});
 test('mirrored right branches share a parent attachment and mirrored curve controls including a primary midpoint',()=>{
  const c=fixture();const shapes=['b','c'].map(to=>{const l={from:'a',to,pathStyle:'curve'},p=c.linkRenderPoints(l);return c.linkPathGeometry(l,p.a,p.b,p)});
  assert.equal(shapes[0].endpoints[0].x,shapes[1].endpoints[0].x);assert.equal(shapes[0].endpoints[0].y,shapes[1].endpoints[0].y);
  shapes[0].samples.forEach((p,i)=>{assert.equal(p.x,shapes[1].samples[i].x);assert.ok(Math.abs(p.y+shapes[1].samples[i].y-80)<1e-8)});
  assert.equal(shapes[0].controls.filter(p=>p.kind==='curve-midpoint').length,1);
  assert.equal(new Set(shapes[0].controls.map(p=>p.index)).size,shapes[0].controls.length,'every visible curve handle has a unique DOM index');
+});
+test('automatic left and right fans bend toward each child with horizontal tangents at both cards',()=>{
+ for(const x of [-300,300]){
+  const c=fixture(),child=c.nodeById('b');child.x=x;
+  for(const y of [-160,-80,0,80,160]){
+   child.y=y;const link={from:'a',to:'b',pathStyle:'curve'},p=c.linkRenderPoints(link),g=c.linkPathGeometry(link,p.a,p.b,p);
+   assert.deepEqual(plain(g.endpoints),[{x:x>0?120:0,y:40},{x:x>0?300:-180,y:y+40}]);
+   assert.equal(g.curveControls[0].y,40);assert.equal(g.curveControls[1].y,y+40);
+   assert.ok((g.curveControls[0].x-g.endpoints[0].x)*Math.sign(x)>0,'source tangent points toward the fan');
+   assert.ok((g.endpoints[1].x-g.curveControls[1].x)*Math.sign(x)>0,'target tangent approaches the child horizontally');
+   g.samples.forEach((point,index,all)=>{if(index)assert.ok((point.y-all[index-1].y)*Math.sign(y)>=0,'every branch moves toward its child without an opposite bow')});
+   assert.equal(link.curveControls,undefined,'fan rendering must leave automatic routes derived');
+  }
+ }
+});
+for(const ports of [{},{fromPort:'right',toPort:'left'}])for(const [from,to,y] of [['c','b',200],['b','c',-120]]){
+ test(`rebinding an automatic ${from==='c'?'upper branch below':'lower branch above'} the parent follows its new target with ${ports.fromPort?'fixed':'automatic'} side ports`,()=>{
+  const link={id:'branch',from:'a',to:from,pathStyle:'curve',...ports},c=endpointFixture(link),original=c.edgeRouteSnapshot(link);
+  c.applyEdgeEndpointDragPoint({clientX:300,clientY:y,world:{x:300,y}});
+  assert.equal(c.bindLinkEndpoint(link,'to',c.edgeEndpointDrag.targetId),true);
+  assert.equal(link.to,to);
+  const next=c.linkRenderPoints(link),after=c.linkPathGeometry(link,next.a,next.b,next);
+  assert.ok(after.samples.every(point=>point.y>=Math.min(40,y)&&point.y<=Math.max(40,y)),'the curve must stay between the new card attachments instead of bowing toward the old target');
+  assert.equal(link.curveControls,undefined,'moving an endpoint must not freeze a previously automatic cubic');
+  c.restoreEdgeRoute(link,original);
+  assert.equal(link.to,from);assert.equal(link.curveControls,undefined,'cancel/undo restores automatic routing');
+  assert.equal(link.fromPort,ports.fromPort||'auto');assert.equal(link.toPort,ports.toPort||'auto');
+ });
+}
+test('rebinding to the same card retains manually bent controls and route restoration',()=>{
+ const controls=[{x:170,y:-50},{x:250,y:-200}],link={id:'manual',from:'a',to:'c',fromPort:'right',toPort:'left',pathStyle:'curve',curveControls:plain(controls)},c=endpointFixture(link,{targetId:'c'}),original=c.edgeRouteSnapshot(link);
+ c.applyEdgeEndpointDragPoint({clientX:300,clientY:-100,world:{x:300,y:-100}});c.finishEdgeEndpointDrag(endpointEvent());
+ assert.deepEqual(plain(link.curveControls),controls);assert.equal(link.to,'c');assert.equal(link.fromPort,'right');assert.equal(link.toPort,'left');
+ c.restoreEdgeRoute(link,original);assert.deepEqual(plain(c.edgeRouteSnapshot(link)),plain(original));
+});
+for(const [from,to,y,controls] of [
+ ['c','b',337,[{x:-213.653,y:108.623},{x:-162.648,y:30.696}]],
+ ['b','c',81,[{x:-213.653,y:309.377},{x:-162.648,y:387.304}]]
+])test(`rebinding a legacy stored ${from==='c'?'upper curve below':'lower curve above'} recalculates its bow and undo restores the old route`,()=>{
+ const link={id:'legacy',from:'a',to:from,fromPort:'auto',toPort:'auto',pathStyle:'curve',curveControls:plain(controls)},c=endpointFixture(link,{setup(c){
+  Object.assign(c.nodeById('a'),{x:-424,y:143,w:128,h:132});Object.assign(c.nodeById('c'),{x:-64,y:15,w:128,h:132});Object.assign(c.nodeById('b'),{x:-64,y:271,w:128,h:132});
+ }}),original=c.edgeRouteSnapshot(link);
+ c.applyEdgeEndpointDragPoint({clientX:-64,clientY:y,world:{x:-64,y}});c.finishEdgeEndpointDrag(endpointEvent());
+ const p=c.linkRenderPoints(link),g=c.linkPathGeometry(link,p.a,p.b,p);
+ assert.equal(link.to,to);assert.ok(g.samples.every(point=>point.y>=Math.min(209,y)&&point.y<=Math.max(209,y)),'old controls must not pull the new branch toward the former card');
+ assert.equal(link.curveControls,undefined);assert.equal(g.curveControls[0].y,209);assert.equal(g.curveControls[1].y,y);
+ assert.equal(link.fromPort,'auto');assert.equal(link.toPort,'auto');
+ c.restoreEdgeRoute(link,original);assert.deepEqual(plain(c.edgeRouteSnapshot(link)),plain(original),'undo recovers the precise legacy controls and original binding');
+});
+test('rebinding the source to a different card recalculates the stored curve too',()=>{
+ const link={id:'source',from:'c',to:'a',pathStyle:'curve',curveControls:[{x:250,y:-200},{x:170,y:-50}]},c=endpointFixture(link,{side:'from',targetId:'b'});
+ c.applyEdgeEndpointDragPoint({clientX:300,clientY:200,world:{x:300,y:200}});c.finishEdgeEndpointDrag(endpointEvent());
+ const p=c.linkRenderPoints(link),g=c.linkPathGeometry(link,p.a,p.b,p);
+ assert.equal(link.from,'b');assert.ok(g.samples.every(point=>point.y>=40&&point.y<=200));assert.equal(link.curveControls,undefined);
+});
+test('binding a previously free endpoint preserves its manually drawn path',()=>{
+ const controls=[{x:170,y:-50},{x:250,y:-200}],link={id:'free',from:'a',to:'',toPoint:{x:300,y:-120},pathStyle:'curve',curveControls:plain(controls)},c=endpointFixture(link,{targetId:'b'});
+ c.applyEdgeEndpointDragPoint({clientX:300,clientY:200,world:{x:300,y:200}});c.finishEdgeEndpointDrag(endpointEvent());
+ assert.equal(link.to,'b');assert.deepEqual(plain(link.curveControls),controls);
+});
+test('detaching a bound endpoint into free space preserves its manually drawn path',()=>{
+ const controls=[{x:170,y:-50},{x:250,y:-200}],link={id:'detach',from:'a',to:'c',pathStyle:'curve',curveControls:plain(controls)},c=endpointFixture(link,{targetId:null});
+ c.applyEdgeEndpointDragPoint({clientX:300,clientY:200,world:{x:300,y:200}});c.finishEdgeEndpointDrag(endpointEvent());
+ assert.equal(link.to,'');assert.deepEqual(plain(link.curveControls),controls);
+});
+test('cancelling a stored curve rebind restores the original binding and controls',()=>{
+ const link={id:'cancel',from:'a',to:'c',pathStyle:'curve',curveControls:[{x:170,y:-50},{x:250,y:-200}]},c=endpointFixture(link),original=c.edgeRouteSnapshot(link);
+ c.applyEdgeEndpointDragPoint({clientX:300,clientY:200,world:{x:300,y:200}});c.finishEdgeEndpointDrag(endpointEvent(),true);
+ assert.deepEqual(plain(c.edgeRouteSnapshot(link)),plain(original));
+});
+test('rebinding an automatic elbow still persists its complete orthogonal route',()=>{
+ const link={id:'elbow',from:'a',to:'c',pathStyle:'elbow'},c=endpointFixture(link);
+ c.applyEdgeEndpointDragPoint({clientX:300,clientY:200,world:{x:300,y:200}});c.finishEdgeEndpointDrag(endpointEvent());
+ assert.deepEqual(plain(link.waypoints),[{x:210,y:40},{x:210,y:-120}]);assert.equal(link.curveControls,undefined);
 });
 test('a short body drag bends the bound curve without detaching cards',()=>{
  const c=fixture(),link={id:'ab',from:'a',to:'b',pathStyle:'curve'},p=c.linkRenderPoints(link),geometry=c.linkPathGeometry(link,p.a,p.b,p);
@@ -28,6 +114,27 @@ test('segment dragging moves a complete orthogonal elbow segment, not a single c
  vm.runInContext(source.slice(source.indexOf('function applyEdgeControlDragPoint('),source.indexOf('function scheduleEdgeControlDrag(')),c);
  c.applyEdgeControlDragPoint({x:216,y:124});assert.deepEqual(plain(link.waypoints),[{x:216,y:40},{x:216,y:200}]);assert.equal(link.from,'a');assert.equal(link.to,'b');
  c.applyEdgeControlDragPoint({x:210,y:120});assert.deepEqual(plain(link.waypoints),[{x:210,y:40},{x:210,y:200}]);
+});
+for(const kind of ['segment','body'])for(const vertical of [false,true])test(`a ${vertical?'vertical':'horizontal'} elbow ${kind} drag along its locked axis creates no route data or history`,()=>{
+ const link={id:'locked',from:'a',to:'b',pathStyle:'elbow'},c=endpointFixture(link,{setup(c){if(vertical)Object.assign(c.nodeById('b'),{x:100,y:300})}}),original=c.edgeRouteSnapshot(link),p=c.linkRenderPoints(link),geometry=c.linkPathGeometry(link,p.a,p.b,p);
+ const startWorld=vertical?{x:110,y:190}:{x:210,y:120},lockedPoint=vertical?{x:119,y:190}:{x:210,y:129};
+ vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'../src/graph/history-controller.js'),'utf8'),c);
+ const history=c.window.KGGraphHistoryController.create({capture:()=>c.edgeRouteSnapshot(link),restore:snapshot=>c.restoreEdgeRoute(link,snapshot)});
+ history.begin('drag');if(kind==='segment')history.checkpoint('drag');
+ Object.assign(c,{state:{viewport:{scale:1}},stage:{classList:{add(){},remove(){}}},hideEdgeHoverFeedback(){},finishGraphGestureHistory(drag,cancelled){return cancelled?history.rollback():history.commit()},translateEdgePoint:(p,x,y)=>({x:p.x+x,y:p.y+y})});
+ if(kind==='segment'){
+  link.waypoints=plain(geometry.waypoints);
+  c.edgeControlDrag={pointerId:1,linkId:link.id,kind:'segment',index:1,startWorld,geometry,moved:false,historyController:history};
+  vm.runInContext(source.slice(source.indexOf('function applyEdgeControlDragPoint('),source.indexOf('function createEdgeControlHandle(')),c);
+  Object.assign(c,{edgeControlDragFrame:0,edgeControlDragPoint:null});
+  c.applyEdgeControlDragPoint(lockedPoint);c.finishEdgeControlDrag(endpointEvent());
+ }else{
+  c.edgeMoveDrag={pointerId:1,linkId:link.id,startWorld,startClient:startWorld,geometry,moved:false,history:false,historyController:history};
+  Object.assign(c,{edgeMoveDragFrame:0,edgeMoveDragPoint:null,selectEdgeForDirectManipulation(){},performance:{now:()=>0}});
+  vm.runInContext(source.slice(source.indexOf('function applyEdgeMoveDragPoint('),source.indexOf('function clearEdgeEndpointBindTarget(')),c);
+  c.applyEdgeMoveDragPoint(lockedPoint);c.finishEdgeMoveDrag(endpointEvent());
+ }
+ assert.deepEqual(plain(c.edgeRouteSnapshot(link)),plain(original));assert.equal(history.getState().undoCount,0);
 });
 
 test('outer segment movement beyond twelve corners renders every orthogonal segment',()=>{

@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.permissions import can
 from app.models.question import Question, QuestionBank
+from app.models.paper_release import PaperReleaseQuestion
 from app.models.subscription import Subscription
 from app.models.training import (
     RecallLibrarySnapshot,
@@ -275,6 +276,35 @@ def progress_payload(progress: RecallProgress, *, read_only: bool = False) -> di
     }
 
 
+async def _compatible_legacy_progress(
+    db: AsyncSession, owner: str, question: RecallQuestionSnapshot,
+    release_id: str, *, for_update: bool = False,
+) -> RecallProgress | None:
+    """Read old unscoped work only when its publication identity is unambiguous.
+
+    An edit forks into the release scope; the historical row remains untouched.
+    Multiple releases sharing a question must never share learner state implicitly.
+    """
+    if not release_id:
+        return None
+    releases = (await db.execute(select(PaperReleaseQuestion.release_id).where(
+        PaperReleaseQuestion.question_id == question.question_id,
+    ))).scalars().all()
+    if set(releases) != {release_id}:
+        return None
+    query = select(RecallProgress).where(
+        RecallProgress.owner_id == owner,
+        RecallProgress.question_id == question.question_id,
+        RecallProgress.release_id.is_(None),
+        RecallProgress.bank_id == question.bank_id,
+        RecallProgress.source_question_revision == question.question_revision,
+        RecallProgress.source_content_hash == question.content_hash,
+    )
+    if for_update:
+        query = query.with_for_update()
+    return (await db.execute(query)).scalar_one_or_none()
+
+
 async def get_session(
     db: AsyncSession,
     user: User,
@@ -309,6 +339,10 @@ async def get_session(
             release_filter,
         ))
     ).scalar_one_or_none()
+    if progress is None:
+        progress = await _compatible_legacy_progress(
+            db, user.username, question_snapshot, release_id
+        )
     mismatch = bool(
         progress
         and (
@@ -424,6 +458,11 @@ async def save_progress(
             .with_for_update()
         )
     ).scalar_one_or_none()
+    if progress is None:
+        progress = await _compatible_legacy_progress(
+            db, user.username, question_snapshot, release_id, for_update=True
+        )
+    inherited = bool(progress is not None and release_id and progress.release_id is None)
     current_revision = int(progress.revision or 0) if progress else 0
     if request.expected_revision != current_revision:
         raise _error(
@@ -433,7 +472,18 @@ async def save_progress(
             currentRevision=current_revision,
         )
 
-    if progress is None:
+    if progress is not None and (
+        int(progress.source_question_revision or 0) != question_snapshot.question_revision
+        or str(progress.source_content_hash or "") != question_snapshot.content_hash
+        or str(progress.recall_library_hash or "") != library_snapshot.content_hash
+    ):
+        raise _error(
+            409,
+            "recall_history_requires_reset",
+            "当前为历史回忆图，请明确重置后再按新版本保存",
+        )
+
+    if progress is None or inherited:
         progress = RecallProgress(
             owner_id=user.username, question_id=question_id, release_id=release_id or None
         )
@@ -490,6 +540,11 @@ async def reset_progress(
             .with_for_update()
         )
     ).scalar_one_or_none()
+    if progress is None:
+        progress = await _compatible_legacy_progress(
+            db, user.username, question_snapshot, release_id, for_update=True
+        )
+    inherited = bool(progress is not None and release_id and progress.release_id is None)
     current_revision = int(progress.revision or 0) if progress else 0
     if request.expected_revision != current_revision:
         raise _error(
@@ -498,7 +553,7 @@ async def reset_progress(
             "深度回忆已在其他页面更新，请重新载入",
             currentRevision=current_revision,
         )
-    if progress is None:
+    if progress is None or inherited:
         progress = RecallProgress(
             owner_id=user.username, question_id=question_id, release_id=release_id or None
         )

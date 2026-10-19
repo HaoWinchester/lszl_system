@@ -110,12 +110,22 @@
       dialog.querySelector("#learningEntryDismissBtn"),
     ].filter(Boolean);
   }
-  function setPageInert(doc, dialogRoot, inert) {
-    Array.from(doc.body.children).forEach(child => {
-      if (child === dialogRoot) return;
+  function setPageInert(doc, dialogRoot) {
+    const previous = [];
+    // Disable siblings along the dialog's ancestor path, including a fullscreen
+    // canvas host, while keeping every ancestor needed to operate it active.
+    for (let branch = dialogRoot; branch && branch !== doc.body; branch = branch.parentNode) {
+      const parent = branch.parentNode; if (!parent) break;
+      Array.from(parent.children).forEach(child => {
+        if (child === branch) return;
+        previous.push({ child, inert: child.inert, hidden: child.getAttribute("aria-hidden") });
+        child.inert = true; child.setAttribute("aria-hidden", "true");
+      });
+    }
+    return () => previous.forEach(({ child, inert, hidden }) => {
       child.inert = inert;
-      if (inert) child.setAttribute("aria-hidden", "true");
-      else child.removeAttribute("aria-hidden");
+      if (hidden === null) child.removeAttribute("aria-hidden");
+      else child.setAttribute("aria-hidden", hidden);
     });
   }
   function restoreGraphFocus(doc) {
@@ -130,7 +140,7 @@
     const current = active;
     global.KGLearningWeeklyOpen?.stopEntryCountdowns?.();
     current.document.removeEventListener("keydown", current.onKeydown);
-    setPageInert(current.document, current.root, false);
+    current.restorePage(); current.unmount();
     if (current.created) current.root.remove();
     else { current.root.classList.remove("show"); current.root.hidden = true; current.root.setAttribute("aria-hidden", "true"); }
     active = null;
@@ -213,9 +223,13 @@
       const next = event.shiftKey ? (index <= 0 ? items.length - 1 : index - 1) : (index === items.length - 1 ? 0 : index + 1);
       event.preventDefault(); items[next].focus();
     };
+    let restorePage = () => {};
+    const syncBackground = () => { restorePage(); restorePage = setPageInert(doc, root); };
+    const unmount = global.KGCanvasDomInteraction?.mountOverlay?.(root, undefined, syncBackground) || (() => {});
+    syncBackground();
     const fetchImpl = options.fetch || global.fetch;
-    active = { document: doc, root, dialog, error, onKeydown, location: options.location || global.location, fetch: fetchImpl, fetchReceiver: fetchImpl === global.fetch ? global : undefined, restoreFocus: doc.activeElement, created };
-    setPageInert(doc, root, true); doc.addEventListener("keydown", onKeydown); focusChoices()[0].focus();
+    active = { document: doc, root, dialog, error, onKeydown, location: options.location || global.location, fetch: fetchImpl, fetchReceiver: fetchImpl === global.fetch ? global : undefined, restoreFocus: doc.activeElement, created, restorePage: () => restorePage(), unmount };
+    doc.addEventListener("keydown", onKeydown); focusChoices()[0].focus();
     return dialog;
   }
 

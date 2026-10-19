@@ -82,12 +82,13 @@
       status.classList.add("show");
       clearTimeout(setStatus.timer);
       setStatus.timer = setTimeout(() => status.classList.remove("show"), 2200);
-    }
+    }else{window.KGSubscription?.showSubscriptionMessage?.(message);}
   }
   function clamp(value, min, max){
     return Math.max(min, Math.min(max, value));
   }
   function applySavedPosition(el){
+    if(!el)return;
     const pos = readJSON(STORAGE_POS, null);
     if(pos && typeof pos.x === "number" && typeof pos.y === "number"){
       const rect = el.getBoundingClientRect();
@@ -101,8 +102,20 @@
       el.style.top = y + "px";
       el.style.right = "auto";
       el.style.bottom = "auto";
+    }else{
+      el.style.left='';el.style.top='';el.style.right='';el.style.bottom='';
+    }
+    const layout=window.KGCanvasFloatingToolbarController,box=el.getBoundingClientRect();
+    const obstacles=[...document.querySelectorAll('.uc-minimap-dock,.canvas-zoom-dock,.lp-canvas-zoom-dock,#krSessionStats,#floatingToolbox')].filter(item=>{
+      const style=getComputedStyle(item);return !item.hidden&&style.display!=='none'&&style.visibility!=='hidden';
+    }).map(item=>item.getBoundingClientRect()).filter(rect=>rect.width&&rect.height);
+    const overlap=obstacles.find(rect=>box.left<rect.right+8&&box.right>rect.left-8&&box.top<rect.bottom+8&&box.bottom>rect.top-8);
+    if(overlap&&layout?.placePopover){
+      const next=layout.placePopover({bounds:{left:0,top:0,right:innerWidth,bottom:innerHeight},anchor:{...overlap,left:box.left,right:box.right,top:overlap.top,bottom:overlap.bottom},width:box.width,height:box.height,avoidRects:obstacles});
+      el.style.left=next.left+'px';el.style.top=next.top+'px';el.style.right='auto';el.style.bottom='auto';
     }
     refreshTooltipSides(el);
+    layout?.repositionAll?.();
   }
   function refreshTooltipSides(el){
     if(!el)return;
@@ -145,6 +158,7 @@
       dragging = false;
       el.classList.remove("dragging");
       savePosition(el);
+      applySavedPosition(el);
       setTimeout(() => { moved = false; }, 0);
       document.removeEventListener("pointermove", move);
       document.removeEventListener("pointerup", up);
@@ -196,7 +210,8 @@
     if(label) label.textContent = next === "horizontal" ? "水平排布" : "纵向排布";
   }
 
-  function openItem(event, item){
+  let leaving=false;
+  async function openItem(event, item){
     if(isCurrent(item)){
       event.preventDefault();
       setStatus("当前已经在" + item.label + "。");
@@ -207,6 +222,24 @@
       setStatus("当前角色无“" + item.label + "”权限。");
       return;
     }
+    const routes=window.KGLearningRouteContext;
+    const mode={workspace:'multi_question_canvas',recall:'deep_recall'}[item.id];
+    const currentMode={'question-workspace.html':'multi_question_canvas','knowledge-recall.html':'deep_recall'}[currentPage()];
+    if(mode&&routes?.resumeHref){
+      if(currentMode)routes.remember(routes.parse({mode:currentMode}));
+      event.currentTarget.setAttribute('href',routes.resumeHref(item.href,mode));
+    }
+    // Opening another tab leaves this editor alive; ordinary navigation must wait for its drafts.
+    if(!currentMode||!window.KGLearningProgress?.prepareLeave||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;
+    event.preventDefault();
+    if(leaving)return;
+    const link=event.currentTarget;leaving=true;link.setAttribute('aria-busy','true');setStatus('正在保存当前画布…');
+    try{
+      if(!await window.KGLearningProgress.prepareLeave(currentMode)){setStatus('当前内容尚未保存，请保存后重试。');return;}
+      location.assign(link.href);
+    }catch(error){
+      setStatus(error?.message||'当前内容尚未保存，请检查网络后重试。');
+    }finally{leaving=false;link.removeAttribute('aria-busy');}
   }
   function render(){
     const existing = document.getElementById("kgGlobalShortcuts");
@@ -277,6 +310,8 @@
       if(!event.key || event.key.indexOf("kg_local_") === 0 || event.key === STORAGE_POS || event.key === STORAGE_LAYOUT) render();
     });
     window.addEventListener("kg-role-theme-change", render);
+    window.addEventListener('kg:canvas-runtime-created',()=>requestAnimationFrame(()=>applySavedPosition(document.getElementById('kgGlobalShortcuts'))));
+    document.addEventListener('click',event=>{if(event.target.closest?.('.uc-minimap-toggle'))requestAnimationFrame(()=>applySavedPosition(document.getElementById('kgGlobalShortcuts')))});
     window.addEventListener("kg-wechat-login-success", () => setTimeout(render, 300));
     document.addEventListener("click", event => {
       const target = event.target && event.target.closest && event.target.closest("#authDoLoginBtn,#authRegisterBtn,#authLogoutBtn,#umSaveUserBtn,#umDeleteUserBtn,#umArchiveUserBtn,#umRestoreUserBtn,#umSetActiveBtn,#umSetPausedBtn");
@@ -291,5 +326,5 @@
   if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();
 
-  window.KGGlobalShortcuts = {render, readLayout};
+  window.KGGlobalShortcuts = {render, readLayout,reposition:()=>applySavedPosition(document.getElementById('kgGlobalShortcuts'))};
 })();

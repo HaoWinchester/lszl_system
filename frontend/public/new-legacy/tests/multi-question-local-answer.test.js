@@ -15,7 +15,7 @@ const adapter = read('../frontend/scripts/new-legacy-assets/practice-learning-ad
   '', '');
 const adapterSrc = fs.readFileSync(path.resolve(ROOT, '..', 'frontend', 'scripts', 'new-legacy-assets', 'practice-learning-adapter.js'), 'utf8');
 const recall = read('src/86-knowledge-recall.js');
-const css = read('styles/knowledge-recall-p4537.css');
+const css = read('styles/knowledge-recall-patch-2.css');
 const html = read('knowledge-recall.html');
 
 // ① 本地判题：快照 correctAnswer 优先，节点兜底
@@ -34,13 +34,13 @@ assert.match(controller, /void flushAnswerQueue\(\);return true\}/);
 // ④ adapter keepalive（pagehide 时请求存活）
 assert.match(adapterSrc, /keepalive: true/);
 assert.match(adapterSrc, /options\.skipRefresh !== true/);
-// ⑤ 右键菜单文案：三页统一"文字高清"
-assert.match(menu, /actionButton\('refresh','文字高清',ICONS\.refresh/);
+// ⑤ 右键不再提供文字高清/刷新操作
+assert.doesNotMatch(menu, /文字高清|actionButton\('refresh'/);
 assert.doesNotMatch(menu, /'刷新'/);
 // ⑥ 深度回忆：防抖 1200ms + 保存提醒默认隐藏仅失败显示
 assert.match(recall, /progressSaveTimer=setTimeout\(\(\)=>\{progressSaveTimer=0;void writeProgressNow\(\)\},1200\)/);
 assert.match(css, /\.kr-save-status\{display:none\}/);
 assert.match(css, /\[data-state="failed"\],[\s\S]*?\[data-state="conflict"\]\{display:inline-flex\}/);
-assert.match(html, /styles\/knowledge-recall-p4537\.css/);
+assert.match(html, /styles\/knowledge-recall-patch-2\.css/);
 
 console.log('multi-question-local-answer-ok');

@@ -359,7 +359,7 @@ function linkPathGeometry(link,a,b,points=null){
     const stored=normalizedEdgePoints(link&&link.waypoints),derived=!stored.length&&!detour;
     let waypoints=stored.length?stored:(detour||defaultElbowWaypoints(start,end,direction));
     // 多线汇总：自动派生的折线中间段吸附到共享通道坐标，使近似平行的主干段完全重合（不回写持久数据）。
-    if(derived&&points?.mainGraph){const channel=currentEdgeBundlePlan()?.channels?.get(String(link?.id));if(Number.isFinite(channel)){const axis=Math.abs(end.x-start.x)>=Math.abs(end.y-start.y)?'x':'y';waypoints=waypoints.map(p=>({...p,[axis]:channel}))}}
+    if(derived&&points?.mainGraph){const channel=(points.bundlePlan||currentEdgeBundlePlan())?.channels?.get(String(link?.id));if(Number.isFinite(channel)){const axis=Math.abs(end.x-start.x)>=Math.abs(end.y-start.y)?'x':'y';waypoints=waypoints.map(p=>({...p,[axis]:channel}))}}
     const samples=[start,...waypoints,end];
     return{style,d:edgePathFromPoints(samples),samples,bounds:edgeGeometryBounds(samples),endpoints:[start,end],waypoints,controls:window.KGGraphEdgeGeometry.segmentHandles(start,waypoints,end),derivedWaypoints:!stored.length};
   }
@@ -531,7 +531,7 @@ async function openRelatedCanvasModal(showMessage=true){
   const ids=selectedNodeIds.size?[...selectedNodeIds]:state.selectedNodeId?[state.selectedNodeId]:[];
   if(!ids.length){showStatus('请先选择一个或多个知识卡片。');return false}
   if(['nodeModal','linkModal','graphModal'].some(id=>document.getElementById(id)?.classList.contains('show'))){showStatus('请先完成或取消当前编辑表单，再打开临时画布。');return false}
-  relatedCanvasOpening=true;const generation=relatedCanvasGeneration,formalState=state;
+  relatedCanvasOpening=true;const generation=relatedCanvasGeneration,formalState=state,readOnly=!canWriteGraph();
   try{
     const initialDraft=nodeInlineTextEditorController?.current();
     const initialEdgeDraft=edgeInlineLabelEditingId&&edgeInlineLabelEditorEl?.classList.contains('show')?{id:edgeInlineLabelEditingId,value:edgeInlineLabelEditorEl.querySelector('input').value}:null;
@@ -547,10 +547,12 @@ async function openRelatedCanvasModal(showMessage=true){
       }
       showStatus('正式图谱保存失败，已保留当前会话与编辑输入。');return false;
     }
-    if(window.KGHomeInk?.hasTextDraft?.()&&await window.KGHomeInk.commitText()===false)return saveFailed();
-    await nodeInlineTextEditorController?.commit();if(nodeInlineTextEditorController?.isEditing())return saveFailed();commitEdgeInlineLabelEditor();
+    if(!readOnly){
+      if(window.KGHomeInk?.hasTextDraft?.()&&await window.KGHomeInk.commitText()===false)return saveFailed();
+      await nodeInlineTextEditorController?.commit();if(nodeInlineTextEditorController?.isEditing())return saveFailed();commitEdgeInlineLabelEditor();
+    }
     const autosave=window.KGGraphFileAutosave;
-    if(autosave){
+    if(autosave&&!readOnly){
       let needsSave=true;
       while(needsSave){
         if(await autosave.saveNow({force:true,reason:'before-temporary'})===false)return saveFailed();
@@ -566,7 +568,7 @@ async function openRelatedCanvasModal(showMessage=true){
     if(!graph.nodes.length)return false;
     closeRelatedCanvasModal();
     const session=window.KGGraphSession.create({kind:'temporary',graph});
-    relatedCanvasController=window.KGRelatedCanvasController.create({session,initialNodeId:ids[0],renderImages:n=>graphImagesMarkup(n,true),model:window.KGGraphModel,nodeDims,idFactory:uid,renderCard:(n,context)=>renderCardElement(n,null,context),renderRelation:createGraphRelationPresentation,layoutEndpoints:(link,map)=>linkRenderPoints(link,map,{ignoreGather:true}),ensureMarkers:ensureGraphEdgeMarkers,onClose:()=>closeRelatedCanvasModal(true),readOnly:window.KGHomeInteractionModes?.getMode?.()==='reading'});
+    relatedCanvasController=window.KGRelatedCanvasController.create({session,initialNodeId:ids[0],renderImages:n=>graphImagesMarkup(n,true),model:window.KGGraphModel,nodeDims,idFactory:uid,renderCard:(n,context)=>renderCardElement(n,null,context),renderRelation:createGraphRelationPresentation,layoutEndpoints:(link,map)=>linkRenderPoints(link,map,{ignoreGather:true}),ensureMarkers:ensureGraphEdgeMarkers,onClose:()=>closeRelatedCanvasModal(true),readOnly});
     relatedCanvasModalEl=relatedCanvasController.overlay;
     nodeStyleToolbarController?.hide();
     if(showMessage)showStatus(`已打开临时相关画布：${graph.nodes.length} 张卡片；关闭即丢弃修改。`);
@@ -912,13 +914,15 @@ function beginEdgeMoveDrag(event,linkId){
 }
 function applyEdgeMoveDragPoint(point){
   const drag=edgeMoveDrag;if(!drag)return;const link=linkById(drag.linkId),dom=edgeDomById.get(drag.linkId);if(!link||!dom)return;
-  const dx=point.x-drag.startWorld.x,dy=point.y-drag.startWorld.y;if(!drag.moved&&Math.hypot(dx,dy)<5/Math.max(.01,state.viewport.scale))return;
+  const dx=point.x-drag.startWorld.x,dy=point.y-drag.startWorld.y,geometry=drag.geometry;
+  const segmentIndex=geometry.waypoints&&(link.from||link.to)?window.KGGraphEdgeGeometry.nearestSegmentIndex(drag.startWorld,[geometry.endpoints[0],...geometry.waypoints,geometry.endpoints[1]]):-1;
+  const segment=segmentIndex>=0?window.KGGraphEdgeGeometry.segmentHandles(geometry.endpoints[0],geometry.waypoints,geometry.endpoints[1]).find(handle=>handle.index===segmentIndex):null;
+  if(!drag.moved&&(segment?Math.abs(segment.axis==='x'?dx:dy):Math.hypot(dx,dy))<5/Math.max(.01,state.viewport.scale))return;
   if(!drag.history){drag.historyController.checkpoint('移动关系线');drag.history=true;selectEdgeForDirectManipulation(drag.linkId,{clientX:drag.startClient.x,clientY:drag.startClient.y})}
-  drag.moved=true;const geometry=drag.geometry;
+  drag.moved=true;
   if(link.from||link.to){
     if(geometry.waypoints){
-      const index=window.KGGraphEdgeGeometry.nearestSegmentIndex(drag.startWorld,[geometry.endpoints[0],...geometry.waypoints,geometry.endpoints[1]]);
-      if(index>=0)link.waypoints=window.KGGraphEdgeGeometry.moveElbowSegment(geometry.endpoints[0],geometry.endpoints[1],geometry.waypoints,index,{x:dx,y:dy});
+      if(segmentIndex>=0)link.waypoints=window.KGGraphEdgeGeometry.moveElbowSegment(geometry.endpoints[0],geometry.endpoints[1],geometry.waypoints,segmentIndex,{x:dx,y:dy});
       delete link.curveControls;
     }else{
       const start=geometry.endpoints[0],end=geometry.endpoints[1],controls=geometry.curveControls||[{x:start.x+(end.x-start.x)/3,y:start.y+(end.y-start.y)/3},{x:start.x+(end.x-start.x)*2/3,y:start.y+(end.y-start.y)*2/3}];
@@ -946,7 +950,12 @@ function finishEdgeMoveDrag(event,cancelled=false){
   if(drag.moved){event.preventDefault();event.stopPropagation()}return drag.moved;
 }
 function clearEdgeEndpointBindTarget(){if(edgeEndpointBindTargetId)cardElementByNodeId(edgeEndpointBindTargetId)?.classList.remove('edge-endpoint-bind-target');edgeEndpointBindTargetId='';ensureGraphViewportController()?.syncControlScale()}
-function edgeEndpointTargetFromClient(clientX,clientY){const element=document.elementFromPoint(clientX,clientY),card=element&&element.closest&&element.closest('.knowledge-card[data-node-id]');if(!card||!cardsLayer.contains(card))return null;const node=nodeById(card.dataset.nodeId);return node&&!isNodeFullyLocked(node)?node:null}
+function edgeEndpointTargetFromClient(clientX,clientY){
+  // The dragged endpoint follows the pointer and otherwise masks the card below it.
+  const element=document.elementsFromPoint(clientX,clientY).find(hit=>!hit.closest?.('.edge-controls-surface'));
+  const card=element?.closest?.('.knowledge-card[data-node-id]');if(!card||!cardsLayer.contains(card))return null;
+  const node=nodeById(card.dataset.nodeId);return node&&!isNodeFullyLocked(node)?node:null;
+}
 function setEdgeEndpointBindTarget(node){const id=node&&String(node.id)||'';if(id===edgeEndpointBindTargetId)return;clearEdgeEndpointBindTarget();if(id){edgeEndpointBindTargetId=id;cardElementByNodeId(id)?.classList.add('edge-endpoint-bind-target');ensureGraphViewportController()?.syncControlScale()}}
 function beginEdgeEndpointDrag(event,linkId,side){
   if(!graphModeAllows('edgeAdvanced'))return false;
@@ -959,7 +968,13 @@ function beginEdgeEndpointDrag(event,linkId,side){
 function applyEdgeEndpointDragPoint(payload){
   const drag=edgeEndpointDrag;if(!drag||!payload)return;const link=linkById(drag.linkId);if(!link)return;
   if(!drag.moved&&Math.hypot(payload.clientX-drag.startClient.x,payload.clientY-drag.startClient.y)<3)return;
-  if(!drag.history){drag.historyController.checkpoint('调整关系线端点');persistDerivedEdgeRoute(link,edgeDomById.get(drag.linkId)?.geometry);drag.history=true}
+  if(!drag.history){
+    drag.historyController.checkpoint('调整关系线端点');
+    const geometry=edgeDomById.get(drag.linkId)?.geometry;
+    // An automatic cubic follows its new target; only edited curves retain stored controls.
+    if(!geometry?.derivedCurveControls)persistDerivedEdgeRoute(link,geometry);
+    drag.history=true;
+  }
   drag.moved=true;setLinkFreeEndpoint(link,drag.side,payload.world);invalidateGraphIndexCache();const target=edgeEndpointTargetFromClient(payload.clientX,payload.clientY),otherId=drag.side==='from'?link.to:link.from;
   if(target&&target.id!==otherId){drag.targetId=target.id;setEdgeEndpointBindTarget(target)}else{drag.targetId='';clearEdgeEndpointBindTarget()}
   updateLinkGeometry(link,getGraphIndex().nodeMap);
@@ -972,10 +987,12 @@ function finishEdgeEndpointDrag(event,cancelled=false){
   const drag=edgeEndpointDrag;if(!drag||drag.pointerId!==event.pointerId)return;
   if(edgeEndpointDragFrame){cancelAnimationFrame(edgeEndpointDragFrame);edgeEndpointDragFrame=0}if(edgeEndpointDragPoint&&!cancelled)applyEdgeEndpointDragPoint(edgeEndpointDragPoint);edgeEndpointDragPoint=null;
   const link=linkById(drag.linkId);let bound=false;if(link&&!cancelled&&drag.moved&&drag.targetId)bound=bindLinkEndpoint(link,drag.side,drag.targetId);
+  // A different bound card defines a new curve; same-card and free endpoint edits keep their manual shape.
+  if(bound&&drag.original[drag.side]&&drag.original[drag.side]!==drag.targetId&&pathStyleForLink(link)==='curve')delete link.curveControls;
   if(!cancelled&&drag.moved){invalidateGraphIndexCache();if(link)updateLinkGeometry(link,getGraphIndex().nodeMap)}
   clearEdgeEndpointBindTarget();try{drag.handle?.releasePointerCapture?.(event.pointerId)}catch(error){}edgeEndpointDrag=null;stage.classList.remove('graph-edge-endpoint-dragging','is-interacting');
   finishGraphGestureHistory(drag,cancelled||!drag.moved);
-  if(!cancelled&&drag.moved){save();renderSelectedEdgeControls();renderSelectedEdgeQuickStylePanel();showStatus(bound?'关系线端点已重新绑定到节点。':'关系线端点已移动，当前保持未绑定状态。')}else if(cancelled)showStatus('已取消调整关系线端点。');event.preventDefault();event.stopPropagation();
+  if(!cancelled&&drag.moved){save();renderDetails();renderSelectedEdgeControls();renderSelectedEdgeQuickStylePanel();showStatus(bound?'关系线端点已重新绑定到节点。':'关系线端点已移动，当前保持未绑定状态。')}else if(cancelled)showStatus('已取消调整关系线端点。');event.preventDefault();event.stopPropagation();
 }
 function createEdgeEndpointHandle(link,side,point){
   const handle=svgElement('g','edge-endpoint-handle');handle.dataset.linkId=String(link.id);handle.dataset.edgeEndpointSide=side;handle.setAttribute('transform',`translate(${point.x} ${point.y})`);
@@ -997,7 +1014,11 @@ function beginEdgeControlDrag(event,linkId,kind,index){
 }
 function applyEdgeControlDragPoint(point){
   const drag=edgeControlDrag;if(!drag)return;const link=linkById(drag.linkId);if(!link)return;
-  if(drag.startWorld&&!drag.moved&&Math.hypot(point.x-drag.startWorld.x,point.y-drag.startWorld.y)<2/Math.max(.01,state.viewport.scale))return;
+  if(drag.startWorld&&!drag.moved){
+    const geometry=drag.geometry,segment=drag.kind==='segment'?window.KGGraphEdgeGeometry.segmentHandles(geometry.endpoints[0],geometry.waypoints,geometry.endpoints[1]).find(handle=>handle.index===drag.index):null;
+    const distance=segment?Math.abs(point[segment.axis]-drag.startWorld[segment.axis]):Math.hypot(point.x-drag.startWorld.x,point.y-drag.startWorld.y);
+    if(distance<2/Math.max(.01,state.viewport.scale))return;
+  }
   drag.moved=true;
   if(drag.kind==='straight-bend'){
     const geometry=drag.geometry,a=geometry.endpoints[0],b=geometry.endpoints[1],horizontal=Math.abs(b.x-a.x)>=Math.abs(b.y-a.y);
@@ -1947,7 +1968,7 @@ function renderCardElement(n,relationState=null,context=null){
   card.dataset.nodeId=n.id;card.dataset.locked=view.interaction&&view.interaction.locked?'true':'false';card.dataset.cardStyle=appearance.cardStyle||'standard';card.dataset.fontSize=String(appearance.fontSize||15);
   const first=(view.content.title||'?').trim().slice(0,1);
   const title=`<span class="node-text-content">${escapeHTML(view.content.title||'未命名知识点')}</span>`;
-  card.innerHTML=`<div class="card-body"><div class="node-top" style="background:${headerBackground}"><div class="node-icon" style="background:${accent};color:${headerText}">${escapeHTML(first)}</div></div><div class="node-title">${title}</div>${graphImagesMarkup(n)}</div><div class="node-size-tools" aria-label="卡牌尺寸"><button type="button" class="node-size-btn" data-size="small" title="小卡">-</button><button type="button" class="node-size-btn" data-size="big" title="大卡">+</button><button type="button" class="node-size-btn" data-size="" title="默认尺寸">o</button></div>${graphResizeHandlesMarkup('node')}`;
+  card.innerHTML=`<div class="card-body"><div class="node-top" style="background:${headerBackground}"><div class="node-icon" style="background:${accent};color:${headerText}">${escapeHTML(first)}</div></div><div class="node-title">${title}</div>${context?.readOnlyPreview?'':graphImagesMarkup(n)}</div>${context?.readOnlyPreview?'':`<div class="node-size-tools" aria-label="卡牌尺寸"><button type="button" class="node-size-btn" data-size="small" title="小卡">-</button><button type="button" class="node-size-btn" data-size="big" title="大卡">+</button><button type="button" class="node-size-btn" data-size="" title="默认尺寸">o</button></div>${graphResizeHandlesMarkup('node')}`}`;
   return card;
 }
 function applyTextElementTypographyVariables(el,appearance){
@@ -1973,12 +1994,33 @@ function applyTextElementTypographyVariables(el,appearance){
   el.style.setProperty('--node-line-height',graphLineHeightCss(appearance.lineHeight,1.45));
   el.style.setProperty('--node-letter-spacing',graphLegacyLetterSpacingCss());
 }
-function renderTextElement(item){
+function renderTextElement(item,context=null){
   const model=window.KGGraphModel,content=model&&model.textElementContentOf?model.textElementContentOf(item):{text:item.text||'点击编辑文字'},appearance=model&&model.textElementAppearanceOf?model.textElementAppearanceOf(item):{textColor:item.textColor||'#0f172a',textBackgroundColor:item.textBackgroundColor||'#ffffff',textBackgroundOpacity:item.textBackgroundOpacity??0,textAlign:item.textAlign||'center',fontSize:item.fontSize||20,fontFamily:item.fontFamily||'system',fontWeight:item.fontWeight||'bold',fontStyle:item.fontStyle||'normal',underline:!!item.underline,strikeThrough:!!item.strikeThrough,lineHeight:item.lineHeight||1.45},geometry=model&&model.textElementGeometryOf?model.textElementGeometryOf(item):{x:item.x||0,y:item.y||0,width:item.width||220,height:item.height||72,manualSize:!!item.manualSize};
-  const selected=state.selectedElementId===item.id||selectedTextElementIds.has(item.id);
+  const selected=!context?.readOnlyPreview&&(state.selectedElementId===item.id||selectedTextElementIds.has(item.id));
   const multiSelected=selected&&(selectedNodeIds.size+selectedTextElementIds.size+selectedLinkIds.size>1);
   const el=document.createElement('div');el.className='graph-text-element'+(selected?' active':'')+(multiSelected?' multi-selected':'');el.dataset.textElementId=item.id;el.dataset.manualSize=geometry.manualSize?'true':'false';el.style.left=geometry.x+'px';el.style.top=geometry.y+'px';el.style.width=geometry.width+'px';el.style.height=geometry.height+'px';applyTextElementTypographyVariables(el,appearance);el.innerHTML=`<div class="graph-text-element-content"><span class="graph-text-inline">${escapeHTML(content.text??'点击编辑文字')}</span></div>${graphResizeHandlesMarkup('text')}`;return el;
 }
+// Read-only surfaces use the editor's own card CSS, ports, routing and arrow styles.
+// The server supplies a visual projection; no live graph/selection/history is replaced.
+function readonlyGraphPresentation(projection,{svg,markerId}={}){
+  const model=window.KGGraphModel,empty={readOnlyPreview:true,state:{},selectedNodeIds:new Set()};
+  const rawNodes=(projection.nodes||[]).map(item=>({id:item.id,content:{title:item.title},geometry:{x:item.x,y:item.y,width:item.width,height:item.height},appearance:Object.hasOwn(item,'appearance')?{...item.appearance}:{fillColor:item.fill,textColor:item.color},...(item.mindmapTheme?{mindmapTheme:{...item.mindmapTheme}}:{})}));
+  const graph=sanitizeState({nodes:rawNodes,links:projection.links||[],elements:projection.elements||[]});
+  const nodes=graph.nodes,nodeMap=new Map(nodes.map(node=>[node.id,node])),links=graph.links;
+  const routes=links.map(link=>({link,points:rawLinkRenderPoints(link,nodeMap,{ignoreGather:true})})).filter(item=>item.points);
+  const bundlePlan=links.length<=600?window.KGGraphEdgeBundle?.plan(routes.map(({link,points})=>({id:String(link.id),fromId:link.from,toId:link.to,...points,hasFromPort:!!link.fromPort&&link.fromPort!=='auto',hasToPort:!!link.toPort&&link.toPort!=='auto',pathStyle:pathStyleForLink(link),hasStoredWaypoints:normalizedEdgePoints(link.waypoints).length>0}))):null;
+  ensureGraphEdgeMarkers(svg,markerId);
+  const edges=routes.map(({link,points})=>{
+    const override=bundlePlan?.endpoints?.get(String(link.id)),resolved={...points,a:override?.from||points.a,b:override?.to||points.b,mainGraph:!!bundlePlan,bundlePlan};
+    const geometry=linkPathGeometry(link,resolved.a,resolved.b,resolved),path=svgElement('path','edge-visible');
+    path.dataset.previewLinkId=link.id;path.setAttribute('d',geometry.d);applyGraphEdgeAppearance(path,link,markerId);
+    return{element:path,bounds:geometry.bounds};
+  });
+  const cards=nodes.map(node=>({element:renderCardElement(node,null,{...empty,position:{x:0,y:0}}),bounds:model.geometryOf(node)}));
+  const texts=graph.elements.map(item=>{const element=renderTextElement(item,empty);element.querySelector('.graph-element-resize-layer')?.remove();return{element,bounds:model.textElementGeometryOf(item)}});
+  return{cards,texts,edges,color:getComputedStyle(stage).color};
+}
+window.KGGraphRenderer.registerReadonly(readonlyGraphPresentation);
 function measureTextElementTightSize(item){
   const model=window.KGGraphModel,content=model.textElementContentOf(item),appearance=model.textElementAppearanceOf(item);
   const probe=document.createElement('div');probe.className='graph-text-element-measure';probe.textContent=content.text??'点击编辑文字';
@@ -3460,6 +3502,12 @@ function clampDetailPanelToStage(left,top,width,height){
   const maxLeft=sr.width-width-margin,maxTop=sr.height-height-margin;
   return{x:clamp(left,margin,Math.max(margin,maxLeft)),y:clamp(top,margin,Math.max(margin,maxTop))};
 }
+function repositionDraggedDetailPanel(){
+  if(!detailPanelDragged||!detailPanel.classList.contains('show'))return;
+  const panel=detailPanel.getBoundingClientRect(),host=stage.getBoundingClientRect();
+  const next=clampDetailPanelToStage(panel.left-host.left,panel.top-host.top,panel.width,panel.height);
+  detailPanel.style.left=next.x+'px';detailPanel.style.top=next.y+'px';
+}
 detailPanel.addEventListener('pointerdown',e=>{
   if(isCanvasPanMode())return;
   if(e.button!==0||e.target.closest('button,input,textarea,select'))return;
@@ -3660,6 +3708,7 @@ function ensureGraphSearchPanel(){
   return graphSearchPanel;
 }
 function openGraphSearchPanel(){
+  hideGraphTransientMenus();
   const panel=ensureGraphSearchPanel(),input=panel.querySelector('#graphSearchInput');
   panel.classList.add('show');
   renderGraphSearchResults(input.value);
@@ -3759,12 +3808,12 @@ function setGraphPointerMode(mode,announce=false){
 }
 function toggleGraphPointerMode(){setGraphPointerMode(graphPointerMode==='pan'?'edit':'pan',true)}
 function isPanBlockedUI(target){
-  return !!(target&&target.closest&&target.closest('[data-stage-ui],[data-canvas-ui],.canvas-toolbar-left,.canvas-toolbar-right,.account-menu-shell,.account-menu,.detail-panel,.mobile-bar,.toolbar,.floating-toolbox,.modal-backdrop,.help-card'));
+  return !!(target&&target.closest&&target.closest('dialog,[role="dialog"],[data-stage-ui],[data-canvas-ui],.canvas-toolbar-left,.canvas-toolbar-right,.account-menu-shell,.account-menu,.detail-panel,.mobile-bar,.toolbar,.floating-toolbox,.modal-backdrop,.help-card'));
 }
 const activePointers=new Map();let pan=null,pinch=null,viewportDirty=false,stageTap=null;
 let stageInteractingTimer=null;
 function markStageInteracting(){if(!stage.classList.contains('is-interacting'))stage.classList.add('is-interacting');clearTimeout(stageInteractingTimer);stageInteractingTimer=setTimeout(()=>{stage.classList.remove('is-interacting');stageInteractingTimer=null},220)}
-function isUI(target){return !!(target&&target.closest&&target.closest('[data-stage-ui],[data-canvas-ui],.canvas-toolbar-left,.canvas-toolbar-right,.account-menu-shell,.account-menu,.knowledge-card,.edge-hit,.detail-panel,.mobile-bar,.toolbar,.floating-toolbox,.modal-backdrop,.help-card'))}
+function isUI(target){return !!(target&&target.closest&&target.closest('dialog,[role="dialog"],[data-stage-ui],[data-canvas-ui],.canvas-toolbar-left,.canvas-toolbar-right,.account-menu-shell,.account-menu,.knowledge-card,.edge-hit,.detail-panel,.mobile-bar,.toolbar,.floating-toolbox,.modal-backdrop,.help-card'))}
 // C-1.4.2：为画布内的悬浮 UI 建立显式事件隔离层。
 // 即使后续 DOM 结构或选择器变化，悬浮模块上的按下、双击和滚轮也不会冒泡到画布平移/缩放/新建节点逻辑。
 function bindStageUIEventGuards(){
@@ -4187,6 +4236,7 @@ function graphHasVisibleNode(){
   return state.nodes.some(node=>{const p=visualPositionForNode(node),d=nodeDims(node),left=vx+p.x*scale,top=vy+p.y*scale,right=left+d.w*scale,bottom=top+d.h*scale;return right>8&&bottom>8&&left<r.width-8&&top<r.height-8});
 }
 function recoverMobileGraphViewport(){
+  repositionDraggedDetailPanel();
   if(relatedCanvasModalEl||relatedCanvasOpening)return false;
   const r=stage.getBoundingClientRect();
   if(r.width>650||r.width<1||r.height<1||!state.nodes.length||graphHasVisibleNode())return false;
@@ -4199,6 +4249,7 @@ function scheduleMobileGraphViewportRecovery(){
   mobileGraphViewportTimer=setTimeout(()=>recoverMobileGraphViewport(),80);
 }
 window.addEventListener('resize',scheduleMobileGraphViewportRecovery,{passive:true});
+document.addEventListener('fullscreenchange',scheduleMobileGraphViewportRecovery);
 window.visualViewport?.addEventListener('resize',scheduleMobileGraphViewportRecovery,{passive:true});
 requestAnimationFrame(()=>requestAnimationFrame(()=>recoverMobileGraphViewport()));
 $('nodeModal').addEventListener('click',e=>{if(e.target===$('nodeModal'))closeNodeModal({discardNew:true})});

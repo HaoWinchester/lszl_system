@@ -2601,6 +2601,11 @@
     },
     {
       "path": "frontend/scripts/new-legacy-contract.json",
+      "token": "kg_multi_question_theme_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "frontend/scripts/new-legacy-contract.json",
       "token": "kg_multi_workspace_closed_tabs_v1__",
       "ordinal": 1
     },
@@ -3782,6 +3787,11 @@
     {
       "path": "new-legacy/src/canvas/97-learning-theme.js",
       "token": "kg_deep_recall_theme_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "new-legacy/src/canvas/97-learning-theme.js",
+      "token": "kg_multi_question_theme_v1",
       "ordinal": 1
     },
     {

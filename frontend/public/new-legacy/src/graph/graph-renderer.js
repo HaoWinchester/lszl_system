@@ -1,6 +1,12 @@
 'use strict';
 
 (function(global){
+  let readonlyRenderer=null;
+  function registerReadonly(renderer){readonlyRenderer=renderer}
+  function readonly(projection,options){
+    if(!readonlyRenderer)throw new Error('图谱预览正在准备，请稍后重试。');
+    return readonlyRenderer(projection,options);
+  }
   function create(callbacks={}){
     const counts={full:0,viewport:0,content:0,appearance:0,geometry:0,selection:0,edges:0,header:0};
     const call=(name,options)=>{if(typeof callbacks[name]==='function')callbacks[name](options||{})};
@@ -20,5 +26,5 @@
     function diagnostics(){return{...counts}}
     return Object.freeze({render,diagnostics});
   }
-  global.KGGraphRenderer=Object.freeze({create});
+  global.KGGraphRenderer=Object.freeze({create,registerReadonly,readonly});
 })(typeof window!=='undefined'?window:globalThis);

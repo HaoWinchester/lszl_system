@@ -1,4 +1,6 @@
 from fastapi.testclient import TestClient
+import pytest
+from uuid import uuid4
 
 from app.main import app
 
@@ -78,7 +80,7 @@ def test_save_uses_expected_revision_and_returns_structured_conflict() -> None:
 def test_files_folders_tags_and_current_are_owner_isolated() -> None:
     with TestClient(app) as owner_client, TestClient(app) as other_client:
         login(owner_client, "学生")
-        login(other_client, "乔治008")
+        login(other_client, "老师")
         folder = owner_client.post("/api/v1/files/folders", json={"name": "owner-only"}).json()["folder"]
         tag = owner_client.post("/api/v1/files/tags", json={"name": "owner-tag"}).json()["tag"]
         created = owner_client.post(
@@ -159,3 +161,79 @@ def test_file_and_folder_lifecycle_preserves_restore_locations_and_favorites() -
         assert emptied.status_code == 200, emptied.text
         assert emptied.json()["deletedFiles"] >= 1
         assert emptied.json()["deletedFolders"] >= 2
+
+
+def readonly_file_fixture():
+    admin, client = TestClient(app), TestClient(app)
+    login(admin, "佩奇007")
+    username = "readonly_files_" + uuid4().hex[:10]
+    created = admin.post("/api/v1/users", json={"username": username, "password": "111111", "role": "student"})
+    assert created.status_code == 200, created.text
+    login(client, username)
+    folder = client.post("/api/v1/files/folders", json={"name": "保留目录"}).json()["folder"]
+    tag = client.post("/api/v1/files/tags", json={"name": "保留标签"}).json()["tag"]
+    file = client.post("/api/v1/files", json={"name": "保留原图", "graphData": {"nodes": [{"id": "kept", "title": "不可覆盖"}], "links": []}}).json()["file"]
+    changed = admin.put(f"/api/v1/users/{username}", json={"role": "viewer"})
+    assert changed.status_code == 200, changed.text
+    return client, file, folder, tag
+
+
+@pytest.mark.parametrize("kind", ["create", "save", "folder", "tag"])
+def test_viewer_cannot_write_owned_file_content_or_organize(kind: str) -> None:
+    client, file, folder, tag = readonly_file_fixture()
+    operations = {
+        "create": ("POST", "/api/v1/files", {"name": "不应新建"}),
+        "save": ("PUT", f"/api/v1/files/{file['id']}", {"graphData": {"nodes": [], "links": []}, "expectedRevision": file["revision"]}),
+        "folder": ("POST", "/api/v1/files/folders", {"name": "不应创建目录"}),
+        "tag": ("POST", "/api/v1/files/tags", {"name": "不应创建标签"}),
+    }
+    method, path, body = operations[kind]
+    denied = client.request(method, path, json=body)
+    assert denied.status_code == 403, denied.text
+    opened = client.get(f"/api/v1/files/{file['id']}")
+    assert opened.status_code == 200, opened.text
+    assert opened.json()["graphData"]["nodes"] == [{"id": "kept", "title": "不可覆盖"}]
+    assert client.put("/api/v1/files/current", json={"fileId": file["id"]}).status_code == 200
+    assert client.get("/api/v1/files/current").json()["fileId"] == file["id"]
+
+
+def test_viewer_cannot_mutate_existing_files_folders_tags_or_bulk_operations() -> None:
+    client, file, folder, tag = readonly_file_fixture()
+    operations = [
+        ("PUT", "/order", {"fileIds": [file["id"]]}),
+        ("POST", "/import-legacy", {"files": []}),
+        ("POST", "/trash/empty", {}),
+        ("PATCH", f"/folders/{folder['id']}", {"name": "改名"}),
+        ("DELETE", f"/folders/{folder['id']}", None),
+        ("POST", f"/folders/{folder['id']}/restore", {}),
+        ("DELETE", f"/folders/{folder['id']}/permanent", None),
+        ("PATCH", f"/tags/{tag['id']}", {"name": "改名"}),
+        ("DELETE", f"/tags/{tag['id']}", None),
+        ("PUT", f"/{file['id']}/tag", {"tagId": tag["id"]}),
+        ("PATCH", f"/{file['id']}", {"name": "改名"}),
+        ("DELETE", f"/{file['id']}", None),
+        ("POST", f"/{file['id']}/restore", {}),
+        ("DELETE", f"/{file['id']}/permanent", None),
+        ("POST", f"/{file['id']}/duplicate", {"name": "副本"}),
+        ("POST", f"/{file['id']}/fragments", {"fragment": {"format": "kg-graph-fragment", "version": 1, "nodes": [], "links": [], "elements": [], "tables": [], "source": {"fileId": file["id"], "revision": file["revision"]}}}),
+    ]
+    for method, path, body in operations:
+        response = client.request(method, "/api/v1/files" + path, json=body)
+        assert response.status_code == 403, (method, path, response.text)
+    assert client.get(f"/api/v1/files/{file['id']}").json()["graphData"]["nodes"][0]["id"] == "kept"
+    assert client.get("/api/v1/files/folders").json()["folders"][0]["name"] == "保留目录"
+    assert client.get("/api/v1/files/tags").json()["tags"][0]["name"] == "保留标签"
+
+
+@pytest.mark.parametrize("username", ["佩奇007", "老师", "学生"])
+def test_graph_writers_keep_owned_create_save_folder_and_tag_access(username: str) -> None:
+    client = TestClient(app)
+    login(client, username)
+    created = client.post("/api/v1/files", json={"name": "正常创建", "graphData": {"nodes": [], "links": []}})
+    assert created.status_code == 200, created.text
+    file = created.json()["file"]
+    saved = client.put(f"/api/v1/files/{file['id']}", json={"graphData": {"nodes": [{"id": "saved"}], "links": []}, "expectedRevision": file["revision"]})
+    assert saved.status_code == 200, saved.text
+    assert client.get(f"/api/v1/files/{file['id']}").json()["graphData"]["nodes"] == [{"id": "saved"}]
+    assert client.post("/api/v1/files/folders", json={"name": "正常目录"}).status_code == 200
+    assert client.post("/api/v1/files/tags", json={"name": "正常标签"}).status_code == 200

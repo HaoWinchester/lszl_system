@@ -24,16 +24,23 @@ const bridge = {
   isRemote: () => true,
   createFile: async input => { calls.push(['remote-create', input.name]); return created; },
 };
+const nameInput={value:'远端新图谱',focus(){},select(){}};
+const nameForm={addEventListener(type,listener){if(type==='submit')this.submit=listener}};
+const nameDialog={
+  setAttribute(){},addEventListener(){},remove(){},close(){this.open=false},
+  querySelector(selector){return selector==='input'?nameInput:selector==='form'?nameForm:selector==='[role="alert"]'?{}:{addEventListener(){}}},
+  showModal(){this.open=true;Promise.resolve().then(()=>nameForm.submit({preventDefault(){}}))},
+};
 const context = {
   console, Promise, Date, JSON, Event, setTimeout, clearTimeout,
   state: { meta: {}, nodes: [], links: [] },
   lastSavedSnapshot: '',
-  document: { getElementById: () => null, documentElement: { dataset: {} } },
+  document: { getElementById: () => null, documentElement: { dataset: {} },body:{appendChild(){}},createElement:tag=>{assert.strictEqual(tag,'dialog');return nameDialog} },
   sessionStorage: { getItem: () => null, setItem: () => {} },
   addEventListener: () => {},
   dispatchEvent: () => {},
   CustomEvent: function CustomEvent(type, init) { this.type = type; this.detail = init && init.detail; },
-  prompt: () => '远端新图谱',
+  prompt: () => { throw new Error('Native prompts are unavailable in this host'); },
   authRequire: () => true,
   templateState: () => ({ meta: {}, nodes: [], links: [] }),
   sanitizeState: value => value,

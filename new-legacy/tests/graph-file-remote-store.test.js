@@ -104,6 +104,20 @@ vm.runInContext(
   await store.restoreFile('f2');
   assert(store.listFiles({ status: 'active' }).some(file => file.id === 'f2'));
 
+  const historicalLearning={flashcards:{legacyCard:{reviewed:4}},deepRecall:{legacyNode:{mastered:true}},questionTraining:{}};
+  store.seedCurrent({...files.find(file=>file.id==='f1'),graphData:{nodes:[{id:'legacyNode'}],links:[]},learningState:historicalLearning});
+  api.save=async id=>{const file=files.find(file=>file.id===id);file.revision+=1;return{file}};
+  await store.saveFile('f1',{nodes:[{id:'legacyNode',x:123}],links:[]});
+  assert.deepStrictEqual(JSON.parse(JSON.stringify((await store.getFile('f1')).learningState)),historicalLearning,'graph-only save must keep historical learning state in the content cache');
+
+  // A list-only caller has no learning body yet: do not invent an empty cache.
+  store.clearSession();await store.initialize();
+  const originalGet=api.get;
+  api.get=async id=>({...await originalGet(id),learningState:historicalLearning});
+  await store.saveFile('f1',{nodes:[{id:'legacyNode',x:456}],links:[]});
+  assert.deepStrictEqual(JSON.parse(JSON.stringify((await store.getFile('f1')).learningState)),historicalLearning,'uncached save must hydrate preserved learning state from the backend');
+  api.get=originalGet;
+
   store.clearSession();
   assert.deepStrictEqual(JSON.parse(JSON.stringify(store.listFiles({ owner: 'alice' }))), []);
   assert.strictEqual(store.getCurrentFileId('alice'), '');
