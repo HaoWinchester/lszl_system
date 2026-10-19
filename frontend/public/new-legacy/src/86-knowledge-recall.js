@@ -380,7 +380,49 @@
   }
   function progressPayload(){
     const tables=window.KGCanvasTableModel?.sanitizeCollection?window.KGCanvasTableModel.sanitizeCollection(state.tables):(Array.isArray(state.tables)?state.tables:[]);
-    return {nodes:state.nodes,edges:state.edges,strokes:state.strokes,tables,customNodes:state.customNodes,activeKeywords:state.activeKeywords,choiceOffsets:state.choiceOffsets,metrics:state.metrics,graphSchemaVersion:3,transform:{x:Number(state.transform.x)||0,y:Number(state.transform.y)||0,scale:Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,Number(state.transform.scale)||1))},optionState:{selected:String(krOptionState.selected||''),persistent:String(krOptionState.persistent||'')}};
+    // The server stores metrics as an extensible JSON object; keep answer state
+    // there so the strict progress contract and adapter preserve it as well.
+    const optionState={selected:String(krOptionState.selected||''),persistent:String(krOptionState.persistent||'')};
+    return {nodes:state.nodes,edges:state.edges,strokes:state.strokes,tables,customNodes:state.customNodes,activeKeywords:state.activeKeywords,choiceOffsets:state.choiceOffsets,metrics:{...state.metrics,optionState},graphSchemaVersion:3,transform:{x:Number(state.transform.x)||0,y:Number(state.transform.y)||0,scale:Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,Number(state.transform.scale)||1))},optionState};
+  }
+  function commitPersonalDraft(){
+    if(isRecallReadonly()||isTeacherDraftPreview())return true;
+    const titleInput=$('krPersonalTitle'),contentInput=$('krPersonalContent');
+    const node=state.nodes.find(item=>item.instanceId===state.activeNodeId);
+    if(!titleInput||!contentInput||!node?.custom)return true;
+    const title=String(titleInput.value||'').trim(),hint=String(contentInput.value||'');
+    const data=getNodeData(node.dataId);
+    if(!title){notifyRecallLimit('请填写卡牌标题后再继续。');titleInput.focus();return false}
+    if(title===String(data.title||node.title||'')&&hint===String(data.hint||''))return true;
+    state.customNodes[node.dataId]={...data,title,hint};
+    state.nodes.filter(item=>item.dataId===node.dataId).forEach(item=>{
+      item.title=title;
+      const wrap=nodeLayer.querySelector(`[data-instance-id="${cssAttr(item.instanceId)}"]`);
+      const label=wrap?.querySelector('.kr-node-label'),button=wrap?.querySelector('button'),initial=button?.querySelector('span');
+      if(label)label.textContent=title;if(initial)initial.textContent=firstChar(title);
+      if(button){button.title=title+' · 拖动整理位置 · 双击删除';button.setAttribute('aria-label','打开 '+title+' 的回忆引导；拖动整理位置；双击删除')}
+    });
+    saveProgress();return true;
+  }
+  async function commitRecallDrafts(){
+    if(!commitPersonalDraft())return false;
+    if(inkController?.hasTextDraft?.()&&await inkController.commitText()===false)return false;
+    return true;
+  }
+  async function prepareRecallLeave(){
+    if(isRecallReadonly()||isTeacherDraftPreview())return true;
+    if(!await commitRecallDrafts())return false;
+    return writeProgressNow();
+  }
+  function hasRecallDraft(){
+    if(isRecallSessionReadonly()||isTeacherDraftPreview())return false;
+    if(progressSaveTimer||inkController?.hasTextDraft?.())return true;
+    if(['saving','failed','conflict'].includes(recallAdapter?.getState?.().saveState))return true;
+    const node=state.nodes.find(item=>item.instanceId===state.activeNodeId);
+    const titleInput=$('krPersonalTitle'),contentInput=$('krPersonalContent');
+    if(!node?.custom||!titleInput||!contentInput)return false;
+    const data=getNodeData(node.dataId);
+    return String(titleInput.value||'').trim()!==String(data.title||node.title||'')||String(contentInput.value||'')!==String(data.hint||'');
   }
   async function writeProgressNow({allowTransition=false}={}){
     if(isRecallSessionReadonly()||(recallTransitionBusy&&!allowTransition)||isTeacherDraftPreview()||!recallAdapter)return false;
@@ -414,7 +456,8 @@
         state.tables=window.KGCanvasTableModel?.sanitizeCollection?window.KGCanvasTableModel.sanitizeCollection(raw.tables):(Array.isArray(raw.tables)?raw.tables:[]);
         inkController?.reset({keepTool:true});
         state.nodes=raw.nodes;state.edges=raw.edges;state.customNodes=raw.customNodes&&typeof raw.customNodes==='object'?raw.customNodes:{};state.activeKeywords=Array.isArray(raw.activeKeywords)?raw.activeKeywords:[];state.choiceOffsets=raw.choiceOffsets&&typeof raw.choiceOffsets==='object'?raw.choiceOffsets:{};state.metrics=raw.metrics&&typeof raw.metrics==='object'?{keywordClicks:Number(raw.metrics.keywordClicks)||0,choiceClicks:Number(raw.metrics.choiceClicks)||0,nodeOpens:Number(raw.metrics.nodeOpens)||0,sessionStartedAt:Date.now()}:{keywordClicks:0,choiceClicks:0,nodeOpens:0,sessionStartedAt:Date.now()};
-        if(raw.optionState&&typeof raw.optionState==='object')krOptionState={selected:String(raw.optionState.selected||''),persistent:String(raw.optionState.persistent||'')};
+        const optionState=raw.optionState||raw.metrics?.optionState;
+        if(optionState&&typeof optionState==='object')krOptionState={selected:String(optionState.selected||''),persistent:String(optionState.persistent||'')};
         // P4.5.32 进入页面不再恢复上次保存的画布平移/缩放：跨窗口尺寸或上次聚焦后视图会偏在一边，
         // 体验差；改为每次进入都以题目卡片(world 0,0)重新居中，会话内仍可自由拖动并保存。
         if(raw.transform&&Number.isFinite(Number(raw.transform.scale))){state.transform.scale=Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,Number(raw.transform.scale)))}
@@ -1068,6 +1111,7 @@
   function renderAll(){renderQuestion();renderGraphOnly();updateQuestionNavigator();inkController?.render();tableController?.sync?.()}
   function syncActiveNodeClass(){nodeLayer.querySelectorAll('.kr-node').forEach(wrap=>wrap.classList.toggle('is-active',String(wrap.dataset.instanceId||'')===String(state.activeNodeId||'')))}
   function openNodeGuide(instanceId,anchor,{countOpen=true}={}){
+    if(!commitPersonalDraft())return false;
     const node=state.nodes.find(n=>n.instanceId===instanceId);if(!node)return;
     const readOnly=isRecallReadonly();
     state.activeNodeId=instanceId;guide.dataset.dragged='';
@@ -1090,10 +1134,7 @@
       guide.insertAdjacentHTML('beforeend',personalMarkup);
       const personalSave=$('krPersonalSaveBtn');
       if(personalSave)personalSave.onclick=()=>{
-        const title=String($('krPersonalTitle')?.value||'').trim();
-        if(!title){$('krPersonalTitle')?.focus();return}
-        state.customNodes[node.dataId]={...d,title,hint:String($('krPersonalContent')?.value||'')};
-        state.nodes.filter(item=>item.dataId===node.dataId).forEach(item=>{item.title=title});
+        if(!commitPersonalDraft())return;
         saveProgress();renderGraphOnly();openNodeGuide(instanceId,null,{countOpen:false});
       };
     }
@@ -1118,7 +1159,7 @@
     requestAnimationFrame(()=>placeGuide(liveAnchor));
   }
   function hideGuide(){guide.hidden=true;guide.innerHTML='';guide.dataset.dragged='';guideDragging=false;state.activeNodeId=null}
-  function closeGuide(){hideGuide();syncActiveNodeClass()}
+  function closeGuide(){if(!commitPersonalDraft())return false;hideGuide();syncActiveNodeClass();return true}
   function placeGuide(anchor){
     if(!guide||guide.hidden||guide.dataset.dragged==='1')return;
     const vp=viewport.getBoundingClientRect();
@@ -1452,7 +1493,7 @@
   }
   async function switchQuestion(bankId,questionId){
     if(recallTransitionBusy)return false;
-    if(inkController?.hasTextDraft?.()&&await inkController.commitText()===false)return false;
+    if(!await commitRecallDrafts())return false;
     const shouldSave=!isRecallReadonly()&&recallAdapter;
     setRecallTransitionBusy(true);
     // 过渡期给出加载反馈（随机鼓励语），避免"点了没反应"的冻结感。
@@ -1660,7 +1701,14 @@
     if(isTeacherDraftPreview()){
       const back=$('krBackBtn');if(back){back.title='退出深度回忆预览';back.setAttribute('aria-label','退出深度回忆预览');back.addEventListener('click',event=>{event.preventDefault();cleanupTeacherDraftPreview();try{window.close()}catch(error){};if(!window.closed)location.href='training-config.html?section=recall'},{once:true})}
     }
-    window.KGLearningProgress?.registerAdapter?.('deep_recall',{flush:flushProgress,clearTransient:()=>{cancelProgressSave();destroyingNodeIds.clear();state.nodes=[];state.edges=[];state.strokes=[];state.tables=[];inkController?.reset({keepTool:true});tableController?.reset();state.customNodes={};state.activeKeywords=[];state.choiceOffsets={};state.activeNodeId=null;state.lastNewEdgeId='';state.lastNewNodeId='';}});
+    window.KGLearningProgress?.registerAdapter?.('deep_recall',{flush:flushProgress,prepareLeave:prepareRecallLeave,hasUnsavedChanges:hasRecallDraft,clearTransient:()=>{cancelProgressSave();destroyingNodeIds.clear();state.nodes=[];state.edges=[];state.strokes=[];state.tables=[];inkController?.reset({keepTool:true});tableController?.reset();state.customNodes={};state.activeKeywords=[];state.choiceOffsets={};state.activeNodeId=null;state.lastNewEdgeId='';state.lastNewNodeId='';}});
+    if(!isTeacherDraftPreview())$('krBackBtn')?.addEventListener('click',async event=>{
+      if(event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;
+      event.preventDefault();
+      const href=event.currentTarget.href;
+      try{if(await prepareRecallLeave())location.href=href}
+      catch(error){notifyRecallLimit(error?.message||'进度尚未保存，请稍后重试。')}
+    });
     inkController=window.KGCanvasInk?.create?.({
       trigger:$('krInkBtn'),viewport,world,getViewport:()=>state.transform,getStrokes:()=>state.strokes,
       setStrokes:strokes=>{state.strokes=strokes;saveProgress()},

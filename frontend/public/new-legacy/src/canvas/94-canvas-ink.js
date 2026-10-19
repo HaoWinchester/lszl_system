@@ -312,18 +312,24 @@
     let textSession=null;
     async function closeTextEditor(commit){
       const session=textSession;if(!session)return true;
-      if(commit){
-        if(session.composing){session.deferredCommit=true;return false}
-        session.resize();const draft={text:session.editor.value.slice(0,TEXT_LIMIT),...session.style,points:[[...session.world]]};
-        if(JSON.stringify(draft)!==JSON.stringify(session.edit.state().draft))session.edit.update(draft);
-        session.editor.dataset.saveState='committing';
-        const success=await session.edit.commit();
-        if(textSession!==session)return false;
-        session.editor.dataset.saveState=session.edit.state().status;
-        if(!success){session.onSaved=null;if(session.edit.state().status==='failed'){session.status.textContent='文字未保存，请点击外部重试';report(session.edit.state().error)}return false}
-      }else{session.edit.cancel();if(session.applied&&!session.stale){options.setStrokes?options.setStrokes(session.before):options.change(session.before,'取消文字修改');render()}}
-      const onSaved=commit?session.onSaved:null;
-      textSession=null;session.unmount.forEach(dispose=>dispose());session.frame.remove();session.status.remove();session.border.remove();refreshControls();onSaved?.();return true;
+      if(commit&&session.closing)return session.closing;
+      const close=async()=>{
+        if(commit){
+          if(session.composing){session.deferredCommit=true;return false}
+          session.resize();const draft={text:session.editor.value.slice(0,TEXT_LIMIT),...session.style,points:[[...session.world]]};
+          if(JSON.stringify(draft)!==JSON.stringify(session.edit.state().draft))session.edit.update(draft);
+          session.editor.dataset.saveState='committing';
+          const success=await session.edit.commit();
+          if(textSession!==session)return false;
+          session.editor.dataset.saveState=session.edit.state().status;
+          if(!success){session.onSaved=null;if(session.edit.state().status==='failed'){session.status.textContent='文字未保存，请点击外部重试';report(session.edit.state().error)}return false}
+        }else{session.edit.cancel();if(session.applied&&!session.stale){options.setStrokes?options.setStrokes(session.before):options.change(session.before,'取消文字修改');render()}}
+        const onSaved=commit?session.onSaved:null;
+        textSession=null;session.unmount.forEach(dispose=>dispose());session.frame.remove();session.status.remove();session.border.remove();refreshControls();onSaved?.();return true;
+      };
+      if(!commit)return close();
+      session.closing=close();
+      try{return await session.closing}finally{session.closing=null}
     }
     function openTextEditor(clientX,clientY,existing){
       if(textSession){closeTextEditor(true);return}

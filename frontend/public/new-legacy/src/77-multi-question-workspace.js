@@ -104,6 +104,7 @@
     answerQueue:[],
     answerFlushTimer:0,
     answerFlushing:false,
+    answerFlushPromise:null,
     optionClickTimers:new Map(),
     optionFlashTimers:new Map(),
     edgeElements:new Map(),
@@ -1694,13 +1695,13 @@
   }
   function optionTimerKey(nodeId,key=''){return String(nodeId||'')+':'+String(key||'')}
   function clearOptionClickTimer(nodeId,key=''){
-    const timerKey=optionTimerKey(nodeId,key),timer=state.optionClickTimers.get(timerKey);
+    const timerKey=optionTimerKey(nodeId,key),timer=state.optionClickTimers.get(timerKey)?.timer;
     if(timer)global.clearTimeout(timer);
     state.optionClickTimers.delete(timerKey);
   }
   function clearOptionTransientState(nodeId=''){
     const prefix=nodeId?String(nodeId)+':':'';
-    [...state.optionClickTimers.entries()].forEach(([key,timer])=>{if(!prefix||key.startsWith(prefix)){global.clearTimeout(timer);state.optionClickTimers.delete(key)}});
+    [...state.optionClickTimers.entries()].forEach(([key,pending])=>{if(!prefix||key.startsWith(prefix)){global.clearTimeout(pending.timer);state.optionClickTimers.delete(key)}});
     [...state.optionFlashTimers.entries()].forEach(([key,timer])=>{if(!prefix||key.startsWith(prefix)){global.clearTimeout(timer);state.optionFlashTimers.delete(key)}});
     const root=nodeId?state.cards.get(String(nodeId))?.element:state.nodeLayer;
     root?.querySelectorAll?.('.is-correct-flash,.is-wrong-flash').forEach(item=>item.classList.remove('is-correct-flash','is-wrong-flash'));
@@ -1775,7 +1776,14 @@
     global.clearTimeout(state.answerFlushTimer);
     state.answerFlushTimer=global.setTimeout(flushAnswerQueue,ANSWER_FLUSH_DELAY);
   }
-  async function flushAnswerQueue(){
+  async function flushAnswerQueue(options={}){
+    const operation=state.answerFlushPromise||sendAnswerQueue();
+    state.answerFlushPromise=operation;
+    try{await operation}
+    finally{if(state.answerFlushPromise===operation)state.answerFlushPromise=null}
+    if(options.throwOnError&&state.answerQueue.length)throw new Error('作答尚未保存，请重试后再离开。');
+  }
+  async function sendAnswerQueue(){
     if(state.answerFlushing)return;
     const queue=state.answerQueue.splice(0);
     if(!queue.length)return;
@@ -1857,10 +1865,15 @@
     if(!record)return false;
     key=String(key||'');
     clearOptionClickTimer(record.id,key);
-    const timerKey=optionTimerKey(record.id,key),timer=global.setTimeout(()=>{
-      state.optionClickTimers.delete(timerKey);handleOptionSingleChoice(record,key);
-    },OPTION_SINGLE_CLICK_DELAY);
-    state.optionClickTimers.set(timerKey,timer);return true;
+    const timerKey=optionTimerKey(record.id,key),pending={timer:null,commit:()=>{
+      if(state.optionClickTimers.get(timerKey)!==pending)return false;
+      clearOptionClickTimer(record.id,key);return handleOptionSingleChoice(record,key);
+    }};
+    pending.timer=global.setTimeout(pending.commit,OPTION_SINGLE_CLICK_DELAY);
+    state.optionClickTimers.set(timerKey,pending);return true;
+  }
+  async function flushPendingOptionChoices(){
+    for(const pending of [...state.optionClickTimers.values()])await pending.commit();
   }
   function handleOptionDoubleChoice(record,key){
     if(!record||record.node?.nodeType!=='question-reference')return false;
@@ -5786,6 +5799,19 @@
     if(route.releaseId)state.releaseId=String(route.releaseId);
     global.KGLearningProgress?.registerAdapter?.('multi_question_canvas',{
       flush:()=>{if(state.workspace)store()?.write?.(state.workspace,{reason:'learning-context-flush'});void flushAnswerQueue();return true},
+      hasUnsavedChanges:()=>{
+        if(state.readonly)return false;
+        const remote=global.KGCanvasWorkspaceAdapter?.getState?.(state.workspaceId||state.workspace?.id);
+        return Boolean(state.ink?.hasTextDraft?.()||state.optionClickTimers.size||state.answerQueue.length||state.answerFlushing||['pending','saving','failed'].includes(remote?.status));
+      },
+      prepareLeave:async()=>{
+        if(state.readonly)return true;
+        if(state.ink?.hasTextDraft?.()&&!await state.ink.commitText())return false;
+        await flushPendingOptionChoices();
+        if(state.workspace)store()?.write?.(state.workspace,{reason:'learning-navigation'});
+        await Promise.all([global.KGCanvasWorkspaceAdapter?.flush?.({throwOnError:true}),flushAnswerQueue({throwOnError:true})]);
+        return true;
+      },
       clearTransient:()=>clearPaperTransientState()
     });
     // P4.5.37：退出/隐藏页面时把待同步作答一次性提交（keepalive 请求可存活于卸载）。

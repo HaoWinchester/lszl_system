@@ -128,7 +128,7 @@ test('a conflict or network failure preserves the exact unsaved graph for recove
   });
   const adapter = adapterApi.create({ questionId: 'q1' });
   await adapter.loadSession();
-  const graph = { ...graphFixture(), strokes: [] };
+  const graph = { ...graphFixture(), strokes: [], tables: [] };
 
   await assert.rejects(adapter.saveGraph(graph), error => error.status === 409);
   assert.equal(adapter.getState().saveState, 'conflict');
@@ -269,4 +269,119 @@ test('overlapping saves are serialized so the second request uses the first resp
   assert.deepEqual(revisions, [4, 5]);
   assert.equal(adapter.getState().progressRevision, 6);
   assert.equal(adapter.getState().graph.nodes[0].title, '第二次编辑');
+});
+
+test('answer selection and persistent correct marking survive the database adapter round trip', async () => {
+  const controller = fs.readFileSync(path.join(root, 'src/86-knowledge-recall.js'), 'utf8');
+  const functionSource = (name, next) => controller.slice(controller.indexOf(`  function ${name}(`), controller.indexOf(next, controller.indexOf(`  function ${name}(`)));
+  const controllerContext = {
+    window: {},
+    state: { ...graphFixture(), strokes: [], tables: [], metrics: { keywordClicks: 2, choiceClicks: 1, nodeOpens: 3 } },
+    krOptionState: { selected: 'A', persistent: 'A' },
+    inkController: null,
+    recallViewportRestored: false,
+    isTeacherDraftPreview: () => false,
+    cloneValue: plain,
+    normalizeGraph: () => {},
+    MIN_ZOOM: 0.01,
+    MAX_ZOOM: 4,
+  };
+  vm.createContext(controllerContext);
+  vm.runInContext(
+    functionSource('progressPayload', '  async function writeProgressNow(') + '\n' +
+    functionSource('loadProgress', '  async function resetProgress('),
+    controllerContext,
+  );
+  let stored;
+  const { adapterApi } = loadAdapter(async (_url, init = {}) => {
+    if (!init.method) return jsonResponse(sessionFixture());
+    stored = { ...JSON.parse(init.body), revision: 5 };
+    return jsonResponse(stored);
+  });
+  const adapter = adapterApi.create({ questionId: 'q1' });
+  await adapter.loadSession();
+  await adapter.saveGraph(controllerContext.progressPayload());
+  controllerContext.krOptionState = { selected: '', persistent: '' };
+  controllerContext.loadProgress(plain(adapter.getState().graph));
+  assert.deepEqual(plain(controllerContext.krOptionState), { selected: 'A', persistent: 'A' });
+  assert.equal(stored.metrics.keywordClicks, 2);
+  assert.equal(stored.metrics.choiceClicks, 1);
+  assert.equal(stored.metrics.nodeOpens, 3);
+});
+
+function loadRecallDraftLifecycle(overrides = {}) {
+  const controller = fs.readFileSync(path.join(root, 'src/86-knowledge-recall.js'), 'utf8');
+  const start = controller.indexOf('  function commitPersonalDraft(');
+  assert.ok(start >= 0, 'personal card drafts need a reusable commit entry point');
+  const inputs = { krPersonalTitle: { value: '更新的标题', focus() {} }, krPersonalContent: { value: '未点保存的正文' } };
+  const calls = [];
+  const context = {
+    state: { activeNodeId: 'n1', nodes: [{ instanceId: 'n1', dataId: 'personal:n1', title: '旧标题', custom: true }], customNodes: { 'personal:n1': { title: '旧标题', hint: '旧正文' } } },
+    $: id => inputs[id],
+    getNodeData: id => context.state.customNodes[id],
+    nodeLayer: { querySelector: () => null },
+    cssAttr: value => value,
+    isRecallReadonly: () => false,
+    isTeacherDraftPreview: () => false,
+    inkController: { hasTextDraft: () => true, commitText: async () => { calls.push('ink'); return true; } },
+    saveProgress: () => calls.push('pending'),
+    writeProgressNow: async () => { calls.push('save'); return true; },
+    notifyRecallLimit: message => calls.push(message),
+    ...overrides,
+  };
+  vm.createContext(context);
+  vm.runInContext(controller.slice(start, controller.indexOf('  async function writeProgressNow(', start)), context);
+  return { context, inputs, calls };
+}
+
+test('leaving commits personal card drafts and ink before awaiting the progress save', async () => {
+  const { context, calls } = loadRecallDraftLifecycle();
+  assert.equal(await context.prepareRecallLeave(), true);
+  assert.deepEqual(plain(context.state.customNodes['personal:n1']), { title: '更新的标题', hint: '未点保存的正文' });
+  assert.equal(context.state.nodes[0].title, '更新的标题');
+  assert.deepEqual(calls, ['pending', 'ink', 'save']);
+});
+
+test('empty personal titles block leaving and preserve the editable draft', async () => {
+  const { context, inputs, calls } = loadRecallDraftLifecycle();
+  inputs.krPersonalTitle.value = '  ';
+  assert.equal(await context.prepareRecallLeave(), false);
+  assert.equal(context.state.customNodes['personal:n1'].title, '旧标题');
+  assert.equal(inputs.krPersonalContent.value, '未点保存的正文');
+  assert.equal(calls.includes('save'), false);
+  assert.equal(calls.includes('ink'), false);
+});
+
+test('read only recall can leave, while failed ink and progress commits prevent leaving', async () => {
+  const readOnly = loadRecallDraftLifecycle({ isRecallReadonly: () => true });
+  assert.equal(await readOnly.context.prepareRecallLeave(), true);
+  assert.deepEqual(readOnly.calls, []);
+  const inkFailure = loadRecallDraftLifecycle({ inkController: { hasTextDraft: () => true, commitText: async () => false } });
+  assert.equal(await inkFailure.context.prepareRecallLeave(), false);
+  assert.equal(inkFailure.calls.includes('save'), false);
+  const saveFailure = loadRecallDraftLifecycle({ writeProgressNow: async () => false });
+  assert.equal(await saveFailure.context.prepareRecallLeave(), false);
+});
+
+test('unload protection reports only editable unsaved drafts, pending saves, or save failures', () => {
+  const { context, inputs } = loadRecallDraftLifecycle({
+    isRecallSessionReadonly: () => false,
+    inkController: { hasTextDraft: () => false },
+    progressSaveTimer: 0,
+    recallAdapter: { getState: () => ({ saveState: 'saved' }) },
+  });
+  assert.equal(typeof context.hasRecallDraft, 'function');
+  assert.equal(context.hasRecallDraft(), true, 'edited personal fields require protection');
+  inputs.krPersonalTitle.value = '旧标题';
+  inputs.krPersonalContent.value = '旧正文';
+  assert.equal(context.hasRecallDraft(), false, 'saved fields do not interrupt refreshing');
+  context.progressSaveTimer = 1;
+  assert.equal(context.hasRecallDraft(), true);
+  context.progressSaveTimer = 0;
+  for (const saveState of ['saving', 'failed', 'conflict']) {
+    context.recallAdapter = { getState: () => ({ saveState }) };
+    assert.equal(context.hasRecallDraft(), true, saveState);
+  }
+  context.isRecallSessionReadonly = () => true;
+  assert.equal(context.hasRecallDraft(), false);
 });

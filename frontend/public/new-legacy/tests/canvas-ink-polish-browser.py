@@ -104,7 +104,8 @@ def public_entry(browser):
     page=setup(browser);assert page.evaluate('ink.activateText()') is True;assert page.evaluate('ink.tool')=='text'
     assert page.evaluate('ink.openTextAt(300,200)') is True;editor=page.locator('.canvas-ink-text-editor');expect(editor).to_be_focused();editor.fill('入口')
     assert page.evaluate('ink.openTextAt(400,300)') is True;expect(editor).to_have_value('');assert page.evaluate('strokes[0].text')=='入口'
-    editor.press('Escape');page.evaluate('locked=true');assert page.evaluate('ink.activateText()') is False;assert page.evaluate('ink.openTextAt(500,400)') is False;expect(editor).to_have_count(0);page.close()
+    editor.fill('并发提交');assert page.evaluate('Promise.all([ink.commitText(),ink.commitText()])')==[True,True],'Pointerdown and navigation must share a successful commit';expect(editor).to_have_count(0)
+    page.evaluate('locked=true');assert page.evaluate('ink.activateText()') is False;assert page.evaluate('ink.openTextAt(500,400)') is False;expect(editor).to_have_count(0);page.close()
 def export_opacity(browser):
     page=setup(browser)
     page.add_script_tag(content=(ROOT/'src/26-graph-export-service.js').read_text())

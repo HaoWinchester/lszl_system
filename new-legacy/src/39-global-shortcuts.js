@@ -82,7 +82,7 @@
       status.classList.add("show");
       clearTimeout(setStatus.timer);
       setStatus.timer = setTimeout(() => status.classList.remove("show"), 2200);
-    }
+    }else{window.KGSubscription?.showSubscriptionMessage?.(message);}
   }
   function clamp(value, min, max){
     return Math.max(min, Math.min(max, value));
@@ -210,7 +210,8 @@
     if(label) label.textContent = next === "horizontal" ? "水平排布" : "纵向排布";
   }
 
-  function openItem(event, item){
+  let leaving=false;
+  async function openItem(event, item){
     if(isCurrent(item)){
       event.preventDefault();
       setStatus("当前已经在" + item.label + "。");
@@ -223,11 +224,22 @@
     }
     const routes=window.KGLearningRouteContext;
     const mode={workspace:'multi_question_canvas',recall:'deep_recall'}[item.id];
+    const currentMode={'question-workspace.html':'multi_question_canvas','knowledge-recall.html':'deep_recall'}[currentPage()];
     if(mode&&routes?.resumeHref){
-      const currentMode={'question-workspace.html':'multi_question_canvas','knowledge-recall.html':'deep_recall'}[currentPage()];
       if(currentMode)routes.remember(routes.parse({mode:currentMode}));
       event.currentTarget.setAttribute('href',routes.resumeHref(item.href,mode));
     }
+    // Opening another tab leaves this editor alive; ordinary navigation must wait for its drafts.
+    if(!currentMode||!window.KGLearningProgress?.prepareLeave||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;
+    event.preventDefault();
+    if(leaving)return;
+    const link=event.currentTarget;leaving=true;link.setAttribute('aria-busy','true');setStatus('正在保存当前画布…');
+    try{
+      if(!await window.KGLearningProgress.prepareLeave(currentMode)){setStatus('当前内容尚未保存，请保存后重试。');return;}
+      location.assign(link.href);
+    }catch(error){
+      setStatus(error?.message||'当前内容尚未保存，请检查网络后重试。');
+    }finally{leaving=false;link.removeAttribute('aria-busy');}
   }
   function render(){
     const existing = document.getElementById("kgGlobalShortcuts");

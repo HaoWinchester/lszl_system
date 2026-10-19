@@ -47,3 +47,25 @@ test('return navigation restores the target mode question and workspace without 
  const href=route.resumeHref('question-workspace.html','multi_question_canvas');assert.match(href,/questionId=q-2/);assert.match(href,/workspace=workspace-b/);assert.match(href,/releaseId=rel-2/);
  route.clear('multi_question_canvas');assert.equal(route.resumeHref('question-workspace.html','multi_question_canvas'),'question-workspace.html');
 });
+
+test('navigation waits for the scene save and keeps failures recoverable',async()=>{
+ const ctx={console,KGLearningSession:{active:()=>({questionId:'q-2'})}};ctx.window=ctx;
+ vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'../src/62a-learning-progress.js'),'utf8'),ctx);const progress=ctx.KGLearningProgress;
+ assert.equal(await progress.prepareLeave('unknown'),true);
+ let release,finished=false;
+ progress.registerAdapter('deep_recall',{prepareLeave:async context=>{assert.equal(context.questionId,'q-2');await new Promise(resolve=>release=resolve);return true}});
+ const pending=progress.prepareLeave('deep_recall').then(value=>(finished=true,value));await Promise.resolve();assert.equal(finished,false);release();assert.equal(await pending,true);
+ progress.registerAdapter('deep_recall',{prepareLeave:async()=>false});assert.equal(await progress.prepareLeave('deep_recall'),false);
+ progress.registerAdapter('deep_recall',{prepareLeave:async()=>{throw new Error('未保存')}});await assert.rejects(progress.prepareLeave('deep_recall'),/未保存/);
+});
+
+test('refresh warns only while a learning scene has unsaved work',()=>{
+ const events={},ctx={console,addEventListener:(name,handler)=>events[name]=handler};ctx.window=ctx;
+ vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'../src/62a-learning-progress.js'),'utf8'),ctx);let dirty=false;
+ ctx.KGLearningProgress.registerAdapter('deep_recall',{hasUnsavedChanges:()=>dirty});
+ assert.equal(typeof events.beforeunload,'function');
+ const event=()=>({prevented:false,preventDefault(){this.prevented=true}});
+ let e=event();events.beforeunload(e);assert.equal(e.prevented,false);
+ dirty=true;e=event();events.beforeunload(e);assert.equal(e.prevented,true);assert.equal(e.returnValue,'');
+ dirty=false;e=event();events.beforeunload(e);assert.equal(e.prevented,false);
+});
