@@ -1,19 +1,10 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.368",
+  "fromVersion": "v9.0-p4.1.369",
   "toVersion": "v9.0-p4.1.369",
   "changes": {
-    "added": [
-      "tests/subscription-source.test.js"
-    ],
-    "changed": [
-      "VERSION",
-      "content-prep-studio/dist/content-prep.html",
-      "src/33-user-center.js",
-      "src/35-user-management.js",
-      "src/37-subscription-core.js",
-      "tests/referral-browser.py"
-    ],
+    "added": [],
+    "changed": [],
     "removed": []
   },
   "incompatible": []
