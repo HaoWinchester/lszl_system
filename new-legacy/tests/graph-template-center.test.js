@@ -88,3 +88,20 @@ test('dragging and resizing keep the complete preview and its footer inside the 
   assert.deepEqual(position(320,140,390,564,390,600),{left:0,top:36});
   assert.deepEqual(position(-40,-20,800,600,800,600),{left:0,top:0});
 });
+
+test('reopening publication keeps one form and its unfinished input',async()=>{
+  const h=publicationHarness();await new Promise(resolve=>setImmediate(resolve));
+  const name=h.find(h.form,node=>node.name==='name');name.value='尚未提交的名字';
+  h.find(h.dialog,node=>node.dataset.templatePublish!==undefined).onclick();
+  assert.equal(h.dialog.children.filter(node=>node.tag==='form').length,1);
+  assert.equal(h.find(h.dialog,node=>node.name==='name').value,'尚未提交的名字');
+  h.find(h.form,node=>node.type==='button').onclick();
+  h.find(h.dialog,node=>node.dataset.templatePublish!==undefined).onclick();
+  assert.equal(h.dialog.children.filter(node=>node.tag==='form').length,1);
+});
+test('publication rejects blank names before saving and trims valid names',async()=>{
+  const blank=publicationHarness();blank.find(blank.form,node=>node.name==='name').value=' \t\n ';
+  await blank.send();assert.equal(blank.calls.includes('save'),false);assert.equal(blank.calls.some(call=>call.options?.method==='POST'),false);assert.match(blank.status.textContent,/名称/);
+  const valid=publicationHarness();valid.find(valid.form,node=>node.name==='name').value='  个人学习  ';await valid.send();
+  assert.equal(JSON.parse(valid.calls.find(call=>call.options?.method==='POST').options.body).name,'个人学习');
+});

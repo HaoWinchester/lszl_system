@@ -950,7 +950,12 @@ function finishEdgeMoveDrag(event,cancelled=false){
   if(drag.moved){event.preventDefault();event.stopPropagation()}return drag.moved;
 }
 function clearEdgeEndpointBindTarget(){if(edgeEndpointBindTargetId)cardElementByNodeId(edgeEndpointBindTargetId)?.classList.remove('edge-endpoint-bind-target');edgeEndpointBindTargetId='';ensureGraphViewportController()?.syncControlScale()}
-function edgeEndpointTargetFromClient(clientX,clientY){const element=document.elementFromPoint(clientX,clientY),card=element&&element.closest&&element.closest('.knowledge-card[data-node-id]');if(!card||!cardsLayer.contains(card))return null;const node=nodeById(card.dataset.nodeId);return node&&!isNodeFullyLocked(node)?node:null}
+function edgeEndpointTargetFromClient(clientX,clientY){
+  // The dragged endpoint follows the pointer and otherwise masks the card below it.
+  const element=document.elementsFromPoint(clientX,clientY).find(hit=>!hit.closest?.('.edge-controls-surface'));
+  const card=element?.closest?.('.knowledge-card[data-node-id]');if(!card||!cardsLayer.contains(card))return null;
+  const node=nodeById(card.dataset.nodeId);return node&&!isNodeFullyLocked(node)?node:null;
+}
 function setEdgeEndpointBindTarget(node){const id=node&&String(node.id)||'';if(id===edgeEndpointBindTargetId)return;clearEdgeEndpointBindTarget();if(id){edgeEndpointBindTargetId=id;cardElementByNodeId(id)?.classList.add('edge-endpoint-bind-target');ensureGraphViewportController()?.syncControlScale()}}
 function beginEdgeEndpointDrag(event,linkId,side){
   if(!graphModeAllows('edgeAdvanced'))return false;

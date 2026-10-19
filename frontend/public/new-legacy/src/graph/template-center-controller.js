@@ -21,7 +21,7 @@
     if(active)return;
     const dialog=el('dialog');dialog.id='graphTemplateCenter';dialog.className='graph-template-center';dialog.setAttribute('aria-label','知识图谱模板中心');
     const heading=el('h2','知识图谱模板中心'),intro=el('p','加载会创建独立的新图谱。模板更新或下架不会修改已加载的副本。'),status=el('p'),list=el('div'),actions=el('div'),close=el('button','关闭');status.setAttribute('role','status');actions.className='template-center-actions';actions.append(close);dialog.append(heading,intro,status,list,actions);
-    let disposed=false,busy=false,unmount=()=>{},closePreview=()=>{};const lifetime=new AbortController();active=dialog;
+    let disposed=false,busy=false,publicationForm=null,unmount=()=>{},closePreview=()=>{};const lifetime=new AbortController();active=dialog;
     function finish(){if(busy)return;disposed=true;lifetime.abort();closePreview();unmount();dialog.close();dialog.remove();active=null}
     close.onclick=finish;dialog.addEventListener('cancel',e=>{e.preventDefault();finish()});
     dialog.addEventListener('keydown',event=>{event.stopPropagation();if(event.key==='Escape'){event.preventDefault();finish()}});
@@ -97,6 +97,7 @@
     }
     function form(item){
       if(busy)return;try{requireOnlineFiles()}catch(error){status.textContent=error.message;return}const current=context(),publisher=global.KGAuthCore?.currentUser?.();if(!canPublish(publisher?.role)){status.textContent='仅教师和管理员可以发布模板。';return}if(!current?.fileId){status.textContent='请先保存并打开一个正式图谱。';return}
+      if(publicationForm){publicationForm.name.focus();status.textContent='请先完成或取消当前模板编辑。';return}
       const publisherId=publisher.username,publisherRole=publisher.role;
       const isCurrent=()=>!disposed&&context()?.fileId===current.fileId&&global.KGAuthCore?.currentUser?.()?.username===publisherId&&global.KGAuthCore?.currentUser?.()?.role===publisherRole;
       const editor=el('form');editor.className='template-publication-form';
@@ -105,10 +106,10 @@
       const descField=el('label');descField.className='template-field';descField.append(el('span','模板描述'));
       const description=el('textarea');description.name='description';description.maxLength=3000;description.value=item?.description||'';description.placeholder='描述模板内容与适用场景';description.setAttribute('aria-label','模板描述');descField.append(description);
       const member=el('input');member.type='checkbox';member.checked=!!item?.memberOnly;member.name='memberOnly';const label=el('label','会员模板（加载需要有效会员） ');label.className='template-member-toggle';label.append(member);
-      const submit=el('button',item?'发布新版本':'直接发布');submit.type='submit';submit.classList.add('template-submit-primary');const cancel=el('button','取消编辑');cancel.type='button';cancel.className='template-cancel';cancel.onclick=()=>editor.remove();
+      const submit=el('button',item?'发布新版本':'直接发布');submit.type='submit';submit.classList.add('template-submit-primary');const cancel=el('button','取消编辑');cancel.type='button';cancel.className='template-cancel';cancel.onclick=()=>{editor.remove();publicationForm=null};
       const row=el('div');row.className='template-form-actions';row.append(cancel,submit);
-      editor.append(nameField,descField,label,row);dialog.insertBefore(editor,list);name.focus();
-      editor.onsubmit=e=>{e.preventDefault();execute(async()=>{
+      editor.append(nameField,descField,label,row);dialog.insertBefore(editor,list);publicationForm={editor,name};name.focus();
+      editor.onsubmit=e=>{e.preventDefault();const cleanName=name.value.trim();if(!cleanName){status.textContent='请输入模板名称。';name.focus();return}execute(async()=>{
         requireOnlineFiles();
         submit.disabled=true;cancel.disabled=true;status.textContent='正在保存当前图谱并发布模板…';
         if(!isCurrent())throw new Error('当前图谱或账号已变化，请重新发布。');
@@ -121,8 +122,8 @@
         await global.KGGraphFileRemoteAdapter?.flush?.();
         if(!isCurrent())throw new Error('当前图谱或账号已变化，请重新发布。');
         const latest=context();
-        await request(item?'/'+encodeURIComponent(item.id)+'/versions':'',{method:'POST',body:{sourceFileId:latest.fileId,expectedFileRevision:latest.revision,name:name.value,description:description.value,memberOnly:member.checked}});
-        editor.remove();const success=item?'新版本已发布，旧副本保留。':'模板已直接发布。';
+        await request(item?'/'+encodeURIComponent(item.id)+'/versions':'',{method:'POST',body:{sourceFileId:latest.fileId,expectedFileRevision:latest.revision,name:cleanName,description:description.value,memberOnly:member.checked}});
+        editor.remove();publicationForm=null;const success=item?'新版本已发布，旧副本保留。':'模板已直接发布。';
         try{await refresh();status.textContent=success}catch(error){status.textContent=success+'模板列表刷新失败，请关闭后重新打开查看。'}
       }).finally(()=>{submit.disabled=false;cancel.disabled=false})};
     }

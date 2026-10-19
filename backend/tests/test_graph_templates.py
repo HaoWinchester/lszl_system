@@ -421,3 +421,12 @@ def test_template_rejects_corrupted_ink_before_publication_or_copy_creation(data
             async with AsyncSessionLocal() as db:
                 assert await db.scalar(select(func.count()).select_from(GraphTemplate).where(GraphTemplate.owner_id==data.teacher))==1
         asyncio.run(assert_no_partial_publication())
+
+
+def test_publication_name_requires_visible_text_and_trims_outer_whitespace():
+    from pydantic import ValidationError
+    from app.schemas.graph_template import PublicationInput
+    payload = publication('source')
+    with pytest.raises(ValidationError):
+        PublicationInput.model_validate({**payload, 'name': ' \t\n\u3000 '})
+    assert PublicationInput.model_validate({**payload, 'name': '  个人学习  '}).name == '个人学习'

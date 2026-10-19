@@ -6,7 +6,7 @@ from uuid import uuid4
 from urllib.parse import urlparse,parse_qs
 from playwright.sync_api import sync_playwright,expect
 ROOT=Path(__file__).resolve().parents[1]
-parser=argparse.ArgumentParser();parser.add_argument('--base-url',required=True);parser.add_argument('--source',action='store_true');parser.add_argument('--case',choices=['themes','entry','background','navigation','settings','draft-navigation']);parser.add_argument('--out-dir');args=parser.parse_args()
+parser=argparse.ArgumentParser();parser.add_argument('--base-url',required=True);parser.add_argument('--source',action='store_true');parser.add_argument('--case',choices=['themes','entry','background','navigation','settings','draft-navigation','duplicate-refresh']);parser.add_argument('--out-dir');args=parser.parse_args()
 assert urlparse(args.base_url).hostname in ['127.0.0.1','localhost'],'Use only disposable local accounts'
 OUT=Path(args.out_dir) if args.out_dir else ROOT.parent/'artifacts/learning-state-regression';OUT.mkdir(parents=True,exist_ok=True)
 FILES=['src/canvas/97-learning-theme.js','src/86-knowledge-recall.js','src/77-multi-question-workspace.js','src/39-global-shortcuts.js','src/59b-learning-route-context.js','src/62a-learning-progress.js','src/canvas/94-canvas-ink.js','styles/unified-canvas-runtime.css','styles/knowledge-recall-patch-1.css','styles/focus-vega-learning.css','knowledge-recall.html','question-workspace.html']
@@ -23,6 +23,7 @@ with sync_playwright() as pw:
      if rel=='knowledge-recall.html':body=re.sub(r'(<details[^>]*id="krSceneMenu"[\s\S]*?</svg>)(\s*</summary>)',r'\1<span>主题</span>\2',body,count=1)
      else:body=body.replace('画布主题（与深度回忆同步）','当前多题归纳主题（独立保存）')
      route.fulfill(response=response,body=body)
+    elif rel=='canvas-workspace-adapter.js':route.fulfill(path=str(ROOT.parent/'frontend/scripts/new-legacy-assets/canvas-workspace-adapter.js'))
     elif rel in FILES:route.fulfill(path=str(ROOT/rel))
     else:route.continue_()
    c.route('**/*',override)
@@ -81,9 +82,41 @@ with sync_playwright() as pw:
   w.locator('[data-global-shortcut=recall]').click();w.wait_for_url('**/knowledge-recall.html?**');w.wait_for_load_state('networkidle');expect(w.locator('#krQuestionCount')).to_have_text('2/2')
   w.locator('[data-global-shortcut=workspace]').click();w.wait_for_url('**/question-workspace.html?**');w.wait_for_load_state('networkidle');w.wait_for_function("KGMultiQuestionWorkspace.activeWorkspace().strokes.some(s=>s.text==='待保存切换不得丢失')");w.reload(wait_until='networkidle');w.wait_for_function("KGMultiQuestionWorkspace.activeWorkspace().strokes.some(s=>s.text==='待保存切换不得丢失')")
   saved=c.request.get(args.base_url+'/api/v1/workspaces/'+wid);assert saved.ok;assert any(item.get('text')=='待保存切换不得丢失' for item in saved.json()['workspace']['payload']['strokes'])
+ def duplicate_refresh(c):
+  assert urlparse(args.base_url).port==5297,'Duplicate fixture setup is restricted to the disposable 5297 server'
+  legacy='pmp-pattern-workspace';h=2166136261
+  for char in 'ink-browser':h=((h^ord(char))*16777619)&0xffffffff
+  digits='0123456789abcdefghijklmnopqrstuvwxyz';suffix=''
+  while h:suffix=digits[h%36]+suffix;h//=36
+  canonical=legacy+'-'+suffix;other=legacy+'-legacy-record'
+  for row in c.request.get(args.base_url+'/api/v1/workspaces').json()['workspaces']:assert c.request.delete(args.base_url+'/api/v1/workspaces/'+row['id']).ok
+  for row,qid,title in [(canonical,'ink-question-1','应稳定恢复的画布A'),(other,'ink-question-2','另一份历史画布B')]:
+   node={'id':'ref-'+qid,'nodeType':'question-reference','questionId':qid,'paperId':'ink-paper','releaseId':'ink-release','bankId':'ink-bank','x':220,'y':180,'width':580,'height':550,'color':'#ffffff'}
+   payload={'id':legacy,'userId':'ink-browser','title':title,'schemaVersion':10,'nodes':{node['id']:node},'edges':[],'groups':[],'strokes':[],'tables':[],'viewport':{'x':0,'y':0,'zoom':1}}
+   response=c.request.post(args.base_url+'/api/v1/workspaces',data={'id':row,'title':title,'schemaVersion':10,'payload':payload});assert response.ok,response.text()
+  base=args.base_url+'/question-workspace.html?paperId=ink-paper&releaseId=ink-release&questionId=ink-question-1&bankId=ink-bank&workspace='
+  p=c.new_page();p.set_default_timeout(10000);errors=[];writes=[];observations=[]
+  p.on('pageerror',lambda error:errors.append(str(error)));p.on('request',lambda request:writes.append(request.url) if request.method=='PUT' and '/workspaces/' in request.url else None)
+  for turn in range(8):
+   if turn==0 or turn>=4:p.goto(base+legacy,wait_until='networkidle')
+   else:p.reload(wait_until='networkidle')
+   p.wait_for_function('window.KGMultiQuestionWorkspace?.getState().questionCount===2');p.wait_for_timeout(650)
+   current=p.evaluate('KGMultiQuestionWorkspace.activeWorkspace()');ids=[node.get('questionId') for node in current['nodes'].values()]
+   expect(p.locator('.qw-question-card')).to_have_count(1);expect(p.locator('.qw-question-card')).to_have_attribute('aria-label',re.compile('笔迹验证题 1'));expect(p.locator('.qw-question-card')).to_contain_text('题1/2')
+   assert current['id']==canonical and ids==['ink-question-1'],(p.url,current)
+   assert parse_qs(urlparse(p.url).query)['workspace']==[canonical]
+   observations.append({'turn':turn,'url':p.url,'id':current['id'],'questions':ids,'catalog':p.evaluate('KGCanvasWorkspaceStore.listWorkspaces().map(w=>w.id)')})
+  assert all(url.endswith('/'+canonical) for url in writes),writes
+  rows=c.request.get(args.base_url+'/api/v1/workspaces').json()['workspaces'];assert len(rows)==2
+  assert {row['id']:list(row['payload']['nodes'].values())[0]['questionId'] for row in rows}=={canonical:'ink-question-1',other:'ink-question-2'}
+  p.goto(base+other,wait_until='networkidle');p.wait_for_function('(id)=>KGMultiQuestionWorkspace.activeWorkspaceId()===id',arg=other);expect(p.locator('.qw-question-card')).to_have_attribute('aria-label',re.compile('笔迹验证题 2'));expect(p.locator('.qw-question-card')).to_contain_text('题2/2')
+  p.reload(wait_until='networkidle');p.wait_for_function('(id)=>KGMultiQuestionWorkspace.activeWorkspaceId()===id',arg=other);expect(p.locator('.qw-question-card')).to_have_attribute('aria-label',re.compile('笔迹验证题 2'));expect(p.locator('.qw-question-card')).to_contain_text('题2/2')
+  p.goto(base+legacy,wait_until='networkidle');p.wait_for_function('(id)=>KGMultiQuestionWorkspace.activeWorkspaceId()===id',arg=canonical);expect(p.locator('.qw-question-card')).to_have_attribute('aria-label',re.compile('笔迹验证题 1'));expect(p.locator('.qw-question-card')).to_contain_text('题1/2')
+  assert not errors,errors;p.screenshot(path=str(OUT/'duplicate-refresh-final.png'))
+  (OUT/'duplicate-refresh.json').write_text(json.dumps({'canonical':canonical,'observations':observations,'writes':writes,'retainedRows':len(rows),'pageErrors':errors,'explicitOtherRowAndReturn':True},ensure_ascii=False,indent=2))
  def settings(c):
   r=recall(c);w,_=workspace(c);old=r.evaluate('KGCanvasAppearanceController.read()');before=w.evaluate('KGMultiQuestionWorkspace.activeWorkspace().background');w.locator('[data-uc-canvas-settings]').click();w.locator('[data-uc-color="#fff1f5"]').click();w.locator('[data-uc-cancel]').click();assert w.evaluate('KGMultiQuestionWorkspace.activeWorkspace().background')==before;w.locator('[data-uc-canvas-settings]').click();w.locator('[data-uc-pattern=solid]').click();w.locator('[data-uc-color="#fff1f5"]').click();w.locator('[data-uc-confirm]').click();r.reload(wait_until='networkidle');assert r.evaluate('KGCanvasAppearanceController.read()')==old;w.reload(wait_until='networkidle');w.wait_for_function("KGMultiQuestionWorkspace?.activeWorkspace()?.background?.appearance.backgroundColor==='#fff1f5'");assert w.locator('.qw-background').evaluate('e=>getComputedStyle(e).backgroundImage')=='none','Saved scene layer must not cover an explicitly chosen solid background'
- for name,fn in [('themes',themes),('entry',entry),('background',background),('navigation',navigation),('settings',settings),('draft-navigation',draft_navigation)]:
+ for name,fn in [('themes',themes),('entry',entry),('background',background),('navigation',navigation),('settings',settings),('draft-navigation',draft_navigation)]+([('duplicate-refresh',duplicate_refresh)] if args.case=='duplicate-refresh' else []):
   if args.case and args.case!=name:continue
   c=setup()
   try:fn(c);report.append({'case':name,'passed':True});print('PASS',name,flush=True)

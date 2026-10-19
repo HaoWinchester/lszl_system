@@ -127,4 +127,27 @@ assert.equal(groupLink.from,'a');assert.equal(groupLink.to,'b');
 context.restoreNodeDragRoutes(snapshots);
 assert.deepEqual(plain(groupLink.curveControls),[{x:220,y:-45},{x:340,y:230}]);
 assert.equal(groupLink.from,'a');assert.equal(groupLink.to,'b');
+
+// A dragged endpoint's overlay follows the cursor. Hit testing must look past
+// that overlay, while preserving actual UI blockers and node lock boundaries.
+{
+  const handle={closest:selector=>selector==='.edge-controls-surface'?{}:null};
+  const card={dataset:{nodeId:'endpoint-target'}};
+  const cardChild={closest:selector=>selector==='.knowledge-card[data-node-id]'?card:null};
+  const blocker={closest:()=>null};
+  let hits=[handle,cardChild],locked=false;
+  Object.assign(context,{
+    document:{elementsFromPoint:()=>hits,elementFromPoint:()=>hits[0]},
+    cardsLayer:{contains:value=>value===card},
+    isNodeFullyLocked:()=>locked
+  });
+  nodes.set('endpoint-target',{id:'endpoint-target'});
+  vm.runInContext(source.slice(source.indexOf('function edgeEndpointTargetFromClient('),source.indexOf('function setEdgeEndpointBindTarget(')),context);
+  assert.equal(context.edgeEndpointTargetFromClient(10,20),nodes.get('endpoint-target'),'moving endpoint overlay must not hide the drop card');
+  hits=[handle,blocker,cardChild];
+  assert.equal(context.edgeEndpointTargetFromClient(10,20),null,'do not bind through a toolbar or other UI blocker');
+  hits=[handle,cardChild];locked=true;
+  assert.equal(context.edgeEndpointTargetFromClient(10,20),null,'fully locked cards remain unavailable');
+}
+
 console.log('PASS graph edge midpoints: directions, overlapping projections, tight gaps, manual routes, free endpoints, route persistence, move/reload, rebind and control dragging');

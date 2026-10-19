@@ -1,22 +1,13 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.356",
-  "toVersion": "v9.0-p4.1.357",
+  "fromVersion": "v9.0-p4.1.358",
+  "toVersion": "v9.0-p4.1.359",
   "changes": {
     "added": [],
     "changed": [
       "VERSION",
       "content-prep-studio/dist/content-prep.html",
-      "src/39-global-shortcuts.js",
-      "src/62a-learning-progress.js",
-      "src/77-multi-question-workspace.js",
-      "src/86-knowledge-recall.js",
-      "src/canvas/94-canvas-ink.js",
-      "tests/canvas-ink-polish-browser.py",
-      "tests/canvas-ink-workspace-save.test.js",
-      "tests/learning-theme-browser.py",
-      "tests/v90-p4529-deep-recall-database-adapter.test.js",
-      "tests/workspace-background.test.js"
+      "tests/learning-theme-browser.py"
     ],
     "removed": []
   },

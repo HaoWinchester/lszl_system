@@ -42,4 +42,21 @@ assert(!/efficient"\] \.edge-control-layer[^-]/.test(css),'efficient mode must n
 assert(css.includes('.node-style-toolbar:not(.readonly-context)'));
 assert(!/efficient"\] \.node-style-toolbar \[data-node-toolbar-action="lock"\]/.test(css),'efficient mode must keep the lock button');
 assert(css.includes('body.graph-phone-reading .graph-mode-switcher'));
+// Authenticated viewers keep selection/navigation but cannot mutate a personal
+// graph, regardless of their stored efficient/professional interaction mode.
+const vm=require('node:vm');
+for(const preferred of ['efficient','professional']){
+  let role='viewer',readonly=false;
+  const document={readyState:'loading',addEventListener(){},body:{classList:{contains:name=>name==='auth-readonly'&&readonly}}};
+  const global={document,addEventListener(){},navigator:{userAgent:''},matchMedia:()=>({matches:false}),
+    localStorage:{getItem:key=>key==='kg_home_interaction_mode_v1'?JSON.stringify(preferred):null},
+    KGRolePermissions:{currentRole:()=>role,can:permission=>permission==='editGraph'&&role!=='viewer'}};
+  vm.runInNewContext(modes,{window:global,document});
+  const api=global.KGHomeInteractionModes;
+  for(const capability of ['editGraph','nodeDrag','nodeEdit','nodeResize','textEdit','textDrag','selectionBoundsMove','connections','nodeToolbar','edgeMove','edgeAdvanced','edgeToolbar','edgeLabelEdit','contextMenuAdvanced'])assert.equal(api.can(capability),false,'viewer '+preferred+' cannot '+capability);
+  for(const capability of ['read','boxSelect','multiSelect','edgeSelect','contextMenu'])assert.equal(api.can(capability),true,'viewer keeps '+capability);
+  assert.equal(api.getMode(),preferred);assert.equal(api.getPreferredDesktopMode(),preferred);
+  for(role of ['teacher','student'])for(const capability of ['editGraph','nodeDrag','connections','edgeAdvanced','edgeToolbar','edgeLabelEdit'])assert.equal(api.can(capability),true,role+' keeps '+capability);
+  readonly=true;assert.equal(api.can('edgeAdvanced'),false,'readonly bootstrap also disables mutation');assert.equal(api.can('edgeSelect'),true,'readonly bootstrap keeps selection');
+}
 console.log('v90-p4330-home-interaction-modes-ok');

@@ -244,8 +244,92 @@ def role_matrix(base, output):
     print('PASS template role matrix: 7/7 real browser identities; fixture only; all positive/negative paths checked',flush=True)
 
 
+
+def publication_flow(base,output,source=False,tag='candidate'):
+    """Complete publication -> preview -> independent-copy workflow on a disposable fixture."""
+    from types import SimpleNamespace
+    from uuid import uuid4
+    A=SimpleNamespace(source=source,tag=tag);B=base.rstrip('/');O=Path(output);O.mkdir(parents=True,exist_ok=True)
+    report={'baseUrl':B,'sourceOverrides':source,'results':[],'errors':[]};uid=uuid4().hex[:6]
+    def check(label,condition=True,detail=None):
+     assert condition,(label,detail);report['results'].append({'label':label,'pass':True,'detail':detail});print('PASS',label,flush=True);(O/(A.tag+'-results.json')).write_text(json.dumps(report,ensure_ascii=False,indent=2))
+    def dismiss(w):
+     for sel in ['#learningEntryDismissBtn','.tour-skip','#hideHelpBtn']:
+      if w.locator(sel).is_visible():w.locator(sel).click()
+    def ready(w):
+     w.wait_for_function('window.KGGraphFileTabs&&!KGGraphFileTabs.isSwitching()');dismiss(w)
+     if A.source:w.add_script_tag(path=str(ROOT/'new-legacy/src/graph/template-center-controller.js'))
+    def center(w):
+     w.locator('#templateBtn').click();expect(w.locator('#graphTemplateCenter')).to_be_visible();expect(w.locator('#graphTemplateCenter [role=status]')).not_to_have_text('正在加载模板…')
+    def close(w):w.locator('#graphTemplateCenter .template-center-actions').get_by_role('button',name='关闭',exact=True).click()
+    def form(w,name,member=False,tid=None):
+     if tid:w.locator('[data-template-id="'+tid+'"]').get_by_role('button',name='更新为新版本',exact=True).click()
+     else:w.locator('[data-template-publish]').click()
+     f=w.locator('.template-publication-form');f.locator('[name=name]').fill(name);f.locator('[name=description]').fill('完整流程 '+uid);f.locator('[name=memberOnly]').set_checked(member);return f
+    def publish(w,f,tid=None):
+     path='/api/v1/graph-templates'+('/'+tid+'/versions' if tid else '')
+     with w.expect_response(lambda r:r.request.method=='POST' and r.url.endswith(path)) as res:f.get_by_role('button',name='发布新版本' if tid else '直接发布',exact=True).click()
+     assert res.value.status==201,res.value.text();expect(f).to_have_count(0);return res.value.json()['template']
+    def load(w,tid):
+     row=w.locator('[data-template-id="'+tid+'"]')
+     with w.expect_response('**/api/v1/graph-templates/'+tid+'/loads') as res:row.locator('[data-template-load]').click()
+     assert res.value.status==201,res.value.text();expect(row.locator('[data-template-result]')).to_be_visible();return res.value.json()
+    def edit_title(w,nid,text):
+     card=w.locator('.knowledge-card[data-node-id="'+nid+'"]');card.locator('.node-title').dblclick();editor=w.locator('[data-node-inline-editor=true]');expect(editor).to_be_visible();editor.fill(text);w.mouse.click(1050,650);expect(editor).to_have_count(0)
+    with sync_playwright() as pw:
+     browser=pw.chromium.launch(channel='chrome');pages=[]
+     def session(user):
+      c=browser.new_context(viewport={'width':1440,'height':960});assert c.request.post(B+'/api/v1/auth/login',data={'username':user,'password':'ink-browser-test'}).ok;w=c.new_page();w.set_default_timeout(10000);w.on('pageerror',lambda e:report['errors'].append(str(e)));pages.append(w);return c,w
+     try:
+      teacher,w=session('ink-browser')
+      setup=browser.new_context();assert setup.request.post(B+'/api/v1/auth/login',data={'username':'ink-admin','password':'ink-browser-test'}).ok;assert setup.request.put(B+'/api/v1/subscriptions/admin/ink-student',data={'planId':'free','status':'active','note':'isolated browser fixture reset'}).ok;setup.close()
+      graph={'nodes':[{'id':'a','title':'完整学习体系','geometry':{'x':200,'y':250,'width':240,'height':130},'appearance':{'cardStyle':'rounded','fillColor':'#fff1f2','textColor':'#9f1239','fontSize':24,'borderColor':'#fb7185','borderWidth':2}},{'id':'b','title':'知识关联','x':650,'y':150},{'id':'c','title':'主动回忆','x':650,'y':450}], 'links':[{'id':'ab','from':'a','to':'b','pathStyle':'curve','strokeWidth':5,'color':'#db2777','arrowStyle':'end','curveControls':[{'x':500,'y':300},{'x':540,'y':160}]},{'id':'ac','from':'a','to':'c','pathStyle':'elbow','lineStyle':'dashed','waypoints':[{'x':550,'y':315},{'x':550,'y':516}]}], 'strokes':[{'id':'ink-pen','tool':'pen','width':5,'color':'#16a34a','opacity':.6,'points':[[280,600],[450,630],[700,600]]},{'id':'ink-text','tool':'text','text':'画布文字 '+uid,'width':24,'color':'#7c3aed','points':[[200,100]]}]}
+      r=teacher.request.post(B+'/api/v1/files',data={'name':'模板全流程-'+uid,'graphData':graph});assert r.ok;fid=r.json()['file']['id'];assert teacher.request.put(B+'/api/v1/files/current',data={'fileId':fid}).ok
+      w.goto(B+'/graph',wait_until='networkidle');ready(w);w.locator('.graph-mode-trigger').click();w.locator('[data-graph-mode-option=professional]').click();edit_title(w,'b','最新知识关联 '+uid);check('edit_source_through_visible_title_editor')
+      center(w);f=form(w,'免费模板 '+uid);w.locator('[data-template-publish]').click();expect(f).to_have_count(1);expect(f.locator('[name=name]')).to_have_value('免费模板 '+uid);check('one_form_retains_input_on_repeated_publish_entry')
+      posts=[];w.on('request',lambda r:posts.append(r.url) if r.method=='POST' and r.url.endswith('/graph-templates') else None)
+      f.locator('[name=name]').fill(' \u3000 ');f.get_by_role('button',name='直接发布',exact=True).click();expect(w.locator('#graphTemplateCenter [role=status]')).to_contain_text('名称');assert not posts;check('whitespace_name_rejected_before_publish')
+      f.locator('[name=name]').fill('  免费模板 '+uid+'  ')
+      def fail(route):route.fulfill(status=503,json={'detail':'模板服务临时不可用'})
+      w.route('**/api/v1/graph-templates',lambda route:fail(route) if route.request.method=='POST' else route.continue_())
+      f.get_by_role('button',name='直接发布',exact=True).click();expect(w.locator('#graphTemplateCenter [role=status]')).to_contain_text('临时不可用');expect(f).to_be_visible();expect(f.locator('[name=name]')).to_have_value('  免费模板 '+uid+'  ');check('publish_503_retains_name_description_and_retry')
+      w.unroute('**/api/v1/graph-templates');free=publish(w,f);tid=free['id'];check('retry_publishes_one_named_template',free['name']=='免费模板 '+uid and free['version']==1)
+      original=teacher.request.get(B+'/api/v1/files/'+fid).json()['graphData'];row=w.locator('[data-template-id="'+tid+'"]');expect(row.locator('.template-thumbnail svg')).to_be_visible();row.locator('.template-thumbnail').click();panel=w.locator('.template-preview-window');drawing=panel.locator('svg');expect(drawing.locator('.knowledge-card')).to_have_count(3);expect(drawing.locator('[data-stroke-id=ink-text]')).to_have_text('画布文字 '+uid);assert drawing.locator('path[data-preview-link-id]').count()==2;check('preview_latest_cards_edges_pen_and_text')
+      source_b=w.locator('#cardsLayer .knowledge-card[data-node-id=b] .node-title').text_content();assert drawing.locator('.knowledge-card[data-node-id=b] .node-title').text_content()==source_b
+      attrs=['width','height','backgroundColor','borderRadius'];styles='(e,keys)=>Object.fromEntries(keys.map(k=>[k,getComputedStyle(e)[k]]))';source_style=w.locator('#cardsLayer .knowledge-card[data-node-id=a]').evaluate(styles,attrs);preview_style=drawing.locator('.knowledge-card[data-node-id=a]').evaluate(styles,attrs);check('preview_card_geometry_and_style_match_original',source_style==preview_style)
+      view=drawing.get_attribute('viewBox');panel.get_by_role('button',name='放大预览',exact=True).click();assert drawing.get_attribute('viewBox')!=view;panel.get_by_role('button',name='缩小预览',exact=True).click();panel.get_by_role('button',name='适应视图',exact=True).click();assert drawing.get_attribute('viewBox')==view
+      box=drawing.bounding_box();w.mouse.move(box['x']+box['width']/2,box['y']+box['height']/2);w.mouse.down();w.mouse.move(box['x']+box['width']/2+75,box['y']+box['height']/2+30,steps=8);w.mouse.up();assert drawing.get_attribute('viewBox')!=view;panel.get_by_role('button',name='适应视图',exact=True).click();check('preview_zoom_pan_fit')
+      before=w.evaluate('JSON.stringify({graph:saveableState(),history:KGGraphKernel.history.getState()})');w.keyboard.press('Delete');assert w.evaluate('JSON.stringify({graph:saveableState(),history:KGGraphKernel.history.getState()})')==before;check('preview_keyboard_cannot_change_source')
+      panel.get_by_role('button',name='全屏',exact=True).click();w.wait_for_function('!!document.fullscreenElement');panel.get_by_role('button',name='退出全屏',exact=True).click();w.wait_for_function('!document.fullscreenElement');w.screenshot(path=str(O/(A.tag+'-preview.png')));panel.get_by_role('button',name='关闭模板预览',exact=True).click();check('preview_fullscreen_and_close')
+      paid=publish(w,form(w,'会员模板 '+uid,True));close(w)
+      student,s=session('ink-student');s.goto(B+'/graph',wait_until='networkidle');ready(s);student_source=student.request.get(B+'/api/v1/files/current').json();center(s);expect(s.locator('[data-template-publish]')).to_have_count(0);check('student_cannot_publish_in_ui')
+      s.locator('[data-template-id="'+paid['id']+'"] [data-template-load]').click();expect(s.locator('#graphTemplateCenter [role=status]')).to_contain_text('需要有效会员');check('nonmember_paid_template_denied')
+      copied=load(s,tid);copyid=copied['fileId'];row=s.locator('[data-template-id="'+tid+'"]');row.locator('[data-template-result]').click();s.wait_for_function('(id)=>KGGraphFileRemoteAdapter.getCurrentFileMeta()?.id===id&&!KGGraphFileTabs.isSwitching()',arg=copyid);check('student_load_opens_new_independent_graph',copyid!=fid)
+      loaded=student.request.get(B+'/api/v1/files/'+copyid).json()['graphData'];check('copy_preserves_cards_links_strokes',len(loaded['nodes'])==3 and len(loaded['links'])==2 and len(loaded['strokes'])==2);check('copy_uses_new_ids',all(n['id'] not in {'a','b','c'} for n in loaded['nodes']) and all(t['id'] not in {'ink-pen','ink-text'} for t in loaded['strokes']))
+      s.locator('.graph-mode-trigger').click();s.locator('[data-graph-mode-option=professional]').click();edit_title(s,copied['idMap']['b'],'学生副本改动 '+uid);s.wait_for_function('!KGGraphFileAutosave.isDirty()');s.reload(wait_until='networkidle');ready(s);expect(s.locator('.knowledge-card[data-node-id="'+copied['idMap']['b']+'"] .node-title')).to_have_text('学生副本改动 '+uid);check('copy_edit_saved_and_refreshed');check('copy_edit_leaves_published_source_unchanged',teacher.request.get(B+'/api/v1/files/'+fid).json()['graphData']==original)
+      edit_title(w,'b','第二版知识关联 '+uid);center(w);f=form(w,'免费模板新版 '+uid,tid=tid);updated=publish(w,f,tid);check('teacher_updates_immutable_version',updated['version']==2);assert teacher.request.get(B+'/api/v1/graph-templates/'+tid).json()['preview']['version']==2
+      check('new_version_leaves_existing_copy_unchanged',next(n for n in student.request.get(B+'/api/v1/files/'+copyid).json()['graphData']['nodes'] if n['id']==copied['idMap']['b'])['title']=='学生副本改动 '+uid)
+      w.locator('[data-template-id=\"'+tid+'\"]').get_by_role('button',name='预览',exact=True).click();expect(w.locator('.template-preview-window .knowledge-card[data-node-id=b] .node-title')).to_have_text('第二版知识关联 '+uid);w.locator('.template-preview-window').get_by_role('button',name='关闭模板预览',exact=True).click();check('preview_shows_updated_version_content')
+      row=w.locator('[data-template-id="'+tid+'"]');row.get_by_role('button',name='下架',exact=True).click();expect(row).to_contain_text('已下架');check('downlist_keeps_loaded_copy',student.request.get(B+'/api/v1/files/'+copyid).ok);row.get_by_role('button',name='重新上架',exact=True).click();expect(row).not_to_contain_text('已下架');check('relist_template')
+      admin,a=session('ink-admin');a.goto(B+'/graph',wait_until='networkidle');ready(a);center(a);expect(a.locator('[data-template-id="'+tid+'"]')).to_be_visible();expect(a.locator('[data-template-id="'+tid+'"]')).to_contain_text('下架');check('admin_can_maintain_teacher_template')
+      response=admin.request.put(B+'/api/v1/subscriptions/admin/ink-student',data={'planId':'lifetime','status':'active','note':'isolated browser template fixture'});assert response.ok,response.text();s.reload(wait_until='networkidle');ready(s);center(s);membercopy=load(s,paid['id']);check('active_member_loads_paid_template',membercopy['fileId']!=copyid)
+      viewer,v=session('ink-viewer');v.goto(B+'/graph',wait_until='networkidle');ready(v);check('viewer_template_entry_hidden',not v.locator('#templateBtn').is_visible());check('viewer_catalog_denied',viewer.request.get(B+'/api/v1/graph-templates').status==403)
+      body={'sourceFileId':fid,'expectedFileRevision':1,'name':'非法发布','memberOnly':False};check('student_publisher_api_denied',student.request.post(B+'/api/v1/graph-templates',data=body).status==403)
+      check('server_rejects_blank_publication_name',teacher.request.post(B+'/api/v1/graph-templates',data={**body,'name':' \u3000 '}).status==422)
+      anon=browser.new_context();check('guest_templates_require_login',anon.request.get(B+'/api/v1/graph-templates').status==401);anon.close();check('no_browser_page_errors',not report['errors'],report['errors'])
+      report['version']=teacher.request.get(B+'/VERSION').text().strip();report['pass']=True
+     except Exception as e:
+      report['pass']=False;report['error']=str(e)
+      for i,p in enumerate(pages):
+       try:p.screenshot(path=str(O/(A.tag+'-failure-'+str(i)+'.png')))
+       except Exception:pass
+      raise
+     finally:
+      (O/(A.tag+'-results.json')).write_text(json.dumps(report,ensure_ascii=False,indent=2));browser.close()
+
 if __name__=='__main__':
     import argparse
-    parser=argparse.ArgumentParser();parser.add_argument('--role-matrix',action='store_true');parser.add_argument('--base-url',default='http://127.0.0.1:5265');parser.add_argument('--output',default=str(ROOT/'artifacts/window-role-qa/templates'));args=parser.parse_args()
-    if args.role_matrix:role_matrix(args.base_url.rstrip('/'),args.output)
+    parser=argparse.ArgumentParser();parser.add_argument('--role-matrix',action='store_true');parser.add_argument('--full-flow',action='store_true');parser.add_argument('--source',action='store_true');parser.add_argument('--tag',default='candidate');parser.add_argument('--base-url',default='http://127.0.0.1:5265');parser.add_argument('--output',default=str(ROOT/'artifacts/window-role-qa/templates'));args=parser.parse_args()
+    if args.full_flow:publication_flow(args.base_url,args.output,args.source,args.tag)
+    elif args.role_matrix:role_matrix(args.base_url.rstrip('/'),args.output)
     else:main()

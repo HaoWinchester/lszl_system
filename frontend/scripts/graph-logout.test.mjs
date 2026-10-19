@@ -54,3 +54,13 @@ test('overlapping title changes persist the latest filename with the latest cont
  const first=h.c.saveGraphTitle('first'),second=h.c.saveGraphTitle('second');finish(true);await Promise.all([first,second])
  assert.deepEqual(writes,[{name:'first',title:'first'},{name:'second',title:'second'}]);assert.equal(h.c.KGGraphFileAutosave.isDirty(),false)
 })
+test('graph ink closes and resets selection only when the authenticated account changes',()=>{
+ const handlers={},calls=[];let account='teacher';
+ const ink={render(){},refreshControls(){},cancel(){},reset(options){calls.push(['reset',options])},setOpen(open){calls.push(['open',open])}};
+ const c={console,stage:{},world:{},state:{strokes:[]},ensureGraphHistoryController:()=>({}),setGraphPointerMode(){},clearSelection(){},showStatus(){},document:{readyState:'complete',getElementById:()=>null},KGAuthCore:{currentUsername:()=>account},KGCanvasInk:{create:()=>ink},KGCanvasTableModel:{ENABLED:false},addEventListener:(type,fn)=>handlers[type]=fn};
+ c.window=c;vm.createContext(c);vm.runInContext(source('canvas/95-home-canvas-tools.js'),c);
+ assert.equal(typeof handlers['kg-auth-session-change'],'function');
+ handlers['kg-auth-session-change']();assert.deepEqual(calls,[],'same account refresh keeps the active tool');
+ account='';handlers['kg-auth-session-change']();assert.deepEqual(calls,[['reset',undefined],['open',false]]);
+ calls.length=0;account='student';handlers['kg-auth-session-change']();assert.deepEqual(calls,[['reset',undefined],['open',false]],'a different account cannot inherit stale ink selection');
+})

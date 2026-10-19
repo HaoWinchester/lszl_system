@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict'
-import { spawnSync } from 'node:child_process'
+import {runNodeTestProcess} from './node-test-process.mjs'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
 const root = fileURLToPath(new URL('../../new-legacy/', import.meta.url))
 test('M1 focus, exact keyword roots, backgrounds and failed-save recovery', () => {
-  const result = spawnSync(process.execPath, ['--test',
+  const result = runNodeTestProcess( ['--test',
     'tests/canvas-dom-interaction.test.js',
     'tests/recall-keyword-resolution.test.js',
     'tests/workspace-background.test.js',

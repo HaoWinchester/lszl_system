@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 class PublicationInput(BaseModel):
     model_config = ConfigDict(extra='forbid', populate_by_name=True)
@@ -7,6 +7,11 @@ class PublicationInput(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     description: str = Field(default='', max_length=3000)
     member_only: bool = Field(default=False, alias='memberOnly')
+
+    @field_validator('name', mode='before')
+    @classmethod
+    def trim_name(cls, value):
+        return value.strip() if isinstance(value, str) else value
 
 class ListingInput(BaseModel):
     model_config = ConfigDict(extra='forbid')
