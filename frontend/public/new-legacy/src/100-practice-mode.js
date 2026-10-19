@@ -395,6 +395,7 @@
   }
   function retriggerViewAnimation(el,cls){if(!el)return;el.classList.remove(cls);void el.offsetWidth;el.classList.add(cls)}
   function setView(name){
+    if(name!=='game')global.KGQuestionComments?.teardownSource?.('danmaku');
     dom.lobby.hidden=name!=='lobby';dom.game.hidden=name!=='game';dom.checkpoint.hidden=name!=='checkpoint';dom.result.hidden=name!=='result';
     if(name==='game')retriggerViewAnimation(dom.game,'is-entering');
     document.body.dataset.practiceView=name;

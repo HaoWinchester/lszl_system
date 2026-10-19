@@ -26,7 +26,6 @@
     const graph=getGraph();panel.innerHTML=`<div class="mm-toolbar" role="toolbar" aria-label="思维导图布局与主题">
       <details class="mm-popover" data-mm-menu="layout"><summary>布局 <span aria-hidden="true">⌄</span></summary><div class="mm-popover-body mm-layout-row">
         <label class="mm-field">方向 <select data-mm-direction><option value="right">向右</option><option value="left">向左</option><option value="bilateral">左右展开</option><option value="down">向下树形</option></select></label>
-        <button type="button" class="mm-apply" data-mm-layout>应用布局</button>
         <details class="mm-advanced"><summary>更多设置</summary><label class="mm-field">根节点 <select data-mm-root><option value="">已有层级根节点</option></select></label><label class="mm-field mm-override"><input type="checkbox" data-mm-override>覆盖手工样式</label></details>
       </div></details>
       <details class="mm-popover" data-mm-menu="theme"><summary>主题 <span aria-hidden="true">⌄</span></summary><div class="mm-popover-body mm-theme-row"></div></details>
@@ -40,7 +39,8 @@
     const root=panel.querySelector('[data-mm-root]');for(const n of graph.nodes){const o=document.createElement('option');o.value=n.id;o.textContent=global.KGGraphModel.contentOf(n).title;root.append(o)}root.value=graph.mindmap?.rootIds?.[0]||'';
     const scope=()=>{if(panel.querySelector('[data-mm-scope]').value==='all')return undefined;const ids=getSelectedIds();if(!ids.length)throw new Error('请先选择节点');return ids};
     const execute=work=>{try{const status=work();panel.refresh();panel.querySelector('[data-mm-status]').textContent=typeof status==='string'?status:'已应用'}catch(e){panel.querySelector('[data-mm-status]').textContent=e.message}};
-    panel.querySelector('[data-mm-layout]').onclick=()=>execute(()=>runLayout({rootIds:root.value?[root.value]:[],direction:panel.querySelector('[data-mm-direction]').value,scopeIds:scope()}));
+    const applyLayout=()=>execute(()=>runLayout({rootIds:root.value?[root.value]:[],direction:panel.querySelector('[data-mm-direction]').value,scopeIds:scope()}));
+    for(const selector of ['[data-mm-direction]','[data-mm-root]','[data-mm-scope]'])panel.querySelector(selector).addEventListener('change',applyLayout);
     for(const t of presets){
       const b=document.createElement('button');b.type='button';b.dataset.mmTheme=t.id;b.className='mm-theme-chip';b.textContent=t.name;
       // 芯片自带主题预览色（背景/文字/描边由主题数据注入）。

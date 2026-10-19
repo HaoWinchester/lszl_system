@@ -213,6 +213,7 @@ python3 new-legacy/tests/practice-answer-sheet-browser.py
 python3 new-legacy/tests/practice-result-report-browser.py
 python3 new-legacy/tests/practice-instant-feedback-browser.py
 python3 new-legacy/tests/practice-lobby-fidelity-browser.py
+python3 new-legacy/tests/practice-side-nav-comments-browser.py
 python3 new-legacy/tests/danmaku-design-browser.py
 python3 new-legacy/tests/run-danmaku-api-browser.py --output-dir "$VALIDATION_ROOT/danmaku-api"
 fi

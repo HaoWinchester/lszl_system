@@ -33,16 +33,22 @@ def main():
         page.locator('[data-formal-mindmap-panel]').get_by_role('button',name='关闭布局与主题').click();page.evaluate('document.exitFullscreen()');page.wait_for_function('!document.fullscreenElement');assert page.locator('[data-formal-mindmap-panel]').count()==0
         assert page.evaluate("()=>{const w=document.createTreeWalker(document,NodeFilter.SHOW_COMMENT);let n=0;while(w.nextNode())if(w.currentNode.data==='canvas-overlay-home')n++;return n}")==markers
         page.locator('#mm-fullscreen-probe').evaluate('(b)=>b.remove()')
-        before=page.evaluate('JSON.stringify(graphUndoSnapshot())');page.locator('#mindmapBtn').click();panel=page.locator('[data-formal-mindmap-panel]');expect(panel).to_be_visible();layout_controls(panel);panel.locator('[data-mm-root]').select_option('a');assert not panel.locator('[data-mm-override]').is_checked()
-        for direction in ['right','left','bilateral','down']:
-            panel.locator('[data-mm-direction]').select_option(direction);panel.locator('[data-mm-layout]').click();expect(panel.locator('[data-mm-status]')).to_have_text('已应用')
+        before=page.evaluate('JSON.stringify(graphUndoSnapshot())');page.locator('#mindmapBtn').click();assert page.evaluate('JSON.stringify(graphUndoSnapshot())')==before;panel=page.locator('[data-formal-mindmap-panel]');expect(panel).to_be_visible();layout_controls(panel);panel.locator('[data-mm-root]').select_option('a');assert not panel.locator('[data-mm-override]').is_checked()
+        for direction in ['left','right','bilateral','down']:
+            previous=page.evaluate('JSON.stringify(graphUndoSnapshot())');undo_count=page.evaluate('KGGraphKernel.history.getState().undoCount')
+            panel.locator('[data-mm-direction]').select_option(direction);expect(panel.locator('[data-mm-status]')).to_have_text('已应用')
             assert page.evaluate('state.nodes.length')==5 and page.evaluate('state.links.length')==5
             pos=page.evaluate('Object.fromEntries(state.nodes.map(n=>[n.id,{x:n.x,y:n.y}]))')
             if direction=='right':assert pos['b']['x']>pos['a']['x']
             if direction=='left':assert pos['b']['x']<pos['a']['x']
             if direction=='down':assert pos['b']['y']>pos['a']['y']
             if direction=='bilateral':assert (pos['b']['x']-pos['a']['x'])*(pos['c']['x']-pos['a']['x'])<0
-            saved=page.evaluate('JSON.stringify(graphUndoSnapshot())');panel.locator('[data-mm-layout]').click();assert page.evaluate('JSON.stringify(graphUndoSnapshot())')==saved
+            applied=page.evaluate('JSON.stringify(graphUndoSnapshot())')
+            assert page.evaluate('KGGraphKernel.history.getState().undoCount')==undo_count+1
+            page.evaluate('restoreGraphUndoSnapshot()');assert page.evaluate('JSON.stringify(graphUndoSnapshot())')==previous
+            page.evaluate('restoreGraphRedoSnapshot()');assert page.evaluate('JSON.stringify(graphUndoSnapshot())')==applied
+            saved=page.evaluate('JSON.stringify(graphUndoSnapshot())');panel.locator('[data-mm-direction]').select_option(direction);assert page.evaluate('JSON.stringify(graphUndoSnapshot())')==saved
+        assert panel.get_by_role('button',name='应用布局',exact=True).count()==0
         page.evaluate("KGGraphKernel.style.updateAppearance(['b'],{fillColor:'#123456',fontSize:36})")
         theme_controls(panel)
         for theme in ['wire','blue','branches','mono','paper','capsule']:
@@ -63,9 +69,16 @@ def main():
         # Explicit selection scope must not move any other node.
         page.evaluate("selectedNodeIds=new Set(['b','d']);state.selectedNodeId='b';refreshSelectionUI()")
         unselected=page.evaluate("JSON.stringify(state.nodes.filter(n=>!['b','d'].includes(n.id)))")
-        page.locator('#mindmapBtn').click();panel=page.locator('[data-formal-mindmap-panel]');layout_controls(panel);panel.locator('[data-mm-scope]').select_option('selected');panel.locator('[data-mm-root]').select_option('b');panel.locator('[data-mm-direction]').select_option('left');panel.locator('[data-mm-layout]').click();expect(panel.locator('[data-mm-status]')).to_have_text('已应用')
+        page.locator('#mindmapBtn').click();panel=page.locator('[data-formal-mindmap-panel]');layout_controls(panel);panel.locator('[data-mm-scope]').select_option('selected');panel.locator('[data-mm-root]').select_option('b');panel.locator('[data-mm-direction]').select_option('left');expect(panel.locator('[data-mm-status]')).to_have_text('已应用')
         assert page.evaluate("JSON.stringify(state.nodes.filter(n=>!['b','d'].includes(n.id)))")==unselected
         page.evaluate('restoreGraphUndoSnapshot()');panel.get_by_role('button',name='关闭布局与主题').click()
+        page.evaluate('selectedNodeIds.clear();state.selectedNodeId=null;refreshSelectionUI()')
+        page.locator('#mindmapBtn').click();panel=page.locator('[data-formal-mindmap-panel]')
+        unchanged=page.evaluate('JSON.stringify(graphUndoSnapshot())')
+        panel.locator('[data-mm-scope]').select_option('selected');expect(panel.locator('[data-mm-status]')).to_have_text('请先选择节点')
+        assert page.evaluate('JSON.stringify(graphUndoSnapshot())')==unchanged
+        panel.locator('[data-mm-scope]').select_option('all');expect(panel.locator('[data-mm-status]')).to_have_text('已应用')
+        panel.get_by_role('button',name='关闭布局与主题').click()
         page.evaluate("selectedNodeIds=new Set(['a','c']);state.selectedNodeId='a';refreshSelectionUI()")
         formal=page.evaluate('JSON.stringify(saveableState())');history=page.evaluate('KGGraphKernel.history.getState().undoCount');assert page.evaluate('openRelatedCanvasModal(false)')
         temporary=page.locator('.related-canvas-backdrop')

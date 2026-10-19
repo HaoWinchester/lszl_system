@@ -84,7 +84,7 @@ def run_full_ui(base, out, username):
       for selector in ['[data-mm-menu="layout"]','.mm-advanced']:
        section=mm.locator(selector)
        if section.get_attribute('open') is None:section.locator(':scope > summary').click()
-      mm.locator('[data-mm-root]').select_option('a');mm.locator('[data-mm-direction]').select_option('right');mm.locator('[data-mm-layout]').click();expect(mm.locator('[data-mm-status]')).to_have_text('已应用');assert len(link().get('curveControls',[]))==2 and not page.evaluate('(id)=>edgeDomById.get(id).geometry.derivedCurveControls',eid)
+      mm.locator('[data-mm-root]').select_option('a');mm.locator('[data-mm-direction]').select_option('right');expect(mm.locator('[data-mm-status]')).to_have_text('已应用');assert len(link().get('curveControls',[]))==2 and not page.evaluate('(id)=>edgeDomById.get(id).geometry.derivedCurveControls',eid)
       mm.get_by_role('button',name='关闭布局与主题').click();page.locator('#stage').focus();page.keyboard.press('ControlOrMeta+z');assert link().get('curveControls')==controls
       select_edge();snap('05-follow-undo-redo');save();stored=ctx.request.get(base+'/api/v1/files/'+fid).json()['graphData'];normalize=lambda links:[{'hierarchy':False,**item} for item in links];assert normalize(stored['links'])==normalize(page.evaluate('JSON.parse(JSON.stringify(saveableState().links))'))
       page.reload(wait_until='networkidle');ready();page.wait_for_function('(id)=>state.links.some(l=>l.id===id)',arg=eid);assert normalize(page.evaluate('JSON.parse(JSON.stringify(saveableState().links))'))==normalize(stored['links']);snap('06-reloaded')

@@ -84,8 +84,8 @@ with sync_playwright() as pw:
  expect(panel.locator('[data-mm-theme="blue"]')).to_have_attribute('aria-pressed','true');panel.locator('[data-mm-undo]').click();assert page.evaluate('KGGraphModel.appearanceOf(nodeById("a")).fillColor')!='#dbeafe'
  panel.locator('[data-mm-menu="layout"] > summary').click();panel.locator('.mm-advanced > summary').click();panel.locator('[data-mm-root]').select_option('a')
  for direction in ['right','left','bilateral','down']:
-  panel.locator('[data-mm-direction]').select_option(direction);panel.locator('[data-mm-layout]').click();assert page.evaluate('state.mindmap.direction')==direction
- panel.locator('[data-mm-direction]').select_option('right');panel.locator('[data-mm-layout]').click()
+  panel.locator('[data-mm-direction]').select_option(direction);assert page.evaluate('state.mindmap.direction')==direction
+ panel.locator('[data-mm-direction]').select_option('right')
  page.screenshot(path=str(OUT/'compact-layout.png'))
  panel.locator('[data-mm-menu="theme"] > summary').click();panel.locator('[data-mm-theme="capsule"]').click();page.screenshot(path=str(OUT/'compact-theme.png'))
  panel.get_by_role('button',name='关闭布局与主题').click()

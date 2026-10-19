@@ -203,6 +203,26 @@ with sync_playwright() as pw:
         expect(page.locator(f'[data-danmaku-comment-id="{target["id"]}"]')).to_have_count(0)
         checks.append('actual toggle and local dislike persist across reload without deleting shared comment')
 
+        page.locator('#practiceExitBtn').click()
+        page.locator('#practiceExitCancel').click()
+        expect(page.locator('.q-danmaku-item')).to_have_count(8)
+        page.locator('#practiceExitBtn').click()
+        page.route('**/sessions/*/pause', lambda route: route.fulfill(status=503, json={'detail':'intentional pause failure'}), times=1)
+        with page.expect_response(lambda response: response.url.endswith('/pause') and response.status==503):
+            page.locator('#practiceSaveExitBtn').click()
+        expect(page.locator('#practiceSaveExitBtn')).to_be_enabled()
+        assert page.evaluate('document.body.dataset.practiceView')=='game'
+        expect(page.locator('.q-danmaku-item')).to_have_count(8)
+        with page.expect_response(lambda response: response.url.endswith('/pause') and response.ok):
+            page.locator('#practiceSaveExitBtn').click()
+        page.wait_for_function("document.body.dataset.practiceView==='lobby'")
+        expect(page.locator('.q-danmaku')).to_have_count(0)
+        expect(page.locator('.q-comments-standalone-host')).to_have_count(0)
+        page.locator('[data-practice-start="practice"]').click()
+        page.wait_for_function('KGPracticeMode.snapshot().active&&KGPracticeMode.snapshot().index===0')
+        expect(page.locator('.q-danmaku-item')).to_have_count(8)
+        checks.append('cancel/failed pause retain comments; successful real pause clears overlays and resume restores them')
+
         # Reloaded actual practice resumes the answered question with refreshed API data.
         page.locator('#practiceNextBtn').click()
         page.wait_for_function('KGPracticeMode.snapshot().index===1')

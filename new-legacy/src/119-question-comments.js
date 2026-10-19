@@ -871,6 +871,7 @@
       instance.root?.remove()
       instance.removeFocusListeners?.()
       if(instance.anchor?.classList.contains('q-favorite-question'))instance.anchor.remove()
+      if(instance.anchor?.classList.contains('q-comments-standalone-host'))instance.anchor.remove()
       global.clearTimeout(instance.toastTimer)
       if(instance.anchor) delete instance.anchor.__kgQuestionComments
       instances.delete(instance)

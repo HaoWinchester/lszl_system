@@ -42,6 +42,8 @@ with sync_playwright() as playwright:
     launch = {"headless": True, "args": ARGS}
     if Path("/usr/bin/chromium").exists():
         launch["executable_path"] = "/usr/bin/chromium"
+    if Path('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome').exists():
+        launch['channel'] = 'chrome'
     browser = playwright.chromium.launch(**launch)
     for viewport in [{"width": 1440, "height": 960}, {"width": 390, "height": 844}]:
         page = browser.new_page(viewport=viewport)
@@ -191,6 +193,46 @@ with sync_playwright() as playwright:
             # 移动端导航为横向静态条，不提供收起把手
             assert page.locator('#practiceSideToggle').is_hidden()
 
+        # Cancelling exit keeps the answered view and its comments alive.
+        page.locator('#practiceExitBtn').click()
+        page.locator('#practiceExitCancel').click()
+        assert page.evaluate('document.body.dataset.practiceView') == 'game'
+        assert page.locator('body > .q-danmaku .q-danmaku-item').count() == 1
+        page.locator('#practiceExitBtn').click()
+        page.locator('#practiceSaveExitBtn').click()
+        page.wait_for_function("document.body.dataset.practiceView==='lobby'")
+        page.wait_for_timeout(100)
+        assert page.locator('body > .q-danmaku').count() == 0, 'saved exit must remove viewport danmaku'
+        assert page.locator('.q-comments-standalone-host').count() == 0, 'owned comment hosts must be disposed'
+
+        for mode in ['challenge', 'scholar']:
+            help = page.locator(f'.practice-mode-card.{mode} .practice-lobby-help')
+            summary = help.locator('summary')
+            summary.hover()
+            assert help.evaluate('el=>el.open'), f'{mode} help must open on hover'
+            help.locator('.practice-help-content').hover()
+            assert help.evaluate('el=>el.open'), 'moving into help must keep it readable'
+            page.mouse.move(1, 1)
+            assert not help.evaluate('el=>el.open'), 'unpinned help closes when pointer leaves'
+            summary.focus()
+            assert help.evaluate('el=>el.open'), 'keyboard focus reveals help'
+            page.keyboard.press('Escape')
+            assert not help.evaluate('el=>el.open'), 'Escape dismisses focused help'
+            summary.click()
+            assert help.evaluate('el=>el.open'), 'first click pins help even after focus or hover'
+            page.locator('#practiceLobbyTitle').click()
+            assert not help.evaluate('el=>el.open'), 'outside click dismisses pinned help'
+            summary.click()
+            assert help.evaluate('el=>el.open')
+            summary.click()
+            assert not help.evaluate('el=>el.open'), 'second click closes help'
+        page.evaluate("KGPracticeMode.startPractice('practice')")
+        page.wait_for_function("document.body.dataset.practiceView==='game'")
+        page.wait_for_selector('body > .q-danmaku .q-danmaku-item')
+        page.locator('#practiceExitBtn').click()
+        page.locator('#practiceAbandonBtn').click()
+        page.wait_for_function("document.body.dataset.practiceView==='lobby'")
+        assert page.locator('body > .q-danmaku').count() == 0, 'abandon exit also clears danmaku'
         assert not errors, errors
         page.close()
     browser.close()
