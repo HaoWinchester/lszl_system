@@ -16,3 +16,8 @@
   .question-workspace-page .qw-layout-toolbar-global{display:none!important}
   .knowledge-recall-page .kr-canvas-action-group.canvas-toolbar{max-width:calc(100vw - 20px);flex-wrap:wrap}
 }
+
+/* Opt-in icon labels: retain accessible names and native hover titles. */
+.canvas-toolbar .canvas-tool-icon-only .canvas-tool-label{display:none!important}
+/* Restore workspace's original compact width; other ink callers keep their layout. */
+@media(max-width:700px){.canvas-ink-toolbar.canvas-ink-compact{max-width:calc(100vw - 2px)}}

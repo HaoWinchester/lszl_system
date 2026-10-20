@@ -4599,7 +4599,7 @@
     if(button){
       button.classList.toggle('active',pan);
       button.innerHTML=pan?POINTER_HAND_ICON:POINTER_ARROW_ICON;
-      global.KGCanvasToolbar?.present(button,'select',pan?'手型':'选择');
+      global.KGCanvasToolbar?.present(button,'select',pan?'手型':'选择',{iconOnly:true});
       const label=pan?'手型浏览模式（V）':'箭头编辑模式（V）';
       button.title=label;
       button.setAttribute('aria-label',label);
@@ -5849,9 +5849,18 @@
     applyWorkspaceBackground();
     global.KGLearningTheme?.bindControls(themeController,byId('qwThemeSelect'));
     state.ink=global.KGCanvasInk?.create?.({
-      trigger:byId('qwInkBtn'),viewport:state.viewport,world:state.world,history:state.kernel.history,showHistory:true,
+      trigger:byId('qwInkBtn'),viewport:state.viewport,world:state.world,history:state.kernel.history,showHistory:true,toolbarPresentation:'compact',
       getViewport:()=>({x:state.panX,y:state.panY,scale:state.zoom}),
       getStrokes:()=>state.workspace?.strokes||[],isReadonly:()=>state.readonly||!state.workspace,
+      getColorContext:()=>JSON.stringify([store()?.currentUserId?.()||'guest',state.workspaceId,state.workspaceSession,state.workspaceTransition]),
+      openColorPicker:request=>{
+        const picker=global.KGColorPickerV2;if(!picker?.open)return null;
+        if(!picker.open({...request,kind:'multi-question-ink',title:'画笔自定义颜色',allowOpacity:false,allowTransparent:false,documentColors:workspaceDocumentColors(),documentLabel:'当前画布'}))return null;
+        const root=picker.ensure().getRoot(),body=root.querySelector('[data-color-window-body]').firstElementChild;
+        // Another card/edge picker may reuse the singleton before this request closes.
+        const owns=()=>root.isConnected&&root.querySelector('[data-color-window-body]').firstElementChild===body;
+        return {isOpen:()=>owns()&&picker.isOpen(),contains:target=>owns()&&root.contains(target),close:()=>{if(owns())picker.close({cancel:true,force:true})}};
+      },
       setStrokes:strokes=>{
         if(!state.workspace||state.readonly)throw new Error('当前画布不能编辑');
         state.suppressStoreEvent=true;
@@ -5871,10 +5880,10 @@
     const ui=global.KGCanvasToolbar,tools=byId('qwInkBtn')?.parentElement;
     if(ui&&tools){
       tools.querySelectorAll('.qw-overlay-divider').forEach(element=>element.remove());
-      ui.group(tools,'选择与绘制',[[byId('qwPointerModeBtn'),'select','选择'],[byId('qwInkBtn'),'pen','画笔']]);
-      ui.group(tools,'显示与导出',[[byId('qwCaptureBtn'),'camera','截图'],[byId('qwFontScaleBtn'),'font','字号'],[byId('qwResetViewBtn'),'fit','重置']]);
+      ui.group(tools,'选择与绘制',[[byId('qwPointerModeBtn'),'select','选择'],[byId('qwInkBtn'),'pen','画笔']],{iconOnly:true});
+      ui.group(tools,'显示与导出',[[byId('qwCaptureBtn'),'camera','截图'],[byId('qwFontScaleBtn'),'font','字号'],[byId('qwResetViewBtn'),'fit','重置']],{iconOnly:true});
       const theme=tools.querySelector('.learning-theme-menu');if(theme)tools.append(theme);
-      const history=byId('qwLayoutToolbar');ui.present(byId('qwUndoBtn'),'undo','撤销');ui.present(byId('qwRedoBtn'),'redo','重做');history?.classList.add('canvas-toolbar');
+      const history=byId('qwLayoutToolbar');ui.present(byId('qwUndoBtn'),'undo','撤销',{iconOnly:true});ui.present(byId('qwRedoBtn'),'redo','重做',{iconOnly:true});history?.classList.add('canvas-toolbar');
     }
 
     // 可编辑表格：workspace.tables 经 65 store 直写；历史并入 kernel 命令栈（与卡牌/笔迹共用撤销）。

@@ -28,12 +28,42 @@ if(exists){
   for(let i=0;i<m.points.length;i++)for(let j=0;j<i;j++)assert.ok(Math.hypot(m.points[i].x-m.points[j].x,m.points[i].y-m.points[j].y,m.points[i].z-m.points[j].z)>1);
   const settled=JSON.stringify(m);assert.equal(api.stepModel(m),false);assert.equal(JSON.stringify(m),settled);
  });
- test('empty, single node and oversized input are safe and bounded to one page',()=>{
+ test('empty and single node input are safe',()=>{
   const empty=api.createModel([]);assert.deepEqual(empty.points,[]);assert.equal(api.stepModel(empty),false);
   const single=api.createModel([{title:'唯一考点'}]);let moving=true;for(let i=0;i<1000&&moving;i++)moving=api.stepModel(single);
   assert.equal(moving,false);assert.ok(single.points.every(p=>[p.x,p.y,p.z].every(Number.isFinite)));
-  assert.equal(api.createModel(Array.from({length:1000},()=>({}))).points.length,60);
   assert.equal(api.mount({host:null,nodes:[]}),null);
+ });
+ for(const size of [320,1000])test(`all ${size} catalog nodes survive bounded deterministic solving`,()=>{
+  const input=Object.freeze(Array.from({length:size},(_,i)=>Object.freeze({id:String(i),parentId:i%40?String(i-1):null,subject:`科目 ${Math.floor(i/40)}`,taxonomyId:Math.floor(i/40),brightness:i%5?.12:1})));
+  const before=JSON.stringify(input),started=performance.now(),m=api.createModel(input);
+  assert.equal(m.points.length,size);assert.equal(m.edges.length,size-Math.ceil(size/40));
+  while(!m.settled&&m.steps<400)api.stepModel(m);
+  assert.ok(m.settled);assert.ok(m.steps<=320);
+  assert.equal(m.points.length,size);assert.ok(m.points.every((p,i)=>p.node===input[i]&&[p.x,p.y,p.z].every(Number.isFinite)));
+  assert.equal(new Set(m.points.map(p=>`${p.x},${p.y},${p.z}`)).size,size);
+  assert.equal(JSON.stringify(input),before);
+  console.log(`catalog ${size}: ${m.steps} steps, ${(performance.now()-started).toFixed(1)}ms`);
+ });
+ test('catalog edges use explicit parent references and never invent or cross trees',()=>{
+  const input=[
+   {id:'child',parentId:'root',subject:'数学',taxonomyId:'a'},
+   {id:'root',parentId:null,subject:'数学',taxonomyId:'a'},
+   {id:'second-root',parentId:null,subject:'数学',taxonomyId:'a'},
+   {id:'orphan',parentId:'missing',subject:'数学',taxonomyId:'a'},
+   {id:'cross-tree',parentId:'root',subject:'数学',taxonomyId:'b'},
+   {id:'self',parentId:'self',subject:'数学',taxonomyId:'a'},
+   {id:'cross-subject',parentId:'root',subject:'英语',taxonomyId:'a'},
+  ];
+  const m=api.createModel(input);
+  assert.deepEqual(m.edges.map(e=>[e.source,e.target]),[[1,0]]);
+ });
+ test('legacy organization fallback stays within wholly legacy groups',()=>{
+  const m=api.createModel([
+   {id:'a',subject:'legacy'},{id:'b',subject:'legacy'},{id:'c',subject:'other'},
+   {id:'catalog',subject:'mixed',parentId:null},{id:'legacy-mixed',subject:'mixed'},
+  ]);
+  assert.deepEqual(m.edges.map(e=>[e.source,e.target]),[[0,1]]);
  });
  test('perspective has depth and camera rotation/zoom affect projection',()=>{
   const camera={yaw:0,pitch:0,zoom:1},p={x:100,y:50,z:50},before=JSON.stringify(p);

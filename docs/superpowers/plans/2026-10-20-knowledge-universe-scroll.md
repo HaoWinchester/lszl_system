@@ -106,11 +106,11 @@ assert score([True]*10+[False]) < 100
 - [x] 更新旧契约“只读禁止拖动/阅读放行小工具栏”的断言为本次用户明确新规则，同时保留内容禁改/零写入/临时副本/已有ink生命周期断言。不得只删断言过测试。证据artifacts/knowledge-universe-20261020/task-7/，复用抛弃DB，报告实际/未验证边界；仅授权文件提交。Task6审查后启动，不并行实现，root统一同步/测试/本地更新，UAT待用户确认。
 
 ## 集成与交付（root）
-- [ ] 按任务spec+quality审查并修复明确问题，最终全分支独立审查。
-- [ ] 复用抛弃DB实际API闭环，加入真实UAT320目录只读核验；截图与滚轮/触摸为真实输入，不能仅scrollIntoView。
-- [ ] 官方sync生成public并完成全量前端/后端与真实API验证；更新缓存隔离的本地5180预览，核验HTTP字节和active release未变化。
+- [x] 按任务spec+quality审查并修复明确问题，最终全分支独立审查。
+- [x] 复用抛弃DB实际API闭环，加入真实UAT320目录只读核验；截图与滚轮/触摸为真实输入，不能仅scrollIntoView。
+- [x] 官方sync生成public并完成全量前端/后端与真实API验证；更新缓存隔离的本地5180预览，核验HTTP字节和active release未变化。
 - [ ] 未来待用户本地确认后：正式版本递增、官方release完整门禁、新鲜UAT备份、推送及部署，停在UAT等本人验收。本轮不执行。
-- [ ] 更新验证记录、功能清单与session-handoff，提供本地链接；保留功能分支及main/uat，明确UAT尚未更新。
+- [x] 更新验证记录、功能清单与session-handoff，提供本地链接；保留功能分支及main/uat，明确UAT尚未更新。
 
 Root滚动RED证据：artifacts/knowledge-universe-20261020/modal-scroll-red.json。用真实scene/dashboard/CSS、isolated3节点布局fixture，1440×650 dialog content848/client616和390×844 shellcontent1181/client765均有可滚区域，但Canvas上wheel500后两scrollTop都0，zoom3→1.417099658。该probe是UI布局测试，不冒称成功真实API；先前UAT访客大厅三尺寸wheel真实通过。Task2/3需物理wheel/触摸覆盖而非scrollIntoView代替。
 Task1接口约定subjects=[{id,code,name,topicCount,practicedTopicCount,unpracticedTopicCount}]，node.subject=ContentSubject.code。

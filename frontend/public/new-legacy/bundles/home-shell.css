@@ -8394,6 +8394,11 @@ body.qw-selection-toolbar-motion .uc-selection-bounds,.stage.graph-card-dragging
   .question-workspace-page .qw-layout-toolbar-global{display:none!important}
   .knowledge-recall-page .kr-canvas-action-group.canvas-toolbar{max-width:calc(100vw - 20px);flex-wrap:wrap}
 }
+
+/* Opt-in icon labels: retain accessible names and native hover titles. */
+.canvas-toolbar .canvas-tool-icon-only .canvas-tool-label{display:none!important}
+/* Restore workspace's original compact width; other ink callers keep their layout. */
+@media(max-width:700px){.canvas-ink-toolbar.canvas-ink-compact{max-width:calc(100vw - 2px)}}
 /* style: styles/canvas-table.css */
 /* KGCanvasTableController · 三页共用可编辑表格视觉。
    表格是 world 内真实 DOM table：1px 实线边框 + 真实文字，随画布变换保持 DPR 清晰度；
@@ -8504,6 +8509,9 @@ body.qw-selection-toolbar-motion .uc-selection-bounds,.stage.graph-card-dragging
 .kg-color-picker-fields label{display:flex;align-items:center;gap:4px;height:30px;padding:0 9px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#64748b;font-size:12px}
 .kg-color-picker-fields input{min-width:0;width:100%;border:0;outline:0;text-transform:uppercase;font:600 12px/1 ui-monospace,SFMono-Regular,Consolas,monospace;color:#0f172a}
 .kg-color-picker-eyedropper{width:34px;height:30px;min-width:34px;padding:0;border-radius:8px;border:1px solid #cbd5e1;background:#fff;color:#475569;box-shadow:none}
+.kg-color-picker-eyedropper{display:grid;place-items:center}
+.kg-color-picker-eyedropper[hidden]{display:none}
+.kg-color-picker-eyedropper svg{display:block;width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .kg-color-picker-transparent{height:30px;border:1px dashed #cbd5e1;border-radius:8px;background:linear-gradient(135deg,#fff 0 47%,#ef4444 48% 52%,#fff 53% 100%);color:#475569;font-size:12px}
 .kg-color-picker-section{display:grid;gap:6px;padding-top:7px;border-top:1px solid #eef2f7}
 .kg-color-picker-section[hidden]{display:none}

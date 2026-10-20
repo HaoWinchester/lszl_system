@@ -226,6 +226,11 @@ const AUTH_EDIT_SELECTOR=[
   '.node-size-btn','.template-card'
 ].join(',');
 const AUTH_EDIT_CHANGE_SELECTOR='#lineColorPicker,#importFile,#flashFile,#nTitle,#nCategory,#nColor,#nSize,#nLevel,#nKeywords,#nSummary,#nNotes,#linkType,#linkStyle,#linkColor,#linkNote,#gTitle,#gSubject,#gAudience,#gDescription';
+function authCanOpenReadingRelatedCanvas(target){
+  return authIsLoggedIn()&&window.KGHomeInteractionModes?.getMode?.()==='reading'
+    &&!!target?.closest?.('.knowledge-card')
+    &&!target.closest('button,a,input,textarea,select,[contenteditable]:not([contenteditable="false"]),[data-node-inline-editor],[data-node-resize-handle]');
+}
 function authInstallGuards(){
   const login=$('authLoginBtn'),logout=$('authLogoutBtn');
   if(window.KGSharedAuthDialog)window.KGSharedAuthDialog.configure({
@@ -269,6 +274,8 @@ function authInstallGuards(){
       if(authIsLoggedIn() && (!window.KGRolePermissions || window.KGRolePermissions.can('editGraph')))return;
       const card=e.target.closest&&e.target.closest('.knowledge-card');
       if(!card)return;
+      // Browsing delegates to the existing protected temporary-session entry.
+      if(authCanOpenReadingRelatedCanvas(e.target))return;
       e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();
       if(authIsLoggedIn())showStatus('当前角色无图谱编辑权限。');else authOpen('登录后才能双击设为连线起点并建立关系。');
     },true);

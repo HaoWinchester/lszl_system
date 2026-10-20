@@ -99,7 +99,7 @@
     const prefs={pen:{...TOOLS.pen},highlighter:{...TOOLS.highlighter},text:{...TOOLS.text}};
     let opened=!options.trigger,settingsOpen=false,tool='select',active=null,frame=0,space=false,destroyed=false,suppressClickUntil=0,sequence=0;
     const listeners=[];
-    let selectedId=null,textDrag=null,textResize=null,erasing=null;
+    let selectedId=null,textDrag=null,textResize=null,erasing=null,colorSession=null;
     const selected=()=>getStrokes().find(item=>item.id===selectedId);
     const styleTool=()=>textSession?'text':tool==='select'?selected()?.tool:tool;
     const currentStyle=()=>{const name=styleTool(),selection=selected();return textSession?{...TOOLS.text,...textSession.style}:selection&&(tool==='select'||tool==='text')?{...TOOLS[name],...selection}:prefs[name]};
@@ -145,6 +145,7 @@
       if(settings){panel.style.right='auto';panel.style.left=(Math.max(8,Math.min(left+box.width-settings.width,global.innerWidth-settings.width-8))-left)+'px'}
     }
     function setOpen(value){
+      if(!value)closeColorPicker();
       if(!value&&textSession){cancel();textSession.onSaved=()=>setOpen(false);closeTextEditor(true);return}
       opened=!!value;if(!opened){settingsOpen=false;space=false;viewport.classList.remove('canvas-ink-panning');setTool('select');options.onExitDraw?.()}else setTool('pen');
       options.onOpenChange?.(opened);refreshControls();positionToolbar();
@@ -180,6 +181,7 @@
       if(destroyed)return;
       const locked=readonly(),state=history?.getState?.()||{};
       if(locked)stopEraserHold();
+      if(colorSession&&!colorContextMatches(colorSession))closeColorPicker();
       // 只读（切题过渡/访客）不再把工具强制降回 select：工具选择保留，绘制入口由
       // pointerdown 的 readonly 拦截兜底，按钮 disabled + 光标还原表达锁定；
       // 只读解除后工具与自定义光标自动恢复（切题保持画笔状态的前提）。
@@ -250,7 +252,7 @@
       try{if(viewport.hasPointerCapture(id))viewport.releasePointerCapture(id)}catch(_){}
     }
     function setTool(value){
-      cancel();
+      closeColorPicker();cancel();
       // Keep the latest tool request on the draft until IME and persistence finish.
       if(textSession){textSession.onSaved=value!==tool?()=>setTool(value):null;if(value!==tool){closeTextEditor(true);return;}}
       if(value!=='select'&&(value!=='text'||selected()?.tool!=='text'))selectedId=null;if(!TOOLS[value])settingsOpen=false;tool=(TOOLS[value]||value==='eraser')&&!readonly()?value:'select';
@@ -271,13 +273,32 @@
     }
     bold.addEventListener('click',()=>updateTextStyle({bold:!currentStyle()?.bold}));
     const palette=toolbar.querySelector('.canvas-ink-colors');
-    toolbar.querySelector('.canvas-ink-tools').insertBefore(palette,toolbar.querySelector('[data-ink-settings]'));
+    toolbar.querySelector('.canvas-ink-tools').insertBefore(palette,toolbar.querySelector(options.toolbarPresentation==='compact'?'[data-ink-action=undo]':'[data-ink-settings]'));
     for(const [color,name] of [['#2563eb','蓝色'],['#111827','黑色'],['#ef4444','红色'],['#facc15','黄色'],['#22c55e','绿色'],['#a855f7','紫色']]){
       const btn=doc.createElement('button');btn.type='button';btn.dataset.inkColor=color;btn.style.setProperty('--ink-color',color);btn.setAttribute('aria-label',name);btn.title=name;palette.append(btn);
       btn.addEventListener('click',()=>updateTextStyle({color}));
     }
     const color=doc.createElement('input');color.type='color';color.setAttribute('aria-label','自定义笔迹颜色');color.title='自定义颜色';palette.append(color);
-    color.addEventListener('input',()=>updateTextStyle({color:color.value}));
+    // A page can supply the existing shared picker; other callers keep native input.
+    // The request owns its original style target for its entire async lifetime.
+    function colorContextMatches(session){
+      return !destroyed&&!readonly()&&opened&&session.tool===tool&&session.selectedId===selectedId&&session.textSession===textSession&&session.context===options.getColorContext?.();
+    }
+    function closeColorPicker(){const session=colorSession;colorSession=null;session?.handle?.close?.()}
+    const colorPickerTarget=target=>!!colorSession?.handle?.contains?.(target);
+    function openColorPicker(event){
+      if(typeof options.openColorPicker!=='function')return;
+      event.preventDefault();event.stopPropagation();
+      closeColorPicker();
+      if(destroyed||readonly()||!opened||!currentStyle())return;
+      const session={tool,selectedId,textSession,context:options.getColorContext?.(),handle:null};colorSession=session;
+      try{session.handle=options.openColorPicker({anchor:color,value:{color:currentStyle().color,opacity:1},
+        onCommit:value=>{if(colorSession!==session||!colorContextMatches(session)||session.handle?.isOpen?.()===false)return;const next=String(value?.color||'');if(/^#[0-9a-f]{6}$/i.test(next))updateTextStyle({color:next})}
+      });if(!session.handle)colorSession=null}catch(error){colorSession=null;report(error)}
+    }
+    color.addEventListener('click',openColorPicker);
+    color.addEventListener('keydown',event=>{if(typeof options.openColorPicker==='function'&&(event.key==='Enter'||event.key===' '))openColorPicker(event)});
+    color.addEventListener('input',()=>{if(typeof options.openColorPicker!=='function')updateTextStyle({color:color.value})});
     range.addEventListener('input',()=>updateTextStyle({width:Number(range.value)}));
     toolbar.querySelector('.canvas-ink-font input').addEventListener('change',event=>{const value=Number(event.target.value);if(event.target.value&&Number.isFinite(value)&&value>=6&&value<=288)updateTextStyle({width:value});else refreshControls()});
     toolbar.querySelector('[data-ink-width-number]').addEventListener('change',event=>{const value=Number(event.target.value),limits=TOOLS[styleTool()];if(event.target.value&&limits&&Number.isFinite(value)&&value>=limits.min&&value<=limits.max)updateTextStyle({width:value});else refreshControls()});
@@ -406,10 +427,10 @@
       editor.addEventListener('keydown',event=>{event.stopPropagation();if(event.isComposing||event.keyCode===229)return;if(event.key==='Enter'&&(event.ctrlKey||event.metaKey)){event.preventDefault();closeTextEditor(true)}else if(event.key==='Escape'){event.preventDefault();closeTextEditor(false)}});
       editor.addEventListener('input',updateDraft);
       editor.addEventListener('keyup',revealCaret);editor.addEventListener('select',revealCaret);
-      editor.addEventListener('blur',event=>{if(toolbar.contains(event.relatedTarget))return;global.setTimeout(()=>{if(textSession===session&&!toolbar.contains(doc.activeElement))closeTextEditor(true)},160)});
+      editor.addEventListener('blur',event=>{if(toolbar.contains(event.relatedTarget)||colorPickerTarget(event.relatedTarget))return;global.setTimeout(()=>{if(textSession===session&&!toolbar.contains(doc.activeElement)&&!colorPickerTarget(doc.activeElement))closeTextEditor(true)},160)});
       editor.focus();resize();refreshControls();
     }
-    listen(global,'pointerdown',event=>{if(!textSession||textSession.frame.contains(event.target)||textSession.border.contains(event.target)||toolbar.contains(event.target))return;closeTextEditor(true);},true);
+    listen(global,'pointerdown',event=>{if(!textSession||textSession.frame.contains(event.target)||textSession.border.contains(event.target)||toolbar.contains(event.target)||colorPickerTarget(event.target))return;closeTextEditor(true);},true);
     function hitStroke(location,padding,textOnly=false){
       const target=new global.DOMPoint(...location),byId=new Map(getStrokes().map(stroke=>[stroke.id,stroke]));
       for(const el of [...layer.querySelectorAll('[data-stroke-id]')].reverse()){
@@ -561,6 +582,7 @@
     listen(global,'pointercancel',stopEraserHold);
     listen(eraserHoldBtn,'pointerleave',stopEraserHold);
     function reset(options){
+      closeColorPicker();
       if(textSession&&!options?.discardDraft){textSession.stale=true;textSession.editor.dataset.saveState='failed';textSession.status.textContent='画布已切换，草稿仍保留，请复制输入或按 Esc 关闭';report(new Error('文字草稿尚未保存，请先保存或按 Esc 取消'));cancel();selectedId=null;if(ownHistory)history?.clear();render();return false}cancel();closeTextEditor(false);selectedId=null;settingsOpen=false;
       if(!options?.keepTool)setTool('select');else refreshControls();
       if(ownHistory)history?.clear();render();
@@ -572,7 +594,7 @@
       try{change([],label||'清空笔迹');return true}
       catch(error){report(error);return false}
     }
-    function destroy(){if(textSession){report(new Error('文字草稿尚未保存'));return false}closeTextEditor(false);stopEraserHold();cursorStyle.remove();cancel();destroyed=true;listeners.forEach(remove=>remove());layer.remove();toolbar.remove();viewport.classList.remove('canvas-ink-drawing','canvas-ink-panning');delete viewport.dataset.inkTool}
+    function destroy(){closeColorPicker();if(textSession){report(new Error('文字草稿尚未保存'));return false}closeTextEditor(false);stopEraserHold();cursorStyle.remove();cancel();destroyed=true;listeners.forEach(remove=>remove());layer.remove();toolbar.remove();viewport.classList.remove('canvas-ink-drawing','canvas-ink-panning');delete viewport.dataset.inkTool}
     function activateText(){if(destroyed||readonly())return false;opened=true;settingsOpen=true;setTool('text');options.onOpenChange?.(true);return true}
     async function openTextAt(clientX,clientY){
       if(destroyed||readonly()||!Number.isFinite(clientX)||!Number.isFinite(clientY))return false;
@@ -580,7 +602,10 @@
       if(!activateText())return false;openTextEditor(clientX,clientY,null);return true;
     }
     const tools=toolbar.querySelector('.canvas-ink-tools'),ui=global.KGCanvasToolbar;
-    if(ui){
+    // Workspace keeps compact buttons with colors before history.
+    // Other callers keep the shared labelled presentation by default.
+    if(options.toolbarPresentation==='compact')toolbar.classList.add('canvas-ink-compact');
+    if(ui&&options.toolbarPresentation!=='compact'){
       tools.querySelectorAll('.canvas-ink-divider').forEach(el=>el.remove());
       ui.group(tools,'选择',[[toolbar.querySelector('[data-ink-tool=select]'),'select','选择']]);
       ui.group(tools,'绘制',[[toolbar.querySelector('[data-ink-tool=pen]'),'pen','画笔'],[toolbar.querySelector('[data-ink-tool=highlighter]'),'highlighter','高亮'],[toolbar.querySelector('[data-ink-tool=text]'),'text','文字'],[toolbar.querySelector('[data-ink-tool=eraser]'),'eraser','橡皮']]);
@@ -589,7 +614,7 @@
       tools.append(palette);
     }
     render();
-    return {activateText,openTextAt,handleKeyDown,commitText:()=>closeTextEditor(true),hasTextDraft:()=>!!textSession,render,refreshControls,cancel,reset,setTool,setOpen,destroy,clearAll,get tool(){return tool},get temporaryPan(){return space}};
+    return {activateText,openTextAt,handleKeyDown,commitText:()=>closeTextEditor(true),hasTextDraft:()=>!!textSession,render,refreshControls,cancel:()=>{closeColorPicker();cancel()},reset,setTool,setOpen,destroy,clearAll,get tool(){return tool},get temporaryPan(){return space}};
   }
   global.KGCanvasInk=Object.freeze({normalize,point,path,textLayout,bounds,draw,svgStroke,create});
 })(window);
