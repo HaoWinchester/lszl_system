@@ -6,6 +6,9 @@
 **Architecture:** 复用现有knowledge_dashboard_service冻结作答聚合+current_taxonomy；新增protected完整universe读接口；复用scene和dashboard扩展全量数据与滚动交互，无依赖/schema变化。
 **Tech Stack:** FastAPI/SQLAlchemy/PostgreSQL + 原生JS/Canvas/Playwright。
 
+## 最新用户执行顺序（优先）
+用户明确要求“问题一个一个的改，改完之后我本地要看一下，没问题再发uat”。当前停在Task5本地验看，不自动启动Task6/7，也不递增版本、promote、推送或部署UAT。后续每个问题按用户本地确认逐项推进；原集成交付清单保留为未来待办，不能视为当前部署授权。
+
 ## Global Constraints
 - 用户已确认全部已发布知识树及弹窗内滚动；规格docs/superpowers/specs/2026-10-20-knowledge-universe-scroll-design.md。
 - 只当前工作区，权威new-legacy，公共能力原共享模块扩展，无新依赖/schema/角色变更，不手改public/release。
@@ -60,20 +63,20 @@ assert score([True]*10+[False]) < 100
 
 **Files:** Modify new-legacy/src/practice/knowledge-dashboard.js, new-legacy/styles/knowledge-dashboard.css, new-legacy/tests/knowledge-dashboard.test.js, new-legacy/tests/knowledge-dashboard-browser.py, new-legacy/tests/practice-lobby-design-browser.py; frontend/scripts/remaining-learning-requirements.test.mjs/frontend/scripts/validate-new-legacy-release.sh若已有注册无需重复。
 **Interfaces:** GET新universe完整响应+Task3熟练度字段；保留public init/open/close/createLoader(owner/generation)API，refresh不再分页。Task1 schema与Task2相机/选择/group契约直接用；groupKey同JSON.stringify([subject,taxonomyId])，当前每科目一树可复用group按钮作为科目筛选。
-- [ ] 先RED：320nodes全部Canvas/list可检索而不是60；零作答有暗节点；部分作答仅对应亮；统计“全部/已练/未练”；科目筛选count与详情同步；请求newendpoint一次；保留安全/owner迟到/401/error/retry/Canvasfallback/关闭清理。
-- [ ] 清除PAGE_SIZE/slice/可见分页逻辑，完整nodes保留；科目button全/科目名+数量，人类可读title，无内部taxonomy ID。未练日期文案“尚未练习”，次数0；空目录提示暂无发布知识树，不再要求先答题才能有星点。亮度图例未练暗色/待巩固/逐渐熟悉/较熟练，越熟练越亮；详情显示综合分值、近期正确率/样本数和连对，pending显示待评估而非0%错误；说明完成练习后更新熟练度。
-- [ ] 弹窗所有视口明确可滚动shell，关闭栏独立可达，不滚动背景；保持当前暗色视觉，避免宽泛改大厅CSS。1440×900/1440×650/390×844/320×568实际wheel从Canvas开始scrollTop变化，真实touch上下滑能看到详情/底部，close后大厅恢复wheel，键盘焦点可达。
-- [ ] 更新真实API companion使用有效发布目录节点作为metadata.knowledge；真实完成作答后新universe目录全量出现，只有确切匹配的节点点亮，未练保持暗；关闭重开/刷新/另一owner隔离。不能mock成功数据。复用抛弃DB helper，root officialsync后运行；如本任务仅语法需诚实报告待跑。
-- [ ] 运行scene/dashboard/大厅/弹幕语言回归与当前前端全套一次；截图自查，报告命令/结果，仅提交任务文件。修正browser脚本旧SDD输出路径，证据统一artifacts/knowledge-universe-20261020/task-4/，不要重建已清理的兄弟计划workspace。完整前端套件需officialsync后由root执行；实现报告若尚未同步应明确待集成验证，避免拿旧public通过冒充新源通过。
+- [x] 先RED：320nodes全部Canvas/list可检索而不是60；零作答有暗节点；部分作答仅对应亮；统计“全部/已练/未练”；科目筛选count与详情同步；请求newendpoint一次；保留安全/owner迟到/401/error/retry/Canvasfallback/关闭清理。
+- [x] 清除PAGE_SIZE/slice/可见分页逻辑，完整nodes保留；科目button全/科目名+数量，人类可读title，无内部taxonomy ID。未练日期文案“尚未练习”，次数0；空目录提示暂无发布知识树，不再要求先答题才能有星点。亮度图例未练暗色/待巩固/逐渐熟悉/较熟练，越熟练越亮；详情显示综合分值、近期正确率/样本数和连对，pending显示待评估而非0%错误；说明完成练习后更新熟练度。
+- [x] 弹窗所有视口明确可滚动shell，关闭栏独立可达，不滚动背景；保持当前暗色视觉，避免宽泛改大厅CSS。1440×900/1440×650/390×844/320×568实际wheel从Canvas开始scrollTop变化，真实touch上下滑能看到详情/底部，close后大厅恢复wheel，键盘焦点可达。
+- [x] 更新真实API companion使用有效发布目录节点作为metadata.knowledge；真实完成作答后新universe目录全量出现，只有确切匹配的节点点亮，未练保持暗；关闭重开/刷新/另一owner隔离。不能mock成功数据。复用抛弃DB helper，root officialsync后运行；如本任务仅语法需诚实报告待跑。
+- [x] 运行scene/dashboard/大厅/弹幕语言回归与当前前端全套一次；截图自查，报告命令/结果，仅提交任务文件。修正browser脚本旧SDD输出路径，证据统一artifacts/knowledge-universe-20261020/task-4/，不要重建已清理的兄弟计划workspace。完整前端套件需officialsync后由root执行；实现报告若尚未同步应明确待集成验证，避免拿旧public通过冒充新源通过。
 
 ### Task 5: 恢复多题归纳原有紧凑画笔排版，仅隐藏图标按钮文字
 
 **背景与范围纠正：** 用户两张截图明确反对多题归纳画笔排版被顺带重做，原先授权仅临时相关画布图标/顶部工具栏；最新确认多题归纳顶部选择/画笔等及底部绘制图标不显示文字，悬浮提示即可。不得继续重设计。根因已追到98a96f8b向共享94-canvas-ink注入label/group并将palette移到末尾，inner flexwrap与绝对定位shrink-to-fit使桌面换行。原98a96f8b^在1440/1024为596×50单排，现1440为720×78、1024为512×92；390旧79高变137，320旧79变183。证据artifacts/knowledge-universe-20261020/toolbar-diagnostic/{before,reference}.json与截图，reference用git保存的前版真实模块。
 **Files:** Modify new-legacy/src/canvas/94-canvas-ink.js, new-legacy/src/canvas/toolbar.js, new-legacy/src/77-multi-question-workspace.js, new-legacy/styles/canvas-toolbar.css或canvas-ink.css（只必要局部），new-legacy/tests/workspace-ink-toolbar-browser.py，必要现有frontend/scripts/practice-canvas-interaction.test.mjs。禁止整文件回退98a96：其中已有dialogs/theme/保存保护须保留。
-- [ ] 先RED：真实共享模块+完整页面CSS可见label、palette第二行；断言恢复多题归纳既有紧凑按钮/颜色顺序，桌面1840/1440/1024单排无巨大空白；390/320仍可达不越界，允许原移动两排。不能只测未加载KGCanvasToolbar的旧isolated fixture。
-- [ ] 复用共享模块加入职责清晰的可选紧凑/只图标呈现，在多题归纳入口显式使用；恢复原palette在撤销重做之后、设置之前，保留按钮原title/aria-label及状态/快捷键。顶部选择/画笔/截图/字号/重置等已有图标的工具按钮隐藏label，中文title悬浮提示保留；不要隐藏智能整理下拉/归纳卡等业务动作文字或主题选项值。不得全局更改临时相关画布/深度回忆已授权视觉，其他caller默认行为保持。
-- [ ] 鼠标与键盘实际切换选择/画笔/高亮/文字/橡皮、颜色、设置、收起、撤销重做；绘画真实生成、撤销/重做同history、刷新保留。无编辑权限保持禁用；恢复过程中不触碰保存/文本草稿/共享dialogs/theme行为。用现有抛弃DB helper测试多题归纳真实页面，同时遍历共享调用方相关画布/深度回忆/首页画笔的入口与图标及可用性防范围回归，只对授权多题恢复布局。
-- [ ] 截图原/修复对比及hover标题/aria证据写artifacts/knowledge-universe-20261020/task-5/，运行现有定向契约及浏览器；只提交授权源/测试，报告精确命令与已验证边界，root最终sync/full/UAT。此任务在Task4审查通过后实施，禁止并行改产品代码。
+- [x] 先RED：真实共享模块+完整页面CSS可见label、palette第二行；断言恢复多题归纳既有紧凑按钮/颜色顺序，桌面1840/1440/1024单排无巨大空白；390/320仍可达不越界，允许原移动两排。不能只测未加载KGCanvasToolbar的旧isolated fixture。
+- [x] 复用共享模块加入职责清晰的可选紧凑/只图标呈现，在多题归纳入口显式使用；恢复原palette在撤销重做之后、设置之前，保留按钮原title/aria-label及状态/快捷键。顶部选择/画笔/截图/字号/重置等已有图标的工具按钮隐藏label，中文title悬浮提示保留；不要隐藏智能整理下拉/归纳卡等业务动作文字或主题选项值。不得全局更改临时相关画布/深度回忆已授权视觉，其他caller默认行为保持。
+- [x] 鼠标与键盘实际切换选择/画笔/高亮/文字/橡皮、颜色、设置、收起、撤销重做；绘画真实生成、撤销/重做同history、刷新保留。无编辑权限保持禁用；恢复过程中不触碰保存/文本草稿/共享dialogs/theme行为。用现有抛弃DB helper测试多题归纳真实页面，同时遍历共享调用方相关画布/深度回忆/首页画笔的入口与图标及可用性防范围回归，只对授权多题恢复布局。
+- [x] 截图原/修复对比及hover标题/aria证据写artifacts/knowledge-universe-20261020/task-5/，运行现有定向契约及浏览器；只提交授权源/测试，报告精确命令与已验证边界，root最终sync/full/UAT。此任务在Task4审查通过后实施，禁止并行改产品代码。
 
 ### Task 6: 多题归纳画笔自定义颜色复用现有悬浮色板
 
@@ -85,6 +88,17 @@ assert score([True]*10+[False]) < 100
 - [ ] 用户进一步明确共用色板的取色按钮“⌖”改成通用滴管图标：复用同一公共color-picker-controller入口，用清晰描边SVG替换字符，按钮内居中，保持title/aria-label“吸取屏幕颜色”、原EyeDropper功能与不支持时隐藏逻辑。此处全局图标一致是用户明确授权，其他布局不变；不额外重设计整个色板。
 - [ ] onCommit经过现有updateTextStyle更新当前笔/高亮/文字颜色与工具图标/光标，随后真实绘画/文字保存服务器并刷新保留颜色。关闭/取消未提交预览不改已提交颜色，非法HEX不产生无效样式。只读不开放/不应用；打开后切工具、切画布、切owner、关闭或destroy不能由迟到commit把颜色应用到其他上下文；使用原module生命周期和上下文校验，不复制存储/判权。不能误改卡牌/分组颜色。
 - [ ] 真实浏览器验证鼠标/键盘开启、预设与HEX选择、hover/拖动浮层、关闭重开、最近使用、全屏以及390/320不越界，已有卡牌色板仍可用；OS屏幕取色器只能验证支持性/取消，未实际系统选色须如实记录边界。复用抛弃DB helper，成功业务不mock；截图/evidence artifacts/knowledge-universe-20261020/task-6/。只提交授权源/测试，报告精确已验证/未验证范围。Task5审查后启动，no并行实现，root最后sync/full/UAT。
+
+### Task 7: 阅读模式双击进入临时画布，临时卡牌始终可拖动
+
+**用户明确追加：** 阅读模式选卡后截图中的grip+打开相关画布悬浮小工具栏取消，改为鼠标双击卡牌进入；临时画布不继承阅读模式禁止拖卡，任何入口模式均可拖动临时卡牌。拖动只改变本次临时布局，不回写原图谱，不额外更改主题/布局。
+**Files:** Modify new-legacy/src/10-graph-editor.js、new-legacy/src/graph/related-canvas-controller.js；仅必要现有styles/home-interaction-modes-p4330.css；Extend new-legacy/tests/v91-related-canvas-reading-mode.test.js、new-legacy/tests/related-canvas-readonly-browser.py，必要现有前端专项契约。
+**已定位：** updateCardQuickActions 当前readingEntry故意放行read-only工具栏；10-graph-editor有两个cardsLayer dblclick处理器（约2804/2870），需统一正确路由并避免stage双击新建/正文编辑冲突。openRelatedCanvasModal使用temporary session并传readOnly=!canWriteGraph()；related-canvas-controller renderCards pointerdown在readOnly直接return，阻断本地拖动。session临时副本/history既有，不要改主图权限或创建持久化工作区。
+- [ ] RED：阅读单击/悬浮卡牌不出现小工具栏，双击同卡一次打开相关画布；当前旧版工具栏出现、双击不开应记录失败。模式切换后仍隐藏reading mini-toolbar，efficient/professional原工具栏与双击编辑保持。
+- [ ] 在现有公共图谱交互入口实现reading双击→选择目标卡并走原openRelatedCanvasModal保护（草稿保存/文件切换锁/迟到generation/单例）；单击仍看详情。不要拦截卡内链接/按钮/输入/正在编辑正文、不要同时触发主画布新建或编辑；其他模式行为不改。
+- [ ] 将临时布局拖动与readOnly内容编辑权限分离；阅读/编辑等模式进入后，卡牌可真实pointer拖动且连线实时跟随，释放/取消正确结束捕获，缩放下坐标正确。readOnly仍隐藏新增/删除/连线/画笔等内容编辑，不得仅为拖动清空整个readonly。说明改为可拖动临时排列、关闭丢弃，内容权限保留。临时数据依旧session副本，无任何原图节点坐标/关系/锁定或后端数据改变。
+- [ ] 真实浏览器API创建图谱→切reading→单击无toolbar→双击开→拖动卡牌后坐标变化/连线跟随→关/重开还原→刷新原图/API坐标逐字不变；记录弹层期间files写请求0。正常editable临时仍保留原新增/绘画/history；其他模式主图工具栏/双击不回归。验证关闭/Escape/全屏、缩放拖动/cancel、连续双击仅单例；合法只读查看上下文只能临时拖动、不扩展正式编辑权限，源文件真正403边界保持。
+- [ ] 更新旧契约“只读禁止拖动/阅读放行小工具栏”的断言为本次用户明确新规则，同时保留内容禁改/零写入/临时副本/已有ink生命周期断言。不得只删断言过测试。证据artifacts/knowledge-universe-20261020/task-7/，复用抛弃DB，报告实际/未验证边界；仅授权文件提交。Task6审查后启动，不并行实现，root统一sync/full/UAT。
 
 ## 集成与交付（root）
 - [ ] 按任务spec+quality审查并修复明确问题，最终全分支独立审查。

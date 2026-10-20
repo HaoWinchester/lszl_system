@@ -1,5 +1,11 @@
 # Handoff: 全量知识星空与弹窗滚动修复进行中
 
+
+## 最新用户流程（覆盖下文早期自动部署计划）
+用户要求“问题一个一个的改，改完之后我本地要看一下，没问题再发uat”。当前仅交付Task5本地画笔恢复供验看；Task6/7未实现，不自动继续，也不发UAT。Task1–4已完成但仅保留本地代码；UAT378/main336保持。Task5 41031abd规范/质量审查通过，真实API11组+契约8项通过，root再次8项通过。
+本地预览 http://127.0.0.1:5180/question-workspace.html，exec session14056/reloaderPID6823仍运行，官方sync --out ignored artifacts/knowledge-universe-20261020/local-ink-preview/site，dev fallback读取该目录，不改正式active指针或public。health/DB与4项运行静态SHA均核对；默认正常登录供用户操作。root尝试API登录遇legal consent400，未代用户接受条款，不冒称已完成本地真人登录截图。之前Task5真实APIfixture证明布局596×50，实际本地served字节与生成一致。启动dev按项目脚本将本地kg_graph_dev迁移80e5925339a7→c8d4e7f2b610，无远程变更。Open-in-Codex已queued该URL，用户也可点击直接打开。
+待用户先看这一项；不要因原计划Tasks6/7存在就擅自继续。SDD workspace保留，其他未完成任务不重复已完成1–5。
+
 ## Session Metadata
 - Created: 2026-10-20T16:04:04.998922+08:00
 - Project: /Users/menghao/Documents/幻谱/佩奇老师/测试环境/lszl_system
@@ -83,3 +89,5 @@ Task1最新补充：ea854558完成，37定向测试+独立spec/quality审查通�
 Task6追加明确授权：共用色板⌖按钮改通用滴管SVG（参考图2），公共入口统一图标，保留原EyeDropper和不可用隐藏，不重设计整个色板。计划/brief已更新。
 
 最新用户再次强调主题保持以前操作、不要乱改页面布局；root已明确回复保留主题选项/操作/入口位置，只恢复画笔紧凑布局+图标文字隐藏+现有色板+滴管图标。全局约束已锁定，不得扩展主题或页面重设计。Task4 2d174711完成，universe_dashboard_review审查中，Task5/6尚未开始。
+
+最新用户Task7：阅读卡牌悬浮小工具栏取消、双击进入相关临时画布；临时画布所有入口模式均可拖牌（临时布局不回写源）。已定位10-graph-editor readingEntry及cardsLayer双击，related-canvas-controller readOnly pointerdown return。新增Task7在Task6审查后执行。不要清空readonly而开放新增删改，保留其他模式和主题布局。Task5 green-4全过正在报告/提交，Task6/7未派。
