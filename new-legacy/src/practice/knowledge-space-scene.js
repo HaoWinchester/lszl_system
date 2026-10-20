@@ -70,6 +70,7 @@
     canvas.className='kg-knowledge-space-canvas';canvas.setAttribute('role','img');canvas.setAttribute('aria-label','知识点三维知识星空，考点详情可通过列表选择');
     canvas.style.cssText='display:block;width:100%;height:100%;touch-action:pan-y;cursor:grab';host.appendChild(canvas);
     const model=createModel(nodes),camera={...DEFAULT_CAMERA},pointers=new Map(),listeners=[];
+    const originalMinHeight=host.style.minHeight,minimumHeight=parseFloat(win.getComputedStyle(host).minHeight)||0;
     const motion=win.matchMedia?.('(prefers-reduced-motion: reduce)');
     let width=0,height=0,raf=0,destroyed=false,selected=null,focused=null,group='',dirty=true,intersecting=true,reduced=!!motion?.matches;
     let inertiaX=0,inertiaY=0,pinching=false,pinchDistance=0,autoFit=true;
@@ -133,6 +134,14 @@
       if(destroyed)return;
       labelCache.clear();
       const rect=host.getBoundingClientRect();width=Math.max(0,rect.width-host.clientLeft*2);height=Math.max(0,rect.height-host.clientTop*2);
+      if(width>0&&model.points.length){
+        ctx.font='600 20px system-ui, sans-serif';
+        const maxWidth=Math.max(20,Math.min(240,width-20));
+        const required=Math.max(minimumHeight,...model.points.map((point,index)=>labelLayout(index,String(point.node.title||'未命名考点'),ctx.font,maxWidth).lines.length*24+32));
+        const minHeight=Math.ceil(required)+'px';if(host.style.minHeight!==minHeight)host.style.minHeight=minHeight;
+        height=Math.max(0,host.getBoundingClientRect().height-host.clientTop*2);
+      }
+      canvas.style.height=height+'px';
       const dpr=Math.min(2,win.devicePixelRatio||1);canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);if(autoFit)fitDefault();mark();if(!visible())stop();
     }
     function applyRotation(dx,dy){camera.yaw+=dx*.006;camera.pitch=clamp(camera.pitch+dy*.006,-1.35,1.35)}
@@ -184,7 +193,7 @@
     // Dialog open/close and CSS visibility changes may not change intersection or size.
     const visibilityObserver=win.MutationObserver?new win.MutationObserver(()=>{if(visible())mark();else{stop();releasePointers()}}):null;
     for(let element=host;element&&visibilityObserver;element=element.parentElement)visibilityObserver.observe(element,{attributes:true,attributeFilter:['style','class','hidden','open']});
-    function destroy(){if(destroyed)return;destroyed=true;stop();releasePointers();resizeObserver?.disconnect();intersectionObserver?.disconnect();visibilityObserver?.disconnect();for(const remove of listeners)remove();canvas.remove()}
+    function destroy(){if(destroyed)return;destroyed=true;stop();releasePointers();resizeObserver?.disconnect();intersectionObserver?.disconnect();visibilityObserver?.disconnect();for(const remove of listeners)remove();canvas.remove();host.style.minHeight=originalMinHeight}
     function snapshot(){return {camera:{...camera},positions:positions(),selected,group,settled:model.settled,running:!!raf,destroyed}}
     resize();return Object.freeze({select,focus,focusGroup,rotate,zoomBy,reset,destroy,snapshot});
   }

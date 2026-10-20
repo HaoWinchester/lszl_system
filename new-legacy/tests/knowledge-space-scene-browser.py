@@ -188,6 +188,13 @@ with sync_playwright() as p:
   page.evaluate("document.querySelector('#host').style.height='200px';document.dispatchEvent(new Event('visibilitychange'))")
   page.wait_for_timeout(150);assert page.evaluate('draws===atDestroy');assert snap()==dead;assert page.evaluate('chosen.length')==count
   assert errors==[],errors
+  # The maximum legal title stays inside the Canvas even at narrow widths.
+  page.evaluate("document.querySelector('#host').style.height='310px'")
+  page.evaluate("()=>{window.longTitle='风险'.repeat(150);window.longRows=[];window.scene=KGKnowledgeSpaceScene.mount({host:document.querySelector('#host'),nodes:[{id:'long',title:longTitle}]});const ctx=document.querySelector('canvas').getContext('2d'),clear=ctx.clearRect,fill=ctx.fillText;ctx.clearRect=function(...args){longRows=[];return clear.apply(this,args)};ctx.fillText=function(...args){longRows.push({text:args[0],y:args[2]});return fill.apply(this,args)};scene.focus(0)}")
+  page.wait_for_function('scene.snapshot().settled&&!scene.snapshot().running')
+  assert page.evaluate('longRows.map(row=>row.text).join("")===longTitle')
+  assert page.evaluate('longRows.every(row=>row.y>=20&&row.y<=document.querySelector("canvas").getBoundingClientRect().height-4)'), 'Long labels must not be cropped above or below the Canvas'
+  page.evaluate('scene.destroy()');assert page.locator('#host').evaluate('e=>e.style.minHeight')==''
   # Canvas unavailable must return fallback without leaving a canvas behind.
   page.evaluate("HTMLCanvasElement.prototype.getContext=()=>null;window.fallback=KGKnowledgeSpaceScene.mount({host:document.querySelector('#host'),nodes:[]})")
   assert page.evaluate('fallback===null');assert page.locator('canvas').count()==0
