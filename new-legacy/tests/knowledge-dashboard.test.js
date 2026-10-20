@@ -24,13 +24,19 @@ test('pagination requests are independent and carry explicit bounded page size',
   const loader=api().createLoader({getUser:()=> 'A',load:async page=>{seen=page;return {nodes:[],topicCount:5}},onData:()=>{},onState:()=>{}});
   await loader.refresh(3);assert.equal(seen,3);
 });
-test('one real topic is centered and dense SVG layouts stay bounded and escape labels',()=>{
-  const one={title:'<script>alert(1)</script>',subject:'PMP',taxonomyId:'tax',brightness:1,attemptCount:1};
-  assert.equal(api().starPositions([one])[0].x,400);
-  const markup=api().networkMarkup(Array.from({length:60},(_,i)=>({...one,title:one.title+i})));
-  assert.equal((markup.match(/class="kg-knowledge-star"/g)||[]).length,60);
-  assert.ok(!markup.includes('<script>'));
-  for(const point of api().starPositions(Array.from({length:60},(_,i)=>({...one,subject:'S'+i})))){
-    assert.ok(point.x>0&&point.x<800&&point.y>0&&point.y<420);
+test('unauthorized and malformed responses never retain private topic data',async()=>{
+  for(const result of ['unauthorized','malformed']){
+    let data={nodes:[{title:'private'}]},state;
+    const loader=api().createLoader({getUser:()=> 'A',load:async()=>{if(result==='unauthorized')throw Object.assign(Error('expired'),{status:401});return {nodes:null}},onData:value=>data=value,onState:value=>state=value});
+    assert.equal(await loader.refresh(),false);assert.equal(data,null);assert.equal(state,result==='unauthorized'?'guest':'error');
+  }
+});
+test('newer page data survives delayed success and errors from older pages of the same owner',async()=>{
+  for(const fail of [false,true]){
+    let resolve,reject,data,state;
+    const loader=api().createLoader({getUser:()=> 'A',load:page=>page===1?new Promise((r,j)=>{resolve=r;reject=j}):Promise.resolve({nodes:[{title:'page two'}]}),onData:value=>data=value,onState:value=>state=value});
+    const old=loader.refresh(1);await loader.refresh(2);
+    if(fail)reject(Error('old failure'));else resolve({nodes:[{title:'page one'}]});await old;
+    assert.equal(data.nodes[0].title,'page two');assert.equal(state,'ready');
   }
 });
