@@ -7,6 +7,16 @@ OUT=ROOT/'.superpowers/sdd/2026-10-20-learning-entry-3d-knowledge-space/artifact
 OUT.mkdir(parents=True,exist_ok=True)
 assert MODULE.exists(), 'knowledge-space-scene.js must exist before browser interactions can run'
 NODES=[dict(id=f'topic-{i}',title=f'真实接口形状测试考点 {i}',subject='数学' if i<12 else '英语',taxonomyId='algebra' if i<12 else 'reading',brightness=.2+i/30) for i in range(24)]
+def assert_fit(page,label):
+ state=page.evaluate('scene.snapshot()');box=page.locator('canvas').bounding_box()
+ points=state['positions'];xs=[v['x'] for v in points];ys=[v['y'] for v in points]
+ span_x=max(xs)-min(xs);span_y=max(ys)-min(ys)
+ assert max(span_x/box['width'],span_y/box['height'])>=.60, f'{label}: default nodes too compact: {span_x:.1f}x{span_y:.1f} in {box}'
+ assert min(xs)>=16 and max(xs)<=box['width']-16 and min(ys)>=16 and max(ys)<=box['height']-16,f'{label}: fit clips nodes'
+ assert .45<=state['camera']['zoom']<=3, f'{label}: default fit must respect zoom bounds'
+ print(f"fit {label}: {span_x:.1f}x{span_y:.1f}, zoom={state['camera']['zoom']:.3f}")
+ return state['camera']
+
 with sync_playwright() as p:
  browser=p.chromium.launch(headless=True)
  for width in (1440,390):
@@ -14,6 +24,25 @@ with sync_playwright() as p:
   page=context.new_page();errors=[];page.on('pageerror',lambda error:errors.append(str(error)))
   page.set_content('''<style>body{margin:0;background:#050914;color:#eef;font:14px sans-serif}#host{margin:40px 16px;width:calc(100% - 32px);height:560px;overflow:hidden;border:1px solid #234}</style><div id="host"></div><div style="height:1200px">场景外滚动区域</div>''')
   page.wait_for_load_state('networkidle');page.add_script_tag(content=MODULE.read_text())
+  for kind in ('single-group','multi-group'):
+   fixture=[dict(id=f'fit-{i}',title=f'布局测试考点 {i}',subject='数学' if kind=='single-group' else f'科目 {i//10}',taxonomyId='classification',brightness=.7) for i in range(60)]
+   page.evaluate("nodes=>{window.scene=KGKnowledgeSpaceScene.mount({host:document.querySelector('#host'),nodes})}",fixture)
+   page.wait_for_function('scene.snapshot().settled && !scene.snapshot().running')
+   fitted=assert_fit(page,f'{width}/{kind}/initial')
+   page.screenshot(path=str(OUT/f'fit-{kind}-{width}.png'))
+   page.evaluate('scene.rotate(80,30);scene.zoomBy(.6)');page.wait_for_function('!scene.snapshot().running')
+   manual=page.evaluate('scene.snapshot().camera')
+   page.evaluate("document.querySelector('#host').style.height='500px'");page.wait_for_timeout(100)
+   assert page.evaluate('scene.snapshot().camera')==manual,'resize cannot overwrite manual camera'
+   page.evaluate("document.querySelector('#host').style.height='560px'");page.wait_for_timeout(100)
+   page.evaluate('scene.reset()');page.wait_for_function('!scene.snapshot().running')
+   assert assert_fit(page,f'{width}/{kind}/reset')==fitted
+   page.evaluate('scene.destroy()')
+  # An early user adjustment must survive later physical settlement.
+  page.evaluate("nodes=>{window.scene=KGKnowledgeSpaceScene.mount({host:document.querySelector('#host'),nodes});scene.rotate(20,10);scene.zoomBy(.8)}",NODES)
+  early=page.evaluate('scene.snapshot().camera');page.wait_for_function('scene.snapshot().settled && !scene.snapshot().running')
+  assert page.evaluate('scene.snapshot().camera')==early,'settlement cannot overwrite manual camera'
+  page.evaluate('scene.destroy()')
   page.evaluate('''nodes=>{window.chosen=[];window.scene=KGKnowledgeSpaceScene.mount({host:document.querySelector('#host'),nodes,onSelect:(node,index)=>chosen.push({id:node.id,index})})}''',NODES)
   page.evaluate("document.querySelector('#host').style.visibility='hidden'")
   page.wait_for_timeout(120);assert not page.evaluate('scene.snapshot().running')
@@ -21,12 +50,20 @@ with sync_playwright() as p:
   page.wait_for_function('scene.snapshot().settled && !scene.snapshot().running',timeout=4000)
   snap=lambda:page.evaluate('scene.snapshot()')
   initial=snap();assert len(initial['positions'])==24;assert initial['selected'] is None
+  assert_fit(page,f'{width}/24-node-initial')
   assert page.locator('canvas').evaluate('(c)=>c.width')<=2*(width-30)
-  box=page.locator('#host').bounding_box();cx=box['x']+box['width']/2;cy=box['y']+box['height']/2
-  page.mouse.move(cx,cy);page.mouse.down();page.mouse.move(cx+80,cy+35,steps=8);page.mouse.up()
+  box=page.locator('canvas').bounding_box();cx=box['x']+box['width']/2;cy=box['y']+box['height']/2
+  page.mouse.move(cx,cy);page.mouse.down();page.mouse.move(cx+80,cy+35,steps=8)
+  held=snap()['camera'];page.wait_for_timeout(400)
+  assert snap()['camera']==held,'holding still must not move camera'
+  assert not snap()['running'],'settled scene must stop RAF while a dragged pointer is held still'
+  page.mouse.up()
   assert snap()['camera']['yaw']!=initial['camera']['yaw'];assert page.evaluate('chosen')==[], 'drag cannot select'
   page.wait_for_function('!scene.snapshot().running')
-  before=snap()['camera']['zoom'];page.mouse.move(cx,cy);page.mouse.wheel(0,-150);page.wait_for_timeout(60)
+  assert snap()['camera']!=held,'released pointer should resume its bounded inertia'
+  before=snap()['camera']['zoom'];page.mouse.move(cx,cy);page.mouse.wheel(0,150);page.wait_for_timeout(60)
+  assert snap()['camera']['zoom']<before
+  before=snap()['camera']['zoom'];page.mouse.wheel(0,-150);page.wait_for_timeout(60)
   assert snap()['camera']['zoom']>before;assert page.evaluate('scrollY')==0
   page.mouse.move(5,650);page.mouse.wheel(0,100);page.wait_for_timeout(100);assert page.evaluate('scrollY')>0
   page.evaluate('scrollTo(0,0);scene.reset()');page.wait_for_function('!scene.snapshot().running')
@@ -46,7 +83,7 @@ with sync_playwright() as p:
   before=snap()['camera'];count=page.evaluate('chosen.length')
   touch('touchStart',[(1,cx-30,cy)]);touch('touchMove',[(1,cx+30,cy+25)]);touch('touchEnd',[])
   assert snap()['camera']['yaw']!=before['yaw'];assert page.evaluate('chosen.length')==count
-  page.evaluate('scene.reset()');before=snap()['camera']['zoom']
+  page.evaluate('scene.reset();scene.zoomBy(.6)');before=snap()['camera']['zoom']
   touch('touchStart',[(1,cx-25,cy),(2,cx+25,cy)]);touch('touchMove',[(1,cx-60,cy),(2,cx+60,cy)]);touch('touchEnd',[])
   assert snap()['camera']['zoom']>before;assert page.evaluate('chosen.length')==count
   touch('touchStart',[(1,cx,cy)]);touch('touchCancel',[]);assert page.evaluate('chosen.length')==count
@@ -88,4 +125,4 @@ with sync_playwright() as p:
   assert page.evaluate('fallback===null');assert page.locator('canvas').count()==0
   context.close()
  browser.close()
-print('knowledge-space-scene-browser: 1440/390 mouse, wheel, touch rotation/pinch/cancel, selection, grouping, reset, resize, reduced motion, visibility, destroy and Canvas fallback passed')
+print('knowledge-space-scene-browser: 1440/390 initial/reset fit, manual camera preservation, held-pointer RAF stop, mouse/wheel/touch, selection, grouping, resize, reduced motion, visibility, destroy and Canvas fallback passed')

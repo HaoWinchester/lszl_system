@@ -58,11 +58,22 @@
     const model=createModel(nodes),camera={...DEFAULT_CAMERA},pointers=new Map(),listeners=[];
     const motion=win.matchMedia?.('(prefers-reduced-motion: reduce)');
     let width=0,height=0,raf=0,destroyed=false,selected=null,group='',dirty=true,intersecting=true,reduced=!!motion?.matches;
-    let inertiaX=0,inertiaY=0,pinching=false,pinchDistance=0;
+    let inertiaX=0,inertiaY=0,pinching=false,pinchDistance=0,autoFit=true;
+    const viewCenter={x:0,y:0,z:0};
     function visible(){return !destroyed&&!document.hidden&&intersecting&&host.isConnected&&width>0&&height>0&&host.getClientRects().length>0&&win.getComputedStyle(host).visibility!=='hidden'}
-    function positions(){return model.points.map(point=>({...projectPoint(point,camera,width,height),index:point.index,key:point.key,group:point.group,visible:!group||point.group===group}))}
+    function relative(point){return {x:point.x-viewCenter.x,y:point.y-viewCenter.y,z:point.z-viewCenter.z}}
+    // Fit once on mount/settlement and reset; explicit camera changes opt out until reset.
+    function fitDefault(){
+      if(!model.points.length||width<=0||height<=0)return;
+      for(const axis of ['x','y','z']){const values=model.points.map(point=>point[axis]);viewCenter[axis]=(Math.min(...values)+Math.max(...values))/2}
+      const projected=model.points.map(point=>projectPoint(relative(point),{...DEFAULT_CAMERA},width,height));
+      const extentX=Math.max(...projected.map(point=>Math.abs(point.x-width/2))),extentY=Math.max(...projected.map(point=>Math.abs(point.y-height/2)));
+      const padding=Math.max(24,Math.min(width,height)*.12);
+      camera.zoom=clamp(Math.min(Math.max(1,width/2-padding)/Math.max(1,extentX),Math.max(1,height/2-padding)/Math.max(1,extentY)),.45,3);
+    }
+    function positions(){return model.points.map(point=>({...projectPoint(relative(point),camera,width,height),index:point.index,key:point.key,group:point.group,visible:!group||point.group===group}))}
     function stop(){if(raf)win.cancelAnimationFrame(raf);raf=0}
-    function request(){if(!destroyed&&!raf&&visible()&&(dirty||!model.settled||Math.abs(inertiaX)+Math.abs(inertiaY)>.02))raf=win.requestAnimationFrame(frame)}
+    function request(){if(!destroyed&&!raf&&visible()&&(dirty||!model.settled||(!reduced&&pointers.size===0&&Math.abs(inertiaX)+Math.abs(inertiaY)>.02)))raf=win.requestAnimationFrame(frame)}
     function mark(){dirty=true;request()}
     function draw(){
       ctx.clearRect(0,0,width,height);ctx.fillStyle='#060b16';ctx.fillRect(0,0,width,height);
@@ -81,7 +92,7 @@
     }
     function frame(){
       raf=0;if(!visible())return;
-      if(!model.settled){for(let i=0;i<3&&!model.settled;i++)stepModel(model);dirty=true}
+      if(!model.settled){for(let i=0;i<3&&!model.settled;i++)stepModel(model);if(model.settled&&autoFit)fitDefault();dirty=true}
       if(!reduced&&pointers.size===0&&(Math.abs(inertiaX)+Math.abs(inertiaY)>.02)){applyRotation(inertiaX,inertiaY);inertiaX*=.88;inertiaY*=.88;dirty=true}
       else if(reduced){inertiaX=0;inertiaY=0}
       if(dirty){draw();dirty=false}request();
@@ -89,14 +100,14 @@
     function resize(){
       if(destroyed)return;
       const rect=host.getBoundingClientRect();width=Math.max(0,rect.width-host.clientLeft*2);height=Math.max(0,rect.height-host.clientTop*2);
-      const dpr=Math.min(2,win.devicePixelRatio||1);canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);mark();if(!visible())stop();
+      const dpr=Math.min(2,win.devicePixelRatio||1);canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);if(autoFit)fitDefault();mark();if(!visible())stop();
     }
     function applyRotation(dx,dy){camera.yaw+=dx*.006;camera.pitch=clamp(camera.pitch+dy*.006,-1.35,1.35)}
-    function rotate(dx,dy){if(destroyed||!Number.isFinite(dx)||!Number.isFinite(dy))return;applyRotation(dx,dy);mark()}
-    function zoomBy(factor){if(destroyed||!Number.isFinite(factor)||factor<=0)return;camera.zoom=clamp(camera.zoom*factor,.45,3);mark()}
+    function rotate(dx,dy){if(destroyed||!Number.isFinite(dx)||!Number.isFinite(dy))return;autoFit=false;applyRotation(dx,dy);mark()}
+    function zoomBy(factor){if(destroyed||!Number.isFinite(factor)||factor<=0)return;autoFit=false;camera.zoom=clamp(camera.zoom*factor,.45,3);mark()}
     function select(index){if(destroyed||!Number.isInteger(index)||!model.points[index])return;selected=index;mark()}
     function focusGroup(key){if(destroyed)return;group=String(key||'');mark()}
-    function reset(){if(destroyed)return;Object.assign(camera,DEFAULT_CAMERA);group='';inertiaX=inertiaY=0;mark()}
+    function reset(){if(destroyed)return;Object.assign(camera,DEFAULT_CAMERA);autoFit=true;fitDefault();group='';inertiaX=inertiaY=0;mark()}
     function listen(target,type,handler,options){target.addEventListener(type,handler,options);listeners.push(()=>target.removeEventListener(type,handler,options))}
     function distance(){const values=[...pointers.values()];return values.length<2?0:Math.hypot(values[0].x-values[1].x,values[0].y-values[1].y)}
     function releasePointers(){for(const id of pointers.keys()){try{if(canvas.hasPointerCapture(id))canvas.releasePointerCapture(id)}catch(error){/* Detached pointers need no release. */}}pointers.clear();pinching=false;pinchDistance=0;inertiaX=inertiaY=0;canvas.style.cursor='grab'}
