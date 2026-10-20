@@ -9,7 +9,7 @@
 ## 最新用户执行顺序（优先）
 最新请求已授权继续完成剩余Task6/7并统一列清单；无需逐项再等本地确认。仍只更新本地预览，不自动发UAT，主题及其他页面布局保持。Task6同时增加色盘与撤销/重做组对调：多题归纳紧凑条顺序为绘制工具→色盘→撤销/重做→设置/收起，现有尺寸/其他caller默认不动。以下旧逐项等待要求由本段覆盖。
 
-用户明确要求“问题一个一个的改，改完之后我本地要看一下，没问题再发uat”。当前停在Task5本地验看，不自动启动Task6/7，也不递增版本、promote、推送或部署UAT。后续每个问题按用户本地确认逐项推进；原集成交付清单保留为未来待办，不能视为当前部署授权。
+此前用户要求逐项本地查看；最新请求已继续授权完成Task6/7。保留本地验看后再发UAT的约束，不递增正式版本、promote、推送或部署UAT。
 
 ## Global Constraints
 - 用户已确认全部已发布知识树及弹窗内滚动；规格docs/superpowers/specs/2026-10-20-knowledge-universe-scroll-design.md。
@@ -18,7 +18,7 @@
 - 每个节点的练习亮度只由当前owner有效保存作答产生，未练也显示，不能泄露其他owner或未发布内容；亮度最终按用户追加确认的综合练习熟练度计算（见Task3），不可沿用初版纯时间亮度。
 - 普通wheel/触摸纵向滚动弹窗；Ctrl/Meta wheel或双指缩放；鼠标/触摸横向旋转、现有按钮/选择/生命周期保持。
 - 用户最新强调主题保留原来的选项、操作方式和入口位置，禁止改主题或其他页面布局；Task5仅恢复误改画笔与隐藏图标文字，Task6仅明确授权的色板复用/滴管图标。
-- 所有Python命令PYTHONDONTWRITEBYTECODE=1。永久main/uat保留，完成自检只部署UAT并等用户本人验收。
+- 所有Python命令PYTHONDONTWRITEBYTECODE=1。永久main/uat保留；本轮完成自检后仅提供本地预览，用户确认后才可部署UAT，UAT仍须用户本人验收。
 
 ### Task 1: 已发布完整知识目录与个人练习叠加API
 
@@ -95,21 +95,22 @@ assert score([True]*10+[False]) < 100
 ### Task 7: 阅读模式双击进入临时画布，临时卡牌始终可拖动
 
 **用户明确追加：** 阅读模式选卡后截图中的grip+打开相关画布悬浮小工具栏取消，改为鼠标双击卡牌进入；临时画布不继承阅读模式禁止拖卡，任何入口模式均可拖动临时卡牌。拖动只改变本次临时布局，不回写原图谱，不额外更改主题/布局。
-**Files:** Modify new-legacy/src/10-graph-editor.js、new-legacy/src/graph/related-canvas-controller.js；仅必要现有styles/home-interaction-modes-p4330.css；Extend new-legacy/tests/v91-related-canvas-reading-mode.test.js、new-legacy/tests/related-canvas-readonly-browser.py，必要现有前端专项契约。
+**Files:** Modify new-legacy/src/10-graph-editor.js、new-legacy/src/graph/related-canvas-controller.js、new-legacy/src/30-auth-guards.js（仅合法viewer阅读卡牌双击捕获放行）；仅必要现有styles/home-interaction-modes-p4330.css；Extend new-legacy/tests/v91-related-canvas-reading-mode.test.js、new-legacy/tests/related-canvas-readonly-browser.py，必要现有前端专项契约。
 **已定位：** updateCardQuickActions 当前readingEntry故意放行read-only工具栏；10-graph-editor有两个cardsLayer dblclick处理器（约2804/2870），需统一正确路由并避免stage双击新建/正文编辑冲突。openRelatedCanvasModal使用temporary session并传readOnly=!canWriteGraph()；related-canvas-controller renderCards pointerdown在readOnly直接return，阻断本地拖动。session临时副本/history既有，不要改主图权限或创建持久化工作区。
-- [ ] RED：阅读单击/悬浮卡牌不出现小工具栏，双击同卡一次打开相关画布；当前旧版工具栏出现、双击不开应记录失败。模式切换后仍隐藏reading mini-toolbar，efficient/professional原工具栏与双击编辑保持。
-- [ ] 在现有公共图谱交互入口实现reading双击→选择目标卡并走原openRelatedCanvasModal保护（草稿保存/文件切换锁/迟到generation/单例）；单击仍看详情。不要拦截卡内链接/按钮/输入/正在编辑正文、不要同时触发主画布新建或编辑；其他模式行为不改。
-- [ ] 将临时布局拖动与readOnly内容编辑权限分离；阅读/编辑等模式进入后，卡牌可真实pointer拖动且连线实时跟随，释放/取消正确结束捕获，缩放下坐标正确。readOnly仍隐藏新增/删除/连线/画笔等内容编辑，不得仅为拖动清空整个readonly。说明改为可拖动临时排列、关闭丢弃，内容权限保留。临时数据依旧session副本，无任何原图节点坐标/关系/锁定或后端数据改变。
-- [ ] 真实浏览器API创建图谱→切reading→单击无toolbar→双击开→拖动卡牌后坐标变化/连线跟随→关/重开还原→刷新原图/API坐标逐字不变；记录弹层期间files写请求0。正常editable临时仍保留原新增/绘画/history；其他模式主图工具栏/双击不回归。验证关闭/Escape/全屏、缩放拖动/cancel、连续双击仅单例；合法只读查看上下文只能临时拖动、不扩展正式编辑权限，源文件真正403边界保持。
-- [ ] 真实API测试可运行官方 node frontend/scripts/sync-new-legacy.js 生成public（不改VERSION/active pointer、不发布）；仅提交授权源/测试，生成产物留root最后检查。artifacts/knowledge-universe-20261020/run-related-api.py复用抛弃DB并传--output-dir，浏览器脚本需支持该参数；无需复制另一套source override。
-- [ ] 更新旧契约“只读禁止拖动/阅读放行小工具栏”的断言为本次用户明确新规则，同时保留内容禁改/零写入/临时副本/已有ink生命周期断言。不得只删断言过测试。证据artifacts/knowledge-universe-20261020/task-7/，复用抛弃DB，报告实际/未验证边界；仅授权文件提交。Task6审查后启动，不并行实现，root统一同步/测试/本地更新，UAT待用户确认。
+- [x] RED：阅读单击/悬浮卡牌不出现小工具栏，双击同卡一次打开相关画布；当前旧版工具栏出现、双击不开应记录失败。模式切换后仍隐藏reading mini-toolbar，efficient/professional原工具栏与双击编辑保持。
+- [x] 在现有公共图谱交互入口实现reading双击→选择目标卡并走原openRelatedCanvasModal保护（草稿保存/文件切换锁/迟到generation/单例）；单击仍看详情。不要拦截卡内链接/按钮/输入/正在编辑正文、不要同时触发主画布新建或编辑；其他模式行为不改。
+- [x] 将临时布局拖动与readOnly内容编辑权限分离；阅读/编辑等模式进入后，卡牌可真实pointer拖动且连线实时跟随，释放/取消正确结束捕获，缩放下坐标正确。readOnly仍隐藏新增/删除/连线/画笔等内容编辑，不得仅为拖动清空整个readonly。说明改为可拖动临时排列、关闭丢弃，内容权限保留。临时数据依旧session副本，无任何原图节点坐标/关系/锁定或后端数据改变。
+- [x] 真实浏览器API创建图谱→切reading→单击无toolbar→双击开→拖动卡牌后坐标变化/连线跟随→关/重开还原→刷新原图/API坐标逐字不变；记录弹层期间files写请求0。正常editable临时仍保留原新增/绘画/history；其他模式主图工具栏/双击不回归。验证关闭/Escape/全屏、缩放拖动/cancel、连续双击仅单例；合法只读查看上下文只能临时拖动、不扩展正式编辑权限，源文件真正403边界保持。
+- [x] 实测发现30-auth-guards.js捕获层阻断viewer阅读双击，故最小放行已登录+reading+knowledge-card非交互后代，仍经原protected入口；guest、非reading、链接/按钮/编辑器等与正式编辑/API403不放行。该模块仅index/workbench主页bundle调用，遍历两别名登录/退出并运行既有shared-auth-dialog-browser相关页回归。
+- [x] 真实API测试可运行官方 node frontend/scripts/sync-new-legacy.js 生成public（不改VERSION/active pointer、不发布）；仅提交授权源/测试，生成产物留root最后检查。artifacts/knowledge-universe-20261020/run-related-api.py复用抛弃DB并传--output-dir，浏览器脚本需支持该参数；无需复制另一套source override。
+- [x] 更新旧契约“只读禁止拖动/阅读放行小工具栏”的断言为本次用户明确新规则，同时保留内容禁改/零写入/临时副本/已有ink生命周期断言。不得只删断言过测试。证据artifacts/knowledge-universe-20261020/task-7/，复用抛弃DB，报告实际/未验证边界；仅授权文件提交。Task6审查后启动，不并行实现，root统一同步/测试/本地更新，UAT待用户确认。
 
 ## 集成与交付（root）
 - [ ] 按任务spec+quality审查并修复明确问题，最终全分支独立审查。
 - [ ] 复用抛弃DB实际API闭环，加入真实UAT320目录只读核验；截图与滚轮/触摸为真实输入，不能仅scrollIntoView。
-- [ ] VERSION379（当前378），重建content-prep、officialsync、暂存新增public后官方manage-new-legacy.js update new-legacy完整full，不skip；source/site/public一致，无旧路径删除。
-- [ ] 新鲜备份UAT378代码+PG，验证非空/SHA/manifest和磁盘；FFuat命令级7897push并lsremote核对，官方update-uat部署、公网和容器源/版本/DB核验，正式main不变。
-- [ ] 更新验证记录与session-handoff，停UAT等用户本人验收，不删除功能分支或永久分支。
+- [ ] 官方sync生成public并完成全量前端/后端与真实API验证；更新缓存隔离的本地5180预览，核验HTTP字节和active release未变化。
+- [ ] 未来待用户本地确认后：正式版本递增、官方release完整门禁、新鲜UAT备份、推送及部署，停在UAT等本人验收。本轮不执行。
+- [ ] 更新验证记录、功能清单与session-handoff，提供本地链接；保留功能分支及main/uat，明确UAT尚未更新。
 
 Root滚动RED证据：artifacts/knowledge-universe-20261020/modal-scroll-red.json。用真实scene/dashboard/CSS、isolated3节点布局fixture，1440×650 dialog content848/client616和390×844 shellcontent1181/client765均有可滚区域，但Canvas上wheel500后两scrollTop都0，zoom3→1.417099658。该probe是UI布局测试，不冒称成功真实API；先前UAT访客大厅三尺寸wheel真实通过。Task2/3需物理wheel/触摸覆盖而非scrollIntoView代替。
 Task1接口约定subjects=[{id,code,name,topicCount,practicedTopicCount,unpracticedTopicCount}]，node.subject=ContentSubject.code。
