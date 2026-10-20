@@ -45,9 +45,12 @@ with sync_playwright() as pw:
   scene(r,'neon');expect(w.locator('#qwThemeSelect')).to_have_value('latte')
  def entry(c):
   r=recall(c);w,_=workspace(c)
-  for name,p,selector in [('recall',r,'#krThemeSelect'),('workspace',w,'#qwThemeSelect')]:
+  for name,p,selector in [('workspace',w,'#qwThemeSelect'),('recall',r,'#krThemeSelect')]:
    for width in [1440,1024,800,525,390,320]:
-    p.set_viewport_size({'width':width,'height':844});select=p.locator(selector);expect(select).to_be_visible()
+    p.set_viewport_size({'width':width,'height':844});c.new_cdp_session(p).send('Emulation.setTouchEmulationEnabled',{'enabled':width<=525});select=p.locator(selector);expect(select).to_be_visible()
+    if width<=525:assert p.evaluate('matchMedia("(pointer:coarse)").matches')
+    if name=='workspace':assert select.evaluate('e=>e.parentElement.lastElementChild===e'), 'Theme must remain after the existing tool groups'
+    expect(select).to_have_accessible_name('画布主题' if name=='workspace' else '卡片主题')
     assert select.evaluate('e=>{const r=e.getBoundingClientRect();return r.width>60&&r.height>=28&&r.left>=0&&r.right<=innerWidth&&r.bottom<=innerHeight&&e.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))}'),(name,width)
     assert select.locator('option').all_text_contents()==['平台默认','羊皮纸','极光绿','暗夜霓虹','樱花粉','海盐蓝','奶油拿铁']
     scene(p,'ocean');select.focus();p.keyboard.press('ArrowDown');p.keyboard.press('Enter');p.keyboard.press('Escape')

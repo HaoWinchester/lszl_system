@@ -29,13 +29,13 @@ test('preview can be cancelled without replacing the saved theme',()=>{
 });
 
 function nativeSelect(){
-  const handlers=new Map(),classes=new Set(['kr-theme-compat-select']);
-  return {value:'platform',hidden:true,tabIndex:-1,classList:{remove:name=>classes.delete(name),add:name=>classes.add(name),contains:name=>classes.has(name)},removeAttribute(){},addEventListener(type,fn){handlers.set(type,fn)},emit(type){handlers.get(type)?.()}};
+  const handlers=new Map(),classes=new Set(['kr-theme-compat-select']),attributes=new Map();
+  return {value:'platform',hidden:true,tabIndex:-1,classList:{remove:name=>classes.delete(name),add:name=>classes.add(name),contains:name=>classes.has(name)},getAttribute:name=>attributes.get(name)||null,setAttribute:(name,value)=>attributes.set(name,value),removeAttribute:name=>attributes.delete(name),addEventListener(type,fn){handlers.set(type,fn)},emit(type){handlers.get(type)?.()}};
 }
 test('native theme selection saves immediately and follows account changes without a panel',()=>{
   const h=harness(),root=h.root(),theme=h.api.create({scope:'recall',roots:[root]}),select=nativeSelect();theme.init();
   let replacement;h.api.bindControls(theme,select,{replaceWith(value){replacement=value}});
-  assert.equal(replacement,select);assert.equal(select.hidden,false);assert.equal(select.tabIndex,0);assert.equal(select.classList.contains('kr-theme-compat-select'),false);
+  assert.equal(replacement,select);assert.equal(select.getAttribute('aria-label'),'卡片主题');assert.equal(select.hidden,false);assert.equal(select.tabIndex,0);assert.equal(select.classList.contains('kr-theme-compat-select'),false);
   select.emit('pointerdown');select.value='neon';select.emit('change');assert.equal(theme.saved(),'neon');assert.equal(root.dataset.theme,'neon');
   h.switchOwner('B');assert.equal(select.value,'platform');h.switchOwner('A');assert.equal(select.value,'neon');
 });

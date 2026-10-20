@@ -84,6 +84,7 @@
     select.classList.remove('kr-theme-compat-select');
     select.classList.add('learning-theme-select');
     select.hidden=false;select.tabIndex=0;select.removeAttribute('aria-hidden');
+    if(!select.getAttribute('aria-label'))select.setAttribute('aria-label','卡片主题');
     const sync=()=>{select.value=controller.saved()};
     const owner=()=>global.KGAuthCore?.currentUser?.()?.username||'';
     let interactionOwner;

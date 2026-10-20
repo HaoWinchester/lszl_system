@@ -5882,7 +5882,7 @@
       tools.querySelectorAll('.qw-overlay-divider').forEach(element=>element.remove());
       ui.group(tools,'选择与绘制',[[byId('qwPointerModeBtn'),'select','选择'],[byId('qwInkBtn'),'pen','画笔']],{iconOnly:true});
       ui.group(tools,'显示与导出',[[byId('qwCaptureBtn'),'camera','截图'],[byId('qwFontScaleBtn'),'font','字号'],[byId('qwResetViewBtn'),'fit','重置']],{iconOnly:true});
-      const theme=tools.querySelector('.learning-theme-menu');if(theme)tools.append(theme);
+      const theme=byId('qwThemeSelect');if(theme)tools.append(theme);
       const history=byId('qwLayoutToolbar');ui.present(byId('qwUndoBtn'),'undo','撤销',{iconOnly:true});ui.present(byId('qwRedoBtn'),'redo','重做',{iconOnly:true});history?.classList.add('canvas-toolbar');
     }
 
