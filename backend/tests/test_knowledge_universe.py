@@ -116,11 +116,15 @@ def test_complete_unpracticed_catalog_uses_current_published_tree_without_limits
         assert body['practicedTopicCount'] == body['attemptCount'] == 0
         assert body['unpracticedTopicCount'] == body['topicCount']
         assert body['unknownAttemptCount'] == body['unmappedAttemptCount'] == 0
-        assert body['brightnessMeaning'] == 'practice-activity'
-        assert body['dimAfterDays'] == 30
+        assert body['brightnessMeaning'] == 'practice-proficiency'
+        assert 'dimAfterDays' not in body
         assert 'hasMore' not in body and 'page' not in body
         assert all(n['brightness'] == .12 and n['attemptCount'] == 0
                    and n['lastPracticedAt'] is None and not n['practiced'] for n in body['nodes'])
+        assert all(n['proficiencyScore'] is None and n['proficiencyLevel'] == 'unpracticed'
+                   and n['gradedAttemptCount'] == n['correctCount'] == 0
+                   and n['recentGradedAttemptCount'] == n['recentCorrectCount'] == 0
+                   and n['recentAccuracy'] is None and n['correctStreak'] == 0 for n in body['nodes'])
         assert {n['taxonomyId'] for n in nodes} == {
             catalog['taxonomies']['current'], catalog['taxonomies']['fallback']}
         groups = {subject['id']: subject for subject in body['subjects']}
@@ -186,6 +190,8 @@ def test_universe_scans_every_owner_session_beyond_first_hundred(catalog):
         assert body['practicedTopicCount'] == 1
         practiced = next(n for n in body['nodes'] if n['practiced'])
         assert practiced['primaryNodeId'] == 'n1' and practiced['attemptCount'] == 105
+        assert practiced['proficiencyLevel'] == 'pending' and practiced['proficiencyScore'] is None
+        assert practiced['brightness'] == .2 and practiced['recentAccuracy'] is None
 
 
 @pytest.mark.parametrize('pointer', ['missing', 'draft', 'archived', 'cross-subject', None])
@@ -267,11 +273,15 @@ def test_only_valid_owner_answers_overlay_exact_current_nodes_and_keep_history_c
         assert body['unmappedAttemptCount'] == 2
         assert body['practicedTopicCount'] == 4
         assert body['unpracticedTopicCount'] == body['topicCount'] - 4
-        assert nodes['n1']['attemptCount'] == 2 and nodes['n1']['brightness'] == 1
+        assert nodes['n1']['attemptCount'] == 2 and nodes['n1']['brightness'] == .4816
+        assert nodes['n1']['gradedAttemptCount'] == nodes['n1']['correctCount'] == 2
+        assert nodes['n1']['proficiencyScore'] == 35.2  # 2/10 volume, tail streak 2/5.
         assert nodes['n1']['title'] == '当前节点1' and nodes['n1']['path'] == ['当前根', '当前节点1']
         assert nodes['n1']['lastPracticedAt'] == NOW.isoformat()
-        assert nodes['n3']['brightness'] == .4 and nodes['n4']['brightness'] == .7
+        assert nodes['n3']['brightness'] == nodes['n4']['brightness'] == .4184
+        assert nodes['n3']['proficiencyScore'] == nodes['n4']['proficiencyScore'] == 27.3
         assert nodes['n5']['practiced'] is True
+        assert nodes['n5']['proficiencyLevel'] == 'pending' and nodes['n5']['brightness'] == .2
         assert nodes['n2']['brightness'] == .12 and not nodes['n2']['practiced']
         assert 'SECRET' not in str(body) and 'private-bank' not in str(body)
         subject = next(s for s in body['subjects'] if s['id'] == catalog['subjects']['main'])
@@ -285,3 +295,150 @@ def test_only_valid_owner_answers_overlay_exact_current_nodes_and_keep_history_c
         other = read_universe(client)
         assert other['attemptCount'] == other['practicedTopicCount'] == 1
         assert [n['primaryNodeId'] for n in other['nodes'] if n['practiced']] == ['n2']
+        assert next(n for n in other['nodes'] if n['practiced'])['proficiencyScore'] == 27.3
+
+
+def seed_proficiency(catalog, batches):
+    """Persist real frozen sessions; each batch supplies owner, id, status and rows."""
+    async def seed():
+        async with AsyncSessionLocal() as db:
+            for owner_index, suffix, status, entries in batches:
+                answers, order = {}, []
+                for question_id, node_id, answer in entries:
+                    answers[question_id] = answer
+                    order.append({'questionId': question_id, 'questionSnapshot': {
+                        'subject': f'冻结科目-{question_id}',
+                        'metadata': {'knowledge': {'taxonomyId': catalog['taxonomies']['current'],
+                            'primaryNodeId': node_id, 'pathSnapshot': [f'冻结路径-{question_id}']}}}})
+                db.add(PracticeSession(id=f"{catalog['prefix']}-{suffix}",
+                    owner_id=catalog['owners'][owner_index], mode='practice', status=status,
+                    question_order=order, answers=answers, runtime_state={}, stats={}, scoring_snapshot={}))
+            await db.commit()
+    asyncio.run(seed())
+
+
+def test_proficiency_rewards_correct_volume_and_streak_but_errors_reduce_it(catalog):
+    sequences = {
+        'n1': [True], 'n2': [True]*5, 'n3': [True]*10,
+        'n4': [True]*10+[False], 'n5': [False]*30,
+        'n6': [True]*5+[False]*5, 'n7': [True]*9+[False, True],
+    }
+    entries = [(f'{node}-{index:02}', node,
+                {'correct': correct, 'submittedAt': (NOW-timedelta(minutes=40-index)).isoformat()})
+               for node, grades in sequences.items() for index, correct in enumerate(grades)]
+    seed_proficiency(catalog, [(0, 'scoring', 'completed', entries)])
+    with TestClient(app) as client:
+        login(client, catalog['owners'][0])
+        body = read_universe(client)
+        nodes = {n['primaryNodeId']: n for n in own_nodes(body, catalog)}
+        assert [nodes[n]['proficiencyScore'] for n in ('n1', 'n2', 'n3')] == [27.3, 62.5, 100]
+        assert nodes['n1']['brightness'] < nodes['n2']['brightness'] < nodes['n3']['brightness']
+        assert [nodes[n]['proficiencyLevel'] for n in ('n1', 'n2', 'n3')] == [
+            'developing', 'familiar', 'proficient']
+        assert nodes['n4']['proficiencyScore'] == 72.7 and nodes['n4']['brightness'] < nodes['n3']['brightness']
+        assert nodes['n4']['recentAccuracy'] == pytest.approx(10/11)
+        assert nodes['n4']['correctStreak'] == 0
+        assert nodes['n5']['gradedAttemptCount'] == 30 and nodes['n5']['correctCount'] == 0
+        assert nodes['n5']['recentGradedAttemptCount'] == 20 and nodes['n5']['recentCorrectCount'] == 0
+        assert nodes['n5']['proficiencyScore'] == 0 and nodes['n5']['brightness'] == .2
+        assert nodes['n5']['proficiencyLevel'] == 'developing'
+        assert nodes['n6']['proficiencyScore'] == 40 and nodes['n6']['proficiencyLevel'] == 'familiar'
+        assert nodes['n7']['proficiencyScore'] == 76.7 and nodes['n7']['proficiencyLevel'] == 'proficient'
+        assert nodes['n7']['correctStreak'] == 1
+        login(client, catalog['owners'][1])
+        other = read_universe(client)
+        assert other['attemptCount'] == 0 and other['practicedTopicCount'] == 0
+        assert all(n['proficiencyScore'] is None for n in other['nodes'])
+
+
+def test_recent_window_is_chronological_bounded_and_independent_of_stream_order(catalog):
+    batches = []
+    for owner_index, indices in ((0, range(40)), (1, reversed(range(40)))):
+        for index in indices:
+            batches.append((owner_index, f'window-{owner_index}-{index:02}', 'completed', [
+                ('q', 'n1', {'correct': index < 30,
+                             'acceptedAt': (NOW-timedelta(minutes=40-index)).isoformat()})]))
+    seed_proficiency(catalog, batches)
+    observed = []
+    with TestClient(app) as client:
+        for owner in catalog['owners']:
+            login(client, owner)
+            node = next(n for n in read_universe(client)['nodes'] if n['practiced'])
+            assert node['attemptCount'] == node['gradedAttemptCount'] == 40
+            assert node['correctCount'] == 30
+            assert node['recentGradedAttemptCount'] == 20 and node['recentCorrectCount'] == 10
+            assert node['recentAccuracy'] == .5 and node['correctStreak'] == 0
+            assert node['proficiencyScore'] == 40 and node['brightness'] == .52
+            observed.append(node)
+    assert observed[0] == observed[1]
+
+
+def test_same_timestamp_uses_session_then_question_id_for_stable_recent_tail(catalog):
+    batches = []
+    for owner_index, indices in ((0, range(21)), (1, reversed(range(21)))):
+        for index in indices:
+            batches.append((owner_index, f'tied-{owner_index}-{index:02}', 'completed', [
+                ('q', 'n1', {'correct': index >= 11, 'submittedAt': NOW.isoformat()})]))
+        # Dict insertion order differs from question-id order: z is the latest correct answer.
+        batches.append((owner_index, f'questions-{owner_index}', 'completed', [
+            ('z', 'n2', {'correct': True, 'submittedAt': NOW.isoformat()}),
+            ('a', 'n2', {'correct': False, 'submittedAt': NOW.isoformat()})]))
+    seed_proficiency(catalog, batches)
+    with TestClient(app) as client:
+        for owner in catalog['owners']:
+            login(client, owner)
+            nodes = {n['primaryNodeId']: n for n in read_universe(client)['nodes'] if n['practiced']}
+            assert nodes['n1']['gradedAttemptCount'] == 21 and nodes['n1']['correctCount'] == 10
+            assert nodes['n1']['recentGradedAttemptCount'] == 20 and nodes['n1']['recentCorrectCount'] == 10
+            assert nodes['n1']['correctStreak'] == 10 and nodes['n1']['proficiencyScore'] == 60
+            assert nodes['n2']['recentAccuracy'] == .5 and nodes['n2']['correctStreak'] == 1
+            assert nodes['n2']['proficiencyScore'] == 17.6
+
+
+def test_only_completed_sessions_with_valid_saved_server_boolean_grades_score(catalog):
+    valid = {'correct': True, 'acceptedAt': NOW.isoformat()}
+    invalid = [
+        {**valid, 'draft': True}, {**valid, 'timedOut': True}, {'correct': True},
+        {**valid, 'acceptedAt': (NOW+timedelta(seconds=1)).isoformat()},
+        {'correct': True, 'submittedAt': 'bad-date'},
+    ]
+    # Client-looking fields cannot substitute for a saved server boolean result.
+    pending = [
+        {'acceptedAt': NOW.isoformat(), 'selectedAnswer': 'A', 'clientCorrect': True},
+        {'acceptedAt': NOW.isoformat(), 'correct': 'true'},
+        {'acceptedAt': NOW.isoformat(), 'correct': 1},
+        {'acceptedAt': NOW.isoformat(), 'correct': None},
+    ]
+    seed_proficiency(catalog, [
+        (0, 'active', 'active', [('active', 'n1', valid)]),
+        (0, 'paused', 'paused', [('paused', 'n1', valid)]),
+        (0, 'abandoned', 'abandoned', [('abandoned', 'n2', valid)]),
+        (0, 'invalid', 'completed', [(f'invalid-{i}', 'n3', a) for i, a in enumerate(invalid)]),
+        (0, 'pending', 'completed', [(f'pending-{i}', 'n4', a) for i, a in enumerate(pending)]),
+    ])
+    with TestClient(app) as client:
+        login(client, catalog['owners'][0])
+        before = read_universe(client)
+        nodes = {n['primaryNodeId']: n for n in own_nodes(before, catalog)}
+        assert before['attemptCount'] == 7 and before['practicedTopicCount'] == 3
+        assert nodes['n1']['attemptCount'] == 2 and nodes['n2']['attemptCount'] == 1
+        assert nodes['n4']['attemptCount'] == 4
+        for node_id in ('n1', 'n2', 'n4'):
+            node = nodes[node_id]
+            assert node['proficiencyLevel'] == 'pending' and node['proficiencyScore'] is None
+            assert node['brightness'] == .2 and node['recentAccuracy'] is None
+            assert node['gradedAttemptCount'] == node['correctCount'] == node['correctStreak'] == 0
+        assert nodes['n3']['proficiencyLevel'] == 'unpracticed' and nodes['n3']['brightness'] == .12
+
+        async def complete_sessions():
+            async with AsyncSessionLocal() as db:
+                await db.execute(update(PracticeSession).where(PracticeSession.id.in_([
+                    f"{catalog['prefix']}-active", f"{catalog['prefix']}-paused"])).values(status='completed'))
+                await db.commit()
+        asyncio.run(complete_sessions())
+        after = read_universe(client)
+        node = next(n for n in after['nodes'] if n['primaryNodeId'] == 'n1'
+                    and n['taxonomyId'] == catalog['taxonomies']['current'])
+        assert after['attemptCount'] == before['attemptCount']
+        assert node['gradedAttemptCount'] == node['correctCount'] == 2
+        assert node['proficiencyScore'] == 35.2 and node['brightness'] == .4816

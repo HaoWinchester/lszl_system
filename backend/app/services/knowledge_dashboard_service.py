@@ -1,10 +1,11 @@
 """Owner-only practice history and its overlay on the current published catalog.
 
-History keeps frozen labels; the universe uses published taxonomy labels and
-exact frozen identifiers. Brightness is activity, never a mastery score.
+History keeps frozen labels and recency brightness; the universe uses published
+taxonomy labels, exact frozen identifiers and completed-practice proficiency.
 """
 from datetime import datetime, timezone
 import hashlib
+import heapq
 import json
 
 from sqlalchemy import select
@@ -53,11 +54,11 @@ def _knowledge(snapshot):
 
 
 def _new_state():
-    return {'groups': {}, 'attemptCount': 0, 'recentAttemptCount': 0,
+    return {'groups': {}, 'grades': {}, 'attemptCount': 0, 'recentAttemptCount': 0,
             'unknownAttemptCount': 0, 'lastPracticedAt': None}
 
 
-def _add_session(state, answers, snapshots, now):
+def _add_session(state, answers, snapshots, now, *, session_status=None, session_id=''):
     if not isinstance(answers, dict):
         return
     for question_id, answer in answers.items():
@@ -83,6 +84,22 @@ def _add_session(state, answers, snapshots, now):
         group = state['groups'].setdefault(key, {'attemptCount': 0, 'last': timestamp})
         group['attemptCount'] += 1
         group['last'] = max(group['last'], timestamp)
+        # This is the persisted server result, never a fresh guess from the
+        # frozen answer or a client field. Active/paused history stays practiced.
+        if session_status != 'completed' or not isinstance(answer.get('correct'), bool):
+            continue
+        _, taxonomy, primary, _ = key
+        grades = state['grades'].setdefault((taxonomy, primary), {
+            'gradedAttemptCount': 0, 'correctCount': 0, 'recent': []})
+        grades['gradedAttemptCount'] += 1
+        grades['correctCount'] += int(answer['correct'])
+        record = (timestamp, session_id, question_id, answer['correct'])
+        # Keep only the latest twenty for each exact catalog identity, even
+        # when sessions or frozen path variants arrive in a different order.
+        if len(grades['recent']) < 20:
+            heapq.heappush(grades['recent'], record)
+        else:
+            heapq.heappushpop(grades['recent'], record)
 
 
 def _result(state, now, page, page_size):
@@ -130,7 +147,8 @@ async def _owner_state(db: AsyncSession, owner: str, now):
         for ref in session.question_order or []:
             if isinstance(ref, dict) and isinstance(ref.get('questionId'), str):
                 snapshots.setdefault(ref['questionId'], {})
-        _add_session(state, session.answers, snapshots, now)
+        _add_session(state, session.answers, snapshots, now,
+                     session_status=session.status, session_id=session.id)
     return state
 
 
@@ -164,6 +182,28 @@ def _catalog_path(node, nodes):
     return parent, list(reversed(chain))
 
 
+def _proficiency(grades, practiced):
+    recent = sorted(grades['recent']) if grades else []
+    count = grades['gradedAttemptCount'] if grades else 0
+    recent_correct = sum(int(record[3]) for record in recent)
+    accuracy = recent_correct/len(recent) if recent else None
+    streak = 0
+    for record in reversed(recent):
+        if not record[3]:
+            break
+        streak += 1
+    score = round(100*(.8*accuracy+.2*min(streak/5, 1))*(.25+.75*min(count/10, 1)), 1) if count else None
+    level = ('unpracticed' if not practiced else 'pending' if score is None else
+             'developing' if score < 40 else 'familiar' if score < 75 else 'proficient')
+    return {
+        'proficiencyScore': score, 'proficiencyLevel': level,
+        'gradedAttemptCount': count, 'correctCount': grades['correctCount'] if grades else 0,
+        'recentGradedAttemptCount': len(recent), 'recentCorrectCount': recent_correct,
+        'recentAccuracy': accuracy, 'correctStreak': streak,
+        'brightness': .12 if not practiced else .2 if score is None else round(.2+.8*score/100, 4),
+    }
+
+
 async def get_universe(db: AsyncSession, owner: str):
     """Return every active node in each active subject's current published tree."""
     now = now_utc()
@@ -194,7 +234,6 @@ async def get_universe(db: AsyncSession, owner: str):
             attempt_count = group['attemptCount'] if practiced else 0
             mapped_attempt_count += attempt_count
             last = group['last'] if practiced else None
-            age = max(0, (now-last).total_seconds()/86400) if practiced else 0
             parent, path = _catalog_path(row, active)
             nodes.append({
                 'id': _catalog_id(taxonomy.id, row.node_id),
@@ -206,7 +245,7 @@ async def get_universe(db: AsyncSession, owner: str):
                 'path': path, 'title': row.title, 'practiced': practiced,
                 'attemptCount': attempt_count,
                 'lastPracticedAt': last.isoformat() if last else None,
-                'brightness': round(max(.4, 1-.6*age/30), 4) if practiced else .12,
+                **_proficiency(state['grades'].get((taxonomy.id, row.node_id)), practiced),
             })
         subjects.append({'id': subject.id, 'code': subject.code, 'name': subject.name,
                          'topicCount': len(active), 'practicedTopicCount': practiced_count,
@@ -221,5 +260,5 @@ async def get_universe(db: AsyncSession, owner: str):
         'unknownAttemptCount': state['unknownAttemptCount'],
         'unmappedAttemptCount': state['attemptCount']-state['unknownAttemptCount']-mapped_attempt_count,
         'lastPracticedAt': state['lastPracticedAt'].isoformat() if state['lastPracticedAt'] else None,
-        'now': now.isoformat(), 'brightnessMeaning': 'practice-activity', 'dimAfterDays': 30,
+        'now': now.isoformat(), 'brightnessMeaning': 'practice-proficiency',
     }
