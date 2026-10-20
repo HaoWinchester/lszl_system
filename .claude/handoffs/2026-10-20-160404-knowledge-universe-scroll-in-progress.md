@@ -75,3 +75,5 @@ Task1最新补充：ea854558完成，37定向测试+独立spec/quality审查通�
 - 最新规格/计划已更新，root 自有文档尚待提交；SDD progress.md 为持续恢复入口。下一步等 Task2 报告后做独立审查，再 Task3、Task4、全分支审查、官方 full379、全新 UAT378 备份、部署 UAT 并等待本人验收。
 
 进展检查点：Task2 fcf7df26 已独立审查通过，无 findings，16 Node 与实际 Chromium 1440/390 滚轮/触摸通过。Task3 ee944636 已实现并通过57定向测试（1既有弃用警告），universe_proficiency_review 正在审查；未通过审查前不启动 Task4。Task4 brief 已准备。当前 UAT378 与正式336容器/镜像只读核对未变，磁盘6079392KiB。
+
+最新用户追加：多题归纳画笔变宽换行未经授权；原任务只说临时相关画布。root已明确承认共享工具栏范围扩大并道歉，承诺恢复原紧凑排版，仅隐藏箭头所指工具图标旁文字、保留悬浮提示。已追到98a96f8b共同ink注入group/label与palette末尾。新增Task5在Task4审查后执行；不可整文件回退破坏theme/dialogs/保存保护，不可全局改其他页面。root before/reference实际模块probe证据在toolbar-diagnostic。Task3审查通过（1既有弃用警告列minor），Task4 universe_dashboard正在实现base3c8eb04d，Task5尚未派。

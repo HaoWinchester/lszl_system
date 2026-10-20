@@ -44,16 +44,16 @@ assert.equal(api.createModel(Array.from({length:320},(_,i)=>({id:String(i)}))).p
 
 **Files:** Modify backend/app/services/knowledge_dashboard_service.py, backend/tests/test_knowledge_universe.py；旧backend/tests/test_knowledge_dashboard.py保持原历史契约。
 **Interfaces:** get_universe完整目录/owner/parent/统计契约保留，新增节点proficiencyScore(nullable0..100),proficiencyLevel(unpracticed/pending/developing/familiar/proficient),gradedAttemptCount,correctCount,recentGradedAttemptCount,recentCorrectCount,recentAccuracy(nullable0..1),correctStreak。brightnessMeaning='practice-proficiency'，新universe不再宣称时间衰减dimAfterDays；旧dashboard不改。
-- [ ] 先RED：同一知识点1/5/10次全对熟练度27.3/62.5/100，亮度严格递增；加入近期错误后降低，全部错不靠刷次数升熟练；最近20窗口、顺序无关、同时间稳定、冻结path变体合并、两个owner隔离；未练暗.12，已练尚无可结算成绩待评估.2且正确率null；活动/暂停会话不提前影响分值，completed后更新；草稿/超时/无有效时间/未来/missingbool不计熟练。保留Task1所有目录和历史契约断言，修改旧亮度断言是本次用户明确改变规则。
+- [x] 先RED：同一知识点1/5/10次全对熟练度27.3/62.5/100，亮度严格递增；加入近期错误后降低，全部错不靠刷次数升熟练；最近20窗口、顺序无关、同时间稳定、冻结path变体合并、两个owner隔离；未练暗.12，已练尚无可结算成绩待评估.2且正确率null；活动/暂停会话不提前影响分值，completed后更新；草稿/超时/无有效时间/未来/missingbool不计熟练。保留Task1所有目录和历史契约断言，修改旧亮度断言是本次用户明确改变规则。
 ```python
 assert score([True]) == 27.3
 assert score([True]*5) == 62.5
 assert score([True]*10) == 100
 assert score([True]*10+[False]) < 100
 ```
-- [ ] 复用共享有效答案处理，在_owner_state传入session完成态及稳定sessionid，只有已完成练习的服务端bool判题能计分；不复制第二套判题，不读客户端correct或按题目猜。每知识点最近20记录用有界heap/列表，所有历史会话仍正确计次数；先按稳定tuple(timestamp,sessionid,questionid)取最近20后算尾部连对。
-- [ ] P=round(100*(.8*近期准确率+.2*min(连对/5,1))*(.25+.75*min(N/10,1)),1)，N0scoreNone(未练score0可用)，practicebrightness .2+.8*P/100，未练.12。分级<40developing/40..<75familiar/>=75proficient，未练/无判题分别unpracticed/pending。近期窗口count<=20，lifetime graded/correct单独统计，未匹配历史仍计原unknown/unmapped，不产生假目录点。
-- [ ] 运行新旧knowledge/当前发布选择/做题提交结果相关定向测试，报告RED/GREEN/精确接口/异常边界，仅提交任务文件。Task2完成并审查后才启动本任务，不并行实现。
+- [x] 复用共享有效答案处理，在_owner_state传入session完成态及稳定sessionid，只有已完成练习的服务端bool判题能计分；不复制第二套判题，不读客户端correct或按题目猜。每知识点最近20记录用有界heap/列表，所有历史会话仍正确计次数；先按稳定tuple(timestamp,sessionid,questionid)取最近20后算尾部连对。
+- [x] P=round(100*(.8*近期准确率+.2*min(连对/5,1))*(.25+.75*min(N/10,1)),1)，N0scoreNone(未练score0可用)，practicebrightness .2+.8*P/100，未练.12。分级<40developing/40..<75familiar/>=75proficient，未练/无判题分别unpracticed/pending。近期窗口count<=20，lifetime graded/correct单独统计，未匹配历史仍计原unknown/unmapped，不产生假目录点。
+- [x] 运行新旧knowledge/当前发布选择/做题提交结果相关定向测试，报告RED/GREEN/精确接口/异常边界，仅提交任务文件。Task2完成并审查后才启动本任务，不并行实现。
 
 ### Task 4: 全量面板、科目筛选与真实弹窗滚动
 
@@ -64,6 +64,15 @@ assert score([True]*10+[False]) < 100
 - [ ] 弹窗所有视口明确可滚动shell，关闭栏独立可达，不滚动背景；保持当前暗色视觉，避免宽泛改大厅CSS。1440×900/1440×650/390×844/320×568实际wheel从Canvas开始scrollTop变化，真实touch上下滑能看到详情/底部，close后大厅恢复wheel，键盘焦点可达。
 - [ ] 更新真实API companion使用有效发布目录节点作为metadata.knowledge；真实完成作答后新universe目录全量出现，只有确切匹配的节点点亮，未练保持暗；关闭重开/刷新/另一owner隔离。不能mock成功数据。复用抛弃DB helper，root officialsync后运行；如本任务仅语法需诚实报告待跑。
 - [ ] 运行scene/dashboard/大厅/弹幕语言回归与当前前端全套一次；截图自查，报告命令/结果，仅提交任务文件。修正browser脚本旧SDD输出路径，证据统一artifacts/knowledge-universe-20261020/task-4/，不要重建已清理的兄弟计划workspace。完整前端套件需officialsync后由root执行；实现报告若尚未同步应明确待集成验证，避免拿旧public通过冒充新源通过。
+
+### Task 5: 恢复多题归纳原有紧凑画笔排版，仅隐藏图标按钮文字
+
+**背景与范围纠正：** 用户两张截图明确反对多题归纳画笔排版被顺带重做，原先授权仅临时相关画布图标/顶部工具栏；最新确认多题归纳顶部选择/画笔等及底部绘制图标不显示文字，悬浮提示即可。不得继续重设计。根因已追到98a96f8b向共享94-canvas-ink注入label/group并将palette移到末尾，inner flexwrap与绝对定位shrink-to-fit使桌面换行。原98a96f8b^在1440/1024为596×50单排，现1440为720×78、1024为512×92；390旧79高变137，320旧79变183。证据artifacts/knowledge-universe-20261020/toolbar-diagnostic/{before,reference}.json与截图，reference用git保存的前版真实模块。
+**Files:** Modify new-legacy/src/canvas/94-canvas-ink.js, new-legacy/src/canvas/toolbar.js, new-legacy/src/77-multi-question-workspace.js, new-legacy/styles/canvas-toolbar.css或canvas-ink.css（只必要局部），new-legacy/tests/workspace-ink-toolbar-browser.py，必要现有frontend/scripts/practice-canvas-interaction.test.mjs。禁止整文件回退98a96：其中已有dialogs/theme/保存保护须保留。
+- [ ] 先RED：真实共享模块+完整页面CSS可见label、palette第二行；断言恢复多题归纳既有紧凑按钮/颜色顺序，桌面1840/1440/1024单排无巨大空白；390/320仍可达不越界，允许原移动两排。不能只测未加载KGCanvasToolbar的旧isolated fixture。
+- [ ] 复用共享模块加入职责清晰的可选紧凑/只图标呈现，在多题归纳入口显式使用；恢复原palette在撤销重做之后、设置之前，保留按钮原title/aria-label及状态/快捷键。顶部选择/画笔/截图/字号/重置等已有图标的工具按钮隐藏label，中文title悬浮提示保留；不要隐藏智能整理下拉/归纳卡等业务动作文字或主题选项值。不得全局更改临时相关画布/深度回忆已授权视觉，其他caller默认行为保持。
+- [ ] 鼠标与键盘实际切换选择/画笔/高亮/文字/橡皮、颜色、设置、收起、撤销重做；绘画真实生成、撤销/重做同history、刷新保留。无编辑权限保持禁用；恢复过程中不触碰保存/文本草稿/共享dialogs/theme行为。用现有抛弃DB helper测试多题归纳真实页面，同时遍历共享调用方相关画布/深度回忆/首页画笔的入口与图标及可用性防范围回归，只对授权多题恢复布局。
+- [ ] 截图原/修复对比及hover标题/aria证据写artifacts/knowledge-universe-20261020/task-5/，运行现有定向契约及浏览器；只提交授权源/测试，报告精确命令与已验证边界，root最终sync/full/UAT。此任务在Task4审查通过后实施，禁止并行改产品代码。
 
 ## 集成与交付（root）
 - [ ] 按任务spec+quality审查并修复明确问题，最终全分支独立审查。

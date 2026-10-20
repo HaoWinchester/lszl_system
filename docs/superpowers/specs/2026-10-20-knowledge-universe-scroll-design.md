@@ -20,3 +20,6 @@ Canvas移除60硬上限，短距离排斥改为三维空间分桶邻域，保留
 用户明确“亮的程度要不一样，越熟练越亮”，并选择“综合计算熟练度（推荐）”：最近正确率、连续答对和有效练习次数共同计算，持续答对变亮、答错回落。仅用于学习反馈的“练习熟练度”，由真实服务端已完成练习的判题记录计算；正在进行的练习只更新已练次数、不通过星空提前透露未结算对错。界面说明“完成练习后更新熟练度”。未被判题的旧记录不伪造正确率。
 每知识点保留按服务端acceptedAt（旧有效submittedAt回退）排序最近20条已完成且correct为bool的有效判题，使用稳定sessionId/questionId处理同时间顺序，内存有界；跨冻结path/科目标签变体以精确taxonomy/node合并。N条样本，A=正确/N，S=尾部连续正确次数，C=.25+.75*min(N/10,1)，P=round(100*(.8*A+.2*min(S/5,1))*C,1)。N=0尚未评估；未练.12，已练brightness=round(.2+.8*P/100,4)，待评估已练.2。完全未练、待评估、待巩固(<40)、逐渐熟悉(40..<75)、较熟练(>=75)有清晰说明。例：1全对27.3分、5全对62.5、10全对100；错误使近期准确率/连对下降，不用时间新鲜度替代熟练度。
 节点新增proficiencyScore(null可表示待评估),proficiencyLevel,gradedAttemptCount,correctCount,recentGradedAttemptCount,recentCorrectCount,recentAccuracy(null可表示无样本),correctStreak。新universe brightnessMeaning='practice-proficiency'，移除旧活动亮度dimAfterDays；旧历史dashboard接口仍按既有新鲜度契约。前端展示熟练度分值/近期正确率/样本数，空样本不能显示成“0%正确率”。
+
+## 用户追加纠正：多题归纳画笔不得顺带重排
+用户指出多题归纳画笔换行/拉宽未获授权，原先重设计要求只针对临时相关画布。已明确承认范围扩大，恢复多题归纳原有紧凑画笔与颜色排列；只按最新确认隐藏已有图标按钮文字并保留悬浮中文提示/无障碍名称。禁止进一步重设计。恢复范围按计划Task5，其他页面默认视觉、已实现dialogs/theme/保存/草稿保护保留。
