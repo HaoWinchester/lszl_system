@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
   "fromVersion": "v9.0-p4.1.378",
-  "toVersion": "v9.0-p4.1.378",
+  "toVersion": "v9.0-p4.1.379",
   "changes": {
     "added": [],
     "changed": [
-      "src/graph/related-canvas-controller.js",
-      "tests/graph-temporary-canvas-browser.py"
+      "VERSION",
+      "content-prep-studio/dist/content-prep.html"
     ],
     "removed": []
   },
