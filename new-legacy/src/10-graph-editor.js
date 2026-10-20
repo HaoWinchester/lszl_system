@@ -2802,9 +2802,15 @@ function finishCardPointer(e,cancelled=false){
 cardsLayer.addEventListener('pointerup',e=>finishCardPointer(e));
 cardsLayer.addEventListener('pointercancel',e=>finishCardPointer(e,true));
 cardsLayer.addEventListener('dblclick',e=>{
-  if(isCanvasPanMode()||e.target.closest?.('button,a,input,textarea,select,[contenteditable="true"],[data-node-resize-handle]'))return;
+  if(isCanvasPanMode()||e.target.closest?.('button,a,input,textarea,select,[contenteditable]:not([contenteditable="false"]),[data-node-inline-editor],[data-node-resize-handle]'))return;
   const card=cardFromEvent(e);if(!card)return;
   e.preventDefault();e.stopPropagation();
+  if(window.KGHomeInteractionModes?.getMode?.()==='reading'){
+    window.KGHomeCanvasRuntime?.selectionFilter?.clear?.({reason:'reading-related-canvas',apply:false});
+    clearMultiSelection();selectedTextElementIds.clear();selectedLinkIds.clear();
+    state.selectedNodeId=card.dataset.nodeId;state.selectedElementId=null;state.selectedLinkId=null;state.linkSourceId=null;
+    refreshSelectionUI();openRelatedCanvasModal(true);return;
+  }
   startNodeInlineEdit(card.dataset.nodeId,card);
 });
 function textElementResizeHandleFromEvent(e){const handle=e.target.closest&&e.target.closest('[data-element-resize-handle]');return handle&&cardsLayer.contains(handle)?handle:null}
@@ -3439,11 +3445,8 @@ function ensureCardQuickActions(){
 }
 function updateCardQuickActionsPosition(){if(nodeStyleToolbarController)nodeStyleToolbarController.position();if(nodeFloatingColorWindowController)nodeFloatingColorWindowController.reposition()}
 function updateCardQuickActions(){
-  // 阅读模式放行「打开相关画布」入口：仅单选一个卡牌时显示工具栏（其余按钮由 readonly-context 隐藏）。
-  const readingEntry=!graphModeAllows('nodeToolbar')&&!document.body.classList.contains('auth-readonly')
-    &&window.KGHomeInteractionModes?.getMode?.()==='reading'
-    &&!nodeToolbarTextElement()&&nodeToolbarSelectedIds().length===1;
-  if(!graphModeAllows('nodeToolbar')&&!readingEntry){if(nodeStyleToolbarController)nodeStyleToolbarController.hide();else if(cardQuickActionsEl)cardQuickActionsEl.classList.remove('show');return}
+  // 阅读模式通过双击卡牌进入临时画布，不显示悬浮小工具栏。
+  if(!graphModeAllows('nodeToolbar')){if(nodeStyleToolbarController)nodeStyleToolbarController.hide();else if(cardQuickActionsEl)cardQuickActionsEl.classList.remove('show');return}
   const ids=nodeToolbarSelectedIds(),primary=nodeToolbarPrimaryNode(),textItem=nodeToolbarTextElement();
   const filter=window.KGHomeCanvasRuntime?.selectionFilter,snapshot=filter?.snapshot?.()||{total:ids.length+(textItem?1:0),categories:[]};
   const activeType=filter?.getActiveType?.()||'',mixed=!activeType&&snapshot.categories?.length>1;

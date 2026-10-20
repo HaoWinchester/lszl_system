@@ -5,29 +5,44 @@ const fs=require('node:fs');
 const path=require('node:path');
 const read=file=>fs.readFileSync(path.join(__dirname,'..',file),'utf8');
 
-test('reading mode exposes the related-canvas entry with a read-only toolbar',()=>{
+// Run the real entry handler with only the formal-editor UI boundary supplied.
+const vm=require('node:vm');
+test('reading single selection always hides the main toolbar',()=>{
   const editor=read('src/10-graph-editor.js');
-  // updateCardQuickActions：阅读模式单选卡牌时放行工具栏入口（auth-readonly 仍整体隐藏）。
-  assert.match(editor,/const readingEntry=!graphModeAllows\('nodeToolbar'\)&&!document\.body\.classList\.contains\('auth-readonly'\)/);
-  // updateNodeStyleToolbarControls：阅读模式统一收口隐藏（grip + related-canvas 除外）。
-  assert.match(editor,/const readonlyContext=!graphModeAllows\('nodeToolbar'\)/);
-  assert.match(editor,/btn\.dataset\.nodeToolbarAction!=='related-canvas'\)btn\.hidden=true/);
-  // handleNodeToolbarAction：阅读模式仅放行 related-canvas 动作。
-  assert.match(editor,/阅读模式下仅可打开相关画布/);
-  // 打开临时画布按当前模式传只读标记。
-  assert.match(editor,/readOnly=!canWriteGraph\(\)/,'temporary view also respects authenticated role and session restrictions');
+  const body=editor.slice(editor.indexOf('function updateCardQuickActions(){'),editor.indexOf('// 模式切换后重算卡牌工具栏'));
+  let hidden=0;
+  const context={graphModeAllows:()=>false,document:{body:{classList:{contains:()=>false}}},window:{KGHomeInteractionModes:{getMode:()=> 'reading'}},nodeStyleToolbarController:{hide:()=>hidden++,show(){},position(){}},cardQuickActionsEl:null,nodeToolbarTextElement:()=>null,nodeToolbarSelectedIds:()=>['a'],nodeToolbarPrimaryNode:()=>({id:'a'}),selectedTextElementIds:new Set(),selectedLinkIds:new Set(),boxSelect:null,cardDrag:null,state:{},stage:{classList:{contains:()=>false}},isCanvasPanMode:()=>false,ensureCardQuickActions:()=>({classList:{toggle(){}},querySelector(){}}),updateNodeStyleToolbarControls(){},homeSelectionAnchorRect(){}};
+  vm.runInNewContext(body+';updateCardQuickActions()',context);
+  assert.equal(hidden,1);
+});
+test('reading double click selects its card and opens the protected temporary entry; editing modes still edit',()=>{
+  const editor=read('src/10-graph-editor.js');
+  const handler=editor.slice(editor.indexOf("cardsLayer.addEventListener('dblclick',e=>{"),editor.indexOf('function textElementResizeHandleFromEvent'));
+  for(const mode of ['reading','efficient','professional']){
+    let listener,opened=0,edited=0,stopped=0;
+    const state={selectedNodeId:'old',selectedElementId:'text',selectedLinkId:'link',linkSourceId:'old'},selectedNodeIds=new Set(['old']);
+    const context={cardsLayer:{addEventListener:(_,fn)=>listener=fn},isCanvasPanMode:()=>false,cardFromEvent:()=>({dataset:{nodeId:'a'}}),window:{KGHomeInteractionModes:{getMode:()=>mode},KGHomeCanvasRuntime:{selectionFilter:{clear(){}}}},state,selectedNodeIds,selectedTextElementIds:new Set(),selectedLinkIds:new Set(),clearMultiSelection:()=>selectedNodeIds.clear(),refreshSelectionUI(){},openRelatedCanvasModal:()=>{opened++},startNodeInlineEdit:()=>{edited++}};
+    vm.runInNewContext(handler,context);
+    listener({target:{closest:()=>true},preventDefault(){},stopPropagation(){}});
+    assert.equal(opened+edited,0,'interactive descendants keep their own action');
+    listener({target:{closest:()=>false},preventDefault(){},stopPropagation(){stopped++}});
+    assert.equal(stopped,1);
+    assert.equal(opened,mode==='reading'?1:0);
+    assert.equal(edited,mode==='reading'?0:1);
+    if(mode==='reading'){assert.equal(state.selectedNodeId,'a');assert.equal(state.selectedElementId,null);assert.equal(state.selectedLinkId,null);assert.equal(state.linkSourceId,null);assert.equal(selectedNodeIds.size,0)}
+  }
+  assert.match(editor,/readOnly=!canWriteGraph\(\)/,'temporary view respects actual role and session restrictions');
   assert.match(editor,/ensureMarkers:ensureGraphEdgeMarkers,onClose:[^\n]+,readOnly\}/);
-  // 模式切换后重算工具栏。
   assert.match(editor,/window\.addEventListener\('kg-home-interaction-mode-change',\(\)=>\{updateCardQuickActions\(\)\}\)/);
 });
 
 test('related canvas supports read-only mode and a local ink tool',()=>{
   const controller=read('src/graph/related-canvas-controller.js');
-  // 只读态：隐藏编辑按钮与画笔、禁卡片拖拽、动作短路、auth 文案。
+  // Content readonly still hides edit tools; ephemeral layout is draggable.
   assert.match(controller,/const readOnly=\(\)=>!!options\.readOnly/);
   assert.match(controller,/readOnly\(\)\?'':'<button data-action="add">新增卡片<\/button>/);
-  assert.match(controller,/只读查看：仅供演示浏览/);
-  assert.match(controller,/if\(readOnly\(\)\)\{selection\.selectNodes\(\[n\.id\]\);return\}if\(connection\.source\(\)\)/);
+  assert.match(controller,/可拖动临时排列，关闭即丢弃/);
+  assert.ok(!controller.includes('if(readOnly()){selection.selectNodes([n.id]);return}'),'readonly must not block temporary layout drag');
   assert.match(controller,/if\(readOnly\(\)&&name!=='fit'&&name!=='fullscreen'\)return/);
   // 临时编辑表单整体移除。
   assert.ok(!controller.includes('应用临时修改'),'临时编辑表单应已移除');
@@ -53,4 +68,21 @@ test('efficient mode keeps the lock and related-canvas toolbar buttons visible',
   assert.ok(!/efficient"\] \.node-style-toolbar \[data-node-toolbar-action="lock"\]/.test(css),'高效模式不得隐藏锁定按钮（用户反馈：锁定后切高效无法解锁）');
   assert.ok(!/efficient"\] \.node-style-toolbar \[data-node-toolbar-action="related-canvas"\]/.test(css));
   assert.match(css,/\.node-style-toolbar\.readonly-context \.node-toolbar-btn:not\(\.node-toolbar-grip\):not\(\[data-node-toolbar-action="related-canvas"\]\)/);
+});
+
+test('auth capture allows only authenticated reading card browsing; other readonly edits stay blocked',()=>{
+  const source=read('src/30-auth-guards.js');
+  const helperStart=source.indexOf('function authCanOpenReadingRelatedCanvas(');
+  const helper=helperStart<0?'':source.slice(helperStart,source.indexOf('function authInstallGuards()',helperStart));
+  const start=source.indexOf("cardsLayer.addEventListener('dblclick',e=>{");
+  const handler=source.slice(start,source.indexOf('},true);',start)+8);
+  for(const [logged,mode,interactive,blocked] of [[true,'reading',false,false],[false,'reading',false,true],[true,'professional',false,true],[true,'efficient',false,true],[true,'reading',true,true]]){
+    let listener,prevented=false,stopped=false;
+    const card={dataset:{nodeId:'a'}},target={closest:selector=>selector==='.knowledge-card'?card:interactive?{}:null};
+    const context={cardsLayer:{addEventListener:(_,fn)=>listener=fn},authIsLoggedIn:()=>logged,window:{KGHomeInteractionModes:{getMode:()=>mode},KGRolePermissions:{can:()=>false}},showStatus(){},authOpen(){}};
+    vm.runInNewContext(helper+handler,context);
+    listener({target,preventDefault:()=>prevented=true,stopPropagation(){},stopImmediatePropagation:()=>stopped=true});
+    assert.equal(prevented,blocked,JSON.stringify({logged,mode,interactive}));
+    assert.equal(stopped,blocked);
+  }
 });
