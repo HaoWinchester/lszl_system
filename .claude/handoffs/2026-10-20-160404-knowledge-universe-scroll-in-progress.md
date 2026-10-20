@@ -65,3 +65,11 @@ PostgreSQL本地/tmp，抛弃DB helper自建并清理kg_pytest_PID。UAT SSHresu
 本轮证据artifacts/knowledge-universe-20261020/；最新业务规格/计划路径见上。Task1报告、diff和review结果使用本计划SDD目录持续记录。
 
 Task1最新补充：ea854558完成，37定向测试+独立spec/quality审查通过，无findings。下一步Task2新agent场景/滚动；Task1不能重复派。其跨任务UI/部署边界留给Task2/3/root。
+
+## 2026-10-20 用户追加熟练度规则后的恢复入口
+用户已明确选择“综合计算熟练度”：按近期正确率、连续答对、有效练习次数计算，越熟练越亮。无确认待定。上文纯活动时间亮度与旧 Task3 编号均由本节及最新计划覆盖。
+- Task1 已完成并审查通过：ea854558，37 项定向测试通过。
+- Task2 场景/滚动正在由 universe_scene 实现，base1568b375，仅三个授权 scene 文件；root 不重复派发。
+- 新 Task3 是后端综合熟练度；Task2 审查通过后才启动，不并行实现。最近20条已完成会话中的服务端有效判题，精确公式/字段见最新计划 Task3。活动/暂停会话仍记录已练，但不提前泄露成绩。未练亮度.12，已练待评估.2，其他 .2+.8*score/100。旧历史 dashboard 接口保持。
+- 原面板任务改为 Task4，显示全部目录/科目筛选/熟练度及说明“完成练习后更新熟练度”；真实 API companion 必须使用发布树真实引用并覆盖不同成绩产生不同亮度、错误回落。
+- 最新规格/计划已更新，root 自有文档尚待提交；SDD progress.md 为持续恢复入口。下一步等 Task2 报告后做独立审查，再 Task3、Task4、全分支审查、官方 full379、全新 UAT378 备份、部署 UAT 并等待本人验收。
