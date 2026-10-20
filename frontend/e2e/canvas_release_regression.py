@@ -27,14 +27,14 @@ def main():
     with tempfile.TemporaryFile(mode='w+') as log:
         server = None
         try:
-            for script in ('canvas-ink-controller-browser.py', 'canvas-capture-browser.py', 'graph-focus-visual-browser.py'):
+            for script in ('canvas-ink-controller-browser.py', 'canvas-capture-browser.py', 'graph-focus-visual-browser.py', 'graph-file-import-permissions-browser.py'):
                 subprocess.run([sys.executable, str(ROOT/'new-legacy/tests'/script)], cwd=ROOT, check=True)
 
             def start_canvas_server():
                 server = subprocess.Popen([
                     str(ROOT / 'backend/.venv/bin/python'),
                     str(ROOT / 'new-legacy/tests/helpers/canvas_ink_server.py'),
-                    '--port', str(port), '--multiple-papers',
+                    '--port', str(port), '--multiple-papers', '--role-matrix',
                 ], cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT)
                 for _ in range(240):
                     if server.poll() is not None:
@@ -79,7 +79,7 @@ def main():
             run_with_fresh_db('canvas-ink-browser.py')
             server = start_canvas_server()
             try:
-                for script in ('home-canvas-tools-browser.py', 'workspace-multitab-browser.py', 'file-manager-search-tabs-browser.py', 'graph-interaction-focus-browser.py', 'graph-mindmap-browser.py', 'graph-question-batch-browser.py'):
+                for script in ('home-canvas-tools-browser.py', 'workspace-multitab-browser.py', 'file-manager-search-tabs-browser.py', 'graph-interaction-focus-browser.py', 'graph-mindmap-browser.py', 'graph-question-batch-browser.py', 'graph-file-import-permissions-browser.py'):
                     subprocess.run([sys.executable, str(ROOT/'new-legacy/tests'/script), '--base-url', base], cwd=ROOT, check=True)
             finally:
                 stop_canvas_server(server)

@@ -7,3 +7,8 @@ test('graph editor restores metadata tabs without eagerly loading graph bodies',
   const result = spawnSync(process.execPath, [fileURLToPath(new URL('../../new-legacy/tests/graph-file-tabs-index.test.js', import.meta.url))], { encoding: 'utf8' })
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`)
 })
+
+test('personal graph import shares the remote file bridge and waits for save acknowledgement', () => {
+  const result = spawnSync(process.execPath, [fileURLToPath(new URL('../../new-legacy/tests/graph-file-editor-store-bridge.test.js', import.meta.url))], { encoding: 'utf8' })
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`)
+})

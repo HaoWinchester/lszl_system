@@ -54,17 +54,20 @@ async function importLearningPackageFile(file){
   clean.selectedNodeId=null;
   clean.selectedLinkId=null;
   clean.linkSourceId=null;
-  const store=window.KGGraphFileStore;
+  const bridge=window.KGGraphFileEditorStoreBridge;
+  const store=bridge&&typeof bridge.current==='function'?bridge.current():window.KGGraphFileStore;
   const name=importedGraphName(clean,file);
   const autosave=window.KGGraphFileAutosave;
-  if(autosave&&typeof autosave.saveBeforeSwitch==='function'&&!autosave.saveBeforeSwitch())throw new Error('当前图谱保存失败，已取消导入。');
+  if(autosave&&typeof autosave.saveBeforeSwitch==='function'&&await autosave.saveBeforeSwitch()===false)throw new Error('当前图谱保存失败，已取消导入。');
   if(store&&typeof store.createFile==='function'){
     const previousId=store.getCurrentFileId&&store.getCurrentFileId();
-    const created=store.createFile({name,graphData:clean,source:'import',sourceFileId:String(file&&file.name||'').slice(0,120)},{makeCurrent:true});
+    const input={name,graphData:clean,source:'import',sourceFileId:String(file&&file.name||'').slice(0,120)};
+    const options={makeCurrent:true};
+    const created=await (bridge&&typeof bridge.createFile==='function'?bridge.createFile(input,options):store.createFile(input,options));
     if(!created)throw new Error(store.getLastError&&store.getLastError()||'导入文件保存失败，本地存储空间可能已满。');
     if(!applyImportedFile(created)){
-      store.deleteFile(created.id,{emit:false,permanent:true});
-      if(previousId)store.openFile(previousId,{emit:false});
+      await store.deleteFile(created.id,{emit:false,permanent:true});
+      if(previousId)await (bridge&&typeof bridge.openFile==='function'?bridge.openFile(previousId,{emit:false}):store.openFile(previousId,{emit:false}));
       throw new Error('导入文件内容异常，已取消导入。');
     }
     window.dispatchEvent(new CustomEvent('kg-graph-current-file-change',{detail:{owner:store.currentOwner?store.currentOwner():'',id:created.id}}));

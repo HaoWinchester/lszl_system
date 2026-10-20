@@ -402,7 +402,7 @@
         return;
       }
       if(action === "import"){
-        if(typeof authRequire === "function" && !authRequire("登录后才能导入图谱文件。", "importData")) return;
+        if(typeof authRequire === "function" && !authRequire("登录后才能导入图谱文件。", "editGraph")) return;
         const input = $("importFile");
         if(input) input.click();
         else if(typeof showStatus === "function") showStatus("导入控件尚未就绪。");
