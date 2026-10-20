@@ -32,13 +32,13 @@ assert all(n['attemptCount']==0 and n['brightness']==.12 for n in result['nodes'
 
 **Files:** Modify new-legacy/src/practice/knowledge-space-scene.js, new-legacy/tests/knowledge-space-scene.test.js, new-legacy/tests/knowledge-space-scene-browser.py。
 **Interfaces:** createModel/stepModel/projectPoint/mount与snapshot保持；输入全部nodes，不截断，新增parentId真实树边。onSelect/选择、group、相机生命周期契约不变。
-- [ ] 先写RED：320/1000输入points数完全一致；真实树边正确、不跨taxonomy；收敛有界/坐标有限/不改输入。普通wheel上滚动容器scrollTop变化且zoom不变，Ctrl/Meta wheelzoom变化且scrollTop不变；touch纵向滚动、横向旋转、pinch缩放。
+- [x] 先写RED：320/1000输入points数完全一致；真实树边正确、不跨taxonomy；收敛有界/坐标有限/不改输入。普通wheel上滚动容器scrollTop变化且zoom不变，Ctrl/Meta wheelzoom变化且scrollTop不变；touch纵向滚动、横向旋转、pinch缩放。
 ```javascript
 assert.equal(api.createModel(Array.from({length:320},(_,i)=>({id:String(i)}))).points.length,320);
 ```
-- [ ] 移除LIMIT60，短距离排斥用3D空间桶邻域（cell75，邻27桶）保持原力模型/有界求解，避免全量n²；保留DPR2与idle停止/隐藏/reducedmotion/destroy。真实parentId边优先，旧无父引用形状保持组织fallback；未练.12的亮度可见但明显低于已练，不再clamp到.2。
-- [ ] wheel只有ctrlKey/metaKey时preventDefault并缩放，其余交给native scroll；canvas touch-action:pan-y，单触摸方向判别避免纵向旋转/误选，横向旋转及双指缩放保持。鼠标拖动两轴旋转不改。
-- [ ] 实际Chromium测试嵌套overflow容器的wheel和touch，含cancel与destroy，1440/390；现有fit/选择/相机/生命周期断言保持。记录320/1000可交互/求解耗时，无隐藏节点截断。只提交本任务文件并报告。
+- [x] 移除LIMIT60，短距离排斥用3D空间桶邻域（cell75，邻27桶）保持原力模型/有界求解，避免全量n²；保留DPR2与idle停止/隐藏/reducedmotion/destroy。真实parentId边优先，旧无父引用形状保持组织fallback；未练.12的亮度可见但明显低于已练，不再clamp到.2。
+- [x] wheel只有ctrlKey/metaKey时preventDefault并缩放，其余交给native scroll；canvas touch-action:pan-y，单触摸方向判别避免纵向旋转/误选，横向旋转及双指缩放保持。鼠标拖动两轴旋转不改。
+- [x] 实际Chromium测试嵌套overflow容器的wheel和touch，含cancel与destroy，1440/390；现有fit/选择/相机/生命周期断言保持。记录320/1000可交互/求解耗时，无隐藏节点截断。只提交本任务文件并报告。
 
 ### Task 3: 综合练习熟练度与分级亮度（用户追加确认）
 
@@ -63,7 +63,7 @@ assert score([True]*10+[False]) < 100
 - [ ] 清除PAGE_SIZE/slice/可见分页逻辑，完整nodes保留；科目button全/科目名+数量，人类可读title，无内部taxonomy ID。未练日期文案“尚未练习”，次数0；空目录提示暂无发布知识树，不再要求先答题才能有星点。亮度图例未练暗色/待巩固/逐渐熟悉/较熟练，越熟练越亮；详情显示综合分值、近期正确率/样本数和连对，pending显示待评估而非0%错误；说明完成练习后更新熟练度。
 - [ ] 弹窗所有视口明确可滚动shell，关闭栏独立可达，不滚动背景；保持当前暗色视觉，避免宽泛改大厅CSS。1440×900/1440×650/390×844/320×568实际wheel从Canvas开始scrollTop变化，真实touch上下滑能看到详情/底部，close后大厅恢复wheel，键盘焦点可达。
 - [ ] 更新真实API companion使用有效发布目录节点作为metadata.knowledge；真实完成作答后新universe目录全量出现，只有确切匹配的节点点亮，未练保持暗；关闭重开/刷新/另一owner隔离。不能mock成功数据。复用抛弃DB helper，root officialsync后运行；如本任务仅语法需诚实报告待跑。
-- [ ] 运行scene/dashboard/大厅/弹幕语言回归与当前前端全套一次；截图自查，报告命令/结果，仅提交任务文件。
+- [ ] 运行scene/dashboard/大厅/弹幕语言回归与当前前端全套一次；截图自查，报告命令/结果，仅提交任务文件。修正browser脚本旧SDD输出路径，证据统一artifacts/knowledge-universe-20261020/task-4/，不要重建已清理的兄弟计划workspace。完整前端套件需officialsync后由root执行；实现报告若尚未同步应明确待集成验证，避免拿旧public通过冒充新源通过。
 
 ## 集成与交付（root）
 - [ ] 按任务spec+quality审查并修复明确问题，最终全分支独立审查。
