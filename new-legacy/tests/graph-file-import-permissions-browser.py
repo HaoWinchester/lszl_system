@@ -140,6 +140,8 @@ def api(browser, base, out):
         failed_selection.set_files({'name': 'failed-hydration.json', 'mimeType': 'application/json',
                                    'buffer': json.dumps(graph, ensure_ascii=False).encode()})
         expect(page.locator('.kg-dialog[open] [data-dialog-message]')).to_contain_text('导入失败')
+        assert page.evaluate('!KGGraphFileTabs.isSwitching()')
+        assert page.locator('#importFile').is_enabled()
         assert failed_hydrations, 'the post-create GET must have actually failed'
         assert ctx.request.get(base + '/api/v1/files/current').json()['fileId'] == original_id
         assert ctx.request.get(base + '/api/v1/files').json()['total'] == before_count
@@ -153,16 +155,59 @@ def api(browser, base, out):
         page.locator('.kg-dialog[open] [data-dialog-accept]').click()
         page.unroute(file_route, fail_new_file_read)
         print('PASS API: post-create GET503 restores original selection/editor and removes partial file', flush=True)
+        # Hold only the create POST; all responses and persistence stay on real APIs.
+        delayed_posts = []
+        def hold_create(route):
+            if route.request.method == 'POST':
+                delayed_posts.append(route)
+            else:
+                route.continue_()
+        create_route = re.compile(r'/api/v1/files(?:\?.*)?$')
+        page.route(create_route, hold_create)
+        page.evaluate("KGHomeInteractionModes.setMode('professional',{announce:false})")
         # Supply a file ONLY through the FileChooser created by the actual menu.
         selected = chooser(page, 'api-free-student-menu', out)
+        assert page.evaluate("startNodeInlineEdit('role-a')")
+        page.locator('[data-node-inline-editor="true"]').fill('导入前尚未提交的节点标题')
         selected.set_files({'name': 'free-personal-graph.json', 'mimeType': 'application/json',
                             'buffer': json.dumps(graph, ensure_ascii=False).encode()})
+        for _ in range(100):
+            if delayed_posts:
+                break
+            page.wait_for_timeout(50)
+        assert len(delayed_posts) == 1, 'actual create POST must be pending'
+        assert page.evaluate('KGGraphFileTabs.isSwitching() && !canWriteGraph()')
+        assert page.evaluate('KGImportGuard.isBusy("20-flashcards-toolbar.js:importLearningPackageFile")')
+        assert page.locator('#importFile').is_disabled()
+        assert page.locator('[data-node-inline-editor="true"]').count() == 0
+        committed = ctx.request.get(base + '/api/v1/files/' + original_id).json()['graphData']
+        assert committed['nodes'][0]['title'] == '导入前尚未提交的节点标题'
+        assert committed['nodes'][0]['id'] == original['nodes'][0]['id']
+        original = committed
+        # Real UI entry points must stay inert while remote create is pending.
+        page.locator('.knowledge-card[data-node-id="role-a"] .node-title').dblclick(force=True)
+        assert page.locator('[data-node-inline-editor="true"]').count() == 0
+        page.locator('#graphFileAddBtn').click()
+        assert page.locator('#graphNewFileDialog').count() == 0
+        page.locator('.graph-file-tab[data-file-id="' + original_id + '"]').hover()
+        page.locator('.graph-file-tab-close[data-close-file-id="' + original_id + '"]').click()
+        assert page.url.endswith('/index.html')
+        assert page.evaluate('KGGraphFileRemoteAdapter.getCurrentFileMeta().id') == original_id
+        assert page.evaluate('state.nodes[0].title') == '导入前尚未提交的节点标题'
+        evidence['delayedCreate'] = {'transitionLocked': True, 'writeGuardBlocked': True,
+                                    'inlineEditingBlocked': True, 'newTabBlocked': True,
+                                    'closeTabBlocked': True, 'pendingDraftSaved': True}
+        page.screenshot(path=str(out / 'api-delayed-create-locked.png'))
+        delayed_posts[0].continue_()
         page.wait_for_function('state.nodes.some(n=>n.id==="free-import-a") && !KGGraphFileTabs.isSwitching()')
         page.wait_for_function('''async original=>{
           const response=await fetch('/api/v1/files/current');
           const current=response.ok && (await response.json()).fileId;
           return current && current!==original;
         }''', arg=original_id)
+        page.unroute(create_route, hold_create)
+        assert page.evaluate('!KGGraphFileTabs.isSwitching() && canWriteGraph()')
+        assert page.locator('#importFile').is_enabled()
         current = ctx.request.get(base + '/api/v1/files/current').json()['fileId']
         assert current and current != original_id, {'current': current, 'expectedNewFile': True}
         assert ctx.request.get(base + '/api/v1/files').json()['total'] == before_count + 1
