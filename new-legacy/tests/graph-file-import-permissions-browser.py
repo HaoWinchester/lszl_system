@@ -123,6 +123,36 @@ def api(browser, base, out):
             {'id': 'free-import-b', 'title': '独立第二节点', 'x': 750, 'y': 300}],
             'links': [{'id': 'free-import-edge', 'from': 'free-import-a', 'to': 'free-import-b'}],
             'viewport': {'x': 0, 'y': 0, 'scale': 1}}
+        # Fail only the newly created file's hydration GET. Creation, selection,
+        # restoration, deletion and all other API responses remain real.
+        failed_hydrations = []
+        def fail_new_file_read(route):
+            file_id = urlparse(route.request.url).path.rsplit('/', 1)[-1]
+            if route.request.method == 'GET' and file_id.startswith('f_'):
+                failed_hydrations.append(file_id)
+                route.fulfill(status=503, content_type='application/json',
+                              body='{"detail":"post-create hydration failure probe"}')
+            else:
+                route.continue_()
+        file_route = re.compile(r'/api/v1/files/[^/?]+(?:\?.*)?$')
+        page.route(file_route, fail_new_file_read)
+        failed_selection = chooser(page, 'api-hydration-failure-menu', out)
+        failed_selection.set_files({'name': 'failed-hydration.json', 'mimeType': 'application/json',
+                                   'buffer': json.dumps(graph, ensure_ascii=False).encode()})
+        expect(page.locator('.kg-dialog[open] [data-dialog-message]')).to_contain_text('导入失败')
+        assert failed_hydrations, 'the post-create GET must have actually failed'
+        assert ctx.request.get(base + '/api/v1/files/current').json()['fileId'] == original_id
+        assert ctx.request.get(base + '/api/v1/files').json()['total'] == before_count
+        assert ctx.request.get(base + '/api/v1/files/' + original_id).json()['graphData'] == original
+        assert page.evaluate('state.nodes.map(n=>n.id)') == ['role-a']
+        assert page.evaluate('KGGraphFileRemoteAdapter.getCurrentFileMeta().id') == original_id
+        assert page.evaluate('document.getElementById("status").textContent.includes("学习包导入成功")') is False
+        evidence['failedHydration'] = {'attemptedIds': failed_hydrations,
+                                      'restoredOriginal': True, 'removedCreatedFile': True}
+        page.screenshot(path=str(out / 'api-hydration-failure-restored.png'))
+        page.locator('.kg-dialog[open] [data-dialog-accept]').click()
+        page.unroute(file_route, fail_new_file_read)
+        print('PASS API: post-create GET503 restores original selection/editor and removes partial file', flush=True)
         # Supply a file ONLY through the FileChooser created by the actual menu.
         selected = chooser(page, 'api-free-student-menu', out)
         selected.set_files({'name': 'free-personal-graph.json', 'mimeType': 'application/json',
