@@ -78,7 +78,7 @@ with sync_playwright() as p:
         try:
             assert not measurement['labels'], 'Workspace drawing toolbar must hide labels: '+str(measurement)
             order=measurement['order']
-            assert order.index('redo')<order.index('canvas-ink-colors')<order.index('settings'),order
+            assert order.index('eraser')<order.index('canvas-ink-colors')<order.index('undo')<order.index('redo')<order.index('settings'),order
             assert measurement['toolbar']['x']>=0 and measurement['toolbar']['x']+measurement['toolbar']['width']<=width,measurement
             if width>700:
                 assert measurement['toolbar']['height']==50,measurement
@@ -100,6 +100,16 @@ with sync_playwright() as p:
             assert '智能整理' in page.locator('#qwSmartArrangeSelect').inner_text()
         except AssertionError as error:
             layout_failures.append(str(error))
+        if width==1440:
+            # Check the missing provider independently so RED records both requirements.
+            color=toolbar.locator('input[type=color]')
+            color.click()
+            try:
+                expect(page.locator('.graph-floating-color-window.show')).to_be_visible(timeout=1500)
+                expect(page.locator('[data-color-window-title]')).to_have_text('画笔自定义颜色')
+            except AssertionError as error:
+                layout_failures.append(str(error))
+            page.screenshot(path=str(OUT/'workspace-custom-color-open.png'))
         context.close()
         print(('FAIL' if len(layout_failures)>failures_before else 'PASS')+' layout '+str(width),flush=True)
     assert not layout_failures, '\n'.join(layout_failures)
@@ -148,8 +158,69 @@ with sync_playwright() as p:
             button.focus();page.keyboard.press('Enter')
             expect(button).to_have_attribute('aria-pressed','true')
         toolbar.locator('[data-ink-tool=pen]').click()
-        toolbar.locator('[data-ink-color="#ef4444"]').click()
-        expect(toolbar.locator('[data-ink-color="#ef4444"]')).to_have_attribute('aria-pressed','true')
+        custom=toolbar.locator('input[type=color]')
+        floating=page.locator('.graph-floating-color-window.show')
+        custom.click()
+        expect(floating).to_be_visible()
+        expect(floating.locator('[data-color-window-title]')).to_have_text('画笔自定义颜色')
+        expect(page.locator('.graph-floating-color-window')).to_have_count(1)
+        for selector in ('[data-color-picker-sv]','[data-color-picker-hue]','[data-color-picker-hex]','[data-color-picker-presets]'):
+            expect(floating.locator(selector)).to_be_visible()
+        expect(floating.locator('[data-color-picker-alpha]')).to_have_count(0)
+        pipette=floating.locator('[data-color-picker-eyedropper]')
+        expect(pipette).to_have_attribute('title','吸取屏幕颜色')
+        expect(pipette).to_have_attribute('aria-label','吸取屏幕颜色')
+        expect(pipette.locator('svg path')).to_have_count(1)
+        assert pipette.evaluate('e=>e.hidden')==page.evaluate('!window.EyeDropper')
+        floating.locator('[data-color-picker-presets] [data-picker-swatch="#ef4444"]').click()
+        expect(custom).to_have_value('#ef4444')
+        floating.hover();expect(floating).to_be_visible()
+        hex=floating.locator('[data-color-picker-hex]')
+        hex.fill('123456');hex.press('Enter');expect(custom).to_have_value('#123456')
+        hex.fill('oops');hex.press('Enter');expect(custom).to_have_value('#123456')
+        expect(hex).to_have_value('123456')
+        # Finish HEX's browser blur/change before starting a separate uncommitted preview.
+        custom.focus()
+        # A preview without the range change/commit event is discarded on close.
+        floating.locator('[data-color-picker-hue]').evaluate("e=>{e.value='120';e.dispatchEvent(new Event('input',{bubbles:true}))}")
+        floating.locator('[data-color-window-close]').click();expect(floating).to_have_count(0)
+        expect(custom).to_have_value('#123456')
+        for key in ('Enter','Space'):
+            custom.focus();page.keyboard.press(key);expect(floating).to_be_visible()
+            expect(floating.locator('[data-color-picker-hex]')).to_have_value('123456')
+            expect(floating.locator('[data-color-picker-recent] [data-picker-swatch="#123456"]')).to_be_visible()
+            floating.locator('[data-color-window-close]').click()
+        custom.click()
+        header=floating.locator('[data-color-window-drag]')
+        rect=header.bounding_box();page.mouse.move(rect['x']+80,rect['y']+15);page.mouse.down();page.mouse.move(220,100,steps=8);page.mouse.up()
+        expect(floating).to_have_class(re.compile('manual-close'))
+        # SV keyboard operation commits through the existing controller.
+        sv=floating.locator('[data-color-picker-sv]');sv.focus();page.keyboard.press('ArrowRight')
+        assert custom.input_value()!='#123456'
+        committed=custom.input_value()
+        rect=sv.bounding_box();page.mouse.move(rect['x']+30,rect['y']+30);page.mouse.down()
+        sv.evaluate("e=>e.dispatchEvent(new PointerEvent('pointercancel',{pointerId:1,bubbles:true}))")
+        page.mouse.up();expect(custom).to_have_value(committed)
+        floating.locator('[data-color-picker-hex]').fill('123456');floating.locator('[data-color-picker-hex]').press('Enter')
+        page.screenshot(path=str(OUT/f'workspace-picker-{name}.png'))
+        floating.locator('[data-color-window-close]').click()
+        # Fullscreen uses the common overlay mount; the same singleton must move inside it.
+        page.locator('#qwCanvasShell').evaluate('e=>e.requestFullscreen()')
+        custom.click();expect(floating).to_be_visible()
+        assert floating.evaluate('e=>document.fullscreenElement.contains(e)')
+        floating.locator('[data-color-window-close]').click();page.evaluate('document.exitFullscreen()')
+        # Fine-pointer narrow viewport remains desktop policy; coarse mobile is
+        # separately verified readonly in the layout loop above.
+        for narrow in (390,320):
+            page.set_viewport_size({'width':narrow,'height':1000});custom.click();expect(floating).to_be_visible()
+            page.wait_for_function("()=>{const r=document.querySelector('.graph-floating-color-window.show').getBoundingClientRect();return r.x>=0&&r.right<=innerWidth&&r.y>=0&&r.bottom<=innerHeight}")
+            bounds=floating.bounding_box()
+            assert bounds['x']>=0 and bounds['x']+bounds['width']<=narrow and bounds['y']>=0 and bounds['y']+bounds['height']<=1000,bounds
+            page.screenshot(path=str(OUT/f'workspace-picker-fine-pointer-{name}-{narrow}.png'))
+            floating.locator('[data-color-window-close]').click()
+        page.set_viewport_size({'width':width,'height':1000})
+        expect(toolbar.locator('[data-ink-tool=pen] svg')).to_have_css('color','rgb(18, 52, 86)')
+        assert page.evaluate("[...document.head.querySelectorAll('style')].some(e=>e.textContent.includes('%23123456'))")
         settings=toolbar.locator('[data-ink-settings]')
         settings.focus();page.keyboard.press('Enter')
         expect(toolbar.locator('.canvas-ink-options')).to_be_visible()
@@ -159,19 +230,22 @@ with sync_playwright() as p:
         expect(toolbar.locator('[data-ink-action=undo]')).to_be_visible()
         expect(toolbar.locator('[data-ink-action=redo]')).to_be_visible()
         n=page.locator('.canvas-ink-layer path').count()
+        existing_text_count=page.locator('.canvas-ink-layer text').count()
         box=page.locator('.qw-question-card').first.bounding_box()
         x=box['x']+min(55,box['width']/5);y=box['y']+min(100,box['height']/2)
         page.mouse.move(x,y);page.mouse.down();page.mouse.move(x+50,y+30,steps=10);page.mouse.up()
         expect(page.locator('.canvas-ink-layer path')).to_have_count(n+1)
-        expect(page.locator('.canvas-ink-layer path').last).to_have_attribute('stroke','#ef4444')
+        expect(page.locator('.canvas-ink-layer path').last).to_have_attribute('stroke','#123456')
         expect(undo).to_be_enabled();undo.click();expect(page.locator('.canvas-ink-layer path')).to_have_count(n)
         expect(redo).to_be_enabled();redo.click();expect(page.locator('.canvas-ink-layer path')).to_have_count(n+1)
         toolbar.locator('[data-ink-action=undo]').click();expect(page.locator('.canvas-ink-layer path')).to_have_count(n)
         toolbar.locator('[data-ink-action=redo]').click();expect(page.locator('.canvas-ink-layer path')).to_have_count(n+1)
         toolbar.locator('[data-ink-tool=highlighter]').click()
+        custom.click();floating.locator('[data-color-picker-hex]').fill('654321');floating.locator('[data-color-picker-hex]').press('Enter');floating.locator('[data-color-window-close]').click()
         page.mouse.move(x,y+40);page.mouse.down();page.mouse.move(x+50,y+60,steps=10);page.mouse.up()
         expect(page.locator('.canvas-ink-layer path')).to_have_count(n+2)
         expect(page.locator('.canvas-ink-layer path').last).to_have_attribute('opacity','0.3')
+        expect(page.locator('.canvas-ink-layer path').last).to_have_attribute('stroke','#654321')
         toolbar.locator('[data-ink-tool=eraser]').dblclick()
         expect(page.locator('.canvas-ink-layer path')).to_have_count(0)
         toolbar.locator('[data-ink-action=undo]').click()
@@ -184,14 +258,59 @@ with sync_playwright() as p:
         saved=context.request.get(args.base_url+'/api/v1/workspaces/'+active)
         assert saved.ok,saved.text()
         expected_strokes=saved.json()['workspace']['payload']['strokes']
-        assert len(expected_strokes)==n+2
+        assert len(expected_strokes)==n+2+existing_text_count
         page.reload(wait_until='networkidle')
         expect(page.locator('.canvas-ink-layer path')).to_have_count(n+2)
         assert page.evaluate('KGMultiQuestionWorkspace.activeWorkspace().strokes')==expected_strokes
         page.locator('#qwInkBtn').click()
+        toolbar=page.locator('.canvas-ink-toolbar');custom=toolbar.locator('input[type=color]')
+        # Reformat the selected existing pen, preserving the shared selection semantics.
+        toolbar.locator('[data-ink-tool=select]').click()
+        stroke=page.locator('.canvas-ink-layer path').first
+        rect=stroke.bounding_box();page.mouse.click(rect['x']+rect['width']/2,rect['y']+rect['height']/2)
+        expect(custom).to_be_enabled()
+        stroke_id=stroke.get_attribute('data-stroke-id')
+        custom.click();floating.locator('[data-color-picker-hex]').fill('2468ac');floating.locator('[data-color-picker-hex]').press('Enter');floating.locator('[data-color-window-close]').click()
+        expect(page.locator('[data-stroke-id="'+stroke_id+'"]')).to_have_attribute('stroke','#2468ac')
+        # Text draft stays editable while interacting with this same shared overlay.
+        toolbar.locator('[data-ink-tool=text]').click()
+        blank=page.evaluate("""()=>{const view=document.querySelector('#qwCanvasViewport'),r=view.getBoundingClientRect();for(let y=r.top+100;y<r.bottom-150;y+=65)for(let x=r.left+100;x<r.right-100;x+=65){const el=document.elementFromPoint(x,y);if(el===view||el?.classList.contains('qw-background')||el?.classList.contains('qw-world'))return {x,y}}throw Error('No blank canvas point')}""")
+        page.mouse.click(blank['x'],blank['y'])
+        editor=page.locator('.canvas-ink-text-editor');expect(editor).to_be_visible();editor.fill('共享色板文字')
+        custom.click();floating.locator('[data-color-picker-hex]').fill('8844cc');floating.locator('[data-color-picker-hex]').press('Enter')
+        expect(editor).to_have_css('color','rgb(136, 68, 204)')
+        floating.locator('[data-color-window-close]').click()
+        expect(editor).to_be_visible();editor.focus();editor.press('Control+Enter');expect(editor).to_have_count(0)
+        text=page.locator('.canvas-ink-layer text').last
+        expect(text).to_have_attribute('fill','#8844cc')
+        # Selected text formatting uses the exact same existing updateTextStyle path.
+        rect=text.bounding_box();page.mouse.click(rect['x']+5,rect['y']+5)
+        custom.click();floating.locator('[data-color-picker-presets] [data-picker-swatch="#22c55e"]').click();floating.locator('[data-color-window-close]').click()
+        expect(text).to_have_attribute('fill','#22c55e')
+        page.evaluate('KGCanvasWorkspaceAdapter.flush({throwOnError:true})')
+        persisted=context.request.get(args.base_url+'/api/v1/workspaces/'+active).json()['workspace']['payload']['strokes']
+        assert next(s for s in persisted if s['id']==stroke_id)['color']=='#2468ac'
+        assert persisted[-1]['tool']=='text' and persisted[-1]['color']=='#22c55e'
+        assert all(s.get('color')!='#8844cc' for s in persisted)
+        page.reload(wait_until='networkidle')
+        assert page.evaluate('KGMultiQuestionWorkspace.activeWorkspace().strokes')==persisted
+        expect(page.locator('.canvas-ink-layer text').last).to_have_attribute('fill','#22c55e')
+        # Existing card entry still uses the singleton, with its own target.
+        page.locator('#qwQuestionDockBtn').click()
+        page.locator('[data-add-index]').last.click()
+        page.keyboard.press('Escape');page.evaluate('KGMultiQuestionWorkspace.closeQuestionDrawer()')
+        # Existing color toolbar is intentionally visible only for multi-card selection.
+        page.evaluate('KGMultiQuestionWorkspace.selectNodes(Object.keys(KGMultiQuestionWorkspace.activeWorkspace().nodes))')
+        card_color=page.locator('[data-qw-selection-action=color]')
+        card_color.click();expect(floating.locator('[data-color-window-title]')).to_have_text('卡牌或分组颜色')
+        floating.locator('[data-color-picker-presets] [data-picker-swatch="#f97316"]').click()
+        floating.locator('[data-color-window-close]').click()
+        assert page.evaluate("Object.values(KGMultiQuestionWorkspace.activeWorkspace().nodes).some(n=>n.color==='#f97316')")
+        assert page.evaluate('KGMultiQuestionWorkspace.activeWorkspace().strokes')==persisted
+        page.locator('#qwInkBtn').click()
         page.locator('.canvas-ink-toolbar [data-ink-tool=pen]').hover()
         page.screenshot(path=str(OUT/f'workspace-tools-{name}.png'))
-        print('PASS '+name+': mouse/keyboard tools, color/settings/close, dynamic labels, theme entry unchanged, pen/highlighter drawing, shared undo/redo, real API/save/reload',flush=True)
+        print('PASS '+name+': mouse/Enter/Space shared picker, HEX/presets/recent/SV/cancel/drag/fullscreen/narrow fine-pointer, pen/highlighter and selected pen/text, real API save/reload, card color, history/theme/layout',flush=True)
         context.close()
     # Actual viewer context and authoritative API, without permission-response mocks.
     viewer=browser.new_context(viewport={'width':1440,'height':900})
@@ -204,6 +323,8 @@ with sync_playwright() as p:
     page.evaluate('KGWorkspaceInk.setOpen(true)')
     for selector in ('[data-ink-tool=pen]','[data-ink-tool=highlighter]','[data-ink-tool=text]','[data-ink-tool=eraser]','[data-ink-action=undo]','[data-ink-action=redo]'):
         expect(page.locator('.canvas-ink-toolbar '+selector)).to_be_disabled()
+    page.locator('.canvas-ink-toolbar input[type=color]').evaluate("e=>e.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}))")
+    expect(page.locator('.graph-floating-color-window.show')).to_have_count(0)
     page.mouse.move(650,430);page.mouse.down();page.mouse.move(750,460,steps=8);page.mouse.up()
     expect(page.locator('.canvas-ink-layer path')).to_have_count(1)
     assert viewer.request.put(args.base_url+'/api/v1/workspaces/viewer-workspace',data={'payload':{'strokes':[]}}).status==403
@@ -225,6 +346,8 @@ with sync_playwright() as p:
             button=toolbar.locator('[data-ink-tool='+tool+']');button.click()
             expect(button).to_have_attribute('aria-pressed','true')
             assert button.locator('svg').evaluate('e=>{const r=e.getBoundingClientRect();return r.width>=16&&r.height>=16&&getComputedStyle(e).stroke!=="none"}')
+        assert toolbar.locator('input[type=color]').evaluate("e=>e.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}))"), 'Default caller retains native activation'
+        expect(page.locator('.graph-floating-color-window.show')).to_have_count(0)
         toolbar.locator('[data-ink-settings]').click()
         expect(toolbar.locator('.canvas-ink-options')).to_be_visible()
         page.screenshot(path=str(OUT/(name+'-default-tools.png')))

@@ -160,5 +160,27 @@ with sync_playwright() as pw:
     box=panel.bounding_box();assert box['x']>=0 and box['y']>=0 and box['x']+box['width']<=360 and box['y']+box['height']<=420,box
     assert errors==[],errors
     page.evaluate('ink.destroy()');assert page.locator('.canvas-ink-toolbar').count()==0
+    # Optional color provider is a UI seam; no business API is replaced here.
+    page.set_viewport_size({'width':1100,'height':780})
+    page.evaluate("""()=>{
+      window.pickerRequests=[];window.pickerHandles=[];window.owner='owner-a';window.canvasId='canvas-a';
+      window.ink=KGCanvasInk.create({trigger:document.querySelector('#launch'),viewport:document.querySelector('#view'),world:document.querySelector('#world'),getViewport:()=>({x:100,y:100,scale:2}),getStrokes:()=>strokes,setStrokes:s=>strokes=s,isReadonly:()=>locked,getColorContext:()=>owner+':'+canvasId,
+        openColorPicker:request=>{pickerRequests.push(request);let open=true;const handle={isOpen:()=>open,close:()=>open=false};pickerHandles.push(handle);return handle},onError:message=>errors.push(message)});ink.setOpen(true);
+    }""")
+    custom=page.locator('.canvas-ink-toolbar input[type=color]')
+    assert custom.evaluate("e=>!e.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}))"), 'Provider must suppress native color picker'
+    assert page.evaluate('pickerRequests.length')==1, 'Custom color must invoke optional provider'
+    page.evaluate("pickerRequests.at(-1).onCommit({color:'#123456'})")
+    expect(custom).to_have_value('#123456')
+    page.evaluate("pickerRequests.at(-1).onCommit({color:'invalid'})")
+    expect(custom).to_have_value('#123456')
+    for action in ["pickerHandles.at(-1).close()", "ink.setTool('highlighter');ink.setTool('pen')", "canvasId='canvas-b';ink.render();canvasId='canvas-a'", "owner='owner-b';ink.render();owner='owner-a'", "locked=true;ink.render();locked=false;ink.render()", "ink.setOpen(false);ink.setOpen(true)", "ink.cancel()", "ink.reset();ink.setTool('pen')"]:
+        custom.click()
+        page.evaluate("window.stale=pickerRequests.at(-1)")
+        page.evaluate(action)
+        page.evaluate("stale.onCommit({color:'#abcdef'})")
+        expect(custom).to_have_value('#123456')
+    custom.click();page.evaluate("window.stale=pickerRequests.at(-1);ink.destroy();stale.onCommit({color:'#abcdef'})")
+    assert page.locator('.canvas-ink-toolbar').count()==0
     browser.close()
 print('canvas-ink-controller-browser: all interaction checks passed')
