@@ -39,6 +39,8 @@ scenario = '''
       window.__dashboard=api;api.refresh();
     }""")
     expect(page.locator('#practiceRecentBody tr')).to_have_count(2)
+    assert page.locator('[data-lobby-open="reports"]').count() == 0
+    assert page.locator('#practiceHistoryOpenBtn').count() == 1
     page.wait_for_timeout(800)
     page.mouse.move(0,0)
     page.evaluate('scrollTo(0,0)')
