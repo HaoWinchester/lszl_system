@@ -29,8 +29,15 @@
     });
     return true;
   }
+  // Ink callers share the floating window while retaining ownership of their own lease.
+  function openInk(options={}){
+    if(!open({...options,title:'画笔自定义颜色',allowOpacity:false,allowTransparent:false}))return null;
+    const root=ensure().getRoot(),body=root.querySelector('[data-color-window-body]').firstElementChild;
+    const owns=()=>root.isConnected&&root.querySelector('[data-color-window-body]').firstElementChild===body;
+    return {isOpen:()=>owns()&&isOpen(),contains:target=>owns()&&root.contains(target),close:()=>{if(owns())close({cancel:true,force:true})}};
+  }
   function close(options={}){return controller?controller.close(options):false}
   function isOpen(){return !!(controller&&controller.isOpen())}
   function destroy(){if(controller)controller.destroy();controller=null}
-  global.KGColorPickerV2=Object.freeze({open,close,isOpen,destroy,ensure});
+  global.KGColorPickerV2=Object.freeze({open,openInk,close,isOpen,destroy,ensure});
 })(typeof window!=='undefined'?window:globalThis);
