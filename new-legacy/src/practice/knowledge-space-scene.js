@@ -1,11 +1,11 @@
 'use strict';
 (function(global){
-  const LIMIT=60,MAX_STEPS=320,DEFAULT_CAMERA={yaw:.24,pitch:-.12,zoom:1};
+  const MAX_STEPS=320,CELL=75,DEFAULT_CAMERA={yaw:.24,pitch:-.12,zoom:1};
   const clamp=(value,min,max)=>Math.min(max,Math.max(min,value));
   const groupKey=node=>JSON.stringify([String(node.subject||''),String(node.taxonomyId||'')]);
   function createModel(nodes){
     const points=[],edges=[],groups=[],byKey=new Map();
-    for(const [index,node] of (Array.isArray(nodes)?nodes:[]).slice(0,LIMIT).entries()){
+    for(const [index,node] of (Array.isArray(nodes)?nodes:[]).entries()){
       const key=groupKey(node);let group=byKey.get(key);
       if(!group){group={key,subject:String(node.subject||''),taxonomyId:String(node.taxonomyId||''),indices:[],x:0,y:0,z:0};groups.push(group);byKey.set(key,group)}
       group.indices.push(index);
@@ -14,10 +14,16 @@
     groups.forEach((group,i)=>{
       const angle=i*2.399963229728653,radius=groups.length===1?0:Math.min(185,80+groups.length*10);
       group.x=Math.cos(angle)*radius;group.y=Math.sin(angle)*radius*.7;group.z=Math.sin(angle*.7)*80;
+      const catalog=group.indices.some(index=>Object.prototype.hasOwnProperty.call(points[index].node,'parentId'));
+      const byId=new Map();
+      for(const index of group.indices){const id=points[index].node.id;if(id!=null){const key=String(id);byId.set(key,byId.has(key)?null:index)}}
       group.indices.forEach((index,j)=>{
         const p=points[index],a=j*2.399963229728653,r=group.indices.length===1?18:30+Math.sqrt(j)*15;
         p.x=group.x+Math.cos(a)*r;p.y=group.y+Math.sin(a)*r;p.z=group.z+Math.cos(j*1.71)*r*.8;
-        if(j)edges.push({source:group.indices[j-1],target:index,group:group.key});
+        if(catalog){
+          const parent=p.node.parentId,source=parent==null?null:byId.get(String(parent));
+          if(source!=null&&source!==index)edges.push({source,target:index,group:group.key});
+        }else if(j)edges.push({source:group.indices[j-1],target:index,group:group.key});
       });
     });
     return {points,edges,groups,steps:0,quiet:0,settled:points.length===0};
@@ -26,12 +32,20 @@
     if(model.settled)return false;
     const {points,groups,edges}=model,centers=new Map(groups.map(group=>[group.key,group]));
     for(const p of points){const c=centers.get(p.group);p.vx+=(c.x-p.x)*.006;p.vy+=(c.y-p.y)*.006;p.vz+=(c.z-p.z)*.006}
-    // The page cap and finite solve budget bound this short-range all-pairs repulsion.
-    for(let i=0;i<points.length;i++)for(let j=0;j<i;j++){
-      const a=points[i],b=points[j],dx=a.x-b.x,dy=a.y-b.y,dz=a.z-b.z,d=Math.max(1,Math.hypot(dx,dy,dz));
-      if(d>=75)continue;
-      const force=Math.min(1.6,(75-d)*.035)/d;
-      a.vx+=dx*force;a.vy+=dy*force;a.vz+=dz*force;b.vx-=dx*force;b.vy-=dy*force;b.vz-=dz*force;
+    // Visit only the 27 neighboring cells; insert after visiting so each pair acts once.
+    const buckets=new Map();
+    for(const a of points){
+      const x=Math.floor(a.x/CELL),y=Math.floor(a.y/CELL),z=Math.floor(a.z/CELL);
+      for(let ox=-1;ox<=1;ox++)for(let oy=-1;oy<=1;oy++)for(let oz=-1;oz<=1;oz++){
+        const neighbors=buckets.get(`${x+ox},${y+oy},${z+oz}`);if(!neighbors)continue;
+        for(const b of neighbors){
+          const dx=a.x-b.x,dy=a.y-b.y,dz=a.z-b.z,squared=dx*dx+dy*dy+dz*dz;
+          if(squared>=CELL*CELL)continue;
+          const d=Math.max(1,Math.sqrt(squared)),force=Math.min(1.6,(CELL-d)*.035)/d;
+          a.vx+=dx*force;a.vy+=dy*force;a.vz+=dz*force;b.vx-=dx*force;b.vy-=dy*force;b.vz-=dz*force;
+        }
+      }
+      const key=`${x},${y},${z}`;let bucket=buckets.get(key);if(!bucket){bucket=[];buckets.set(key,bucket)}bucket.push(a);
     }
     for(const edge of edges){
       const a=points[edge.source],b=points[edge.target],dx=b.x-a.x,dy=b.y-a.y,dz=b.z-a.z,d=Math.max(1,Math.hypot(dx,dy,dz)),f=(d-48)*.003/d;
@@ -53,8 +67,8 @@
     if(!host?.ownerDocument?.createElement||!host.appendChild)return null;
     const document=host.ownerDocument,win=document.defaultView||global,canvas=document.createElement('canvas');
     let ctx;try{ctx=canvas.getContext('2d')}catch(error){return null}if(!ctx)return null;
-    canvas.className='kg-knowledge-space-canvas';canvas.setAttribute('role','img');canvas.setAttribute('aria-label','本页考点三维知识星空，考点详情可通过列表选择');
-    canvas.style.cssText='display:block;width:100%;height:100%;touch-action:none;cursor:grab';host.appendChild(canvas);
+    canvas.className='kg-knowledge-space-canvas';canvas.setAttribute('role','img');canvas.setAttribute('aria-label','知识点三维知识星空，考点详情可通过列表选择');
+    canvas.style.cssText='display:block;width:100%;height:100%;touch-action:pan-y;cursor:grab';host.appendChild(canvas);
     const model=createModel(nodes),camera={...DEFAULT_CAMERA},pointers=new Map(),listeners=[];
     const motion=win.matchMedia?.('(prefers-reduced-motion: reduce)');
     let width=0,height=0,raf=0,destroyed=false,selected=null,group='',dirty=true,intersecting=true,reduced=!!motion?.matches;
@@ -83,7 +97,7 @@
       const projected=positions();ctx.lineWidth=.8;
       for(const edge of model.edges){const a=projected[edge.source],b=projected[edge.target];if(!a.visible||!b.visible)continue;ctx.strokeStyle='rgba(117,161,218,.22)';ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke()}
       for(const p of projected.filter(p=>p.visible).sort((a,b)=>b.depth-a.depth)){
-        const node=model.points[p.index].node,brightness=clamp(Number(node.brightness)||.2,.2,1),radius=clamp(4*p.scale,2.5,9),halo=radius*5;
+        const node=model.points[p.index].node,value=Number(node.brightness),brightness=Number.isFinite(value)?clamp(value,.12,1):.12,radius=clamp(4*p.scale,2.5,9),halo=radius*5;
         const glow=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,halo);glow.addColorStop(0,`rgba(143,199,255,${brightness*.45})`);glow.addColorStop(1,'rgba(72,139,255,0)');ctx.fillStyle=glow;ctx.beginPath();ctx.arc(p.x,p.y,halo,0,Math.PI*2);ctx.fill();
         ctx.fillStyle=`rgba(190,224,255,${.3+brightness*.7})`;ctx.beginPath();ctx.arc(p.x,p.y,radius,0,Math.PI*2);ctx.fill();
         if(p.index===selected){ctx.strokeStyle='#e1c594';ctx.lineWidth=1.3;ctx.beginPath();ctx.arc(p.x,p.y,radius+7,0,Math.PI*2);ctx.stroke()}
@@ -113,7 +127,7 @@
     function releasePointers(){for(const id of pointers.keys()){try{if(canvas.hasPointerCapture(id))canvas.releasePointerCapture(id)}catch(error){/* Detached pointers need no release. */}}pointers.clear();pinching=false;pinchDistance=0;inertiaX=inertiaY=0;canvas.style.cursor='grab'}
     listen(canvas,'pointerdown',event=>{
       if(event.pointerType==='mouse'&&event.button!==0)return;
-      inertiaX=inertiaY=0;pointers.set(event.pointerId,{x:event.clientX,y:event.clientY,startX:event.clientX,startY:event.clientY,moved:false});
+      inertiaX=inertiaY=0;pointers.set(event.pointerId,{x:event.clientX,y:event.clientY,startX:event.clientX,startY:event.clientY,moved:false,touch:event.pointerType==='touch',direction:''});
       try{canvas.setPointerCapture(event.pointerId)}catch(error){/* Capture may be unavailable after a cancelled contact. */}
       if(pointers.size>1){pinching=true;pinchDistance=distance();for(const point of pointers.values())point.moved=true}canvas.style.cursor='grabbing';
     });
@@ -122,7 +136,10 @@
       const dx=event.clientX-point.x,dy=event.clientY-point.y;point.x=event.clientX;point.y=event.clientY;
       if(Math.hypot(point.x-point.startX,point.y-point.startY)>5)point.moved=true;
       if(pointers.size>1){const next=distance();if(pinchDistance>0)zoomBy(next/pinchDistance);pinchDistance=next;return}
-      if(point.moved){rotate(dx,dy);inertiaX=reduced?0:dx;inertiaY=reduced?0:dy}
+      if(pinching)return;
+      if(point.touch&&point.moved&&!point.direction)point.direction=Math.abs(point.x-point.startX)>Math.abs(point.y-point.startY)?'horizontal':'vertical';
+      if(point.touch&&point.direction!=='horizontal')return;
+      if(point.moved){const vertical=point.touch?0:dy;rotate(dx,vertical);inertiaX=reduced?0:dx;inertiaY=reduced?0:vertical}
     });
     function finish(event,cancelled){
       const point=pointers.get(event.pointerId);if(!point)return;
@@ -137,7 +154,7 @@
     }
     listen(canvas,'pointerup',event=>finish(event,false));listen(canvas,'pointercancel',event=>finish(event,true));
     listen(canvas,'lostpointercapture',event=>{if(pointers.has(event.pointerId))finish(event,true)});
-    listen(canvas,'wheel',event=>{event.preventDefault();zoomBy(Math.exp(clamp(-event.deltaY*.0015,-1,1)))},{passive:false});
+    listen(canvas,'wheel',event=>{if(!event.ctrlKey&&!event.metaKey)return;event.preventDefault();zoomBy(Math.exp(clamp(-event.deltaY*.0015,-1,1)))},{passive:false});
     listen(document,'visibilitychange',()=>{if(document.hidden){stop();releasePointers()}else mark()});
     listen(win,'pagehide',destroy);
     if(motion){const changed=()=>{reduced=motion.matches;if(reduced)inertiaX=inertiaY=0;mark()};listen(motion,'change',changed)}
