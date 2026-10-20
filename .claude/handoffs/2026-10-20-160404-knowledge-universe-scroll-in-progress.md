@@ -81,3 +81,5 @@ Task1最新补充：ea854558完成，37定向测试+独立spec/quality审查通�
 用户再追加：画笔自定义颜色复用截图现有“卡牌或分组颜色”悬浮色板。已确认现有KGColorPickerV2.open/shared-color-picker-v2.js链路可用且question-workspace已加载，绝不重写面板。新增Task6在Task5审查后，以共享ink可选提供者在多题归纳显式接入，其他caller默认不变。生命周期/readonly/切画布迟到commit保护和真实颜色落库/刷新测试见计划Task6。Task4仍在实际650触摸诊断，真实API13项已过/DB清理，尚未审查完。
 
 Task6追加明确授权：共用色板⌖按钮改通用滴管SVG（参考图2），公共入口统一图标，保留原EyeDropper和不可用隐藏，不重设计整个色板。计划/brief已更新。
+
+最新用户再次强调主题保持以前操作、不要乱改页面布局；root已明确回复保留主题选项/操作/入口位置，只恢复画笔紧凑布局+图标文字隐藏+现有色板+滴管图标。全局约束已锁定，不得扩展主题或页面重设计。Task4 2d174711完成，universe_dashboard_review审查中，Task5/6尚未开始。
