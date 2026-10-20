@@ -442,3 +442,90 @@ def test_only_completed_sessions_with_valid_saved_server_boolean_grades_score(ca
         assert after['attemptCount'] == before['attemptCount']
         assert node['gradedAttemptCount'] == node['correctCount'] == 2
         assert node['proficiencyScore'] == 35.2 and node['brightness'] == .4816
+
+QUESTIONS_ENDPOINT = '/api/v1/learning/practice/knowledge-questions'
+
+
+def test_knowledge_questions_require_login():
+    with TestClient(app) as client:
+        assert client.get(QUESTIONS_ENDPOINT, params={'taxonomyId': 'x', 'nodeId': 'x'}).status_code == 401
+
+
+def test_knowledge_questions_use_current_frozen_publications_and_permissions(catalog):
+    prefix = catalog['prefix']
+    taxonomy = catalog['taxonomies']['current']
+
+    async def seed():
+        async with AsyncSessionLocal() as db:
+            for suffix, status, access, roles, modes in (
+                ('free', 'published', 'free', ['student', 'teacher'], ['practice_mode']),
+                ('paid', 'published', 'member', ['student', 'teacher'], ['practice_mode']),
+                ('role', 'published', 'free', ['teacher'], ['practice_mode']),
+                ('old', 'superseded', 'free', [], ['practice_mode']),
+                ('withdrawn', 'withdrawn', 'free', [], ['practice_mode']),
+                ('disabled', 'published', 'free', [], []),
+            ):
+                release_id = f'{prefix}-{suffix}'
+                db.add(PaperRelease(id=release_id, paper_id=release_id, version=1, status=status,
+                                    name=suffix, subject='PMP', publisher_id=catalog['owners'][0],
+                                    access_level=access, allowed_roles=roles, enabled_modes=modes))
+                await db.flush()
+                for index in range(4):
+                    knowledge = {'taxonomyId': taxonomy, 'primaryNodeId': 'n1', 'pathSnapshot': ['旧名称']}
+                    if index == 2: knowledge['primaryNodeId'] = 'n2'
+                    if index == 3: knowledge['taxonomyId'] = catalog['taxonomies']['newer']
+                    snapshot = {'id': f'q{index}', 'title': f'冻结题{index}', 'stemParts': [{'text': '冻结题干 <安全>'}],
+                                'options': [{'id': 'A', 'text': '选项内容', 'correct': True}],
+                                'correctAnswer': 'A', 'analysis': '私密解析', 'metadata': {'knowledge': knowledge},
+                                'matching': {'left': [{'id': 'L', 'text': '左侧'}], 'right': [{'id': 'R', 'text': '候选'}], 'correctPairs': {'L': 'R'}},
+                                'material': {'id': 'm', 'title': '案例', 'text': '冻结案例材料', 'analysis': '不可返回'},
+                                'caseGroup': {'id': 'm', 'order': 2, 'total': 3},
+                                'images': [{'id': 'qa_preview', 'url': '/api/v1/question-assets/qa_preview', 'alt': '图表'}]}
+                    if index == 1:
+                        knowledge['nodeId'] = knowledge.pop('primaryNodeId')
+                    db.add(PaperReleaseQuestion(release_id=release_id, order_index=index, bank_id='private-bank',
+                                               question_id=f'{suffix}-q{index}', snapshot=snapshot))
+            await db.commit()
+
+    async def cleanup():
+        async with AsyncSessionLocal() as db:
+            releases = [f'{prefix}-{suffix}' for suffix in ('free', 'paid', 'role', 'old', 'withdrawn', 'disabled')]
+            await db.execute(delete(PaperReleaseQuestion).where(PaperReleaseQuestion.release_id.in_(releases)))
+            await db.execute(delete(PaperRelease).where(PaperRelease.id.in_(releases)))
+            await db.commit()
+
+    asyncio.run(seed())
+    try:
+        with TestClient(app) as client:
+            login(client, catalog['owners'][0])
+            params = {'taxonomyId': taxonomy, 'nodeId': 'n1', 'pageSize': 1}
+            first = client.get(QUESTIONS_ENDPOINT, params=params)
+            assert first.status_code == 200, first.text
+            body = first.json()
+            assert body['total'] == 2 and body['hasMore'] and len(body['questions']) == 1
+            question = body['questions'][0]
+            assert question['releaseId'] == f'{prefix}-free'
+            assert question['stem'] == '冻结题干 <安全>'
+            assert question['options'] == [{'id': 'A', 'text': '选项内容'}]
+            assert question['matching'] == {'left': [{'id': 'L', 'text': '左侧'}], 'right': [{'id': 'R', 'text': '候选'}]}
+            assert question['material']['text'] == '冻结案例材料' and 'analysis' not in question['material']
+            assert question['images'][0]['alt'] == '图表'
+            assert question['caseGroup'] == {'id': 'm', 'order': 2, 'total': 3}
+            assert not any(key in first.text for key in ('correctAnswer', 'analysis', 'metadata', 'correct"', 'correctPairs', 'private-bank'))
+            second = client.get(QUESTIONS_ENDPOINT, params={**params, 'page': 2}).json()
+            assert not second['hasMore'] and second['questions'][0]['questionId'] != question['questionId']
+            assert client.get(QUESTIONS_ENDPOINT, params={**params, 'page': 3}).json()['questions'] == []
+            assert client.get(QUESTIONS_ENDPOINT, params={**params, 'nodeId': 'n3'}).json()['total'] == 0
+            for tax, node in ((taxonomy, 'hidden'), (taxonomy, 'missing-node'),
+                              (catalog['taxonomies']['newer'], 'other'), (catalog['taxonomies']['draft'], 'other'),
+                              (catalog['taxonomies']['inactive'], 'other')):
+                assert client.get(QUESTIONS_ENDPOINT, params={'taxonomyId': tax, 'nodeId': node}).status_code == 404
+            assert client.get(QUESTIONS_ENDPOINT, params={**params, 'pageSize': 1000}).status_code == 422
+            async def teacher():
+                async with AsyncSessionLocal() as db:
+                    await db.execute(update(User).where(User.username == catalog['owners'][0]).values(role='teacher'))
+                    await db.commit()
+            asyncio.run(teacher())
+            assert client.get(QUESTIONS_ENDPOINT, params=params).json()['total'] == 6
+    finally:
+        asyncio.run(cleanup())

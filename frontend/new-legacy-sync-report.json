@@ -5,8 +5,7 @@
   "changes": {
     "added": [],
     "changed": [
-      "src/practice/knowledge-space-scene.js",
-      "tests/knowledge-space-scene-browser.py"
+      "tests/practice-lobby-design-browser.py"
     ],
     "removed": []
   },

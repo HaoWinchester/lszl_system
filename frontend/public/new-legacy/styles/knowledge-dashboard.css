@@ -26,7 +26,7 @@
 @media(max-width:850px) and (min-width:601px){.kg-knowledge-header{grid-template-columns:minmax(0,1fr)}.kg-knowledge-overview{grid-column:1}}
 @media(max-width:600px){.kg-knowledge-dialog[open]{height:calc(100dvh - 16px)}.kg-knowledge-shell{padding-top:16px}.kg-knowledge-dismiss{padding:8px 16px}.kg-knowledge-header{grid-template-columns:minmax(0,1fr);padding-right:0}.kg-knowledge-overview{grid-column:1}.kg-knowledge-body{min-height:0}}
 
-/* Search the complete catalog without removing any stars from the network. */
+/* Search practiced stars and the unpracticed catalog together. */
 .kg-knowledge-search{margin:0 0 12px;padding:12px;border:1px solid #34414f;background:#0a111b}
 .kg-knowledge-search label{display:block;margin-bottom:8px;font-size:14px;color:#e5edf8}
 .kg-knowledge-search-field{display:flex;gap:8px;min-width:0}
@@ -37,3 +37,19 @@
 .kg-knowledge-search li+li{margin-top:4px}
 .kg-knowledge-search ol button{width:100%;text-align:left;font-size:14px;overflow-wrap:anywhere}
 .kg-knowledge-search small{display:block;color:#a1b8d1;font-size:12px;line-height:1.6}
+
+.kg-knowledge-unpracticed-heading,.kg-knowledge-questions h4{margin:24px 0 8px;font-size:16px;color:#e9d6ae}
+.kg-knowledge-questions{border-top:1px solid #34414f;margin-top:20px;padding-top:4px;overflow-wrap:anywhere;font-size:14px;line-height:1.7}
+.kg-knowledge-questions [role="status"]{color:#b4c6db}
+.kg-knowledge-questions details{border:1px solid #34414f;padding:12px;margin:10px 0;background:#0a111b}
+.kg-knowledge-questions summary{cursor:pointer;min-height:44px;display:list-item;line-height:1.7;color:#edf4ff}
+.kg-knowledge-questions summary:focus-visible{outline:3px solid #d8b775;outline-offset:3px}
+.kg-knowledge-questions p,.kg-knowledge-questions li{white-space:pre-wrap}
+.kg-knowledge-question-source{font-size:12px;color:#9fb2c9}
+.kg-knowledge-body{align-items:start}
+
+.kg-knowledge-questions .qm-preview-matching{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.kg-knowledge-questions .qm-preview-matching h5{font-size:13px;margin:12px 0 4px}
+.kg-knowledge-questions ol{padding-left:20px}
+.kg-knowledge-questions img{max-width:100%;height:auto}
+.kg-knowledge-questions .qm-case{background:#0e1722;color:#ecf2fb}

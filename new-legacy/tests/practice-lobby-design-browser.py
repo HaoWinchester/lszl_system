@@ -15,7 +15,7 @@ with sync_playwright() as pw:
         r=getattr(ctx.request,method)(BASE+path,data=body) if body is not None else getattr(ctx.request,method)(BASE+path)
         assert r.ok,(path,r.status,r.text());return r.json()
     call('post','/api/v1/auth/login',{'username':'ink-browser','password':'ink-browser-test'})
-    page=ctx.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
+    page=ctx.new_page();page.add_init_script("Object.defineProperty(window,'KGKnowledgeSpaceScene',{configurable:true,set(value){this.__sceneModule={...value,mount(options){const result=value.mount(options);window.__knowledgeScene=result;window.__knowledgeMounted=options.nodes.length;return result}}},get(){return this.__sceneModule}})");errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
     if args.source_overrides:
         # Exercise authoritative edited assets without syncing or promoting a release.
         def source_asset(route):
@@ -32,20 +32,21 @@ with sync_playwright() as pw:
     assert page.locator('#practiceRecentPanel').count()==1,'actual history preview missing'
     universe_path='/api/v1/learning/practice/knowledge-universe'
     catalog=call('get',universe_path)
-    catalog_nodes=catalog['nodes'];published=[node for node in catalog_nodes if node['subject']=='PMP'][:20]
-    assert len(published)==20,'Requires real published PMP knowledge catalog'
+    catalog_nodes=catalog['nodes'];published=[node for node in catalog_nodes if node['subject']=='PMP'][:21]
+    assert len(published)==21,'Requires real published PMP knowledge catalog'
     fixture_file=OUT/'fixture.json'
     if fixture_file.exists():fixture=json.loads(fixture_file.read_text())
     else:
         token=uuid.uuid4().hex[:7];bank=call('post','/api/v1/banks',{'name':'大厅回归 '+token,'subject':'PMP','visibility':'private'})['bank'];ids=[]
-        for i in range(20):
+        for i in range(21):
             q=call('post',f'/api/v1/banks/{bank["id"]}/questions',{'title':f'大厅第{i+1}题','subject':'PMP','type':'single_choice','stemParts':[{'text':'如何处理已识别风险？'}],'options':[{'id':'A','text':'分析并响应风险'},{'id':'B','text':'忽略风险'}],'correctAnswer':'A','analysis':'应当分析风险并选择响应措施。','metadata':{'subjectFacets':[{'dimensionId':'exam-domain','valueId':'process'}],'knowledge':{'taxonomyId':published[i]['taxonomyId'],'primaryNodeId':published[i]['primaryNodeId'],'pathSnapshot':published[i]['path']}}})['question'];ids.append(q['id'])
         papers=[]
-        for name,access in [('敏捷精讲练习','free'),('预测专题练习','free'),('专项会员练习','member')]:
-            paper=call('post','/api/v1/papers',{'name':name+' '+token,'subject':'PMP','totalCount':20,'questions':[{'bankId':bank['id'],'questionId':qid,'order':i+1,'score':1} for i,qid in enumerate(ids)]})['paper']
+        for name,access in [('敏捷精讲练习','free'),('预测专题练习','free'),('专项会员练习','member'),('未练知识点题目','free')]:
+            selected_ids=ids[-1:] if name=='未练知识点题目' else ids[:20]
+            paper=call('post','/api/v1/papers',{'name':name+' '+token,'subject':'PMP','totalCount':len(selected_ids),'questions':[{'bankId':bank['id'],'questionId':qid,'order':i+1,'score':1} for i,qid in enumerate(selected_ids)]})['paper']
             release=call('post',f'/api/v1/paper-releases/papers/{paper["id"]}/publish',{'revision':paper['revision'],'accessLevel':access,'enabledModes':['practice_mode'],'allowedRoles':['student','teacher','admin'],'metadata':{}})['release'];papers.append({'id':paper['id'],'releaseId':release['id'],'name':paper['name'],'access':access})
-        fixture={'papers':papers,'questions':ids,'knowledgeNodes':published,'knowledgeFixture':2};fixture_file.write_text(json.dumps(fixture))
-    assert fixture.get('knowledgeFixture')==2,'Use a fresh output directory: old fixture predates frozen knowledge references'
+        fixture={'papers':papers,'questions':ids[:20],'knowledgeNodes':published[:20],'unpracticedNode':published[20],'knowledgeFixture':3};fixture_file.write_text(json.dumps(fixture))
+    assert fixture.get('knowledgeFixture')==3,'Use a fresh output directory: old fixture predates frozen knowledge references'
     call('delete','/api/v1/learning/practice/sessions')
     for favorite in call('get','/api/v1/question-favorites?limit=50')['favorites']:call('post','/api/v1/question-favorites/'+favorite['questionId']+'/toggle',{})
     page.reload(wait_until='networkidle');page.wait_for_function('document.querySelectorAll("#practicePaperLibrary [data-paper-id]").length>=4')
@@ -53,7 +54,7 @@ with sync_playwright() as pw:
     choose();checks.append('real catalog and four modes')
     assert page.locator('.practice-mode-card').count()==4
     for label in ['普通练习','挑战模式','学霸模式','复仇模式']:assert page.get_by_role('heading',name=label,exact=True).count()==1,label
-    page.locator('#practiceLibrarySearch').fill('找不到的试卷');expect(page.locator('#practicePaperLibrary .practice-paper-empty')).to_contain_text('没有找到');page.locator('#practiceLibraryClear').click();expect(page.locator('#practicePaperLibrary [data-paper-id]')).to_have_count(4)
+    page.locator('#practiceLibrarySearch').fill('找不到的试卷');expect(page.locator('#practicePaperLibrary .practice-paper-empty')).to_contain_text('没有找到');page.locator('#practiceLibraryClear').click();expect(page.locator('#practicePaperLibrary [data-paper-id]')).to_have_count(5)
     page.locator('#practiceLibraryFilters [data-paper-filter="member"]').click();expect(page.locator('#practicePaperLibrary [data-paper-id]')).to_have_count(1);page.locator('#practiceLibraryClear').click();page.locator('#practiceLibrarySubject').select_option('PMP');page.locator('#practiceLibraryClear').click();checks.append('search, free/member, subject and clear')
     page.locator('#practiceLibraryMoreBtn').click();expect(page.locator('#practicePaperDrawer')).to_be_visible();page.keyboard.press('Escape');expect(page.locator('#practicePaperDrawer')).to_be_hidden()
     for mode in ['challenge','scholar']:
@@ -101,27 +102,37 @@ with sync_playwright() as pw:
     actual=opened.value.json();verify_universe(actual)
     knowledge=page.get_by_role('dialog',name='星空知识网络');expect(knowledge).to_be_visible()
     expect(knowledge.locator('canvas')).to_have_count(1)
+    assert page.evaluate('__knowledgeMounted')==20
+    knowledge.locator('canvas').scroll_into_view_if_needed()
+    page.wait_for_function('__knowledgeScene.snapshot().settled && !__knowledgeScene.snapshot().running')
+    assert page.evaluate("(()=>{const c=document.querySelector('[data-knowledge-network] canvas');const p=c.getContext('2d').getImageData(0,0,c.width,c.height).data;return p.filter((value,i)=>i%4===0&&value>100).length>50})()")
     expect(knowledge.locator('[data-knowledge-summary]')).to_contain_text('累计 20 次作答')
-    expect(knowledge.locator('[data-knowledge-page-count]')).to_have_text(f"全部 {len(catalog_nodes)} 个考点")
-    first=actual['nodes'][0]
+    expect(knowledge.locator('[data-knowledge-page-count]')).to_have_text("星空 · 已练 20 个考点")
+    first=next(node for node in actual['nodes'] if node['practiced'])
     expect(knowledge.locator('[data-knowledge-detail-title]')).to_have_text(first['title'])
     expect(knowledge.locator('[data-knowledge-detail-path]')).to_have_text(' / '.join(first['path']))
-    target=actual['nodes'][-1]
+    target=fixture['unpracticedNode']
     knowledge.locator('[data-knowledge-search]').fill(target['title'])
     results=knowledge.locator('[data-knowledge-search-results] button');expect(results.first).to_be_visible();assert results.count()>0
     results.first.click();expect(knowledge.locator('[data-knowledge-detail-title]')).to_have_text(target['title'])
-    page.screenshot(path=str(OUT/'knowledge-search-located.png'),full_page=True)
-    expect(knowledge.locator('[data-knowledge-page-count]')).to_have_text(f"全部 {len(catalog_nodes)} 个考点")
+    expect(knowledge.locator('[data-knowledge-questions-status]')).to_contain_text('1 道')
+    assert page.evaluate('__knowledgeScene.snapshot().positions.length')==20
+    knowledge.locator('[data-knowledge-question-items] summary').click()
+    expect(knowledge.locator('[data-knowledge-question-items]')).to_contain_text('如何处理已识别风险？')
+    expect(knowledge.locator('[data-knowledge-unpracticed] button')).to_have_count(len(catalog_nodes)-20)
+    page.screenshot(path=str(OUT/'knowledge-search-located.png'))
+    expect(knowledge.locator('[data-knowledge-page-count]')).to_have_text("星空 · 已练 20 个考点")
     knowledge.locator('[data-knowledge-search]').fill('不存在的知识点搜索验证');expect(knowledge.locator('[data-knowledge-search-status]')).to_contain_text('没有找到')
     knowledge.locator('[data-knowledge-search-clear]').click();expect(knowledge.locator('[data-knowledge-search]')).to_have_value('')
     knowledge.locator('[data-knowledge-reset]').click()
     knowledge.locator('[data-knowledge-list-toggle]').click()
-    expect(knowledge.locator('[data-knowledge-list] button')).to_have_count(len(catalog_nodes))
+    expect(knowledge.locator('[data-knowledge-list] button')).to_have_count(20)
     practiced_index=next(i for i,node in enumerate(actual['nodes']) if node['practiced'])
-    knowledge.locator('[data-knowledge-list] button').nth(practiced_index).click()
+    knowledge.locator('[data-knowledge-list] button').first.click()
     expect(knowledge.locator('[data-knowledge-detail-title]')).to_have_text(actual['nodes'][practiced_index]['title'])
     expect(knowledge.locator('[data-knowledge-detail-attempts]')).to_have_text('1 次')
-    page.screenshot(path=str(OUT/'knowledge-space-real-api.png'),full_page=True)
+    knowledge.locator('canvas').scroll_into_view_if_needed();page.wait_for_function('!__knowledgeScene.snapshot().running')
+    page.screenshot(path=str(OUT/'knowledge-space-real-api.png'))
     knowledge.locator('[data-knowledge-close]').click();expect(knowledge).to_be_hidden()
     expect(page.locator('#practiceKnowledgeDashboardOpen')).to_be_focused()
     with page.expect_response(lambda response:dashboard_path in response.url) as reopened:
@@ -187,7 +198,8 @@ with sync_playwright() as pw:
     isolated=other.json();assert isolated['topicCount']==len(catalog_nodes) and isolated['practicedTopicCount']==0
     assert all(not node['practiced'] and node['attemptCount']==0 and node['brightness']==.12 for node in isolated['nodes'])
     sp.locator('#practiceKnowledgeDashboardOpen').click()
-    expect(sp.locator('[data-knowledge-list] button')).to_have_count(len(catalog_nodes))
+    expect(sp.locator('[data-knowledge-unpracticed] button')).to_have_count(len(catalog_nodes))
+    expect(sp.locator('canvas')).to_have_count(0)
     expect(sp.locator('[data-knowledge-summary]')).to_contain_text('已练 0')
     sp.keyboard.press('Escape')
     checks.append('non-member student blocks membership paper in three catalog modes; isolated preview')

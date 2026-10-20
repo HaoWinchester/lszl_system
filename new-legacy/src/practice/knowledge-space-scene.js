@@ -147,7 +147,7 @@
     function applyRotation(dx,dy){camera.yaw+=dx*.006;camera.pitch=clamp(camera.pitch+dy*.006,-1.35,1.35)}
     function rotate(dx,dy){if(destroyed||!Number.isFinite(dx)||!Number.isFinite(dy))return;autoFit=false;applyRotation(dx,dy);mark()}
     function zoomBy(factor){if(destroyed||!Number.isFinite(factor)||factor<=0)return;autoFit=false;camera.zoom=clamp(camera.zoom*factor,.45,8);mark()}
-    function select(index){if(destroyed||!Number.isInteger(index)||!model.points[index])return;selected=index;if(focused!==null)focused=index;mark()}
+    function select(index){if(index===null&&!destroyed){selected=null;focused=null;mark();return}if(destroyed||!Number.isInteger(index)||!model.points[index])return;selected=index;if(focused!==null)focused=index;mark()}
     function focus(index){if(destroyed||!Number.isInteger(index)||!model.points[index])return;selected=index;focused=index;autoFit=false;inertiaX=inertiaY=0;camera.zoom=Math.max(camera.zoom,3);mark()}
     function focusGroup(key){if(destroyed)return;group=String(key||'');if(focused!==null){focused=null;Object.assign(camera,DEFAULT_CAMERA);autoFit=true;fitDefault()}mark()}
     function reset(){if(destroyed)return;Object.assign(camera,DEFAULT_CAMERA);focused=null;autoFit=true;fitDefault();group='';inertiaX=inertiaY=0;mark()}

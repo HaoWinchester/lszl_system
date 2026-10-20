@@ -8,14 +8,56 @@ import hashlib
 import heapq
 import json
 
-from sqlalchemy import select
+from fastapi import HTTPException
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import now_utc
 from app.models.training import PracticeSession
-from app.models.teaching_content import ContentSubject
+from app.models.teaching_content import ContentSubject, ContentTaxonomy
+from app.models.paper_release import PaperRelease, PaperReleaseQuestion
+from app.services import paper_release_service
+from app.services.question_preview_service import practice_projection
 from app.services.practice_session_service import _session_question_rows
 from app.services.teaching_content_current_service import current_taxonomy
+
+
+async def get_knowledge_questions(db: AsyncSession, user, taxonomy_id: str, node_id: str,
+                                 *, page=1, page_size=10):
+    """Read-only previews from accessible current publications, never live banks."""
+    taxonomy = await db.get(ContentTaxonomy, taxonomy_id)
+    subject = await db.get(ContentSubject, taxonomy.subject_id) if taxonomy else None
+    current = await current_taxonomy(db, subject.id) if subject and subject.status == 'active' else None
+    if not current or current[0].id != taxonomy_id or not any(
+            node.node_id == node_id and node.status == 'active' for node in current[1]):
+        raise HTTPException(status_code=404, detail='知识点不存在或未发布')
+
+    knowledge = PaperReleaseQuestion.snapshot['metadata']['knowledge']
+    identity = func.coalesce(func.nullif(knowledge['primaryNodeId'].astext, ''), knowledge['nodeId'].astext)
+    association = (knowledge['taxonomyId'].astext == taxonomy_id, identity == node_id)
+    releases = (await db.scalars(select(PaperRelease).join(PaperReleaseQuestion).where(
+        PaperRelease.status == paper_release_service.ACTIVE_STATUS, *association).distinct())).all()
+    entitled = await paper_release_service.entitlement_for_request(db, user)
+    accessible = {release.id: release for release in releases
+                  if set(release.enabled_modes or []) & paper_release_service.VALID_MODES
+                  and paper_release_service.can_access_with_entitlement(user, release, entitled)}
+    query = select(PaperReleaseQuestion).where(
+        PaperReleaseQuestion.release_id.in_(accessible), *association)
+    total = int(await db.scalar(select(func.count()).select_from(query.subquery())) or 0)
+    rows = (await db.scalars(query.order_by(PaperReleaseQuestion.release_id, PaperReleaseQuestion.order_index)
+                             .offset((page-1)*page_size).limit(page_size))).all()
+    questions = []
+    for row in rows:
+        snapshot = row.snapshot or {}
+        preview = practice_projection(snapshot)
+        stem = ''.join(str(part.get('text') or '') for part in preview.get('stemParts', []))
+        questions.append({**preview, 'questionId': row.question_id, 'releaseId': row.release_id,
+                          'paperId': accessible[row.release_id].paper_id,
+                          'paperName': accessible[row.release_id].name,
+                          'order': row.order_index+1,
+                          'stem': stem or str(snapshot.get('stem') or snapshot.get('title') or '')})
+    return {'questions': questions, 'total': total, 'page': page, 'pageSize': page_size,
+            'hasMore': page*page_size < total}
 
 
 def _timestamp(value):
