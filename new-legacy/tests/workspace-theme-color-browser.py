@@ -20,7 +20,7 @@ with sync_playwright() as pw:
     page.goto(args.base_url+'/question-workspace.html?paperId=ink-paper&releaseId=ink-release',wait_until='networkidle')
     page.wait_for_function('!!window.KGMultiQuestionWorkspace?.activeWorkspace()')
     def scene(theme):
-        page.locator('[data-learning-theme-menu]>summary').click();page.locator('[data-kr-theme='+theme+']').click();page.locator('[data-theme-save]').click()
+        page.locator('#qwThemeSelect').select_option(theme)
     if args.readonly_only:
         assert page.locator('body').get_attribute('data-qw-readonly')=='1'
         first=page.evaluate('KGMultiQuestionWorkspace.activeWorkspace().background')

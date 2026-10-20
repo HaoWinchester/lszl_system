@@ -79,29 +79,25 @@
   }
   function bindControls(controller,select,existingMenu){
     if(!controller||!select)return null;
-    const menu=existingMenu||document.createElement('details');
-    menu.className='learning-theme-menu';menu.dataset.learningThemeMenu=controller.scope;
-    const choices=[...select.options].map(option=>({id:option.value,label:option.textContent}));
-    if(!existingMenu)select.before(menu);
-    select.hidden=true;select.tabIndex=-1;
-    const summary=document.createElement('summary');summary.textContent='卡片主题';summary.setAttribute('aria-label','设置卡片主题');
-    const panel=document.createElement('div');panel.className='learning-theme-panel';panel.dataset.learningThemePanel='';
-    const title=document.createElement('strong');title.textContent='卡片主题';
-    const hint=document.createElement('p');hint.textContent='预览整张卡片；文档背景保持独立。';
-    const grid=document.createElement('div');grid.className='learning-theme-choices';grid.setAttribute('role','group');grid.setAttribute('aria-label','卡片主题');
-    let draft=controller.saved(),openingOwner='';
-    const sync=value=>{draft=value;select.value=value;grid.querySelectorAll('button').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.krTheme===value)))};
-    for(const choice of choices){const button=document.createElement('button');button.type='button';button.dataset.krTheme=choice.id;button.className='kr-scene-option';button.textContent=choice.label;button.addEventListener('click',()=>{sync(choice.id);controller.preview(choice.id)});grid.append(button)}
-    const actions=document.createElement('footer'),cancel=document.createElement('button'),save=document.createElement('button');cancel.type=save.type='button';cancel.textContent='取消';save.textContent='保存主题';save.dataset.themeSave='';
-    const cancelPreview=()=>{controller.preview(controller.saved());sync(controller.saved());menu.open=false};
-    cancel.onclick=cancelPreview;save.onclick=()=>{if(openingOwner!==(global.KGAuthCore?.currentUser?.()?.username||'')){cancelPreview();return}try{controller.apply(draft);menu.open=false}catch(_){hint.textContent='主题保存失败，请重试。';hint.setAttribute('role','status')}};
-    actions.append(cancel,save);panel.append(title,hint,grid,actions);menu.replaceChildren(summary,panel,select);
-    menu.addEventListener('toggle',()=>{if(menu.open){openingOwner=global.KGAuthCore?.currentUser?.()?.username||'';sync(controller.saved())}else{controller.preview(controller.saved());sync(controller.saved())}});
-    document.addEventListener('click',event=>{if(menu.open&&!menu.contains(event.target))cancelPreview()});
-    document.addEventListener('keydown',event=>{if(event.key==='Escape'&&menu.open){event.preventDefault();cancelPreview();summary.focus()}});
-    global.addEventListener('kg-auth-session-change',cancelPreview);
-    select.addEventListener('change',()=>{controller.apply(select.value);sync(select.value)});
-    sync(controller.saved());return menu;
+    // Keep the original native dropdown in each toolbar; choosing a theme saves immediately.
+    if(existingMenu)existingMenu.replaceWith(select);
+    select.classList.remove('kr-theme-compat-select');
+    select.classList.add('learning-theme-select');
+    select.hidden=false;select.tabIndex=0;select.removeAttribute('aria-hidden');
+    const sync=()=>{select.value=controller.saved()};
+    const owner=()=>global.KGAuthCore?.currentUser?.()?.username||'';
+    let interactionOwner;
+    for(const type of ['pointerdown','keydown'])select.addEventListener(type,()=>{interactionOwner=owner()});
+    select.addEventListener('change',()=>{
+      const stale=interactionOwner!==undefined&&interactionOwner!==owner();interactionOwner=undefined;
+      if(stale){sync();return}
+      try{select.value=controller.apply(select.value)}
+      catch(_){sync();global.KGDialogs?.alert('主题保存失败，请重试。')}
+    });
+    global.addEventListener('kg:deep-recall-theme-change',event=>{
+      if(event.detail?.scope===controller.scope)select.value=event.detail.theme;
+    });
+    sync();return select;
   }
   global.KGLearningTheme=Object.freeze({create,bindControls,THEMES,captureWorkspaceBackground,applyWorkspaceBackground});
 })(window);
