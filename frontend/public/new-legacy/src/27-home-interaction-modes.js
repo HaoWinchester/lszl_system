@@ -80,7 +80,7 @@
     // Keep the desktop preference and browsing/selection capabilities. Signed-in
     // roles without graph write permission must not edit even in professional mode.
     const readonly=document.body?.classList.contains('auth-readonly')||(role&&role!=='guest'&&permissions?.can?.('editGraph')===false);
-    if(readonly&&WRITE_CAPABILITIES.has(capability))return false;
+    if((readonly||global.KGGraphFileTabs?.isSwitching?.())&&WRITE_CAPABILITIES.has(capability))return false;
     return !!(CAPABILITIES[mode]&&CAPABILITIES[mode][capability]);
   }
   function is(mode){return getMode()===normalizeMode(mode)}

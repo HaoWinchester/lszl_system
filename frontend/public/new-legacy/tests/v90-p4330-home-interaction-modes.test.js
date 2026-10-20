@@ -57,6 +57,10 @@ for(const preferred of ['efficient','professional']){
   for(const capability of ['read','boxSelect','multiSelect','edgeSelect','contextMenu'])assert.equal(api.can(capability),true,'viewer keeps '+capability);
   assert.equal(api.getMode(),preferred);assert.equal(api.getPreferredDesktopMode(),preferred);
   for(role of ['teacher','student'])for(const capability of ['editGraph','nodeDrag','connections','edgeAdvanced','edgeToolbar','edgeLabelEdit'])assert.equal(api.can(capability),true,role+' keeps '+capability);
+  let switching=true;global.KGGraphFileTabs={isSwitching:()=>switching};
+  for(const capability of ['editGraph','nodeDrag','nodeEdit','nodeResize','textEdit','textDrag','selectionBoundsMove','connections','nodeToolbar','edgeMove','edgeAdvanced','edgeToolbar','edgeLabelEdit','contextMenuAdvanced'])assert.equal(api.can(capability),false,'file transition blocks '+capability);
+  for(const capability of ['read','boxSelect','multiSelect','edgeSelect','contextMenu'])assert.equal(api.can(capability),true,'file transition keeps '+capability);
+  switching=false;assert.equal(api.can('nodeEdit'),true,'failed or completed transition unlocks editing');
   readonly=true;assert.equal(api.can('edgeAdvanced'),false,'readonly bootstrap also disables mutation');assert.equal(api.can('edgeSelect'),true,'readonly bootstrap keeps selection');
 }
 console.log('v90-p4330-home-interaction-modes-ok');

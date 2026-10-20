@@ -161,6 +161,13 @@
     try{return await action()}
     finally{switching=false;global.dispatchEvent(new Event('kg-graph-file-transition'))}
   }
+  async function withSavedFileTransition(action){
+    if(switching)throw new Error('图谱文件正在切换，请稍后重试。');
+    return withFileTransition(async()=>{
+      if(!await saveBeforeSwitch())throw new Error('当前图谱保存失败，已取消文件切换。');
+      return action();
+    });
+  }
   function openFile(id){return withFileTransition(()=>openFileNow(id))}
   function closeFile(id){return withFileTransition(()=>closeFileNow(id))}
   function createFile(){return withFileTransition(createFileNow,null)}
@@ -434,5 +441,5 @@
   async function init(options={}){if(initialized)return;initialized=true;await initializeStore(options);bind();renderTabs();restoreFileIndex(options)}
   async function refresh(options={}){await initializeStore(options);renderTabs();restoreFileIndex(options)}
 
-  global.KGGraphFileTabs={isSwitching:()=>switching,init,refresh,renderTabs,openFile,closeFile,createFile,manualSave,updateCurrentFileDisplay};
+  global.KGGraphFileTabs={withSavedFileTransition,isSwitching:()=>switching,init,refresh,renderTabs,openFile,closeFile,createFile,manualSave,updateCurrentFileDisplay};
 })(window);

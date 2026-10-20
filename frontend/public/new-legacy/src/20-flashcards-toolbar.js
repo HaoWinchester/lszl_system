@@ -54,11 +54,12 @@ async function importLearningPackageFile(file){
   clean.selectedNodeId=null;
   clean.selectedLinkId=null;
   clean.linkSourceId=null;
+  const tabs=window.KGGraphFileTabs;
+  if(!tabs||typeof tabs.withSavedFileTransition!=='function')throw new Error('图谱文件管理尚未就绪，请稍后重试。');
+  return tabs.withSavedFileTransition(async()=>{
   const bridge=window.KGGraphFileEditorStoreBridge;
   const store=bridge&&typeof bridge.current==='function'?bridge.current():window.KGGraphFileStore;
   const name=importedGraphName(clean,file);
-  const autosave=window.KGGraphFileAutosave;
-  if(autosave&&typeof autosave.saveBeforeSwitch==='function'&&await autosave.saveBeforeSwitch()===false)throw new Error('当前图谱保存失败，已取消导入。');
   if(store&&typeof store.createFile==='function'){
     const previousId=store.getCurrentFileId&&store.getCurrentFileId();
     const input={name,graphData:clean,source:'import',sourceFileId:String(file&&file.name||'').slice(0,120)};
@@ -79,6 +80,7 @@ async function importLearningPackageFile(file){
   render({persist:true});
   showStatus('学习包导入成功，已自动过滤无效节点、关系和颜色值。');
   return clean;
+  });
 
   },["importFile", "importBtn"]);
 }

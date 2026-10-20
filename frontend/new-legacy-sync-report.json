@@ -5,6 +5,7 @@
   "changes": {
     "added": [],
     "changed": [
+      "tests/graph-file-editor-store-bridge.test.js",
       "tests/graph-file-import-permissions-browser.py"
     ],
     "removed": []

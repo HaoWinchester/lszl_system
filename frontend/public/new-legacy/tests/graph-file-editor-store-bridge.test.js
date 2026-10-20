@@ -74,22 +74,26 @@ function load({ remoteActive }) {
 });
 
 // Home JSON/ZIP import must use the same remote file bridge as tab creation.
-async function homeImport({saveResult=true,createFails=false,hydrateFails=false,restoreFails=false,deleteFails=false}={}){
+async function homeImport({saveResult=true,createFails=false,hydrateFails=false,restoreFails=false,deleteFails=false,createGate=null,hydrateGate=null,parseGate=null,textDraft=false,inlineDraft=false,draftFails=false}={}){
   const original={id:'server-original',graphData:{nodes:[{id:'original',title:'原文件'}],links:[]}};
   const remoteFiles=new Map([[original.id,structuredClone(original)]]);
   const localFiles=new Map(),messages=[];let current=original.id;
-  const context={console,Promise,CustomEvent:class{constructor(type,options){this.type=type;this.detail=options.detail}},
+  let textPending=textDraft,inlinePending=inlineDraft;
+  const controls={importFile:{disabled:false,setAttribute(){},removeAttribute(){}},importBtn:{disabled:false,setAttribute(){},removeAttribute(){}}};
+  const context={console,Promise,Event,document:{documentElement:{dataset:{}},body:{classList:{contains:()=>false}},getElementById:id=>controls[id]||null},addEventListener(){},CustomEvent:class{constructor(type,options){this.type=type;this.detail=options.detail}},
     state:structuredClone(original.graphData),lastSavedSnapshot:'',
     sanitizeState:value=>structuredClone(value),render:()=>{},dispatchEvent:()=>{},
-    showStatus:text=>messages.push(text),KGImportGuard:{run:(_key,action)=>action()},
-    KGHomePackageService:{parseFile:async()=>({meta:{title:'个人导入'},nodes:[{id:'imported',title:'导入内容'}],links:[]})},
-    KGGraphFileAutosave:{saveBeforeSwitch:async()=>saveResult,clearDirty:()=>{}},
+    showStatus:text=>messages.push(text),
+    KGHomeInk:{hasTextDraft:()=>textPending,commitText:async()=>{if(draftFails)return false;context.state.nodes[0].summary='已提交文本草稿';textPending=false;context.KGGraphFileAutosave.markDirty();return true}},
+    ensureNodeInlineTextEditorController:()=>({isEditing:()=>inlinePending,commit:async()=>{if(draftFails)return false;context.state.nodes[0].title='已提交节点草稿';inlinePending=false;context.KGGraphFileAutosave.markDirty();return true}}),
+    KGHomePackageService:{parseFile:async()=>{if(parseGate)await parseGate;return {meta:{title:'个人导入'},nodes:[{id:'imported',title:'导入内容'}],links:[]}}},
+    persistCurrentGraphNow:async()=>{if(!saveResult)return false;remoteFiles.get(current).graphData=structuredClone(context.state);return true},
     KGGraphFileStore:{getCurrentFileId:()=>current,createFile:input=>{
       const file={id:'local-only',graphData:input.graphData};localFiles.set(file.id,file);return file;
     }},
-    KGGraphFileRemoteStore:{active:()=>true,getCurrentFileId:()=>current,
-      createFile:async input=>{if(createFails)return null;const file={id:'server-imported',revision:1,graphData:structuredClone(input.graphData)};remoteFiles.set(file.id,file);current=file.id;return file},
-      openFile:async id=>hydrateFails&&id==='server-imported'?null:structuredClone(remoteFiles.get(id)),
+    KGGraphFileRemoteStore:{active:()=>true,initialize:async()=>true,getCurrentFileId:()=>current,
+      createFile:async input=>{if(createGate)await createGate;if(createFails)return null;const file={id:'server-imported',revision:1,graphData:structuredClone(input.graphData)};remoteFiles.set(file.id,file);current=file.id;return file},
+      openFile:async id=>{if(hydrateGate&&id==='server-imported')await hydrateGate;return hydrateFails&&id==='server-imported'?null:structuredClone(remoteFiles.get(id))},
       setCurrentFileId:async id=>{if(restoreFails)throw new Error('恢复原文件失败');current=id||'';return current},
       deleteFile:async(id,options={})=>{
         if(deleteFails)return false;
@@ -102,9 +106,13 @@ async function homeImport({saveResult=true,createFails=false,hydrateFails=false,
   context.window=context;context.globalThis=context;vm.createContext(context);
   vm.runInContext(fs.readFileSync(path.join(root,'src/23-graph-file-editor-store-bridge.js'),'utf8'),context);
   await context.KGGraphFileEditorStoreBridge.initializeCurrent();
+  for(const file of ['00-import-guard.js','24-graph-file-autosave.js','25-graph-file-tabs.js'])vm.runInContext(fs.readFileSync(path.join(root,'src',file),'utf8'),context);
+  const editor=fs.readFileSync(path.join(root,'src/10-graph-editor.js'),'utf8');
+  vm.runInContext(editor.slice(0,editor.indexOf('function currentGraphInteractionMode()')),context);
+  context.KGGraphFileAutosave.markDirty();
   const source=fs.readFileSync(path.join(root,'src/20-flashcards-toolbar.js'),'utf8');
   vm.runInContext(source.slice(0,source.indexOf('function addAtCenter()')),context);
-  return{context,remoteFiles,localFiles,original,messages,current:()=>current,run:()=>context.importLearningPackageFile({name:'personal.json'})};
+  return{context,remoteFiles,localFiles,original,messages,controls,current:()=>current,run:()=>context.importLearningPackageFile({name:'personal.json'})};
 }
 
 (async()=>{
@@ -142,4 +150,61 @@ async function homeImport({saveResult=true,createFails=false,hydrateFails=false,
   assert.strictEqual(cleanupFailed.messages.length,0);
   assert.strictEqual(cleanupFailed.remoteFiles.size,2,'a failed cleanup can retain the extra file, but must not announce import success');
   console.log('home import remote persistence, failed-save and partial-create rollback contract passed');
+})().catch(error=>{console.error(error);process.exitCode=1});
+
+// Removing the shared transition must expose writable state and drop pending drafts.
+(async()=>{
+  let releaseCreate,releaseHydrate;
+  const createGate=new Promise(resolve=>releaseCreate=resolve),hydrateGate=new Promise(resolve=>releaseHydrate=resolve);
+  const item=await homeImport({createGate,hydrateGate,textDraft:true,inlineDraft:true});
+  const {context,controls}=item,tabs=context.KGGraphFileTabs;
+  const importing=item.run();
+  for(let i=0;i<30;i++)await Promise.resolve();
+  assert.strictEqual(tabs.isSwitching(),true,'remote create must hold the actual file transition lock');
+  assert.strictEqual(context.canWriteGraph(),false,'actual editor write guard must block concurrent edits');
+  assert.strictEqual(controls.importFile.disabled,true);
+  assert.strictEqual(controls.importBtn.disabled,true);
+  assert.strictEqual(await tabs.openFile('other'),false);
+  assert.strictEqual(await tabs.closeFile('server-original'),false);
+  assert.strictEqual(await tabs.createFile(),null);
+  assert.strictEqual(item.current(),'server-original');
+  const saved=item.remoteFiles.get('server-original').graphData.nodes[0];
+  assert.strictEqual(saved.title,'已提交节点草稿','inline draft must be committed and saved before create');
+  assert.strictEqual(saved.summary,'已提交文本草稿','text draft must be committed and saved before create');
+  releaseCreate();for(let i=0;i<30;i++)await Promise.resolve();
+  assert.strictEqual(tabs.isSwitching(),true,'hydration must remain inside the same transition');
+  assert.strictEqual(context.canWriteGraph(),false);
+  releaseHydrate();await importing;
+  assert.strictEqual(context.state.nodes[0].title,'导入内容');
+  assert.strictEqual(tabs.isSwitching(),false);
+  assert.strictEqual(context.canWriteGraph(),true);
+  assert.strictEqual(controls.importFile.disabled,false);
+  assert.strictEqual(context.KGGraphFileAutosave.isDirty(),false);
+  for(const options of [{saveResult:false},{createFails:true},{hydrateFails:true},{hydrateFails:true,restoreFails:true},{hydrateFails:true,deleteFails:true},{textDraft:true,draftFails:true},{inlineDraft:true,draftFails:true}]){
+    const failed=await homeImport(options);
+    await assert.rejects(failed.run());
+    assert.strictEqual(failed.context.KGGraphFileTabs.isSwitching(),false,'every failure must release shared transition');
+    assert.strictEqual(failed.context.canWriteGraph(),true);
+    assert.strictEqual(failed.controls.importFile.disabled,false);
+    assert.strictEqual(failed.controls.importBtn.disabled,false);
+    assert.strictEqual(failed.context.state.nodes[0].id,'original');
+  }
+  let finishParsing;
+  const parsing=await homeImport({parseGate:new Promise(resolve=>finishParsing=resolve)});
+  const parsed=parsing.run();
+  assert.strictEqual(parsing.context.canWriteGraph(),true,'parsing must leave original editable until transition acquisition');
+  parsing.context.state.nodes[0].title='解析期间的新修改';
+  parsing.context.KGGraphFileAutosave.markDirty();
+  finishParsing();await parsed;
+  assert.strictEqual(parsing.remoteFiles.get('server-original').graphData.nodes[0].title,'解析期间的新修改');
+  let finishSwitch;
+  const busy=await homeImport();
+  const other=busy.context.KGGraphFileTabs.withSavedFileTransition(()=>new Promise(resolve=>finishSwitch=resolve));
+  await assert.rejects(busy.run(),/正在切换/);
+  assert.strictEqual(busy.context.KGGraphFileTabs.isSwitching(),true,'rejected import must not unlock another transition');
+  assert.strictEqual(busy.controls.importFile.disabled,false);
+  finishSwitch();await other;
+  assert.strictEqual(busy.context.KGGraphFileTabs.isSwitching(),false);
+  assert.strictEqual(busy.remoteFiles.size,1);
+  console.log('home import actual transition/draft/save/guard lifetime contract passed');
 })().catch(error=>{console.error(error);process.exitCode=1});
