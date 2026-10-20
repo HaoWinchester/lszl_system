@@ -580,7 +580,10 @@
       if(!activateText())return false;openTextEditor(clientX,clientY,null);return true;
     }
     const tools=toolbar.querySelector('.canvas-ink-tools'),ui=global.KGCanvasToolbar;
-    if(ui){
+    // Workspace retains its original compact buttons and palette position.
+    // Other callers keep the shared labelled presentation by default.
+    if(options.toolbarPresentation==='compact')toolbar.classList.add('canvas-ink-compact');
+    if(ui&&options.toolbarPresentation!=='compact'){
       tools.querySelectorAll('.canvas-ink-divider').forEach(el=>el.remove());
       ui.group(tools,'选择',[[toolbar.querySelector('[data-ink-tool=select]'),'select','选择']]);
       ui.group(tools,'绘制',[[toolbar.querySelector('[data-ink-tool=pen]'),'pen','画笔'],[toolbar.querySelector('[data-ink-tool=highlighter]'),'highlighter','高亮'],[toolbar.querySelector('[data-ink-tool=text]'),'text','文字'],[toolbar.querySelector('[data-ink-tool=eraser]'),'eraser','橡皮']]);
