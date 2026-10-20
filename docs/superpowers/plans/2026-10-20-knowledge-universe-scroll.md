@@ -85,12 +85,12 @@ assert score([True]*10+[False]) < 100
 **用户明确追加：** 画笔色盘的自定义颜色复用截图中“卡牌或分组颜色”浮层。只接入现有能力，不新增或重设计颜色面板，保持Task5紧凑尺寸，仅按用户最新明确要求把色盘和撤销/重做组互换：绘制工具→色盘→撤销/重做→设置/收起。
 **Files:** Modify new-legacy/src/canvas/94-canvas-ink.js、new-legacy/src/77-multi-question-workspace.js、new-legacy/src/graph/color-picker-controller.js、new-legacy/styles/canvas-color-picker.css（后两者只滴管图标局部）；必要既有new-legacy/src/canvas/toolbar.js/样式局部；Extend new-legacy/tests/workspace-ink-toolbar-browser.py和必要canvas-ink-controller-browser.py/已有契约。
 **现有接口：** KGColorPickerV2.open已加载于question-workspace.html，实际实现src/graph/shared-color-picker-v2.js→floating-color-window-controller.js→color-picker-controller.js，与卡牌共用。open接anchor/title/kind/value{color,opacity}/allowOpacity/allowTransparent/documentColors/onCommit等。现有画笔input[type=color]在94约280行，updateTextStyle为唯一颜色应用路径；复用，不复制HSV、预设/最近使用/取色器实现。
-- [ ] 增加顺序RED：多题归纳compact中palette在undo/redo之前，原来的palette在redo之后；桌面仍596×50，其他caller默认顺序不变。更新Task5旧顺序断言为新授权要求，不删除几何/主题/权限断言。
-- [ ] RED：在真实多题归纳点画笔自定义色块后，现有同一个graph-floating-color-window出现而非系统native色窗，title为画笔自定义颜色，预设/SV/色相/HEX/最近使用可用。当前该点不打开共用浮层，先记录失败。
-- [ ] 通过共享ink模块职责明确的可选回调/提供者由多题归纳显式接入KGColorPickerV2；其余页面默认native色块行为不变。允许复用原input并拦截用户点击默认行为，但键盘激活也必须打开浮层且无native picker。浮层锚定自定义色块，保持Task5原紧凑排版；不增加工具按钮。已有笔迹透明度设置保持，不额外将颜色透明度变成新业务需求。
-- [ ] 用户进一步明确共用色板的取色按钮“⌖”改成通用滴管图标：复用同一公共color-picker-controller入口，用清晰描边SVG替换字符，按钮内居中，保持title/aria-label“吸取屏幕颜色”、原EyeDropper功能与不支持时隐藏逻辑。此处全局图标一致是用户明确授权，其他布局不变；不额外重设计整个色板。
-- [ ] onCommit经过现有updateTextStyle更新当前笔/高亮/文字颜色与工具图标/光标，随后真实绘画/文字保存服务器并刷新保留颜色。关闭/取消未提交预览不改已提交颜色，非法HEX不产生无效样式。只读不开放/不应用；打开后切工具、切画布、切owner、关闭或destroy不能由迟到commit把颜色应用到其他上下文；使用原module生命周期和上下文校验，不复制存储/判权。不能误改卡牌/分组颜色。
-- [ ] 真实浏览器验证鼠标/键盘开启、预设与HEX选择、hover/拖动浮层、关闭重开、最近使用、全屏以及390/320不越界，已有卡牌色板仍可用；OS屏幕取色器只能验证支持性/取消，未实际系统选色须如实记录边界。复用抛弃DB helper，成功业务不mock；截图/evidence artifacts/knowledge-universe-20261020/task-6/。只提交授权源/测试，报告精确已验证/未验证范围。Task5审查后启动，no并行实现，root最后同步/测试/本地更新，UAT待用户确认。
+- [x] 增加顺序RED：多题归纳compact中palette在undo/redo之前，原来的palette在redo之后；桌面仍596×50，其他caller默认顺序不变。更新Task5旧顺序断言为新授权要求，不删除几何/主题/权限断言。
+- [x] RED：在真实多题归纳点画笔自定义色块后，现有同一个graph-floating-color-window出现而非系统native色窗，title为画笔自定义颜色，预设/SV/色相/HEX/最近使用可用。当前该点不打开共用浮层，先记录失败。
+- [x] 通过共享ink模块职责明确的可选回调/提供者由多题归纳显式接入KGColorPickerV2；其余页面默认native色块行为不变。允许复用原input并拦截用户点击默认行为，但键盘激活也必须打开浮层且无native picker。浮层锚定自定义色块，保持Task5原紧凑排版；不增加工具按钮。已有笔迹透明度设置保持，不额外将颜色透明度变成新业务需求。
+- [x] 用户进一步明确共用色板的取色按钮“⌖”改成通用滴管图标：复用同一公共color-picker-controller入口，用清晰描边SVG替换字符，按钮内居中，保持title/aria-label“吸取屏幕颜色”、原EyeDropper功能与不支持时隐藏逻辑。此处全局图标一致是用户明确授权，其他布局不变；不额外重设计整个色板。
+- [x] onCommit经过现有updateTextStyle更新当前笔/高亮/文字颜色与工具图标/光标，随后真实绘画/文字保存服务器并刷新保留颜色。关闭/取消未提交预览不改已提交颜色，非法HEX不产生无效样式。只读不开放/不应用；打开后切工具、切画布、切owner、关闭或destroy不能由迟到commit把颜色应用到其他上下文；使用原module生命周期和上下文校验，不复制存储/判权。不能误改卡牌/分组颜色。
+- [x] 真实浏览器验证鼠标/键盘开启、预设与HEX选择、hover/拖动浮层、关闭重开、最近使用、全屏以及390/320不越界，已有卡牌色板仍可用；OS屏幕取色器只能验证支持性/取消，未实际系统选色须如实记录边界。复用抛弃DB helper，成功业务不mock；截图/evidence artifacts/knowledge-universe-20261020/task-6/。只提交授权源/测试，报告精确已验证/未验证范围。Task5审查后启动，no并行实现，root最后同步/测试/本地更新，UAT待用户确认。
 
 ### Task 7: 阅读模式双击进入临时画布，临时卡牌始终可拖动
 
@@ -101,6 +101,7 @@ assert score([True]*10+[False]) < 100
 - [ ] 在现有公共图谱交互入口实现reading双击→选择目标卡并走原openRelatedCanvasModal保护（草稿保存/文件切换锁/迟到generation/单例）；单击仍看详情。不要拦截卡内链接/按钮/输入/正在编辑正文、不要同时触发主画布新建或编辑；其他模式行为不改。
 - [ ] 将临时布局拖动与readOnly内容编辑权限分离；阅读/编辑等模式进入后，卡牌可真实pointer拖动且连线实时跟随，释放/取消正确结束捕获，缩放下坐标正确。readOnly仍隐藏新增/删除/连线/画笔等内容编辑，不得仅为拖动清空整个readonly。说明改为可拖动临时排列、关闭丢弃，内容权限保留。临时数据依旧session副本，无任何原图节点坐标/关系/锁定或后端数据改变。
 - [ ] 真实浏览器API创建图谱→切reading→单击无toolbar→双击开→拖动卡牌后坐标变化/连线跟随→关/重开还原→刷新原图/API坐标逐字不变；记录弹层期间files写请求0。正常editable临时仍保留原新增/绘画/history；其他模式主图工具栏/双击不回归。验证关闭/Escape/全屏、缩放拖动/cancel、连续双击仅单例；合法只读查看上下文只能临时拖动、不扩展正式编辑权限，源文件真正403边界保持。
+- [ ] 真实API测试可运行官方 node frontend/scripts/sync-new-legacy.js 生成public（不改VERSION/active pointer、不发布）；仅提交授权源/测试，生成产物留root最后检查。artifacts/knowledge-universe-20261020/run-related-api.py复用抛弃DB并传--output-dir，浏览器脚本需支持该参数；无需复制另一套source override。
 - [ ] 更新旧契约“只读禁止拖动/阅读放行小工具栏”的断言为本次用户明确新规则，同时保留内容禁改/零写入/临时副本/已有ink生命周期断言。不得只删断言过测试。证据artifacts/knowledge-universe-20261020/task-7/，复用抛弃DB，报告实际/未验证边界；仅授权文件提交。Task6审查后启动，不并行实现，root统一同步/测试/本地更新，UAT待用户确认。
 
 ## 集成与交付（root）
