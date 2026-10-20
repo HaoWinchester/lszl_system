@@ -54,9 +54,10 @@ with sync_playwright() as pw:
     for mode in ['challenge','scholar']:
         help=page.locator('.'+mode+' .practice-lobby-help');help.locator('summary').click();expect(help).to_have_attribute('open','');page.keyboard.press('Escape');assert not help.evaluate('e=>e.open')
     page.locator('#practiceRevengeRuleTrigger').click();expect(page.locator('#practiceRevengeRuleTooltip')).to_be_visible();page.keyboard.press('Escape');page.locator('.practice-revenge-options summary').click();expect(page.locator('#practiceRevengePendingCount')).to_be_visible();page.locator('.practice-revenge-options summary').click();checks.append('rule disclosure and all revenge batch controls')
-    for button,drawer,close in [('#practiceHistoryOpenBtn','#practiceHistoryDrawer','#practiceHistoryCloseBtn'),('#practiceFavoritesOpenBtn','#practiceFavoritesDrawer','#practiceFavoritesCloseBtn'),('[data-lobby-open="reports"]','#practiceHistoryDrawer','#practiceHistoryCloseBtn')]:
+    assert page.locator('[data-lobby-open="reports"]').count()==0,'duplicate reports entry must stay absent'
+    for button,drawer,close in [('#practiceHistoryOpenBtn','#practiceHistoryDrawer','#practiceHistoryCloseBtn'),('#practiceFavoritesOpenBtn','#practiceFavoritesDrawer','#practiceFavoritesCloseBtn')]:
         page.locator(button).click();expect(page.locator(drawer)).to_be_visible();page.locator(close).click()
-    page.locator('[data-lobby-open="account"]').click();expect(page.locator('#userCenterModal')).to_be_visible();page.keyboard.press('Escape');checks.append('sidebar existing record, favorites, report and account actions')
+    page.locator('[data-lobby-open="account"]').click();expect(page.locator('#userCenterModal')).to_be_visible();page.keyboard.press('Escape');checks.append('sidebar history, favorites and account actions; recent report replay is tested below')
     # A failed preview fetch must expose retry without stale/private rows.
     page.route('**/api/v1/learning/practice/sessions',lambda route:route.fulfill(status=503,json={'detail':'temporary'}))
     page.locator('#practiceRecentFavoritesTab').click();page.locator('#practiceRecentHistoryTab').click();expect(page.locator('[data-recent-retry]')).to_be_visible();expect(page.locator('#practiceRecentBody tr')).to_have_count(0)
