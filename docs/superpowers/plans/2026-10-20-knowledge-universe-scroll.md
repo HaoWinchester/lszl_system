@@ -74,6 +74,17 @@ assert score([True]*10+[False]) < 100
 - [ ] 鼠标与键盘实际切换选择/画笔/高亮/文字/橡皮、颜色、设置、收起、撤销重做；绘画真实生成、撤销/重做同history、刷新保留。无编辑权限保持禁用；恢复过程中不触碰保存/文本草稿/共享dialogs/theme行为。用现有抛弃DB helper测试多题归纳真实页面，同时遍历共享调用方相关画布/深度回忆/首页画笔的入口与图标及可用性防范围回归，只对授权多题恢复布局。
 - [ ] 截图原/修复对比及hover标题/aria证据写artifacts/knowledge-universe-20261020/task-5/，运行现有定向契约及浏览器；只提交授权源/测试，报告精确命令与已验证边界，root最终sync/full/UAT。此任务在Task4审查通过后实施，禁止并行改产品代码。
 
+### Task 6: 多题归纳画笔自定义颜色复用现有悬浮色板
+
+**用户明确追加：** 画笔色盘的自定义颜色复用截图中“卡牌或分组颜色”浮层。只接入现有能力，不新增或重设计颜色面板，不改变Task5恢复的紧凑排列。
+**Files:** Modify new-legacy/src/canvas/94-canvas-ink.js、new-legacy/src/77-multi-question-workspace.js、new-legacy/src/graph/color-picker-controller.js、new-legacy/styles/canvas-color-picker.css（后两者只滴管图标局部）；必要既有new-legacy/src/canvas/toolbar.js/样式局部；Extend new-legacy/tests/workspace-ink-toolbar-browser.py和必要canvas-ink-controller-browser.py/已有契约。
+**现有接口：** KGColorPickerV2.open已加载于question-workspace.html，实际实现src/graph/shared-color-picker-v2.js→floating-color-window-controller.js→color-picker-controller.js，与卡牌共用。open接anchor/title/kind/value{color,opacity}/allowOpacity/allowTransparent/documentColors/onCommit等。现有画笔input[type=color]在94约280行，updateTextStyle为唯一颜色应用路径；复用，不复制HSV、预设/最近使用/取色器实现。
+- [ ] RED：在真实多题归纳点画笔自定义色块后，现有同一个graph-floating-color-window出现而非系统native色窗，title为画笔自定义颜色，预设/SV/色相/HEX/最近使用可用。当前该点不打开共用浮层，先记录失败。
+- [ ] 通过共享ink模块职责明确的可选回调/提供者由多题归纳显式接入KGColorPickerV2；其余页面默认native色块行为不变。允许复用原input并拦截用户点击默认行为，但键盘激活也必须打开浮层且无native picker。浮层锚定自定义色块，保持Task5原紧凑排版；不增加工具按钮。已有笔迹透明度设置保持，不额外将颜色透明度变成新业务需求。
+- [ ] 用户进一步明确共用色板的取色按钮“⌖”改成通用滴管图标：复用同一公共color-picker-controller入口，用清晰描边SVG替换字符，按钮内居中，保持title/aria-label“吸取屏幕颜色”、原EyeDropper功能与不支持时隐藏逻辑。此处全局图标一致是用户明确授权，其他布局不变；不额外重设计整个色板。
+- [ ] onCommit经过现有updateTextStyle更新当前笔/高亮/文字颜色与工具图标/光标，随后真实绘画/文字保存服务器并刷新保留颜色。关闭/取消未提交预览不改已提交颜色，非法HEX不产生无效样式。只读不开放/不应用；打开后切工具、切画布、切owner、关闭或destroy不能由迟到commit把颜色应用到其他上下文；使用原module生命周期和上下文校验，不复制存储/判权。不能误改卡牌/分组颜色。
+- [ ] 真实浏览器验证鼠标/键盘开启、预设与HEX选择、hover/拖动浮层、关闭重开、最近使用、全屏以及390/320不越界，已有卡牌色板仍可用；OS屏幕取色器只能验证支持性/取消，未实际系统选色须如实记录边界。复用抛弃DB helper，成功业务不mock；截图/evidence artifacts/knowledge-universe-20261020/task-6/。只提交授权源/测试，报告精确已验证/未验证范围。Task5审查后启动，no并行实现，root最后sync/full/UAT。
+
 ## 集成与交付（root）
 - [ ] 按任务spec+quality审查并修复明确问题，最终全分支独立审查。
 - [ ] 复用抛弃DB实际API闭环，加入真实UAT320目录只读核验；截图与滚轮/触摸为真实输入，不能仅scrollIntoView。

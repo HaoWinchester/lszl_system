@@ -77,3 +77,7 @@ Task1最新补充：ea854558完成，37定向测试+独立spec/quality审查通�
 进展检查点：Task2 fcf7df26 已独立审查通过，无 findings，16 Node 与实际 Chromium 1440/390 滚轮/触摸通过。Task3 ee944636 已实现并通过57定向测试（1既有弃用警告），universe_proficiency_review 正在审查；未通过审查前不启动 Task4。Task4 brief 已准备。当前 UAT378 与正式336容器/镜像只读核对未变，磁盘6079392KiB。
 
 最新用户追加：多题归纳画笔变宽换行未经授权；原任务只说临时相关画布。root已明确承认共享工具栏范围扩大并道歉，承诺恢复原紧凑排版，仅隐藏箭头所指工具图标旁文字、保留悬浮提示。已追到98a96f8b共同ink注入group/label与palette末尾。新增Task5在Task4审查后执行；不可整文件回退破坏theme/dialogs/保存保护，不可全局改其他页面。root before/reference实际模块probe证据在toolbar-diagnostic。Task3审查通过（1既有弃用警告列minor），Task4 universe_dashboard正在实现base3c8eb04d，Task5尚未派。
+
+用户再追加：画笔自定义颜色复用截图现有“卡牌或分组颜色”悬浮色板。已确认现有KGColorPickerV2.open/shared-color-picker-v2.js链路可用且question-workspace已加载，绝不重写面板。新增Task6在Task5审查后，以共享ink可选提供者在多题归纳显式接入，其他caller默认不变。生命周期/readonly/切画布迟到commit保护和真实颜色落库/刷新测试见计划Task6。Task4仍在实际650触摸诊断，真实API13项已过/DB清理，尚未审查完。
+
+Task6追加明确授权：共用色板⌖按钮改通用滴管SVG（参考图2），公共入口统一图标，保留原EyeDropper和不可用隐藏，不重设计整个色板。计划/brief已更新。
