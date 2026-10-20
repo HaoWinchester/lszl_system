@@ -32,13 +32,16 @@
     return fullscreen||surface||doc.body;
   }
   // Keep one real DOM node and a placeholder, including when fullscreen exits.
-  function mountOverlay(element,surface,onMove){
+  function mountOverlay(element,surface,onMove,options={}){
     const doc=element.ownerDocument||global.document,home=surface||doc.body;
     if(!element.parentNode)home.appendChild(element);
     const marker=doc.createComment('canvas-overlay-home');
     element.parentNode.insertBefore(marker,element);
     function sync(){
-      const host=overlayHost(home,element);if(!host)return;
+      const allowed=overlayHost(home,element);if(!allowed)return;
+      const fullscreen=doc.fullscreenElement||doc.webkitFullscreenElement;
+      // An explicit unscaled modal remains above its backdrop within fullscreen.
+      const host=options.preserveSurface&&fullscreen?.contains(home)?home:allowed;
       if(!doc.fullscreenElement&&!doc.webkitFullscreenElement&&marker.parentNode){
         if(element.parentNode!==marker.parentNode)marker.parentNode.insertBefore(element,marker.nextSibling);
       }else if(element.parentNode!==host)host.appendChild(element);

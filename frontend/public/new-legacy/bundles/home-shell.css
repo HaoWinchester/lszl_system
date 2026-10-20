@@ -8397,7 +8397,7 @@ body.qw-selection-toolbar-motion .uc-selection-bounds,.stage.graph-card-dragging
 
 /* Opt-in icon labels: retain accessible names and native hover titles. */
 .canvas-toolbar .canvas-tool-icon-only .canvas-tool-label{display:none!important}
-/* Restore workspace's original compact width; other ink callers keep their layout. */
+/* Every ink surface uses the same compact width. */
 @media(max-width:700px){.canvas-ink-toolbar.canvas-ink-compact{max-width:calc(100vw - 2px)}}
 /* style: styles/canvas-table.css */
 /* KGCanvasTableController · 三页共用可编辑表格视觉。

@@ -1676,7 +1676,7 @@
       catch(error){notifyRecallLimit(error?.message||'进度尚未保存，请稍后重试。')}
     });
     inkController=window.KGCanvasInk?.create?.({
-      trigger:$('krInkBtn'),viewport,world,toolbarPresentation:'compact',getViewport:()=>state.transform,getStrokes:()=>state.strokes,
+      trigger:$('krInkBtn'),viewport,world,getViewport:()=>state.transform,getStrokes:()=>state.strokes,
       getColorContext:()=>JSON.stringify([window.KGAuthCore?.currentUser?.()?.username||'',question.id,questionSessionToken,recallTransitionBusy]),
       openColorPicker:request=>window.KGColorPickerV2?.openInk({...request,kind:'deep-recall-ink',documentColors:(state.strokes||[]).map(stroke=>stroke.color),documentLabel:'当前画布'})||null,
       setStrokes:strokes=>{state.strokes=strokes;saveProgress()},

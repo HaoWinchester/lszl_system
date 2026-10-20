@@ -5849,7 +5849,7 @@
     applyWorkspaceBackground();
     global.KGLearningTheme?.bindControls(themeController,byId('qwThemeSelect'));
     state.ink=global.KGCanvasInk?.create?.({
-      trigger:byId('qwInkBtn'),viewport:state.viewport,world:state.world,history:state.kernel.history,showHistory:true,toolbarPresentation:'compact',
+      trigger:byId('qwInkBtn'),viewport:state.viewport,world:state.world,history:state.kernel.history,showHistory:true,
       getViewport:()=>({x:state.panX,y:state.panY,scale:state.zoom}),
       getStrokes:()=>state.workspace?.strokes||[],isReadonly:()=>state.readonly||!state.workspace,
       getColorContext:()=>JSON.stringify([store()?.currentUserId?.()||'guest',state.workspaceId,state.workspaceSession,state.workspaceTransition]),

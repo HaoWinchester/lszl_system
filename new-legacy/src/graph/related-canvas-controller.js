@@ -58,7 +58,7 @@
       ink=global.KGCanvasInk.create({
         viewport:viewportEl,world:stage,overlayHost:overlay,
         getViewport:()=>viewport,
-        getStrokes:()=>graph().strokes||[],
+        getStrokes:()=>graph().strokes||[],getColorContext:graph,
         setStrokes:strokes=>{graph().strokes=strokes;ink.render()},
         history:{getState:session.history.getState,undo:()=>action('undo'),redo:()=>action('redo')},showHistory:true,
         change:(strokes,label)=>mutate(label,()=>{graph().strokes=strokes}),
@@ -110,6 +110,8 @@
     // Capture before formal document shortcuts, including events whose focus remained behind the modal.
     const key=e=>{
       if(closed)return;
+      // The active shared color window handles its own keys before they reach page shortcuts.
+      if(ink?.ownsColorPickerTarget?.(e.target))return;
       // Native text/IME keys belong to the shared draft editor, including Escape.
       if(e.target?.closest?.('.canvas-ink-text-editor'))return;
       if(e.key==='Escape'){

@@ -13,6 +13,7 @@
     const instance=ensure();if(!instance)return false;
     instance.open({
       kind:options.kind||'color',
+      overlayHost:options.overlayHost,
       title:options.title||'选择颜色',
       anchor:options.anchor||null,
       pointer:options.pointer||null,

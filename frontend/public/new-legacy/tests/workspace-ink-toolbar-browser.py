@@ -339,19 +339,48 @@ with sync_playwright() as p:
     page.locator('#krInkBtn').click()
     def default_tools(toolbar,name):
         expect(toolbar).to_be_visible()
-        assert toolbar.locator('.canvas-tool-group').count()==4
-        assert toolbar.locator('.canvas-tool-label').evaluate_all("es=>es.length===9&&es.every(e=>getComputedStyle(e).display!=='none')")
+        assert toolbar.locator('.canvas-tool-group,.canvas-tool-label').count()==0
+        assert 'canvas-ink-compact' in toolbar.get_attribute('class')
+        assert toolbar.locator('.canvas-ink-tools').evaluate('e=>[...e.children].indexOf(e.querySelector(".canvas-ink-colors"))<[...e.children].indexOf(e.querySelector("[data-ink-action=undo]"))')
         for tool in ('pen','highlighter','text','eraser','select','pen'):
             button=toolbar.locator('[data-ink-tool='+tool+']');button.click()
             expect(button).to_have_attribute('aria-pressed','true')
             assert button.locator('svg').evaluate('e=>{const r=e.getBoundingClientRect();return r.width>=16&&r.height>=16&&getComputedStyle(e).stroke!=="none"}')
-        assert toolbar.locator('input[type=color]').evaluate("e=>e.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}))"), 'Default caller retains native activation'
-        expect(page.locator('.graph-floating-color-window.show')).to_have_count(0)
+        assert not toolbar.locator('input[type=color]').evaluate("e=>e.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}))"), 'Shared picker must replace native dialog'
+        floating=page.locator('.graph-floating-color-window.show');expect(floating).to_be_visible();assert floating.locator('[data-color-picker-eyedropper] svg').count()==1
+        floating.locator('[data-color-picker-hex]').click();floating.locator('[data-color-picker-hex]').fill('2468AC');floating.locator('[data-color-picker-hex]').press('Enter')
+        expect(toolbar.locator('input[type=color]')).to_have_value('#2468ac')
+        before=toolbar.locator('input[type=color]').input_value()
+        floating.locator('[data-color-picker-sv]').focus();floating.locator('[data-color-picker-sv]').press('ArrowLeft')
+        expect(toolbar.locator('input[type=color]')).not_to_have_value(before)
+        floating.locator('[data-color-picker-sv]').press('Escape');expect(floating).to_be_hidden()
+        if name=='related':expect(modal).to_be_visible()
+        toolbar.locator('input[type=color]').click();expect(floating).to_be_visible()
+        floating.locator('[data-color-window-close]').click()
+        for width in (1840,1440,1024,390,320):
+            page.set_viewport_size({'width':width,'height':1000});box=toolbar.bounding_box()
+            assert box['x']>=-1 and box['x']+box['width']<=width+1 and box['height']<=80, (name,width,box)
+            if width>700:assert box['height']<=52,(name,width,box)
+            toolbar.screenshot(path=str(OUT/(name+'-toolbar-'+str(width)+'.png')))
+        page.set_viewport_size({'width':1440,'height':1000})
         toolbar.locator('[data-ink-settings]').click()
         expect(toolbar.locator('.canvas-ink-options')).to_be_visible()
         page.screenshot(path=str(OUT/(name+'-default-tools.png')))
+        toolbar.locator('[data-ink-settings]').click()
+        viewport=page.locator('#stage' if name=='home' else '.related-canvas-viewport');box=viewport.bounding_box()
+        x=box['x']+box['width']*.65;y=box['y']+box['height']*.55
+        page.mouse.move(x,y);page.mouse.down();page.mouse.move(x+70,y+20,steps=8);page.mouse.up()
+        stroke=viewport.locator('.canvas-ink-layer path[data-stroke-id]').last;expect(stroke).to_be_visible()
+        sid=stroke.get_attribute('data-stroke-id');color=toolbar.locator('input[type=color]').input_value();expect(stroke).to_have_attribute('stroke',color)
+        toolbar.locator('[data-ink-action=undo]').click();expect(viewport.locator('path[data-stroke-id="'+sid+'"]').first).to_have_count(0)
+        toolbar.locator('[data-ink-action=redo]').click();expect(viewport.locator('path[data-stroke-id="'+sid+'"]').first).to_have_attribute('stroke',color)
+        if name=='home':
+            assert page.evaluate('KGGraphFileAutosave.saveAcknowledged({force:true})')
+            assert any(item['id']==sid and item['color']==color for item in context.request.get(args.base_url+'/api/v1/files/'+fid).json()['graphData']['strokes'])
+
         toolbar.locator('[data-ink-close]').click();expect(toolbar).to_be_hidden()
-        print('PASS '+name+': default groups/labels, visible icons, tool states, settings and close',flush=True)
+        print('PASS '+name+': shared compact icons/palette at five widths, pointer/HEX/arrows/Escape, ink/history/persistence and close',flush=True)
+        return sid
     recall_bar=page.locator('.canvas-ink-toolbar')
     assert 'canvas-ink-compact' in recall_bar.get_attribute('class')
     assert recall_bar.locator('.canvas-tool-group,.canvas-tool-label').count()==0
@@ -369,13 +398,29 @@ with sync_playwright() as p:
     page.evaluate('KGHomeInteractionModes.setMode("professional")')
     page.wait_for_function('!KGGraphFileTabs.isSwitching()')
     page.locator('#homeInkBtn').click()
-    default_tools(page.locator('.canvas-ink-toolbar'),'home')
+    home_sid=default_tools(page.locator('.canvas-ink-toolbar'),'home')
+    page.reload(wait_until='networkidle');page.wait_for_function('!!window.KGHomeInk');expect(page.locator('.canvas-ink-layer path[data-stroke-id="'+home_sid+'"]').first).to_be_visible()
+    formal=context.request.get(args.base_url+'/api/v1/files/'+fid).json()['graphData']
     page.evaluate('()=>{selectedNodeIds=new Set(["task5-node"]);state.selectedNodeId="task5-node";refreshSelectionUI()}')
     assert page.evaluate('openRelatedCanvasModal(false)')
     modal=page.locator('.related-canvas-backdrop')
     modal.locator('[data-action=ink]').click()
     default_tools(modal.locator('.canvas-ink-toolbar'),'related')
     modal.locator('[data-action=close]').click()
-    assert context.request.get(args.base_url+'/api/v1/files/'+fid).json()['graphData']['strokes']==[]
+    assert context.request.get(args.base_url+'/api/v1/files/'+fid).json()['graphData']==formal
+    assert page.locator('.graph-floating-color-window.show').count()==0
+    page.locator('#stage').evaluate('e=>e.requestFullscreen()');page.wait_for_function('!!document.fullscreenElement')
+    page.evaluate('()=>{selectedNodeIds=new Set(["task5-node"]);state.selectedNodeId="task5-node";refreshSelectionUI()}');assert page.evaluate('openRelatedCanvasModal(false)')
+    modal=page.locator('.related-canvas-backdrop');modal.locator('[data-action=ink]').click()
+    modal.locator('.canvas-ink-toolbar input[type=color]').click();floating=page.locator('.graph-floating-color-window.show');expect(floating).to_be_visible()
+    assert floating.evaluate('e=>!!e.closest(".related-canvas-backdrop") && document.fullscreenElement.contains(e)')
+    floating.locator('[data-color-picker-hex]').click();floating.locator('[data-color-picker-hex]').fill('345678');floating.locator('[data-color-picker-hex]').press('Enter');expect(modal.locator('input[type=color]').last).to_have_value('#345678')
+    before=modal.locator('input[type=color]').last.input_value();floating.locator('[data-color-picker-sv]').press('ArrowLeft');expect(modal.locator('input[type=color]').last).not_to_have_value(before)
+    floating.locator('[data-color-picker-sv]').press('Escape');expect(floating).to_be_hidden();expect(modal).to_be_visible()
+    modal.locator('[data-action=close]').click();page.evaluate('document.exitFullscreen()');page.wait_for_function('!document.fullscreenElement')
+    assert context.request.get(args.base_url+'/api/v1/files/'+fid).json()['graphData']==formal
+    print('PASS native-fullscreen graph to temporary canvas: shared popup pointer/keyboard ownership and close/no formal writes',flush=True)
+    page.locator('#homeInkBtn').click();page.locator('.canvas-ink-toolbar input[type=color]').click();expect(page.locator('.graph-floating-color-window.show')).to_be_visible();assert page.locator('.graph-floating-color-window').count()==1
+    page.locator('[data-color-window-close]').click()
     context.close()
     browser.close()

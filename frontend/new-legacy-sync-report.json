@@ -5,8 +5,10 @@
   "changes": {
     "added": [],
     "changed": [
-      "styles/knowledge-dashboard.css",
-      "tests/knowledge-dashboard-browser.py"
+      "src/canvas/dom-interaction.js",
+      "src/graph/floating-color-window-controller.js",
+      "tests/canvas-ink-controller-browser.py",
+      "tests/workspace-ink-toolbar-browser.py"
     ],
     "removed": []
   },

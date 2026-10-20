@@ -6,9 +6,14 @@
   function clamp(value,min,max){return Math.min(max,Math.max(min,Number(value)||0))}
   function create(options={}){
     const home=options.stage||document.body;
-    let stage=home,unmount=null;
+    let stage=home,surface=home,unmount=null;
     let root=null,picker=null,drag=null,current=null,pinned=false,outsideBound=false;
     let outsideHandler=null,resizeObserver=null;
+    function attach(next){
+      if(unmount){unmount();unmount=null}
+      surface=next;stage=next;next.appendChild(root);
+      if(global.KGCanvasDomInteraction)unmount=global.KGCanvasDomInteraction.mountOverlay(root,next,host=>{stage=host;if(current)requestAnimationFrame(()=>positionNear(current.anchor,current.pointer))},{preserveSurface:next!==home});
+    }
     function ensure(){
       if(root&&root.isConnected)return root;
       root=document.createElement('aside');
@@ -20,6 +25,7 @@
       root.addEventListener('click',event=>event.stopPropagation());
       root.addEventListener('dblclick',event=>event.stopPropagation());
       root.addEventListener('wheel',event=>event.stopPropagation(),{passive:true});
+      root.addEventListener('keydown',event=>{if(event.key==='Escape'&&!event.defaultPrevented){event.preventDefault();const anchor=current?.anchor;close({cancel:true,force:true});anchor?.focus?.()}event.stopPropagation()});
       root.querySelector('[data-color-window-close]').addEventListener('click',()=>close({cancel:true,force:true,reason:'explicit'}));
       const grip=root.querySelector('[data-color-window-drag]');
       grip.addEventListener('pointerdown',event=>{
@@ -43,8 +49,7 @@
         drag=null;root.classList.remove('dragging');event.preventDefault();event.stopPropagation();
       };
       grip.addEventListener('pointerup',finish);grip.addEventListener('pointercancel',finish);
-      stage.appendChild(root);
-      if(global.KGCanvasDomInteraction)unmount=global.KGCanvasDomInteraction.mountOverlay(root,home,host=>{stage=host;if(current)requestAnimationFrame(()=>positionNear(current.anchor,current.pointer))});
+      attach(home);
       global.addEventListener?.('resize',reposition,{passive:true});
       global.visualViewport?.addEventListener('resize',reposition,{passive:true});
       if(global.ResizeObserver){resizeObserver=new global.ResizeObserver(reposition);resizeObserver.observe(home);resizeObserver.observe(root)}
@@ -100,6 +105,7 @@
     }
     function open(config={}){
       ensure();
+      const host=config.overlayHost||home;if(surface!==host)attach(host);
       if(picker&&picker.destroy)picker.destroy();picker=null;
       const anchorRect=config.anchor&&config.anchor.getBoundingClientRect?config.anchor.getBoundingClientRect():config.anchor;
       current={...config,anchorRect};pinned=false;root.classList.remove('manual-close');
@@ -128,7 +134,7 @@
       if(closeOptions.cancel!==false&&picker&&picker.cancel)picker.cancel();
       root.hidden=true;root.classList.remove('show','dragging','manual-close');drag=null;pinned=false;
       if(typeof options.onClose==='function')options.onClose({config:current});
-      current=null;return true;
+      current=null;if(surface!==home)attach(home);return true;
     }
     function isOpen(){return !!(root&&!root.hidden)}
     function reposition(){if(isOpen())setPosition(parseFloat(root.style.left)||10,parseFloat(root.style.top)||10)}

@@ -1,5 +1,6 @@
 """Real pointer/DOM tests for the shared ink controller, independent of page data."""
 from pathlib import Path
+import re
 from playwright.sync_api import sync_playwright, expect
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -10,7 +11,7 @@ with sync_playwright() as pw:
     page.on('pageerror', lambda error: errors.append(str(error)))
     page.set_content('''<style>#view{position:relative;width:1000px;height:680px;overflow:hidden;background:#f8fafc}#world{position:absolute;transform-origin:0 0;transform:translate(100px,100px) scale(2)}#card{position:absolute;width:160px;height:90px;background:white;border:1px solid #ccc}</style><button id="launch" style="position:absolute;right:0;top:0" type="button">画笔工具</button><button id="outside" style="position:absolute;right:0;top:740px" type="button">其他</button><div id="view"><div class="qw-background" style="position:absolute;inset:0"></div><div id="world"><button id="card">卡片选项</button></div></div>''')
     page.add_style_tag(content=(ROOT/'styles/canvas-ink.css').read_text())
-    for name in ['83-canvas-history-controller.js','text-edit-session.js','94-canvas-ink.js']:
+    for name in ['dom-interaction.js','83-canvas-history-controller.js','text-edit-session.js','94-canvas-ink.js']:
         page.add_script_tag(content=(ROOT/'src/canvas'/name).read_text())
     page.evaluate('''() => {
       window.strokes=[];window.locked=false;window.cardClicks=0;window.errors=[];window.panStarts=0;
@@ -21,6 +22,8 @@ with sync_playwright() as pw:
     expect(page.locator('.canvas-ink-toolbar')).to_be_hidden()
     page.locator('#launch').click()
     expect(page.locator('.canvas-ink-toolbar')).to_be_visible()
+    expect(page.locator('.canvas-ink-toolbar')).to_have_class(re.compile(r'\bcanvas-ink-compact\b'))
+    assert page.locator('.canvas-tool-group,.canvas-tool-label').count()==0
     pen=page.get_by_role('button',name='画笔',exact=True)
     close=page.get_by_role('button',name='关闭画笔工具',exact=True)
     expect(close).to_be_visible()
@@ -182,5 +185,21 @@ with sync_playwright() as pw:
         expect(custom).to_have_value('#123456')
     custom.click();page.evaluate("window.stale=pickerRequests.at(-1);ink.destroy();stale.onCommit({color:'#abcdef'})")
     assert page.locator('.canvas-ink-toolbar').count()==0
+    # All page adapters inherit this same floating picker without an opt-in flag.
+    page.evaluate("""()=>{
+      window.KGColorPickerV2={openInk:request=>{pickerRequests.push(request);let open=true;const handle={isOpen:()=>open,close:()=>open=false};pickerHandles.push(handle);return handle}};
+      window.ink=KGCanvasInk.create({trigger:document.querySelector('#launch'),viewport:document.querySelector('#view'),world:document.querySelector('#world'),getViewport:()=>({x:100,y:100,scale:2}),getStrokes:()=>strokes,setStrokes:s=>strokes=s,isReadonly:()=>locked,getColorContext:()=>owner+':'+canvasId});ink.setOpen(true);
+    }""")
+    custom=page.locator('.canvas-ink-toolbar input[type=color]');custom.click()
+    assert page.evaluate('pickerRequests.at(-1).kind')=='canvas-ink'
+    page.evaluate("pickerRequests.at(-1).onCommit({color:'#2468ac'})");expect(custom).to_have_value('#2468ac')
+    custom.click();page.evaluate("window.stale=pickerRequests.at(-1);canvasId='next';ink.render();stale.onCommit({color:'#abcdef'})");expect(custom).to_have_value('#2468ac')
+    page.evaluate('ink.destroy()')
+    # Explicit modal hosts must stay above their own backdrop inside native fullscreen.
+    page.evaluate("""async()=>{const host=document.createElement('div');host.id='test-fullscreen';const modal=document.createElement('div');modal.id='test-modal';const popup=document.createElement('aside');popup.id='test-picker';modal.append(popup);host.append(modal);document.body.append(host);await host.requestFullscreen();window.unmountPicker=KGCanvasDomInteraction.mountOverlay(popup,modal,null,{preserveSurface:true})}""")
+    assert page.locator('#test-picker').evaluate("e=>e.parentElement.id")=='test-modal'
+    page.evaluate('document.exitFullscreen()');page.wait_for_function('!document.fullscreenElement')
+    assert page.locator('#test-picker').evaluate("e=>e.parentElement.id")=='test-modal'
+    page.evaluate('unmountPicker();document.querySelector("#test-fullscreen").remove()')
     browser.close()
 print('canvas-ink-controller-browser: all interaction checks passed')

@@ -7,7 +7,7 @@
     let previous;
     const ink=global.KGCanvasInk.create({
       viewport:stage,world,placement:'right',trigger:()=>document.getElementById('homeInkBtn'),
-      getViewport:()=>state.viewport,getStrokes:()=>state.strokes||[],
+      getViewport:()=>state.viewport,getStrokes:()=>state.strokes||[],getColorContext:()=>state,
       // 画笔批注是轻量编辑：阅读模式也允许（登录+账号权限即可），与改名/文件级操作一致。
       // 切文件过渡期（isSwitching）仍保持禁用，防止笔迹落进切换前后的错误文件。
       isReadonly:()=>document.body.classList.contains('auth-readonly')

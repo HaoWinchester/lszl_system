@@ -92,7 +92,7 @@
     const {viewport,world}=options;if(!viewport||!world)return null;
     const doc=viewport.ownerDocument,ns='http://www.w3.org/2000/svg';
     const layer=doc.createElementNS(ns,'svg');layer.classList.add('canvas-ink-layer');layer.setAttribute('aria-hidden','true');world.append(layer);
-    const toolbar=doc.createElement('div');toolbar.className='canvas-ink-toolbar';toolbar.dataset.canvasUi='true';toolbar.setAttribute('role','group');toolbar.setAttribute('aria-label','画笔工具');
+    const toolbar=doc.createElement('div');toolbar.className='canvas-ink-toolbar canvas-ink-compact';toolbar.dataset.canvasUi='true';toolbar.setAttribute('role','group');toolbar.setAttribute('aria-label','画笔工具');
     toolbar.innerHTML='<div class="canvas-ink-tools"><button type="button" data-ink-tool="select" title="选择（Esc）" aria-label="选择"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3l13.5 7.8-6.1 1.6-2.7 5.9z"/></svg></button><button type="button" data-ink-tool="pen" aria-label="画笔" title="画笔"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 4 5 5M4 20l5-1L20 8a2 2 0 0 0-5-5L4 14z"/></svg></button><button type="button" data-ink-tool="highlighter" aria-label="荧光笔" title="荧光笔"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 15 5 5 7-10-8-8-10 7 5 5M5 15l4 4-4 3-3-3zM2 23h16"/></svg></button><button type="button" data-ink-tool="text" aria-label="文字" title="文字"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7V5h14v2M12 5v14M9 19h6"/></svg></button><button type="button" data-ink-tool="eraser" aria-label="橡皮擦" title="橡皮擦：拖动连续擦除整笔；双击此按钮清空全部笔迹，可撤销"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 3 7 7-11 11H6l-4-4zM8 11l7 7M10 21h12"/></svg></button><span class="canvas-ink-divider"></span><button type="button" data-ink-action="undo" aria-label="撤销笔迹" title="撤销笔迹（Ctrl/Command+Z）">↶</button><button type="button" data-ink-action="redo" aria-label="重做笔迹" title="重做笔迹（Ctrl/Command+Shift+Z）">↷</button><button type="button" data-ink-settings aria-label="笔迹设置" title="颜色、粗细和透明度" aria-expanded="false">⚙</button><span class="canvas-ink-divider"></span><button type="button" data-ink-close aria-label="关闭画笔工具" title="关闭画笔工具，返回选择"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div><div class="canvas-ink-colors" aria-label="笔迹颜色"></div><div class="canvas-ink-options" hidden><label class="canvas-ink-width">粗细 <input type="range" aria-label="笔迹粗细" step="1"><input type="number" data-ink-width-number aria-label="笔迹粗细数值" step="1"><output hidden></output></label><label class="canvas-ink-font" hidden>字号 <input type="number" min="6" max="288" step="1" aria-label="文字字号"></label><label class="canvas-ink-opacity">透明度 <input type="range" min="0" max="1" step="0.05" aria-label="笔迹透明度"><output data-ink-opacity-value></output></label><svg class="canvas-ink-preview" viewBox="0 0 180 52" aria-label="笔触预览"><path d="M 12 32 Q 45 10 80 26 T 168 24" fill="none" stroke-linecap="round"/></svg><small>Esc / 双击右键退出绘画 · 空格拖动平移</small></div>';
     (options.toolbarHost||viewport).append(toolbar);
     const panel=toolbar.querySelector('.canvas-ink-options'),range=toolbar.querySelector('input[type=range]'),preview=toolbar.querySelector('.canvas-ink-preview path');
@@ -273,13 +273,15 @@
     }
     bold.addEventListener('click',()=>updateTextStyle({bold:!currentStyle()?.bold}));
     const palette=toolbar.querySelector('.canvas-ink-colors');
-    toolbar.querySelector('.canvas-ink-tools').insertBefore(palette,toolbar.querySelector(options.toolbarPresentation==='compact'?'[data-ink-action=undo]':'[data-ink-settings]'));
+    toolbar.querySelector('.canvas-ink-tools').insertBefore(palette,toolbar.querySelector('[data-ink-action=undo]'));
     for(const [color,name] of [['#2563eb','蓝色'],['#111827','黑色'],['#ef4444','红色'],['#facc15','黄色'],['#22c55e','绿色'],['#a855f7','紫色']]){
       const btn=doc.createElement('button');btn.type='button';btn.dataset.inkColor=color;btn.style.setProperty('--ink-color',color);btn.setAttribute('aria-label',name);btn.title=name;palette.append(btn);
       btn.addEventListener('click',()=>updateTextStyle({color}));
     }
     const color=doc.createElement('input');color.type='color';color.setAttribute('aria-label','自定义笔迹颜色');color.title='自定义颜色';palette.append(color);
-    // A page can supply the existing shared picker; other callers keep native input.
+    // All canvases share one picker; isolated consumers without it retain native input.
+    const colorPicker=typeof options.openColorPicker==='function'?options.openColorPicker:
+      typeof global.KGColorPickerV2?.openInk==='function'?request=>global.KGColorPickerV2.openInk({...request,kind:'canvas-ink',documentColors:getStrokes().map(stroke=>stroke.color),documentLabel:'当前画布'}):null;
     // The request owns its original style target for its entire async lifetime.
     function colorContextMatches(session){
       return !destroyed&&!readonly()&&opened&&session.tool===tool&&session.selectedId===selectedId&&session.textSession===textSession&&session.context===options.getColorContext?.();
@@ -287,18 +289,18 @@
     function closeColorPicker(){const session=colorSession;colorSession=null;session?.handle?.close?.()}
     const colorPickerTarget=target=>!!colorSession?.handle?.contains?.(target);
     function openColorPicker(event){
-      if(typeof options.openColorPicker!=='function')return;
+      if(!colorPicker)return;
       event.preventDefault();event.stopPropagation();
       closeColorPicker();
       if(destroyed||readonly()||!opened||!currentStyle())return;
       const session={tool,selectedId,textSession,context:options.getColorContext?.(),handle:null};colorSession=session;
-      try{session.handle=options.openColorPicker({anchor:color,value:{color:currentStyle().color,opacity:1},
+      try{session.handle=colorPicker({anchor:color,overlayHost:options.overlayHost,value:{color:currentStyle().color,opacity:1},
         onCommit:value=>{if(colorSession!==session||!colorContextMatches(session)||session.handle?.isOpen?.()===false)return;const next=String(value?.color||'');if(/^#[0-9a-f]{6}$/i.test(next))updateTextStyle({color:next})}
       });if(!session.handle)colorSession=null}catch(error){colorSession=null;report(error)}
     }
     color.addEventListener('click',openColorPicker);
-    color.addEventListener('keydown',event=>{if(typeof options.openColorPicker==='function'&&(event.key==='Enter'||event.key===' '))openColorPicker(event)});
-    color.addEventListener('input',()=>{if(typeof options.openColorPicker!=='function')updateTextStyle({color:color.value})});
+    color.addEventListener('keydown',event=>{if(colorPicker&&(event.key==='Enter'||event.key===' '))openColorPicker(event)});
+    color.addEventListener('input',()=>{if(!colorPicker)updateTextStyle({color:color.value})});
     range.addEventListener('input',()=>updateTextStyle({width:Number(range.value)}));
     toolbar.querySelector('.canvas-ink-font input').addEventListener('change',event=>{const value=Number(event.target.value);if(event.target.value&&Number.isFinite(value)&&value>=6&&value<=288)updateTextStyle({width:value});else refreshControls()});
     toolbar.querySelector('[data-ink-width-number]').addEventListener('change',event=>{const value=Number(event.target.value),limits=TOOLS[styleTool()];if(event.target.value&&limits&&Number.isFinite(value)&&value>=limits.min&&value<=limits.max)updateTextStyle({width:value});else refreshControls()});
@@ -517,6 +519,7 @@
     listen(global,'click',event=>{if(inside(event.target)&&(Date.now()<suppressClickUntil||(tool!=='select'&&!space)))stop(event)},true);
     function handleKeyDown(event){
       if(destroyed)return false;
+      if(event.target?.closest?.('.graph-floating-color-window'))return false;
       if(global.KGCanvasDomInteraction?.isEditingTarget(event)||event.target?.closest?.('input,textarea,[contenteditable]'))return false;
       if((event.key==='Delete'||event.key==='Backspace')&&selected()&&!readonly()){stop(event);cancel();const id=selectedId;selectedId=null;try{change(getStrokes().filter(item=>item.id!==id),'删除笔迹')}catch(error){report(error)}return true}
       if(event.key==='Escape'){if(textResize){cancel();return true}setTool('select');return true}
@@ -601,20 +604,9 @@
       if(textSession&&!await closeTextEditor(true))return false;
       if(!activateText())return false;openTextEditor(clientX,clientY,null);return true;
     }
-    const tools=toolbar.querySelector('.canvas-ink-tools'),ui=global.KGCanvasToolbar;
-    // Workspace keeps compact buttons with colors before history.
-    // Other callers keep the shared labelled presentation by default.
-    if(options.toolbarPresentation==='compact')toolbar.classList.add('canvas-ink-compact');
-    if(ui&&options.toolbarPresentation!=='compact'){
-      tools.querySelectorAll('.canvas-ink-divider').forEach(el=>el.remove());
-      ui.group(tools,'选择',[[toolbar.querySelector('[data-ink-tool=select]'),'select','选择']]);
-      ui.group(tools,'绘制',[[toolbar.querySelector('[data-ink-tool=pen]'),'pen','画笔'],[toolbar.querySelector('[data-ink-tool=highlighter]'),'highlighter','高亮'],[toolbar.querySelector('[data-ink-tool=text]'),'text','文字'],[toolbar.querySelector('[data-ink-tool=eraser]'),'eraser','橡皮']]);
-      ui.group(tools,'撤销重做',[[toolbar.querySelector('[data-ink-action=undo]'),'undo','撤销'],[toolbar.querySelector('[data-ink-action=redo]'),'redo','重做']]);
-      ui.group(tools,'笔迹设置',[[toolbar.querySelector('[data-ink-settings]'),'settings','设置'],[toolbar.querySelector('[data-ink-close]'),'close','收起']]);
-      tools.append(palette);
-    }
+    // Icon presentation and palette order are shared defaults for every canvas.
     render();
-    return {activateText,openTextAt,handleKeyDown,commitText:()=>closeTextEditor(true),hasTextDraft:()=>!!textSession,render,refreshControls,cancel:()=>{closeColorPicker();cancel()},reset,setTool,setOpen,destroy,clearAll,get tool(){return tool},get temporaryPan(){return space}};
+    return {activateText,openTextAt,handleKeyDown,ownsColorPickerTarget:colorPickerTarget,commitText:()=>closeTextEditor(true),hasTextDraft:()=>!!textSession,render,refreshControls,cancel:()=>{closeColorPicker();cancel()},reset,setTool,setOpen,destroy,clearAll,get tool(){return tool},get temporaryPan(){return space}};
   }
   global.KGCanvasInk=Object.freeze({normalize,point,path,textLayout,bounds,draw,svgStroke,create});
 })(window);
