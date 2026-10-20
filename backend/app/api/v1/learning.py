@@ -185,6 +185,11 @@ async def practice_overview(db: DB, user: CurrentUser):
     return await learning_service.practice_overview(db, user.username)
 
 
+@router.get("/learning/practice/knowledge-universe")
+async def knowledge_universe(db: DB, user: CurrentUser):
+    return await knowledge_dashboard_service.get_universe(db, user.username)
+
+
 @router.get("/learning/practice/papers/{paper_id}/progress")
 async def practice_paper_progress(
     paper_id: str,

@@ -1,7 +1,7 @@
-"""Practice freshness from learner-owned answers and frozen question references.
+"""Owner-only practice history and its overlay on the current published catalog.
 
-No live question/taxonomy lookup: historical labels stay tied to what the learner
-actually practised. Brightness is recency, never a validated mastery score.
+History keeps frozen labels; the universe uses published taxonomy labels and
+exact frozen identifiers. Brightness is activity, never a mastery score.
 """
 from datetime import datetime, timezone
 import hashlib
@@ -12,7 +12,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import now_utc
 from app.models.training import PracticeSession
+from app.models.teaching_content import ContentSubject
 from app.services.practice_session_service import _session_question_rows
+from app.services.teaching_content_current_service import current_taxonomy
 
 
 def _timestamp(value):
@@ -112,11 +114,11 @@ def aggregate_sessions(rows, *, now=None, page=1, page_size=100):
     return _result(state, now, page, page_size)
 
 
-async def get_dashboard(db: AsyncSession, owner: str, *, page=1, page_size=100):
-    now = now_utc()
+async def _owner_state(db: AsyncSession, owner: str, now):
+    """Read every owner session using one frozen-answer validity policy."""
     state = _new_state()
     # Stream all owner history rather than silently limiting the latest sessions.
-    # Only compact per-topic accumulators survive a row; response is paginated.
+    # Only compact per-topic accumulators survive a row.
     sessions = await db.stream_scalars(select(PracticeSession).where(
         PracticeSession.owner_id == owner).execution_options(yield_per=100))
     async for session in sessions:
@@ -129,4 +131,95 @@ async def get_dashboard(db: AsyncSession, owner: str, *, page=1, page_size=100):
             if isinstance(ref, dict) and isinstance(ref.get('questionId'), str):
                 snapshots.setdefault(ref['questionId'], {})
         _add_session(state, session.answers, snapshots, now)
+    return state
+
+
+async def get_dashboard(db: AsyncSession, owner: str, *, page=1, page_size=100):
+    now = now_utc()
+    state = await _owner_state(db, owner, now)
     return _result(state, now, page, page_size)
+
+
+def _catalog_id(taxonomy_id, node_id):
+    key = json.dumps([taxonomy_id, node_id], ensure_ascii=False)
+    return hashlib.sha256(key.encode()).hexdigest()[:24]
+
+
+def _catalog_path(node, nodes):
+    """Keep only active in-tree parents; broken/cyclic ancestry becomes a root."""
+    chain, seen = [], set()
+    current = node
+    while current is not None:
+        if current.node_id in seen:
+            return None, [node.title]
+        seen.add(current.node_id)
+        chain.append(current.title)
+        parent = current.parent_node_id
+        if parent and parent not in nodes:
+            # An immediate missing parent is a root. Descendants can still
+            # follow the valid portion of their published ancestry.
+            break
+        current = nodes.get(parent)
+    parent = node.parent_node_id if node.parent_node_id in nodes else None
+    return parent, list(reversed(chain))
+
+
+async def get_universe(db: AsyncSession, owner: str):
+    """Return every active node in each active subject's current published tree."""
+    now = now_utc()
+    state = await _owner_state(db, owner, now)
+    # Frozen path/subject labels may change without changing node identity.
+    overlay = {}
+    for (_, taxonomy_id, node_id, _), group in state['groups'].items():
+        key = (taxonomy_id, node_id)
+        total = overlay.setdefault(key, {'attemptCount': 0, 'last': group['last']})
+        total['attemptCount'] += group['attemptCount']
+        total['last'] = max(total['last'], group['last'])
+
+    nodes, subjects = [], []
+    mapped_attempt_count = 0
+    subject_rows = (await db.scalars(select(ContentSubject).where(
+        ContentSubject.status == 'active').order_by(ContentSubject.code, ContentSubject.id))).all()
+    for subject in subject_rows:
+        selected = await current_taxonomy(db, subject.id)
+        if selected is None:
+            continue
+        taxonomy, rows = selected
+        active = {row.node_id: row for row in rows if row.status == 'active'}
+        practiced_count = 0
+        for row in active.values():
+            group = overlay.get((taxonomy.id, row.node_id))
+            practiced = group is not None
+            practiced_count += int(practiced)
+            attempt_count = group['attemptCount'] if practiced else 0
+            mapped_attempt_count += attempt_count
+            last = group['last'] if practiced else None
+            age = max(0, (now-last).total_seconds()/86400) if practiced else 0
+            parent, path = _catalog_path(row, active)
+            nodes.append({
+                'id': _catalog_id(taxonomy.id, row.node_id),
+                'subject': subject.code, 'subjectId': subject.id,
+                'taxonomyId': taxonomy.id, 'taxonomyTitle': taxonomy.title,
+                'primaryNodeId': row.node_id,
+                'parentNodeId': parent,
+                'parentId': _catalog_id(taxonomy.id, parent) if parent else None,
+                'path': path, 'title': row.title, 'practiced': practiced,
+                'attemptCount': attempt_count,
+                'lastPracticedAt': last.isoformat() if last else None,
+                'brightness': round(max(.4, 1-.6*age/30), 4) if practiced else .12,
+            })
+        subjects.append({'id': subject.id, 'code': subject.code, 'name': subject.name,
+                         'topicCount': len(active), 'practicedTopicCount': practiced_count,
+                         'unpracticedTopicCount': len(active)-practiced_count})
+
+    practiced_count = sum(subject['practicedTopicCount'] for subject in subjects)
+    return {
+        'nodes': nodes, 'subjects': subjects, 'topicCount': len(nodes),
+        'practicedTopicCount': practiced_count,
+        'unpracticedTopicCount': len(nodes)-practiced_count,
+        'attemptCount': state['attemptCount'], 'recentAttemptCount': state['recentAttemptCount'],
+        'unknownAttemptCount': state['unknownAttemptCount'],
+        'unmappedAttemptCount': state['attemptCount']-state['unknownAttemptCount']-mapped_attempt_count,
+        'lastPracticedAt': state['lastPracticedAt'].isoformat() if state['lastPracticedAt'] else None,
+        'now': now.isoformat(), 'brightnessMeaning': 'practice-activity', 'dimAfterDays': 30,
+    }
