@@ -21,6 +21,13 @@
     const overlay=document.createElement('div');overlay.className='related-canvas-backdrop';overlay.dataset.stageUi='true';
     overlay.innerHTML='<section class="related-canvas-dialog" role="dialog" aria-modal="true" aria-label="临时相关画布"><header class="related-canvas-header"><div><strong>临时相关画布</strong><span>'+(readOnly()?'只读查看：仅供演示浏览，不提供编辑':'修改仅在本次视图中有效，关闭即丢弃；题目功能不可用')+'</span></div><div class="related-canvas-header-actions">'+editButtons+'<button data-action="fit">适应</button><button data-action="fullscreen">全屏</button><button class="related-canvas-close" data-action="close" aria-label="退出临时画布"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"></path></svg></button></div></header><div class="related-canvas-body"><div class="related-canvas-viewport"><div class="related-canvas-stage"><svg class="related-canvas-edges"></svg><div class="related-canvas-cards"></div></div></div></div><section class="related-canvas-info"><div class="related-canvas-detail"></div><p class="related-canvas-empty"></p></section></section>';
     const body=overlay.querySelector('.related-canvas-body'),stage=overlay.querySelector('.related-canvas-stage'),cards=overlay.querySelector('.related-canvas-cards'),svg=overlay.querySelector('.related-canvas-edges'),viewportEl=overlay.querySelector('.related-canvas-viewport'),info=overlay.querySelector('.related-canvas-info'),detail=overlay.querySelector('.related-canvas-detail');
+    const ui=global.KGCanvasToolbar,tools=overlay.querySelector('.related-canvas-header-actions'),tool=name=>overlay.querySelector('[data-action="'+name+'"]');
+    if(ui){
+      ui.group(tools,'卡片与关系',[[tool('add'),'add','新增卡片'],[tool('connect'),'connect','连线'],[tool('delete'),'delete','删除']]);
+      ui.group(tools,'绘制',[[tool('ink'),'pen','画笔']]);
+      ui.group(tools,'撤销与重做',[[tool('undo'),'undo','撤销'],[tool('redo'),'redo','重做']]);
+      ui.group(tools,'视图',[[tool('fit'),'fit','适应'],[tool('fullscreen'),'fit','全屏'],[tool('close'),'close','关闭']]);
+    }
     cards.style.pointerEvents='none';
     const viewport={x:0,y:0,scale:1};
     function applyViewport(){stage.style.width='10000px';stage.style.height='10000px';stage.style.transform=`translate(${viewport.x}px,${viewport.y}px) scale(${viewport.scale})`}
@@ -127,11 +134,12 @@
     graph().selectedNodeId=node(options.initialNodeId)?.id||graph().nodes[0]?.id||null;
     global.KGGraphMindmapLayout.apply(graph(),{rootIds:[graph().selectedNodeId,...graph().nodes.map(n=>n.id)].filter(Boolean),direction:'right',model,endpoints:options.layoutEndpoints});
     renderer.render();fit();
+    const resizeObserver=new ResizeObserver(()=>{if(!closed)fit()});resizeObserver.observe(body);
     function close(){
       if(closed)return;closed=true;
       if(drag){try{body.releasePointerCapture(drag.pointerId)}catch{}drag=null}
       if(ink){try{ink.reset({discardDraft:true})}catch{}try{ink.destroy()}catch{}ink=null;inkOpen=false}
-      global.removeEventListener('keydown',key,true);for(const type of ['copy','cut','paste'])document.removeEventListener(type,clipboard,true);unmount();overlay.remove();session.close();document.body.classList.remove('related-canvas-open')
+      resizeObserver.disconnect();global.removeEventListener('keydown',key,true);for(const type of ['copy','cut','paste'])document.removeEventListener(type,clipboard,true);unmount();overlay.remove();session.close();document.body.classList.remove('related-canvas-open')
     }
     return Object.freeze({session,overlay,close,renderer,selection,connection});
   }

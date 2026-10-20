@@ -166,6 +166,33 @@ body.question-workspace-page[data-theme] .qw-card-header{border-bottom-color:var
 .qw-theme-select:focus-visible{outline:2px solid var(--qw-primary,#6d5dfc);outline-offset:2px}
 body.question-workspace-page[data-theme] .qw-theme-select{border-color:var(--kr-border);background:var(--kr-control-bg);color:var(--kr-control-ink)}
 
+/* Shared theme picker; preview/cancel changes no document content or background. */
+.learning-theme-menu{position:relative;display:inline-block;flex:0 0 auto;color:#514a65;font:12px/1.5 system-ui}
+.learning-theme-menu>summary{display:flex;align-items:center;justify-content:center;min-height:36px;padding:6px 12px;border:1px solid #e3deec;border-radius:8px;background:#fff;cursor:pointer;list-style:none;white-space:nowrap}
+.learning-theme-menu>summary::-webkit-details-marker{display:none}
+.learning-theme-menu>summary::before{content:'◉';margin-right:6px;color:#7755bd}
+.learning-theme-menu [hidden]{display:none!important}
+.learning-theme-panel{position:absolute;right:0;top:calc(100% + 8px);z-index:5500;width:300px;max-height:calc(100dvh - 100px);overflow:auto;padding:16px;border:1px solid #ded7e9;border-radius:12px;background:#fff;color:#493e5c;box-shadow:0 8px 30px #35234624;text-align:left}
+.learning-theme-panel>strong{font-size:14px}.learning-theme-panel>p{margin:5px 0 12px;color:#756b82;font-size:11px;line-height:1.6}
+.learning-theme-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.learning-theme-panel .kr-scene-option{display:flex!important;align-items:center;gap:8px;width:100%!important;height:auto!important;min-height:40px;padding:8px!important;border:1px solid #e8e2ef!important;border-radius:8px!important;background:#fff!important;color:#514563!important;font:12px/1.3 system-ui!important;cursor:pointer}
+.learning-theme-panel .kr-scene-option::before{content:'';width:18px;height:18px;flex:0 0 18px;border:1px solid #0001;border-radius:5px;background:linear-gradient(135deg,var(--kr-scene-a),var(--kr-scene-c))}
+.learning-theme-panel .kr-scene-option[aria-pressed=true]{border-color:#8a67cd!important;background:#f3effb!important}
+.learning-theme-panel footer{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}.learning-theme-panel footer button{height:34px;padding:6px 12px;border:1px solid #dfd7eb;border-radius:7px;background:#fff;color:#62516f;font:12px system-ui;cursor:pointer}.learning-theme-panel footer [data-theme-save]{background:#7651c4;color:#fff;border-color:#7651c4}
+.learning-theme-menu :is(button,summary):focus-visible{outline:2px solid #8158c7;outline-offset:2px}
+@media(max-width:700px){.learning-theme-panel{position:fixed;left:10px;right:10px;top:104px;width:auto;max-width:calc(100vw - 20px);max-height:calc(100dvh - 122px)}}
+
+/* Explicit scene selection covers the whole card, including formerly white
+ * document surfaces. Saved manual colors remain in the document unchanged. */
+body.question-workspace-page[data-theme]:not([data-theme="platform"]) .qw-question-card,
+body.question-workspace-page[data-theme]:not([data-theme="platform"]) .qw-question-card>.qw-card-body{background:var(--kr-card)!important;color:var(--kr-card-ink)!important;border-color:var(--kr-border)!important}
+body.question-workspace-page[data-theme]:not([data-theme="platform"]) .qw-card-header{background:var(--kr-card-2)!important;color:var(--kr-card-ink)!important}
+body.question-workspace-page[data-theme]:not([data-theme="platform"]) :is(.qw-card-content,.qw-card-stem,.qw-card-question,.qw-card-question-stem,.qw-synthesis-text,.qw-synthesis-content,.qw-synthesis-principle,.qw-bilingual-en){color:var(--kr-card-ink)!important}
+body.question-workspace-page[data-theme]:not([data-theme="platform"]) .qw-card-option{background:var(--kr-choice-bg)!important;color:var(--kr-card-ink)!important;border-color:var(--kr-border)!important}
+body.knowledge-recall-page[data-kr-theme]:not([data-kr-theme="platform"]) .kr-question-card{background:var(--kr-card)!important;color:var(--kr-card-ink)!important;border-color:var(--kr-border)!important}
+
+body.knowledge-recall-page[data-kr-theme]:not([data-kr-theme="platform"]) .kr-question-card .qw-bilingual-en{color:var(--kr-card-ink)!important}
+
 /* Legacy documents capture their first effective themed background once. */
 body.question-workspace-page[data-theme]:not([data-workspace-background]) .uc-canvas-surface{
   /* 画布运行时会把这几个变量以内联样式写到 viewport，需 !important 才能赢得级联 */
@@ -180,3 +207,6 @@ body.question-workspace-page[data-theme]:not([data-workspace-background]) .qw-ba
     radial-gradient(circle at 1px 1px,var(--kr-grid-line) .85px,transparent 1.05px),
     linear-gradient(135deg,color-mix(in srgb,var(--kr-bg-a) 74%,transparent),color-mix(in srgb,var(--kr-bg-b) 92%,transparent));
 }
+/* Fixed previews must also clear their toolbar's stacking context. */
+.qw-overlay-right:has(.learning-theme-menu[open]){z-index:5600!important}
+.kr-topbar:has(.learning-theme-menu[open]){z-index:5600!important}

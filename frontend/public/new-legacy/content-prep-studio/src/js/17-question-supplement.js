@@ -228,7 +228,7 @@ document.addEventListener('DOMContentLoaded',()=>{
       toast(`补录完成：更新 ${report.changedQuestions} / 匹配 ${report.matched}${report.unmatched?` · 跳过 ${report.unmatched}`:''}`);
     }catch(err){
       const status=document.getElementById('questionSupplementStatus');if(status){status.textContent='补录失败：'+err.message;status.className='supplement-status bad'}
-      alert('补录失败：'+err.message);
+      await window.KGDialogs.alert('补录失败：'+err.message);
     }finally{e.target.value=''}
   }));
 });

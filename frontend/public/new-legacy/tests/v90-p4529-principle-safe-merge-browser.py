@@ -17,6 +17,7 @@ import tempfile
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright
+from helpers.dialog_actions import respond_dialog
 
 ROOT = Path(__file__).resolve().parents[1]
 DIST = ROOT / "content-prep-studio" / "dist" / "content-prep.html"
@@ -76,6 +77,10 @@ def import_payload(page, dialogs, payload, action="accept"):
         json.dump(payload, handle, ensure_ascii=False)
         path = handle.name
     page.set_input_files("#filePrincipleCardBundle", path)
+    if payload==INCOMING_KG:
+        dialogs.append(respond_dialog(page,'项原则/归纳卡冲突',text='采用导入' if action=='take-incoming' else '保留现有'))
+    elif payload==UNKNOWN_FORMAT:
+        dialogs.append(respond_dialog(page,'不支持的原则与归纳卡文件格式'))
     page.wait_for_timeout(200)
 
 
@@ -84,7 +89,6 @@ def run() -> None:
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page(viewport={"width": 1360, "height": 900})
-        page.on("dialog", lambda dialog: (dialogs.append(dialog.message), dialog.accept()))
         page.route("**/api/**", lambda route: route.fulfill(status=200, content_type="application/json", body="{}"))
         page.goto(DIST.as_uri())
         page.wait_for_timeout(400)
@@ -124,7 +128,7 @@ def run() -> None:
         set_existing(page)
         before = state_principles(page)
         dialogs.clear()
-        import_payload(page, [], UNKNOWN_FORMAT)
+        import_payload(page, dialogs, UNKNOWN_FORMAT)
         page.wait_for_timeout(200)
         assert any("不支持的原则与归纳卡文件格式" in message for message in dialogs), dialogs
         assert state_principles(page) == before, "未知格式导入后状态必须保持不变"

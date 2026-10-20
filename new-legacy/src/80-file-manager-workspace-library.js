@@ -52,15 +52,15 @@
     if(push){const url=new URL(location.href);if(state.type==='workspace')url.searchParams.set('type','workspace');else url.searchParams.delete('type');history.replaceState(null,'',url.pathname+url.search)}
     if(state.type==='workspace')render();
   }
-  function create(){
+  async function create(){
     let title='新建解题画布';
-    try{const value=global.prompt?.('请输入画布名称',title);if(value===null)return;title=String(value||title).trim()||title}catch(e){}
+    try{const value=await window.KGDialogs.prompt('请输入画布名称',title);if(value===null)return;title=String(value||title).trim()||title}catch(e){toast('弹窗暂不可用，请重试。','error');return}
     const workspace=store.createWorkspace?.(title,{activate:true});
     if(workspace){toast('已创建多题画布。');global.location.href=workspaceUrl(workspace.id)}
   }
-  function rename(id){
+  async function rename(id){
     const item=all().find(x=>String(x.id)===String(id));if(!item)return;
-    let title=item.title;try{const value=global.prompt?.('请输入新的画布名称',title);if(value===null)return;title=String(value||'').trim()}catch(e){}
+    let title=item.title;try{const value=await window.KGDialogs.prompt('请输入新的画布名称',title);if(value===null)return;title=String(value||'').trim()}catch(e){toast('弹窗暂不可用，请重试。','error');return}
     if(!title)return;const saved=store.renameWorkspace?.(id,title);if(saved){toast('画布名称已更新。');render()}
   }
   function duplicate(id){
@@ -69,9 +69,9 @@
     const copy=JSON.parse(JSON.stringify(source));copy.id=created.id;copy.title=created.title;copy.userId=created.userId;copy.createdAt=Date.now();copy.updatedAt=Date.now();
     const saved=store.write?.(copy,{reason:'workspace-duplicated'});if(saved){toast('已创建画布副本。');render()}
   }
-  function remove(id){
+  async function remove(id){
     const item=all().find(x=>String(x.id)===String(id));if(!item)return;
-    let ok=true;try{ok=global.confirm?.('删除“'+item.title+'”？只删除多题画布，不删除原题和学习记录。')!==false}catch(e){}
+    let ok=false;try{ok=await window.KGDialogs.confirm('删除“'+item.title+'”？只删除多题画布，不删除原题和学习记录。',{danger:true})===true}catch(e){toast('弹窗暂不可用，请重试。','error');return}
     if(!ok)return;const result=store.deleteWorkspace?.(id);if(result){toast('多题画布已删除。');render()}
   }
   function open(id){store.setActiveWorkspace?.(id);global.location.href=workspaceUrl(id)}

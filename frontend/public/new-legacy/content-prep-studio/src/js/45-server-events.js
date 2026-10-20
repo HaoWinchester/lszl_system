@@ -245,8 +245,8 @@
     try{window.dispatchEvent(new CustomEvent('prep:server-content-applied',{detail:{mode,revision:prepRuntime.serverContentRevision}}))}catch(_error){}
     return true;
   }
-  function requestExplicitRemoteApply(){
-    const choice=String(prompt('服务器有新版本。输入“重新载入”以放弃当前表单，或输入“合并”保留本地内容。','合并')||'').trim();
+  async function requestExplicitRemoteApply(){
+    const choice=String(await window.KGDialogs.prompt('服务器有新版本。输入“重新载入”以放弃当前表单，或输入“合并”保留本地内容。','合并')||'').trim();
     if(choice==='重新载入'||choice.toLowerCase()==='reload')return applyRemoteContent({mode:'reload'});
     if(choice==='合并'||choice.toLowerCase()==='merge')return applyRemoteContent({mode:'merge'});
     return false;
@@ -319,7 +319,7 @@
     markWorkspaceDirty();refreshButtons();
   });
   createButton.addEventListener('click',async()=>{
-    const name=prompt('请输入新题库名称',state.questionBank.name||'PMP 内容准备题库');if(!name?.trim())return;
+    const name=await window.KGDialogs.prompt('请输入新题库名称',state.questionBank.name||'PMP 内容准备题库');if(!name?.trim())return;
     createButton.disabled=true;setStatus('正在新建题库…');setIssues(null);
     try{
       const bank=await Catalog.createBank({
@@ -338,7 +338,7 @@
       sourceBankSelect.value=previousBankId;setStatus('请先新建或打开共享草稿。','warn');return;
     }
     const hasWorkspaceContent=state.questionBank.questions.length>0;
-    if(prepRuntime.dirty&&hasWorkspaceContent&&!confirm('载入题库会替换当前工作区的题目。未保存内容可能丢失，是否继续？')){
+    if(prepRuntime.dirty&&hasWorkspaceContent&&!await window.KGDialogs.confirm('载入题库会替换当前工作区的题目。未保存内容可能丢失，是否继续？',{danger:true})){
       sourceBankSelect.value=previousBankId;setStatus('已取消载入，当前工作区未改变。','warn');return;
     }
     sourceBankSelect.disabled=true;setStatus('正在载入题库题目…');setIssues(null);

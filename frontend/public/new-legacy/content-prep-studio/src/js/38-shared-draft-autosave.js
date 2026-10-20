@@ -30,25 +30,30 @@
 
   async function handleRevisionConflict(error){
     const message=String(error?.message||'共享草稿已在其他地方被修改');
-    const copy=confirm(`自动保存被拒绝：${message}。\n\n【确定】把当前内容复制为新草稿（保留本地修改，不动服务器原草稿）\n【取消】查看其他恢复选项`);
-    if(copy){
-      const title=String(prompt('新草稿名称：',`${prepRuntime.draftTitle||'未命名草稿'}（冲突副本）`)||'').trim();
+    const owner=global.KGAuthCore?.currentUser?.()?.username||'',draftId=prepRuntime.draftId;
+    const stillCurrent=()=>owner===(global.KGAuthCore?.currentUser?.()?.username||'')&&draftId===prepRuntime.draftId;
+    const action=await window.KGDialogs.prompt(`自动保存被拒绝：${message}。\n\n请输入“复制草稿”保留本地修改为新草稿，或“重新载入”放弃本地并载入服务器版本。稍后处理或关闭将保留本地修改。`,'稍后处理');
+    if(!stillCurrent())return;
+    if(action==='复制草稿'){
+      const title=String(await window.KGDialogs.prompt('新草稿名称：',`${prepRuntime.draftTitle||'未命名草稿'}（冲突副本）`)||'').trim();
+      if(!stillCurrent())return;
       if(!title){updateWorkspaceSaveStatus('自动保存冲突已保留本地修改，可手动处理','warn');prepRuntime.dirty=true;return}
       try{
         const payload=typeof workspacePayload==='function'?workspacePayload():null;
         const draft=await Drafts.create({title,payload});
+        if(!stillCurrent())return;
         prepRuntime.draftId=String(draft.id||'');prepRuntime.draftRevision=Number(draft.revision||1);prepRuntime.draftTitle=title;
         prepRuntime.dirty=false;rememberDraftId();
         updateWorkspaceSaveStatus(`冲突已通过新草稿“${title}”保留本地修改`,'good');
         toast('本地修改已复制为新草稿');
         return;
       }catch(createError){
+        if(!stillCurrent())return;
         updateWorkspaceSaveStatus(`复制冲突草稿失败：${createError.message||createError}（本地修改已保留）`,'bad');
         prepRuntime.dirty=true;return;
       }
     }
-    const discard=confirm('放弃本地未保存修改，并重新载入服务器上的最新版本？');
-    if(discard){
+    if(action==='重新载入'){
       try{await global.PMPPrepDraftUi.openDraft(prepRuntime.draftId)}
       catch(reloadError){updateWorkspaceSaveStatus(`重新载入失败：${reloadError.message||reloadError}`,'bad');prepRuntime.dirty=true}
       return;

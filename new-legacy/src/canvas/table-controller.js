@@ -547,7 +547,7 @@
     });
 
     // —— 面板动作：合并 / 拆分 / 删除 / 撤销重做 ——
-    listen(layer,'click',event=>{
+    listen(layer,'click',async event=>{
       const button=event.target.closest?.('[data-table-action]');
       if(!button||!layer.contains(button))return;
       event.preventDefault();event.stopPropagation();
@@ -563,7 +563,7 @@
         const table=tableById(tableId);if(!table)return;
         selectTable(tableId);
         if(action==='delete'){
-          if(!confirmOperation('确认删除整张表格？可按 Ctrl/Command+Z 撤销。'))return;
+          if(!await confirmOperation('确认删除整张表格？可按 Ctrl/Command+Z 撤销。'))return;
           mutate(getTables().filter(item=>item.id!==tableId),'删除表格');
           if(selectedTableId===tableId)selectTable(null);
           status('表格已删除。');return;
@@ -586,7 +586,7 @@
         }
       }catch(error){status(error?.message||'表格操作失败');render({force:true})}
     });
-    function confirmOperation(message){return typeof options.confirm==='function'?!!options.confirm(message):global.confirm(message)}
+    async function confirmOperation(message){return typeof options.confirm==='function'?(await options.confirm(message))===true:await window.KGDialogs.confirm(message,{danger:true})}
 
     // —— 粘贴：编辑态文本优先（cell 层拦截）；选中起始格粘贴；空画布表格数据新建表 ——
     function parseGrid(data){

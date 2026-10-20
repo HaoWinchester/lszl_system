@@ -52,9 +52,8 @@
     async function load(fileName,jsonText){return loadFiles([{name:fileName,text:jsonText}])}
     async function ask(kind,plan){
       const message=kind==='replace'?replacementMessage(plan):duplicateMessage(plan);
-      const confirm=options.confirm||global.confirm;
-      if(typeof confirm!=='function')return false;
-      return (await Promise.resolve(confirm({kind,message,plan:clone(plan)})))===true;
+      if(typeof options.confirm==='function')return (await options.confirm({kind,message,plan:clone(plan)}))===true;
+      return (await global.KGDialogs.confirm(message,{danger:true}))===true;
     }
     async function submit(confirmReplace=false,confirmDuplicateCleanup=false){
       try{return await api.importBanks({banks:clone(state.banks),confirmReplace,confirmDuplicateCleanup})}

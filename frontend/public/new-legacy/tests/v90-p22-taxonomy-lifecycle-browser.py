@@ -2,11 +2,13 @@
 from pathlib import Path
 import re
 from playwright.sync_api import sync_playwright
+from helpers.dialog_actions import respond_dialog
 ROOT=Path(__file__).resolve().parents[1]
 HTML=(ROOT/'admin-subjects.html').read_text(encoding='utf-8')
 BODY=re.search(r'<body[^>]*>([\s\S]*)</body>',HTML,re.I).group(1)
 BODY=re.sub(r'<script[\s\S]*?</script>','',BODY,flags=re.I)
 SCRIPTS=[
+ 'src/00-dialogs.js',
  'src/28-app-storage.js','src/29-auth-core.js','src/86-activity-schema-v1.js','src/87-guided-learning-data.js','src/91-learning-content-core.js','src/93-content-organization-core.js',
  'src/admin/00-admin-core.js','src/admin/10-content-repository.js','src/admin/11-local-content-repository.js','src/admin/20-admin-permission-service.js','src/admin/21-admin-audit-service.js','src/admin/22-admin-transaction-service.js','src/admin/30-reference-index-service.js','src/admin/31-subject-service.js','src/admin/32-taxonomy-service.js','src/admin/33-activity-service.js','src/admin/34-course-service.js','src/admin/35-release-service.js','src/admin/40-admin-service-registry.js','src/admin/41-learning-content-compat.js','src/admin/49-admin-ui.js','src/admin/51-admin-subjects-app.js'
 ]
@@ -38,24 +40,18 @@ with sync_playwright() as p:
     assert page.locator('[data-archive-taxonomy="taxonomy-delete-v1"]').is_enabled()
     assert page.locator('[data-delete-taxonomy="taxonomy-delete-v3"]').is_enabled()
     dialogs=[]
-    def handle_dialog(dialog):
-        dialogs.append((dialog.type,dialog.message))
-        if dialog.type=='prompt':
-            if '归档说明' in dialog.message: dialog.accept('browser archive')
-            elif 'v1.0' in dialog.message: dialog.accept('v1.0')
-            elif 'v3.0' in dialog.message: dialog.accept('v3.0')
-            else: dialog.accept('')
-        else: dialog.accept()
-    page.on('dialog',handle_dialog)
     page.locator('[data-archive-taxonomy="taxonomy-delete-v1"]').click()
+    respond_dialog(page,'归档 v1.0');respond_dialog(page,'归档说明',text='browser archive')
     page.wait_for_timeout(170)
     assert page.evaluate("()=>KGAdminServices.taxonomies.get('taxonomy-delete-v1').status")=='archived'
     assert page.locator('[data-restore-taxonomy="taxonomy-delete-v1"]').is_enabled()
     assert page.locator('[data-delete-taxonomy="taxonomy-delete-v1"]').is_enabled()
     page.locator('[data-delete-taxonomy="taxonomy-delete-v1"]').click()
+    respond_dialog(page,'永久删除');respond_dialog(page,'请输入版本号',text='v1.0')
     page.wait_for_timeout(180)
     assert page.evaluate("()=>KGAdminServices.taxonomies.get('taxonomy-delete-v1')") is None
     page.locator('[data-delete-taxonomy="taxonomy-delete-v3"]').click()
+    respond_dialog(page,'永久删除');respond_dialog(page,'请输入版本号',text='v3.0')
     page.wait_for_timeout(180)
     assert page.evaluate("()=>KGAdminServices.taxonomies.get('taxonomy-delete-v3')") is None
     assert page.evaluate("()=>KGAdminServices.taxonomies.deletionRecords().length")==2

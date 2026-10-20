@@ -250,7 +250,7 @@
     const role=currentUser()?roleLabel(currentRole()):'未登录';
     const msg=message || `当前身份（${role}）没有“${label}”权限。`;
     if(typeof showStatus==='function')showStatus(msg);
-    else alert(msg);
+    else void window.KGDialogs.alert(msg);
     return false;
   }
   function renderPermissionDenied(container,message){

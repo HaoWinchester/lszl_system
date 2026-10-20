@@ -142,7 +142,7 @@
     if(!cfg.appId){toast('请先填写 AppID');renderWechatConfig();return}
     try{
       const result=await api.createOfficialAuthRequest('login',location.pathname+location.search+location.hash,window.KGAuthRuntime?.legalConsentVersion||'2026-08-13-v1');
-      prompt('微信授权地址预览，可复制给技术人员调试：',result.authUrl);
+      await window.KGDialogs.prompt('微信授权地址预览，可复制给技术人员调试：',result.authUrl);
     }catch(error){
       toast(error?.message||'授权地址生成失败，请检查服务端微信配置。');
     }finally{renderWechatConfig()}
@@ -292,8 +292,8 @@
     const action=btn.dataset.codeAction;
     if(action==='copy'){
       const text=item.querySelector('.subscription-code-main strong')?.textContent||'';
-      if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(()=>toast('卡密已复制')).catch(()=>prompt('复制卡密：',text));}
-      else prompt('复制卡密：',text);
+      if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(()=>toast('卡密已复制')).catch(async ()=>await window.KGDialogs.prompt('复制卡密：',text));}
+      else await window.KGDialogs.prompt('复制卡密：',text);
       return;
     }
     try{
@@ -301,7 +301,7 @@
       if(action==='disable')result=typeof sub.disableRedeemCode==='function'?await sub.disableRedeemCode(id):null;
       else if(action==='enable')result=typeof sub.enableRedeemCode==='function'?await sub.enableRedeemCode(id):null;
       else if(action==='remove'){
-        if(!confirm('确认删除这条卡密？删除后不可恢复。'))return;
+        if(!await window.KGDialogs.confirm('确认删除这条卡密？删除后不可恢复。',{danger:true}))return;
         result=typeof sub.removeRedeemCode==='function'?await sub.removeRedeemCode(id):null;
       }
       if(!result||!result.ok){toast(result&&result.message||'卡密操作失败');return}
@@ -327,10 +327,11 @@
     try{
       let result=null;
       if(btn.dataset.orderAction==='approve'){
-        if(!confirm('确认开通该学员的订阅申请？'))return;
+        if(!await window.KGDialogs.confirm('确认开通该学员的订阅申请？',{danger:true}))return;
         result=typeof sub.approveOrder==='function'?await sub.approveOrder(id,{note:'管理员在系统设置中确认开通'}):null;
       }else if(btn.dataset.orderAction==='cancel'){
-        const note=prompt('请输入取消原因（可选）：','')||'';
+        const note=await window.KGDialogs.prompt('请输入取消原因（可选）：','');
+        if(note===null)return;
         result=typeof sub.cancelOrder==='function'?await sub.cancelOrder(id,{note}):null;
       }
       if(!result||!result.ok){toast(result&&result.message||'订阅申请处理失败');return}
@@ -444,7 +445,7 @@
   }
   async function resetAllPlanSettings(){
     const sub=window.KGSubscription;if(!sub||typeof sub.savePlanSettings!=='function')return;
-    if(!confirm('确认恢复全部订阅套餐默认配置？'))return;
+    if(!await window.KGDialogs.confirm('确认恢复全部订阅套餐默认配置？',{danger:true}))return;
     try{await sub.savePlanSettings({});
     logAction('恢复全部订阅套餐默认','SYSTEM','全部套餐恢复默认配置');
     renderSubscriptionPlans();
@@ -459,7 +460,7 @@
     panel.innerHTML=logs.map(log=>`<div class="um-log-item"><strong>${escapeHTML(log.action)} · ${escapeHTML(log.username||'系统')}</strong><span>${fmtTime(log.at)} · 操作者：${escapeHTML(log.actor||'system-admin')}</span>${log.detail?`<span>${escapeHTML(log.detail)}</span>`:''}</div>`).join('');
   }
   async function clearLogs(){
-    if(!confirm('确认清空系统操作日志？'))return;
+    if(!await window.KGDialogs.confirm('确认清空系统操作日志？',{danger:true}))return;
     try{await window.KGSystemDomain?.clearAdminLogs?.();renderLogs();toast('日志已清空')}catch(error){toast(error?.message||'日志清空失败')}
   }
 

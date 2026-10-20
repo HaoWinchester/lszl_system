@@ -3,6 +3,7 @@ import time
 from uuid import uuid4
 
 from playwright.sync_api import APIRequestContext, Page, sync_playwright
+from app_dialogs import respond_app_dialog
 
 
 BASE = os.environ.get("E2E_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
@@ -114,8 +115,8 @@ def select_creator(page: Page) -> None:
 
 def create_shared_draft(page: Page, title: str) -> str:
     page.locator("#sharedDraftGate").wait_for(state="visible")
-    page.once("dialog", lambda dialog: dialog.accept(title))
     page.locator("#btnCreateSharedDraft").click()
+    respond_app_dialog(page, value=title, message="共享草稿名称")
     page.locator("#sharedDraftGate").wait_for(state="hidden")
     draft_id = page.evaluate("prepRuntime.draftId")
     assert draft_id
@@ -177,8 +178,8 @@ with sync_playwright() as playwright:
         prep_page.locator("#serverBankSelect").select_option(private_bank["id"])
 
         ui_bank_name = f"Prep 页面新建题库 {stamp}"
-        prep_page.once("dialog", lambda dialog: dialog.accept(ui_bank_name))
         prep_page.locator("#btnCreateServerBank").click()
+        respond_app_dialog(prep_page, value=ui_bank_name, message="新题库名称")
         prep_page.wait_for_function(
             "name => [...document.querySelectorAll('#serverBankSelect option')].some(option => option.textContent.includes(name))",
             arg=ui_bank_name,

@@ -2,6 +2,7 @@
 import os
 from pathlib import Path
 from playwright.sync_api import sync_playwright, expect
+from helpers.dialog_actions import respond_dialog
 ROOT=Path(__file__).resolve().parents[1]
 BASE=os.environ.get('RECALL_CUSTOM_BASE','http://127.0.0.1:5191')
 URL=BASE+'/knowledge-recall.html?questionId=ink-question-1&bankId=ink-bank&paperId=ink-paper&releaseId=ink-release'
@@ -13,12 +14,11 @@ with sync_playwright() as pw:
     for filename in ('src/86-knowledge-recall.js','src/95-recall-association-library.js','src/recall/deep-recall-flow-model.js','src/canvas/dom-interaction.js','styles/knowledge-recall.css'):
         context.route('**/'+filename+'*',lambda route,request,filename=filename:route.fulfill(status=200,content_type='text/css' if filename.endswith('.css') else 'application/javascript',body=(ROOT/filename).read_text()))
     page=context.new_page()
-    page.on('dialog',lambda dialog:dialog.accept())
     page.on('pageerror',lambda error:print('PAGEERROR',error,flush=True))
     page.goto(URL)
     expect(page.locator('#krRevealKeywordsBtn')).to_be_enabled(timeout=30000)
     with page.expect_response(lambda response:'/api/v1/recall/progress/' in response.url and response.request.method=='POST' and '/reset' in response.url):
-        page.locator('#krResetBtn').click()
+        page.locator('#krResetBtn').click();respond_dialog(page,'清除这道题')
     page.locator('#krRevealKeywordsBtn').click()
     keyword=page.locator('.kr-keyword-token').filter(has_text='分析影响').first
     expect(keyword).to_be_visible()
@@ -101,7 +101,7 @@ with sync_playwright() as pw:
     expect(page.locator('#krUndoPersonalBtn')).to_have_count(0)
     page.locator('.kr-guide-close').click()
     with page.expect_response(lambda response:'/reset' in response.url and response.request.method=='POST'):
-        page.locator('#krResetBtn').click()
+        page.locator('#krResetBtn').click();respond_dialog(page,'清除这道题')
     expect(page.locator('.kr-node')).to_have_count(0)
     page.locator('#krRevealKeywordsBtn').click()
     page.locator('.kr-keyword-token').filter(has_text='分析影响').first.click()
@@ -109,6 +109,6 @@ with sync_playwright() as pw:
     expect(page.locator('#krPersonalTitle')).to_be_visible()
     expect(page.locator('#krUndoPersonalBtn')).to_have_count(0)
     page.locator('.kr-guide-close').click()
-    page.locator('#krResetBtn').click();expect(page.locator('.kr-node')).to_have_count(0)
+    page.locator('#krResetBtn').click();respond_dialog(page,'清除这道题');expect(page.locator('.kr-node')).to_have_count(0)
     browser.close()
 print('recall-unmatched-custom-browser: passed')

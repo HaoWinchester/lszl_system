@@ -413,7 +413,7 @@
     }
     $('new-session').onclick = () => leaveDraft(() => action(async () => { epoch++; disconnect(); sourceViews.clear(); const s = await client.create(); await activate(s.id); clearDraft(); panel(false); if (global.innerWidth <= 760) sidebar(false); }, true));
     $('session-history').onchange = () => { if ($('session-history').value) switchSession($('session-history').value); };
-    $('delete-session').onclick = () => leaveDraft(() => { if (global.confirm('删除本会话及私人原文件？已发布内容不会撤回。')) action(async () => { epoch++; disconnect(); sourceViews.clear(); await client.remove(); clearDraft(); activated = false; panel(false); }, true); });
+    $('delete-session').onclick = () => leaveDraft(async () => { if (await window.KGDialogs.confirm('删除本会话及私人原文件？已发布内容不会撤回。',{danger:true})) action(async () => { epoch++; disconnect(); sourceViews.clear(); await client.remove(); clearDraft(); activated = false; panel(false); }, true); });
     $('attach-files').onclick = $('upload-materials').onclick = () => $('assistant-files').click();
     $('assistant-files').onchange = () => addFiles($('assistant-files').files);
     $('assistant-message').onpaste = event => { const files = Array.from(event.clipboardData?.files || []); if (files.length) { event.preventDefault(); addFiles(files); } };

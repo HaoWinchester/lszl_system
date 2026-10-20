@@ -413,7 +413,7 @@
 
   function runGraphExportAction(format){
     if(format === "zip"){
-      if(typeof exportLearningPackage === "function") exportLearningPackage().catch(err=>alert("导出学习包失败：" + (err.message || err)));
+      if(typeof exportLearningPackage === "function") exportLearningPackage().catch(async err=>await window.KGDialogs.alert("导出学习包失败：" + (err.message || err)));
       else if(typeof showStatus === "function") showStatus("导出服务尚未就绪。");
       return;
     }
@@ -422,7 +422,7 @@
       if(typeof showStatus === "function") showStatus("图片 / PDF 导出服务尚未就绪。");
       return;
     }
-    service.exportVisual(format).catch(err=>alert("导出" + (format === "pdf" ? " PDF" : " PNG") + "失败：" + (err.message || err)));
+    service.exportVisual(format).catch(async err=>await window.KGDialogs.alert("导出" + (format === "pdf" ? " PDF" : " PNG") + "失败：" + (err.message || err)));
   }
 
   function ensureExportSubmenu(){

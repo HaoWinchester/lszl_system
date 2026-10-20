@@ -81,10 +81,10 @@ document.addEventListener('DOMContentLoaded',()=>{
         const msg='审计日志导入完成：'+parts.join('，');
         if(status){status.textContent=msg;status.className='smalltxt '+(result.conflicts||result.invalid?'warn':'ok')}
         toast(msg);
-        if(result.conflicts)alert(`审计日志已合并，但发现 ${result.conflicts} 条 auditId 冲突。为保护审计链，已保留本机记录且未覆盖。\n\n冲突 ID：\n${result.conflictIds.slice(0,20).join('\n')}${result.conflictIds.length>20?'\n…':''}`);
+        if(result.conflicts)await window.KGDialogs.alert(`审计日志已合并，但发现 ${result.conflicts} 条 auditId 冲突。为保护审计链，已保留本机记录且未覆盖。\n\n冲突 ID：\n${result.conflictIds.slice(0,20).join('\n')}${result.conflictIds.length>20?'\n…':''}`);
       }catch(err){
         if(status){status.textContent='导入失败：'+err.message;status.className='smalltxt bad'}
-        alert('审计日志导入失败：'+err.message);
+        await window.KGDialogs.alert('审计日志导入失败：'+err.message);
       }finally{e.target.value=''}
     }));
   }

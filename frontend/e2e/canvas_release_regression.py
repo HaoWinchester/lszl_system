@@ -75,6 +75,7 @@ def main():
                         server = start_canvas_server()
                 raise subprocess.CalledProcessError(result.returncode, result.args)
 
+            run_with_fresh_db('canvas-tools-theme-browser.py', attempts=1)
             run_with_fresh_db('canvas-ink-browser.py')
             server = start_canvas_server()
             try:

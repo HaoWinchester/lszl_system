@@ -22,6 +22,7 @@ from urllib.request import urlopen
 from uuid import uuid4
 
 from playwright.sync_api import BrowserContext, Page, sync_playwright
+from helpers.dialog_actions import respond_dialog
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -375,8 +376,8 @@ def exercise(page: Page, context: BrowserContext, base: str, database_url: str) 
     assert page.locator(".kr-node").count() == 3
     assert page.locator("#krResetBtn").is_enabled()
 
-    page.once("dialog", lambda dialog: dialog.accept())
     page.locator("#krResetBtn").click()
+    respond_dialog(page,"清除这道题")
     page.wait_for_function("document.querySelectorAll('.kr-node').length === 0")
     wait_saved(page)
     assert "新版：风险发生后" in page.locator("#krQuestionCard").inner_text()
@@ -465,8 +466,8 @@ def historical_audit(base: str, database: str, *, baseline: bool = False, source
         denied=context.request.put(base+f'/api/v1/recall/progress/{qid}{scope}',data={'expectedRevision':after['progressRevision'],'questionRevision':2,'libraryHash':(after['currentLibrary'] or after['library'])['contentHash'],'nodes':[],'edges':[],'graphSchemaVersion':3})
         assert denied.status==409, denied.text()
         assert assert_ok(context.request.get(base+session_path),'preserved history')['progress']==after['progress']
-        page.once('dialog',lambda dialog:dialog.dismiss())
         page.locator('#krResetBtn').click()
+        respond_dialog(page,'清除这道题',accept=False)
         assert page.locator('.kr-node').count()==expected_nodes
         page.screenshot(path=str(REPO_ROOT/'artifacts/deep-recall-history-audit/history-preserved.png'))
         print(json.dumps({'historicalNodes':expected_nodes,'historicalEdges':len(after['progress']['edges']),'revision':after['progressRevision'],'readonly':True,'explicitResetAvailable':True,'sourceOverride':source_override}),flush=True)

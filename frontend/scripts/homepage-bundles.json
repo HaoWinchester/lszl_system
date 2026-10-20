@@ -5,6 +5,7 @@
       "initial": true,
       "defer": false,
       "scripts": [
+        "src/00-dialogs.js",
         "teaching-content-sync.js",
         "runtime-config.override.js",
         "auth-session-bootstrap.js",
@@ -36,6 +37,7 @@
         "src/39-global-shortcuts.js"
       ],
       "styles": [
+        "styles/dialogs.css",
         "styles/main.css",
         "styles/custom-cursor.css",
         "styles/global-shortcuts.css",
@@ -49,6 +51,7 @@
         "styles/graph-user-preferences.css",
         "styles/unified-canvas-runtime.css",
         "styles/canvas-ink.css",
+        "styles/canvas-toolbar.css",
         "styles/canvas-table.css",
         "styles/canvas-color-picker.css",
         "styles/home-graph-components.css",
@@ -109,6 +112,7 @@
         "src/23-graph-file-remote-store.js",
         "src/23-graph-file-editor-store-bridge.js",
         "src/canvas/dom-interaction.js",
+        "src/canvas/toolbar.js",
         "src/canvas/94-canvas-ink.js",
         "src/canvas/table-model.js",
         "src/canvas/table-clipboard.js",

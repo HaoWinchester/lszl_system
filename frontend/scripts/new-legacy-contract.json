@@ -12,6 +12,8 @@
     "knowledge-recall.html"
   ],
   "requiredFiles": [
+    "src/00-dialogs.js",
+    "styles/dialogs.css",
     "styles/landing.css",
     "src/landing.js",
     "assets/landing/graph.png",
@@ -175,6 +177,8 @@
       "kg_question_danmaku_hidden_v1__",
       "kg_question_danmaku_settings_v1__",
       "kg_practice_sound_v1__",
+      "kg_deep_recall_theme_v1__",
+      "kg_multi_question_theme_v1__",
       "kg_multi_question_analysis_sections_v1__",
       "kg_multi_question_font_scale_v1__",
       "kg_multi_question_highlight_color_v1__",

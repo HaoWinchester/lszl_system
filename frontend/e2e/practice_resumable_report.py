@@ -905,6 +905,7 @@ def run_matrix() -> None:
             background_page.close()
             page.bring_to_front()
             def cancel_leave(dialog):
+                assert dialog.type == 'beforeunload', (dialog.type, dialog.message)
                 dialog.dismiss()
             page.on("dialog", cancel_leave)
             page.close(run_before_unload=True)
@@ -927,7 +928,10 @@ def run_matrix() -> None:
             page.locator("#practiceNextBtn").click()
             page.locator('[data-option-id="A"]').first.click()
             page.wait_for_timeout(750)
-            page.on("dialog", lambda dialog: dialog.accept())
+            def accept_leave(dialog):
+                assert dialog.type == 'beforeunload', (dialog.type, dialog.message)
+                dialog.accept()
+            page.on("dialog", accept_leave)
             page.close(run_before_unload=True)
             deadline = time.monotonic() + 10
             while time.monotonic() < deadline:
@@ -940,7 +944,7 @@ def run_matrix() -> None:
             # ---- matrix 13: refresh saves and duplicate lifecycle is idempotent ----
             page = context.new_page()
             page.on("pageerror", lambda error: page_errors.append(str(error)))
-            page.on("dialog", lambda dialog: dialog.accept())
+            page.on("dialog", accept_leave)
             page.goto(f"{base}/practice-mode.html", wait_until="networkidle")
             page.locator("#practiceHistoryOpenBtn").click()
             page.locator(f'[data-history-practice="{ids["paper"]}"]').click()

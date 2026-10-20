@@ -3170,11 +3170,11 @@
     notify(editingId?'已更新分组。':'已建立分组；可拖动分组标题整体移动。');
     return true;
   }
-  function removeGroup(groupId){
+  async function removeGroup(groupId){
     if(!canEdit())return false;
     const group=(state.workspace?.groups||[]).find(item=>String(item.id)===String(groupId));
     if(!group)return false;
-    if(global.confirm?.('解散“'+group.title+'”？卡片和关系不会被删除。')===false)return false;
+    const target=state.workspaceId;if(!await global.KGDialogs.confirm('解散“'+group.title+'”？卡片和关系不会被删除。',{danger:true})||target!==state.workspaceId||!canEdit())return false;
     const before=workspaceSnapshot();
     state.suppressStoreEvent=true;
     try{store()?.removeGroup?.(groupId,workspaceOptions())}finally{state.suppressStoreEvent=false}
@@ -3648,11 +3648,11 @@
     if(!result?.edge)return false;state.workspace=result.workspace||store()?.ensure?.(workspaceOptions())||state.workspace;
     const after=workspaceSnapshot();pushWorkspaceHistory(label||'修改关系',before,after);renderEdges();showEdgeQuickMenu(edgeId);notify((label||'关系已更新')+'。');return true;
   }
-  function deleteEdgeById(edgeId,options={}){
+  async function deleteEdgeById(edgeId,options={}){
     if(!canEdit())return false;
-    let approved=true;
-    if(options.confirm!==false){try{approved=global.confirm?.('删除这条关系线？')!==false}catch(e){}}
-    if(!approved)return false;
+    const target=state.workspaceId;
+    if(options.confirm!==false&&!await global.KGDialogs.confirm('删除这条关系线？',{danger:true}))return false;
+    if(target!==state.workspaceId||!canEdit())return false;
     const before=workspaceSnapshot();state.suppressStoreEvent=true;try{store()?.removeEdge?.(edgeId,workspaceOptions())}finally{state.suppressStoreEvent=false}
     state.workspace=store()?.ensure?.(workspaceOptions())||state.workspace;state.selectedEdgeIds.delete(String(edgeId));const after=workspaceSnapshot();pushWorkspaceHistory('删除关系',before,after);hideEdgeQuickMenu();hideEdgeInlineEditor();renderEdges();notify('已删除关系。');return true;
   }
@@ -4074,14 +4074,12 @@
     if(!questionSourcesLoading)void rebuildQuestionSources();
     return true;
   }
-  function createWorkspace(){
+  async function createWorkspace(){
     if(!canEdit())return null;
     let title='新建解题画布';
-    try{
-      const entered=global.prompt?.('请输入画布名称',title);
-      if(entered===null)return null;
-      title=String(entered||title).trim()||title;
-    }catch(e){}
+    const entered=await global.KGDialogs.prompt('请输入画布名称',title);
+    if(entered===null||!canEdit())return null;
+    title=String(entered||title).trim()||title;
     const workspace=store()?.createWorkspace?.(title,{activate:false});
     if(workspace){
       global.KGMultiQuestionWorkspaceTabs?.reopen?.(workspace.id);
@@ -4104,16 +4102,14 @@
     }
     return workspace;
   }
-  function renameWorkspace(workspaceId=state.workspaceId){
+  async function renameWorkspace(workspaceId=state.workspaceId){
     if(!canEdit())return null;
     workspaceId=String(workspaceId||state.workspaceId||'');
     const summary=(store()?.listWorkspaces?.()||[]).find(item=>String(item.id)===workspaceId);
     let title=summary?.title||(workspaceId===state.workspaceId?state.workspace?.title:'')||'';
-    try{
-      const entered=global.prompt?.('请输入新的画布名称',title);
-      if(entered===null)return null;
-      title=String(entered||'').trim();
-    }catch(e){}
+    const entered=await global.KGDialogs.prompt('请输入新的画布名称',title);
+    if(entered===null||!canEdit())return null;
+    title=String(entered||'').trim();
     return renameWorkspaceTo(workspaceId,title);
   }
   async function manualSaveWorkspace(){
@@ -4125,12 +4121,10 @@
     return false;
   }
 
-  function deleteWorkspace(workspaceId=state.workspaceId){
+  async function deleteWorkspace(workspaceId=state.workspaceId){
     if(!canEdit())return null;
     workspaceId=String(workspaceId||state.workspaceId||'');
-    let approved=true;
-    try{approved=global.confirm?.('删除当前多题画布？其中的题目引用和布局会被删除，原题和学习记录不受影响。')!==false}catch(e){}
-    if(!approved)return null;
+    if(!await global.KGDialogs.confirm('删除当前多题画布？其中的题目引用和布局会被删除，原题和学习记录不受影响。',{danger:true})||!canEdit())return null;
     const result=store()?.deleteWorkspace?.(workspaceId);
     if(result){
       global.KGMultiQuestionWorkspaceTabs?.forget?.(workspaceId);
@@ -4605,6 +4599,7 @@
     if(button){
       button.classList.toggle('active',pan);
       button.innerHTML=pan?POINTER_HAND_ICON:POINTER_ARROW_ICON;
+      global.KGCanvasToolbar?.present(button,'select',pan?'手型':'选择');
       const label=pan?'手型浏览模式（V）':'箭头编辑模式（V）';
       button.title=label;
       button.setAttribute('aria-label',label);
@@ -5852,16 +5847,7 @@
     const themeController=global.KGLearningTheme?.create?.({scope:'workspace',roots:()=>[document.body]});
     themeController?.init();
     applyWorkspaceBackground();
-    const themeSelect=byId('qwThemeSelect');
-    if(themeSelect){
-      themeSelect.value=themeController?themeController.saved():'platform';
-      themeSelect.addEventListener('change',()=>{if(themeController)themeController.apply(themeSelect.value);themeSelect.blur()});
-      global.addEventListener('kg:deep-recall-theme-change',event=>{
-        if(event.detail?.scope!=='workspace')return;
-        const next=String(event.detail?.theme||'platform');
-        if(themeSelect.value!==next)themeSelect.value=next;
-      });
-    }
+    global.KGLearningTheme?.bindControls(themeController,byId('qwThemeSelect'));
     state.ink=global.KGCanvasInk?.create?.({
       trigger:byId('qwInkBtn'),viewport:state.viewport,world:state.world,history:state.kernel.history,showHistory:true,
       getViewport:()=>({x:state.panX,y:state.panY,scale:state.zoom}),
@@ -5874,14 +5860,23 @@
       },
       persistText:()=>global.KGCanvasWorkspaceAdapter.flush({throwOnError:true}),
       onError:notify,onDrawMode:()=>{setPointerMode('edit');clearCardSelection();clearEdgeSelection();setActiveGroup('')},
-      onLongPressEraser:()=>{
+      onLongPressEraser:async()=>{
         if(state.readonly||!state.workspace)return;
         if(!(state.workspace.strokes||[]).length){notify('当前画布没有可清除的笔迹。');return}
-        if(!global.confirm('确认清空整套试卷画布上的全部笔迹？清空后可按 Ctrl/Command+Z 撤销。'))return;
+        const target=state.workspace.id;if(!await global.KGDialogs.confirm('确认清空整套试卷画布上的全部笔迹？清空后可按 Ctrl/Command+Z 撤销。',{danger:true})||target!==state.workspace?.id||state.readonly)return;
         if(!state.ink?.clearAll('清空整套试卷笔迹'))notify('清空笔迹失败，请重试。');
       }
     });
     global.KGWorkspaceInk=state.ink;
+    const ui=global.KGCanvasToolbar,tools=byId('qwInkBtn')?.parentElement;
+    if(ui&&tools){
+      tools.querySelectorAll('.qw-overlay-divider').forEach(element=>element.remove());
+      ui.group(tools,'选择与绘制',[[byId('qwPointerModeBtn'),'select','选择'],[byId('qwInkBtn'),'pen','画笔']]);
+      ui.group(tools,'显示与导出',[[byId('qwCaptureBtn'),'camera','截图'],[byId('qwFontScaleBtn'),'font','字号'],[byId('qwResetViewBtn'),'fit','重置']]);
+      const theme=tools.querySelector('.learning-theme-menu');if(theme)tools.append(theme);
+      const history=byId('qwLayoutToolbar');ui.present(byId('qwUndoBtn'),'undo','撤销');ui.present(byId('qwRedoBtn'),'redo','重做');history?.classList.add('canvas-toolbar');
+    }
+
     // 可编辑表格：workspace.tables 经 65 store 直写；历史并入 kernel 命令栈（与卡牌/笔迹共用撤销）。
     // 表格功能暂时下线（ENABLED=false）：入口隐藏、控制器不启动，已存数据保留。
     state.tablesController=(global.KGCanvasTableModel?.ENABLED===false)?null:global.KGCanvasTableController?.create?.({

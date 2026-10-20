@@ -37,7 +37,7 @@
     if(!result.valid)return notify('标签保存失败。');$('ccTagDialog').close();render();Center()?.rerender?.();notify('标签已保存。');
   }
   async function removeTag(id){
-    const tag=Org.getTags().find(item=>item.id===id);if(!tag)return;if(!confirm(`删除标签“${tag.name}”？`))return;const result=await Org.deleteTag(id);if(!result.valid)return notify(result.errors.join('；'));const filter=$('ccTagFilter');if(filter?.value===id){filter.value='';filter.dispatchEvent(new Event('change'))}render();Center()?.rerender?.();notify('标签已删除。');
+    const tag=Org.getTags().find(item=>item.id===id);if(!tag)return;if(!await window.KGDialogs.confirm(`删除标签“${tag.name}”？`,{danger:true}))return;const result=await Org.deleteTag(id);if(!result.valid)return notify(result.errors.join('；'));const filter=$('ccTagFilter');if(filter?.value===id){filter.value='';filter.dispatchEvent(new Event('change'))}render();Center()?.rerender?.();notify('标签已删除。');
   }
 
   function openMeta(ids){
@@ -67,9 +67,9 @@
     const list=Org.getCollections({subjectId:subjectId(),status:'active'}).filter(item=>item.type==='collection');$('ccCollectionSelect').innerHTML='<option value="">不选择现有题集</option>'+list.map(item=>`<option value="${escapeHTML(item.id)}">${escapeHTML(item.title)}（${item.activityIds.length}）</option>`).join('');$('ccCollectionSelect').value='';$('ccCollectionNewTitle').value='';$('ccCollectionNewDescription').value='';$('ccCollectionDialog').showModal();requestAnimationFrame(()=>$('ccCollectionNewTitle').focus());
   }
   async function editCollection(id){
-    const item=Org.getCollections().find(collection=>collection.id===id);if(!item)return;const title=prompt('题集名称',item.title);if(title===null)return;const description=prompt('题集说明',item.description||'');if(description===null)return;const result=await Org.saveCollection({...item,title:clean(title)||item.title,description:clean(description)});if(!result?.valid)return notify(result?.errors?.join('；')||'题集保存失败。');render();Center()?.rerender?.();notify('题集已更新。');
+    const item=Org.getCollections().find(collection=>collection.id===id);if(!item)return;const title=await window.KGDialogs.prompt('题集名称',item.title);if(title===null)return;const description=await window.KGDialogs.prompt('题集说明',item.description||'');if(description===null)return;const result=await Org.saveCollection({...item,title:clean(title)||item.title,description:clean(description)});if(!result?.valid)return notify(result?.errors?.join('；')||'题集保存失败。');render();Center()?.rerender?.();notify('题集已更新。');
   }
-  async function removeCollection(id){const item=Org.getCollections().find(collection=>collection.id===id);if(!item)return;if(!confirm(`删除题集“${item.title}”？不会删除原活动。`))return;const result=await Org.deleteCollection(id);if(!result.valid)return notify(result.errors.join('；'));Center()?.setCollectionFilter?.('');render();Center()?.rerender?.();notify('题集已删除。')}
+  async function removeCollection(id){const item=Org.getCollections().find(collection=>collection.id===id);if(!item)return;if(!await window.KGDialogs.confirm(`删除题集“${item.title}”？不会删除原活动。`,{danger:true}))return;const result=await Org.deleteCollection(id);if(!result.valid)return notify(result.errors.join('；'));Center()?.setCollectionFilter?.('');render();Center()?.rerender?.();notify('题集已删除。')}
   async function createEmptyCollection(){
     const title=clean($('ccCollectionNewTitle').value);if(!title)return notify('请输入新题集名称。');const result=await Org.saveCollection({title,description:clean($('ccCollectionNewDescription').value),subjectId:subjectId(),type:'collection',activityIds:collectionTargets});if(!result?.valid)return notify(result?.errors?.join('；')||'题集创建失败。');$('ccCollectionDialog').close();render();Center()?.rerender?.();notify(collectionTargets.length?'题集已创建并加入活动。':'空题集已创建。');return result;
   }

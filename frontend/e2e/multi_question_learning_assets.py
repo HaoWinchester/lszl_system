@@ -8,6 +8,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 from playwright.sync_api import APIRequestContext, BrowserContext, Page, sync_playwright
+from app_dialogs import respond_app_dialog
 
 
 BASE = os.environ.get("E2E_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
@@ -265,8 +266,8 @@ def test_workflow(browser, username_a: str, username_b: str, release: dict, ques
 
         # Workspace B inserts the same card; editing it hydrates workspace A on reopen.
         workspace_a = page.evaluate("KGMultiQuestionWorkspace.activeWorkspaceId()")
-        page.once("dialog", lambda dialog: dialog.accept("全局卡工作区 B"))
         page.locator("#qwCreateWorkspaceBtn").click()
+        respond_app_dialog(page, value="全局卡工作区 B", message="画布名称")
         page.wait_for_function("previous=>KGMultiQuestionWorkspace.activeWorkspaceId()!==previous", arg=workspace_a)
         workspace_b = page.evaluate("KGMultiQuestionWorkspace.activeWorkspaceId()")
         set_drawer_open(page, "#qwPersonalCardsDrawer", "#qwPersonalCardsBtn", True)

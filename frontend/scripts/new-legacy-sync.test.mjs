@@ -21,6 +21,8 @@ const requiredPages = [
   'knowledge-recall.html',
 ]
 const requiredFiles = [
+  'src/00-dialogs.js',
+  'styles/dialogs.css',
   'styles/landing.css',
   'src/landing.js',
   'assets/landing/graph.png',
@@ -114,7 +116,9 @@ function fixture({ omit, omitP45MigrationManifest = false } = {}) {
   }
   for (const path of requiredFiles) {
     if (path === omit) continue
-    const content = path.endsWith('.json')
+    const content = ['src/00-dialogs.js', 'styles/dialogs.css'].includes(path)
+      ? readFileSync(resolve(scriptsDir, '..', '..', 'new-legacy', path), 'utf8')
+      : path.endsWith('.json')
       ? '{"type":"object"}\n'
       : path === 'src/64-flow-orchestrator.js'
         ? `'use strict';\n(function(global){\n  let active=null;\n  let runtimeKey='';\n  function useSession(session,reason='restore'){\n    active=session;\n    try{global.dispatchEvent(new CustomEvent('kg:learning-session-changed',{detail:{reason,session:active}}))}catch(e){}\n    return active;\n  }\n  function persist(current,saved){\n    active=saved;\n    runtimeKey=makeRuntimeKey(saved);\n    return saved;\n  }\n})(window);\n`

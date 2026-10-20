@@ -64,14 +64,14 @@ test('recall transition flush bypasses only temporary lock, never session permis
 });
 test('recall reset freezes edits while pending and restores access on failure',async()=>{
   const pending=deferred(),notices=[];
-  const context={recallTransitionBusy:false,recallSession:{versionState:'current'},
+  const context={questionSessionToken:1,window:{KGDialogs:{confirm:async()=>true}},recallTransitionBusy:false,recallSession:{versionState:'current'},
     isRecallReadonly:()=>context.recallTransitionBusy,confirm:()=>true,cancelProgressSave(){},
     setRecallTransitionBusy:value=>{context.recallTransitionBusy=value},
     recallAdapter:{resetToCurrent:()=>pending.promise},notifyRecallLimit:message=>notices.push(message)
   };
   vm.createContext(context);
   vm.runInContext(section(read('86-knowledge-recall.js'),'async function resetProgress(){','function isTextEditingTarget('),context);
-  const result=context.resetProgress();assert.equal(context.isRecallReadonly(),true);
+  const result=context.resetProgress();await new Promise(resolve=>setImmediate(resolve));assert.equal(context.isRecallReadonly(),true);
   assert.equal(await context.resetProgress(),false);
   pending.reject(new Error('offline'));await result;
   assert.equal(context.isRecallReadonly(),false);assert.equal(notices[0],'offline');
@@ -91,7 +91,7 @@ function workspace(){
     clamp:(n,min,max)=>Math.max(min,Math.min(max,n)),MIN_ZOOM:.01,MAX_ZOOM:4
   };
   vm.createContext(context);
-  vm.runInContext(section(read('77-multi-question-workspace.js'),'function loadWorkspace(workspaceId,options={}){','function createWorkspace(){'),context);
+  vm.runInContext(section(read('77-multi-question-workspace.js'),'function loadWorkspace(workspaceId,options={}){','async function createWorkspace(){'),context);
   return {context,state,pending,notices,activated};
 }
 test('workspace activation waits for persistence and rejects concurrent switches',async()=>{

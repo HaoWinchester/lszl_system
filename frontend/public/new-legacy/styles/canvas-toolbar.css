@@ -1,0 +1,18 @@
+/* One canvas toolbar language: explicit icons, compact labels and named groups. */
+.canvas-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:6px;color:#514a65;background:#fff;border:1px solid #e3deec;border-radius:12px;padding:6px;box-shadow:0 3px 14px #4034570c}
+.canvas-tool-group{display:flex;align-items:center;gap:3px;min-width:0;padding:0 4px;border-right:1px solid #e8e3ef}.canvas-tool-group:last-child{border-right:0}
+.canvas-toolbar .canvas-tool-button{display:inline-flex!important;align-items:center;justify-content:center;gap:5px;flex:0 0 auto;width:auto!important;min-width:36px!important;height:36px!important;padding:6px 8px!important;border:0!important;border-radius:7px!important;background:transparent;color:inherit;font:12px/1.25 system-ui;white-space:nowrap;cursor:pointer}
+.canvas-toolbar .canvas-tool-button:hover{background:#f1edfa}.canvas-toolbar .canvas-tool-button[aria-pressed=true]{background:#ece6fb;color:#6d42c5}.canvas-toolbar .canvas-tool-button:disabled{opacity:.4;cursor:default}
+.canvas-toolbar .canvas-tool-button:focus-visible{outline:2px solid #7952d4;outline-offset:2px}
+.canvas-toolbar .canvas-tool-button svg{display:block!important;flex:0 0 18px!important;width:18px!important;height:18px!important;min-width:18px;fill:none!important;stroke:currentColor!important;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+.canvas-toolbar .canvas-tool-label{display:inline!important;margin:0!important;color:inherit!important;font-size:11px!important;font-weight:500}
+.related-canvas-header-actions.canvas-toolbar{justify-content:flex-start;max-width:100%;gap:4px!important;box-shadow:none}.related-canvas-header{flex-wrap:wrap}.related-canvas-header-actions .canvas-tool-group{padding:0 3px}
+.canvas-ink-tools.canvas-toolbar{padding:0;border:0;box-shadow:none;background:transparent}.canvas-ink-tools .canvas-tool-group{padding:0 2px}.canvas-ink-tools .canvas-tool-label{font-size:10px!important}
+@media(max-width:700px){.canvas-toolbar .canvas-tool-button{min-height:40px!important;height:40px!important;padding:5px 7px!important}.canvas-toolbar .canvas-tool-group{gap:1px;padding:0 2px}.related-canvas-header{padding:10px!important;gap:8px}.related-canvas-header-actions.canvas-toolbar{width:100%;max-height:136px;overflow:auto}.canvas-ink-toolbar{max-width:calc(100vw - 20px)}.canvas-ink-tools.canvas-toolbar{max-width:calc(100vw - 34px);flex-wrap:wrap;justify-content:center}}
+/* The old coarse-pointer layout hid the entire utility row, including themes. */
+@media(max-width:780px) and (pointer:coarse){
+  .question-workspace-page .qw-overlay-right.canvas-toolbar{display:flex!important;position:absolute;left:7px;right:7px;top:58px;max-width:calc(100% - 14px);justify-content:flex-start;gap:4px;z-index:210}
+  .question-workspace-page .qw-overlay-right.canvas-toolbar .learning-theme-menu{margin-left:auto}
+  .question-workspace-page .qw-layout-toolbar-global{display:none!important}
+  .knowledge-recall-page .kr-canvas-action-group.canvas-toolbar{max-width:calc(100vw - 20px);flex-wrap:wrap}
+}

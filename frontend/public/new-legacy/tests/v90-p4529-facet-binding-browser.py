@@ -62,7 +62,6 @@ def run() -> None:
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page(viewport={"width": 1360, "height": 900})
-        page.on("dialog", lambda dialog: dialog.accept())
 
         # file:// 页面无法走 playwright route，直接 stub window.fetch 模拟服务器
         stub = """

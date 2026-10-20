@@ -25,13 +25,13 @@
   }
   function bind(){
     sync();
-    document.addEventListener('click',event=>{
+    document.addEventListener('click',async event=>{
       const button=event.target.closest?.('[data-question-language]');
       if(!button)return;
       const requested=schema()?.normalizeLanguageMode?.(button.dataset.questionLanguage)||'zh';
       const next=isStudentPage()?(schema()?.normalizeStudentLanguageMode?.(requested)||'zh'):requested;
       if(next===mode())return;
-      if(isStudentPage()&&global.confirm?.('切换题目显示方式会重新加载当前练习，未完成的本页答题状态将清空。是否继续？')===false)return;
+      if(isStudentPage()&&await window.KGDialogs.confirm('切换题目显示方式会重新加载当前练习，未完成的本页答题状态将清空。是否继续？',{danger:true})===false)return;
       schema()?.setLanguageMode?.(next);
       sync();
       if(!isLiveFreeModePage())global.location?.reload?.();

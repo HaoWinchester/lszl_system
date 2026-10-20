@@ -9,6 +9,7 @@ from pathlib import Path
 from threading import Thread
 
 from playwright.sync_api import sync_playwright
+from helpers.dialog_actions import respond_dialog
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -97,7 +98,6 @@ def inspect_runtime(browser):
           }));
         }"""
     )
-    page.on('dialog', lambda dialog: dialog.accept())
     page.on('pageerror', lambda error: errors.append(f'pageerror:{error}'))
     page.on('console', lambda message: errors.append(f'console:{message.text}') if message.type == 'error' else None)
     try:
@@ -152,7 +152,6 @@ def inspect_chrome_runtime(browser):
           }));
         })();"""
     )
-    page.on('dialog', lambda dialog: dialog.accept('界面验证画布') if dialog.type == 'prompt' else dialog.accept())
     page.on('pageerror', lambda error: errors.append(f'pageerror:{error}'))
     page.on('console', lambda message: errors.append(f'console:{message.text}') if message.type == 'error' else None)
     try:
@@ -160,6 +159,7 @@ def inspect_chrome_runtime(browser):
         page.locator('.qt-canvas-shell').wait_for(state='visible')
         page.locator('.qt-back-link [data-ui-icon-ready]').wait_for(state='attached')
         page.locator('.qt-language-switch [data-question-language="bilingual"]').click()
+        respond_dialog(page,'切换题目显示方式')
         if page.locator('.qt-language-switch [data-question-language="bilingual"]').get_attribute('aria-pressed') != 'true':
             raise AssertionError('question-training.html: language switch failed')
 
@@ -167,10 +167,12 @@ def inspect_chrome_runtime(browser):
         page.locator('.qw-canvas-shell').wait_for(state='visible')
         page.locator('.qw-back [data-ui-icon-ready]').wait_for(state='attached')
         page.locator('.qw-language-switch [data-question-language="zh"]').click()
+        respond_dialog(page,'切换题目显示方式')
         if page.locator('.qw-language-switch [data-question-language="zh"]').get_attribute('aria-pressed') != 'true':
             raise AssertionError('question-workspace.html: language switch failed')
         before_tabs = page.locator('.qw-workspace-tab').count()
         page.locator('#qwCreateWorkspaceBtn').click()
+        respond_dialog(page,'画布名称',text='界面验证画布')
         page.wait_for_timeout(100)
         if page.locator('.qw-workspace-tab').count() < before_tabs:
             raise AssertionError('question-workspace.html: workspace tabs regressed after create')
@@ -185,6 +187,7 @@ def inspect_chrome_runtime(browser):
         if theme != 'ocean':
             raise AssertionError(f'knowledge-recall.html: scene switch failed ({theme})')
         page.locator('.kr-language-switch [data-question-language="bilingual"]').click()
+        respond_dialog(page,'切换题目显示方式')
         if page.locator('.kr-language-switch [data-question-language="bilingual"]').get_attribute('aria-pressed') != 'true':
             raise AssertionError('knowledge-recall.html: language switch failed')
         if errors:

@@ -75,8 +75,18 @@ with sync_playwright() as pw:
     def open_chip(comment_id=target['id']):
         chip = page.locator(f'[data-danmaku-comment-id="{comment_id}"]')
         expect(chip).to_have_count(1)
-        # Freeze only motion for repeatable browser clicks; real DOM/CSS/actions remain.
-        chip.evaluate("e=>{e.style.animation='none';e.style.position='fixed';e.style.transform='none';e.style.left='min(120px,10vw)';e.style.top='160px'}")
+        # Same-question refresh now retains each real chip. Restore the previous
+        # test-only freeze before moving another chip into the click position.
+        # Never hide other chips or force pointer actions through an overlap.
+        chip.evaluate("""e=>{
+          const previous=window.__danmakuTestFreeze;
+          if(previous?.element?.isConnected)previous.element.style.cssText=previous.cssText;
+          window.__danmakuTestFreeze={element:e,cssText:e.style.cssText};
+          e.style.animation='none';e.style.position='fixed';e.style.transform='none';
+          e.style.left='min(120px,10vw)';
+          e.style.top=Math.round(e.closest('.q-danmaku').getBoundingClientRect().bottom+16)+'px';
+        }""")
+        assert chip.evaluate("e=>{const r=e.getBoundingClientRect();return e.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))}"), 'Stable test chip must receive a real pointer click'
         chip.click()
         expect(page.locator('[data-danmaku-pop]')).to_be_visible()
 

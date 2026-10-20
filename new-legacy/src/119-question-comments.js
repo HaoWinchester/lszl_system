@@ -27,6 +27,60 @@
   }
   const API_ROOT = '/api/v1/questions/'
   const MAX_CONTENT = 200
+  // Microsoft Fluent Emoji artwork: assets/emoji/fluent/LICENSE (MIT). Text remains portable Unicode.
+  const COMMENT_EMOJI = [["😊", "微笑", "faces"], ["👍", "赞", "gestures"], ["🙋", "举手", "gestures"], ["🎉", "庆祝", "learning"], ["🤔", "思考", "faces"], ["💡", "灵感", "learning"], ["✅", "完成", "learning"], ["👏", "鼓掌", "gestures"], ["❤️", "爱心", "learning"], ["📚", "学习", "learning"], ["💪", "加油", "gestures"], ["🙏", "感谢", "gestures"], ["😀", "开心", "faces"], ["😁", "笑容", "faces"], ["😆", "大笑", "faces"], ["😂", "笑哭", "faces"], ["🤣", "捧腹大笑", "faces"], ["🙂", "浅笑", "faces"], ["😉", "眨眼", "faces"], ["🥰", "喜爱", "faces"], ["😍", "心动", "faces"], ["😎", "酷", "faces"], ["🤩", "惊喜", "faces"], ["🥳", "欢呼", "faces"], ["😅", "流汗笑", "faces"], ["😇", "天使", "faces"], ["🤗", "拥抱", "faces"], ["🤭", "偷笑", "faces"], ["🤫", "安静", "faces"], ["🧐", "仔细看看", "faces"], ["😐", "平静", "faces"], ["🙄", "无奈", "faces"], ["😴", "睡觉", "faces"], ["😭", "大哭", "faces"], ["😮", "惊讶", "faces"], ["🥺", "恳求", "faces"], ["😤", "打气", "faces"], ["😔", "难过", "faces"], ["😷", "口罩", "faces"], ["🤯", "震惊", "faces"], ["👋", "你好", "gestures"], ["👌", "好的", "gestures"], ["🤝", "握手", "gestures"], ["✌️", "胜利", "gestures"], ["✍️", "记笔记", "learning"], ["🎯", "目标", "learning"], ["⭐", "星星", "learning"], ["🔥", "热情", "learning"]]
+  const emojiAsset = value => 'assets/emoji/fluent/'+Array.from(value).map(char=>char.codePointAt(0).toString(16)).filter(code=>code!=='fe0f').join('-')+'.svg'
+  const emojiNames=new Map(COMMENT_EMOJI.map(([emoji,name])=>[emoji,name]))
+  const emojiSegments=typeof Intl.Segmenter==='function'?new Intl.Segmenter('zh',{granularity:'grapheme'}):null
+  function commentContentMarkup(value) {
+    if(!emojiSegments)return escapeHTML(value)
+    return [...emojiSegments.segment(text(value))].map(({segment})=>emojiNames.has(segment)?`<img class="q-inline-emoji" data-comment-emoji="${segment}" src="${emojiAsset(segment)}" alt="${segment}" title="${emojiNames.get(segment)}" width="20" height="20" loading="lazy"/>`:escapeHTML(segment)).join('')
+  }
+  function emojiImageFallback(event) {
+    const img=event.target
+    if(img.tagName!=='IMG')return
+    if(img.dataset.commentEmoji){img.replaceWith(document.createTextNode(img.dataset.commentEmoji));return}
+    if(img.closest('[data-qc-emoji]')){img.hidden=true;const fallback=img.nextElementSibling;if(fallback)fallback.hidden=false}
+  }
+  function emojiPickerMarkup(state) {
+    return `<div class="q-emoji-picker" data-qc-emoji-picker ${state.emojiExpanded?'':'hidden'} role="dialog" aria-label="基础表情">
+      <div class="q-emoji-head"><strong>基础表情</strong><button type="button" data-qc-action="emoji-close" aria-label="关闭表情">×</button></div>
+      <div class="q-emoji-categories" role="group" aria-label="表情分类">${[['all','全部'],['faces','笑脸'],['gestures','手势'],['learning','学习']].map(([id,label])=>`<button type="button" data-qc-action="emoji-category" data-qc-emoji-category="${id}" aria-pressed="${(state.emojiCategory||'all')===id}">${label}</button>`).join('')}</div>
+      <div class="q-emoji-grid">${COMMENT_EMOJI.map(([emoji,name,group])=>`<button type="button" data-qc-action="emoji-insert" data-qc-emoji="${emoji}" data-qc-emoji-group="${group}" title="${name}" aria-label="插入${name}" ${(state.emojiCategory&&state.emojiCategory!=='all'&&state.emojiCategory!==group)?'hidden':''}><img src="${emojiAsset(emoji)}" alt="" width="28" height="28"/><span class="q-emoji-fallback" hidden>${emoji}</span></button>`).join('')}</div>
+      <small>选择表情后继续输入评论</small></div>`
+  }
+  function positionEmojiPicker(instance) {
+    const picker=instance.drawer?.querySelector('[data-qc-emoji-picker]'),button=instance.drawer?.querySelector('[data-qc-action="emoji-toggle"]')
+    if(!picker||picker.hidden||!button)return
+    const view=global.visualViewport,width=view?.width||global.innerWidth,height=view?.height||global.innerHeight,x=view?.offsetLeft||0,y=view?.offsetTop||0
+    picker.style.width=Math.min(344,width-24)+'px';picker.style.maxHeight=Math.max(120,Math.min(310,height-24))+'px'
+    const anchor=(instance.drawer.querySelector('.q-composer')||button).getBoundingClientRect(),rect=picker.getBoundingClientRect()
+    picker.style.left=Math.max(x+12,Math.min(anchor.left,x+width-rect.width-12))+'px'
+    picker.style.top=Math.max(y+12,Math.min(anchor.top-rect.height-8,y+height-rect.height-12))+'px'
+  }
+  function closeEmojiPicker(instance,focus=false) {
+    instance.state.emojiExpanded=false
+    const picker=instance.drawer?.querySelector('[data-qc-emoji-picker]'),button=instance.drawer?.querySelector('[data-qc-action="emoji-toggle"]')
+    if(picker)picker.hidden=true
+    button?.setAttribute('aria-expanded','false')
+    if(focus)button?.focus()
+  }
+  function positionDanmaku(instance) {
+    if(!instance?.overlay)return
+    let top=112
+    const button=document.getElementById('practiceLanguageCycle'),rect=button?.getBoundingClientRect()
+    if(rect&&rect.width&&rect.height&&rect.bottom>0&&rect.top<global.innerHeight)top=Math.max(top,rect.bottom+18)
+    instance.overlay.style.setProperty('--q-danmaku-top',Math.ceil(top)+'px')
+  }
+  let layoutFrame=0
+  function queueCommentLayout() {
+    if(layoutFrame)return
+    layoutFrame=global.requestAnimationFrame(()=>{layoutFrame=0;for(const instance of instances){positionDanmaku(instance);positionEmojiPicker(instance)}})
+  }
+  global.addEventListener('resize',queueCommentLayout,{passive:true})
+  global.addEventListener('scroll',queueCommentLayout,{passive:true,capture:true})
+  global.visualViewport?.addEventListener('resize',queueCommentLayout,{passive:true})
+  global.visualViewport?.addEventListener('scroll',queueCommentLayout,{passive:true})
   const DANMAKU_LIMIT = 8
   const DANMAKU_DURATION_SECONDS = 18
   const danmakuSettingsKey = () => 'kg_question_danmaku_settings_v1__' + encodeURIComponent(currentUser()?.username || 'guest')
@@ -138,7 +192,7 @@
   }
 
   function danmakuChipContent(comment) {
-    return `<span class="q-danmaku-content">${escapeHTML(comment.content)}</span>${danmakuLikeTail(comment)}`
+    return `<span class="q-danmaku-content">${commentContentMarkup(comment.content)}</span>${danmakuLikeTail(comment)}`
   }
 
   /* 点赞计数随弹幕滚动；统一复用公共线性图标。 */
@@ -164,7 +218,7 @@
         <span class="q-comment-author">${escapeHTML(comment.author)}</span>
         <span class="q-comment-time">${escapeHTML(formatTime(comment.createdAt))}</span>
         ${comment.parentId ? `<small class="q-comment-parent">回复：${escapeHTML(comment.parentContent || "原留言")}</small>` : ''}
-        <p class="q-comment-content">${escapeHTML(comment.content)}</p>
+        <p class="q-comment-content">${commentContentMarkup(comment.content)}</p>
         <div class="q-comment-actions">
           <button type="button" data-qc-action="reply">回复</button>
           <button type="button" data-qc-action="toggle-favorite" aria-pressed="${!!comment.myFavorite}">${comment.myFavorite ? '已收藏' : '收藏'}</button>
@@ -183,7 +237,7 @@
     return `<div class="q-composer">
       <textarea class="q-composer-input" rows="2" maxlength="${MAX_CONTENT}" placeholder="留下你的精彩评论吧"></textarea>
       <button type="button" class="q-emoji-toggle" data-qc-action="emoji-toggle" aria-expanded="${!!state.emojiExpanded}">表情</button>
-      <div class="q-emoji-picker" data-qc-emoji-picker ${state.emojiExpanded?'':'hidden'} aria-label="预设表情">${['😊','👍','🙋','🎉','🤔','💡','✅','👏','❤️','📚','💪','🙏'].map(emoji=>`<button type="button" data-qc-action="emoji-insert" data-qc-emoji="${emoji}" aria-label="插入${emoji}">${emoji}</button>`).join('')}</div>
+      ${emojiPickerMarkup(state)}
       ${state.sendError ? `<p class="q-composer-error" role="alert">${escapeHTML(state.sendError)}</p>` : ''}
       <div class="q-composer-foot"><span class="q-composer-count" data-qc-count>0/${MAX_CONTENT}</span><button type="button" class="q-composer-send" data-qc-action="send" disabled>发布</button></div>
     </div>`
@@ -269,6 +323,8 @@
     if (!overlay) return
     document.body.appendChild(overlay)
     instance.overlay = overlay
+    positionDanmaku(instance)
+    overlay.addEventListener('error',emojiImageFallback,true)
     overlay.addEventListener('click', event => {
       const item = event.target.closest('[data-danmaku-comment-id]')
       if (item) { showDanmakuPop(instance, item); return }
@@ -284,7 +340,7 @@
   function danmakuPopMarkup(comment) {
     return `<div class="q-danmaku-pop" data-danmaku-pop role="dialog" aria-label="弹幕互动">
       <div class="q-danmaku-pop-head"><div class="q-danmaku-pop-meta"><time datetime="${escapeHTML(comment.createdAt)}">${escapeHTML(formatTime(comment.createdAt))}</time></div><button type="button" class="q-danmaku-pop-close" data-qc-pop-action="close" aria-label="关闭弹幕互动">${danmakuIcon('x', '×')}</button></div>
-      <p class="q-danmaku-pop-text">${escapeHTML(comment.content)}</p>
+      <p class="q-danmaku-pop-text">${commentContentMarkup(comment.content)}</p>
       <div class="q-danmaku-pop-actions">
         <button type="button" data-qc-pop-action="like" class="${comment.myLike ? 'is-liked' : ''}" aria-pressed="${!!comment.myLike}">${danmakuIcon('heart')}<span>点赞 ${Number(comment.likeCount) || 0}</span></button>
         <button type="button" data-qc-pop-action="reply">${danmakuIcon('message-circle')}<span>回复</span></button>
@@ -467,7 +523,7 @@
     if (instance.disposed) return
     const { root, state } = instance
     const old = instance.drawer?.querySelector('.q-composer-input')
-    if (old) state.draft = old.value
+    if (old) {state.draft = old.value;state.selectionStart=old.selectionStart;state.selectionEnd=old.selectionEnd}
     root.innerHTML = collapsedMarkup({...state, expanded:false})
     root.querySelector('[data-qc-action="expand"]')?.setAttribute('aria-expanded', String(state.expanded))
     if (!state.expanded) {
@@ -486,11 +542,13 @@
       instance.drawer.focus()
       wireEvents({...instance, root:instance.drawer, owner:instance})
       instance.drawer.addEventListener('keydown', event => {
-        if (event.key === 'Escape') closeDrawer(instance)
+        if (event.key === 'Escape') {if(instance.state.emojiExpanded){event.stopPropagation();closeEmojiPicker(instance,true)}else closeDrawer(instance)}
+        if(event.key.startsWith('Arrow')&&event.target.matches('[data-qc-emoji]')){const buttons=[...instance.drawer.querySelectorAll('[data-qc-emoji]:not([hidden])')],index=buttons.indexOf(event.target),columns=Math.max(1,Math.round(instance.drawer.querySelector('.q-emoji-grid').clientWidth/40)),step=event.key==='ArrowLeft'?-1:event.key==='ArrowRight'?1:event.key==='ArrowUp'?-columns:columns;event.preventDefault();buttons[Math.max(0,Math.min(buttons.length-1,index+step))]?.focus()}
       })
       // 点击评论区以外的任意位置：收起评论区。
       instance.outsideDrawerClose = event => {
         if (instance.disposed || !instance.drawer) return
+        if(instance.state.emojiExpanded&&!event.target.closest('[data-qc-emoji-picker],[data-qc-action=emoji-toggle]')){closeEmojiPicker(instance);if(!instance.drawer.contains(event.target))return}
         if (instance.drawer.contains(event.target)) return
         if (event.target.closest('[data-danmaku-pop]')) return
         closeDrawer(instance)
@@ -501,6 +559,7 @@
     const composer = instance.drawer.querySelector('.q-composer-input')
     if (composer) {
       composer.value = state.draft || ''
+      if(Number.isInteger(state.selectionStart))composer.setSelectionRange(state.selectionStart,state.selectionEnd)
       const update = () => {
         state.draft = composer.value
         instance.drawer.querySelector('[data-qc-count]').textContent = `${composer.value.length}/${MAX_CONTENT}`
@@ -509,6 +568,7 @@
       composer.addEventListener('input', update)
       update()
     }
+    positionEmojiPicker(instance)
     const handle = instance.drawer.querySelector('[data-qc-handle]')
     handle?.addEventListener('pointerdown', event => {
       const startY = event.clientY, startHeight = instance.drawer.getBoundingClientRect().height
@@ -569,6 +629,7 @@
   function wireEvents(instance) {
     const eventRoot = instance.root
     instance = instance.owner || instance
+    eventRoot.addEventListener('error',emojiImageFallback,true)
     eventRoot.addEventListener('click', async (event) => {
       const action = event.target.closest('[data-qc-action]')?.dataset.qcAction
       if (!action) return
@@ -593,14 +654,21 @@
         instance.state.emojiExpanded=!instance.state.emojiExpanded
         const picker=instance.drawer?.querySelector('[data-qc-emoji-picker]')
         if(picker)picker.hidden=!instance.state.emojiExpanded
-        event.target.closest('button').setAttribute('aria-expanded',String(instance.state.emojiExpanded));return
+        event.target.closest('button').setAttribute('aria-expanded',String(instance.state.emojiExpanded));positionEmojiPicker(instance);return
+      }
+      if(action==='emoji-close'){closeEmojiPicker(instance,true);return}
+      if(action==='emoji-category'){
+        const category=event.target.closest('button').dataset.qcEmojiCategory;instance.state.emojiCategory=category
+        instance.drawer.querySelectorAll('[data-qc-emoji-category]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.qcEmojiCategory===category)))
+        instance.drawer.querySelectorAll('[data-qc-emoji-group]').forEach(button=>button.hidden=category!=='all'&&button.dataset.qcEmojiGroup!==category)
+        positionEmojiPicker(instance);return
       }
       if (action === 'emoji-insert') {
         const composer=instance.drawer?.querySelector('.q-composer-input'),emoji=event.target.closest('[data-qc-emoji]')?.dataset.qcEmoji
         if(!composer||!emoji)return
         const start=composer.selectionStart,end=composer.selectionEnd
         if(composer.value.length-(end-start)+emoji.length>MAX_CONTENT){showToast(instance,'评论最多 200 字');return}
-        composer.setRangeText(emoji,start,end,'end');composer.focus();composer.dispatchEvent(new Event('input',{bubbles:true}));return
+        composer.setRangeText(emoji,start,end,'end');closeEmojiPicker(instance);composer.focus();composer.dispatchEvent(new Event('input',{bubbles:true}));return
       }
       if (action === 'favorites') { await loadFavorites(instance); return }
       if (action === 'discussion') { instance.state.favoritesMode=false; instance.state.nextCursor=instance.state.commentsCursor; renderInto(instance); return }
@@ -828,15 +896,17 @@
       instance = ensureInstance(host, '__kgQuestionComments', id, 'danmaku')
       attach(instance, host)
     }
+    const keepOverlay=active===instance&&!instance.state.overlaySuppressed&&instance.overlay?.isConnected
     instance.state.overlaySuppressed = false
-    activate(instance)
+    if(!keepOverlay)activate(instance)
+    else positionDanmaku(instance)
     if (!instance.state.loaded) reload(instance)
     return instance
   }
   /* 按来源清理实例（练习页换题/隐藏解析时清掉上一题的弹幕层）。 */
-  function teardownSource(source) {
+  function teardownSource(source,options={}) {
     for (const instance of [...instances]) {
-      if (instance.source === source) teardown(instance)
+      if (instance.source === source && (!options.exceptQuestionId || instance.questionId!==text(options.exceptQuestionId))) teardown(instance)
     }
   }
 

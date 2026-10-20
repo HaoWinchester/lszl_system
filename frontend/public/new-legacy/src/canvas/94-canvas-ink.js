@@ -555,7 +555,7 @@
       if(event.button!==0||typeof options.onLongPressEraser!=='function')return;
       stopEraserHold();
       eraserHoldBtn.classList.add('canvas-ink-holding');
-      eraserHoldTimer=global.setTimeout(()=>{eraserHoldTimer=0;stopEraserHold();if(!destroyed&&!readonly())options.onLongPressEraser()},3000);
+      eraserHoldTimer=global.setTimeout(()=>{eraserHoldTimer=0;stopEraserHold();if(!destroyed&&!readonly())Promise.resolve(options.onLongPressEraser()).catch(report)},3000);
     });
     listen(global,'pointerup',stopEraserHold);
     listen(global,'pointercancel',stopEraserHold);
@@ -578,6 +578,15 @@
       if(destroyed||readonly()||!Number.isFinite(clientX)||!Number.isFinite(clientY))return false;
       if(textSession&&!await closeTextEditor(true))return false;
       if(!activateText())return false;openTextEditor(clientX,clientY,null);return true;
+    }
+    const tools=toolbar.querySelector('.canvas-ink-tools'),ui=global.KGCanvasToolbar;
+    if(ui){
+      tools.querySelectorAll('.canvas-ink-divider').forEach(el=>el.remove());
+      ui.group(tools,'选择',[[toolbar.querySelector('[data-ink-tool=select]'),'select','选择']]);
+      ui.group(tools,'绘制',[[toolbar.querySelector('[data-ink-tool=pen]'),'pen','画笔'],[toolbar.querySelector('[data-ink-tool=highlighter]'),'highlighter','高亮'],[toolbar.querySelector('[data-ink-tool=text]'),'text','文字'],[toolbar.querySelector('[data-ink-tool=eraser]'),'eraser','橡皮']]);
+      ui.group(tools,'撤销重做',[[toolbar.querySelector('[data-ink-action=undo]'),'undo','撤销'],[toolbar.querySelector('[data-ink-action=redo]'),'redo','重做']]);
+      ui.group(tools,'笔迹设置',[[toolbar.querySelector('[data-ink-settings]'),'settings','设置'],[toolbar.querySelector('[data-ink-close]'),'close','收起']]);
+      tools.append(palette);
     }
     render();
     return {activateText,openTextAt,handleKeyDown,commitText:()=>closeTextEditor(true),hasTextDraft:()=>!!textSession,render,refreshControls,cancel,reset,setTool,setOpen,destroy,clearAll,get tool(){return tool},get temporaryPan(){return space}};

@@ -182,30 +182,9 @@
     return next;
   }
   function bindThemeSelect(){
-    const select=$('krThemeSelect'),menu=$('krSceneMenu');
-    window.addEventListener('kg:deep-recall-theme-change',event=>{if(event.detail?.scope!=='workspace')syncThemeControls(event.detail?.theme||'platform')});
+    window.addEventListener('kg:deep-recall-theme-change',event=>{if(event.detail?.scope==='recall')syncThemeControls(event.detail?.theme||'platform')});
     applyTheme(savedTheme());
-    if(select)select.addEventListener('change',()=>applyTheme(select.value));
-    document.querySelectorAll('.kr-scene-option[data-kr-theme]').forEach(button=>button.addEventListener('click',event=>{
-      event.preventDefault();event.stopPropagation();
-      applyTheme(button.dataset.krTheme);
-      if(menu)menu.open=false;
-      button.blur();
-    }));
-    if(!menu)return;
-    let closeTimer=0,openedByHover=false;
-    const cancelClose=()=>{if(closeTimer){clearTimeout(closeTimer);closeTimer=0}};
-    const openMenu=()=>{cancelClose();menu.open=true};
-    const closeMenuSoon=()=>{cancelClose();closeTimer=setTimeout(()=>{if(!menu.matches(':hover')&&!menu.contains(document.activeElement)){menu.open=false;openedByHover=false}},120)};
-    if(window.matchMedia?.('(hover: hover)').matches){
-      menu.addEventListener('pointerenter',()=>{if(!menu.open)openedByHover=true;openMenu()});
-      menu.addEventListener('pointerleave',closeMenuSoon);
-    }
-    const summary=menu.querySelector('summary');
-    summary?.addEventListener('click',event=>{if(openedByHover){event.preventDefault();openMenu();openedByHover=false}});
-    menu.addEventListener('focusin',event=>{if(event.target!==summary)openMenu()});
-    menu.addEventListener('focusout',closeMenuSoon);
-    document.addEventListener('keydown',event=>{if(event.key==='Escape'&&menu.open){menu.open=false;menu.querySelector('summary')?.focus()}});
+    window.KGLearningTheme?.bindControls(themeController,$('krThemeSelect'),$('krSceneMenu'));
   }
   function uid(prefix='kr'){return prefix+'-'+Math.random().toString(36).slice(2,9)+'-'+Date.now().toString(36)}
   function firstChar(text){const s=String(text||'?').trim();return Array.from(s)[0]||'?'}
@@ -461,7 +440,8 @@
     if(recallTransitionBusy)return false;
     const versionReset=recallSession?.versionState==='mismatch'&&recallSession?.permissions?.canReset;
     if(isRecallReadonly()&&!versionReset){notifyRecallReadonly();return}
-    if(!confirm('确定清除这道题已回忆的全部知识点和笔迹吗？'))return;
+    const target=questionSessionToken;
+    if(!await window.KGDialogs.confirm('确定清除这道题已回忆的全部知识点和笔迹吗？',{danger:true})||target!==questionSessionToken)return;
     cancelProgressSave();if(!recallAdapter)return;
     setRecallTransitionBusy(true);
     try{
@@ -1705,13 +1685,19 @@
       persistText:flushProgress,
       isReadonly:()=>isRecallReadonly()||isTeacherDraftPreview(),onError:notifyRecallLimit,
       onDrawMode:()=>{closeGuide();closeNodeSearch()},
-      onLongPressEraser:()=>{
+      onLongPressEraser:async()=>{
         if(isRecallReadonly()||isTeacherDraftPreview()||!(state.strokes||[]).length){notifyRecallLimit(state.strokes?.length?'当前画布只读，无法清除笔迹。':'当前画布没有可清除的笔迹。');return}
-        if(!window.confirm('确认清空整套试卷画布上的全部笔迹？清空后可按 Ctrl/Command+Z 撤销。'))return;
+        const target=question.id;if(!await window.KGDialogs.confirm('确认清空整套试卷画布上的全部笔迹？清空后可按 Ctrl/Command+Z 撤销。',{danger:true})||target!==question.id||isRecallReadonly())return;
         if(!inkController?.clearAll('清空整套试卷笔迹'))notifyRecallLimit('清空笔迹失败，请重试。');
       }
     });
     window.KGRecallInk=inkController;
+    const ui=window.KGCanvasToolbar,tools=$('krInkBtn')?.parentElement;
+    if(ui&&tools){
+      ui.group(tools,'绘制',[[ $('krInkBtn'),'pen','画笔']]);
+      ui.group(tools,'视图',[[ $('krCaptureBtn'),'camera','截图'],[$('krNodeSearchBtn'),'select','搜索'],[$('krResetBtn'),'undo','重置']]);
+    }
+
     // 可编辑表格：state.tables 读写 + saveProgress 持久化；历史由控制器内部命令栈承载。
     // 表格功能暂时下线（ENABLED=false）：入口隐藏、控制器不启动，已存数据保留。
     tableController=(window.KGCanvasTableModel?.ENABLED===false)?null:window.KGCanvasTableController?.create?.({
@@ -1722,7 +1708,7 @@
       showHistory:true,
       isReadonly:()=>isRecallReadonly()||isTeacherDraftPreview(),
       onStatus:notifyRecallLimit,
-      confirm:message=>{try{return window.confirm(message)}catch(error){return false}}
+      confirm:message=>window.KGDialogs.confirm(message,{danger:true})
     });
     window.KGRecallTables=tableController;
     window.KGCanvasCapture?.bind($('krCaptureBtn'),viewport,{filename:'深度回忆',onError:notifyRecallLimit});

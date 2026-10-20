@@ -737,9 +737,9 @@
       +'<div class="gln-complete-actions">'+(next?'<a class="ui-button ui-button--primary" href="guided-learning-node.html?node='+encodeURIComponent(next.id)+'">'+(challenge?'进入下一部分':'继续下一节点')+'</a>':'')
       +'<a class="ui-button ui-button--secondary" href="'+pathHref()+'">返回学习路径</a></div></section>';
   }
-  function confirmExit(){
+  async function confirmExit(){
     if(state.nodeCompleted||!state.started)return true;
-    return global.confirm?.('退出后，本节点将从头开始，当前学习进度不会保存。')!==false;
+    return await window.KGDialogs.confirm('退出后，本节点将从头开始，当前学习进度不会保存。',{danger:true})===true;
   }
 
 
@@ -871,9 +871,9 @@
   function bind(){
     if(state.bound)return;
     state.bound=true;
-    byId('glnExitBtn')?.addEventListener('click',event=>{
+    byId('glnExitBtn')?.addEventListener('click',async event=>{
       event.preventDefault();
-      if(confirmExit()){state.started=false;pauseActiveTimer();clearMemoryTimer();global.location.href=pathHref()}
+      if(await confirmExit()){state.started=false;pauseActiveTimer();clearMemoryTimer();global.location.href=pathHref()}
     });
     const activityRoot=byId('glnActivity');
     activityRoot?.addEventListener('click',event=>{activePlugin()?.handleClick?.(event,state.current,pluginRuntime())});

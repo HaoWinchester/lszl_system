@@ -330,7 +330,7 @@ function raBindEvents(){
   };
   const clearLog=document.getElementById('raClearLog');
   if(clearLog)clearLog.onclick=async()=>{
-    if(!confirm('确认清空本验收器保存的测试记录？')){
+    if(!await window.KGDialogs.confirm('确认清空本验收器保存的测试记录？',{danger:true})){
       return;
     }
     await raClearRecords();
@@ -344,7 +344,7 @@ function raBindEvents(){
       RA.L=j;RA.LSource='external';RA.path=[];RA.page=0;raIndex();raRenderAll();
       raRenderAcceptance();
       raSetStatus(`✓ 已临时加载 ${raEsc(f.name)}：${j.nodes.length} 节点 / ${j.edges.length} 边。记录将继续累计。`,'ok');
-      if(confirm('是否同时将其设为当前工作区联想库？（会更新工作区并标记草稿待保存）')){
+      if(await window.KGDialogs.confirm('是否同时将其设为当前工作区联想库？（会更新工作区并标记草稿待保存）',{danger:true})){
         state.recallLibrary=normalizeRecall(j);markWorkspaceDirty();raSyncFromWorkspace(true);raRenderAcceptance();
         raSetStatus(`✓ 已设为工作区联想库：${j.nodes.length} 节点 / ${j.edges.length} 边。`,'ok');
       }

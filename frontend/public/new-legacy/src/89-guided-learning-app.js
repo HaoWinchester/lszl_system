@@ -515,8 +515,8 @@
       }
       scrollCurrentNodeIntoView('smooth');
     });
-    byId('glResetBtn')?.addEventListener('click',()=>{
-      if(global.confirm?.('确定重置这门示范课程的全部节点完成记录？')===false)return;
+    byId('glResetBtn')?.addEventListener('click',async ()=>{
+      if(await window.KGDialogs.confirm('确定重置这门示范课程的全部节点完成记录？',{danger:true})===false)return;
       clearSavedScroll();
       state.progress=store().resetCourse(state.course);resolveStages();renderAll();toast('学习路径已重置。');
     });

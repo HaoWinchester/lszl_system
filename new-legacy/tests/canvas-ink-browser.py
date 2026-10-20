@@ -15,6 +15,7 @@ import time
 from urllib.parse import urlparse
 from urllib.request import urlopen
 from playwright.sync_api import sync_playwright, expect
+from helpers.dialog_actions import respond_dialog
 
 ROOT=Path(__file__).resolve().parents[2]
 ARTIFACTS=ROOT/'artifacts/canvas-ink'
@@ -221,8 +222,9 @@ def check_page(context,base,kind):
         stroke_count(page,3)
     else:
         old_id=page.evaluate('KGMultiQuestionWorkspace.activeWorkspaceId()')
-        page.once('dialog',lambda d:d.accept('第二笔迹画布'))
-        page.evaluate('KGMultiQuestionWorkspace.createWorkspace()')
+        page.evaluate('void KGMultiQuestionWorkspace.createWorkspace()')
+        respond_dialog(page,'请输入画布名称',text='第二笔迹画布')
+        page.wait_for_function('(old)=>KGMultiQuestionWorkspace.activeWorkspaceId()!==old',arg=old_id)
         stroke_count(page,0)
         expect(page.locator('#qwUndoBtn')).to_be_disabled()
         page.evaluate('(id)=>KGMultiQuestionWorkspace.loadWorkspace(id)',old_id)
@@ -352,10 +354,8 @@ def check_recall_reset(context,base):
     page=context.new_page()
     page.goto(base+RECALL,wait_until='networkidle')
     stroke_count(page,4)
-    page.once('dialog',lambda dialog:dialog.dismiss())
-    page.locator('#krResetBtn').click();stroke_count(page,4)
-    page.once('dialog',lambda dialog:dialog.accept())
-    page.locator('#krResetBtn').click();stroke_count(page,0)
+    page.locator('#krResetBtn').click();respond_dialog(page,'确定清除这道题已回忆的全部知识点和笔迹吗？',accept=False);stroke_count(page,4)
+    page.locator('#krResetBtn').click();respond_dialog(page,'确定清除这道题已回忆的全部知识点和笔迹吗？');stroke_count(page,0)
     assert persisted(context,base,'recall')==[]
     expect(page.locator('#krQuestionCard')).to_have_count(1)
     record('recall: reset cancel/confirm clears persisted ink for current release')

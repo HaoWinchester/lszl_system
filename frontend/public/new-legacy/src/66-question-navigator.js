@@ -254,7 +254,7 @@
     updateWorkspaceLinks(active);
     return workspaces.find(item=>item.id===active)||null;
   }
-  function createWorkspaceFromDrawer(){
+  async function createWorkspaceFromDrawer(){
     const store=global.KGCanvasWorkspaceStore;
     if(!store)return null;
     if(isReadOnlyMobile()){
@@ -263,10 +263,10 @@
     }
     let title='新建解题画布';
     try{
-      const entered=global.prompt?.('请输入多题画布名称',title);
+      const entered=await window.KGDialogs.prompt('请输入多题画布名称',title);
       if(entered===null)return null;
       title=String(entered||title).trim()||title;
-    }catch(e){}
+    }catch(e){return null}
     const workspace=store.createWorkspace?.(title,{activate:true});
     if(!workspace)return null;
     state.selectedWorkspaceId=workspace.id;

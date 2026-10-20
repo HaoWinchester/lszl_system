@@ -33,6 +33,7 @@ function load(fetchImpl){
     Blob:function(){},URL:{createObjectURL(){return ''},revokeObjectURL(){}},
     state:{recallLibrary:{nodes:[],edges:[]}},confirm:()=>true,setTimeout,
   });
+vm.runInContext('window.KGDialogs={confirm:async (...args)=>confirm(...args),prompt:async (...args)=>typeof prompt===\"function\"?prompt(...args):null,alert:async (...args)=>typeof alert===\"function\"?alert(...args):undefined}',context);
   vm.runInContext(fs.readFileSync(SOURCE,'utf8'),context,{filename:SOURCE});
   return {context,window,status,storageCalls};
 }

@@ -1,3 +1,19 @@
+/* style: styles/dialogs.css */
+.kg-dialog{box-sizing:border-box;width:min(440px,calc(100vw - 32px));max-height:calc(100dvh - 32px);padding:0;border:1px solid var(--border,#d9dfe9);border-radius:16px;background:var(--panel,#fff);color:var(--text,#172033);box-shadow:0 20px 64px #10213b33;overflow:auto;z-index:2147483000;font:inherit}
+.kg-dialog::backdrop{background:rgba(17,27,44,.42)}
+.kg-dialog-panel{position:relative;display:flex;flex-direction:column;gap:16px;margin:0;padding:26px 24px 20px}
+.kg-dialog h2{margin:0;padding-right:30px;font-size:18px;font-weight:650;line-height:1.5;color:inherit}
+.kg-dialog [data-dialog-message]{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;line-height:1.7;color:inherit}
+.kg-dialog .kg-dialog-close{position:absolute;top:14px;right:14px;display:grid;place-items:center;width:32px;height:32px;padding:0;border:0;border-radius:8px;background:transparent;color:inherit;font-size:24px;line-height:1;cursor:pointer}
+.kg-dialog-field{display:flex;flex-direction:column;gap:8px;font-size:13px}
+.kg-dialog [hidden]{display:none!important}
+.kg-dialog input{box-sizing:border-box;width:100%;min-height:42px;padding:9px 12px;border:1px solid var(--border,#cdd5e3);border-radius:8px;background:var(--panel,#fff);color:inherit;font:inherit}
+.kg-dialog-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:6px}
+.kg-dialog-actions button{min-width:76px;min-height:40px;padding:8px 16px;border:1px solid var(--border,#d4dce9);border-radius:8px;background:var(--panel,#fff);color:inherit;font:inherit;font-size:14px;cursor:pointer}
+.kg-dialog-actions [data-dialog-accept]{border-color:#285bd8;background:#285bd8;color:#fff}
+.kg-dialog-danger .kg-dialog-actions [data-dialog-accept]{border-color:#b83235;background:#b83235}
+.kg-dialog button:focus-visible,.kg-dialog input:focus-visible{outline:3px solid #5b8def;outline-offset:2px}
+@media(max-width:480px){.kg-dialog-panel{padding:24px 20px 20px}.kg-dialog-actions button{min-height:44px}}
 /* style: styles/main.css */
 /*
  * 主样式文件。
@@ -8359,6 +8375,25 @@ body.qw-selection-toolbar-motion .uc-selection-bounds,.stage.graph-card-dragging
 .canvas-ink-width{flex-wrap:wrap;gap:6px}
 .canvas-ink-width input[type=range]{width:120px}
 .canvas-ink-width input[type=number]{width:50px;padding:3px;border:1px solid #cbd5e1;border-radius:5px;font:inherit}
+/* style: styles/canvas-toolbar.css */
+/* One canvas toolbar language: explicit icons, compact labels and named groups. */
+.canvas-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:6px;color:#514a65;background:#fff;border:1px solid #e3deec;border-radius:12px;padding:6px;box-shadow:0 3px 14px #4034570c}
+.canvas-tool-group{display:flex;align-items:center;gap:3px;min-width:0;padding:0 4px;border-right:1px solid #e8e3ef}.canvas-tool-group:last-child{border-right:0}
+.canvas-toolbar .canvas-tool-button{display:inline-flex!important;align-items:center;justify-content:center;gap:5px;flex:0 0 auto;width:auto!important;min-width:36px!important;height:36px!important;padding:6px 8px!important;border:0!important;border-radius:7px!important;background:transparent;color:inherit;font:12px/1.25 system-ui;white-space:nowrap;cursor:pointer}
+.canvas-toolbar .canvas-tool-button:hover{background:#f1edfa}.canvas-toolbar .canvas-tool-button[aria-pressed=true]{background:#ece6fb;color:#6d42c5}.canvas-toolbar .canvas-tool-button:disabled{opacity:.4;cursor:default}
+.canvas-toolbar .canvas-tool-button:focus-visible{outline:2px solid #7952d4;outline-offset:2px}
+.canvas-toolbar .canvas-tool-button svg{display:block!important;flex:0 0 18px!important;width:18px!important;height:18px!important;min-width:18px;fill:none!important;stroke:currentColor!important;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+.canvas-toolbar .canvas-tool-label{display:inline!important;margin:0!important;color:inherit!important;font-size:11px!important;font-weight:500}
+.related-canvas-header-actions.canvas-toolbar{justify-content:flex-start;max-width:100%;gap:4px!important;box-shadow:none}.related-canvas-header{flex-wrap:wrap}.related-canvas-header-actions .canvas-tool-group{padding:0 3px}
+.canvas-ink-tools.canvas-toolbar{padding:0;border:0;box-shadow:none;background:transparent}.canvas-ink-tools .canvas-tool-group{padding:0 2px}.canvas-ink-tools .canvas-tool-label{font-size:10px!important}
+@media(max-width:700px){.canvas-toolbar .canvas-tool-button{min-height:40px!important;height:40px!important;padding:5px 7px!important}.canvas-toolbar .canvas-tool-group{gap:1px;padding:0 2px}.related-canvas-header{padding:10px!important;gap:8px}.related-canvas-header-actions.canvas-toolbar{width:100%;max-height:136px;overflow:auto}.canvas-ink-toolbar{max-width:calc(100vw - 20px)}.canvas-ink-tools.canvas-toolbar{max-width:calc(100vw - 34px);flex-wrap:wrap;justify-content:center}}
+/* The old coarse-pointer layout hid the entire utility row, including themes. */
+@media(max-width:780px) and (pointer:coarse){
+  .question-workspace-page .qw-overlay-right.canvas-toolbar{display:flex!important;position:absolute;left:7px;right:7px;top:58px;max-width:calc(100% - 14px);justify-content:flex-start;gap:4px;z-index:210}
+  .question-workspace-page .qw-overlay-right.canvas-toolbar .learning-theme-menu{margin-left:auto}
+  .question-workspace-page .qw-layout-toolbar-global{display:none!important}
+  .knowledge-recall-page .kr-canvas-action-group.canvas-toolbar{max-width:calc(100vw - 20px);flex-wrap:wrap}
+}
 /* style: styles/canvas-table.css */
 /* KGCanvasTableController · 三页共用可编辑表格视觉。
    表格是 world 内真实 DOM table：1px 实线边框 + 真实文字，随画布变换保持 DPR 清晰度；

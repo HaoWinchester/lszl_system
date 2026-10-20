@@ -9,7 +9,7 @@ ROOT=Path(__file__).resolve().parents[1]
 parser=argparse.ArgumentParser();parser.add_argument('--base-url',required=True);parser.add_argument('--source',action='store_true');parser.add_argument('--case',choices=['themes','entry','background','navigation','settings','draft-navigation','duplicate-refresh','historical-refresh']);parser.add_argument('--historical-workspaces');parser.add_argument('--out-dir');args=parser.parse_args()
 assert urlparse(args.base_url).hostname in ['127.0.0.1','localhost'],'Use only disposable local accounts'
 OUT=Path(args.out_dir) if args.out_dir else ROOT.parent/'artifacts/learning-state-regression';OUT.mkdir(parents=True,exist_ok=True)
-FILES=['src/canvas/97-learning-theme.js','src/86-knowledge-recall.js','src/77-multi-question-workspace.js','src/39-global-shortcuts.js','src/59b-learning-route-context.js','src/62a-learning-progress.js','src/canvas/94-canvas-ink.js','styles/unified-canvas-runtime.css','styles/knowledge-recall-patch-1.css','styles/focus-vega-learning.css','knowledge-recall.html','question-workspace.html']
+FILES=['src/28-device-preferences.js','src/00-dialogs.js','src/canvas/toolbar.js','styles/canvas-toolbar.css','styles/learning-theme.css','src/canvas/97-learning-theme.js','src/86-knowledge-recall.js','src/77-multi-question-workspace.js','src/39-global-shortcuts.js','src/59b-learning-route-context.js','src/62a-learning-progress.js','src/canvas/94-canvas-ink.js','styles/unified-canvas-runtime.css','styles/knowledge-recall-patch-1.css','styles/focus-vega-learning.css','knowledge-recall.html','question-workspace.html']
 report=[]
 with sync_playwright() as pw:
  browser=pw.chromium.launch(channel='chrome')
@@ -19,7 +19,7 @@ with sync_playwright() as pw:
    def override(route):
     rel=urlparse(route.request.url).path.lstrip('/')
     if rel in ['knowledge-recall.html','question-workspace.html']:
-     response=route.fetch();body=response.text()
+     response=route.fetch();body=response.text().replace('<head>','<head><link rel="stylesheet" href="styles/canvas-toolbar.css"><script src="src/00-dialogs.js"></script>');body=re.sub(r'(<script[^>]*src="src/canvas/94-canvas-ink.js[^>]*>)',r'<script defer src="src/canvas/toolbar.js"></script>\1',body)
      if rel=='knowledge-recall.html':body=re.sub(r'(<details[^>]*id="krSceneMenu"[\s\S]*?</svg>)(\s*</summary>)',r'\1<span>主题</span>\2',body,count=1)
      else:body=body.replace('画布主题（与深度回忆同步）','当前多题归纳主题（独立保存）')
      route.fulfill(response=response,body=body)
@@ -36,22 +36,22 @@ with sync_playwright() as pw:
   r=c.request.post(args.base_url+'/api/v1/workspaces',data={'id':wid,'title':payload['title'],'schemaVersion':10,'payload':payload});assert r.ok,r.text()
   p=page or c.new_page();p.set_default_timeout(6000);p.goto(args.base_url+'/question-workspace.html?paperId=ink-paper&releaseId=ink-release&questionId='+question+'&bankId=ink-bank&workspace='+wid,wait_until='networkidle');p.wait_for_function('(id)=>KGMultiQuestionWorkspace?.activeWorkspaceId()===id&&KGMultiQuestionWorkspace.getState().questionCount===2',arg=wid);return p,wid
  def scene(p,value):
-  p.locator('#krSceneMenu>summary').click();p.locator('.kr-scene-option[data-kr-theme='+value+']').click();expect(p.locator('#krThemeSelect')).to_have_value(value)
+  p.locator('[data-learning-theme-menu]>summary').click();p.locator('.kr-scene-option[data-kr-theme='+value+']').click();p.locator('[data-theme-save]').click();expect(p.locator('#qwThemeSelect,#krThemeSelect')).to_have_value(value)
  def themes(c):
-  r=recall(c);w,_=workspace(c);scene(r,'sakura');w.locator('#qwThemeSelect').select_option('ocean');expect(r.locator('#krThemeSelect')).to_have_value('sakura');scene(r,'latte');expect(w.locator('#qwThemeSelect')).to_have_value('ocean');r.reload(wait_until='networkidle');w.reload(wait_until='networkidle');expect(r.locator('#krThemeSelect')).to_have_value('latte');expect(w.locator('#qwThemeSelect')).to_have_value('ocean')
+  r=recall(c);w,_=workspace(c);scene(r,'sakura');scene(w,'ocean');expect(r.locator('#krThemeSelect')).to_have_value('sakura');scene(r,'latte');expect(w.locator('#qwThemeSelect')).to_have_value('ocean');r.reload(wait_until='networkidle');w.reload(wait_until='networkidle');expect(r.locator('#krThemeSelect')).to_have_value('latte');expect(w.locator('#qwThemeSelect')).to_have_value('ocean')
   r.evaluate("sessionStorage.setItem('kg_multi_question_theme_v1','neon')");expect(w.locator('#qwThemeSelect')).to_have_value('ocean')
   for value in ['platform','parchment','aurora','neon','sakura','ocean','latte']:
-   w.locator('#qwThemeSelect').select_option(value);expect(r.locator('#krThemeSelect')).to_have_value('latte')
+   scene(w,value);expect(r.locator('#krThemeSelect')).to_have_value('latte')
   scene(r,'neon');expect(w.locator('#qwThemeSelect')).to_have_value('latte')
  def entry(c):
   r=recall(c)
   for width in [1440,1024,800,525,390]:
-   r.set_viewport_size({'width':width,'height':844});summary=r.locator('#krSceneMenu>summary');assert '主题' in summary.inner_text(),'Theme entry needs a visible text label';summary.click();button=r.locator('.kr-scene-option[data-kr-theme=ocean]');assert button.evaluate('e=>{const r=e.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&e.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))}');button.click();expect(r.locator('#krThemeSelect')).to_have_value('ocean')
+   r.set_viewport_size({'width':width,'height':844});summary=r.locator('#krSceneMenu>summary');assert '主题' in summary.inner_text(),'Theme entry needs a visible text label';summary.click();button=r.locator('.kr-scene-option[data-kr-theme=ocean]');assert button.evaluate('e=>{const r=e.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&e.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))}');button.click();r.locator('[data-theme-save]').click();expect(r.locator('#krThemeSelect')).to_have_value('ocean')
   r.set_viewport_size({'width':1440,'height':900});r.mouse.move(500,400);r.keyboard.press('Escape');summary=r.locator('#krSceneMenu>summary');summary.focus();summary.press('Enter');expect(r.locator('#krSceneMenu')).to_have_attribute('open','');r.keyboard.press('Escape');assert not r.locator('#krSceneMenu').evaluate('e=>e.open');summary.press('Space');expect(r.locator('#krSceneMenu')).to_have_attribute('open','');r.keyboard.press('Escape')
   r.screenshot(path=str(OUT/'entry-after.png'))
  def background(c):
   w,_=workspace(c);layer=w.locator('.qw-background');assert layer.evaluate('e=>+getComputedStyle(e).opacity')==1,'The saved gradient is invisible';assert 'linear-gradient' in layer.evaluate('e=>getComputedStyle(e).backgroundImage')
-  before=w.evaluate('KGMultiQuestionWorkspace.activeWorkspace().background');w.locator('#qwThemeSelect').select_option('neon');assert w.evaluate('KGMultiQuestionWorkspace.activeWorkspace().background')==before,'Scene controls must preserve a saved document background';w.reload(wait_until='networkidle');assert layer.evaluate('e=>+getComputedStyle(e).opacity')==1;w.screenshot(path=str(OUT/'background-after.png'))
+  before=w.evaluate('KGMultiQuestionWorkspace.activeWorkspace().background');scene(w,'neon');assert w.evaluate('KGMultiQuestionWorkspace.activeWorkspace().background')==before,'Scene controls must preserve a saved document background';w.reload(wait_until='networkidle');assert layer.evaluate('e=>+getComputedStyle(e).opacity')==1;w.screenshot(path=str(OUT/'background-after.png'))
  def navigation(c):
   r=recall(c);w,wid=workspace(c,page=r);before=w.evaluate('KGMultiQuestionWorkspace.activeWorkspace()');w.evaluate('KGCanvasWorkspaceAdapter.flush({throwOnError:true})')
   other,other_id=workspace(c,question='ink-question-1');other.evaluate('KGCanvasWorkspaceAdapter.flush({throwOnError:true})');other.close();assert w.evaluate('KGMultiQuestionWorkspace.activeWorkspaceId()')==wid

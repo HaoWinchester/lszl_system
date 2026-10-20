@@ -26,7 +26,6 @@ def run() -> None:
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page(viewport={"width": 1360, "height": 900})
-        page.on("dialog", lambda dialog: dialog.accept())
         page.goto(DIST.as_uri())
         page.wait_for_timeout(400)
         if page.locator("#creatorGate").is_visible():

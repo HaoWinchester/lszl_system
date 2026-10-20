@@ -16,6 +16,27 @@
     })[char])
   }
 
+  // Render only the learner's selection; correctness fields never participate.
+  function selectionSummary(question, answer, { compact = false } = {}) {
+    if (!answer || typeof answer !== 'object') return ''
+    if (answer.timedOut === true) return '未选择（超时）'
+    if (question?.type === 'matching' || answer.selectedPairs) {
+      const pairs = answer.selectedPairs || {}, matching = question?.matching || {}
+      const left = Array.isArray(matching.left) ? matching.left : Object.keys(pairs).map(id => ({id, text:id}))
+      const right = Array.isArray(matching.right) ? matching.right : []
+      const selected = left.flatMap((item,index) => {
+        const target = pairs[item.id]
+        if (!target) return []
+        const position = right.findIndex(option => text(option.id) === text(target))
+        const label = position >= 0 ? text(right[position].text) : text(target)
+        return [compact ? `${index+1}→${position >= 0 ? position+1 : text(target)}` : `${text(item.text || item.id)} → ${label}`]
+      })
+      return selected.join('；') || '未选择'
+    }
+    const selected = Array.isArray(answer.selectedAnswerIds) ? answer.selectedAnswerIds : [answer.selectedAnswer]
+    return selected.map(text).filter(id => id && id !== '__timeout__').join('、') || '未选择'
+  }
+
   function mount(root, options = {}) {
     if (!root) return null
     let snapshot = null
@@ -49,8 +70,11 @@
         const status = !showCorrectness && ['correct','wrong'].includes(actualStatus) ? 'answered' : actualStatus
         const current = id === currentId
         const marked = !!(markedIds && markedIds.has(id))
-        const label = `第 ${index + 1} 题，${STATUS_LABELS[status] || status}${marked ? '，已标记' : ''}${current ? '，当前题' : ''}`
-        return `<button type="button" class="practice-answer-number is-${escapeHTML(status)}${current ? ' is-current' : ''}${marked ? ' is-marked' : ''}" data-question-id="${escapeHTML(id)}" aria-label="${escapeHTML(label)}" aria-current="${current ? 'step' : 'false'}"><span>${index + 1}</span><small>${escapeHTML(STATUS_LABELS[status] || '')}</small></button>`
+        const answer = snapshot.answers?.[id], rawQuestion = question.question || question.questionSnapshot || question
+        const choice = selectionSummary(rawQuestion, answer, {compact:true})
+        const fullChoice = selectionSummary(rawQuestion, answer)
+        const label = `第 ${index + 1} 题，${STATUS_LABELS[status] || status}${marked ? '，已标记' : ''}${current ? '，当前题' : ''}${fullChoice ? '，我的选择：'+fullChoice : ''}`
+        return `<button type="button" class="practice-answer-number is-${escapeHTML(status)}${current ? ' is-current' : ''}${marked ? ' is-marked' : ''}" data-question-id="${escapeHTML(id)}" aria-label="${escapeHTML(label)}" aria-current="${current ? 'step' : 'false'}"><span class="practice-answer-index">${index + 1}</span><small>${escapeHTML(STATUS_LABELS[status] || '')}</small><span class="practice-answer-choice" title="${escapeHTML(fullChoice ? '我的选择：'+fullChoice : '尚未选择答案')}">${escapeHTML(choice ? '我的选择：'+choice : '—')}</span></button>`
       }).join('')
       root.innerHTML = `<div class="practice-answer-sheet-head"><div><span>ANSWER SHEET</span><h2>答题概览</h2></div><strong>${stats.answered}/${stats.total}</strong></div>
         <div class="practice-answer-sheet-summary">${showCorrectness ? `<span>正确 <b>${stats.correct}</b></span><span>错误 <b>${stats.wrong}</b></span>` : `<span>已答 <b>${stats.answered}</b></span>`}<span>未答 <b>${stats.unanswered}</b></span></div>
@@ -61,7 +85,7 @@
           <button type="button" data-answer-filter="marked" class="${activeFilter === 'marked' ? 'is-active' : ''}">已标记</button>
         </div>`}
         <div class="practice-answer-number-grid">${numbers || '<p class="practice-answer-filter-empty">该筛选下暂无题目</p>'}</div>
-        <div class="practice-answer-sheet-legend">${showCorrectness ? '<span><i class="is-correct"></i>正确</span><span><i class="is-wrong"></i>错误</span>' : '<span><i class="is-answered"></i>已答</span>'}<span><i class="is-unanswered"></i>未答</span>${markedIds && markedIds.size ? '<span><i class="is-marked"></i>已标记</span>' : ''}</div>
+        <div class="practice-answer-sheet-legend">${showCorrectness ? '<span><i class="is-correct"></i>正确</span><span><i class="is-wrong"></i>错误</span>' : '<span><i class="is-answered"></i>已答</span>'}<span><i class="is-unanswered"></i>未答</span><span><i class="is-current"></i>当前题</span>${markedIds && markedIds.size ? '<span><i class="is-marked"></i>已标记</span>' : ''}</div>
         ${!global.KGPracticeModePolicy.forMode(snapshot.mode,{reviewOnly:snapshot.reviewOnly}).canSubmit || snapshot.status === 'completed' ? '' : '<button type="button" class="practice-answer-submit" data-answer-submit="true">交卷并查看成绩</button>'}`
       return stats
     }
@@ -84,5 +108,5 @@
     return Object.freeze({ render, filter: () => activeFilter })
   }
 
-  global.KGPracticeAnswerSheet = Object.freeze({ mount })
+  global.KGPracticeAnswerSheet = Object.freeze({ mount, selectionSummary })
 })(window)

@@ -2,9 +2,11 @@
 from pathlib import Path
 import re
 from playwright.sync_api import sync_playwright
+from helpers.dialog_actions import respond_dialog
 ROOT=Path(__file__).resolve().parents[1]
 ARGS=['--no-sandbox','--disable-dev-shm-usage','--disable-gpu']
 SCRIPTS=[
+ 'src/00-dialogs.js',
  'src/28-app-storage.js','src/29-auth-core.js','src/86-activity-schema-v1.js','src/87-guided-learning-data.js','src/91-learning-content-core.js','src/93-content-organization-core.js',
  'src/admin/00-admin-core.js','src/admin/10-content-repository.js','src/admin/11-local-content-repository.js','src/admin/20-admin-permission-service.js','src/admin/21-admin-audit-service.js','src/admin/22-admin-transaction-service.js','src/admin/30-reference-index-service.js','src/admin/31-subject-service.js','src/admin/32-taxonomy-service.js','src/admin/33-activity-service.js','src/admin/34-course-service.js','src/admin/35-release-service.js','src/admin/40-admin-service-registry.js','src/admin/41-learning-content-compat.js','src/admin/49-admin-ui.js','src/admin/51-admin-subjects-app.js'
 ]
@@ -30,22 +32,15 @@ with sync_playwright() as p:
     assert '[object Object]' not in page.locator('#adminSelectedSubjectDescription').inner_text()
     page.locator('#adminEditSubjectBtn').click();page.locator('#adminSubjectNameZh').fill('质量与过程管理');page.locator('#adminSubjectDescriptionZh').fill('编辑后的说明');page.locator('#adminSubjectDialogSubmit').click();page.wait_for_timeout(80)
     assert page.locator('#adminSelectedSubjectName').inner_text()=='质量与过程管理';assert page.locator('#adminSelectedSubjectDescription').inner_text()=='编辑后的说明'
-    page.once('dialog',lambda dialog: dialog.accept())
-    page.locator('#adminToggleSubjectBtn').click();page.wait_for_function("document.querySelector('#adminSelectedSubjectStatus')?.textContent==='已停用'")
-    page.once('dialog',lambda dialog: dialog.accept())
-    page.locator('#adminToggleSubjectBtn').click();page.wait_for_function("document.querySelector('#adminSelectedSubjectStatus')?.textContent==='启用'")
+    page.locator('#adminToggleSubjectBtn').click();respond_dialog(page,'停用');page.wait_for_function("document.querySelector('#adminSelectedSubjectStatus')?.textContent==='已停用'")
+    page.locator('#adminToggleSubjectBtn').click();respond_dialog(page,'恢复');page.wait_for_function("document.querySelector('#adminSelectedSubjectStatus')?.textContent==='启用'")
     dialog_count={'value':0}
-    def accept_delete(dialog):
-        dialog_count['value']+=1
-        dialog.accept('QA' if dialog.type=='prompt' else '')
-    page.on('dialog',accept_delete);page.locator('#adminDeleteSubjectBtn').click();page.wait_for_function(f"document.querySelectorAll('#adminSubjectList button').length=={initial}")
-    page.remove_listener('dialog',accept_delete)
+    page.locator('#adminDeleteSubjectBtn').click();respond_dialog(page,'永久删除空科目');dialog_count['value']+=1;respond_dialog(page,'请输入科目编号',text='QA');dialog_count['value']+=1;page.wait_for_function(f"document.querySelectorAll('#adminSubjectList button').length=={initial}")
     assert dialog_count['value']==2
     assert page.locator('#adminSubjectList button').count()==initial
     pmp=page.locator('#adminSubjectList button').filter(has_text='PMP 项目管理').first;pmp.click();page.wait_for_timeout(50)
     captured=[]
-    def capture(dialog):captured.append(dialog.message);dialog.accept()
-    page.once('dialog',capture);page.locator('#adminDeleteSubjectBtn').click();page.wait_for_timeout(50)
+    page.locator('#adminDeleteSubjectBtn').click();captured.append(respond_dialog(page,'不能永久删除'));page.wait_for_timeout(50)
     assert any('不能永久删除' in msg for msg in captured);assert page.locator('#adminSelectedSubjectName').inner_text()=='PMP 项目管理'
     assert not errors,errors
     page.close();browser.close()

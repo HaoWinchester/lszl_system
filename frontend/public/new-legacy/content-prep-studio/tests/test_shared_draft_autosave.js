@@ -38,6 +38,7 @@ function buildHarness(){
     confirm:()=>true,prompt:()=>'',alert:()=>{},
     Blob:function(){},URL:{createObjectURL:()=>'',revokeObjectURL:()=>{}},
   });
+vm.runInContext('window.KGDialogs={confirm:async (...args)=>confirm(...args),prompt:async (...args)=>args[0].startsWith(\"自动保存被拒绝\")?(window.__recoveryAction||\"复制草稿\"):(typeof prompt===\"function\"?prompt(...args):null),alert:async (...args)=>typeof alert===\"function\"?alert(...args):undefined}',context);
   ['00-core-bootstrap.js','10-state-domain.js','12-p45-authoring-domain.js','38-shared-draft-autosave.js'].forEach(name=>{
     vm.runInContext(source(name),context,{filename:name});
   });
@@ -107,7 +108,7 @@ async function main(){
         save:async()=>{throw Object.assign(new Error('服务器数据已变化'),{code:'CONFLICT',status:409})},
         openDraft:async id=>{window.__opened.push(id)},
       };
-      let step=0;confirm=()=>{step++;return step===1?false:true};  // 第一次拒绝复制，第二次接受“放弃并重载”
+      window.__recoveryAction='重新载入';let step=0;confirm=()=>{step++;return step===1?false:true};  // 第一次拒绝复制，第二次接受“放弃并重载”
       prepRuntime.draftId='d3b';prepRuntime.dirty=true;prepRuntime.draftTitle='原草稿';
     `);
     evalIn(context,'(async()=>{try{await window.PMPPrepAutosave.runNow()}catch(e){}})()');

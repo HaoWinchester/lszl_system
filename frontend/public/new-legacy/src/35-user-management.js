@@ -396,10 +396,11 @@
     return true;
   }
   async function addUser(){
-    const username=cleanUsername(prompt('请输入新用户名（至少 2 个字符）：')||'');
+    const username=cleanUsername(await window.KGDialogs.prompt('请输入新用户名（至少 2 个字符）：')||'');
     if(username.length<2){toast('用户名至少 2 个字符');return}
     if(state.users[username]){toast('该用户名已存在');return}
-    const password=prompt('请输入初始密码（至少 4 个字符）：')||'';
+    const password=await window.KGDialogs.prompt('请输入初始密码（至少 4 个字符）：','',{inputType:'password'});
+    if(password===null)return;
     const result=await UserService.createUser(state.users,{username,password,user:{role:'student',status:'active',subject:'PMP',source:'user-management'}});
     applyServiceResult(result,{
       selected:result&&result.username?result.username:state.selected,
@@ -422,7 +423,7 @@
   }
   async function resetPassword(){
     const username=state.selected;if(!username)return;
-    const password=prompt(`请输入 ${username} 的新密码（至少 4 个字符）：`);
+    const password=await window.KGDialogs.prompt(`请输入 ${username} 的新密码（至少 4 个字符）：`,'',{inputType:'password'});
     if(password===null)return;
     const result=await UserService.resetPassword(state.users,username,password);
     applyServiceResult(result,{
@@ -444,9 +445,9 @@
   }
   async function deleteUser(){
     const username=state.selected;if(!username)return;
-    if(!confirm(`确认删除账号“${username}”？
+    if(!await window.KGDialogs.confirm(`确认删除账号“${username}”？
 
-这会移除账号资料，但不会主动清除该用户的本地图谱/题库数据。`))return;
+这会移除账号资料，但不会主动清除该用户的本地图谱/题库数据。`,{danger:true}))return;
     const result=await UserService.deleteUsers(state.users,[username]);
     const nextSelected=result&&result.ok?Object.keys(result.users)[0]||'':state.selected;
     applyServiceResult(result,{
@@ -458,9 +459,10 @@
   }
   async function duplicateUser(){
     const username=state.selected;if(!username)return;
-    const next=cleanUsername(prompt('请输入复制后的新用户名：',username+'_copy')||'');
+    const next=cleanUsername(await window.KGDialogs.prompt('请输入复制后的新用户名：',username+'_copy')||'');
     if(next.length<2||state.users[next]){toast('用户名无效或已存在');return}
-    const password=prompt('请输入新用户初始密码（至少 4 个字符）：')||'';
+    const password=await window.KGDialogs.prompt('请输入新用户初始密码（至少 4 个字符）：','',{inputType:'password'});
+    if(password===null)return;
     const result=await UserService.duplicateUser(state.users,username,{username:next,password});
     applyServiceResult(result,{
       selected:result&&result.username?result.username:state.selected,
@@ -488,7 +490,7 @@
     const status=$('umBatchStatusSelect')?$('umBatchStatusSelect').value:'KEEP';
     const subject=$('umBatchSubjectSelect')?$('umBatchSubjectSelect').value:'KEEP';
     if(role==='KEEP'&&status==='KEEP'&&subject==='KEEP'){toast('请选择要批量调整的字段');return}
-    if(!confirm(`确认批量调整 ${names.length} 个用户？`))return;
+    if(!await window.KGDialogs.confirm(`确认批量调整 ${names.length} 个用户？`,{danger:true}))return;
     const result=await UserService.batchUpdate(state.users,names,{role,status,subject});
     applyServiceResult(result,{
       detail:{action:'batch-update',usernames:names,role,status,subject},
@@ -510,9 +512,9 @@
   async function deleteBatchUsers(){
     const names=selectedUsernames();
     if(!names.length){toast('请先勾选用户');return}
-    if(!confirm(`确认删除所选 ${names.length} 个账号？
+    if(!await window.KGDialogs.confirm(`确认删除所选 ${names.length} 个账号？
 
-这会移除账号资料，但不会主动清除这些用户的本地图谱/题库数据。`))return;
+这会移除账号资料，但不会主动清除这些用户的本地图谱/题库数据。`,{danger:true}))return;
     const result=await UserService.deleteUsers(state.users,names);
     const nextSelected=result&&result.ok&&result.users[state.selected]?state.selected:(result&&result.ok?Object.keys(result.users)[0]||'':state.selected);
     state.selectedUsers.clear();
@@ -576,7 +578,7 @@
     },["umImportFile", "umImportBtn"]);
   }
   function bindEvents(){
-    $('umAddUserBtn').onclick=addUser;$('umRefreshBtn').onclick=async()=>{if(await loadUsers()){render();toast('已刷新')}};$('umUserForm').addEventListener('submit',saveSelected);$('umResetPasswordBtn').onclick=resetPassword;$('umArchiveUserBtn').onclick=()=>setStatus('archived');$('umRestoreUserBtn').onclick=()=>setStatus('active');$('umDeleteUserBtn').onclick=deleteUser;$('umSetActiveBtn').onclick=()=>setStatus('active');$('umSetPausedBtn').onclick=()=>setStatus('paused');$('umDuplicateUserBtn').onclick=duplicateUser;$('umExportBtn').onclick=()=>exportData(false);$('umExportSelectedBtn').onclick=()=>exportData(true);$('umImportBtn').onclick=()=>$('umImportFile').click();$('umImportFile').onchange=e=>importUsers(e.target.files&&e.target.files[0]);$('umClearLogsBtn').onclick=async()=>{if(confirm('确认清空操作日志？')){try{await window.KGSystemDomain?.clearAdminLogs?.();renderLogs();toast('日志已清空')}catch(error){toast(error?.message||'日志清空失败')}}};
+    $('umAddUserBtn').onclick=addUser;$('umRefreshBtn').onclick=async()=>{if(await loadUsers()){render();toast('已刷新')}};$('umUserForm').addEventListener('submit',saveSelected);$('umResetPasswordBtn').onclick=resetPassword;$('umArchiveUserBtn').onclick=()=>setStatus('archived');$('umRestoreUserBtn').onclick=()=>setStatus('active');$('umDeleteUserBtn').onclick=deleteUser;$('umSetActiveBtn').onclick=()=>setStatus('active');$('umSetPausedBtn').onclick=()=>setStatus('paused');$('umDuplicateUserBtn').onclick=duplicateUser;$('umExportBtn').onclick=()=>exportData(false);$('umExportSelectedBtn').onclick=()=>exportData(true);$('umImportBtn').onclick=()=>$('umImportFile').click();$('umImportFile').onchange=e=>importUsers(e.target.files&&e.target.files[0]);$('umClearLogsBtn').onclick=async()=>{if(await window.KGDialogs.confirm('确认清空操作日志？',{danger:true})){try{await window.KGSystemDomain?.clearAdminLogs?.();renderLogs();toast('日志已清空')}catch(error){toast(error?.message||'日志清空失败')}}};
     const listToolsToggle=$('umListToolsToggle');if(listToolsToggle)listToolsToggle.onclick=()=>{state.userToolsExpanded=!state.userToolsExpanded;renderUserToolsState(filteredUsers().length)};
     $('umSearchInput').oninput=e=>{state.query=e.target.value;state.userPage=1;renderUserList()};$('umRoleFilter').onchange=e=>{state.roleFilter=e.target.value;state.userPage=1;renderUserList()};$('umStatusFilter').onchange=e=>{state.statusFilter=e.target.value;state.userPage=1;renderUserList()};
     const selectAll=$('umSelectAllUsers');if(selectAll)selectAll.onchange=e=>toggleSelectAllVisible(e.target.checked);

@@ -247,7 +247,7 @@
   }
   async function deleteSelectedPrinciples(){
     const ids=selectedPrinciples();if(!ids.length)return toast('请先勾选要删除的原则。');
-    if(!global.confirm?.(`确定删除所选 ${ids.length} 条原则及其系统归纳卡吗？仍被题目引用的原则不会被删除。`))return;
+    if(!await window.KGDialogs.confirm(`确定删除所选 ${ids.length} 条原则及其系统归纳卡吗？仍被题目引用的原则不会被删除。`,{danger:true}))return;
     try{const result=await global.KGTeachingContentApi.deletePrinciples(ids);applyPrincipleCardBundle(result);selectedPrincipleIds.clear();activePrincipleId='';draftPrincipleId='';renderPrincipleList();toast(`已删除 ${ids.length} 条原则及其系统归纳卡。`)}catch(error){const counts=error?.detail?.referenceCounts||{},total=Object.values(counts).reduce((sum,value)=>sum+Number(value||0),0);if(total&&openPrincipleReferenceConflict(error?.detail))return;toast(total?`所选原则仍被 ${total} 道题引用，请先解除或重新绑定。`:revisionConflictMessage(error,'删除失败。'))}
   }
   function bind(){

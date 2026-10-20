@@ -14,7 +14,7 @@ assert.match(admin,/function canonicalQuestionDuplicateSignature\(question/);
 assert.match(admin,/\.normalize\('NFKC'\)/);
 assert.match(admin,/function preflightQuestionDuplicates\(incoming,existing/);
 assert.match(admin,/已有重复.*本批重复[\s\S]*自动清除/);
-assert.match(admin,/global\.confirm/);
+assert.match(admin,/await window\.KGDialogs\.confirm/);
 assert.match(admin,/cancelled:true/);
 assert.doesNotMatch(workflow,/skipDuplicates:byId\('tqSkipDuplicates'\)/);
 

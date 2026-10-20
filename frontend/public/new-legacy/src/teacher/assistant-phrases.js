@@ -36,7 +36,7 @@
         });
         const remove = button(row, '删除', async () => {
           if (saving) return;
-          if (!global.confirm('删除快捷话语“' + item.title + '”？')) return;
+          if (!await window.KGDialogs.confirm('删除快捷话语“' + item.title + '”？',{danger:true})) return;
           await save(state.custom.filter((_, i) => i !== index));
         });
         remove.setAttribute('aria-label', '删除 ' + item.title);

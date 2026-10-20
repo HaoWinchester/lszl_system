@@ -8,6 +8,7 @@ from pathlib import Path
 import tempfile
 
 from playwright.sync_api import BrowserContext, Page, sync_playwright
+from helpers.dialog_actions import respond_dialog
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -172,8 +173,8 @@ def exercise_prep(page: Page, context: BrowserContext, base: str, bundle_path: P
     page.goto(base + "/content-prep", wait_until="networkidle")
     page.locator("[data-creator-key='peiqi']").click()
     page.locator("#sharedDraftGate").wait_for(state="visible")
-    page.once("dialog", lambda dialog: dialog.accept("Recall 联动浏览器草稿"))
     page.locator("#btnCreateSharedDraft").click()
+    respond_dialog(page,"共享草稿名称",text="Recall 联动浏览器草稿")
     page.locator("#sharedDraftGate").wait_for(state="hidden")
 
     page.locator("#fileContentBundle").set_input_files(str(bundle_path))

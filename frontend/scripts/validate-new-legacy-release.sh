@@ -122,6 +122,7 @@ deployment_timing_stage landing-contracts-browser
 node new-legacy/tests/landing-page-contract.test.js
 node new-legacy/tests/shared-auth-dialog.test.js
 python3 new-legacy/tests/landing-page-browser.py
+python3 new-legacy/tests/dialogs-browser.py
 fi
 if new_legacy_validation_group_enabled "$VALIDATION_PROFILE" extended-contracts; then
   deployment_timing_stage extended-contracts
@@ -209,6 +210,9 @@ E2E_BASE_URL="http://127.0.0.1:$INTEGRATED_PORT" \
 E2E_BASE_URL="http://127.0.0.1:$INTEGRATED_PORT" \
 KG_E2E_ACTIVE_RELEASE_ROOT="$VALIDATION_ROOT/releases" \
   python3 frontend/e2e/practice_resumable_report.py
+python3 new-legacy/tests/practice-own-selection-browser.py
+python3 new-legacy/tests/practice-comment-language-browser.py
+python3 new-legacy/tests/comment-composer-popover-browser.py
 python3 new-legacy/tests/practice-answer-sheet-browser.py
 python3 new-legacy/tests/practice-result-report-browser.py
 python3 new-legacy/tests/practice-instant-feedback-browser.py

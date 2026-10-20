@@ -461,6 +461,11 @@
     },
     {
       "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_deep_recall_theme_v1__",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
       "token": "kg_default_entry_mode_v1",
       "ordinal": 1
     },
@@ -611,7 +616,17 @@
     },
     {
       "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_multi_question_theme_v1__",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
       "token": "kg_paper_workspace_layout_v1",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_practice_sound_v1__",
       "ordinal": 1
     },
     {
@@ -622,6 +637,11 @@
     {
       "path": "backend/app/services/runtime_retirement_service.py",
       "token": "kg_question_danmaku_hidden_v1__",
+      "ordinal": 1
+    },
+    {
+      "path": "backend/app/services/runtime_retirement_service.py",
+      "token": "kg_question_danmaku_settings_v1__",
       "ordinal": 1
     },
     {
@@ -2306,6 +2326,11 @@
     },
     {
       "path": "frontend/scripts/new-legacy-contract.json",
+      "token": "kg_deep_recall_theme_v1__",
+      "ordinal": 1
+    },
+    {
+      "path": "frontend/scripts/new-legacy-contract.json",
       "token": "kg_default_entry_mode_v1",
       "ordinal": 1
     },
@@ -2606,6 +2631,11 @@
     },
     {
       "path": "frontend/scripts/new-legacy-contract.json",
+      "token": "kg_multi_question_theme_v1__",
+      "ordinal": 1
+    },
+    {
+      "path": "frontend/scripts/new-legacy-contract.json",
       "token": "kg_multi_workspace_closed_tabs_v1__",
       "ordinal": 1
     },
@@ -2641,6 +2671,11 @@
     },
     {
       "path": "frontend/scripts/new-legacy-contract.json",
+      "token": "kg_practice_sound_v1__",
+      "ordinal": 1
+    },
+    {
+      "path": "frontend/scripts/new-legacy-contract.json",
       "token": "kg_principle_repository_v1",
       "ordinal": 1
     },
@@ -2672,6 +2707,11 @@
     {
       "path": "frontend/scripts/new-legacy-contract.json",
       "token": "kg_question_danmaku_hidden_v1__",
+      "ordinal": 1
+    },
+    {
+      "path": "frontend/scripts/new-legacy-contract.json",
+      "token": "kg_question_danmaku_settings_v1__",
       "ordinal": 1
     },
     {
@@ -3271,6 +3311,11 @@
     },
     {
       "path": "new-legacy/src/119-question-comments.js",
+      "token": "kg_question_danmaku_settings_v1__",
+      "ordinal": 1
+    },
+    {
+      "path": "new-legacy/src/119-question-comments.js",
       "token": "kg_question_discussion_danmaku_v1__",
       "ordinal": 1
     },
@@ -3805,6 +3850,11 @@
       "ordinal": 1
     },
     {
+      "path": "new-legacy/src/practice/practice-sound.js",
+      "token": "kg_practice_sound_v1__",
+      "ordinal": 1
+    },
+    {
       "path": "new-legacy/src/teacher/question-bank/workspace-layout.js",
       "token": "kg_question_library_workspace_layout_v1",
       "ordinal": 1
@@ -3817,36 +3867,6 @@
     {
       "path": "new-legacy/src/teacher/training-config/workspace-layout.js",
       "token": "kg_training_workspace_layout_v1",
-      "ordinal": 1
-    },
-    {
-      "path": "backend/app/services/runtime_retirement_service.py",
-      "token": "kg_practice_sound_v1__",
-      "ordinal": 1
-    },
-    {
-      "path": "backend/app/services/runtime_retirement_service.py",
-      "token": "kg_question_danmaku_settings_v1__",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-contract.json",
-      "token": "kg_practice_sound_v1__",
-      "ordinal": 1
-    },
-    {
-      "path": "frontend/scripts/new-legacy-contract.json",
-      "token": "kg_question_danmaku_settings_v1__",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/119-question-comments.js",
-      "token": "kg_question_danmaku_settings_v1__",
-      "ordinal": 1
-    },
-    {
-      "path": "new-legacy/src/practice/practice-sound.js",
-      "token": "kg_practice_sound_v1__",
       "ordinal": 1
     }
   ],

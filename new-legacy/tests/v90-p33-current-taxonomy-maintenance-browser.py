@@ -2,11 +2,13 @@
 from pathlib import Path
 import re
 from playwright.sync_api import sync_playwright
+from helpers.dialog_actions import respond_dialog
 ROOT=Path(__file__).resolve().parents[1]
 HTML=(ROOT/'content-center.html').read_text(encoding='utf-8')
 BODY=re.search(r'<body[^>]*>([\s\S]*)</body>',HTML,re.I).group(1)
 BODY=re.sub(r'<script[\s\S]*?</script>','',BODY,flags=re.I)
 SCRIPTS=[
+ 'src/00-dialogs.js',
  'src/28-app-storage.js','src/29-auth-core.js','src/86-activity-schema-v1.js','src/87-guided-learning-data.js','src/91-learning-content-core.js','src/93-content-organization-core.js',
  'src/admin/00-admin-core.js','src/admin/10-content-repository.js','src/admin/11-local-content-repository.js','src/admin/20-admin-permission-service.js','src/admin/21-admin-audit-service.js','src/admin/22-admin-transaction-service.js','src/admin/30-reference-index-service.js','src/admin/31-subject-service.js','src/admin/32-taxonomy-service.js','src/admin/33-activity-service.js','src/admin/34-course-service.js','src/admin/35-release-service.js','src/admin/40-admin-service-registry.js','src/admin/41-learning-content-compat.js',
  'src/91-knowledge-tree-index.js','src/91-content-center-app.js','src/93-content-organization-app.js','src/92-workspace-panel-manager.js'
@@ -70,12 +72,8 @@ with sync_playwright() as p:
     page.locator('#ccKnowledgeSearch').fill('');page.wait_for_timeout(180)
 
     dialogs=[]
-    def capture(dialog):
-        dialogs.append(dialog.message)
-        dialog.accept()
-    page.once('dialog',capture)
     page.locator('#ccKnowledgeTree [data-select-node="root"]').click()
-    page.locator('[data-inspector-delete]').click();page.wait_for_timeout(80)
+    page.locator('[data-inspector-delete]').click();dialogs.append(respond_dialog(page,'子节点'));page.wait_for_timeout(80)
     assert dialogs and '子节点' in dialogs[0]
     assert page.evaluate("()=>!!KGLearningContent.taxonomyById('taxonomy-current').nodes.find(n=>n.id==='root')")
 

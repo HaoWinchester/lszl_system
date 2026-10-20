@@ -85,6 +85,8 @@ DEVICE_PREFERENCE_PREFIXES = (
     "kg_question_danmaku_hidden_v1__",
     "kg_question_danmaku_settings_v1__",
     "kg_practice_sound_v1__",
+    "kg_deep_recall_theme_v1__",
+    "kg_multi_question_theme_v1__",
     "kg_multi_question_highlight_color_v1__",
     "kg_multi_question_analysis_sections_v1__",
     "kg_multi_question_paper_selection_v1__",

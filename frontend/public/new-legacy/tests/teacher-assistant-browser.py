@@ -7,6 +7,7 @@ import threading
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from playwright.sync_api import sync_playwright, expect
+from helpers.dialog_actions import respond_dialog
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -216,9 +217,10 @@ def run():
             page.screenshot(path=str(screenshot_dir / 'mock-results-390.png'))
             page.locator('#tab-conversation').click()
             expect(page.locator('#conversation-panel')).to_be_visible()
-            page.on('dialog', lambda dialog: dialog.accept())
             page.locator('#toggle-sidebar').click()
             page.locator('#delete-session').click()
+            respond_dialog(page,'删除本会话')
+            respond_dialog(page,'删除本会话')
             expect(page.locator('#delete-session')).to_be_disabled()
             page.locator('#new-session').click()
             page.locator('#toggle-sidebar').click()

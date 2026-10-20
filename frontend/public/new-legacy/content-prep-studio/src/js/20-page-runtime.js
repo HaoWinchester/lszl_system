@@ -66,7 +66,7 @@ async function duplicateQuestion(){
   state.questionBank.questions.push(copy);state.currentQuestionId=copy.id;renderQuestions();toast('已复制 · 新全局 ID 已生成');
 }
 async function deleteQuestion(){
-  const q=currentQuestion();if(!q)return;if(!confirm('删除当前草稿题目？不会影响正式程序。'))return;
+  const q=currentQuestion();if(!q)return;if(!await window.KGDialogs.confirm('删除当前草稿题目？不会影响正式程序。',{danger:true}))return;
   await switchQuestionForEdit(null);
   state.questionBank.questions=state.questionBank.questions.filter(x=>x.id!==q.id);
   state.currentQuestionId=state.questionBank.questions[0]?.id||'';renderQuestions();
@@ -144,11 +144,11 @@ function renderQuestionFacetBindings(){
     renderCurrentIssues();markWorkspaceDirty();
   }));
 }
-function createFamilyMemberFromCurrent(){
+async function createFamilyMemberFromCurrent(){
   const q=currentQuestion();if(!q)return;
   const root=familyRootFor(q);
   const base=root&&root.id!==q.id?root:q;
-  if(questionFamily(base).role!=='root'&&!confirm('当前题不是母题，先把它设为母题再创建成员？'))return;
+  if(questionFamily(base).role!=='root'&&!await window.KGDialogs.confirm('当前题不是母题，先把它设为母题再创建成员？',{danger:true}))return;
   makeQuestionFamilyRoot(base);
   const copy=QuestionService.duplicatePayload(base);
   copy.title=base.title+'（家族成员）';
@@ -276,25 +276,25 @@ function renderSubjectFacetManager(){  const box=document.getElementById('subjec
     const imported=importFacetSchema(await readJsonFile(f));
     state.questionBank.questions.forEach(q=>q.metadata.subjectFacets=normalizeQuestionFacets(q.metadata?.subjectFacets,q.subject||state.questionBank.subject));
     renderSubjectFacetManager();renderQuestionEditor();renderCurrentIssues();markWorkspaceDirty();toast(`已导入科目分类：${imported.name}`);
-  }catch(err){alert('科目分类导入失败：'+err.message)}file.value=''});
+  }catch(err){await window.KGDialogs.alert('科目分类导入失败：'+err.message)}file.value=''});
   const exportBtn=document.getElementById('btnExportCurrentFacetSchema');
   if(exportBtn&&schema)exportBtn.onclick=()=>downloadJson({format:'pmp-facet-schema-v1',...clone(schema)},`${schema.schemaId}.json`,{auditType:'subject-facet-schema'});
   const loadBtn=document.getElementById('btnLoadServerFacets');
   if(loadBtn)loadBtn.onclick=async()=>{
     if(!window.PMPPrepP45Server){toast('服务器适配器未加载');return}
     try{const result=await window.PMPPrepP45Server.loadSubjectFacetSchemas();state.questionBank.questions.forEach(q=>q.metadata.subjectFacets=normalizeQuestionFacets(q.metadata?.subjectFacets,q.subject||state.questionBank.subject));renderSubjectFacetManager();renderQuestionEditor();renderCurrentIssues();toast(`已从服务器拉取 ${result.schemas.length} 份 Facet Schema`)}
-    catch(error){alert('从服务器拉取科目分类失败：'+error.message)}
+    catch(error){await window.KGDialogs.alert('从服务器拉取科目分类失败：'+error.message)}
   };
   const pushBtn=document.getElementById('btnPushServerFacets');
   if(pushBtn&&schema)pushBtn.onclick=async()=>{
     if(!window.PMPPrepP45Server){toast('服务器适配器未加载');return}
-    if(!confirm(`将当前科目分类（${schema.name}）推送到服务器？\n服务器将按科目替换同名 Schema；历史使用过的 ID 会被保留，不会被硬删除。`))return;
+    if(!await window.KGDialogs.confirm(`将当前科目分类（${schema.name}）推送到服务器？\n服务器将按科目替换同名 Schema；历史使用过的 ID 会被保留，不会被硬删除。`,{danger:true}))return;
     try{
       const result=await window.PMPPrepP45Server.pushSubjectFacetSchema(schema,{contentRevision:prepRuntime.serverContentRevision||0});
       prepRuntime.serverContentRevision=Math.max(Number(prepRuntime.serverContentRevision||0),Number(result?.contentRevision||0));
       toast('科目分类已推送到服务器');
     }catch(error){
-      alert(error.code==='SUBJECT_FACET_REVISION_CONFLICT'?error.message:'推送到服务器失败：'+error.message);
+      await window.KGDialogs.alert(error.code==='SUBJECT_FACET_REVISION_CONFLICT'?error.message:'推送到服务器失败：'+error.message);
       if(error.code==='SUBJECT_FACET_REVISION_CONFLICT'&&error.detail?.latestContentRevision)prepRuntime.serverContentRevision=error.detail.latestContentRevision;
     }
   };
@@ -442,10 +442,10 @@ function keywordLooksLikeWord(term){
   if(term.length>14)return {ok:false,msg:'关键词过长，疑似半句话'};
   return {ok:true,msg:''};
 }
-function addKeyword(level){
+async function addKeyword(level){
   const q=currentQuestion(),sel=state.lastSelection;if(!q)return;
   if(!sel?.text){toast('请先在题干或选项中选中一个词/术语');return}
-  const check=keywordLooksLikeWord(sel.text);if(!check.ok&&!confirm(check.msg+'。仍要添加吗？'))return;
+  const check=keywordLooksLikeWord(sel.text);if(!check.ok&&!await window.KGDialogs.confirm(check.msg+'。仍要添加吗？',{danger:true}))return;
   if(q.clues.some(c=>c.text===sel.text&&c.sourceType===sel.sourceType&&String(c.sourceOptionId||'')===String(sel.optionId||''))){toast('该位置已存在此关键词');return}
   const resolved=resolveRecall(sel.text);
   const primary=q.metadata?.knowledge?.primaryNodeId||'';
@@ -667,11 +667,11 @@ function showKeywordFloatEditor({clue=null,text='',sourceType='stem',optionId=''
     recallMeta.textContent=`已手动输入：${typed}（未关联稳定 ID）`;
   };
   filterFloatRecall();
-  document.getElementById('floatSave').onclick=()=>{
+  document.getElementById('floatSave').onclick=async ()=>{
     const selectedLevel=document.getElementById('floatLevel').value==='core'?'core':'normal';
     let c=existing;
     if(!c){
-      const check=keywordLooksLikeWord(text);if(!check.ok&&!confirm(check.msg+'。仍要添加吗？'))return;
+      const check=keywordLooksLikeWord(text);if(!check.ok&&!await window.KGDialogs.confirm(check.msg+'。仍要添加吗？',{danger:true}))return;
       c={id:uid('kw'),text:String(text).trim(),textEn:'',type:'recall-keyword',clueRole:'true',keywordLevel:'normal',isCore:false,solutionRole:'context',coreReason:'',
         sourceType,sourceOptionId:optionId||'',conceptIds:[],explain:'',recallNodeId:'',recallEntryLabel:'',sourceMode:'prep-studio-keyword-v2',matchLocations:[]};
       q.clues.push(c);
@@ -779,14 +779,14 @@ function renderPrincipleEditor(){
       const index=state.synthesisPresets.items.findIndex(item=>item.id===nextPreset.id||item.principleId===p.id);
       if(index>=0)state.synthesisPresets.items[index]=nextPreset;else state.synthesisPresets.items.push(nextPreset);
       refreshAll();markWorkspaceDirty();toast('原则与归纳卡已保存到共享草稿');
-    }catch(error){alert('草稿保存失败：'+(error?.message||error))}
+    }catch(error){await window.KGDialogs.alert('草稿保存失败：'+(error?.message||error))}
     finally{button.disabled=false}
   };
   document.getElementById('pmDelete').onclick=async()=>{
-    if(!confirm('从当前共享草稿删除该原则及其归纳卡？题目中的旧原则 ID 会在校验中心提示。'))return;
+    if(!await window.KGDialogs.confirm('从当前共享草稿删除该原则及其归纳卡？题目中的旧原则 ID 会在校验中心提示。',{danger:true}))return;
     const button=document.getElementById('pmDelete');button.disabled=true;
     try{state.principles.items=state.principles.items.filter(item=>item.id!==p.id);state.synthesisPresets.items=state.synthesisPresets.items.filter(item=>item.principleId!==p.id);state.currentPrincipleId=state.principles.items[0]?.id||'';refreshAll();markWorkspaceDirty();toast('原则与归纳卡已从共享草稿删除')}
-    catch(error){alert('草稿删除失败：'+(error?.message||error))}
+    catch(error){await window.KGDialogs.alert('草稿删除失败：'+(error?.message||error))}
     finally{button.disabled=false}
   };
 }
@@ -1141,8 +1141,8 @@ document.querySelectorAll('[data-creator-key]').forEach(btn=>btn.addEventListene
 document.getElementById('btnSwitchCreator').onclick=requireCreatorSelection;
 document.getElementById('btnSwitchCreatorBase').onclick=requireCreatorSelection;
 document.getElementById('themeSelect').addEventListener('change',e=>applyTheme(e.target.value,{persist:true}));
-document.getElementById('btnQuickSaveWorkspace').onclick=()=>window.PMPPrepDraftUi?.save?.().catch(error=>alert(error.message||error));
-document.getElementById('btnSaveWorkspaceLocal').onclick=()=>window.PMPPrepDraftUi?.save?.().catch(error=>alert(error.message||error));
+document.getElementById('btnQuickSaveWorkspace').onclick=()=>window.PMPPrepDraftUi?.save?.().catch(async error=>await window.KGDialogs.alert(error.message||error));
+document.getElementById('btnSaveWorkspaceLocal').onclick=()=>window.PMPPrepDraftUi?.save?.().catch(async error=>await window.KGDialogs.alert(error.message||error));
 document.getElementById('btnOpenSharedDrafts').onclick=()=>window.PMPPrepDraftUi?.open?.();
 
 

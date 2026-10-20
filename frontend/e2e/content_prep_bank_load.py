@@ -6,6 +6,7 @@ import time
 from uuid import uuid4
 
 from playwright.sync_api import APIRequestContext, Page, sync_playwright
+from app_dialogs import respond_app_dialog
 
 
 BASE = os.environ.get("E2E_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
@@ -107,8 +108,8 @@ def choose_creator(page: Page) -> None:
 
 def create_shared_draft(page: Page, title: str) -> str:
     page.locator("#sharedDraftGate").wait_for(state="visible")
-    page.once("dialog", lambda dialog: dialog.accept(title))
     page.locator("#btnCreateSharedDraft").click()
+    respond_app_dialog(page, value=title, message="共享草稿名称")
     page.locator("#sharedDraftGate").wait_for(state="hidden")
     draft_id = page.evaluate("prepRuntime.draftId")
     assert draft_id
@@ -195,15 +196,15 @@ with sync_playwright() as playwright:
             "() => state.questionBank.questions.some(question => question.id === state.currentQuestionId)"
         )
         page.locator('button[data-tab="base"]').click()
-        page.once("dialog", lambda dialog: dialog.dismiss())
         page.locator("#serverSourceBankSelect").select_option(empty["id"])
+        respond_app_dialog(page, accept=False, message="未保存")
         wait_for_status(page, "已取消载入")
         assert len(page.evaluate("() => state.questionBank.questions")) == len(loaded_ids) + 1
         assert page.evaluate("() => state.questionBank.questions.some(question => question.id === state.currentQuestionId)")
         assert page.locator("#serverSourceBankSelect").input_value() == populated["id"]
 
-        page.once("dialog", lambda dialog: dialog.accept())
         page.locator("#serverSourceBankSelect").select_option(empty["id"])
+        respond_app_dialog(page, message="未保存")
         wait_for_status(page, "该题库暂无题目")
         assert len(page.evaluate("() => state.questionBank.questions")) == len(loaded_ids) + 1
         assert page.evaluate("() => state.questionBank.questions.some(question => question.id === state.currentQuestionId)")
@@ -211,8 +212,8 @@ with sync_playwright() as playwright:
         assert page.locator("#serverSourceBankSelect").is_enabled()
 
         page.locator('button[data-tab="questions"]').click()
-        page.once("dialog", lambda dialog: dialog.accept())
         page.locator("#btnDeleteQuestion").click()
+        respond_app_dialog(page, message="删除当前草稿题目")
         page.wait_for_function(
             "count => state.questionBank.questions.length === count", arg=len(loaded_ids)
         )

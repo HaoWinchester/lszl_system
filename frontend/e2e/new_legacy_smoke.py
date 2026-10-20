@@ -3,7 +3,8 @@ import time
 from pathlib import Path
 from urllib.parse import quote
 
-from playwright.sync_api import Dialog, sync_playwright
+from playwright.sync_api import sync_playwright
+from app_dialogs import respond_app_dialog
 
 
 BASE = os.environ.get("E2E_BASE_URL", "http://127.0.0.1:5173").rstrip("/")
@@ -43,7 +44,7 @@ with sync_playwright() as playwright:
     console_errors: list[str] = []
     page_errors: list[str] = []
     http_errors: list[str] = []
-    dialog_answers: list[str] = []
+    native_dialogs: list[str] = []
     api_activity: dict = {}
 
     def wait_for_api_settled(target) -> None:
@@ -55,12 +56,14 @@ with sync_playwright() as playwright:
             assert time.monotonic() < deadline, 'API requests did not settle before navigation'
             target.wait_for_timeout(50)
 
-    def handle_dialog(dialog: Dialog) -> None:
-        if dialog.type == "prompt":
-            assert dialog_answers, f"unexpected prompt: {dialog.message}"
-            dialog.accept(dialog_answers.pop(0))
-        else:
+    def handle_native_dialog(dialog) -> None:
+        # Leaving a workspace can invoke the browser's real navigation guard.
+        # App alert/confirm/prompt must use KGDialogs; beforeunload stays native.
+        if dialog.type == "beforeunload":
             dialog.accept()
+            return
+        native_dialogs.append(f"{dialog.type}: {dialog.message}")
+        dialog.dismiss()
 
     def record_response(response) -> None:
         if response.status < 400 or response.status in {401, 409}:
@@ -97,7 +100,7 @@ with sync_playwright() as playwright:
         target.on('request', track)
         target.on('requestfinished', lambda request: track(request, True))
         target.on('requestfailed', lambda request: track(request, True))
-        target.on("dialog", handle_dialog)
+        target.on("dialog", handle_native_dialog)
         target.on("console", lambda message: console_errors.append(message.text) if message.type == "error" else None)
         target.on("pageerror", lambda error: page_errors.append(error.stack or str(error)) if len(page_errors) < 12 else None)
         target.on("response", record_response)
@@ -168,19 +171,21 @@ with sync_playwright() as playwright:
         page.locator("#umSearchInput").fill("")
 
         temporary_user = f"验收账号{int(time.time())}"
-        dialog_answers.extend([temporary_user, "111111"])
         page.locator("#umAddUserBtn").click()
+        respond_app_dialog(page, value=temporary_user, message="请输入新用户名")
+        respond_app_dialog(page, value="111111", message="请输入初始密码")
         page.locator("#umSearchInput").fill(temporary_user)
         page.locator(f'.um-user-item[data-user="{temporary_user}"]').wait_for(state="visible")
         created = context.request.get(BASE + "/api/v1/users/" + quote(temporary_user))
         assert created.ok, (created.status, created.text())
 
         page.locator("#umDeleteUserBtn").click()
+        respond_app_dialog(page, message="确认删除账号")
         page.locator(f'.um-user-item[data-user="{temporary_user}"]').wait_for(state="detached")
         listed = context.request.get(BASE + "/api/v1/users?page=1&page_size=200")
         assert listed.ok
         assert temporary_user not in {item["username"] for item in listed.json()["users"]}
-        assert not dialog_answers
+        assert not native_dialogs, native_dialogs
 
         print("smoke: retired training alias redirects to practice mode", flush=True)
         goto_page(BASE + "/training", wait_until="networkidle")
@@ -266,6 +271,7 @@ with sync_playwright() as playwright:
         page.screenshot(path=str(screenshot), full_page=False)
         assert screenshot.exists()
 
+        assert not native_dialogs, native_dialogs
         assert not page_errors, page_errors
         assert not http_errors, http_errors
         filtered_console = [

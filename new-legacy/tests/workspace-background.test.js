@@ -20,7 +20,8 @@ test('invalid background cannot replace a valid CSS capture with a primitive',()
 
 function themes(seed={}){
  const data=new Map(Object.entries(seed)),handlers={};
- const ctx={console,localStorage:{getItem:k=>data.get(k)||null,setItem:(k,v)=>data.set(k,v)},document:{body:{dataset:{}}},CustomEvent:class{constructor(type,options){this.type=type;this.detail=options.detail}},dispatchEvent(){},addEventListener:(type,fn)=>(handlers[type]??=[]).push(fn)};ctx.window=ctx;
+ const ctx={console,localStorage:{getItem:k=>data.get(k)||null,setItem:(k,v)=>data.set(k,v)},KGAuthCore:{currentUser:()=>({username:'A'})},document:{body:{dataset:{}}},CustomEvent:class{constructor(type,options){this.type=type;this.detail=options.detail}},dispatchEvent(){},addEventListener:(type,fn)=>(handlers[type]??=[]).push(fn)};ctx.window=ctx;
+ vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'../src/28-device-preferences.js'),'utf8'),ctx);
  vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'../src/canvas/97-learning-theme.js'),'utf8'),ctx);
  const recall={dataset:{}},workspace={dataset:{}};
  return {ctx,data,handlers,recall,workspace,r:ctx.KGLearningTheme.create({scope:'recall',roots:[recall]}),w:ctx.KGLearningTheme.create({scope:'workspace',roots:[workspace]})};
@@ -29,13 +30,14 @@ test('recall and workspace scene preferences remain independent through reload a
  const t=themes();t.r.init();t.w.init();t.r.apply('sakura');t.w.apply('ocean');
  assert.equal(t.r.saved(),'sakura');assert.equal(t.w.saved(),'ocean');
  assert.equal(t.recall.dataset.theme,'sakura');assert.equal(t.workspace.dataset.theme,'ocean');
+ t.data.set(t.r.key,'neon');
  for(const fn of t.handlers.storage)fn({key:t.r.key,newValue:'neon',storageArea:t.ctx.localStorage});
  assert.equal(t.recall.dataset.theme,'neon');assert.equal(t.workspace.dataset.theme,'ocean');
- const reload=themes(Object.fromEntries(t.data));assert.equal(reload.r.saved(),'sakura');assert.equal(reload.w.saved(),'ocean');
+ const reload=themes(Object.fromEntries(t.data));assert.equal(reload.r.saved(),'neon');assert.equal(reload.w.saved(),'ocean');
 });
-test('workspace copies the former shared theme only once without overwriting recall preference',()=>{
+test('workspace never inherits the former shared recall theme',()=>{
  const t=themes({kg_deep_recall_theme_v1:'ocean',kg_deep_recall_theme_platform_migrated_v1:'1'});
- t.w.init();assert.equal(t.w.saved(),'ocean');t.r.apply('latte');assert.equal(t.w.saved(),'ocean');
+ t.w.init();assert.equal(t.w.saved(),'platform');assert.equal(t.r.init(),'ocean');t.r.apply('latte');assert.equal(t.w.saved(),'platform');
  t.w.apply('aurora');assert.equal(t.r.saved(),'latte');
 });
 

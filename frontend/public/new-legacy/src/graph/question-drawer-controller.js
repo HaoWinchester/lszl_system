@@ -71,7 +71,7 @@
             const sections=global.KGQuestionAnalysis.sections(history.question);feedback.innerHTML+=`<div class="gqd-analysis"><h4>解析</h4><p class="qm-text">${esc(history.analysis||'暂无文字解析')}</p><p>正确答案：${esc(global.KGQuestionAnswerSet.answerText(history.question,history.question.type==='matching'?history.question.matching?.correctPairs:global.KGQuestionAnswerSet.correctIds(history.question)))}</p>${sections.concepts.map(c=>`<p>${esc(c.title)}：${esc(c.rule)}</p>`).join('')}${sections.traps.map(o=>`<p>${esc(o.id)}：${esc(o.trap)}</p>`).join('')}</div>`;
           }catch(error){if(token===epoch&&error.name!=='AbortError'){feedback.textContent=(savedAttempt?'作答已保存，解析加载失败：':'提交失败，请重试当前答案：')+error.message;button.textContent=savedAttempt?'重试读取作答结果':'重试提交当前答案';}}finally{if(token===epoch){pending=false;button.disabled=submitted;}}
         };
-        card.querySelector('[data-remove]')?.addEventListener('click',()=>{if(global.confirm('确定移除这道关联题目？'))save(bindings.filter(b=>b.id!==binding.id).map(b=>b.questionId));});
+        card.querySelector('[data-remove]')?.addEventListener('click',async ()=>{if(await window.KGDialogs.confirm('确定移除这道关联题目？',{danger:true}))save(bindings.filter(b=>b.id!==binding.id).map(b=>b.questionId));});
       });drawSearch();
     }
     function drawSearch(){

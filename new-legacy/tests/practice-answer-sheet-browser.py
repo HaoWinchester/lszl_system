@@ -841,7 +841,7 @@ with sync_playwright() as playwright:
         buttons = page.locator('#practiceAnswerSheet [data-question-id]')
         expected_ids = [f'random-q{n}' for n in [7, 2, 9, 1, 8, 3, 10, 4, 6, 5]]
         assert buttons.evaluate_all('(rows)=>rows.map(row=>row.dataset.questionId)') == expected_ids
-        assert buttons.locator('span').all_text_contents() == [str(n) for n in range(1, 11)]
+        assert buttons.locator('.practice-answer-index').all_text_contents() == [str(n) for n in range(1, 11)]
         assert buttons.first.get_attribute('aria-current') == 'step'
         close_via(page, 'escape')
         page.locator('[data-option-id="A"]').click()

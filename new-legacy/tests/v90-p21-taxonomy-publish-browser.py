@@ -2,11 +2,13 @@
 from pathlib import Path
 import re
 from playwright.sync_api import sync_playwright
+from helpers.dialog_actions import respond_dialog
 ROOT=Path(__file__).resolve().parents[1]
 HTML=(ROOT/'admin-subjects.html').read_text(encoding='utf-8')
 BODY=re.search(r'<body[^>]*>([\s\S]*)</body>',HTML,re.I).group(1)
 BODY=re.sub(r'<script[\s\S]*?</script>','',BODY,flags=re.I)
 SCRIPTS=[
+ 'src/00-dialogs.js',
  'src/28-app-storage.js','src/29-auth-core.js','src/86-activity-schema-v1.js','src/87-guided-learning-data.js','src/91-learning-content-core.js','src/93-content-organization-core.js',
  'src/admin/00-admin-core.js','src/admin/10-content-repository.js','src/admin/11-local-content-repository.js','src/admin/20-admin-permission-service.js','src/admin/21-admin-audit-service.js','src/admin/22-admin-transaction-service.js','src/admin/30-reference-index-service.js','src/admin/31-subject-service.js','src/admin/32-taxonomy-service.js','src/admin/33-activity-service.js','src/admin/34-course-service.js','src/admin/35-release-service.js','src/admin/40-admin-service-registry.js','src/admin/41-learning-content-compat.js','src/admin/49-admin-ui.js','src/admin/51-admin-subjects-app.js'
 ]
@@ -34,11 +36,9 @@ with sync_playwright() as p:
     page.wait_for_timeout(80)
     assert page.locator('[data-publish-taxonomy="taxonomy-pmp-main-v2"]').is_enabled()
     dialogs=[]
-    def handle_dialog(dialog):
-        dialogs.append(dialog.type)
-        dialog.accept('P2.1 browser release') if dialog.type=='prompt' else dialog.accept()
-    page.on('dialog',handle_dialog)
     page.locator('[data-publish-taxonomy="taxonomy-pmp-main-v2"]').click()
+    respond_dialog(page,'设为当前知识树');dialogs.append('confirm')
+    respond_dialog(page,'切换说明',text='P2.1 browser release');dialogs.append('prompt')
     page.wait_for_timeout(220)
     assert page.evaluate("()=>KGAdminServices.taxonomies.currentForSubject('subject-pmp').id")=='taxonomy-pmp-main-v2'
     assert page.evaluate("()=>KGLearningContent.subjectById('subject-pmp').defaultTaxonomyId")=='taxonomy-pmp-main-v2'

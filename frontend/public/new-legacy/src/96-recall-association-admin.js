@@ -51,7 +51,7 @@
     const libraryApi=api(),text=$('ccRecallLibraryText');if(!libraryApi||!text)return;
     const subject=currentSubject(),mode=$('ccRecallLibraryMode')?.value||'merge';
     const parsed=parseCurrent();if(!parsed?.valid)return;
-    if(mode==='replace'&&!global.confirm(`将替换 ${subject.code} 当前科目级知识联想库。确定继续吗？`))return;
+    if(mode==='replace'&&!await window.KGDialogs.confirm(`将替换 ${subject.code} 当前科目级知识联想库。确定继续吗？`,{danger:true}))return;
     const current=libraryApi.read(subject.code),incoming=libraryApi.reconcileIncoming(current,parsed.library);
     const candidate=mode==='replace'?incoming:libraryApi.merge(current,incoming);
     try{

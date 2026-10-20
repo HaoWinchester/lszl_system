@@ -249,8 +249,8 @@
     byId('gptIntro').hidden=true;byId('gptQuestion').hidden=false;byId('gptActionBar').hidden=true;byId('gptResult').hidden=true;
     byId('gptQuestion').innerHTML='<div class="glp-fatal"><p>'+escapeHTML(message)+'</p><a href="'+pathHref()+'">返回学习路径</a></div>';
   }
-  function exit(){
-    if(!state.completed&&state.started&&global.confirm?.('退出后，本次跳级测试不会保存。确定退出吗？')===false)return;
+  async function exit(){
+    if(!state.completed&&state.started&&await window.KGDialogs.confirm('退出后，本次跳级测试不会保存。确定退出吗？',{danger:true})===false)return;
     global.location.href=pathHref();
   }
   function bind(){

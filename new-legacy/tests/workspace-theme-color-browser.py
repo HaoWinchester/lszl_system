@@ -19,24 +19,26 @@ with sync_playwright() as pw:
     page=context.new_page()
     page.goto(args.base_url+'/question-workspace.html?paperId=ink-paper&releaseId=ink-release',wait_until='networkidle')
     page.wait_for_function('!!window.KGMultiQuestionWorkspace?.activeWorkspace()')
+    def scene(theme):
+        page.locator('[data-learning-theme-menu]>summary').click();page.locator('[data-kr-theme='+theme+']').click();page.locator('[data-theme-save]').click()
     if args.readonly_only:
         assert page.locator('body').get_attribute('data-qw-readonly')=='1'
         first=page.evaluate('KGMultiQuestionWorkspace.activeWorkspace().background')
-        page.locator('#qwThemeSelect').select_option('neon')
+        scene('neon')
         page.evaluate('KGMultiQuestionWorkspace.renderCards()')
         assert page.evaluate('KGMultiQuestionWorkspace.activeWorkspace().background')==first
         print('PASS readonly legacy document keeps first effective background after theme and rerender')
         browser.close()
         raise SystemExit(0)
     if args.migration_only:
-        legacy_id=page.evaluate('''()=>{localStorage.setItem('kg_deep_recall_theme_platform_migrated_v1','1');localStorage.setItem('kg_deep_recall_theme_v1','ocean');const w=KGCanvasWorkspaceStore.createWorkspace('T02旧背景',{activate:false});delete w.background;KGCanvasWorkspaceStore.write(w);return w.id}''')
+        legacy_id=page.evaluate('''()=>{localStorage.setItem('kg_deep_recall_theme_platform_migrated_v1','1');KGDevicePreferences.remove('kg_multi_question_theme_v1__ink-browser');localStorage.setItem('kg_multi_question_theme_v1','ocean');const w=KGCanvasWorkspaceStore.createWorkspace('T02旧背景',{activate:false});delete w.background;KGCanvasWorkspaceStore.write(w);return w.id}''')
         page.evaluate('KGCanvasWorkspaceAdapter.flush({throwOnError:true})')
         page.goto(args.base_url+'/question-workspace.html?workspace='+legacy_id,wait_until='networkidle')
         captured=page.evaluate('KGMultiQuestionWorkspace.activeWorkspace().background')
         assert captured['appearance']['backgroundColor']=='#eff6ff',captured
         assert captured['layer']['color']=='rgb(239, 246, 255)',captured
         assert captured.get('surface',{}).get('ink')=='rgba(2,132,199,.08)',captured
-        page.locator('#qwThemeSelect').select_option('neon')
+        scene('neon')
         assert page.evaluate('KGMultiQuestionWorkspace.activeWorkspace().background')==captured
         print('PASS first legacy ocean load captures effective blue gradient before theme switches')
         browser.close()
@@ -116,7 +118,7 @@ with sync_playwright() as pw:
     appearance=lambda:page.locator('#qwCanvasViewport').evaluate('(e)=>{const s=getComputedStyle(e);return [s.getPropertyValue("--uc-canvas-bg"),s.getPropertyValue("--uc-canvas-pattern-ink"),e.dataset.canvasPattern]}')
     before=background(),appearance()
     for theme in ['platform','parchment','aurora','neon','sakura','ocean','latte']:
-        page.locator('#qwThemeSelect').select_option(theme)
+        scene(theme)
         assert (background(),appearance())==before,theme+' changed effective background'
     print('PASS seven themes preserve gradient and surface grid')
     page.evaluate('KGCanvasAppearanceController.write({pattern:"grid",backgroundColor:"#fff8dc"},{source:"T02"})')
@@ -162,7 +164,7 @@ with sync_playwright() as pw:
     page.locator('#qwUndoBtn').click()
     assert page.evaluate('(id)=>KGMultiQuestionWorkspace.activeWorkspace().groups.find(g=>g.id===id).color',group_id)=='#ede9fe'
     print('PASS common-group color retains selection and undo restores group fill')
-    page.locator('#qwThemeSelect').select_option('ocean')
+    scene('ocean')
     legacy_id=page.evaluate('''async()=>{const w=KGCanvasWorkspaceStore.createWorkspace('T02切换未迁移文档',{activate:false});await KGMultiQuestionWorkspace.loadWorkspace(w.id);return w.id}''')
     migrated=page.evaluate('KGMultiQuestionWorkspace.activeWorkspace().background')
     assert migrated['appearance']['backgroundColor']=='#eff6ff',migrated

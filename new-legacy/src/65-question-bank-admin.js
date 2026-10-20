@@ -1606,7 +1606,7 @@
     const factory=TeacherDomains.QuestionBankImportController;if(!factory?.create)return;
     questionBankImportController=factory.create({
       api:Catalog,
-      confirm:request=>window.confirm(request.message),
+      confirm:async request=>await window.KGDialogs.confirm(request.message,{danger:true}),
       onChange:renderQuestionBankImportState,
       onReload:async result=>{
         state.banks=loadBanks();
@@ -3229,17 +3229,17 @@
   }
   async function addPaperCategory(){
     if(!(await confirmPaperLeave()))return;
-    const name=String(prompt('请输入试卷分类名称：','')||'').trim();if(!name)return;
+    const name=String(await window.KGDialogs.prompt('请输入试卷分类名称：','')||'').trim();if(!name)return;
     try{const category=normalizePaperCategory(await PaperDraftApi.createCategory({name,orderIndex:state.paperCategories.length}));state.paperCategories.push(category);state.paperCategoryFilter=category.id;state.paperListPage=1;state.selectedPaperId='';state.selectedPaperIds=new Set();closePaperQuestionPreview();renderPaperManager();toast(`已创建分类“${name}”。`)}catch(error){toast(paperApiMessage(error,'创建分类失败。'))}
   }
   async function renamePaperCategory(categoryId){
-    const category=state.paperCategories.find(item=>item.id===categoryId);if(!category)return;const name=String(prompt('修改分类名称：',category.name)||'').trim();if(!name||name===category.name)return;
+    const category=state.paperCategories.find(item=>item.id===categoryId);if(!category)return;const name=String(await window.KGDialogs.prompt('修改分类名称：',category.name)||'').trim();if(!name||name===category.name)return;
     try{const saved=normalizePaperCategory(await PaperDraftApi.updateCategory(categoryId,{revision:category.revision,name}));state.paperCategories=state.paperCategories.map(item=>item.id===categoryId?saved:item);renderPaperManager();toast('分类名称已更新。')}catch(error){if(error?.status===409)await reloadPaperDrafts().catch(()=>{});toast(paperApiMessage(error,'修改分类失败。'))}
   }
   async function deletePaperCategory(categoryId){
     const category=state.paperCategories.find(item=>item.id===categoryId);if(!category)return;const count=state.papers.filter(paper=>paper.categoryId===categoryId).length;
     if(count)return toast(`该分类仍有 ${count} 张试卷，请先批量移到其他分类或“未分类”。`);
-    if(!confirm(`确定删除空分类“${category.name}”吗？`))return;
+    if(!await window.KGDialogs.confirm(`确定删除空分类“${category.name}”吗？`,{danger:true}))return;
     try{await PaperDraftApi.removeCategory(categoryId,category.revision);state.paperCategories=state.paperCategories.filter(item=>item.id!==categoryId);if(state.paperCategoryFilter===categoryId)state.paperCategoryFilter='UNCATEGORIZED';renderPaperManager();toast('分类已删除。')}catch(error){if(error?.status===409)await reloadPaperDrafts().catch(()=>{});toast(paperApiMessage(error,'删除分类失败。'))}
   }
   function toggleSelectPaperPage(event){state.selectedPaperIds=event.currentTarget.checked?new Set(state.currentPaperPageIds):new Set();renderPaperList()}
@@ -3253,9 +3253,9 @@
     if(!(await confirmPaperLeave()))return;
     const selected=state.papers.filter(paper=>state.selectedPaperIds.has(paper.id)&&!isPaperArchived(paper));
     if(!selected.length)return toast('选中的试卷均已归档。');
-    if(!confirm(`确定归档选中的 ${selected.length} 张试卷吗？
+    if(!await window.KGDialogs.confirm(`确定归档选中的 ${selected.length} 张试卷吗？
 
-已发布试卷将从学员端下架，历史发布记录仍保留。`))return;
+已发布试卷将从学员端下架，历史发布记录仍保留。`,{danger:true}))return;
     const failed=[];for(const paper of selected){try{if(isPaperPublished(paper)&&!(await withdrawPaperRelease(paper))){failed.push(paper.name);continue}const latest=await PaperDraftApi.detail(paper.id);await PaperDraftApi.archive(paper.id,latest?.revision||paper.revision)}catch(error){failed.push(paper.name)}}
     const archived=selected.length-failed.length;if(!archived)return toast('批量归档失败，请重试。');
     if(selected.some(paper=>paper.id===currentPaper()?.id))setCurrentPaper(null);
@@ -3263,9 +3263,9 @@
   }
   async function deleteSelectedPaperDrafts(){
     if(!(await confirmPaperLeave()))return;
-    const selected=state.papers.filter(paper=>state.selectedPaperIds.has(paper.id)),deletable=selected.filter(paper=>paperStatusKey(paper)==='draft'&&!hasPaperReleaseHistory(paper)),protectedCount=selected.length-deletable.length;if(!deletable.length)return toast('选中项中没有可删除的未发布草稿；有发布历史或已归档试卷受到保护。');if(!confirm(`即将删除 ${deletable.length} 张草稿${protectedCount?`，另有 ${protectedCount} 张受保护试卷会跳过`:''}。
+    const selected=state.papers.filter(paper=>state.selectedPaperIds.has(paper.id)),deletable=selected.filter(paper=>paperStatusKey(paper)==='draft'&&!hasPaperReleaseHistory(paper)),protectedCount=selected.length-deletable.length;if(!deletable.length)return toast('选中项中没有可删除的未发布草稿；有发布历史或已归档试卷受到保护。');if(!await window.KGDialogs.confirm(`即将删除 ${deletable.length} 张草稿${protectedCount?`，另有 ${protectedCount} 张受保护试卷会跳过`:''}。
 
-只删除试卷配置，不会删除题库原题。`))return;let removed=0;for(const paper of deletable){try{await PaperDraftApi.remove(paper.id,{revision:paper.revision,reason:'bulk_delete_draft'});removed+=1}catch(error){console.warn('删除试卷草稿失败',paper.id,error)}}state.selectedPaperIds=new Set();await reloadPaperDrafts().catch(()=>{});ensureSelectedPaperVisible();renderPaperManager();toast(`已删除 ${removed} 张草稿${removed<deletable.length?`，${deletable.length-removed} 张失败`:''}${protectedCount?`，跳过 ${protectedCount} 张受保护试卷`:''}。`)
+只删除试卷配置，不会删除题库原题。`,{danger:true}))return;let removed=0;for(const paper of deletable){try{await PaperDraftApi.remove(paper.id,{revision:paper.revision,reason:'bulk_delete_draft'});removed+=1}catch(error){console.warn('删除试卷草稿失败',paper.id,error)}}state.selectedPaperIds=new Set();await reloadPaperDrafts().catch(()=>{});ensureSelectedPaperVisible();renderPaperManager();toast(`已删除 ${removed} 张草稿${removed<deletable.length?`，${deletable.length-removed} 张失败`:''}${protectedCount?`，跳过 ${protectedCount} 张受保护试卷`:''}。`)
   }
   function paperQuotaBucketLabel(mode,bucketId){
     if(mode==='principle'){
@@ -3464,9 +3464,9 @@
   }
   function toggleSelectPaperPreview(event){const paper=currentPaper(),checked=!!event.currentTarget.checked;if(!paper)return;state.selectedPaperQuestionKeys=checked?new Set((paper.questions||[]).map(paperRefKey)):new Set();renderPaperQuestionList()}
   async function removeSelectedPaperQuestions(){
-    const paper=currentPaper(),keys=state.selectedPaperQuestionKeys;if(!paper||!keys.size)return;const count=keys.size;if(state.paperPreviewRef&&keys.has(paperPreviewKey()))closePaperQuestionPreview();if(!confirm(`确定从试卷中移除选中的 ${count} 道题吗？
+    const paper=currentPaper(),keys=state.selectedPaperQuestionKeys;if(!paper||!keys.size)return;const count=keys.size;if(state.paperPreviewRef&&keys.has(paperPreviewKey()))closePaperQuestionPreview();if(!await window.KGDialogs.confirm(`确定从试卷中移除选中的 ${count} 道题吗？
 
-只移除试卷引用，不会删除题库原题。`))return;
+只移除试卷引用，不会删除题库原题。`,{danger:true}))return;
     const draft=clone(paper),response=teacherDomainServices().paperPicker?.remove?.(draft,[...keys]);if(!response?.ok)return toast(response?.errors?.[0]||'移除题目失败。');const remainingIds=new Set((draft.questions||[]).map(ref=>String(ref.questionId||'')));draft.manualQuestionIds=(draft.manualQuestionIds||[]).filter(id=>remainingIds.has(String(id)));const saved=await persistPaperQuestions(draft,{silent:true});if(!saved)return;state.paperQuotaFeedback=null;state.selectedPaperQuestionKeys=new Set();renderPaperManager();toast(`已从试卷移除 ${response.value.removed} 道题。`);return response;
   }
   async function movePaperQuestion(index,direction){const paper=currentPaper(),target=index+direction;if(!paper||index<0||target<0||target>=paper.questions.length)return;const draft=clone(paper);const moved=teacherDomainServices().paperPicker.moveGroup(draft,paperRefKey(draft.questions[index]),direction);if(!moved.ok)return;if(await persistPaperQuestions(draft,{silent:true}))renderPaperQuestionList()}
@@ -3595,26 +3595,26 @@
   async function withdrawCurrentPaper(){
     if(window.KGRolePermissions&&!window.KGRolePermissions.can('publishPapers'))return toast('当前角色无试卷取消发布权限。');
     const paper=currentPaper();if(!paper)return toast('请先选择试卷。');if(!isPaperPublished(paper))return toast('当前试卷未处于发布状态。');
-    if(!confirm(`确定取消发布试卷“${paper.name}”吗？
+    if(!await window.KGDialogs.confirm(`确定取消发布试卷“${paper.name}”吗？
 
-学员端将立即下架当前版本；历史发布记录继续保留，试卷恢复为可编辑草稿。`))return;
+学员端将立即下架当前版本；历史发布记录继续保留，试卷恢复为可编辑草稿。`,{danger:true}))return;
     if(!(await withdrawPaperRelease(paper)))return;
     setCurrentPaper(null);await reloadPaperDrafts({selectedId:paper.id}).catch(()=>{});renderPaperManager();toast(`已取消发布；历史 v${paper.publishedVersion} 已保留。`);
   }
   async function archiveCurrentPaper(){
     if(!(await confirmPaperLeave()))return;
     const paper=currentPaper();if(!paper)return;if(isPaperArchived(paper))return toast('当前试卷已经归档。');
-    if(!confirm(`确定归档试卷“${paper.name}”吗？
+    if(!await window.KGDialogs.confirm(`确定归档试卷“${paper.name}”吗？
 
-归档后学员端不再显示，历史发布记录仍保留。`))return;
+归档后学员端不再显示，历史发布记录仍保留。`,{danger:true}))return;
     if(isPaperPublished(paper)&&!(await withdrawPaperRelease(paper)))return;
     try{const latest=await PaperDraftApi.detail(paper.id);await PaperDraftApi.archive(paper.id,latest?.revision||paper.revision);setCurrentPaper(null);await reloadPaperDrafts({selectedId:paper.id});renderPaperManager();toast('试卷已归档。')}catch(error){toast(paperApiMessage(error,'归档试卷失败。'))}
   }
   async function unarchiveCurrentPaper(){
     const paper=currentPaper();if(!paper)return toast('请先选择试卷。');if(!isPaperArchived(paper))return toast('当前试卷未归档。');
-    if(!confirm(`确定取消归档试卷“${paper.name}”吗？
+    if(!await window.KGDialogs.confirm(`确定取消归档试卷“${paper.name}”吗？
 
-试卷将恢复为可编辑草稿，不会自动重新发布。`))return;
+试卷将恢复为可编辑草稿，不会自动重新发布。`,{danger:true}))return;
     try{await PaperDraftApi.restore(paper.id,paper.revision);await reloadPaperDrafts({selectedId:paper.id});renderPaperManager();toast('已取消归档，可继续编辑并发布新版本。')}catch(error){toast(paperApiMessage(error,'取消归档失败。'))}
   }
   async function removePaperQuestion(index){
@@ -3634,7 +3634,7 @@
     const paper = currentPaper();
     if(!paper) return;
     if(paperStatusKey(paper)!=='draft'||hasPaperReleaseHistory(paper))return toast('只有从未发布的草稿可以删除；有发布历史或已归档试卷受到保护。');
-    if(!confirm(`确定删除试卷“${paper.name}”吗？\n\n不会删除原题库题目，只删除这套试卷配置。`)) return;
+    if(!await window.KGDialogs.confirm(`确定删除试卷“${paper.name}”吗？\n\n不会删除原题库题目，只删除这套试卷配置。`,{danger:true})) return;
     try{await PaperDraftApi.remove(paper.id,{revision:paper.revision,reason:'delete_draft'});setCurrentPaper(null);await reloadPaperDrafts();renderPaperManager();toast('已删除试卷。')}catch(error){toast(paperApiMessage(error,'删除试卷失败。'))}
   }
   async function exportCurrentPaper(){
@@ -3676,7 +3676,7 @@
     }catch(error){
       Object.assign(bank,before);
       render();
-      alert('题库保存失败：'+(error.message||error));
+      await window.KGDialogs.alert('题库保存失败：'+(error.message||error));
       return false;
     }
   }
@@ -3828,12 +3828,12 @@
     const q = currentQuestion();
     if(!bank || !q) return false;
     if(state.serverCatalogNewerRevision&&!options.allowServerMerge){if(!options.silent)toast('服务器有新版本，请先选择重新载入或合并。');return false}
-    try{await window.KGQuestionRichEditor?.flush(q);}catch(error){if(!options.silent)alert(error.message);return false;}
+    try{await window.KGQuestionRichEditor?.flush(q);}catch(error){if(!options.silent)await window.KGDialogs.alert(error.message);return false;}
     const collected=collectQuestionDraftFromDom(q,bank);
     if(!collected)return false;
     const {draft,rawStem,reasoningSteps}=collected;
     const answerErrors=AnswerSet.validate?.(draft)||[];
-    if(answerErrors.length){if(!options.silent)alert(answerErrors.join('\n'));return false}
+    if(answerErrors.length){if(!options.silent)await window.KGDialogs.alert(answerErrors.join('\n'));return false}
     const published=!!draft.status?.published;
     const trainingResponse=teacherDomainServices().training?.update?.(draft,{clues:draft.clues||[],concepts:draft.concepts||[],reasoningSteps,metadata:draft.metadata});
     if(trainingResponse?.ok===false)return false;
@@ -3856,7 +3856,7 @@
     }catch(error){
       state.banks=previousBanks.map(normalizeBank);
       if(!options.silent)render();
-      alert('题目保存失败：'+(error.message||error));
+      await window.KGDialogs.alert('题目保存失败：'+(error.message||error));
       return false;
     }
   }
@@ -3927,7 +3927,7 @@
       audit:{action:nodeId?'question.knowledge.bulk_update':'question.unclassified.bulk_move',entityType:'question-batch',entityId:bank?.id||'',summary:nodeId?`批量修改 ${questions.length} 道题的主要知识点`:`批量将 ${questions.length} 道题移入待分类`,metadata:{bankId:bank?.id||'',questionIds:questions.map(item=>item.id),nodeId:String(nodeId||'')}}
     });
     if(!response.ok){render();toast(`批量操作失败，已回滚：${response.errors[0]||'未知错误'}`);return response}
-    persistCatalogQuestionChanges(questions,bank.id,state.selectedQuestionId).then(()=>render()).catch(error=>{state.banks=beforeBanks.map(normalizeBank);render();alert('批量保存失败：'+(error.message||error))});clearQuestionSelection();$('qbBulkKnowledgeDialog')?.close();render();toast(nodeId?`正在保存 ${questions.length} 道题的知识点修改。`:`正在将 ${questions.length} 道题移入待分类。`);return response;
+    persistCatalogQuestionChanges(questions,bank.id,state.selectedQuestionId).then(()=>render()).catch(async error=>{state.banks=beforeBanks.map(normalizeBank);render();await window.KGDialogs.alert('批量保存失败：'+(error.message||error))});clearQuestionSelection();$('qbBulkKnowledgeDialog')?.close();render();toast(nodeId?`正在保存 ${questions.length} 道题的知识点修改。`:`正在将 ${questions.length} 道题移入待分类。`);return response;
   }
   function tagPathsFor(tags){
     const groups=window.KGQuestionClassification?.TAG_GROUPS||[];const paths=[];
@@ -3953,7 +3953,7 @@
       audit:{action:'question.tags.bulk_set',entityType:'question-batch',entityId:bank?.id||'',summary:`为 ${questions.length} 道题${mode==='remove'?'移除':'增加'}标签`,metadata:{bankId:bank?.id||'',questionIds:questions.map(item=>item.id),mode,tags:chosen}}
     });
     if(!response.ok){render();toast(`批量标签操作失败，已回滚：${response.errors[0]||'未知错误'}`);return response}
-    persistCatalogQuestionChanges(questions,bank.id,state.selectedQuestionId).then(()=>render()).catch(error=>{state.banks=beforeBanks.map(normalizeBank);render();alert('批量保存失败：'+(error.message||error))});clearQuestionSelection();$('qbBulkTagDialog')?.close();render();toast(`正在为 ${questions.length} 道题${mode==='remove'?'移除':'增加'}标签。`);return response;
+    persistCatalogQuestionChanges(questions,bank.id,state.selectedQuestionId).then(()=>render()).catch(async error=>{state.banks=beforeBanks.map(normalizeBank);render();await window.KGDialogs.alert('批量保存失败：'+(error.message||error))});clearQuestionSelection();$('qbBulkTagDialog')?.close();render();toast(`正在为 ${questions.length} 道题${mode==='remove'?'移除':'增加'}标签。`);return response;
   }
   function referenceSummaryForQuestion(question,bank=currentBank()){
     const service=teacherDomainServices().safeDelete;
@@ -3986,12 +3986,12 @@
     try{
       await persistCatalogQuestionChanges(bank.questions.filter(question=>ids.includes(question.id)),bank.id,selectedQuestionId);
       state.pendingSafeDeleteIds=[];clearQuestionSelection();state.selectedQuestionId=currentBank()?.questions.find(question=>questionMatchesLifecycle(question))?.id||'';$('qbSafeDeleteDialog')?.close();render();CatalogEditor.applyReadonlyState(CatalogEditor.status().readonly);toast(`已安全删除 ${response.meta.changed||0} 道题，可在“已删除题目”中恢复。`);return response;
-    }catch(error){state.banks=previousBanks.map(normalizeBank);render();alert('删除保存失败：'+(error.message||error));return {ok:false,errors:[error.message||String(error)]}}
+    }catch(error){state.banks=previousBanks.map(normalizeBank);render();await window.KGDialogs.alert('删除保存失败：'+(error.message||error));return {ok:false,errors:[error.message||String(error)]}}
   }
   async function restoreQuestionIds(ids){
     const bank=currentBank(),service=teacherDomainServices().safeDelete;if(!service||!bank)return toast('题目恢复服务不可用。');const previousBanks=clone(state.banks),selectedQuestionId=state.selectedQuestionId;const response=service.restore(bank,ids);if(!response.ok)return toast(`恢复失败：${response.errors[0]||'未知错误'}`);
     try{await persistCatalogQuestionChanges(bank.questions.filter(question=>ids.includes(question.id)),bank.id,selectedQuestionId);clearQuestionSelection();state.selectedQuestionId=currentBank()?.questions.find(question=>questionMatchesLifecycle(question))?.id||'';render();CatalogEditor.applyReadonlyState(CatalogEditor.status().readonly);toast(`已恢复 ${response.meta.changed||0} 道题。`);return response}
-    catch(error){state.banks=previousBanks.map(normalizeBank);render();alert('恢复保存失败：'+(error.message||error));return {ok:false,errors:[error.message||String(error)]}}
+    catch(error){state.banks=previousBanks.map(normalizeBank);render();await window.KGDialogs.alert('恢复保存失败：'+(error.message||error));return {ok:false,errors:[error.message||String(error)]}}
   }
   function openPermanentDeleteDialog(ids){
     const bank=currentBank(),valid=[...new Set(ids.map(String))].filter(id=>{const question=bank?.questions.find(item=>item.id===id);return question&&isQuestionDeleted(question)});if(!valid.length)return toast('请先选择已删除题目。');
@@ -4006,7 +4006,7 @@
     try{
       for(const question of beforeQuestions.filter(item=>deletableIds.includes(item.id))){const lockState=await CatalogEditor.open(question);if(lockState.readonly)throw new Error(`题目“${question.title||question.id}”正在由其他人编辑`);await Catalog.deleteQuestion(question.id);await CatalogEditor.release({forgetOnly:true})}
       reloadBanksFromCatalog(bank.id,'');state.pendingPermanentDeleteIds=[];clearQuestionSelection();state.selectedQuestionId=currentBank()?.questions.find(question=>questionMatchesLifecycle(question))?.id||'';$('qbPermanentDeleteDialog')?.close();render();toast(`已永久删除 ${response.meta.deleted||0} 道题${response.meta.protected?`，${response.meta.protected} 道受引用保护未删除`:''}。`);return response;
-    }catch(error){reloadBanksFromCatalog(bank.id,'');render();alert('永久删除失败：'+(error.message||error));return {ok:false,errors:[error.message||String(error)]}}
+    }catch(error){reloadBanksFromCatalog(bank.id,'');render();await window.KGDialogs.alert('永久删除失败：'+(error.message||error));return {ok:false,errors:[error.message||String(error)]}}
   }
 
   async function addBank(subject='PMP'){
@@ -4036,7 +4036,7 @@
       render();
       toast('已创建题库。');
       return created;
-    }catch(error){alert('题库创建失败：'+(error.message||error));return null}
+    }catch(error){await window.KGDialogs.alert('题库创建失败：'+(error.message||error));return null}
   }
   async function createCaseChildren(){
     if(!await saveQuestionForm({silent:true}))throw new Error('请先补全并保存当前小题。');
@@ -4065,7 +4065,7 @@
       CatalogEditor?.applyReadonlyState(CatalogEditor.status().readonly);
       toast('已创建题目并进入服务器题库。');
       return created;
-    }catch(error){alert('题目创建失败：'+(error.message||error));return null}
+    }catch(error){await window.KGDialogs.alert('题目创建失败：'+(error.message||error));return null}
   }
   async function cloneQuestion(){
     const bank = currentBank();
@@ -4084,7 +4084,7 @@
       CatalogEditor?.applyReadonlyState(CatalogEditor.status().readonly);
       toast('已复制为服务器题库中的新题。');
       return created;
-    }catch(error){alert('复制题目失败：'+(error.message||error));return null}
+    }catch(error){await window.KGDialogs.alert('复制题目失败：'+(error.message||error));return null}
   }
   function deleteQuestion(){
     const q=currentQuestion();if(!q)return;openSafeDeleteDialog([q.id]);
@@ -4097,7 +4097,7 @@
   async function clearCurrentBankTestRecords(){
     const bank=currentBank();
     if(!bank)return;
-    const confirmed=confirm(`确定清除题库“${bank.name}”的测试答题记录吗？\n\n只会清除本题库题目的训练进度、深度回忆和答题事件，其他题库不会受影响。`);
+    const confirmed=await window.KGDialogs.confirm(`确定清除题库“${bank.name}”的测试答题记录吗？\n\n只会清除本题库题目的训练进度、深度回忆和答题事件，其他题库不会受影响。`,{danger:true});
     if(!confirmed)return;
     try{
       if(!Catalog?.clearBankTestRecords)throw new Error('题库 API 未加载。');
@@ -4106,7 +4106,7 @@
       const total=Number(cleared.trainingProgress||0)+Number(cleared.recallProgress||0)+Number(cleared.learningEvents||0);
       state.clearedTestRecordBankIds.add(bank.id);
       toast(`已清除 ${total} 条测试答题记录（训练 ${Number(cleared.trainingProgress||0)}、回忆 ${Number(cleared.recallProgress||0)}、事件 ${Number(cleared.learningEvents||0)}）。`);
-    }catch(error){alert('清除测试答题记录失败：'+(error.message||error));}
+    }catch(error){await window.KGDialogs.alert('清除测试答题记录失败：'+(error.message||error));}
   }
   async function deleteBankById(bankId){
     const bank = state.banks.find(b => b.id === bankId);
@@ -4120,7 +4120,7 @@
       const paperCount=referenced.filter(row=>row.refs.paperRefs>0).length;
       const courseCount=referenced.filter(row=>row.refs.courseTaskRefs>0).length;
       const answerCount=referenced.filter(row=>row.refs.answerRefs>0).length;
-      alert(`该题库暂不能删除。
+      await window.KGDialogs.alert(`该题库暂不能删除。
 
 共有 ${referenced.length} 道题存在业务引用：
 试卷引用 ${paperCount} 道
@@ -4138,8 +4138,8 @@
 将物理删除该题库下 ${bank.questions.length} 道无业务引用题目。${bank.visibility==='published'?'该题库也会从学员的自由练习列表中撤下。':'此操作只影响当前教师题库。'}${testRecordCleanupNote}
 
 此操作不可恢复。`;
-    if(!confirm(message)) return;
-    try{await Catalog.deleteBank(bank.id)}catch(error){alert('题库删除失败：'+(error.message||error));return false}
+    if(!await window.KGDialogs.confirm(message,{danger:true})) return;
+    try{await Catalog.deleteBank(bank.id)}catch(error){await window.KGDialogs.alert('题库删除失败：'+(error.message||error));return false}
     state.clearedTestRecordBankIds.delete(bank.id);
     const filteredBefore = filteredBanks();
     const filteredIndex = filteredBefore.findIndex(b => b.id === bank.id);
@@ -4589,7 +4589,7 @@
       const saved=window.KGRecallStorage.writeCurrent(payload);
       if(saved===false)throw new Error('预览数据写入失败');
       setRecallConfigSaveState('saved','已保存');
-    }catch(e){alert('预览失败：'+(e.message||e));return}
+    }catch(e){await window.KGDialogs.alert('预览失败：'+(e.message||e));return}
     const url='knowledge-recall.html?preview=teacher-draft&previewToken='+encodeURIComponent(previewToken)+'&bankId='+encodeURIComponent(bank.id||'')+'&questionId='+encodeURIComponent(q.id||'current');
     window.open(url,'_blank');
   }
@@ -4644,9 +4644,9 @@
   }
   async function importQuestionBanks(data){
     const factory=TeacherDomains.QuestionBankImportController;
-    if(!factory?.create||!Catalog?.importBanks){alert('导入未提交：题库导入服务未加载。');return {ok:false,error:'题库导入服务未加载。'};}
+    if(!factory?.create||!Catalog?.importBanks){await window.KGDialogs.alert('导入未提交：题库导入服务未加载。');return {ok:false,error:'题库导入服务未加载。'};}
     const snapshot=questionImportStateSnapshot();
-    const controller=factory.create({api:Catalog,confirm:request=>window.confirm(request.message)});
+    const controller=factory.create({api:Catalog,confirm:async request=>await window.KGDialogs.confirm(request.message,{danger:true})});
     try{
       const loaded=await controller.load('question-bank.json',JSON.stringify(data));
       if(!loaded.ok)throw new Error(loaded.error);
@@ -4655,7 +4655,7 @@
       if(!submitted.ok){
         restoreQuestionImportState(snapshot);render();
         const cancelled=/^已取消/.test(String(submitted.error||''));
-        if(cancelled)toast(submitted.error);else alert('导入未提交：'+submitted.error);
+        if(cancelled)toast(submitted.error);else await window.KGDialogs.alert('导入未提交：'+submitted.error);
         return {ok:false,cancelled,error:submitted.error};
       }
       const result=submitted.result;
@@ -4675,7 +4675,7 @@
       return {ok:true,bankId:state.selectedBankId,questionId:state.selectedQuestionId,importedBankCount:savedBanks.length,importedPaperCount:0};
     }catch(error){
       restoreQuestionImportState(snapshot);render();
-      const message=String(error?.message||error||'未知错误');alert('导入未提交：'+message);
+      const message=String(error?.message||error||'未知错误');await window.KGDialogs.alert('导入未提交：'+message);
       return {ok:false,error:message};
     }
   }
@@ -4683,7 +4683,7 @@
     if(!file)return Promise.resolve();
     return globalThis.KGImportGuard.run('legacy-bank-file',async()=>{
       try{await importQuestionBanks(JSON.parse(String(await file.text()).replace(/^\ufeff/,'')))}
-      catch(error){alert('导入未提交：'+(error?.message||error))}
+      catch(error){await window.KGDialogs.alert('导入未提交：'+(error?.message||error))}
       finally{$('qbImportFile').value=''}
     },['qbImportFile','qbImportBtn']);
   }
@@ -4759,7 +4759,7 @@
     if(typeof Catalog?.importQuestions!=='function')return {valid:false,added:[],duplicates:[],errors:['题目批量导入服务尚未加载。'],bankId:bank.id};
     const normalizedIncoming=incoming.map((raw,index)=>normalizeQuestion({...raw,subject:raw?.subject||bank.subject},index));
     const report=preflightQuestionDuplicates(normalizedIncoming,bank.questions);
-    if(report.duplicates.length&&!window.confirm(questionDuplicateConfirmationMessage(report))){
+    if(report.duplicates.length&&!await window.KGDialogs.confirm(questionDuplicateConfirmationMessage(report),{danger:true})){
       if(options.notify!==false)toast('已取消导入，题库没有变化。');
       return {valid:false,cancelled:true,added:[],duplicates:clone(report.duplicates),errors:[],bankId:bank.id};
     }
@@ -4769,10 +4769,10 @@
       catch(error){
         if(error?.code!=='QUESTION_DUPLICATES_CONFIRMATION_REQUIRED')throw error;
         const serverReport=error?.detail?.detail?.importPlan||{};
-        if(!window.confirm(questionDuplicateConfirmationMessage({
+        if(!await window.KGDialogs.confirm(questionDuplicateConfirmationMessage({
           existingCount:serverReport.existingCount,batchCount:serverReport.batchCount,
           unique:Array.from({length:Number(serverReport.keepCount||0)})
-        })))return {valid:false,cancelled:true,added:[],duplicates:clone(report.duplicates),errors:[],bankId:bank.id};
+        }),{danger:true}))return {valid:false,cancelled:true,added:[],duplicates:clone(report.duplicates),errors:[],bankId:bank.id};
         result=await Catalog.importQuestions(bank.id,report.unique,{confirmDuplicateCleanup:true});
       }
       const added=Array.isArray(result?.questions)?result.questions:[];
@@ -4791,7 +4791,7 @@
 
   function updateCurrentQuestion(patch={}){
     const bank=currentBank(),question=currentQuestion();if(!bank||!question)return {valid:false,error:'请先选择题目。'};const beforeBanks=clone(state.banks);
-    Object.assign(question,normalizeQuestion({...question,...clone(patch),id:question.id,teacherNumber:question.teacherNumber||nextTeacherNumber(bank.subject)}));bank.updatedAt=Date.now();persistCatalogQuestionChanges([question],bank.id,question.id).then(()=>render()).catch(error=>{state.banks=beforeBanks.map(normalizeBank);render();alert('题目保存失败：'+(error.message||error))});render();return {valid:true,question:clone(currentQuestion())};
+    Object.assign(question,normalizeQuestion({...question,...clone(patch),id:question.id,teacherNumber:question.teacherNumber||nextTeacherNumber(bank.subject)}));bank.updatedAt=Date.now();persistCatalogQuestionChanges([question],bank.id,question.id).then(()=>render()).catch(async error=>{state.banks=beforeBanks.map(normalizeBank);render();await window.KGDialogs.alert('题目保存失败：'+(error.message||error))});render();return {valid:true,question:clone(currentQuestion())};
   }
   function renameTagAcrossQuestions(oldName,newName){
     const from=String(oldName||'').trim(),to=String(newName||'').trim();
@@ -4808,7 +4808,7 @@
       audit:{action:'question.tags.rename',entityType:'question-batch',summary:`将标签“${from}”重命名为“${to}”`,metadata:{from,to,questionIds:targets.map(item=>item.question.id)}}
     });
     if(!response.ok){render();return {valid:false,error:response.errors?.[0]||'标签重命名失败，已回滚。',updatedQuestions:0}}
-    persistCatalogQuestionChanges(targets.map(item=>item.question),state.selectedBankId,state.selectedQuestionId).then(()=>render()).catch(error=>{state.banks=beforeBanks.map(normalizeBank);render();alert('标签重命名保存失败：'+(error.message||error))});render();return {valid:true,updatedQuestions:targets.length};
+    persistCatalogQuestionChanges(targets.map(item=>item.question),state.selectedBankId,state.selectedQuestionId).then(()=>render()).catch(async error=>{state.banks=beforeBanks.map(normalizeBank);render();await window.KGDialogs.alert('标签重命名保存失败：'+(error.message||error))});render();return {valid:true,updatedQuestions:targets.length};
   }
 
 
@@ -4823,7 +4823,7 @@
       }
     });
     const bank=currentBank();if(bank)bank.updatedAt=Date.now();
-    persistCatalogQuestionChanges(questions,bank?.id||state.selectedBankId,state.selectedQuestionId).then(()=>render()).catch(error=>{state.banks=beforeBanks.map(normalizeBank);render();alert('批量保存失败：'+(error.message||error))});
+    persistCatalogQuestionChanges(questions,bank?.id||state.selectedBankId,state.selectedQuestionId).then(()=>render()).catch(async error=>{state.banks=beforeBanks.map(normalizeBank);render();await window.KGDialogs.alert('批量保存失败：'+(error.message||error))});
     render();return {valid:true,updated:questions.length};
   }
 

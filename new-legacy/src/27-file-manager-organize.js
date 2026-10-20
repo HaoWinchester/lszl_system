@@ -112,7 +112,7 @@
   }
   async function removeTag(id){
     const tag=tags().find(item=>item.id===id);if(!tag)return;
-    if(!confirm(`删除标签“${tag.name}”？相关文件将取消该标签。`))return;
+    if(!await window.KGDialogs.confirm(`删除标签“${tag.name}”？相关文件将取消该标签。`,{danger:true}))return;
     if(!await Promise.resolve(store.deleteTag(id,{owner:owner()}))){notify(store.getLastError&&store.getLastError()||'删除标签失败。','error');return}
     if(editingTagId===id)editingTagId='';
     notify('标签已删除。');await Promise.resolve(refresh());renderPicker(searchTerm());

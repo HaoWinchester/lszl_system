@@ -3,6 +3,7 @@ import argparse,json
 from pathlib import Path
 from helpers.graph_detail_actions import open_retained_practice
 from playwright.sync_api import sync_playwright,expect
+from helpers.dialog_actions import respond_dialog
 ROOT=Path(__file__).resolve().parents[2];OUT=ROOT/'artifacts/canvas-m2-m5/t14'
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--base-url',default='http://127.0.0.1:5194');base=parser.parse_args().base_url.rstrip('/');assert base.startswith('http://127.0.0.1:')
@@ -36,7 +37,7 @@ def main():
         p.locator('[data-close]').click();open_card(p,'empty');expect(p.locator('[data-questions]')).to_have_text('暂无关联题目');p.locator('[data-add]').click();p.locator('[data-search] input[name=q]').fill('zz-no-match');p.locator('[data-search] form button').click();expect(p.locator('[data-search-status]')).to_have_text('未找到匹配题目')
         p.locator('[data-search] input[name=q]').fill('card');p.locator('[data-search] form button').click();expect(p.locator('[data-results] label')).to_have_count(20);p.locator('[data-results] input').first.check()
         p.route('**/graph-questions/files/*/nodes/*/bindings',lambda route:route.fulfill(status=409,json={'detail':'REVISION_CONFLICT'}) if route.request.method=='PUT' else route.continue_());p.locator('[data-confirm]').click();expect(p.locator('[data-status]')).to_contain_text('关联保存失败');expect(p.locator('[data-questions]')).to_have_text('暂无关联题目');p.unroute('**/graph-questions/files/*/nodes/*/bindings');p.locator('[data-confirm]').click();expect(p.locator('.gqd-question')).to_have_count(1)
-        p.on('dialog',lambda d:d.accept());p.locator('[data-remove]').click();expect(p.locator('[data-questions]')).to_have_text('暂无关联题目')
+        p.locator('[data-remove]').click();respond_dialog(p,'移除这道关联题目');expect(p.locator('[data-questions]')).to_have_text('暂无关联题目')
         # Search failures preserve explicit error and never fabricate results.
         p.route('**/graph-questions/search?*',lambda route:route.fulfill(status=503,json={'detail':'search unavailable'}));p.locator('[data-search] form button').click();expect(p.locator('[data-search-status]')).to_contain_text('搜索失败');expect(p.locator('[data-results] label')).to_have_count(0);p.unroute('**/graph-questions/search?*')
         # Request failure must not render the empty state; switching cancels old card response.

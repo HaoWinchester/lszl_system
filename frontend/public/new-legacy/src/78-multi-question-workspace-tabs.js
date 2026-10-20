@@ -172,8 +172,8 @@
     });
     host?.addEventListener('dragend',()=>{tabDrag=null;clearDrag()});
 
-    byId('qwCreateWorkspaceBtn')?.addEventListener('click',()=>{
-      const created=options.onCreate?.();
+    byId('qwCreateWorkspaceBtn')?.addEventListener('click',async()=>{
+      const created=await options.onCreate?.();
       if(created?.id)markOpen(created.id);
     });
   }

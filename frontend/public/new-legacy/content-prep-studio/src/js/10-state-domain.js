@@ -268,7 +268,7 @@ function renderAuditTrail(){
   </div>`).join('');
 }
 async function clearAuditTrail(){
-  if(!confirm('清空当前浏览器设备上的全部导出审计记录？已经导出的审计日志文件不会受影响。'))return;
+  if(!await window.KGDialogs.confirm('清空当前浏览器设备上的全部导出审计记录？已经导出的审计日志文件不会受影响。',{danger:true}))return;
   prepRuntime.auditTrail=[];try{await prepDbDelete(AUDIT_TRAIL_KEY)}catch(_err){}renderAuditTrail();toast('本机导出审计记录已清空');
 }
 
@@ -614,9 +614,9 @@ function normalizeContentBundle(payload){
   const qb=payload.questionBank||payload.bank||(Array.isArray(payload.questions)?payload:null);if(!qb)throw new Error('完整内容包缺少 questionBank。');
   return {prepContentBundleVersion:Number(payload.prepContentBundleVersion||1),questionBank:normalizeBank(qb),principles:normalizePrinciples(payload.principles||{}),synthesisPresets:normalizePresets(payload.synthesisPresets||payload.presets||{}),tagConfig:normalizeTagConfig(payload.tagConfig||{}),subjectFacetRegistry:typeof normalizeSubjectFacetRegistry==='function'?normalizeSubjectFacetRegistry(payload.subjectFacetRegistry||{}):null,recallLibrary:payload.recallLibrary?normalizeRecall(payload.recallLibrary):null,knowledgeTree:payload.knowledgeTree?normalizeTree(payload.knowledgeTree):null};
 }
-function importContentBundle(payload){
+async function importContentBundle(payload){
   const b=ImportService.completeBundle(payload),report=preflightQuestionDuplicates(b.questionBank.questions,[]);
-  if(report.duplicates.length&&!confirm(`检测到重复题目：已有重复 ${report.existingCount} 道，本批重复 ${report.batchCount} 道。\n是否自动清除后继续导入？`))return {ok:false,cancelled:true,report};
+  if(report.duplicates.length&&!await window.KGDialogs.confirm(`检测到重复题目：已有重复 ${report.existingCount} 道，本批重复 ${report.batchCount} 道。\n是否自动清除后继续导入？`,{danger:true}))return {ok:false,cancelled:true,report};
   b.questionBank.questions=report.unique;state.tagConfig=b.tagConfig;state.principles=b.principles;state.synthesisPresets=b.synthesisPresets;state.questionBank=b.questionBank;if(b.subjectFacetRegistry)state.subjectFacetRegistry=b.subjectFacetRegistry;if(b.recallLibrary)state.recallLibrary=b.recallLibrary;if(b.knowledgeTree)state.knowledgeTree=b.knowledgeTree;
   stampImportedQuestions(state.questionBank.questions,'complete-content-bundle');
   refreshQuestionTagPaths();state.questionBank.questions.forEach(syncQuestionPrinciples);state.currentQuestionId=state.questionBank.questions[0]?.id||'';state.demoQuestionId=state.currentQuestionId;state.currentRecallId=state.recallLibrary.nodes[0]?.id||'';state.currentPrincipleId=state.principles.items[0]?.id||'';refreshAll();return {ok:true,report};

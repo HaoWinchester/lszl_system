@@ -227,7 +227,7 @@
   service.importUsers = async function (users, payload, options = {}) {
     const validated = original.importUsers(users, payload, options)
     if (!validated?.ok) return validated
-    const initialPassword = global.prompt('请设置本次导入账号的初始密码（至少 4 位）。所有导入账号首次登录都使用此密码：', '')
+    const initialPassword = await window.KGDialogs.prompt('请设置本次导入账号的初始密码（至少 4 位）。所有导入账号首次登录都使用此密码：', '', {inputType:'password'})
     if (initialPassword == null) return { ok: false, code: 'IMPORT_CANCELLED', message: '已取消导入。', users }
     if (String(initialPassword).length < 4) return { ok: false, code: 'INVALID_INITIAL_PASSWORD', message: '导入账号的初始密码至少 4 位。', users }
     const incoming = payload?.users && typeof payload.users === 'object' ? payload.users : payload

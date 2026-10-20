@@ -13,6 +13,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright
+from helpers.dialog_actions import respond_dialog
 
 ROOT = Path(__file__).resolve().parents[1]
 DIST = ROOT / "content-prep-studio" / "dist" / "content-prep.html"
@@ -69,7 +70,6 @@ def run() -> None:
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page(viewport={"width": 1360, "height": 900})
-        page.on("dialog", lambda dialog: (dialogs.append(dialog.message), dialog.accept()))
         page.add_init_script(STUB)
         goto_prep(page)
 
@@ -105,18 +105,14 @@ def run() -> None:
           };
           prepRuntime.draftId = 'draft-1'; prepRuntime.draftRevision = 4; prepRuntime.draftTitle = '当前草稿';
         }""")
-        page.evaluate("() => { window.__promptAnswer = '冲突副本'; }")
-        page.evaluate("""() => {
-          window.__confirmMessages = [];
-          window.confirm = message => { window.__confirmMessages.push(String(message)); return true; };
-          window.prompt = () => window.__promptAnswer;
-        }""")
-        page.evaluate("async () => { prepRuntime.dirty = true; try { await window.PMPPrepAutosave.runNow(); } catch (e) {} }")
-        page.wait_for_timeout(200)
+        page.evaluate("() => { prepRuntime.dirty=true;window.__recoveryDone=false;window.PMPPrepAutosave.runNow().finally(()=>window.__recoveryDone=true) }")
+        dialogs.append(respond_dialog(page,'自动保存被拒绝',text='复制草稿'))
+        respond_dialog(page,'新草稿名称',text='冲突副本')
+        page.wait_for_function('window.__recoveryDone===true')
         posts = page.evaluate("() => window.__draftCalls.filter(c => c.method === 'POST').length")
         assert posts >= 1, "409 选择复制副本时应 POST 新草稿"
-        conflict_messages = page.evaluate("() => window.__confirmMessages || []")
-        conflict_dialog = any("复制为新草稿" in message for message in [*dialogs, *conflict_messages])
+        conflict_messages = []
+        conflict_dialog = any("复制草稿" in message for message in [*dialogs, *conflict_messages])
         assert conflict_dialog, "冲突必须显式提示，不允许静默覆盖"
         assert page.evaluate("() => prepRuntime.draftId") == "draft-copy"
 

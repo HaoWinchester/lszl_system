@@ -763,17 +763,17 @@ window.KGHomeToolbarActions={
   setCurvePath:()=>applyPathStyle('curve'),
   openLineColorPicker:event=>openCanvasColorPicker(event),
   setLineColor:event=>applyLineColor(event.target.value),
-  exportLearningPackage:()=>{exportLearningPackage().catch(err=>alert('导出学习包失败：'+(err.message||err)))},
+  exportLearningPackage:()=>{exportLearningPackage().catch(async err=>await window.KGDialogs.alert('导出学习包失败：'+(err.message||err)))},
   openImportFile:()=>$('importFile').click(),
   importLearningPackage:async event=>{
     const f=event.target.files[0];
     if(!f)return;
     try{await importLearningPackageFile(f)}
-    catch(err){alert('导入失败：'+(err.message||err))}
+    catch(err){await window.KGDialogs.alert('导入失败：'+(err.message||err))}
     event.target.value='';
   },
-  resetGraph:()=>{
-    if(confirm('确定清空当前知识图谱吗？建议先导出备份。')){
+  resetGraph:async ()=>{
+    if(await window.KGDialogs.confirm('确定清空当前知识图谱吗？建议先导出备份。',{danger:true})){
       state=templateState('blank');
       normalizeState();
       if(window.KGGraphKernel&&window.KGGraphKernel.resetSession)window.KGGraphKernel.resetSession();
@@ -822,7 +822,7 @@ $('flashImportBtn').onclick=()=>{setFlashToolsExpanded(false);$('flashImportFile
 $('flashAddMissingBtn').onclick=()=>{setFlashToolsExpanded(false);addAllMissingFlashcardsToCanvas()};
 $('flashTemplateBtn').onclick=()=>{setFlashToolsExpanded(false);downloadFlashcardTemplate()};
 $('flashSwipeSpeed').addEventListener('input',e=>setFlashSwipeSpeed(e.target.value));
-$('flashImportFile').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{await importFlashcardFile(f)}catch(err){alert('闪卡导入失败：'+(err.message||err))}e.target.value=''});
+$('flashImportFile').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{await importFlashcardFile(f)}catch(err){await window.KGDialogs.alert('闪卡导入失败：'+(err.message||err))}e.target.value=''});
 
 $('cancelTemplateBtn').onclick=()=>$('templateModal').classList.remove('show');
 for(const id of ['nodeModal','linkModal','graphModal','templateModal','flashcardModal']){

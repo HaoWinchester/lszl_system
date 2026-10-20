@@ -1,0 +1,439 @@
+{
+  "source": "https://github.com/microsoft/fluentui-emoji",
+  "commit": "1ffb34c752ecf5d402f04cfb4b392c77f57c54bc",
+  "license": "MIT",
+  "assets": [
+    {
+      "emoji": "😊",
+      "name": "微笑",
+      "category": "faces",
+      "file": "1f60a.svg",
+      "upstreamPath": "assets/Smiling face with smiling eyes/Flat/smiling_face_with_smiling_eyes_flat.svg",
+      "sha256": "4a429b15f9aa2831f2fe786923751b6d59b099fabff39a4e41003267629cda25",
+      "bytes": 2181
+    },
+    {
+      "emoji": "👍",
+      "name": "赞",
+      "category": "gestures",
+      "file": "1f44d.svg",
+      "upstreamPath": "assets/Thumbs up/Default/Flat/thumbs_up_flat_default.svg",
+      "sha256": "2fdd1e26258c7edcf8d9204a9e8c288030244d0c8f049c6f28441ec74fe1e2b8",
+      "bytes": 1932
+    },
+    {
+      "emoji": "🙋",
+      "name": "举手",
+      "category": "gestures",
+      "file": "1f64b.svg",
+      "upstreamPath": "assets/Person raising hand/Default/Flat/person_raising_hand_flat_default.svg",
+      "sha256": "515540c2db0ee381341260a64912047e6d35cc51413b4e6ccdd4e59ec7a12416",
+      "bytes": 7007
+    },
+    {
+      "emoji": "🎉",
+      "name": "庆祝",
+      "category": "learning",
+      "file": "1f389.svg",
+      "upstreamPath": "assets/Party popper/Flat/party_popper_flat.svg",
+      "sha256": "8128c958bfc06568aa49d03cd001556a6c6223660f43c657d381e638416c51f6",
+      "bytes": 4395
+    },
+    {
+      "emoji": "🤔",
+      "name": "思考",
+      "category": "faces",
+      "file": "1f914.svg",
+      "upstreamPath": "assets/Thinking face/Flat/thinking_face_flat.svg",
+      "sha256": "3026c4db7c56c913318d0526e774cd4f7feb5733f7fe9a2d3d5edc84d00bbe2d",
+      "bytes": 3647
+    },
+    {
+      "emoji": "💡",
+      "name": "灵感",
+      "category": "learning",
+      "file": "1f4a1.svg",
+      "upstreamPath": "assets/Light bulb/Flat/light_bulb_flat.svg",
+      "sha256": "3e746a9b94051287b263e518e1f156cbfbffb45b5e0a6db6570b99d4c8c56484",
+      "bytes": 2538
+    },
+    {
+      "emoji": "✅",
+      "name": "完成",
+      "category": "learning",
+      "file": "2705.svg",
+      "upstreamPath": "assets/Check mark button/Flat/check_mark_button_flat.svg",
+      "sha256": "526d3efe42ac3ede81400c171c4a39722034ceb57f661923ef34bea0dcd68532",
+      "bytes": 620
+    },
+    {
+      "emoji": "👏",
+      "name": "鼓掌",
+      "category": "gestures",
+      "file": "1f44f.svg",
+      "upstreamPath": "assets/Clapping hands/Default/Flat/clapping_hands_flat_default.svg",
+      "sha256": "d198a0f3587ccedbe019ddccf20f693e85642faa12901be09d2a7395f28184b1",
+      "bytes": 6792
+    },
+    {
+      "emoji": "❤️",
+      "name": "爱心",
+      "category": "learning",
+      "file": "2764.svg",
+      "upstreamPath": "assets/Red heart/Flat/red_heart_flat.svg",
+      "sha256": "61846b9c946736481d65dbf244fe53792d06d50405c2d5f3e40a0a06cbfe5317",
+      "bytes": 1153
+    },
+    {
+      "emoji": "📚",
+      "name": "学习",
+      "category": "learning",
+      "file": "1f4da.svg",
+      "upstreamPath": "assets/Books/Flat/books_flat.svg",
+      "sha256": "41e2686cdc526bfa41ea599e2a74378f3a02788ff7e8cd1b9ad0a39ea157000c",
+      "bytes": 1989
+    },
+    {
+      "emoji": "💪",
+      "name": "加油",
+      "category": "gestures",
+      "file": "1f4aa.svg",
+      "upstreamPath": "assets/Flexed biceps/Default/Flat/flexed_biceps_flat_default.svg",
+      "sha256": "0271c7b5033da1653b0c9d6e54f0136c568a7f7e974c301fe56a6643948cc7c1",
+      "bytes": 2078
+    },
+    {
+      "emoji": "🙏",
+      "name": "感谢",
+      "category": "gestures",
+      "file": "1f64f.svg",
+      "upstreamPath": "assets/Folded hands/Default/Flat/folded_hands_flat_default.svg",
+      "sha256": "d454949a4ec2de964331cc5167c4ea6dbd2f75639c349009c0686b74f3156310",
+      "bytes": 2775
+    },
+    {
+      "emoji": "😀",
+      "name": "开心",
+      "category": "faces",
+      "file": "1f600.svg",
+      "upstreamPath": "assets/Grinning face/Flat/grinning_face_flat.svg",
+      "sha256": "d2324f21bcb2c6925bcc944e69d903b462d90278016a42a129716008906032b5",
+      "bytes": 1273
+    },
+    {
+      "emoji": "😁",
+      "name": "笑容",
+      "category": "faces",
+      "file": "1f601.svg",
+      "upstreamPath": "assets/Beaming face with smiling eyes/Flat/beaming_face_with_smiling_eyes_flat.svg",
+      "sha256": "1cbe6ae8d08d6a0398f6595e7cef5133f389d1c9f2fc679e31f82b0139342b95",
+      "bytes": 1927
+    },
+    {
+      "emoji": "😆",
+      "name": "大笑",
+      "category": "faces",
+      "file": "1f606.svg",
+      "upstreamPath": "assets/Grinning squinting face/Flat/grinning_squinting_face_flat.svg",
+      "sha256": "022ad71fc156d7f37005cd2a24b17e630631c898662271cd2346a442cc6f9ed9",
+      "bytes": 1217
+    },
+    {
+      "emoji": "😂",
+      "name": "笑哭",
+      "category": "faces",
+      "file": "1f602.svg",
+      "upstreamPath": "assets/Face with tears of joy/Flat/face_with_tears_of_joy_flat.svg",
+      "sha256": "70b274401b327c246129741c9ea009b79a57aac974ffd5a3c3dcee6daa7e31ed",
+      "bytes": 2142
+    },
+    {
+      "emoji": "🤣",
+      "name": "捧腹大笑",
+      "category": "faces",
+      "file": "1f923.svg",
+      "upstreamPath": "assets/Rolling on the floor laughing/Flat/rolling_on_the_floor_laughing_flat.svg",
+      "sha256": "ad00326cb8eebd4502a40916656c128054fa0c595d35b350e244791f5885918b",
+      "bytes": 2003
+    },
+    {
+      "emoji": "🙂",
+      "name": "浅笑",
+      "category": "faces",
+      "file": "1f642.svg",
+      "upstreamPath": "assets/Slightly smiling face/Flat/slightly_smiling_face_flat.svg",
+      "sha256": "63dc67ca4b2836b30da0c1952d5e28715d7784034f64498625dbef651e75c6b1",
+      "bytes": 1517
+    },
+    {
+      "emoji": "😉",
+      "name": "眨眼",
+      "category": "faces",
+      "file": "1f609.svg",
+      "upstreamPath": "assets/Winking face/Flat/winking_face_flat.svg",
+      "sha256": "ca6b6ec5236b7173ed18b44fc77acc94213f89381e93161fc1754fed24d22e76",
+      "bytes": 2437
+    },
+    {
+      "emoji": "🥰",
+      "name": "喜爱",
+      "category": "faces",
+      "file": "1f970.svg",
+      "upstreamPath": "assets/Smiling face with hearts/Flat/smiling_face_with_hearts_flat.svg",
+      "sha256": "a03eb36c8857b6641c40048190d46f123d66539b0b6641fb012dcc8b7b9c89bf",
+      "bytes": 2903
+    },
+    {
+      "emoji": "😍",
+      "name": "心动",
+      "category": "faces",
+      "file": "1f60d.svg",
+      "upstreamPath": "assets/Smiling face with heart-eyes/Flat/smiling_face_with_heart-eyes_flat.svg",
+      "sha256": "378f8488b83385f293743eaec09bca85e02e841e2277ef73035e75f2ce2242ea",
+      "bytes": 1050
+    },
+    {
+      "emoji": "😎",
+      "name": "酷",
+      "category": "faces",
+      "file": "1f60e.svg",
+      "upstreamPath": "assets/Smiling face with sunglasses/Flat/smiling_face_with_sunglasses_flat.svg",
+      "sha256": "e680a2a862087e29d73ce8bd2a2f30ba5e661d40e92f5e3792441483c8a6581c",
+      "bytes": 3625
+    },
+    {
+      "emoji": "🤩",
+      "name": "惊喜",
+      "category": "faces",
+      "file": "1f929.svg",
+      "upstreamPath": "assets/Star-struck/Flat/star-struck_flat.svg",
+      "sha256": "c2207e61f41de47854eb31137d7297a6c1a5a72ca6249745a6b186107bf00958",
+      "bytes": 1843
+    },
+    {
+      "emoji": "🥳",
+      "name": "欢呼",
+      "category": "faces",
+      "file": "1f973.svg",
+      "upstreamPath": "assets/Partying face/Flat/partying_face_flat.svg",
+      "sha256": "e74f8e3543ddee0fe7839a457eada5faebb10745f8aaca645e697630ecd1e386",
+      "bytes": 3765
+    },
+    {
+      "emoji": "😅",
+      "name": "流汗笑",
+      "category": "faces",
+      "file": "1f605.svg",
+      "upstreamPath": "assets/Grinning face with sweat/Flat/grinning_face_with_sweat_flat.svg",
+      "sha256": "f9730e554a892484f9e462dc696562e74a43a4296ccb206aeed494a52b782f0b",
+      "bytes": 1808
+    },
+    {
+      "emoji": "😇",
+      "name": "天使",
+      "category": "faces",
+      "file": "1f607.svg",
+      "upstreamPath": "assets/Smiling face with halo/Flat/smiling_face_with_halo_flat.svg",
+      "sha256": "4d65e9ad3342235aa913d1b64eddb04694cea7bd5ee11e9e459958bcd04012a5",
+      "bytes": 3402
+    },
+    {
+      "emoji": "🤗",
+      "name": "拥抱",
+      "category": "faces",
+      "file": "1f917.svg",
+      "upstreamPath": "assets/Hugging face/Flat/hugging_face_flat.svg",
+      "sha256": "6f07a3521ca0634f6c1d38bf6fc3919fd42dd6c16670d9e18815a70807925ed6",
+      "bytes": 3781
+    },
+    {
+      "emoji": "🤭",
+      "name": "偷笑",
+      "category": "faces",
+      "file": "1f92d.svg",
+      "upstreamPath": "assets/Face with hand over mouth/Flat/face_with_hand_over_mouth_flat.svg",
+      "sha256": "ab6a4c87b6aeabc840b15c8dbad3924567961405c36b91a46fb78bd1b6b43f2c",
+      "bytes": 2460
+    },
+    {
+      "emoji": "🤫",
+      "name": "安静",
+      "category": "faces",
+      "file": "1f92b.svg",
+      "upstreamPath": "assets/Shushing face/Flat/shushing_face_flat.svg",
+      "sha256": "331689820694c754538afb84361ddc9c327c546c5f11c52af654a0c660e335db",
+      "bytes": 1487
+    },
+    {
+      "emoji": "🧐",
+      "name": "仔细看看",
+      "category": "faces",
+      "file": "1f9d0.svg",
+      "upstreamPath": "assets/Face with monocle/Flat/face_with_monocle_flat.svg",
+      "sha256": "8d0dd42c0d827da6655a9e2044bf145091c01af7d249916c0ec6a3a78293f700",
+      "bytes": 2656
+    },
+    {
+      "emoji": "😐",
+      "name": "平静",
+      "category": "faces",
+      "file": "1f610.svg",
+      "upstreamPath": "assets/Neutral face/Flat/neutral_face_flat.svg",
+      "sha256": "dda2611cb58783d0a5bcad6623f87e057f000ac0ea052fc9139e4529f7432c87",
+      "bytes": 1201
+    },
+    {
+      "emoji": "🙄",
+      "name": "无奈",
+      "category": "faces",
+      "file": "1f644.svg",
+      "upstreamPath": "assets/Face with rolling eyes/Flat/face_with_rolling_eyes_flat.svg",
+      "sha256": "ac8c83118a36ad3fb3dc41a4e730f73c913572af3e6b89f0972426d25bd1abf5",
+      "bytes": 1338
+    },
+    {
+      "emoji": "😴",
+      "name": "睡觉",
+      "category": "faces",
+      "file": "1f634.svg",
+      "upstreamPath": "assets/Sleeping face/Flat/sleeping_face_flat.svg",
+      "sha256": "47c702745c7be1af9250f79afbea555cfe8bf01a59a78f67b8cae3ed9645143f",
+      "bytes": 2614
+    },
+    {
+      "emoji": "😭",
+      "name": "大哭",
+      "category": "faces",
+      "file": "1f62d.svg",
+      "upstreamPath": "assets/Loudly crying face/Flat/loudly_crying_face_flat.svg",
+      "sha256": "d5e347b4f3a64a1e53f2f3e987da7043133093953dec980b5de5ccd714be94eb",
+      "bytes": 1508
+    },
+    {
+      "emoji": "😮",
+      "name": "惊讶",
+      "category": "faces",
+      "file": "1f62e.svg",
+      "upstreamPath": "assets/Face with open mouth/Flat/face_with_open_mouth_flat.svg",
+      "sha256": "4b54df2d22c097e621694f7e300f87b01bfbac6a3c3775a891399686d1400aac",
+      "bytes": 1052
+    },
+    {
+      "emoji": "🥺",
+      "name": "恳求",
+      "category": "faces",
+      "file": "1f97a.svg",
+      "upstreamPath": "assets/Pleading face/Flat/pleading_face_flat.svg",
+      "sha256": "3ad4897a20160fc6f75da9828c164c075cee70ca163a3d19121eb89452c293b4",
+      "bytes": 2756
+    },
+    {
+      "emoji": "😤",
+      "name": "打气",
+      "category": "faces",
+      "file": "1f624.svg",
+      "upstreamPath": "assets/Face with steam from nose/Flat/face_with_steam_from_nose_flat.svg",
+      "sha256": "22a92d9382c51f4a746a1945a0ce05030d1ae272abb40c947d0d5e92a027c8a0",
+      "bytes": 6669
+    },
+    {
+      "emoji": "😔",
+      "name": "难过",
+      "category": "faces",
+      "file": "1f614.svg",
+      "upstreamPath": "assets/Pensive face/Flat/pensive_face_flat.svg",
+      "sha256": "9761b548bfcffa6516a3707b92ff102d1fe9aa72815e3f5bd0fa65273ee9d21c",
+      "bytes": 1993
+    },
+    {
+      "emoji": "😷",
+      "name": "口罩",
+      "category": "faces",
+      "file": "1f637.svg",
+      "upstreamPath": "assets/Face with medical mask/Flat/face_with_medical_mask_flat.svg",
+      "sha256": "da996691f6fde6bf228170778e8470e47419395eac40998cfed3bed603bf5b6f",
+      "bytes": 2450
+    },
+    {
+      "emoji": "🤯",
+      "name": "震惊",
+      "category": "faces",
+      "file": "1f92f.svg",
+      "upstreamPath": "assets/Exploding head/Flat/exploding_head_flat.svg",
+      "sha256": "eb106eae150fa1a8552cd593854223933b29d1e2dd5896ad5a86d5160f63fd04",
+      "bytes": 4483
+    },
+    {
+      "emoji": "👋",
+      "name": "你好",
+      "category": "gestures",
+      "file": "1f44b.svg",
+      "upstreamPath": "assets/Waving hand/Default/Flat/waving_hand_flat_default.svg",
+      "sha256": "a43bd601a3d46573cd3425faed5983b46e64374eaa61d7ac319c41903c17e51d",
+      "bytes": 4893
+    },
+    {
+      "emoji": "👌",
+      "name": "好的",
+      "category": "gestures",
+      "file": "1f44c.svg",
+      "upstreamPath": "assets/Ok hand/Default/Flat/ok_hand_flat_default.svg",
+      "sha256": "b86eb586d77023461ce1e5e855787c10a8e81f6baef99bd6fad19138064007ba",
+      "bytes": 1702
+    },
+    {
+      "emoji": "🤝",
+      "name": "握手",
+      "category": "gestures",
+      "file": "1f91d.svg",
+      "upstreamPath": "assets/Handshake/Flat/handshake_flat.svg",
+      "sha256": "64206bd30217e01847ac8c6041d1b040bc81fe5efe412ace481c79a579bd1266",
+      "bytes": 4910
+    },
+    {
+      "emoji": "✌️",
+      "name": "胜利",
+      "category": "gestures",
+      "file": "270c.svg",
+      "upstreamPath": "assets/Victory hand/Default/Flat/victory_hand_flat_default.svg",
+      "sha256": "e1aca8ecc40fe164b050554a52338012ccc874e81ab5f91fba3c1c0f39cefaa1",
+      "bytes": 3564
+    },
+    {
+      "emoji": "✍️",
+      "name": "记笔记",
+      "category": "learning",
+      "file": "270d.svg",
+      "upstreamPath": "assets/Writing hand/Default/Flat/writing_hand_flat_default.svg",
+      "sha256": "9db258837429a393ed54af023bea486ac2a75465c8b4eaa900a70a14c6a2ce92",
+      "bytes": 2190
+    },
+    {
+      "emoji": "🎯",
+      "name": "目标",
+      "category": "learning",
+      "file": "1f3af.svg",
+      "upstreamPath": "assets/Bullseye/Flat/bullseye_flat.svg",
+      "sha256": "900e8499bc4fb16ecd606d60f6cee4907aeccc0503d2679c5d22735a351b0d4e",
+      "bytes": 1925
+    },
+    {
+      "emoji": "⭐",
+      "name": "星星",
+      "category": "learning",
+      "file": "2b50.svg",
+      "upstreamPath": "assets/Star/Flat/star_flat.svg",
+      "sha256": "47b4772001147be3920d3471e9c1ac2024ca739b384f414ac37cf95a59a07bfa",
+      "bytes": 783
+    },
+    {
+      "emoji": "🔥",
+      "name": "热情",
+      "category": "learning",
+      "file": "1f525.svg",
+      "upstreamPath": "assets/Fire/Flat/fire_flat.svg",
+      "sha256": "00184d516421223782fc5efd67af64641ee8044af9613a3674ce5899cd38583d",
+      "bytes": 660
+    }
+  ]
+}

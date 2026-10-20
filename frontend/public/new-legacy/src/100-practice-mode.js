@@ -779,6 +779,12 @@
   }
   function questionCorrectIds(question){return question?.type==='multiple_choice'?(question.correctOptionIds||[]):[text(question?.correctAnswer)].filter(Boolean)}
   function answerSelectedIds(answer){return Array.isArray(answer?.selectedAnswerIds)?answer.selectedAnswerIds.map(text):[text(answer?.selectedAnswer)].filter(Boolean)}
+  function renderOwnSelection(question,answer){
+    let panel=dom.options.parentElement.querySelector('.practice-own-selection');
+    if(!panel){panel=document.createElement('p');panel.className='practice-own-selection';panel.setAttribute('role','status');panel.setAttribute('aria-live','polite');dom.options.insertAdjacentElement('afterend',panel);}
+    const summary=global.KGPracticeAnswerSheet.selectionSummary(question,answer);
+    panel.hidden=!summary;panel.textContent=summary?'我的选择：'+summary:'';
+  }
   function renderPracticeExplanation(question,correct,neutral=false){
     const panel=$('practiceExplanationPanel');if(!panel)return;
     // neutral：显示答案开关下的未答题回放，不适用"回答正确/错误"文案与配色。
@@ -800,7 +806,6 @@
     }
     // 解析面板不再内嵌评论区；只挂弹幕层（讨论入口统一收敛到左侧导航「评论」按钮）。
     if(!neutral){
-      global.KGQuestionComments?.teardownSource?.('danmaku');
       global.KGQuestionComments?.mountDanmaku?.({questionId:text(question.id)});
     }
     panel.hidden=false;
@@ -831,7 +836,7 @@
     const savedAnswer=state.draft?.answer?.(question.id)||state.session?.answers?.[question.id]||null;
     const practiceAnswered=savedAnswer?{selected:answerSelectedIds(savedAnswer),correct:savedAnswer.correct===true}:null;
     state.locked=false;dom.feedback.hidden=true;hideRemediation();dom.questionCard.classList.remove('is-timeout');
-    if($('practiceExplanationPanel')){$('practiceExplanationPanel').hidden=true;global.KGQuestionComments?.teardownSource?.('danmaku');}
+    if($('practiceExplanationPanel')){$('practiceExplanationPanel').hidden=true;global.KGQuestionComments?.teardownSource?.('danmaku',{exceptQuestionId:shouldShowExplanation()&&practiceAnswered?text(question.id):''});}
     if(!modePolicy().showCorrectness){const head=$('practiceExplanationHead'),body=$('practiceExplanationBody');if(head){head.textContent='';head.className='practice-explanation-head';}if(body)body.innerHTML='';dom.feedback.textContent='';}
     const view=questionLanguageView(question);
     if(view){
@@ -862,6 +867,7 @@
     if(question.type==='matching')renderMatchingAnswer(question,savedAnswer,!!savedAnswer||(state.mode==='practice'&&showAnswersEnabled()));
     if(AnswerSet.supported&&!AnswerSet.supported(question)){dom.options.innerHTML='<p role="alert">当前客户端不支持此题型，请更新后重试。</p>';state.locked=true;}
     renderPreviousWrongAnswer(question);
+    renderOwnSelection(question,savedAnswer);
     const multi=question.type==='multiple_choice',pending=new Set(state.pendingSelections[question.id]||[]);
     dom.options.querySelectorAll('[data-option-id]').forEach(button=>{
       const id=text(button.dataset.optionId);button.classList.toggle('is-pending',multi&&pending.has(id));button.setAttribute('aria-pressed',multi&&pending.has(id)?'true':'false');
@@ -1005,6 +1011,7 @@
     const selection=state.draft.select(question.id,selected);
     if(!selection?.accepted||!selection.answer){showToast(text(selection?.message)||'该题已作答');renderAnswerSheet();return false}
     const correct=selection.answer.correct===true;
+    renderOwnSelection(question,selection.answer);
     void state.sound?.play(correct);
     if(question.type==='multiple_choice')question.correctOptionIds=selection.answer.correctOptionIds||question.correctOptionIds;
     else question.correctAnswer=selection.answer.correctAnswer||question.correctAnswer;
@@ -1232,7 +1239,7 @@
     try{return await api.startSession(input)}catch(error){
       if(error?.detail?.code!=='RESUMABLE_SESSION_EXISTS'||!error.detail.sessionId)throw error;
       const previous=await api.getSession(error.detail.sessionId);
-      if(!global.confirm(`还有一轮${historyModeLabel(previous.mode)}未完成，已保存 ${Number(previous.stats?.answered||0)}/${Number(previous.stats?.total||0)} 题。新开将结束旧轮，保留已有记录，但不能再继续旧轮。是否继续？`))return null;
+      if(!await global.KGDialogs.confirm(`还有一轮${historyModeLabel(previous.mode)}未完成，已保存 ${Number(previous.stats?.answered||0)}/${Number(previous.stats?.total||0)} 题。新开将结束旧轮，保留已有记录，但不能再继续旧轮。是否继续？`,{danger:true}))return null;
       await api.abandonSession(previous.id,{revision:previous.revision});
       try{return await api.startSession(input)}catch(startError){startError.practiceMessage='旧轮已结束并保留记录，新一轮未能开始，请重试。';throw startError}
     }finally{if(document.body.dataset.practiceView==='lobby')void syncResumableButtons()}

@@ -128,7 +128,7 @@
     if(unbind)unbind.addEventListener("click",async()=>{
       const api=window.KGWechatLogin;
       if(!api||typeof api.unbind!=="function"){msg("微信登录模块未加载，请刷新后重试。");return}
-      if(!confirm("解除后将不能使用该微信扫码登录，确定解除绑定吗？"))return;
+      if(!await window.KGDialogs.confirm("解除后将不能使用该微信扫码登录，确定解除绑定吗？",{danger:true}))return;
       unbind.disabled=true;
       const result=await api.unbind();
       if(!result||!result.ok){
@@ -575,7 +575,7 @@
         login.click();
         showStatus("请先登录后再进入用户中心。");
       }else{
-        alert("请先登录后再进入用户中心。");
+        void window.KGDialogs.alert("请先登录后再进入用户中心。");
       }
       return;
     }

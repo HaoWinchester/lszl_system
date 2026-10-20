@@ -50,7 +50,7 @@
   }
   async function create(){
     if(!prepRuntime.serverActor){setGateStatus('请先登录后再创建共享草稿。','bad');return}
-    const title=String(prompt('请输入共享草稿名称','PMP 内容准备草稿')||'').trim();if(!title)return;
+    const title=String(await window.KGDialogs.prompt('请输入共享草稿名称','PMP 内容准备草稿')||'').trim();if(!title)return;
     resetWorkspace();setGateStatus('正在创建共享草稿…');
     try{const draft=await Drafts.create({title,payload:workspacePayload()});activate(draft);toast('共享草稿已创建')}
     catch(error){setGateStatus(error.message||'创建共享草稿失败。','bad')}
@@ -90,7 +90,7 @@
     finally{button&&(button.disabled=false)}
   }
   async function remove(id){
-    if(!confirm('删除这个共享草稿？未同步的内容将无法恢复。'))return;
+    if(!await window.KGDialogs.confirm('删除这个共享草稿？未同步的内容将无法恢复。',{danger:true}))return;
     try{await Drafts.remove(id);toast('共享草稿已删除');await reload()}catch(error){setGateStatus(error.message||'删除共享草稿失败。','bad')}
   }
   function openLanding(){show();return reload()}
