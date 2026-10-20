@@ -5,7 +5,8 @@
   "changes": {
     "added": [],
     "changed": [
-      "tests/practice-lobby-design-browser.py"
+      "styles/knowledge-dashboard.css",
+      "tests/knowledge-dashboard-browser.py"
     ],
     "removed": []
   },

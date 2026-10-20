@@ -190,18 +190,6 @@ async def knowledge_universe(db: DB, user: CurrentUser):
     return await knowledge_dashboard_service.get_universe(db, user.username)
 
 
-@router.get("/learning/practice/knowledge-questions")
-async def knowledge_questions(
-    db: DB, user: CurrentUser,
-    taxonomy_id: str = Query(..., alias="taxonomyId", min_length=1, max_length=128),
-    node_id: str = Query(..., alias="nodeId", min_length=1, max_length=128),
-    page: int = Query(1, ge=1),
-    page_size: int = Query(10, alias="pageSize", ge=1, le=20),
-):
-    return await knowledge_dashboard_service.get_knowledge_questions(
-        db, user, taxonomy_id, node_id, page=page, page_size=page_size)
-
-
 @router.get("/learning/practice/papers/{paper_id}/progress")
 async def practice_paper_progress(
     paper_id: str,

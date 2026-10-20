@@ -30,12 +30,6 @@
       return `<div class="qm-pair${reveal?(match?.id===correct?.id?' is-correct':' is-wrong'):''}"><button type="button" class="qm-target" data-qm-left="${esc(item.id)}" ${readOnly?'disabled':''} aria-pressed="false"><b>${index+1}. ${esc(item.text)}</b><span>${esc(match?.text||'选择或拖入答案')}</span></button>${match&&!readOnly?`<button type="button" class="qm-clear" data-qm-clear="${esc(item.id)}" aria-label="取消第 ${index+1} 项配对">取消</button>`:''}${reveal?`<p class="qm-pair-feedback">${match?.id===correct?.id?'✓ 配对正确':'正确配对：'+esc(correct?.text||'未设置')}</p>`:''}</div>`;
     }).join('')}</div>${readOnly?'':`<div class="qm-candidates" aria-label="候选答案">${right.map(item=>`<button type="button" class="qm-candidate" draggable="true" data-qm-right="${esc(item.id)}" aria-label="候选：${esc(item.text)}">${esc(item.text)}${Object.values(selected).includes(item.id)?'<small>已配对，可重新分配</small>':''}</button>`).join('')}</div>`}<p class="qm-status" role="status" aria-live="polite"></p></section>`;
   }
-  // Discovery uses the same safe media renderer, with both matching columns visible.
-  function renderPreview(question){
-    const q=extension(question),matching=q.matching;
-    const columns=matching?`<div class="qm-preview-matching">${['left','right'].map((side,index)=>`<section><h5>${index?'候选内容':'待匹配内容'}</h5><ol>${(matching[side]||[]).map(item=>`<li>${esc(item.text)}</li>`).join('')}</ol></section>`).join('')}</div>`:'';
-    return renderMaterials(q)+`<p class="qm-text">${esc(q.stem||'暂无题干')}</p>`+columns+`<ol class="qm-preview-options">${(q.options||[]).map(option=>`<li>${esc(option.id)} · ${esc(option.text)}</li>`).join('')}</ol>`;
-  }
   function bindMedia(container){
     if(!container||container.dataset.qmMediaBound)return;
     container.dataset.qmMediaBound='true';
@@ -79,5 +73,5 @@
     const data=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(',')[1]);reader.onerror=()=>reject(new Error('无法读取图片，请重新选择'));reader.readAsDataURL(file);});
     return (await request('question-assets',{method:'POST',body:{filename:file.name,mimeType:file.type,dataBase64:data,alt}})).asset;
   }
-  global.KGQuestionMaterials=Object.freeze({render,renderPreview,renderMaterials,renderCardContent,renderMatching,bind,bindMedia,extension,safeUrl,request,upload});
+  global.KGQuestionMaterials=Object.freeze({render,renderMaterials,renderCardContent,renderMatching,bind,bindMedia,extension,safeUrl,request,upload});
 })(typeof window!=='undefined'?window:globalThis);

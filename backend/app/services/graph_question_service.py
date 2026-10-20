@@ -13,7 +13,6 @@ from app.services import question_answer_service as answers, question_catalog_se
 from app.services.question_material_service import freeze_question_resources
 from app.services.question_access_service import TEACHING_MANAGER_ROLES
 from app.services import teaching_content_revision_service
-from app.services.question_preview_service import practice_projection
 
 
 def fail(code, status=404):
@@ -65,6 +64,22 @@ async def freeze_source(db, question_id):
     snapshot = deepcopy(catalog.question_to_payload(question))
     await freeze_question_resources(db, owner, snapshot, exact_revision=True)
     return snapshot
+
+
+def practice_projection(snapshot):
+    """Positive projection drops every arbitrary metadata/translation/answer carrier."""
+    result = {key: deepcopy(snapshot[key]) for key in ('id', 'title', 'type', 'subject', 'difficulty', 'revision') if key in snapshot}
+    result['stemParts'] = [{'text': p.get('text', '')} for p in snapshot.get('stemParts', []) if isinstance(p, dict)]
+    result['options'] = [{'id': p.get('id'), 'text': p.get('text', '')} for p in snapshot.get('options', []) if isinstance(p, dict)]
+    if snapshot.get('images'):
+        result['images'] = deepcopy(snapshot['images'])
+    if isinstance(snapshot.get('material'), dict):
+        result['material'] = {key: deepcopy(snapshot['material'][key]) for key in ('id', 'revision', 'title', 'text', 'images') if key in snapshot['material']}
+    if isinstance(snapshot.get('matching'), dict):
+        result['matching'] = {side: [{'id': p.get('id'), 'text': p.get('text', '')} for p in snapshot['matching'].get(side, [])] for side in ('left', 'right')}
+    if isinstance(snapshot.get('caseGroup'), dict):
+        result['caseGroup'] = {k: deepcopy(snapshot['caseGroup'][k]) for k in ('id', 'order') if k in snapshot['caseGroup']}
+    return result
 
 
 def binding_payload(row, *, practice=True):
