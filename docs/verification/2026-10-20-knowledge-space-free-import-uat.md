@@ -17,3 +17,5 @@
 候选VERSION378，当前已部署UAT377。发布前备份/home/ubuntu/lszl-uat-backups/20261020T063848Z已校验代码包、PG dump、TOC和SHA，manifest记录原377/正式336容器镜像。不得删除既有备份；main保持b76862ed，未经用户验收不得合入。
 
 Task4提交7e78d585；最终当前活动前端377/377+9运行时+4部署脚本全通过。候选源1218/public1230，377旧路径无删除、admin-console存在。候选378全分支审查与官方full尚未完成；不能把定向检查当发布成功。
+
+Task4独立审查提出创建后读取失败的Important：API当前文件已切换但画布仍原图。fix round1在共享bridge记录原ID，读取失败恢复选择并按现有trash→permanent规则清理创建记录。真实API仅新文件GET503错误注入验证通过，恢复原current/画布/原图内容且无额外文件；随后正常导入/角色边界仍通过。fixture53172退出0、无剩余DB；证据artifacts/free-graph-import-20261020/fix-1-api-green.log。初次故障注入范围过宽也拦截folders/tags，已纠正，未把该运行当有效回归结论。定向共享桥/远程store/adapter/tab测试4/4通过。待 scoped re-review。

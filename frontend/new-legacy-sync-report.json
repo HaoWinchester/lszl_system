@@ -4,7 +4,9 @@
   "toVersion": "v9.0-p4.1.378",
   "changes": {
     "added": [],
-    "changed": [],
+    "changed": [
+      "tests/graph-file-import-permissions-browser.py"
+    ],
     "removed": []
   },
   "incompatible": []

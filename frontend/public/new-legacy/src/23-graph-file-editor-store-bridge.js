@@ -36,8 +36,17 @@
   async function createFile(input={},options={}){
     const store=current();
     if(!store||typeof store.createFile!=='function')return null;
+    const previousId=store.getCurrentFileId?.()||null;
     let file=await Promise.resolve(store.createFile(input,options));
-    if(isRemote()&&file&&typeof store.openFile==='function')file=await Promise.resolve(store.openFile(file.id,options));
+    if(isRemote()&&file&&typeof store.openFile==='function'){
+      const created=file;
+      file=await Promise.resolve(store.openFile(created.id,options));
+      if(!file){
+        await store.setCurrentFileId(previousId);
+        if(await store.deleteFile(created.id,{emit:false})!==false)await store.deleteFile(created.id,{emit:false,permanent:true});
+        return null;
+      }
+    }
     return adopt(file);
   }
   function fragmentSource(){

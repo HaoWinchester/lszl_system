@@ -74,14 +74,14 @@ function load({ remoteActive }) {
 });
 
 // Home JSON/ZIP import must use the same remote file bridge as tab creation.
-async function homeImport({saveResult=true,createFails=false}={}){
+async function homeImport({saveResult=true,createFails=false,hydrateFails=false,restoreFails=false,deleteFails=false}={}){
   const original={id:'server-original',graphData:{nodes:[{id:'original',title:'原文件'}],links:[]}};
   const remoteFiles=new Map([[original.id,structuredClone(original)]]);
-  const localFiles=new Map();let current=original.id;
+  const localFiles=new Map(),messages=[];let current=original.id;
   const context={console,Promise,CustomEvent:class{constructor(type,options){this.type=type;this.detail=options.detail}},
     state:structuredClone(original.graphData),lastSavedSnapshot:'',
     sanitizeState:value=>structuredClone(value),render:()=>{},dispatchEvent:()=>{},
-    showStatus:()=>{},KGImportGuard:{run:(_key,action)=>action()},
+    showStatus:text=>messages.push(text),KGImportGuard:{run:(_key,action)=>action()},
     KGHomePackageService:{parseFile:async()=>({meta:{title:'个人导入'},nodes:[{id:'imported',title:'导入内容'}],links:[]})},
     KGGraphFileAutosave:{saveBeforeSwitch:async()=>saveResult,clearDirty:()=>{}},
     KGGraphFileStore:{getCurrentFileId:()=>current,createFile:input=>{
@@ -89,14 +89,22 @@ async function homeImport({saveResult=true,createFails=false}={}){
     }},
     KGGraphFileRemoteStore:{active:()=>true,getCurrentFileId:()=>current,
       createFile:async input=>{if(createFails)return null;const file={id:'server-imported',revision:1,graphData:structuredClone(input.graphData)};remoteFiles.set(file.id,file);current=file.id;return file},
-      openFile:async id=>structuredClone(remoteFiles.get(id))},
+      openFile:async id=>hydrateFails&&id==='server-imported'?null:structuredClone(remoteFiles.get(id)),
+      setCurrentFileId:async id=>{if(restoreFails)throw new Error('恢复原文件失败');current=id||'';return current},
+      deleteFile:async(id,options={})=>{
+        if(deleteFails)return false;
+        const file=remoteFiles.get(id);
+        if(!file)return false;
+        if(options.permanent)return file.status==='trashed'&&remoteFiles.delete(id);
+        file.status='trashed';return true;
+      }},
     KGGraphFileRemoteAdapter:{adoptFile:file=>file}};
   context.window=context;context.globalThis=context;vm.createContext(context);
   vm.runInContext(fs.readFileSync(path.join(root,'src/23-graph-file-editor-store-bridge.js'),'utf8'),context);
   await context.KGGraphFileEditorStoreBridge.initializeCurrent();
   const source=fs.readFileSync(path.join(root,'src/20-flashcards-toolbar.js'),'utf8');
   vm.runInContext(source.slice(0,source.indexOf('function addAtCenter()')),context);
-  return{context,remoteFiles,localFiles,original,run:()=>context.importLearningPackageFile({name:'personal.json'})};
+  return{context,remoteFiles,localFiles,original,messages,current:()=>current,run:()=>context.importLearningPackageFile({name:'personal.json'})};
 }
 
 (async()=>{
@@ -114,5 +122,24 @@ async function homeImport({saveResult=true,createFails=false}={}){
   await assert.rejects(failed.run(),/导入文件保存失败/);
   assert.strictEqual(failed.context.state.nodes[0].id,'original');
   assert.strictEqual(failed.remoteFiles.size,1);assert.strictEqual(failed.localFiles.size,0);
-  console.log('home import remote persistence and failed-save contract passed');
+  const partial=await homeImport({hydrateFails:true});
+  await assert.rejects(partial.run(),/导入文件保存失败/);
+  assert.strictEqual(partial.current(),'server-original','failed hydration must restore server selection after create selected the new file');
+  assert.strictEqual(partial.context.state.nodes[0].id,'original');
+  assert.strictEqual(partial.remoteFiles.size,1,'failed hydration must remove the newly created unusable record');
+  assert.deepStrictEqual(partial.remoteFiles.get('server-original'),partial.original);
+  assert.strictEqual(partial.localFiles.size,0);
+  assert.strictEqual(partial.messages.length,0,'partial create must never announce import success');
+  const restoreFailed=await homeImport({hydrateFails:true,restoreFails:true});
+  await assert.rejects(restoreFailed.run(),/恢复原文件失败/);
+  assert.strictEqual(restoreFailed.context.state.nodes[0].id,'original');
+  assert.strictEqual(restoreFailed.messages.length,0);
+  assert.strictEqual(restoreFailed.remoteFiles.size,2,'a failed server restoration must surface failure rather than claim rollback succeeded');
+  const cleanupFailed=await homeImport({hydrateFails:true,deleteFails:true});
+  await assert.rejects(cleanupFailed.run(),/导入文件保存失败/);
+  assert.strictEqual(cleanupFailed.current(),'server-original');
+  assert.strictEqual(cleanupFailed.context.state.nodes[0].id,'original');
+  assert.strictEqual(cleanupFailed.messages.length,0);
+  assert.strictEqual(cleanupFailed.remoteFiles.size,2,'a failed cleanup can retain the extra file, but must not announce import success');
+  console.log('home import remote persistence, failed-save and partial-create rollback contract passed');
 })().catch(error=>{console.error(error);process.exitCode=1});
