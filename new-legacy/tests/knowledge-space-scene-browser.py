@@ -36,10 +36,11 @@ with sync_playwright() as p:
    });
    window.observeDrawing=()=>{
     const ctx=document.querySelector('canvas').getContext('2d');
-    const clear=ctx.clearRect,arc=ctx.arc,fill=ctx.fill;let radius=0;
-    window.dotStyles=[];window.arcs=0;
-    ctx.clearRect=function(...args){dotStyles=[];arcs=0;return clear.apply(this,args)};
+    const clear=ctx.clearRect,arc=ctx.arc,fill=ctx.fill,fillText=ctx.fillText;let radius=0;
+    window.dotStyles=[];window.arcs=0;window.labels=[];
+    ctx.clearRect=function(...args){dotStyles=[];arcs=0;labels=[];return clear.apply(this,args)};
     ctx.arc=function(...args){radius=args[2];arcs++;return arc.apply(this,args)};
+    ctx.fillText=function(...args){labels.push({title:args[0],font:this.font});return fillText.apply(this,args)};
     ctx.fill=function(...args){if(radius<=9)dotStyles.push(this.fillStyle);return fill.apply(this,args)};
    };
   }''')
@@ -58,6 +59,8 @@ with sync_playwright() as p:
    state=page.evaluate('scene.snapshot()')
    assert len(state['positions'])==size and all(v['visible'] for v in state['positions'])
    assert page.evaluate('dotStyles.length')==size and page.evaluate('arcs')==size*2,'every business point must be drawn, without LOD dropping nodes'
+   assert page.evaluate('labels.length')==size,'Every node needs a visible name, including 320/1000-node catalogs'
+   assert page.evaluate('labels.every(l=>Number(l.font.match(/([0-9.]+)px/)[1])>=16)'),'Labels must stay readable instead of shrinking with zoom'
    assert_fit(page,f'{width}/{size}-node-catalog')
    costs=sorted(page.evaluate('frameCosts'))
    metrics.append(dict(width=width,nodes=size,settlementMs=round(elapsed,1),frames=len(costs),callbackP95Ms=round(costs[int((len(costs)-1)*.95)],1),callbackMaxMs=round(max(costs),1),drawnNodes=page.evaluate('dotStyles.length')))

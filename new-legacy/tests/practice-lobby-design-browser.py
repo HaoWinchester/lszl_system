@@ -106,6 +106,15 @@ with sync_playwright() as pw:
     first=actual['nodes'][0]
     expect(knowledge.locator('[data-knowledge-detail-title]')).to_have_text(first['title'])
     expect(knowledge.locator('[data-knowledge-detail-path]')).to_have_text(' / '.join(first['path']))
+    target=actual['nodes'][-1]
+    knowledge.locator('[data-knowledge-search]').fill(target['title'])
+    results=knowledge.locator('[data-knowledge-search-results] button');expect(results.first).to_be_visible();assert results.count()>0
+    results.first.click();expect(knowledge.locator('[data-knowledge-detail-title]')).to_have_text(target['title'])
+    page.screenshot(path=str(OUT/'knowledge-search-located.png'),full_page=True)
+    expect(knowledge.locator('[data-knowledge-page-count]')).to_have_text(f"全部 {len(catalog_nodes)} 个考点")
+    knowledge.locator('[data-knowledge-search]').fill('不存在的知识点搜索验证');expect(knowledge.locator('[data-knowledge-search-status]')).to_contain_text('没有找到')
+    knowledge.locator('[data-knowledge-search-clear]').click();expect(knowledge.locator('[data-knowledge-search]')).to_have_value('')
+    knowledge.locator('[data-knowledge-reset]').click()
     knowledge.locator('[data-knowledge-list-toggle]').click()
     expect(knowledge.locator('[data-knowledge-list] button')).to_have_count(len(catalog_nodes))
     practiced_index=next(i for i,node in enumerate(actual['nodes']) if node['practiced'])

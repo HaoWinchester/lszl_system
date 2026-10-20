@@ -49,6 +49,16 @@ with sync_playwright() as pw:
     expect(page.locator('[data-knowledge-page-count]')).to_have_text('全部 320 个考点')
     expect(page.locator('[data-knowledge-summary]')).to_contain_text('全部 320 · 已练 3 · 未练 317')
     assert page.evaluate('calls')==['/api/v1/learning/practice/knowledge-universe']
+    search=page.get_by_role('searchbox',name='搜索知识点')
+    search.fill('项目考点 320');expect(page.locator('[data-knowledge-search-results] button')).to_have_count(1)
+    page.locator('[data-knowledge-search-results] button').click();page.wait_for_function('!scenes.at(-1).snapshot().running')
+    found=snap();point=found['positions'][319];canvas_box=page.locator('canvas').bounding_box()
+    assert found['selected']==319 and abs(point['x']-canvas_box['width']/2)<2 and abs(point['y']-canvas_box['height']/2)<2
+    expect(page.locator('[data-knowledge-detail-title]')).to_have_text('项目考点 320')
+    search.fill('不存在的知识点');expect(page.locator('[data-knowledge-search-status]')).to_contain_text('没有找到');assert len(snap()['positions'])==320
+    search.fill('风险管理 <安全>');search.press('Enter');assert snap()['selected']==0 and not page.evaluate('!!window.injected')
+    page.locator('[data-knowledge-search-clear]').click();expect(search).to_have_value('');expect(search).to_be_focused()
+    page.locator('[data-knowledge-reset]').click();page.locator('[data-knowledge-node="0"]').evaluate('e=>e.click()')
     expect(page.locator('[data-knowledge-groups]')).not_to_contain_text('risk')
     expect(page.locator('[data-knowledge-group]').nth(1)).to_contain_text('项目管理专业人士 · 160')
     page.locator('[data-knowledge-node-next]').click()
@@ -149,22 +159,24 @@ with sync_playwright() as pw:
         assert dialog.evaluate('(e)=>e.scrollWidth<=e.clientWidth&&e.querySelector(".kg-knowledge-shell").scrollWidth<=e.querySelector(".kg-knowledge-shell").clientWidth'), f'{width}: dialog overflow'
         assert dialog.evaluate('e=>[...e.querySelectorAll("button")].filter(b=>b.getClientRects().length).every(b=>b.getBoundingClientRect().height>=44)')
         assert shell.evaluate('e=>e.scrollHeight>e.clientHeight'), f'{width}x{height}: no scroll range'
+        page.locator('canvas').scroll_into_view_if_needed()
         box=page.locator('canvas').bounding_box();shell_box=shell.bounding_box()
         x=box['x']+box['width']/2;y=(max(box['y'],shell_box['y'])+min(box['y']+box['height'],shell_box['y']+shell_box['height']))/2
         assert y>box['y'] and y<box['y']+box['height']
-        background=page.evaluate('scrollY');zoom=snap()['camera']['zoom']
+        background=page.evaluate('scrollY');zoom=snap()['camera']['zoom'];wheel_before=shell.evaluate('e=>e.scrollTop')
         page.mouse.move(x,y);page.mouse.wheel(0,450);page.wait_for_timeout(300)
-        wheel_top=shell.evaluate('e=>e.scrollTop');assert wheel_top>0, f'{width}x{height}: Canvas wheel did not scroll'
+        wheel_top=shell.evaluate('e=>e.scrollTop');assert wheel_top>wheel_before, f'{width}x{height}: Canvas wheel did not scroll'
         assert snap()['camera']['zoom']==zoom and page.evaluate('scrollY')==background
         page.screenshot(path=str(OUT/f'dashboard-{width}x{height}-wheel.png'))
         shell.evaluate('(e)=>e.scrollTop=0');page.wait_for_timeout(600)
+        page.locator('canvas').scroll_into_view_if_needed()
         box=page.locator('canvas').bounding_box();shell_box=shell.bounding_box()
         y=(max(box['y'],shell_box['y'])+min(box['y']+box['height'],shell_box['y']+shell_box['height']))/2
         assert page.evaluate('([x,y])=>document.elementFromPoint(x,y)?.tagName',[x,y])=='CANVAS'
-        camera=snap()['camera']
+        touch_before=shell.evaluate('e=>e.scrollTop');camera=snap()['camera']
         touch_swipe(x,y,max(shell_box['y']+20,y-200))
         assert snap()['camera']==camera and page.evaluate('scrollY')==background
-        touch_top=shell.evaluate('e=>e.scrollTop');assert touch_top>0, f'{width}x{height}: Canvas touch did not scroll'
+        touch_top=shell.evaluate('e=>e.scrollTop');assert touch_top>touch_before, f'{width}x{height}: Canvas touch did not scroll'
         for _ in range(12):
             if shell.evaluate('e=>e.scrollTop+e.clientHeight>=e.scrollHeight-2'):break
             touch_swipe(shell_box['x']+shell_box['width']/2,shell_box['y']+shell_box['height']*.65,shell_box['y']+shell_box['height']*.2)
@@ -202,6 +214,10 @@ with sync_playwright() as pw:
     page.evaluate('nodes.forEach(node=>node.path=[])')
     page.locator('[data-knowledge-refresh]').click()
     expect(page.locator('[data-knowledge-group]').nth(1)).to_contain_text('项目管理专业人士 · 160')
+    search=page.get_by_role('searchbox',name='搜索知识点');search.fill('项目考点 320')
+    page.locator('[data-knowledge-search-results] button').click()
+    expect(page.locator('[data-knowledge-detail-title]')).to_have_text('项目考点 320');assert page.locator('canvas').count()==0
+    page.locator('[data-knowledge-search-clear]').click()
     expect(page.locator('[data-knowledge-groups]')).not_to_contain_text('risk')
     expect(page.locator('[data-knowledge-detail-path]')).to_have_text('无路径标签')
     checks.append('readable subject names and counts, missing path fallback and explicit refresh')
