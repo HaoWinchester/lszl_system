@@ -18,15 +18,15 @@
 
 **Files:** Modify backend/app/services/knowledge_dashboard_service.py, backend/app/api/v1/learning.py; Create backend/tests/test_knowledge_universe.py; existing backend/tests/test_knowledge_dashboard.py保持兼容。
 **Interfaces:** 新GET /api/v1/learning/practice/knowledge-universe(CurrentUser) -> get_universe(db,owner)完整单响应，不分页；复用current_taxonomy和原有效作答聚合读取。节点id稳定hash(taxonomyId,nodeId)，parentId同命名空间父id；保留nodes已有字段，增加parentNodeId/parentId/subjectId/taxonomyTitle/practiced。整体返回nodes,topicCount,practicedTopicCount,unpracticedTopicCount,attemptCount,recentAttemptCount,unknownAttemptCount,unmappedAttemptCount,subjects,now,brightnessMeaning:'practice-activity',dimAfterDays:30。
-- [ ] 先写RED：未登录401；无作答仍出现完整目录暗色；121+节点无60/100截断；当前published版本选择/draft/archived/inactive过滤；真实父子/path；两个owner仅各自点亮；草稿/超时/无时间/未来作答不点亮；未知/未匹配历史计数保留；路径更名不重复当前节点；原历史接口契约不变。
+- [x] 先写RED：未登录401；无作答仍出现完整目录暗色；121+节点无60/100截断；当前published版本选择/draft/archived/inactive过滤；真实父子/path；两个owner仅各自点亮；草稿/超时/无时间/未来作答不点亮；未知/未匹配历史计数保留；路径更名不重复当前节点；原历史接口契约不变。
 ```python
 assert len(result['nodes']) == result['topicCount']
 assert result['practicedTopicCount'] == 1
 assert all(n['attemptCount']==0 and n['brightness']==.12 for n in result['nodes'] if not n['practiced'])
 ```
-- [ ] 复用原service聚合state读取，不复制session有效性。目录用active ContentSubject与current_taxonomy（有效pointer+published fallback），节点statusactive。精确taxonomyId/nodeId叠加，冻结path改变不重复目录。未练.12，已练max(.4,1-.6*ageDays/30)，时间来自真实作答，三十天后保留已练亮度下限。
-- [ ] current节点title/path用发布树；不回传题干/答案/私有题库内容；父路径防循环/缺失。未知引用保持unknownAttemptCount，识别但不在目录的次数unmappedAttemptCount。
-- [ ] 运行新旧knowledge测试及相关teaching-current测试，报告RED/GREEN/命令/结果、自查，仅提交本任务源/测试，不碰root版本/同步/文档/发布。
+- [x] 复用原service聚合state读取，不复制session有效性。目录用active ContentSubject与current_taxonomy（有效pointer+published fallback），节点statusactive。精确taxonomyId/nodeId叠加，冻结path改变不重复目录。未练.12，已练max(.4,1-.6*ageDays/30)，时间来自真实作答，三十天后保留已练亮度下限。
+- [x] current节点title/path用发布树；不回传题干/答案/私有题库内容；父路径防循环/缺失。未知引用保持unknownAttemptCount，识别但不在目录的次数unmappedAttemptCount。
+- [x] 运行新旧knowledge测试及相关teaching-current测试，报告RED/GREEN/命令/结果、自查，仅提交本任务源/测试，不碰root版本/同步/文档/发布。
 
 ### Task 2: 全量三维场景与可滚动交互
 
@@ -56,3 +56,6 @@ assert.equal(api.createModel(Array.from({length:320},(_,i)=>({id:String(i)}))).p
 - [ ] VERSION379（当前378），重建content-prep、officialsync、暂存新增public后官方manage-new-legacy.js update new-legacy完整full，不skip；source/site/public一致，无旧路径删除。
 - [ ] 新鲜备份UAT378代码+PG，验证非空/SHA/manifest和磁盘；FFuat命令级7897push并lsremote核对，官方update-uat部署、公网和容器源/版本/DB核验，正式main不变。
 - [ ] 更新验证记录与session-handoff，停UAT等用户本人验收，不删除功能分支或永久分支。
+
+Root滚动RED证据：artifacts/knowledge-universe-20261020/modal-scroll-red.json。用真实scene/dashboard/CSS、isolated3节点布局fixture，1440×650 dialog content848/client616和390×844 shellcontent1181/client765均有可滚区域，但Canvas上wheel500后两scrollTop都0，zoom3→1.417099658。该probe是UI布局测试，不冒称成功真实API；先前UAT访客大厅三尺寸wheel真实通过。Task2/3需物理wheel/触摸覆盖而非scrollIntoView代替。
+Task1接口约定subjects=[{id,code,name,topicCount,practicedTopicCount,unpracticedTopicCount}]，node.subject=ContentSubject.code。
