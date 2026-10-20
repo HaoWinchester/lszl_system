@@ -19,10 +19,11 @@ test('late successful and failed requests cannot overwrite a switched account or
   const old=loader.refresh();owner='B';loader.invalidate();resolve({nodes:[{title:'A private'}]});await old;assert.equal(data,null);
   const newer=loader.refresh();loader.invalidate();reject(Error('stale failure'));await newer;assert.equal(data,null);assert.notEqual(states.at(-1),'error');
 });
-test('pagination requests are independent and carry explicit bounded page size',async()=>{
-  let seen;
-  const loader=api().createLoader({getUser:()=> 'A',load:async page=>{seen=page;return {nodes:[],topicCount:5}},onData:()=>{},onState:()=>{}});
-  await loader.refresh(3);assert.equal(seen,3);
+test('one refresh loads the entire catalog without pagination arguments',async()=>{
+  let seen,data;
+  const nodes=Array.from({length:320},(_,id)=>({id,practiced:id===319}));
+  const loader=api().createLoader({getUser:()=> 'A',load:async(...args)=>{seen=args;return {nodes,topicCount:320}},onData:value=>data=value,onState:()=>{}});
+  await loader.refresh();assert.deepEqual(seen,[]);assert.equal(data.nodes.length,320);assert.equal(data.nodes[319].practiced,true);
 });
 test('unauthorized and malformed responses never retain private topic data',async()=>{
   for(const result of ['unauthorized','malformed']){
@@ -31,10 +32,10 @@ test('unauthorized and malformed responses never retain private topic data',asyn
     assert.equal(await loader.refresh(),false);assert.equal(data,null);assert.equal(state,result==='unauthorized'?'guest':'error');
   }
 });
-test('newer page data survives delayed success and errors from older pages of the same owner',async()=>{
+test('newer refresh survives delayed success and errors from older requests of the same owner',async()=>{
   for(const fail of [false,true]){
-    let resolve,reject,data,state;
-    const loader=api().createLoader({getUser:()=> 'A',load:page=>page===1?new Promise((r,j)=>{resolve=r;reject=j}):Promise.resolve({nodes:[{title:'page two'}]}),onData:value=>data=value,onState:value=>state=value});
+    let resolve,reject,data,state,calls=0;
+    const loader=api().createLoader({getUser:()=> 'A',load:()=>++calls===1?new Promise((r,j)=>{resolve=r;reject=j}):Promise.resolve({nodes:[{title:'page two'}]}),onData:value=>data=value,onState:value=>state=value});
     const old=loader.refresh(1);await loader.refresh(2);
     if(fail)reject(Error('old failure'));else resolve({nodes:[{title:'page one'}]});await old;
     assert.equal(data.nodes[0].title,'page two');assert.equal(state,'ready');
