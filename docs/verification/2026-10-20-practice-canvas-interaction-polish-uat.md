@@ -1,6 +1,6 @@
 # 答题、评论、弹窗与共享画布交互调整
 
-用户2026-10-20提出六项修改；基线UAT v369、交付记录77148607。当前功能分支codex/practice-canvas-interaction-polish，产品及专项测试冻结，v376官方完整门禁已通过；UAT仍369，尚未部署或经用户业务验收。大厅和成人模板继续暂缓，main及正式环境不在范围。
+用户2026-10-20提出六项修改；基线UAT v369、交付记录77148607。当前已完成开发自检并部署UAT v376；运行提交98a96f8bb084f6a422f9f668a5738ede5b418e34，功能分支codex/practice-canvas-interaction-polish保留。用户本人业务验收尚未完成。大厅和成人模板继续暂缓，main及正式环境不在范围。
 
 ## 本轮范围与验证
 
@@ -19,13 +19,13 @@
 
 ## 组合检查与发布状态
 
-候选v9.0-p4.1.376，previous369；sourceHash a6f991036af2e855b0114ef3ea131cd866fe2e0d90b636c933b8e2bdce1dafc2，adapterHash d8a633866d899791325f322f287bae340e2650c66680242d83807f048f4873f0。site/public1225文件逐字节一致，相对369的1161文件无旧路径移除、新增64文件，admin-console等关键页齐全。官方full gate已通过（exit 0、profile full、passed true、未skip），北京时间2026-10-20 13:13结束，整轮1405秒。后端1145/1145、前端375/375、扩展10/10，landing/dialog、core practice、canvas、cross domain、workspace assets及visual全部status 0；真实弹幕API11流程、画布31检查及新增主题三宽度/六主题均通过；画布新用例仅一次且既有用例本轮也无重试。最终视觉差异0～0.001%。通过后源1213文件与snapshot逐字节一致，site/public1225逐字节一致。提交和线上检查待部署后补录；当前尚未更新UAT。
+候选v9.0-p4.1.376，previous369；sourceHash a6f991036af2e855b0114ef3ea131cd866fe2e0d90b636c933b8e2bdce1dafc2，adapterHash d8a633866d899791325f322f287bae340e2650c66680242d83807f048f4873f0。site/public1225文件逐字节一致，相对369的1161文件无旧路径移除、新增64文件，admin-console等关键页齐全。官方full gate已通过（exit 0、profile full、passed true、未skip），北京时间2026-10-20 13:13结束，整轮1405秒。后端1145/1145、前端375/375、扩展10/10，landing/dialog、core practice、canvas、cross domain、workspace assets及visual全部status 0；真实弹幕API11流程、画布31检查及新增主题三宽度/六主题均通过；画布新用例仅一次且既有用例本轮也无重试。最终视觉差异0～0.001%。通过后源1213文件与snapshot逐字节一致，site/public1225逐字节一致。功能提交98a96f8b已fast-forward合入uat并经命令级代理推送、ls-remote核对；部署前官方full缓存复核exit 0，完整证据完成时间未改变。官方UAT部署57秒、exit 0：后端/HTTPS、小程序和教师助手就绪、历史回填核对均通过。部署后公网5入口及81资源SHA与site一致，访客admin为403、私有推荐码/看板API为401；容器12关键后端SHA一致，active376/previous369、1225文件、Alembic c8d4e7f2b610，成人模板种子仍0。正式公网336及容器ID/镜像均与发布前一致；本地/远端main仍b76862ed。后续交付文档提交只更新记录，不代表服务器运行代码自动改变。
 
 独立reviewer在实际candidate371一次性DB服务执行5项受弹窗迁移影响的完整frontend/e2e，全部通过；共享画布在全新一次性DB下的1440/390/320严格流程全部通过，无page error。371→372仅版本、Prep构建版本和首次进入选择器测试夹具变化，产品代码完全一致。重复使用同一测试库曾出现卡片等待超时，尚无足够证据归因或宣称修复；最终门禁使用全新DB且新用例只运行一次。前端总检查375项全部通过（exit 0），同步夹具已补齐真实公共弹窗资源，未放宽断言。所有测试写入一次性库，不修改UAT/正式用户数据。
 
 ## 备份与边界
 
-发布前UAT备份目录/home/ubuntu/lszl-uat-backups/20261020T031551Z；代码49272563字节、PG dump27559610字节；代码归档、pg_restore TOC、SHA-256和manifest全部验证，旧369镜像另保留tag。既有备份未删除。正式环境仍336，main仍b76862ed，最终发布后再重新核对。
+发布前UAT备份目录/home/ubuntu/lszl-uat-backups/20261020T031551Z；代码49272563字节、PG dump27559610字节；代码归档、pg_restore TOC、SHA-256和manifest全部验证，旧369镜像另保留tag。既有备份未删除。正式环境仍336，main仍b76862ed，部署后公网与容器均已重新核对一致。
 
 遗留非本轮问题：旧content-prep-question-bank-integration.test.js的第33行principles/status正则在基线也不匹配，已由git show只读复现，本轮未弱化该断言；其余原164图谱/20回忆卡顿未复现、内容/运营及企微客户端待办见上轮追踪，不借此扩大开发范围。
 
@@ -41,3 +41,5 @@
 6. 在深度回忆和多题归纳打开主题面板，逐项预览整卡主题，取消还原、保存刷新保持；两个模式及账号偏好独立，文档背景不被改动。
 
 用户明确反馈“验收通过”或授权合入main前，仅停留UAT；自动检查不替代上述验收。
+
+部署核验原始结果：artifacts/ui-polish-20261020/uat-public-verification.json、uat-container-verification.json、remote-after.txt。UAT新容器 18e396e35242661afd7e6d33b99aefbfa7f78420b7e23eb46601bb0ca89f1312 sha256:5515f1cb9044c35ccddfee7df0d9ba99276712eaab66b11af7c06ae271c7dd21。远端备份目录仍保留；发布后磁盘5208420KB（约4.96GiB），下一次发布需先按5GiB门槛检查并只清理可确认的非运行缓存，不能删除既有备份或在用镜像。

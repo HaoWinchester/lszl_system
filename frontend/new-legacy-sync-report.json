@@ -1,14 +1,10 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.375",
+  "fromVersion": "v9.0-p4.1.376",
   "toVersion": "v9.0-p4.1.376",
   "changes": {
     "added": [],
-    "changed": [
-      "VERSION",
-      "content-prep-studio/dist/content-prep.html",
-      "tests/danmaku-api-browser.py"
-    ],
+    "changed": [],
     "removed": []
   },
   "incompatible": []
