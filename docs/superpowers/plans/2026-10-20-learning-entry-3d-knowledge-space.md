@@ -1,6 +1,6 @@
 # 学习入口去重与三维知识星空 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** 去除重复学习报告入口，并把真实学习记录的静态星空升级为参考HTML风格的三维重力网络。
 
@@ -89,12 +89,12 @@ assert.ok(model.points.every(p=>[p.x,p.y,p.z].every(Number.isFinite)));
 
 ## 集成、复核与发布（控制任务）
 
-- [ ] 对每个任务按其完整变更范围复核规范与质量，修复明确问题后再进入下一任务；记录独立审查结果。
-- [ ] 全分支审查通过后递增新版本；重建content-prep，官方sync，暂存生成产物，再运行官方`manage-new-legacy.js update new-legacy`完整门禁；不跳过检查。
-- [ ] 检查site/public逐字节一致、新版本文件数与当前377旧路径无缺失、admin-console存在；更新交付记录。
-- [ ] 备份UAT当前代码和PG，验证非空、SHA和manifest；磁盘不足只清理可确认的构建/包缓存，保留既有备份和运行/回滚镜像。
-- [ ] 按AGENTS使用命令级代理合入/推送uat并核对远端引用，官方部署UAT，核对公网版本、资源字节及健康。main和正式环境不变。
-- [ ] 更新交接，停在UAT等待用户业务验收，不删除功能分支或永久分支。
+- [x] 对每个任务按其完整变更范围复核规范与质量，修复明确问题后再进入下一任务；记录独立审查结果。
+- [x] 全分支审查通过后递增新版本；重建content-prep，官方sync，暂存生成产物，再运行官方`manage-new-legacy.js update new-legacy`完整门禁；不跳过检查。
+- [x] 检查site/public逐字节一致、新版本文件数与当前377旧路径无缺失、admin-console存在；更新交付记录。
+- [x] 备份UAT当前代码和PG，验证非空、SHA和manifest；磁盘不足只清理可确认的构建/包缓存，保留既有备份和运行/回滚镜像。
+- [x] 按AGENTS使用命令级代理合入/推送uat并核对远端引用，官方部署UAT，核对公网版本、资源字节及健康。main和正式环境不变。
+- [x] 更新交接，停在UAT等待用户业务验收，不删除功能分支或永久分支。
 
 Task 1补充发现：旧真实API浏览器用例`practice-lobby-design-browser.py`的侧栏循环仍要求reports按钮存在；移除该重复项并增加零入口断言，保留后面的`data-recent-report`实际成绩回放测试。该用例依赖可抛弃后端，列入集成阶段在新release上运行，不冒称本任务已运行。
 
@@ -114,3 +114,5 @@ Task3 integration-test addition: also amend existing new-legacy/tests/practice-l
 Task3验真：root fresh disposable DB 实际API联调已exit0，artifacts/knowledge-space-20261020/api-integration-1/；20次真实作答保存→20个真实考点→Canvas/list/详情→关闭重开总数不变；12项回归全部通过，临时数据库清理确认无遗留。Task3审查spec PASS、quality PASS，零findings。
 
 Task4调查补充（实际API暴露，纳入本任务必要修复）：菜单放行后20-flashcards-toolbar.js的importLearningPackageFile直接写旧本地KGGraphFileStore，页面报成功但API文件数/current不变，刷新丢失。必须局部改为复用现有KGGraphFileEditorStoreBridge异步create/adopt与当前autosave确认；保持失败不污染原图、权限与源参数，不复制跨页持久化能力，不做旁支重构。新增/扩展导入器定向Node红绿测试纳入现有契约。实际API保存/重开检查仍为必需；根因证据artifacts/free-graph-import-20261020/api/api-FAILED.json。
+
+交付完成：官方full378通过，官方UAT部署exit0，公网5页/88资源及容器核验通过；记录见docs/verification/2026-10-20-knowledge-space-free-import-uat.md。main保持不动，待用户本人UAT验收。

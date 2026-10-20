@@ -1,25 +1,34 @@
-# 学习入口去重、三维知识星空与免费图谱导入（候选378）
+# 学习入口去重、三维知识星空与免费导入：UAT v378
 
-## 用户要求及边界
-用户明确批准去掉重复学习报告主入口，保留学习记录与每条记录报告；知识星空按提供HTML改暗色三维重力网络，真实练习数据。随后截图新增个人图谱“文件→导入”免费会员无权限，要求允许。其余大厅暂缓、成人模板暂缓、正式环境不发布；推荐双方7天规则保持。
+已于2026-10-20部署UAT https://uat.aihuanpu.com ，版本v9.0-p4.1.378。开发自检与部署验证通过；等待用户本人业务验收，不合入main。
 
-## 已确认实现与定向验证
-- Task1 efe0f403/d2773162：入口去重，独立spec/quality审查通过。
-- Task2 25aa66ec/b8c6e85a：有界三维重力、排斥与弹簧场景；真实鼠标、触摸、取景、缩放、静止停止、隐藏/销毁回归通过，两个P2修复已独立复审。
-- Task3 c9c2fb6c：真实面板集成，桌面/手机布局、详情/列表/分组/分页与账号销毁；独立spec/quality审查PASS。定向Node15项、面板11组、场景/大厅/弹幕/语言浏览器及当前前端376契约/9运行时/4部署脚本套件通过。
-- root真实API独立数据库闭环：20次真实作答→20真实考点→Canvas/列表/详情→重开统计不变，12检查全部通过，无页面错误。证据artifacts/knowledge-space-20261020/api-integration-1/，临时数据库清理为空。
-- Task4已定位菜单误用教师importData，修正为个人editGraph；源浏览器RED确认免费student被拦，GREEN覆盖6身份。另修正20导入器旧本地写入路径，复用现有EditorStoreBridge；真实API free导入→保存→刷新重开/原文件保持已exit0，升级付费与teacher/admin/viewer/guest边界也通过。任务审查/全分支审查与官方完整门禁尚在执行，本文不是上线或验收通过声明。
+## 交付范围
+- 免费student可从首页文件→导入打开文件选择器并导入个人图谱，使用editGraph；教师题库importData权限不向student开放。
+- 个人图谱导入复用共享远端桥，创建/读取成功后才应用；刷新后内容保留、原图不被覆盖。创建后读取失败恢复原current并清理新记录；错误不报成功。
+- 导入复用共享文件切换锁及草稿提交/保存；网络等待时禁止原图编辑和页签新建/关闭，防止并发编辑丢失。
+- 去掉重复学习报告主入口，保留学习记录及记录内查看报告。
+- 知识星空为暗色三维重力网络，旋转/缩放/选点/详情/分组/列表/分页，真实作答数据、owner隔离、60条/页；练习新鲜度语义保持。
+- 其余大厅暂缓需求、成人模板/公开课等保持暂缓；推荐人与新用户各7天规则不变。
 
-## 验证限制
-额外探索的历史脚本learning-entry-answer-feedback.test.js引用早已缺失的question-training.css，未纳入当前活动契约，已如实记录；现有活动套件通过。自动化测试不等于用户UAT业务验收。
+## 实现与审查
+Task1 efe0f403/d2773162；Task2 25aa66ec/b8c6e85a；Task3 c9c2fb6c；Task4 7e78d585/c9a7ff87；最终编辑保护431a6611。任务规范/质量审查及最终全分支审查均通过。审查发现的场景取景/空转、导入部分成功恢复和并发编辑P1均已修复并复审，无未解决Critical/Important。
+所有SDD报告、差异、截图归档artifacts/knowledge-space-20261020/sdd-review-archive/，原本计划工作目录已清理，兄弟目录未动。
 
-## 发布准备
-候选VERSION378，当前已部署UAT377。发布前备份/home/ubuntu/lszl-uat-backups/20261020T063848Z已校验代码包、PG dump、TOC和SHA，manifest记录原377/正式336容器镜像。不得删除既有备份；main保持b76862ed，未经用户验收不得合入。
+## 验证证据
+- 官方完整full：2026-10-20T07:12:16.262Z→07:33:01.238Z，1243秒，passed=true、profile=full、未skip。后端1145通过（3项既有依赖警告）；前端377/377、9项运行时与4组部署脚本通过；扩展10项；全部做题/画布/跨域/资产/视觉浏览器组exit0。
+- 整包source1218/site1230/public1230。source snapshot及site/public逐字节相同，旧377的1226路径及旧369的1161路径无删除，admin-console存在。
+- sourceHash `2f74d835425fa7ab43678b23a904f960e2f407eb6ed28fd6e5d51f44ea817d4e`；adapterHash `d8a633866d899791325f322f287bae340e2650c66680242d83807f048f4873f0`；validatorHash `e0f001f06bcc699181661f94c4d840244ec8a3076b70c32e9fe92d9f61b1e43c`。
+- 真实学习数据闭环：20次保存作答→20服务端考点→Canvas/列表/详情/重开，12组检查通过，fixture36126清理无遗留。证据api-integration-1.log。
+- 真实免费导入：确认free/default套餐，实际菜单chooser→延迟POST→新文件API落库→刷新保留节点/说明/连线；原图保存真实inline草稿。等待期间双击编辑/新建/hover关闭均被阻止；新文件GET503后恢复原图并清理部分记录。free/paid/teacher/admin/viewer/guest边界通过，学生题库403保持。fixture56706退出0、无临时DB；证据artifacts/free-graph-import-20261020/final-fix/api-green/及api-green.log。
+- 官方完整门禁再次运行上述免费导入真实API回归通过。完整日志frontend/new-legacy-releases/v9.0-p4.1.378/validation-run.log，outer full-update-378.log。
+- UAT部署官方脚本exit0，52秒；公网5页/88关键静态资源SHA一致，健康/DB正常、游客管理页403/私有API401；容器1230文件、12后端SHA、Alembicc8d4e7f2b610、推荐奖励列和暂缓模板0核对通过。
 
-Task4提交7e78d585；最终当前活动前端377/377+9运行时+4部署脚本全通过。候选源1218/public1230，377旧路径无删除、admin-console存在。候选378全分支审查与官方full尚未完成；不能把定向检查当发布成功。
+## 发布与备份
+部署代码提交`be947a602b2ff33c9acd803714482d3978f15b86`，已合入/代理推送uat和功能分支，远端引用已核对。正式main仍b76862ed2d12d36a6c3d0b6782f5bd601f12d8a5，正式版本336、容器镜像未变。
+UAT当前 `fff9e8ec32bad2bd069c964e925b9255a12a17b707c2b93110349fd1a3cd7627 sha256:d5b99a73fdc19a838c890852cd67e62e8da67f1ff7615180fa52ab47064088af`，previous377。
+发布前远端备份 `/home/ubuntu/lszl-uat-backups/20261020T063848Z`：代码49591150B，SHA312cccb29f25601d0373b2583da3379aec085ad2474edc634065a4419a5f8e03；PG27567519B，SHAb51f5f2d86475e55e9ec12b9fe71bf51ca25d918070aba20413dd1cdcdf3bbe9。非空/归档/TOC/manifest已校验，377回滚镜像tag保留，旧备份未删除。
+部署日志artifacts/knowledge-space-20261020/deploy-uat-378.log；公网/容器/local校验JSON及runtime记录在同目录。
 
-Task4独立审查提出创建后读取失败的Important：API当前文件已切换但画布仍原图。fix round1在共享bridge记录原ID，读取失败恢复选择并按现有trash→permanent规则清理创建记录。真实API仅新文件GET503错误注入验证通过，恢复原current/画布/原图内容且无额外文件；随后正常导入/角色边界仍通过。fixture53172退出0、无剩余DB；证据artifacts/free-graph-import-20261020/fix-1-api-green.log。初次故障注入范围过宽也拦截folders/tags，已纠正，未把该运行当有效回归结论。定向共享桥/远程store/adapter/tab测试4/4通过。待 scoped re-review。
-
-最终全分支审查发现一项P1：导入await创建期间未持有Tabs切换锁，原图并发编辑可能丢失。单次修复波431a6611复用Tabs.withSavedFileTransition及已有草稿提交/保存，并让共享交互模式write能力检查同一切换状态。真实延迟POST回归：锁定、canWrite、卡片双击、新建页签、关闭页签、原图草稿保存均true；原图与导入图刷新保留，故障回滚/角色回归继续通过，fixture56706清理无遗留。根目录frontend-final-preflight.log最新全套377+9+4退出0。最终scoped复核待返回，再完整full。真实ink草稿成功未单独验证，仍保留既有安全中止；无readonly绕过。
-
-最终复核knowledge_import_final_review针对994e6b51..431a6611确认P1ADDRESSED，无新Critical/Important，无其他观察。所有实施与审查完成，SDD归档artifacts/knowledge-space-20261020/sdd-review-archive/，进入官方完整full378。正式上线与用户UAT仍未完成。
+## 验证边界
+自动化不是用户UAT验收。真实草稿成功覆盖节点inline；真实ink草稿可能保留既有安全中止并保持草稿，本轮未单独浏览器验证成功，不绕过readonly。成功导入用JSON，ZIP共用未改parser，未声称另跑ZIP/XMind完整E2E。回滚中第二次API故障可能保留记录/选择，但会明确失败不报成功。
+额外探索的历史learning-entry-answer-feedback.test.js引用早已缺失question-training.css，未纳入当前活动套件；已如实记录，当前活动全套通过。历史测试诊断失败（宽泛注入或缺少hover）已修正，未冒充业务回归通过证据。

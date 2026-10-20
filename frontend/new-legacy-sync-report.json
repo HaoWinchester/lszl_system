@@ -4,10 +4,7 @@
   "toVersion": "v9.0-p4.1.378",
   "changes": {
     "added": [],
-    "changed": [
-      "tests/graph-file-editor-store-bridge.test.js",
-      "tests/graph-file-import-permissions-browser.py"
-    ],
+    "changed": [],
     "removed": []
   },
   "incompatible": []
