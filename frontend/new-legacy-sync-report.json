@@ -5,10 +5,8 @@
   "changes": {
     "added": [],
     "changed": [
-      "src/canvas/dom-interaction.js",
-      "src/graph/floating-color-window-controller.js",
-      "tests/canvas-ink-controller-browser.py",
-      "tests/workspace-ink-toolbar-browser.py"
+      "src/graph/related-canvas-controller.js",
+      "tests/graph-temporary-canvas-browser.py"
     ],
     "removed": []
   },

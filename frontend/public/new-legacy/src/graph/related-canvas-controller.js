@@ -76,10 +76,9 @@
       const nodeMap=new Map(graph().nodes.map(n=>[n.id,n]));
       for(const link of graph().links){
         const presentation=options.renderRelation(link,nodeMap,{markerId,ignoreGather:true});if(!presentation)continue;
-        const {path,label}=presentation;
+        const {path}=presentation;
         path.classList.add('related-canvas-edge');path.dataset.linkId=link.id;path.style.pointerEvents=readOnly()?'none':'stroke';
         if(!readOnly())path.onclick=e=>{e.stopPropagation();selection.selectLink(link.id)};svg.append(path);
-        if(label){label.classList.add('related-canvas-label');label.style.pointerEvents='none';svg.append(label)}
       }
     }
     function renderCards(){cards.replaceChildren();for(const n of graph().nodes){const card=renderCard(n,{state:graph(),selectedNodeIds:nodeIds,position:model.geometryOf(n)});card.classList.add('related-canvas-card');card.style.pointerEvents='auto';card.querySelectorAll('.node-size-tools,.graph-node-resize-layer').forEach(el=>el.remove());card.addEventListener('pointerdown',e=>{if(e.button!==0||e.target.closest?.('button,a,input,textarea,select,[contenteditable]:not([contenteditable="false"])'))return;e.preventDefault();if(!readOnly()&&connection.source()){connection.connectTo(n.id);return}selection.selectNodes([n.id]);const g=model.geometryOf(n);drag={id:n.id,pointerId:e.pointerId,x:e.clientX,y:e.clientY,start:g};body.setPointerCapture(e.pointerId)});cards.append(card)}}

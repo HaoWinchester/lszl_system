@@ -34,7 +34,7 @@ def main():
         assert page.evaluate('(()=>{const ns=relatedCanvasController.session.getState().nodes;return Math.max(...ns.map(n=>n.x))-Math.min(...ns.map(n=>n.x))})()')<2000
         assert page.evaluate('relatedCanvasController.session.getState().nodes[0].x')==400
         assert page.evaluate('JSON.stringify(state.viewport)')==view
-        expect(page.locator('.related-canvas-label')).to_contain_text('先决条件')
+        expect(page.locator('.related-canvas-edges text')).to_have_count(0)
         edge=page.locator('.related-canvas-edge[data-link-id="ab"]');assert edge.get_attribute('marker-end') and edge.get_attribute('marker-start');assert edge.get_attribute('stroke-dasharray')=='24 12'
         expected=page.evaluate('(()=>{const l=relatedCanvasController.session.getState().links[0],m=new Map(relatedCanvasController.session.getState().nodes.map(n=>[n.id,n])),p=linkRenderPoints(l,m,{ignoreGather:true});return linkPathGeometry(l,p.a,p.b,p).d})()');assert edge.get_attribute('d')==expected
         assert page.evaluate('relatedCanvasController.session.getState().links[0].curveControls.length')==2
