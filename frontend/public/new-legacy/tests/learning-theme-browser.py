@@ -36,7 +36,7 @@ with sync_playwright() as pw:
   r=c.request.post(args.base_url+'/api/v1/workspaces',data={'id':wid,'title':payload['title'],'schemaVersion':10,'payload':payload});assert r.ok,r.text()
   p=page or c.new_page();p.set_default_timeout(6000);p.goto(args.base_url+'/question-workspace.html?paperId=ink-paper&releaseId=ink-release&questionId='+question+'&bankId=ink-bank&workspace='+wid,wait_until='networkidle');p.wait_for_function('(id)=>KGMultiQuestionWorkspace?.activeWorkspaceId()===id&&KGMultiQuestionWorkspace.getState().questionCount===2',arg=wid);return p,wid
  def scene(p,value):
-  p.locator('[data-learning-theme-menu]>summary').click();p.locator('.kr-scene-option[data-kr-theme='+value+']').click();p.locator('[data-theme-save]').click();expect(p.locator('#qwThemeSelect,#krThemeSelect')).to_have_value(value)
+  select=p.locator('#qwThemeSelect,#krThemeSelect');expect(select).to_be_visible();assert select.evaluate('e=>e.tagName==="SELECT"&&!e.hidden&&e.tabIndex>=0&&e.getAttribute("aria-hidden")!=="true"');assert p.locator('[data-learning-theme-panel],.learning-theme-menu').count()==0;select.select_option(value);expect(select).to_have_value(value)
  def themes(c):
   r=recall(c);w,_=workspace(c);scene(r,'sakura');scene(w,'ocean');expect(r.locator('#krThemeSelect')).to_have_value('sakura');scene(r,'latte');expect(w.locator('#qwThemeSelect')).to_have_value('ocean');r.reload(wait_until='networkidle');w.reload(wait_until='networkidle');expect(r.locator('#krThemeSelect')).to_have_value('latte');expect(w.locator('#qwThemeSelect')).to_have_value('ocean')
   r.evaluate("sessionStorage.setItem('kg_multi_question_theme_v1','neon')");expect(w.locator('#qwThemeSelect')).to_have_value('ocean')
@@ -44,11 +44,18 @@ with sync_playwright() as pw:
    scene(w,value);expect(r.locator('#krThemeSelect')).to_have_value('latte')
   scene(r,'neon');expect(w.locator('#qwThemeSelect')).to_have_value('latte')
  def entry(c):
-  r=recall(c)
-  for width in [1440,1024,800,525,390]:
-   r.set_viewport_size({'width':width,'height':844});summary=r.locator('#krSceneMenu>summary');assert '主题' in summary.inner_text(),'Theme entry needs a visible text label';summary.click();button=r.locator('.kr-scene-option[data-kr-theme=ocean]');assert button.evaluate('e=>{const r=e.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&e.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))}');button.click();r.locator('[data-theme-save]').click();expect(r.locator('#krThemeSelect')).to_have_value('ocean')
-  r.set_viewport_size({'width':1440,'height':900});r.mouse.move(500,400);r.keyboard.press('Escape');summary=r.locator('#krSceneMenu>summary');summary.focus();summary.press('Enter');expect(r.locator('#krSceneMenu')).to_have_attribute('open','');r.keyboard.press('Escape');assert not r.locator('#krSceneMenu').evaluate('e=>e.open');summary.press('Space');expect(r.locator('#krSceneMenu')).to_have_attribute('open','');r.keyboard.press('Escape')
-  r.screenshot(path=str(OUT/'entry-after.png'))
+  r=recall(c);w,_=workspace(c)
+  for name,p,selector in [('workspace',w,'#qwThemeSelect'),('recall',r,'#krThemeSelect')]:
+   for width in [1440,1024,800,525,390,320]:
+    p.set_viewport_size({'width':width,'height':844});c.new_cdp_session(p).send('Emulation.setTouchEmulationEnabled',{'enabled':width<=525});select=p.locator(selector);expect(select).to_be_visible()
+    if width<=525:assert p.evaluate('matchMedia("(pointer:coarse)").matches')
+    if name=='workspace':assert select.evaluate('e=>e.parentElement.lastElementChild===e'), 'Theme must remain after the existing tool groups'
+    expect(select).to_have_accessible_name('画布主题' if name=='workspace' else '卡片主题')
+    assert select.evaluate('e=>{const r=e.getBoundingClientRect();return r.width>60&&r.height>=28&&r.left>=0&&r.right<=innerWidth&&r.bottom<=innerHeight&&e.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))}'),(name,width)
+    assert select.locator('option').all_text_contents()==['平台默认','羊皮纸','极光绿','暗夜霓虹','樱花粉','海盐蓝','奶油拿铁']
+    scene(p,'ocean');select.focus();p.keyboard.press('ArrowDown');p.keyboard.press('Enter');p.keyboard.press('Escape')
+    assert p.locator('[data-learning-theme-panel],.learning-theme-menu').count()==0
+    p.screenshot(path=str(OUT/(name+'-select-'+str(width)+'.png')))
  def background(c):
   w,_=workspace(c);layer=w.locator('.qw-background');assert layer.evaluate('e=>+getComputedStyle(e).opacity')==1,'The saved gradient is invisible';assert 'linear-gradient' in layer.evaluate('e=>getComputedStyle(e).backgroundImage')
   before=w.evaluate('KGMultiQuestionWorkspace.activeWorkspace().background');scene(w,'neon');assert w.evaluate('KGMultiQuestionWorkspace.activeWorkspace().background')==before,'Scene controls must preserve a saved document background';w.reload(wait_until='networkidle');assert layer.evaluate('e=>+getComputedStyle(e).opacity')==1;w.screenshot(path=str(OUT/'background-after.png'))

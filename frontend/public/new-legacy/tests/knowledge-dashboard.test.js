@@ -41,3 +41,9 @@ test('newer refresh survives delayed success and errors from older requests of t
     assert.equal(data.nodes[0].title,'page two');assert.equal(state,'ready');
   }
 });
+
+test('node search uses names, full paths and subject names without mutating the catalog',()=>{
+ const nodes=[{title:'风险识别',path:['项目管理','不确定性'],subject:'PMP'},{title:'成本估算',path:['规划'],subject:'ACP'},{title:'Risk response',path:['风险'],subject:'PMP'}];
+ const subjects=[{code:'PMP',name:'项目管理专业人士'}],before=JSON.stringify(nodes);
+ assert.deepEqual(api().findMatches(nodes,'风险'),[0,2]);assert.deepEqual(api().findMatches(nodes,'ＰＭＰ 风险'),[0,2]);assert.deepEqual(api().findMatches(nodes,'不确定性'),[0]);assert.deepEqual(api().findMatches(nodes,'专业人士',subjects),[0,2]);assert.deepEqual(api().findMatches(nodes,'RISK RESPONSE'),[2]);assert.deepEqual(api().findMatches(nodes,'不存在'),[]);assert.deepEqual(api().findMatches(nodes,'  '),[]);assert.equal(JSON.stringify(nodes),before);
+});

@@ -5,7 +5,8 @@
   "changes": {
     "added": [],
     "changed": [
-      "tests/related-canvas-readonly-browser.py"
+      "src/practice/knowledge-space-scene.js",
+      "tests/knowledge-space-scene-browser.py"
     ],
     "removed": []
   },

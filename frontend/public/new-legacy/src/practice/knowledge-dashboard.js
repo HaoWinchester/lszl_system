@@ -26,6 +26,15 @@
     return global.KGDomainApi.request({path:'/api/v1/learning/practice/knowledge-universe'});
   }
   const groupKey=node=>JSON.stringify([text(node.subject||''),text(node.taxonomyId||'')]);
+  function findMatches(nodes,query,subjects=[]){
+    const normalize=value=>text(value).normalize('NFKC').toLocaleLowerCase(),terms=normalize(query).trim().split(/\s+/).filter(Boolean);
+    if(!terms.length)return [];
+    return nodes.flatMap((node,index)=>{
+      const subject=subjects.find(item=>item.code===node.subject)?.name||'';
+      const content=normalize([node.title,node.subject,subject,node.taxonomyTitle,...(Array.isArray(node.path)?node.path:[]),node.description,...(Array.isArray(node.keywords)?node.keywords:[])].filter(Boolean).join(' '));
+      return terms.every(term=>content.includes(term))?[index]:[];
+    });
+  }
   let instance;
   function init(options={}){
     if(instance)return instance;
@@ -37,7 +46,7 @@
       <p data-knowledge-status role="status" aria-live="polite"></p><button type="button" data-knowledge-retry hidden>重试</button>
       <div class="kg-knowledge-body">
         <section class="kg-knowledge-detail" aria-label="选中考点详情"><p class="kg-knowledge-eyebrow" data-knowledge-detail-subject></p><p class="kg-knowledge-number" data-knowledge-detail-number>—</p><h3 data-knowledge-detail-title>选择一个考点</h3><p class="kg-knowledge-path" data-knowledge-detail-path></p><dl class="kg-knowledge-facts"><div><dt>已保存作答</dt><dd data-knowledge-detail-attempts>—</dd></div><div><dt>最近练习</dt><dd data-knowledge-detail-date>—</dd></div><div><dt>综合分值</dt><dd data-knowledge-detail-score>—</dd></div><div><dt>近期正确率 / 样本</dt><dd data-knowledge-detail-accuracy>—</dd></div><div><dt>近期连对</dt><dd data-knowledge-detail-streak>—</dd></div></dl><div class="kg-knowledge-step"><button type="button" data-knowledge-node-prev>← 上一个</button><button type="button" data-knowledge-node-next>下一个 →</button><button type="button" data-knowledge-list-toggle aria-expanded="false" aria-controls="kgKnowledgeList">考点列表</button></div><ol id="kgKnowledgeList" data-knowledge-list class="kg-knowledge-list" hidden></ol></section>
-        <section class="kg-knowledge-space" aria-label="知识星空探索"><div class="kg-knowledge-space-heading"><span data-knowledge-page-count>全部 0 个考点</span><span>练习熟练度 · 越熟练越亮</span></div><div data-knowledge-network class="kg-knowledge-network" hidden></div><div class="kg-knowledge-space-empty" data-knowledge-space-empty>暂无发布知识树</div><div class="kg-knowledge-camera" role="group" aria-label="星空视角"><button type="button" data-knowledge-rotate-left aria-label="向左旋转星空">↶</button><button type="button" data-knowledge-rotate-right aria-label="向右旋转星空">↷</button><button type="button" data-knowledge-zoom-out aria-label="缩小星空">−</button><button type="button" data-knowledge-zoom-in aria-label="放大星空">＋</button><button type="button" data-knowledge-reset>复位视角</button></div><p class="kg-knowledge-help">横向拖动旋转 · 上下滚动浏览 · Ctrl / ⌘ 滚轮或双指缩放<br>也可使用视角按钮和考点列表探索</p></section>
+        <section class="kg-knowledge-space" aria-label="知识星空探索"><div class="kg-knowledge-space-heading"><span data-knowledge-page-count>全部 0 个考点</span><span>练习熟练度 · 越熟练越亮</span></div><form class="kg-knowledge-search" role="search" aria-label="搜索知识网络"><label for="kgKnowledgeSearch">搜索知识点</label><div class="kg-knowledge-search-field"><input id="kgKnowledgeSearch" type="search" data-knowledge-search placeholder="名称、科目或知识路径" maxlength="200" autocomplete="off"><button type="button" data-knowledge-search-clear disabled>清空</button></div><p data-knowledge-search-status role="status" aria-live="polite">搜索全部已发布知识点，点击结果定位。</p><ol data-knowledge-search-results aria-label="知识点搜索结果" hidden></ol></form><div data-knowledge-network class="kg-knowledge-network" hidden></div><div class="kg-knowledge-space-empty" data-knowledge-space-empty>暂无发布知识树</div><div class="kg-knowledge-camera" role="group" aria-label="星空视角"><button type="button" data-knowledge-rotate-left aria-label="向左旋转星空">↶</button><button type="button" data-knowledge-rotate-right aria-label="向右旋转星空">↷</button><button type="button" data-knowledge-zoom-out aria-label="缩小星空">−</button><button type="button" data-knowledge-zoom-in aria-label="放大星空">＋</button><button type="button" data-knowledge-reset>复位视角</button></div><p class="kg-knowledge-help">横向拖动旋转 · 上下滚动浏览 · Ctrl / ⌘ 滚轮或双指缩放<br>也可使用视角按钮和考点列表探索</p></section>
       </div>
       <footer class="kg-knowledge-footer"><div class="kg-knowledge-groups" data-knowledge-groups role="group" aria-label="科目筛选"></div></footer>
       <p id="kgKnowledgeMeaning">未练暗色 · 待巩固 · 逐渐熟悉 · 较熟练，越熟练越亮。完成练习后，综合有效作答次数、近期正确率和连对更新熟练度；未完成的练习待评估。连线组织同科目、同分类考点。没有匹配当前目录引用的作答计入总数，不点亮星点。</p>
@@ -45,7 +54,8 @@
     document.body.appendChild(dialog);
     const find=selector=>dialog.querySelector(selector);
     const summary=find('[data-knowledge-summary]'),network=find('[data-knowledge-network]'),list=find('[data-knowledge-list]'),status=find('[data-knowledge-status]'),retry=find('[data-knowledge-retry]'),groups=find('[data-knowledge-groups]');
-    let returnFocus=null,scene=null,nodes=[],selected=null,activeGroup='',listOpen=false;
+    let returnFocus=null,scene=null,nodes=[],selected=null,activeGroup='',listOpen=false,subjects=[];
+    const search=find('[data-knowledge-search]'),searchResults=find('[data-knowledge-search-results]'),searchStatus=find('[data-knowledge-search-status]'),searchClear=find('[data-knowledge-search-clear]');
     const formatDate=value=>{const date=value?new Date(value):null;return !date||Number.isNaN(date.getTime())?'时间未知':date.toLocaleDateString('zh-CN')};
     const setText=(name,value)=>{find(`[data-knowledge-${name}]`).textContent=text(value)};
     function toggleList(value){listOpen=value;list.hidden=!value||!nodes.length;find('[data-knowledge-list-toggle]').setAttribute('aria-expanded',String(!list.hidden))}
@@ -60,6 +70,22 @@
       setText('detail-streak',`${Number(node.correctStreak)||0} 次`);
       for(const button of list.querySelectorAll('button'))button.setAttribute('aria-pressed',String(Number(button.dataset.knowledgeNode)===index));
     }
+    function renderSearch(){
+      const query=search.value.trim();searchResults.replaceChildren();searchResults.hidden=!query;searchClear.disabled=!query;
+      const matches=findMatches(nodes,query,subjects);
+      searchStatus.textContent=!query?'搜索全部已发布知识点，点击结果定位。':matches.length?`找到 ${matches.length} 个知识点，点击结果定位。`:'没有找到匹配的知识点，请换个关键词。';
+      for(const index of matches){
+        const node=nodes[index],item=document.createElement('li'),control=button(node.title||'未命名考点','data-knowledge-locate',index),path=document.createElement('small');
+        path.textContent=[subjects.find(subject=>subject.code===node.subject)?.name||node.subject,...(Array.isArray(node.path)?node.path:[])].filter(Boolean).join(' / ');
+        control.appendChild(path);item.appendChild(control);searchResults.appendChild(item);
+      }
+      return matches;
+    }
+    function locate(index){
+      if(!nodes[index])return;
+      if(activeGroup&&groupKey(nodes[index])!==activeGroup)focusGroup('');
+      select(index);scene?.focus(index);network.scrollIntoView({block:'center',behavior:'instant'});
+    }
     function focusGroup(key){
       activeGroup=key;scene?.focusGroup(key);
       for(const button of groups.querySelectorAll('button'))button.setAttribute('aria-pressed',String(button.dataset.knowledgeGroup===key));
@@ -73,12 +99,12 @@
     }
     function button(label,attribute,value){const element=document.createElement('button');element.type='button';element.textContent=label;element.setAttribute(attribute,value);return element}
     function render(data){
-      scene?.destroy();scene=null;nodes=[];selected=null;activeGroup='';summary.textContent='';network.replaceChildren();list.replaceChildren();groups.replaceChildren();
+      scene?.destroy();scene=null;nodes=[];selected=null;activeGroup='';subjects=[];search.value='';search.disabled=true;renderSearch();summary.textContent='';network.replaceChildren();list.replaceChildren();groups.replaceChildren();
       network.hidden=true;find('[data-knowledge-space-empty]').hidden=false;
       setText('detail-title','选择一个考点');setText('detail-number','—');setText('detail-subject','');setText('detail-path','');setText('detail-attempts','—');setText('detail-date','—');setText('detail-score','—');setText('detail-accuracy','—');setText('detail-streak','—');setText('page-count','全部 0 个考点');
       for(const control of dialog.querySelectorAll('.kg-knowledge-step button,.kg-knowledge-camera button'))control.disabled=true;
       toggleList(listOpen);if(!data)return;
-      nodes=data.nodes.filter(node=>node&&typeof node==='object');
+      nodes=data.nodes.filter(node=>node&&typeof node==='object');subjects=Array.isArray(data.subjects)?data.subjects:[];search.disabled=!nodes.length;
       summary.textContent=`全部 ${Number(data.topicCount)||0} · 已练 ${Number(data.practicedTopicCount)||0} · 未练 ${Number(data.unpracticedTopicCount)||0}；累计 ${Number(data.attemptCount)||0} 次作答 · 近 7 天 ${Number(data.recentAttemptCount)||0} 次${data.unknownAttemptCount?` · ${Number(data.unknownAttemptCount)} 次作答暂无考点引用`:''}。`;
       setText('page-count',`全部 ${nodes.length} 个考点`);
       for(const [index,node] of nodes.entries()){
@@ -118,6 +144,8 @@
       const button=event.target.closest('button');if(!button||button.disabled)return;
       if(button.hasAttribute('data-knowledge-close'))close();
       else if(button.hasAttribute('data-knowledge-retry')||button.hasAttribute('data-knowledge-refresh'))void loader.refresh();
+      else if(button.hasAttribute('data-knowledge-search-clear')){search.value='';renderSearch();search.focus()}
+      else if(button.hasAttribute('data-knowledge-locate'))locate(Number(button.dataset.knowledgeLocate));
       else if(button.hasAttribute('data-knowledge-node'))select(Number(button.dataset.knowledgeNode));
       else if(button.hasAttribute('data-knowledge-group'))focusGroup(button.dataset.knowledgeGroup);
       else if(button.hasAttribute('data-knowledge-node-prev'))step(-1);
@@ -129,9 +157,11 @@
       else if(button.hasAttribute('data-knowledge-rotate-left'))scene?.rotate(-30,0);
       else if(button.hasAttribute('data-knowledge-rotate-right'))scene?.rotate(30,0);
     });
+    search.addEventListener('input',renderSearch);
+    find('.kg-knowledge-search').addEventListener('submit',event=>{event.preventDefault();const matches=renderSearch();if(matches.length)locate(matches[0])});
     dialog.addEventListener('keydown',event=>{
       if(event.key!=='Tab')return;
-      const buttons=[...dialog.querySelectorAll('button:not(:disabled)')].filter(button=>!button.closest('[hidden]')&&button.getClientRects().length);
+      const buttons=[...dialog.querySelectorAll('button:not(:disabled),input:not(:disabled)')].filter(button=>!button.closest('[hidden]')&&button.getClientRects().length);
       const first=buttons[0],last=buttons.at(-1);
       if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus()}
       else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus()}
@@ -142,7 +172,7 @@
     global.addEventListener?.('pagehide',close);
     instance=Object.freeze({open,close,refresh:()=>loader.refresh()});return instance;
   }
-  const api=Object.freeze({init,open:()=>init()?.open(),close:()=>instance?.close(),createLoader});
+  const api=Object.freeze({init,open:()=>init()?.open(),close:()=>instance?.close(),createLoader,findMatches});
   global.KGKnowledgeDashboard=api;
   global.document?.addEventListener('click',event=>{
     const trigger=event.target?.closest?.('[data-knowledge-dashboard-open]');

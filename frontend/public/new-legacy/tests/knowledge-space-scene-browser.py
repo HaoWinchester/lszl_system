@@ -36,10 +36,11 @@ with sync_playwright() as p:
    });
    window.observeDrawing=()=>{
     const ctx=document.querySelector('canvas').getContext('2d');
-    const clear=ctx.clearRect,arc=ctx.arc,fill=ctx.fill;let radius=0;
-    window.dotStyles=[];window.arcs=0;
-    ctx.clearRect=function(...args){dotStyles=[];arcs=0;return clear.apply(this,args)};
+    const clear=ctx.clearRect,arc=ctx.arc,fill=ctx.fill,fillText=ctx.fillText;let radius=0;
+    window.dotStyles=[];window.arcs=0;window.labels=[];
+    ctx.clearRect=function(...args){dotStyles=[];arcs=0;labels=[];return clear.apply(this,args)};
     ctx.arc=function(...args){radius=args[2];arcs++;return arc.apply(this,args)};
+    ctx.fillText=function(...args){labels.push({title:args[0],font:this.font});return fillText.apply(this,args)};
     ctx.fill=function(...args){if(radius<=9)dotStyles.push(this.fillStyle);return fill.apply(this,args)};
    };
   }''')
@@ -58,6 +59,8 @@ with sync_playwright() as p:
    state=page.evaluate('scene.snapshot()')
    assert len(state['positions'])==size and all(v['visible'] for v in state['positions'])
    assert page.evaluate('dotStyles.length')==size and page.evaluate('arcs')==size*2,'every business point must be drawn, without LOD dropping nodes'
+   assert page.evaluate('labels.length')==size,'Every node needs a visible name, including 320/1000-node catalogs'
+   assert page.evaluate('labels.every(l=>Number(l.font.match(/([0-9.]+)px/)[1])>=16)'),'Labels must stay readable instead of shrinking with zoom'
    assert_fit(page,f'{width}/{size}-node-catalog')
    costs=sorted(page.evaluate('frameCosts'))
    metrics.append(dict(width=width,nodes=size,settlementMs=round(elapsed,1),frames=len(costs),callbackP95Ms=round(costs[int((len(costs)-1)*.95)],1),callbackMaxMs=round(max(costs),1),drawnNodes=page.evaluate('dotStyles.length')))
@@ -185,6 +188,13 @@ with sync_playwright() as p:
   page.evaluate("document.querySelector('#host').style.height='200px';document.dispatchEvent(new Event('visibilitychange'))")
   page.wait_for_timeout(150);assert page.evaluate('draws===atDestroy');assert snap()==dead;assert page.evaluate('chosen.length')==count
   assert errors==[],errors
+  # The maximum legal title stays inside the Canvas even at narrow widths.
+  page.evaluate("document.querySelector('#host').style.height='310px'")
+  page.evaluate("()=>{window.longTitle='风险'.repeat(150);window.longRows=[];window.scene=KGKnowledgeSpaceScene.mount({host:document.querySelector('#host'),nodes:[{id:'long',title:longTitle}]});const ctx=document.querySelector('canvas').getContext('2d'),clear=ctx.clearRect,fill=ctx.fillText;ctx.clearRect=function(...args){longRows=[];return clear.apply(this,args)};ctx.fillText=function(...args){longRows.push({text:args[0],y:args[2]});return fill.apply(this,args)};scene.focus(0)}")
+  page.wait_for_function('scene.snapshot().settled&&!scene.snapshot().running')
+  assert page.evaluate('longRows.map(row=>row.text).join("")===longTitle')
+  assert page.evaluate('longRows.every(row=>row.y>=20&&row.y<=document.querySelector("canvas").getBoundingClientRect().height-4)'), 'Long labels must not be cropped above or below the Canvas'
+  page.evaluate('scene.destroy()');assert page.locator('#host').evaluate('e=>e.style.minHeight')==''
   # Canvas unavailable must return fallback without leaving a canvas behind.
   page.evaluate("HTMLCanvasElement.prototype.getContext=()=>null;window.fallback=KGKnowledgeSpaceScene.mount({host:document.querySelector('#host'),nodes:[]})")
   assert page.evaluate('fallback===null');assert page.locator('canvas').count()==0

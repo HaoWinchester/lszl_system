@@ -135,19 +135,18 @@ with sync_playwright() as p:
         page.wait_for_timeout(500)
         # Pointer-mode re-presentation must keep labels hidden and preserve the
         # existing theme entry/option values and business-action text.
-        theme_before=page.locator('.learning-theme-menu').evaluate('e=>({parent:e.parentElement.className,index:[...e.parentElement.children].indexOf(e),html:e.outerHTML})')
+        theme_before=page.locator('#qwThemeSelect').evaluate('e=>({parent:e.parentElement.className,index:[...e.parentElement.children].indexOf(e),html:e.outerHTML})')
         for _ in range(2):
             page.locator('#qwPointerModeBtn').click()
             assert page.locator('#qwPointerModeBtn .canvas-tool-label').evaluate("e=>getComputedStyle(e).display==='none'")
         for _ in range(2):
             page.keyboard.press('v')
             assert page.locator('#qwPointerModeBtn .canvas-tool-label').evaluate("e=>getComputedStyle(e).display==='none'")
-        assert page.locator('.learning-theme-menu').evaluate('e=>({parent:e.parentElement.className,index:[...e.parentElement.children].indexOf(e),html:e.outerHTML})')==theme_before
+        assert page.locator('#qwThemeSelect').evaluate('e=>({parent:e.parentElement.className,index:[...e.parentElement.children].indexOf(e),html:e.outerHTML})')==theme_before
         assert '归纳卡' in page.locator('#qwNewSynthesisBtn').inner_text()
-        page.locator('.learning-theme-menu>summary').click()
-        expect(page.locator('[data-learning-theme-panel]')).to_be_visible()
-        page.keyboard.press('Escape')
-        expect(page.locator('[data-learning-theme-panel]')).to_be_hidden()
+        expect(page.locator('#qwThemeSelect')).to_be_visible()
+        assert page.locator('#qwThemeSelect option').count()==7
+        assert page.locator('[data-learning-theme-panel],.learning-theme-menu').count()==0
         ink.click()
         toolbar=page.locator('.canvas-ink-toolbar')
         for tool in ('pen','highlighter','eraser','text'):
@@ -353,7 +352,12 @@ with sync_playwright() as p:
         page.screenshot(path=str(OUT/(name+'-default-tools.png')))
         toolbar.locator('[data-ink-close]').click();expect(toolbar).to_be_hidden()
         print('PASS '+name+': default groups/labels, visible icons, tool states, settings and close',flush=True)
-    default_tools(page.locator('.canvas-ink-toolbar'),'recall')
+    recall_bar=page.locator('.canvas-ink-toolbar')
+    assert 'canvas-ink-compact' in recall_bar.get_attribute('class')
+    assert recall_bar.locator('.canvas-tool-group,.canvas-tool-label').count()==0
+    recall_bar.locator('input[type=color]').click();expect(page.locator('.graph-floating-color-window.show')).to_be_visible()
+    page.locator('[data-color-window-close]').click();recall_bar.locator('[data-ink-close]').click()
+    print('PASS recall: compact icon-only tools and shared floating picker',flush=True)
     response=context.request.post(args.base_url+'/api/v1/files',data={'name':'Task5 caller regression','graphData':{'nodes':[{'id':'task5-node','title':'Task5 caller node','x':400,'y':300}],'links':[],'strokes':[]}})
     assert response.ok,response.text()
     fid=response.json()['file']['id']

@@ -70,8 +70,9 @@
     canvas.className='kg-knowledge-space-canvas';canvas.setAttribute('role','img');canvas.setAttribute('aria-label','知识点三维知识星空，考点详情可通过列表选择');
     canvas.style.cssText='display:block;width:100%;height:100%;touch-action:pan-y;cursor:grab';host.appendChild(canvas);
     const model=createModel(nodes),camera={...DEFAULT_CAMERA},pointers=new Map(),listeners=[];
+    const originalMinHeight=host.style.minHeight,minimumHeight=parseFloat(win.getComputedStyle(host).minHeight)||0;
     const motion=win.matchMedia?.('(prefers-reduced-motion: reduce)');
-    let width=0,height=0,raf=0,destroyed=false,selected=null,group='',dirty=true,intersecting=true,reduced=!!motion?.matches;
+    let width=0,height=0,raf=0,destroyed=false,selected=null,focused=null,group='',dirty=true,intersecting=true,reduced=!!motion?.matches;
     let inertiaX=0,inertiaY=0,pinching=false,pinchDistance=0,autoFit=true;
     const viewCenter={x:0,y:0,z:0};
     function visible(){return !destroyed&&!document.hidden&&intersecting&&host.isConnected&&width>0&&height>0&&host.getClientRects().length>0&&win.getComputedStyle(host).visibility!=='hidden'}
@@ -85,10 +86,18 @@
       const padding=Math.max(24,Math.min(width,height)*.12);
       camera.zoom=clamp(Math.min(Math.max(1,width/2-padding)/Math.max(1,extentX),Math.max(1,height/2-padding)/Math.max(1,extentY)),.45,3);
     }
-    function positions(){return model.points.map(point=>({...projectPoint(relative(point),camera,width,height),index:point.index,key:point.key,group:point.group,visible:!group||point.group===group}))}
+    function positions(){if(focused!==null){const point=model.points[focused];if(point)Object.assign(viewCenter,{x:point.x,y:point.y,z:point.z})}return model.points.map(point=>({...projectPoint(relative(point),camera,width,height),index:point.index,key:point.key,group:point.group,visible:!group||point.group===group}))}
     function stop(){if(raf)win.cancelAnimationFrame(raf);raf=0}
     function request(){if(!destroyed&&!raf&&visible()&&(dirty||!model.settled||(!reduced&&pointers.size===0&&Math.abs(inertiaX)+Math.abs(inertiaY)>.02)))raf=win.requestAnimationFrame(frame)}
     function mark(){dirty=true;request()}
+    const labelCache=new Map();
+    function labelLayout(index,title,font,maxWidth){
+      const cached=labelCache.get(index);if(cached&&cached.font===font&&cached.maxWidth===maxWidth)return cached;
+      const lines=[];let line='';
+      for(const char of title){if(line&&ctx.measureText(line+char).width>maxWidth){lines.push(line);line=''}line+=char}
+      if(line)lines.push(line);
+      const layout={font,maxWidth,lines,width:Math.max(0,...lines.map(value=>ctx.measureText(value).width))};labelCache.set(index,layout);return layout;
+    }
     function draw(){
       ctx.clearRect(0,0,width,height);ctx.fillStyle='#060b16';ctx.fillRect(0,0,width,height);
       // Tiny unconnected background dots are decoration, never selectable business nodes.
@@ -101,9 +110,19 @@
         const glow=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,halo);glow.addColorStop(0,`rgba(143,199,255,${brightness*.45})`);glow.addColorStop(1,'rgba(72,139,255,0)');ctx.fillStyle=glow;ctx.beginPath();ctx.arc(p.x,p.y,halo,0,Math.PI*2);ctx.fill();
         ctx.fillStyle=`rgba(190,224,255,${.3+brightness*.7})`;ctx.beginPath();ctx.arc(p.x,p.y,radius,0,Math.PI*2);ctx.fill();
         if(p.index===selected){ctx.strokeStyle='#e1c594';ctx.lineWidth=1.3;ctx.beginPath();ctx.arc(p.x,p.y,radius+7,0,Math.PI*2);ctx.stroke()}
-        if(p.index===selected||projected.length<=12){ctx.font='12px system-ui, sans-serif';ctx.textAlign='center';ctx.fillStyle=p.index===selected?'#f3dfba':'#a2b5d0';const title=String(node.title||'未命名考点');ctx.fillText(title.length>22?title.slice(0,21)+'…':title,p.x,p.y+radius+23,Math.max(30,width-20))}
+      }
+      // Names remain readable for every visible node, independently of practice brightness.
+      const labels=projected.filter(p=>p.visible&&p.x>=0&&p.x<=width&&p.y>=0&&p.y<=height).sort((a,b)=>Number(a.index===selected)-Number(b.index===selected));
+      for(const p of labels){
+        const size=p.index===selected?20:16,title=String(model.points[p.index].node.title||'未命名考点');
+        ctx.font=`${p.index===selected?600:500} ${size}px system-ui, sans-serif`;ctx.textAlign='center';
+        const layout=labelLayout(p.index,title,ctx.font,Math.max(20,Math.min(240,width-20))),lineHeight=size+4;
+        const x=clamp(p.x,layout.width/2+8,width-layout.width/2-8),y=clamp(p.y+clamp(4*p.scale,2.5,9)+size+5,size+6,height-(layout.lines.length-1)*lineHeight-8);
+        ctx.strokeStyle='#060b16';ctx.lineWidth=4;ctx.lineJoin='round';ctx.fillStyle=p.index===selected?'#ffe1a7':'#d7e5f6';
+        layout.lines.forEach((line,index)=>{ctx.strokeText(line,x,y+index*lineHeight);ctx.fillText(line,x,y+index*lineHeight)});
       }
     }
+
     function frame(){
       raf=0;if(!visible())return;
       if(!model.settled){for(let i=0;i<3&&!model.settled;i++)stepModel(model);if(model.settled&&autoFit)fitDefault();dirty=true}
@@ -113,15 +132,25 @@
     }
     function resize(){
       if(destroyed)return;
+      labelCache.clear();
       const rect=host.getBoundingClientRect();width=Math.max(0,rect.width-host.clientLeft*2);height=Math.max(0,rect.height-host.clientTop*2);
+      if(width>0&&model.points.length){
+        ctx.font='600 20px system-ui, sans-serif';
+        const maxWidth=Math.max(20,Math.min(240,width-20));
+        const required=Math.max(minimumHeight,...model.points.map((point,index)=>labelLayout(index,String(point.node.title||'未命名考点'),ctx.font,maxWidth).lines.length*24+32));
+        const minHeight=Math.ceil(required)+'px';if(host.style.minHeight!==minHeight)host.style.minHeight=minHeight;
+        height=Math.max(0,host.getBoundingClientRect().height-host.clientTop*2);
+      }
+      canvas.style.height=height+'px';
       const dpr=Math.min(2,win.devicePixelRatio||1);canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);if(autoFit)fitDefault();mark();if(!visible())stop();
     }
     function applyRotation(dx,dy){camera.yaw+=dx*.006;camera.pitch=clamp(camera.pitch+dy*.006,-1.35,1.35)}
     function rotate(dx,dy){if(destroyed||!Number.isFinite(dx)||!Number.isFinite(dy))return;autoFit=false;applyRotation(dx,dy);mark()}
-    function zoomBy(factor){if(destroyed||!Number.isFinite(factor)||factor<=0)return;autoFit=false;camera.zoom=clamp(camera.zoom*factor,.45,3);mark()}
-    function select(index){if(destroyed||!Number.isInteger(index)||!model.points[index])return;selected=index;mark()}
-    function focusGroup(key){if(destroyed)return;group=String(key||'');mark()}
-    function reset(){if(destroyed)return;Object.assign(camera,DEFAULT_CAMERA);autoFit=true;fitDefault();group='';inertiaX=inertiaY=0;mark()}
+    function zoomBy(factor){if(destroyed||!Number.isFinite(factor)||factor<=0)return;autoFit=false;camera.zoom=clamp(camera.zoom*factor,.45,8);mark()}
+    function select(index){if(destroyed||!Number.isInteger(index)||!model.points[index])return;selected=index;if(focused!==null)focused=index;mark()}
+    function focus(index){if(destroyed||!Number.isInteger(index)||!model.points[index])return;selected=index;focused=index;autoFit=false;inertiaX=inertiaY=0;camera.zoom=Math.max(camera.zoom,3);mark()}
+    function focusGroup(key){if(destroyed)return;group=String(key||'');if(focused!==null){focused=null;Object.assign(camera,DEFAULT_CAMERA);autoFit=true;fitDefault()}mark()}
+    function reset(){if(destroyed)return;Object.assign(camera,DEFAULT_CAMERA);focused=null;autoFit=true;fitDefault();group='';inertiaX=inertiaY=0;mark()}
     function listen(target,type,handler,options){target.addEventListener(type,handler,options);listeners.push(()=>target.removeEventListener(type,handler,options))}
     function distance(){const values=[...pointers.values()];return values.length<2?0:Math.hypot(values[0].x-values[1].x,values[0].y-values[1].y)}
     function releasePointers(){for(const id of pointers.keys()){try{if(canvas.hasPointerCapture(id))canvas.releasePointerCapture(id)}catch(error){/* Detached pointers need no release. */}}pointers.clear();pinching=false;pinchDistance=0;inertiaX=inertiaY=0;canvas.style.cursor='grab'}
@@ -164,9 +193,9 @@
     // Dialog open/close and CSS visibility changes may not change intersection or size.
     const visibilityObserver=win.MutationObserver?new win.MutationObserver(()=>{if(visible())mark();else{stop();releasePointers()}}):null;
     for(let element=host;element&&visibilityObserver;element=element.parentElement)visibilityObserver.observe(element,{attributes:true,attributeFilter:['style','class','hidden','open']});
-    function destroy(){if(destroyed)return;destroyed=true;stop();releasePointers();resizeObserver?.disconnect();intersectionObserver?.disconnect();visibilityObserver?.disconnect();for(const remove of listeners)remove();canvas.remove()}
+    function destroy(){if(destroyed)return;destroyed=true;stop();releasePointers();resizeObserver?.disconnect();intersectionObserver?.disconnect();visibilityObserver?.disconnect();for(const remove of listeners)remove();canvas.remove();host.style.minHeight=originalMinHeight}
     function snapshot(){return {camera:{...camera},positions:positions(),selected,group,settled:model.settled,running:!!raf,destroyed}}
-    resize();return Object.freeze({select,focusGroup,rotate,zoomBy,reset,destroy,snapshot});
+    resize();return Object.freeze({select,focus,focusGroup,rotate,zoomBy,reset,destroy,snapshot});
   }
   const api=Object.freeze({createModel,stepModel,projectPoint,mount});
   global.KGKnowledgeSpaceScene=api;if(typeof module!=='undefined'&&module.exports)module.exports=api;

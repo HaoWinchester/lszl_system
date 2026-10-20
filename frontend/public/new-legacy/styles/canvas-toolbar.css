@@ -12,7 +12,7 @@
 /* The old coarse-pointer layout hid the entire utility row, including themes. */
 @media(max-width:780px) and (pointer:coarse){
   .question-workspace-page .qw-overlay-right.canvas-toolbar{display:flex!important;position:absolute;left:7px;right:7px;top:58px;max-width:calc(100% - 14px);justify-content:flex-start;gap:4px;z-index:210}
-  .question-workspace-page .qw-overlay-right.canvas-toolbar .learning-theme-menu{margin-left:auto}
+  .question-workspace-page .qw-overlay-right.canvas-toolbar .learning-theme-select{margin-left:auto}
   .question-workspace-page .qw-layout-toolbar-global{display:none!important}
   .knowledge-recall-page .kr-canvas-action-group.canvas-toolbar{max-width:calc(100vw - 20px);flex-wrap:wrap}
 }

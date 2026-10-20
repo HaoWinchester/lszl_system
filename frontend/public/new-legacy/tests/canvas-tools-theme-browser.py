@@ -57,13 +57,13 @@ with sync_playwright() as pw:
   for kind,url,card in [('workspace','/question-workspace.html?paperId=ink-paper&releaseId=ink-release&workspace='+wid,'.qw-question-card'),('recall','/knowledge-recall.html?paperId=ink-paper&releaseId=ink-release&questionId=ink-question-2&bankId=ink-bank','.kr-question-card')]:
    page.goto(a.base_url+url,wait_until='networkidle');expect(page.locator(card).first).to_be_visible();page.wait_for_timeout(700)
    if kind=='workspace':before=page.evaluate('KGMultiQuestionWorkspace.activeWorkspace().background')
-   summary=page.locator('[data-learning-theme-menu]>summary');summary.click();page.locator('[data-kr-theme=neon]').click()
+   select=page.locator('#qwThemeSelect' if kind=='workspace' else '#krThemeSelect');expect(select).to_be_visible();select.select_option('neon')
    page.screenshot(path=str(OUT/f'{kind}-neon-{width}.png'))
    surface=page.locator(card).first.evaluate('e=>getComputedStyle(e).backgroundColor');assert surface!='rgb(255, 255, 255)',surface
    # The real stem has its own CSS color; changing only the card surface can
    # leave dark text on a dark theme even when the outer card is correct.
    for theme in ['neon','parchment','aurora','sakura','ocean','latte']:
-    page.locator('button[data-kr-theme='+theme+']').click()
+    select.select_option(theme)
     contrasts=page.locator(card).evaluate_all("""cards=>{
       const rgb=s=>s.match(/[\d.]+/g).map(Number),lum=c=>c.slice(0,3).map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4}).reduce((s,v,i)=>s+v*[.2126,.7152,.0722][i],0);
       return cards.flatMap(card=>[...card.querySelectorAll('.qw-card-question-stem,.kr-stem,.qw-card-option-copy,.qw-synthesis-content,.qw-synthesis-principle,.qw-bilingual-en')]).filter(e=>e.textContent.trim()).map(e=>{
@@ -74,12 +74,12 @@ with sync_playwright() as pw:
       });
     }""")
     assert contrasts and (kind!='workspace' or any(item['selector']=='qw-synthesis-content' for item in contrasts)) and all(item['ratio']>=4.5 for item in contrasts),(kind,width,theme,contrasts)
-   page.locator('[data-learning-theme-panel] button').filter(has_text='取消').click()
-   summary.click();page.locator('[data-kr-theme=ocean]').click();page.locator('[data-theme-save]').click()
+   select.select_option('ocean')
    page.reload(wait_until='networkidle');expect(page.locator('#qwThemeSelect' if kind=='workspace' else '#krThemeSelect')).to_have_value('ocean')
    if kind=='workspace':assert page.evaluate('KGMultiQuestionWorkspace.activeWorkspace().background')==before
-   summary=page.locator('[data-learning-theme-menu]>summary');summary.click();assert page.locator('[data-learning-theme-panel]').evaluate('e=>{const r=e.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.bottom<=innerHeight}')
-   page.screenshot(path=str(OUT/f'{kind}-theme-{width}.png'));page.keyboard.press('Escape');assert not page.locator('[data-learning-theme-menu]').evaluate('e=>e.open')
+   assert page.locator('[data-learning-theme-panel],.learning-theme-menu').count()==0
+   assert select.evaluate('e=>{const r=e.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.bottom<=innerHeight}')
+   page.screenshot(path=str(OUT/f'{kind}-theme-{width}.png'));select.focus();page.keyboard.press('Escape')
    launcher=page.locator('#qwInkBtn' if kind=='workspace' else '#krInkBtn')
    if kind=='workspace' and width<700:
     expect(launcher).to_be_disabled();page.screenshot(path=str(OUT/f'{kind}-tools-{width}.png'));continue
