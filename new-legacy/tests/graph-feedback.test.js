@@ -20,6 +20,19 @@ function endpointFixture(link,options={}){
  return c;
 }
 const endpointEvent=()=>({pointerId:1,preventDefault(){},stopPropagation(){}});
+for(const side of ['from','to'])for(const [port,drop,expected] of [
+ ['top',{x:330,y:161},{x:360,y:160}],
+ ['right',{x:419,y:175},{x:420,y:200}],
+ ['bottom',{x:390,y:239},{x:360,y:240}],
+ ['left',{x:301,y:185},{x:300,y:200}]
+])test(`dragging ${side} endpoint snaps to the nearest ${port} edge midpoint instead of its old port`,()=>{
+ const link={id:'snap',from:side==='from'?'b':'a',to:side==='to'?'b':'a',fromPort:'left',toPort:'right',pathStyle:'curve'},c=endpointFixture(link,{side,targetId:'b'}),original=c.edgeRouteSnapshot(link);
+ c.applyEdgeEndpointDragPoint({clientX:drop.x,clientY:drop.y,world:drop});c.finishEdgeEndpointDrag(endpointEvent());
+ assert.equal(link[side+'Port'],port);
+ assert.deepEqual(plain(c.linkRenderPoints(link)[side==='from'?'a':'b']),expected);
+ assert.equal(link[side==='from'?'toPort':'fromPort'],side==='from'?'right':'left','opposite endpoint is unchanged');
+ c.restoreEdgeRoute(link,original);assert.deepEqual(plain(c.edgeRouteSnapshot(link)),plain(original));
+});
 test('mirrored right branches share a parent attachment and mirrored curve controls including a primary midpoint',()=>{
  const c=fixture();const shapes=['b','c'].map(to=>{const l={from:'a',to,pathStyle:'curve'},p=c.linkRenderPoints(l);return c.linkPathGeometry(l,p.a,p.b,p)});
  assert.equal(shapes[0].endpoints[0].x,shapes[1].endpoints[0].x);assert.equal(shapes[0].endpoints[0].y,shapes[1].endpoints[0].y);
@@ -72,7 +85,7 @@ for(const [from,to,y,controls] of [
  const p=c.linkRenderPoints(link),g=c.linkPathGeometry(link,p.a,p.b,p);
  assert.equal(link.to,to);assert.ok(g.samples.every(point=>point.y>=Math.min(209,y)&&point.y<=Math.max(209,y)),'old controls must not pull the new branch toward the former card');
  assert.equal(link.curveControls,undefined);assert.equal(g.curveControls[0].y,209);assert.equal(g.curveControls[1].y,y);
- assert.equal(link.fromPort,'auto');assert.equal(link.toPort,'auto');
+ assert.equal(link.fromPort,'auto');assert.equal(link.toPort,'left');
  c.restoreEdgeRoute(link,original);assert.deepEqual(plain(c.edgeRouteSnapshot(link)),plain(original),'undo recovers the precise legacy controls and original binding');
 });
 test('rebinding the source to a different card recalculates the stored curve too',()=>{

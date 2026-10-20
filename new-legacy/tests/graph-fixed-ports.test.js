@@ -3,6 +3,10 @@ const assert=require('node:assert/strict'),test=require('node:test'),fs=require(
 const geometry=require('../src/graph/edge-geometry.js');
 const plain=value=>JSON.parse(JSON.stringify(value));
 const near=(actual,expected)=>{for(const axis of ['x','y'])assert.ok(Math.abs(actual[axis]-expected[axis])<1e-7,JSON.stringify({actual,expected}))};
+test('nearest edge uses distance to the edge, including long cards and off-center drop points',()=>{
+ const rect={x:-300,y:40,width:400,height:80};
+ for(const [p,port] of [[{x:-290,y:70},'left'],[{x:80,y:55},'top'],[{x:-280,y:105},'bottom'],[{x:99,y:95},'right']])assert.equal(geometry.nearestPort(rect,p),port);
+});
 function environment(){
   const nodes=new Map(),c={console,window:{},Math,Number,String,Array,Map,Set,clamp:(v,a,b)=>Math.max(a,Math.min(b,v)),matchMedia:()=>({matches:false}),document:{getElementById:()=>null},nodeById:id=>nodes.get(id),nodeDims:n=>({w:n.w,h:n.h}),visualPositionForNode:n=>({x:n.x,y:n.y}),nodeCenter:n=>({x:n.x+n.w/2,y:n.y+n.h/2}),invalidateGraphIndexCache(){}};
   c.window=c;c.globalThis=c;vm.createContext(c);

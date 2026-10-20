@@ -4,7 +4,9 @@
   "toVersion": "v9.0-p4.1.379",
   "changes": {
     "added": [],
-    "changed": [],
+    "changed": [
+      "tests/graph-interaction-focus-browser.py"
+    ],
     "removed": []
   },
   "incompatible": []

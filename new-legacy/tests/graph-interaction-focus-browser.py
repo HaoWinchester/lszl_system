@@ -144,9 +144,23 @@ def main():
             select_ab();hit=page.locator('[data-edge-endpoint-side="from"] .edge-endpoint-hit');box=hit.bounding_box();x=box['x']+box['width']-3;y=box['y']+box['height']/2
             page.mouse.move(x,y);page.mouse.down();assert page.evaluate('!!edgeEndpointDrag'),{'hit':box,'viewport':page.evaluate('({viewport:state.viewport,scrollY:window.scrollY,stageTop:stage.getBoundingClientRect().top})'),'target':page.evaluate('(p)=>document.elementFromPoint(p.x,p.y)?.outerHTML',{ 'x':x,'y':y })};page.mouse.move(x+32,y-25,steps=5);assert page.evaluate("linkById('ab').from===''")
             page.evaluate("""()=>{const drag=edgeEndpointDrag;finishEdgeEndpointDrag({pointerId:drag.pointerId,preventDefault(){},stopPropagation(){}},true)}""");page.mouse.up();check_ports()
+            # Real endpoint drags choose the nearest edge on both cards, under
+            # the fitted/zoomed viewport, instead of retaining the previous port.
+            def check_snap(side,nid,port):
+                assert page.evaluate('(side)=>linkById("ab")[side+"Port"]',side)==port
+                value=page.evaluate('''({side,nid,port})=>{const path=edgeDomById.get('ab').vis,p=path.getPointAtLength(side==='from'?0:path.getTotalLength()),q=new DOMPoint(p.x,p.y).matrixTransform(path.getScreenCTM()),r=cardElementByNodeId(nid).getBoundingClientRect(),expected={top:{x:r.left+r.width/2,y:r.top},right:{x:r.right,y:r.top+r.height/2},bottom:{x:r.left+r.width/2,y:r.bottom},left:{x:r.left,y:r.top+r.height/2}}[port];return{actual:{x:q.x,y:q.y},expected}}''',{'side':side,'nid':nid,'port':port})
+                assert abs(value['actual']['x']-value['expected']['x'])<1 and abs(value['actual']['y']-value['expected']['y'])<1,value
+            for side,nid in [('from','a'),('to','b')]:
+                for port,fx,fy in [('top',.3,.04),('right',.98,.3),('bottom',.7,.96),('left',.02,.7)]:
+                    select_ab();hit=page.locator('[data-edge-endpoint-side="'+side+'"] .edge-endpoint-hit');box=hit.bounding_box();target=page.locator('.knowledge-card[data-node-id="'+nid+'"]').bounding_box()
+                    page.mouse.move(box['x']+box['width']-3,box['y']+box['height']/2);page.mouse.down();assert page.evaluate('!!edgeEndpointDrag')
+                    page.mouse.move(target['x']+target['width']*fx,target['y']+target['height']*fy,steps=10);page.mouse.up();check_snap(side,nid,port)
+                    page.keyboard.press('ControlOrMeta+z');check_ports()
+                    page.keyboard.press('ControlOrMeta+Shift+z');check_snap(side,nid,port)
+                    page.keyboard.press('ControlOrMeta+z');check_ports()
             # Rebind the same selected side to a different card, then undo/redo.
             select_ab();box=page.locator('[data-edge-endpoint-side="from"] .edge-endpoint-hit').bounding_box();target=page.locator('.knowledge-card[data-node-id="c"]').bounding_box()
-            page.mouse.move(box['x']+box['width']-3,box['y']+box['height']/2);page.mouse.down();assert page.evaluate('!!edgeEndpointDrag');page.mouse.move(target['x']+target['width']/2,target['y']+target['height']/2,steps=10);page.mouse.up()
+            page.mouse.move(box['x']+box['width']-3,box['y']+box['height']/2);page.mouse.down();assert page.evaluate('!!edgeEndpointDrag');page.mouse.move(target['x']+target['width']-4,target['y']+target['height']/2,steps=10);page.mouse.up()
             assert page.evaluate("linkById('ab').from")=='c';check_ports('c')
             page.keyboard.press('ControlOrMeta+z');assert page.evaluate("linkById('ab').from")=='a';check_ports()
             page.keyboard.press('ControlOrMeta+Shift+z');assert page.evaluate("linkById('ab').from")=='c';check_ports('c')
@@ -154,6 +168,11 @@ def main():
             flush();saved=ctx.request.get(base+'/api/v1/files/'+fid).json()['graphData'];saved_ab=next(l for l in saved['links'] if l['id']=='ab');assert [saved_ab['fromPort'],saved_ab['toPort']]==['right','top']
             reload();check_ports();assert model('a')['geometry']==resized
             old=page.evaluate("linkById('ac')");assert old['fromPort']=='auto' and old['toPort']=='auto','old links remain automatic and editable'
+            # Persist a direction chosen by the actual drag, not by the port menu.
+            select_ab();box=page.locator('[data-edge-endpoint-side="to"] .edge-endpoint-hit').bounding_box();target=page.locator('.knowledge-card[data-node-id="b"]').bounding_box()
+            page.mouse.move(box['x']+box['width']-3,box['y']+box['height']/2);page.mouse.down();page.mouse.move(target['x']+target['width']*.7,target['y']+target['height']*.96,steps=10);page.mouse.up();check_snap('to','b','bottom')
+            flush();saved=ctx.request.get(base+'/api/v1/files/'+fid).json()['graphData'];assert next(l for l in saved['links'] if l['id']=='ab')['toPort']=='bottom'
+            reload();check_snap('to','b','bottom')
             page.screenshot(path=str(out/'fixed-ports.png'))
             print('PASS ports: separate choices, repeated card drags, actual resize, long title edit, zoom, automatic reset/undo, endpoint cancel, rebind/undo/redo, API save/reload, old link compatibility',flush=True)
         if args.section in ('all','curves'):

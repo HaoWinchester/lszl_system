@@ -271,7 +271,12 @@ function currentEdgeBundlePlan(){
   return edgeBundleMemo.plan;
 }
 function setLinkFreeEndpoint(link,side,point){if(!link)return;const key=linkEndpointPointKey(side),clean=normalizedEdgePoint(point);if(side==='from')link.from='';else link.to='';if(clean)link[key]=clean;else delete link[key]}
-function bindLinkEndpoint(link,side,nodeId){if(!link)return false;const node=nodeById(nodeId);if(!node)return false;const other=side==='from'?link.to:link.from;if(other&&other===node.id)return false;if(side==='from')link.from=node.id;else link.to=node.id;delete link[linkEndpointPointKey(side)];return true}
+function bindLinkEndpoint(link,side,nodeId){
+  if(!link)return false;const node=nodeById(nodeId);if(!node)return false;const other=side==='from'?link.to:link.from;if(other&&other===node.id)return false;
+  const dropPoint=linkEndpointFreePoint(link,side);
+  if(dropPoint){const dims=nodeDims(node),pos=visualPositionForNode(node);link[side+'Port']=window.KGGraphEdgeGeometry.nearestPort({...pos,width:dims.w,height:dims.h},dropPoint)}
+  if(side==='from')link.from=node.id;else link.to=node.id;delete link[linkEndpointPointKey(side)];return true;
+}
 function linkGeometryMidpoint(link){const dom=edgeDomById.get(String(link&&link.id||'')),samples=dom&&dom.geometry&&dom.geometry.samples;if(samples&&samples.length===2)return{x:(samples[0].x+samples[1].x)/2,y:(samples[0].y+samples[1].y)/2};if(samples&&samples.length)return samples[Math.floor(samples.length/2)];const points=linkRenderPoints(link,getGraphIndex().nodeMap);return points?{x:(points.ca.x+points.cb.x)/2,y:(points.ca.y+points.cb.y)/2}:null}
 function applyTransform(){const scale=Math.max(.01,Number(state.viewport.scale)||1);updateSelectedEdgeControlScale(scale);updateEdgeHoverFeedbackWidth(scale);const controller=ensureGraphViewportController();if(controller)return controller.apply(state.viewport);world.style.transform=`translate(${state.viewport.x}px, ${state.viewport.y}px) scale(${scale})`;updateCardQuickActionsPosition();updateSelectedEdgeQuickStylePosition();updateEdgeInlineLabelEditorPosition();if(typeof updateCanvasZoomControls==='function')updateCanvasZoomControls()}
 function screenToWorld(clientX,clientY){const controller=ensureGraphViewportController();if(controller)return controller.screenToWorld(clientX,clientY,state.viewport);const r=stage.getBoundingClientRect();return{x:(clientX-r.left-state.viewport.x)/state.viewport.scale,y:(clientY-r.top-state.viewport.y)/state.viewport.scale}}

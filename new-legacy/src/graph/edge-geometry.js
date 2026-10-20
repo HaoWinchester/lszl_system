@@ -97,6 +97,10 @@
   function portDirection(port){
     switch(port){case 'top':return point(0,-1);case 'right':return point(1,0);case 'bottom':return point(0,1);case 'left':return point(-1,0);default:return null}
   }
+  function nearestPort({x,y,width,height},p){
+    const corners=[point(x,y),point(x+width,y),point(x+width,y+height),point(x,y+height),point(x,y)];
+    return ['top','right','bottom','left'][nearestSegmentIndex(p,corners)]||'auto';
+  }
   function portPoint(nodeGeometry,port,oppositeCenter){
     const {x,y,width,height,cardStyle='standard'}=nodeGeometry;
     const center=point(x+width/2,y+height/2);
@@ -122,7 +126,7 @@
       ?point(center.x+Math.sign(ray.x||1)*width/2,center.y)
       :point(center.x,center.y+Math.sign(ray.y||1)*height/2);
   }
-  const api=Object.freeze({MAX_WAYPOINTS,distanceToPolyline,nearestSegmentIndex,curveMidpoint,bendCurveMidpoint,segmentHandles,moveElbowSegment,curveHandles,controlsFromHandles,constrainWaypointDrag,moveRoute,portPoint,portDirection});
+  const api=Object.freeze({MAX_WAYPOINTS,distanceToPolyline,nearestSegmentIndex,curveMidpoint,bendCurveMidpoint,segmentHandles,moveElbowSegment,curveHandles,controlsFromHandles,constrainWaypointDrag,moveRoute,portPoint,portDirection,nearestPort});
   global.KGGraphEdgeGeometry=api;
   if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);
