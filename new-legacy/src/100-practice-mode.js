@@ -1640,7 +1640,14 @@
     $('practiceDanmakuToggle')?.addEventListener('click',()=>{
       const next=!(global.KGQuestionComments?.danmakuEnabled()!==false);
       global.KGQuestionComments?.setDanmakuEnabled(next);
-      renderPracticeTools(currentPracticeQuestion());
+      const question=currentPracticeQuestion();
+      const answered=question&&(state.verification?.active?state.locked:state.draft?.answer?.(question.id)||state.session?.answers?.[question.id]);
+      // Session refresh can dispose the overlay while the answered explanation stays open.
+      // Explicitly enabling must restore that question, without exposing unanswered previews.
+      if(next&&state.active&&!state.reviewing&&answered&&shouldShowExplanation()&&$('practiceExplanationPanel')?.hidden===false){
+        global.KGQuestionComments?.mountDanmaku({questionId:question.id});
+      }
+      renderPracticeTools(question);
     });
     // 侧栏「收藏」按钮：切换当前题收藏（题目收藏存后端，跨设备可见）。
     $('practiceFavoriteBtn')?.addEventListener('click',()=>{void toggleCurrentQuestionFavorite()});

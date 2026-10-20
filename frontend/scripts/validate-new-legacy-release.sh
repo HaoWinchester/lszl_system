@@ -212,6 +212,7 @@ KG_E2E_ACTIVE_RELEASE_ROOT="$VALIDATION_ROOT/releases" \
   python3 frontend/e2e/practice_resumable_report.py
 python3 new-legacy/tests/practice-own-selection-browser.py
 python3 new-legacy/tests/practice-comment-language-browser.py
+python3 new-legacy/tests/practice-danmaku-recovery-browser.py
 python3 new-legacy/tests/comment-composer-popover-browser.py
 python3 new-legacy/tests/practice-answer-sheet-browser.py
 python3 new-legacy/tests/practice-result-report-browser.py
