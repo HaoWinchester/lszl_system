@@ -35,12 +35,13 @@ with sync_playwright() as pw:
     else:
         token=uuid.uuid4().hex[:7];bank=call('post','/api/v1/banks',{'name':'大厅回归 '+token,'subject':'PMP','visibility':'private'})['bank'];ids=[]
         for i in range(20):
-            q=call('post',f'/api/v1/banks/{bank["id"]}/questions',{'title':f'大厅第{i+1}题','subject':'PMP','type':'single_choice','stemParts':[{'text':'如何处理已识别风险？'}],'options':[{'id':'A','text':'分析并响应风险'},{'id':'B','text':'忽略风险'}],'correctAnswer':'A','analysis':'应当分析风险并选择响应措施。','metadata':{'subjectFacets':[{'dimensionId':'exam-domain','valueId':'process'}]}})['question'];ids.append(q['id'])
+            q=call('post',f'/api/v1/banks/{bank["id"]}/questions',{'title':f'大厅第{i+1}题','subject':'PMP','type':'single_choice','stemParts':[{'text':'如何处理已识别风险？'}],'options':[{'id':'A','text':'分析并响应风险'},{'id':'B','text':'忽略风险'}],'correctAnswer':'A','analysis':'应当分析风险并选择响应措施。','metadata':{'subjectFacets':[{'dimensionId':'exam-domain','valueId':'process'}],'knowledge':{'taxonomyId':'lobby-knowledge-'+token,'primaryNodeId':f'risk-{i+1}','pathSnapshot':['项目管理','风险管理',f'风险响应考点 {i+1}']}}})['question'];ids.append(q['id'])
         papers=[]
         for name,access in [('敏捷精讲练习','free'),('预测专题练习','free'),('专项会员练习','member')]:
             paper=call('post','/api/v1/papers',{'name':name+' '+token,'subject':'PMP','totalCount':20,'questions':[{'bankId':bank['id'],'questionId':qid,'order':i+1,'score':1} for i,qid in enumerate(ids)]})['paper']
             release=call('post',f'/api/v1/paper-releases/papers/{paper["id"]}/publish',{'revision':paper['revision'],'accessLevel':access,'enabledModes':['practice_mode'],'allowedRoles':['student','teacher','admin'],'metadata':{}})['release'];papers.append({'id':paper['id'],'releaseId':release['id'],'name':paper['name'],'access':access})
-        fixture={'papers':papers,'questions':ids};fixture_file.write_text(json.dumps(fixture))
+        fixture={'papers':papers,'questions':ids,'knowledgeFixture':1};fixture_file.write_text(json.dumps(fixture))
+    assert fixture.get('knowledgeFixture')==1,'Use a fresh output directory: old fixture predates frozen knowledge references'
     call('delete','/api/v1/learning/practice/sessions')
     for favorite in call('get','/api/v1/question-favorites?limit=50')['favorites']:call('post','/api/v1/question-favorites/'+favorite['questionId']+'/toggle',{})
     page.reload(wait_until='networkidle');page.wait_for_function('document.querySelectorAll("#practicePaperLibrary [data-paper-id]").length>=4')
@@ -54,9 +55,10 @@ with sync_playwright() as pw:
     for mode in ['challenge','scholar']:
         help=page.locator('.'+mode+' .practice-lobby-help');help.locator('summary').click();expect(help).to_have_attribute('open','');page.keyboard.press('Escape');assert not help.evaluate('e=>e.open')
     page.locator('#practiceRevengeRuleTrigger').click();expect(page.locator('#practiceRevengeRuleTooltip')).to_be_visible();page.keyboard.press('Escape');page.locator('.practice-revenge-options summary').click();expect(page.locator('#practiceRevengePendingCount')).to_be_visible();page.locator('.practice-revenge-options summary').click();checks.append('rule disclosure and all revenge batch controls')
-    for button,drawer,close in [('#practiceHistoryOpenBtn','#practiceHistoryDrawer','#practiceHistoryCloseBtn'),('#practiceFavoritesOpenBtn','#practiceFavoritesDrawer','#practiceFavoritesCloseBtn'),('[data-lobby-open="reports"]','#practiceHistoryDrawer','#practiceHistoryCloseBtn')]:
+    assert page.locator('[data-lobby-open="reports"]').count()==0,'duplicate reports entry must stay absent'
+    for button,drawer,close in [('#practiceHistoryOpenBtn','#practiceHistoryDrawer','#practiceHistoryCloseBtn'),('#practiceFavoritesOpenBtn','#practiceFavoritesDrawer','#practiceFavoritesCloseBtn')]:
         page.locator(button).click();expect(page.locator(drawer)).to_be_visible();page.locator(close).click()
-    page.locator('[data-lobby-open="account"]').click();expect(page.locator('#userCenterModal')).to_be_visible();page.keyboard.press('Escape');checks.append('sidebar existing record, favorites, report and account actions')
+    page.locator('[data-lobby-open="account"]').click();expect(page.locator('#userCenterModal')).to_be_visible();page.keyboard.press('Escape');checks.append('sidebar history, favorites and account actions; recent report replay is tested below')
     # A failed preview fetch must expose retry without stale/private rows.
     page.route('**/api/v1/learning/practice/sessions',lambda route:route.fulfill(status=503,json={'detail':'temporary'}))
     page.locator('#practiceRecentFavoritesTab').click();page.locator('#practiceRecentHistoryTab').click();expect(page.locator('[data-recent-retry]')).to_be_visible();expect(page.locator('#practiceRecentBody tr')).to_have_count(0)
@@ -80,6 +82,37 @@ with sync_playwright() as pw:
     page.wait_for_function('KGPracticeMode.snapshot().view==="result"')
     page.locator('[data-report-lobby]').click();page.wait_for_function('KGPracticeMode.snapshot().view==="lobby"');page.wait_for_timeout(500)
     page.locator('[data-recent-report]').click();page.wait_for_function('KGPracticeMode.snapshot().view==="result"');page.locator('[data-report-lobby]').click();checks.append('preview resume, settled report and real favorites')
+    # Read the actual saved answers through the dashboard API; no successful API mocking.
+    dashboard_path='/api/v1/learning/practice/knowledge-dashboard?page=1&pageSize=60'
+    saved=call('get',dashboard_path)
+    assert saved['attemptCount']==20 and saved['topicCount']==20 and saved['unknownAttemptCount']==0,saved
+    assert {node['primaryNodeId'] for node in saved['nodes']}=={f'risk-{i+1}' for i in range(20)}
+    assert all(node['attemptCount']==1 and node['subject']=='PMP' and node['path'][:2]==['项目管理','风险管理'] for node in saved['nodes'])
+    with page.expect_response(lambda response:dashboard_path in response.url) as opened:
+        page.locator('#practiceKnowledgeDashboardOpen').click()
+    actual=opened.value.json();assert actual['topicCount']==20 and actual['attemptCount']==20
+    knowledge=page.get_by_role('dialog',name='星空知识网络');expect(knowledge).to_be_visible()
+    expect(knowledge.locator('canvas')).to_have_count(1)
+    expect(knowledge.locator('[data-knowledge-summary]')).to_contain_text('累计 20 次作答')
+    expect(knowledge.locator('[data-knowledge-page-count]')).to_have_text('本页 20 个考点')
+    first=actual['nodes'][0]
+    expect(knowledge.locator('[data-knowledge-detail-title]')).to_have_text(first['title'])
+    expect(knowledge.locator('[data-knowledge-detail-path]')).to_have_text(' / '.join(first['path']))
+    knowledge.locator('[data-knowledge-list-toggle]').click()
+    expect(knowledge.locator('[data-knowledge-list] button')).to_have_count(20)
+    knowledge.locator('[data-knowledge-list] button').nth(1).click()
+    expect(knowledge.locator('[data-knowledge-detail-title]')).to_have_text(actual['nodes'][1]['title'])
+    expect(knowledge.locator('[data-knowledge-detail-attempts]')).to_have_text('1 次')
+    page.screenshot(path=str(OUT/'knowledge-space-real-api.png'),full_page=True)
+    knowledge.locator('[data-knowledge-close]').click();expect(knowledge).to_be_hidden()
+    expect(page.locator('#practiceKnowledgeDashboardOpen')).to_be_focused()
+    with page.expect_response(lambda response:dashboard_path in response.url) as reopened:
+        page.locator('#practiceKnowledgeDashboardOpen').click()
+    persisted=reopened.value.json()
+    assert (persisted['attemptCount'],persisted['topicCount'])==(20,20)
+    assert {node['id'] for node in persisted['nodes']}=={node['id'] for node in actual['nodes']}
+    expect(knowledge.locator('canvas')).to_have_count(1);page.keyboard.press('Escape')
+    checks.append('real completed practice produces 20 server-owned knowledge nodes; Canvas/list/details and reopen preserve saved counts')
     page.locator('#practiceRecentFavoritesTab').click();expect(page.locator('[data-recent-favorite]')).to_have_count(1);page.locator('[data-recent-favorite]').click();expect(page.locator('#practiceFavoriteDetail')).to_be_visible();page.keyboard.press('Escape');page.locator('#practiceRecentHistoryTab').click()
     page.locator('[data-practice-start="revenge"]').click();page.wait_for_function('KGPracticeMode.snapshot().active&&KGPracticeMode.snapshot().mode==="revenge"');click_tool(page, '#practiceExitBtn');page.locator('#practiceSaveExitBtn').click();page.wait_for_function('KGPracticeMode.snapshot().view==="lobby"');checks.append('revenge mode retained with real wrong-question pool')
     # Mobile: no viewport overflow, all four modes and all help/actions remain reachable.

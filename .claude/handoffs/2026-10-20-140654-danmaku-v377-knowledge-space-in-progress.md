@@ -1,4 +1,4 @@
-# Handoff: 弹幕v377已部署，学习入口去重完成，三维知识星空开发中
+# Handoff: UAT377已部署，入口去重/三维星空审查通过，免费导入修复中
 
 ## Session Metadata
 - Created: 2026-10-20 14:06:54 Asia/Shanghai
@@ -10,7 +10,7 @@
 - Supersedes: 本轮新增弹幕回归与随后两项新需求的进行状态；上轮暂缓边界保持，用户最新明确点名的入口去重和知识星空除外。
 
 ## Current State Summary
-用户反馈已答题、解析显示、评论可见、普通窗口但弹幕开启无显示。修复已通过v377官方full并合入推送uat；官方部署脚本已exit0（858秒），公网5页/81资源、容器12后端文件与数据库核对通过，UAT377已上线。随后用户要求学习报告/学习记录入口去重及参考本地HTML改成三维重力星空，已明确回复“按此方案实施”。新分支开发中，Task1已完成独立审查，Task2场景模块由实现智能体处理中，Task3面板集成尚未开始。不要重新问方案确认，不要结束任务只交付弹幕。
+UAT377弹幕修复已部署并完成公网/容器核验。用户批准的学习入口去重、三维重力星空三个实施任务均已完成独立审查，Task3 c9c2fb6c，spec/quality PASS；root另跑真实API新数据库联调，20次作答产生20真实考点，Canvas/列表/详情/重开均通过，12检查exit0，临时DB无遗留。最新用户新增截图：index.html→文件→导入免费会员被拦，要求可导入。已追溯18-graph-user-preferences.js:405误用教师importData而非个人editGraph。Task4已加入计划，free_graph_import代理执行，base c9c2fb6c；不能重复派工。source/public候选378准备中，immutable378不存在、官方full/全分支审查尚未开始；本地与公网active仍377。下一步完成Task4审查和真实API验证，再全分支审查、正式full、新版本部署UAT。用户尚未UAT验收，不合main。
 
 ## Architecture Overview
 权威源new-legacy，FastAPI按不可变release/current.json同源提供，public只是同步产物。星空继续现有knowledge-dashboard API/loader，60条/页、真实历史、账号隔离；新增独立Canvas三维场景，保留服务端30天练习新鲜度语义。
@@ -88,3 +88,14 @@ UAT SSH resume-prod，目录/home/ubuntu/lszl-kg-uat，后端18087，db kg_graph
 ## 14:20进度补充
 Task2 b8c6e85a修复了两P2，space_task2_review复审两个ADDRESSED，无新Critical/Important；Task2已完成，进入Task3面板集成。SDD ledger已记账，不能重派Task1/2。
 pnpm store prune只回收小量；已使用Bun官方pm cache rm清理1.9GiB可再生安装缓存，未改bin/global安装/备份/运行镜像；当前df6272788KB，约5.98GiB，可满足下次发布及备份。APT lists未删除；磁盘inventory与缓存日志在artifacts/knowledge-space-20261020/。
+
+## Task3执行位置
+Task3已分派space_task3，base5ee61966770b116b9f37933acc821bf13dcf073d，正在修改HTML/面板/CSS和浏览器测试；不能重复派工。Task3 brief新增实际API companion验证：给practice-lobby-design-browser.py题目添加metadata.knowledge，实际完成普通练习后验证API节点与新UI。root提供artifacts/knowledge-space-20261020/run-lobby-api.py复用既有抛弃DB生命周期；新源sync后运行，可用public fallback不必提前skip/promote。Task1/2均已完成复核；下一步等Task3报告，运行实际API集成，再Task3独立审查、全分支审查、完整发布下一版UAT。
+
+## 最新恢复入口（覆盖上面历史进行态）
+Task1/2/3均完成，不要重派；SDD ledger记录准确提交和审查。Task4 free_graph_import执行中，读task-4-brief/report与ledger恢复。新的UAT备份已在任何本次代码同步之前完成：/home/ubuntu/lszl-uat-backups/20261020T063848Z，归档/PG TOC/非空/SHA/manifest全部确认，前后容器记录仍377和正式336，当前磁盘6193172KB。备份日志artifacts/knowledge-space-20261020/backup-before-378.log。远端host老current.json不代表容器active，必须读容器/app路径；当前容器actual377。
+
+## Task4实际接口验证
+免费菜单误拦修正editGraph后，真API暴露旧20导入器只写本地；已用共享EditorStoreBridge异步create/adopt与await saveBeforeSwitch修复。artifacts/free-graph-import-20261020/api-green.log真实会话测试exit0：确认free套餐、截图菜单chooser→服务端新文件/当前ID→重载内容保留、原图不变；升级lifetime入口可用但importData仍false/题库403；teacher/admin可用，viewer写403/无chooser，guest需登录。fixture44830退出0且临时数据库无遗留。Task4最终前端套件/独立任务审查/全分支审查待完成，不能宣称378已部署。新增同步测试1文件，候选site预计1230/source1218，核验脚本已调整。
+
+Task4提交7e78d585，6任务文件；最终前端377/377+9+4部署脚本通过。free_graph_import_review独立任务审查进行中，basec9c2fb6c，review包已生成；之后必须最强模型全分支审查。root content-prep重建+officialsync完成，source1218/public1230/旧377site1226，旧路径无缺失，新增4文件。候选378仍未immutable/full/promote/deploy，当前UAT377。本文件在完整门禁前冻结，门禁期间不能改。

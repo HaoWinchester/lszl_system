@@ -52,7 +52,7 @@
       if(button.hasAttribute('data-recent-report')){options.onReport(button.dataset.recentReport);return}
       if(button.hasAttribute('data-recent-resume')){options.onResume(button.dataset.recentResume);return}
       if(button.hasAttribute('data-recent-favorite')){options.onFavorite(button.dataset.recentFavorite);return}
-      const action=button.dataset.lobbyOpen;if(action==='history'||action==='reports')options.onHistory();else if(action==='favorites')options.onFavorites();else if(action==='account')options.onSettings();else if(action==='recent')active==='history'?options.onHistory():options.onFavorites();
+      const action=button.dataset.lobbyOpen;if(action==='history')options.onHistory();else if(action==='favorites')options.onFavorites();else if(action==='account')options.onSettings();else if(action==='recent')active==='history'?options.onHistory():options.onFavorites();
     });
     root.addEventListener('keydown',event=>{
       const tab=event.target.closest('[data-recent-tab]');if(tab&&['ArrowLeft','ArrowRight','Home','End'].includes(event.key)){
