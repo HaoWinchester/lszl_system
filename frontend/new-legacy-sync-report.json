@@ -1,16 +1,10 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.376",
+  "fromVersion": "v9.0-p4.1.377",
   "toVersion": "v9.0-p4.1.377",
   "changes": {
-    "added": [
-      "tests/practice-danmaku-recovery-browser.py"
-    ],
-    "changed": [
-      "VERSION",
-      "content-prep-studio/dist/content-prep.html",
-      "src/100-practice-mode.js"
-    ],
+    "added": [],
+    "changed": [],
     "removed": []
   },
   "incompatible": []
