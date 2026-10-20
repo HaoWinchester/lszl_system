@@ -23,4 +23,6 @@
 
 ## 部署状态
 
-v9.0-p4.1.377已通过官方full检查，部署前提交。UAT当前376的代码与数据库备份目录：`/home/ubuntu/lszl-uat-backups/20261020T053307Z`，代码与dump非空、SHA/归档/TOC已验证，376镜像已保留。main和正式环境保持不变。
+v9.0-p4.1.377已通过官方full检查并完成官方UAT部署（858秒，exit0）。公网5个页面及81项资源SHA核验通过；容器active377/previous376、1226文件、12项后端SHA、数据库迁移均核验通过。运行代码cf40f4faca89e1dbc8b873a5fff8d852a551da83。UAT当前376的代码与数据库备份目录：`/home/ubuntu/lszl-uat-backups/20261020T053307Z`，代码与dump非空、SHA/归档/TOC已验证，376镜像已保留。main和正式环境保持不变。
+
+部署后UAT容器`ce132a76242db197e1aa7f200faf753491d6078b762057db54dfc29ca92de5dd`，镜像`fda90de16c46f3f1c872d9435d2fda74ba394f994229141ccbcfc1330539765e`。正式仍v336，容器及镜像未变。用户随后确认的新需求（重复入口去重/三维星空）在独立功能分支继续开发，不包含在377中。

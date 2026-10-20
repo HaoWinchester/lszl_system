@@ -22,7 +22,7 @@
 
 ### Task 1: 学习报告重复入口去重
 
-**Files:** Modify `new-legacy/practice-mode.html`, `new-legacy/src/practice/lobby-dashboard.js`, `new-legacy/tests/practice-lobby-fidelity-browser.py`.
+**Files:** Modify `new-legacy/practice-mode.html`, `new-legacy/src/practice/lobby-dashboard.js`, `new-legacy/tests/practice-lobby-fidelity-browser.py`, `new-legacy/tests/practice-lobby-design-browser.py`.
 
 **Interfaces:** 保持`KGPracticeLobbyDashboard.create(options)`的`onHistory/onResume/onReport/onFavorites`回调契约。只移除`data-lobby-open="reports"`重复按钮及多余分支；每条记录的`data-recent-report`继续调用`onReport(sessionId)`。
 
@@ -95,3 +95,5 @@ assert.ok(model.points.every(p=>[p.x,p.y,p.z].every(Number.isFinite)));
 - [ ] 备份UAT当前代码和PG，验证非空、SHA和manifest；磁盘不足只清理可确认的构建/包缓存，保留既有备份和运行/回滚镜像。
 - [ ] 按AGENTS使用命令级代理合入/推送uat并核对远端引用，官方部署UAT，核对公网版本、资源字节及健康。main和正式环境不变。
 - [ ] 更新交接，停在UAT等待用户业务验收，不删除功能分支或永久分支。
+
+Task 1补充发现：旧真实API浏览器用例`practice-lobby-design-browser.py`的侧栏循环仍要求reports按钮存在；移除该重复项并增加零入口断言，保留后面的`data-recent-report`实际成绩回放测试。该用例依赖可抛弃后端，列入集成阶段在新release上运行，不冒称本任务已运行。
