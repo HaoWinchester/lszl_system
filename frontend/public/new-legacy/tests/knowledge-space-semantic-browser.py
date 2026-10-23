@@ -6,17 +6,30 @@ OUT=ROOT/'artifacts/learning-feedback-three-groups/task-3'
 OUT.mkdir(parents=True,exist_ok=True)
 with sync_playwright() as p:
  browser=p.chromium.launch(headless=True,channel='chrome')
- for width in (1440,390):
-  page=browser.new_page(viewport={'width':width,'height':900},reduced_motion='reduce')
+ for width in (1440,559,390):
+  page=browser.new_page(viewport={'width':width,'height':854 if width==559 else 900},reduced_motion='reduce')
   errors=[];page.on('pageerror',lambda e: errors.append(str(e)))
   page.set_content('<button id="open" data-knowledge-dashboard-open>知识星空</button>')
   page.add_style_tag(path=str(ROOT/'new-legacy/styles/knowledge-dashboard.css'))
+  page.evaluate('''()=>{window.starArcs=0;const clear=CanvasRenderingContext2D.prototype.clearRect;CanvasRenderingContext2D.prototype.clearRect=function(...args){starArcs=0;return clear.apply(this,args)};const arc=CanvasRenderingContext2D.prototype.arc;CanvasRenderingContext2D.prototype.arc=function(...args){starArcs++;return arc.apply(this,args)}}''')
   page.add_script_tag(path=str(ROOT/'new-legacy/src/practice/knowledge-space-scene.js'))
-  page.evaluate('''()=>{const real=KGKnowledgeSpaceScene;window.scenes=[];window.KGKnowledgeSpaceScene={...real,mount:o=>{const s=real.mount(o);scenes.push(s);return s}};window.owner='a';window.calls=0;window.fail=false;KGAuthCore={currentUser:()=>owner?{username:owner}:null};KGDomainApi={request:async()=>{calls++;if(fail)throw Error('offline');return {topicCount:61,hasMore:true,attemptCount:9,recentAttemptCount:2,nodes:Array.from({length:24},(_,i)=>({id:String(i),title:'考点'+i,subject:i<12?'数学':'英语',taxonomyId:i<12?'a':'b',path:i<12?['代数','方程','考点'+i]:['阅读','理解','考点'+i],brightness:.6}))}}}}''')
+  page.evaluate('''()=>{const real=KGKnowledgeSpaceScene;window.scenes=[];window.KGKnowledgeSpaceScene={...real,mount:o=>{window.overlay=o.nodes;const s=real.mount(o);scenes.push(s);return s}};window.owner='a';window.calls=0;window.fail=false;KGAuthCore={currentUser:()=>owner?{username:owner}:null};KGDomainApi={request:async()=>{calls++;if(fail)throw Error('offline');return {topicCount:81,attemptCount:9,recentAttemptCount:2,nodes:Array.from({length:81},(_,i)=>({id:String(i),title:'考点'+i,subject:i<12?'数学':'英语',taxonomyId:i<12?'a':'b',path:i<12?['代数','方程','考点'+i]:['阅读','理解','考点'+i],brightness:.6}))}}}}''')
   page.add_script_tag(path=str(ROOT/'new-legacy/src/practice/knowledge-dashboard.js'))
   page.locator('#open').click();page.wait_for_function('scenes.at(-1).snapshot().settled')
   assert page.evaluate('scenes.at(-1).snapshot().mode')=='clusters'
+  assert page.evaluate('starArcs')>81, 'overview must draw real catalog stars beneath clusters'
+  assert page.evaluate('overlay.length===81 && overlay.every(n=>n.brightness===.12 && n.relatedAttemptCount===0)')
   box=page.locator('canvas').bounding_box();shell=page.locator('.kg-knowledge-body').bounding_box()
+  dialog_box=page.locator('dialog').bounding_box()
+  assert box['y']<=dialog_box['y']+2, 'scene should reach dialog top without a reserved close band'
+  header=page.locator('.kg-knowledge-header').bounding_box()
+  assert box['y']<=header['y'] and box['y']+box['height']>=header['y']+header['height'], 'scene must extend behind foreground header and summary'
+  assert page.locator('h2').evaluate('(e)=>{const r=e.getBoundingClientRect();return document.elementFromPoint(r.x+r.width/2,r.y+r.height/2).tagName==="CANVAS"}'), 'noninteractive heading must let canvas gestures through'
+  close_box=page.locator('[data-knowledge-close]').bounding_box();refresh_box=page.locator('[data-knowledge-refresh]').bounding_box()
+  assert refresh_box['x']+refresh_box['width']<=close_box['x'] or refresh_box['y']>=close_box['y']+close_box['height'], 'refresh must not overlap floating close'
+  assert close_box['width']>=44 and close_box['height']>=44
+  assert page.locator('[data-knowledge-close]').evaluate('(e)=>{const r=e.getBoundingClientRect();return document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)===e}')
+  assert page.locator('[data-knowledge-refresh]').evaluate('(e)=>{const r=e.getBoundingClientRect();return document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)===e}'), 'foreground refresh must physically receive clicks'
   assert box['width']>=shell['width']*.95
   assert box['height']>= (430 if width>600 else 340)
   assert not page.locator('.kg-knowledge-detail').evaluate('(e)=>e.open')
@@ -33,7 +46,7 @@ with sync_playwright() as p:
   page.locator('[data-knowledge-node-next]').click();expect(page.locator('[data-knowledge-detail-title]')).to_have_text('考点3')
   page.locator('[data-knowledge-refresh]').click();page.wait_for_function('scenes.at(-1).snapshot().settled')
   expect(page.locator('[data-knowledge-summary]')).to_contain_text('9 次')
-  page.locator('[data-knowledge-next]').click();expect(page.locator('[data-knowledge-page]')).to_contain_text('第 2')
+  expect(page.locator('[data-knowledge-list] button')).to_have_count(81)
   page.evaluate('fail=true');page.locator('[data-knowledge-refresh]').click();expect(page.locator('[data-knowledge-retry]')).to_be_visible()
   page.evaluate('fail=false');page.locator('[data-knowledge-retry]').click();expect(page.locator('canvas')).to_have_count(1)
   page.evaluate("owner='';dispatchEvent(new Event('kg-auth-session-change'))");expect(page.locator('canvas')).to_have_count(0)
@@ -43,6 +56,21 @@ with sync_playwright() as p:
   page.locator('[data-knowledge-close]').focus();page.keyboard.press('Escape');expect(page.locator('#open')).to_be_focused()
   assert not errors,errors
   page.locator('#open').click();page.wait_for_function('scenes.at(-1).snapshot().settled');page.screenshot(path=str(OUT/f'space-{width}.png'))
-  print(f'{width}: semantic zoom, cluster click, full canvas, drawer/list, refresh/retry, pagination, auth invalidation, close/reopen passed')
+  page.evaluate('''()=>{KGDomainApi.request=async()=>({attemptCount:0,nodes:[{id:'r',parentId:null,subject:'PMP',taxonomyId:1,path:['PMP']},{id:'people',parentId:'r',subject:'PMP',taxonomyId:1,path:['PMP','人']},{id:'child',parentId:'people',subject:'PMP',taxonomyId:1,path:['PMP','人','团队']},{id:'process',parentId:'r',subject:'PMP',taxonomyId:1,path:['PMP','过程']}]})}''')
+  page.locator('[data-knowledge-refresh]').click()
+  expect(page.locator('[data-knowledge-groups]')).to_contain_text('PMP · 科目总览 / 1')
+  expect(page.locator('[data-knowledge-groups]')).to_contain_text('PMP · 人 / 2')
+  expect(page.locator('[data-knowledge-groups]')).to_contain_text('PMP · 过程 / 1')
+  expect(page.locator('[data-knowledge-groups]')).not_to_contain_text('未分类')
+  if width in (559,390):
+   page.evaluate('''()=>{KGDomainApi.request=async()=>({attemptCount:51,unknownAttemptCount:23,unmappedAttemptCount:28,nodes:Array.from({length:317},(_,i)=>({id:String(i),parentId:null,title:'当前目录'+i,attemptCount:0}))})}''')
+   page.locator('[data-knowledge-refresh]').click();page.wait_for_function('scenes.at(-1).snapshot().settled && !scenes.at(-1).snapshot().running')
+   summary=page.locator('[data-knowledge-summary]');summary.scroll_into_view_if_needed()
+   assert summary.evaluate('e=>e.scrollWidth>e.clientWidth'), 'long real-response summary must exercise overflow'
+   camera=page.evaluate('scenes.at(-1).snapshot().camera');rect=summary.bounding_box()
+   page.mouse.move(rect['x']+rect['width']/2,rect['y']+rect['height']/2);page.mouse.wheel(600,0);page.wait_for_timeout(200)
+   assert summary.evaluate('e=>e.scrollLeft')>0, 'physical horizontal wheel must reveal trailing summary counts'
+   assert page.evaluate('scenes.at(-1).snapshot().camera')==camera, 'summary scroll cannot move star camera'
+  print(f'{width}: semantic zoom, cluster click, full canvas, drawer/list, refresh/retry, full catalog, auth invalidation, close/reopen passed')
   page.close()
  browser.close()

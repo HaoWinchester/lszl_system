@@ -2,12 +2,20 @@
 (function(global){
   const MAX_STEPS=320,CELL=75,DEFAULT_CAMERA={yaw:.24,pitch:-.12,zoom:1};
   const clamp=(value,min,max)=>Math.min(max,Math.max(min,value));
-  const categoryPath=node=>(Array.isArray(node.path)?node.path.slice(0,-1).map(String):[]).filter(value=>value.trim()&&value!==String(node.subject||''));
+  function categoryPath(node){
+    const path=Array.isArray(node.path)?node.path.map(String):[],subject=String(node.subject||'');
+    const parents=path.slice(0,-1).filter(value=>value.trim()&&value!==subject);
+    if(!parents.length&&Object.prototype.hasOwnProperty.call(node,'parentId')){
+      const own=path.at(-1);if(own?.trim()&&own!==subject)return [own];
+    }
+    return parents;
+  }
   const groupKey=node=>JSON.stringify([String(node.subject||''),String(node.taxonomyId??''),categoryPath(node)[0]||'']);
   function classificationLabel(nodes){
     const paths=nodes.map(categoryPath),common=[];
     for(let i=0;i<(paths[0]?.length||0)&&paths.every(path=>path[i]===paths[0][i]);i++)common.push(paths[0][i]);
-    const name=nodes[0]?.taxonomyName||nodes[0]?.categoryName||common.filter(value=>value.trim()).join(' / ')||'未分类';
+    const subjectOverview=nodes.length&&nodes.every(node=>Object.prototype.hasOwnProperty.call(node,'parentId')&&!categoryPath(node).length&&Array.isArray(node.path)&&node.path.includes(String(node.subject||'')));
+    const name=nodes[0]?.taxonomyName||nodes[0]?.categoryName||common.filter(value=>value.trim()).join(' / ')||(subjectOverview?'科目总览':'未分类');
     return `${nodes[0]?.subject||'科目未标注'} · ${name}`;
   }
   function semanticView(model,zoomRatio,group=''){
@@ -22,18 +30,18 @@
       group.indices.push(index);
       points.push({node,index,key:node.id==null?`index:${index}`:`id:${String(node.id)}:${index}`,group:key,x:0,y:0,z:0,vx:0,vy:0,vz:0});
     }
+    const catalogKey=(node,id)=>JSON.stringify([String(node.subject||''),String(node.taxonomyId??''),String(id)]),catalogIds=new Map();
+    for(const point of points)if(point.node.id!=null){const key=catalogKey(point.node,point.node.id);catalogIds.set(key,catalogIds.has(key)?null:point.index)}
     groups.forEach((group,i)=>{
       group.label=classificationLabel(group.indices.map(index=>points[index].node));
       const angle=i*2.399963229728653,radius=groups.length===1?0:Math.min(185,80+groups.length*10);
       group.x=Math.cos(angle)*radius;group.y=Math.sin(angle)*radius*.7;group.z=Math.sin(angle*.7)*80;
       const catalog=group.indices.some(index=>Object.prototype.hasOwnProperty.call(points[index].node,'parentId'));
-      const byId=new Map();
-      for(const index of group.indices){const id=points[index].node.id;if(id!=null){const key=String(id);byId.set(key,byId.has(key)?null:index)}}
       group.indices.forEach((index,j)=>{
         const p=points[index],a=j*2.399963229728653,r=group.indices.length===1?18:30+Math.sqrt(j)*15;
         p.x=group.x+Math.cos(a)*r;p.y=group.y+Math.sin(a)*r;p.z=group.z+Math.cos(j*1.71)*r*.8;
         if(catalog){
-          const parent=p.node.parentId,source=parent==null?null:byId.get(String(parent));
+          const parent=p.node.parentId,source=parent==null?null:catalogIds.get(catalogKey(p.node,parent));
           if(source!=null&&source!==index)edges.push({source,target:index,group:group.key});
         }else if(j)edges.push({source:group.indices[j-1],target:index,group:group.key});
       });
@@ -84,9 +92,10 @@
     const model=createModel(nodes),camera={...DEFAULT_CAMERA},pointers=new Map(),listeners=[];
     const motion=win.matchMedia?.('(prefers-reduced-motion: reduce)');
     let width=0,height=0,raf=0,destroyed=false,selected=null,group='',dirty=true,intersecting=true,reduced=!!motion?.matches;
-    let inertiaX=0,inertiaY=0,pinching=false,pinchDistance=0,autoFit=true,baseZoom=1;
+    let inertiaX=0,inertiaY=0,pinching=false,pinchDistance=0,autoFit=true,baseZoom=1,horizontalSpread=1,verticalSpread=1;
     const viewCenter={x:0,y:0,z:0},overviewCenter={x:0,y:0,z:0};
     function visible(){return !destroyed&&!document.hidden&&intersecting&&host.isConnected&&width>0&&height>0&&host.getClientRects().length>0&&win.getComputedStyle(host).visibility!=='hidden'}
+    function project(point){const projected=projectPoint(relative(point),camera,width,height);projected.x=width/2+(projected.x-width/2)*horizontalSpread;projected.y=height/2+(projected.y-height/2)*verticalSpread;return projected}
     function relative(point){return {x:point.x-viewCenter.x,y:point.y-viewCenter.y,z:point.z-viewCenter.z}}
     // Fit once on mount/settlement and reset; explicit camera changes opt out until reset.
     function fitDefault(){
@@ -95,11 +104,14 @@
       Object.assign(overviewCenter,viewCenter);
       const projected=model.points.map(point=>projectPoint(relative(point),{...DEFAULT_CAMERA},width,height));
       const extentX=Math.max(...projected.map(point=>Math.abs(point.x-width/2))),extentY=Math.max(...projected.map(point=>Math.abs(point.y-height/2)));
-      const padding=Math.max(24,Math.min(width,height)*.12);
+      const padding=Math.max(24,Math.min(width,height)*.08);
       camera.zoom=clamp(Math.min(Math.max(1,width/2-padding)/Math.max(1,extentX),Math.max(1,height/2-padding)/Math.max(1,extentY)),.45,3);baseZoom=camera.zoom;
+      // Fill the available aspect ratio without cropping; drawing and picking share this projection.
+      horizontalSpread=Math.max(1,(width/2-padding)/Math.max(1,extentX*camera.zoom));
+      verticalSpread=Math.max(1,(height/2-padding)/Math.max(1,extentY*camera.zoom));
     }
-    function positions(){return model.points.map(point=>({...projectPoint(relative(point),camera,width,height),index:point.index,key:point.key,group:point.group,visible:!group||point.group===group}))}
-    function clusterPositions(){return model.groups.filter(item=>!group||item.key===group).map(item=>({...item,count:item.indices.length,...projectPoint(relative(item),camera,width,height)}))}
+    function positions(){return model.points.map(point=>({...project(point),index:point.index,key:point.key,group:point.group,visible:!group||point.group===group}))}
+    function clusterPositions(){return model.groups.filter(item=>!group||item.key===group).map(item=>({...item,count:item.indices.length,...project(item)}))}
     function stop(){if(raf)win.cancelAnimationFrame(raf);raf=0}
     function request(){if(!destroyed&&!raf&&visible()&&(dirty||!model.settled||(!reduced&&pointers.size===0&&Math.abs(inertiaX)+Math.abs(inertiaY)>.02)))raf=win.requestAnimationFrame(frame)}
     function mark(){dirty=true;request()}
@@ -108,14 +120,6 @@
       // Tiny unconnected background dots are decoration, never selectable business nodes.
       ctx.fillStyle='rgba(179,203,244,.28)';
       for(let i=0;i<70;i++){const x=((i*173.71)%997)/997*width,y=((i*237.29)%991)/991*height;ctx.fillRect(x,y,i%5===0?1.3:.7,i%5===0?1.3:.7)}
-      if(semanticView(model,camera.zoom/baseZoom,group).mode==='clusters'){
-        for(const cluster of clusterPositions()){
-          const radius=18+Math.min(12,Math.sqrt(cluster.count)*2);
-          ctx.fillStyle='#17304e';ctx.strokeStyle='#82b8ea';ctx.lineWidth=1.2;ctx.beginPath();ctx.arc(cluster.x,cluster.y,radius,0,Math.PI*2);ctx.fill();ctx.stroke();
-          ctx.font='13px system-ui, sans-serif';ctx.textAlign='center';ctx.fillStyle='#e1efff';ctx.fillText(String(cluster.count),cluster.x,cluster.y+4);
-          ctx.fillText(cluster.label,cluster.x,cluster.y+radius+22,Math.max(80,width-24));
-        }return;
-      }
       const projected=positions();ctx.lineWidth=.8;
       for(const edge of model.edges){const a=projected[edge.source],b=projected[edge.target];if(!a.visible||!b.visible)continue;ctx.strokeStyle='rgba(117,161,218,.22)';ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke()}
       for(const p of projected.filter(p=>p.visible).sort((a,b)=>b.depth-a.depth)){
@@ -125,6 +129,15 @@
         if(p.index===selected){ctx.strokeStyle='#e1c594';ctx.lineWidth=1.3;ctx.beginPath();ctx.arc(p.x,p.y,radius+7,0,Math.PI*2);ctx.stroke()}
         if(p.index===selected||projected.length<=12){ctx.font='12px system-ui, sans-serif';ctx.textAlign='center';ctx.fillStyle=p.index===selected?'#f3dfba':'#a2b5d0';const title=String(node.title||'未命名考点');ctx.fillText(title.length>22?title.slice(0,21)+'…':title,p.x,p.y+radius+23,Math.max(30,width-20))}
       }
+      if(semanticView(model,camera.zoom/baseZoom,group).mode==='clusters'){
+        for(const cluster of clusterPositions()){
+          const radius=18+Math.min(12,Math.sqrt(cluster.count)*2);
+          ctx.fillStyle='rgba(23,48,78,.75)';ctx.strokeStyle='#82b8ea';ctx.lineWidth=1.2;ctx.beginPath();ctx.arc(cluster.x,cluster.y,radius,0,Math.PI*2);ctx.fill();ctx.stroke();
+          ctx.font='13px system-ui, sans-serif';ctx.textAlign='center';ctx.fillStyle='#e1efff';ctx.fillText(String(cluster.count),cluster.x,cluster.y+4);
+          ctx.fillText(cluster.label,cluster.x,cluster.y+radius+22,Math.max(80,width-24));
+        }
+      }
+
     }
     function frame(){
       raf=0;if(!visible())return;

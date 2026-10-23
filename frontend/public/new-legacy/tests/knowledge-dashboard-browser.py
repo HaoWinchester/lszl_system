@@ -18,15 +18,16 @@ with sync_playwright() as pw:
     page.evaluate('''() => {
       window.owner='A'; window.KGAuthCore={currentUser:()=>owner?{username:owner}:null};
       window.mode='ready'; window.calls=[];
-      window.nodes=Array.from({length:60},(_,i)=>({id:'topic-'+i,title:i===0?'风险管理 <安全>':i===1?'<img src=x onerror="window.injected=true">':'项目考点 '+(i+1),subject:i<30?'PMP':'产品管理',taxonomyId:i<30?'risk':'<分类>',path:['项目',i<30?'风险':'<分类>'],attemptCount:i+3,brightness:.2+(i%9)/10,lastPracticedAt:'2026-10-17T00:00:00Z'}));
+      window.nodes=Array.from({length:81},(_,i)=>({id:'topic-'+i,title:i===0?'风险管理 <安全>':i===1?'<img src=x onerror="window.injected=true">':'项目考点 '+(i+1),subject:i<30?'PMP':'产品管理',taxonomyId:i<30?'risk':'<分类>',path:['项目',i<30?'风险':'<分类>'],attemptCount:i+3,brightness:.2+(i%9)/10,lastPracticedAt:'2026-10-17T00:00:00Z'}));
       window.KGDomainApi={request: async options => {
         calls.push(options.path); if(mode==='error')throw Error('offline');
         if(mode==='401')throw Object.assign(Error('unauthorized'),{status:401});
         if(mode==='pending')return new Promise(resolve=>window.resolveOld=resolve);
         if(mode==='empty')return {nodes:[],topicCount:0,attemptCount:0};
-        if(mode==='unknown')return {nodes:[],topicCount:0,attemptCount:7,unknownAttemptCount:7};
-        const second=options.path.includes('page=2&');
-        return {nodes:second?[{...nodes[0],id:'page-two',title:'第二页考点'}]:nodes,topicCount:61,hasMore:!second,attemptCount:200,recentAttemptCount:12,unknownAttemptCount:1};
+        if(mode==='unknown')return {nodes:[],topicCount:0,attemptCount:51,unknownAttemptCount:23,unmappedAttemptCount:28};
+        if(mode==='historical')return {nodes:Array.from({length:317},(_,i)=>({id:'current-'+i,parentId:null,title:'当前目录 '+i,attemptCount:0})),topicCount:317,attemptCount:51,unknownAttemptCount:23,unmappedAttemptCount:28};
+        if(mode==='ancestry')return {nodes:[{id:'parent',parentId:null,title:'父节点',attemptCount:0},{id:'child',parentId:'parent',title:'子节点',attemptCount:1},{id:'unlit',parentId:null,title:'未练习',attemptCount:0}],attemptCount:1};
+        return {nodes,topicCount:81,attemptCount:200,recentAttemptCount:12,unknownAttemptCount:1};
       }};
     }''')
     page.add_script_tag(path=str(ROOT/'new-legacy/src/practice/knowledge-space-scene.js'))
@@ -43,19 +44,18 @@ with sync_playwright() as pw:
     assert page.locator('[data-knowledge-search],[data-knowledge-unpracticed],[data-knowledge-questions]').count()==0
     page.wait_for_function('scenes.at(-1).snapshot().settled && !scenes.at(-1).snapshot().running')
     snap=lambda:page.evaluate('scenes.at(-1).snapshot()')
-    assert len(snap()['positions'])==60 and len(set(p['depth'] for p in snap()['positions']))>10
+    assert len(snap()['positions'])==81 and len(set(p['depth'] for p in snap()['positions']))>10
     expect(page.locator('[data-knowledge-detail-title]')).to_have_text('风险管理 <安全>')
-    expect(page.locator('[data-knowledge-page-count]')).to_have_text('本页 60 个考点')
-    expect(page.locator('[data-knowledge-summary]')).to_contain_text('61 个考点')
-    expect(page.locator('[data-knowledge-prev]')).to_be_disabled()
-    assert page.evaluate('calls')==['/api/v1/learning/practice/knowledge-dashboard?page=1&pageSize=60']
+    expect(page.locator('[data-knowledge-page-count]')).to_have_text('全目录 81 个节点')
+    expect(page.locator('[data-knowledge-summary]')).to_contain_text('81 个目录节点')
+    assert page.evaluate('calls')==['/api/v1/learning/practice/knowledge-universe']
     expect(page.locator('[data-knowledge-groups]')).not_to_contain_text('risk')
     expect(page.locator('[data-knowledge-group]').nth(1)).to_contain_text('PMP · 项目')
     calls=page.evaluate('calls.length')
     page.locator('.kg-knowledge-detail summary').click()
     page.locator('.kg-knowledge-detail').evaluate('(e)=>e.open=true');page.locator('[data-knowledge-list-toggle]').click()
     buttons=page.locator('[data-knowledge-list] button')
-    expect(buttons).to_have_count(60)
+    expect(buttons).to_have_count(81)
     buttons.nth(1).focus();page.keyboard.press('Enter')
     expect(page.locator('[data-knowledge-detail-title]')).to_have_text('<img src=x onerror="window.injected=true">')
     assert snap()['selected']==1 and page.locator('dialog img').count()==0 and not page.evaluate('!!window.injected')
@@ -64,10 +64,10 @@ with sync_playwright() as pw:
     page.locator('[data-knowledge-node-prev]').click();assert snap()['selected']==1
     page.locator('[data-knowledge-group]').nth(2).click()
     state=snap();assert state['group']=='["产品管理","<分类>","项目"]' and state['selected']==30
-    assert sum(p['visible'] for p in state['positions'])==30
+    assert sum(p['visible'] for p in state['positions'])==51
     expect(page.locator('[data-knowledge-detail-subject]')).to_have_text('产品管理')
-    assert page.locator('[data-knowledge-list] button:visible').count()==30
-    page.locator('[data-knowledge-node-prev]').click();assert snap()['selected']==59
+    assert page.locator('[data-knowledge-list] button:visible').count()==51
+    page.locator('[data-knowledge-node-prev]').click();assert snap()['selected']==80
     page.locator('[data-knowledge-reset]').click();assert snap()['group']==''
     zoom=snap()['camera']['zoom'];page.locator('[data-knowledge-zoom-out]').click();assert snap()['camera']['zoom']<zoom
     page.locator('[data-knowledge-zoom-in]').click();assert abs(snap()['camera']['zoom']-zoom)<.001
@@ -78,19 +78,11 @@ with sync_playwright() as pw:
     page.evaluate('scenes.at(-1).zoomBy(1.5)');page.wait_for_function('!scenes.at(-1).snapshot().running')
     state=snap();point=state['positions'][15];box=page.locator('canvas').bounding_box()
     page.mouse.click(box['x']+point['x'],box['y']+point['y'])
-    chosen=snap()['selected'];assert chosen!=59
+    chosen=snap()['selected'];assert chosen!=80
     expect(page.locator('[data-knowledge-detail-title]')).to_have_text(page.evaluate('nodes[scenes.at(-1).snapshot().selected].title'))
     assert page.evaluate('calls.length')==calls, 'selection, group and camera must never refetch'
     checks.append('real 3D projection, safe labels, semantic list keyboard selection, pointer/detail sync, group traversal and camera controls')
-    page.locator('[data-knowledge-next]').click()
-    expect(page.locator('[data-knowledge-detail-title]')).to_have_text('第二页考点')
-    assert page.evaluate('scenes.at(-2).snapshot().destroyed')
-    expect(page.locator('[data-knowledge-next]')).to_be_disabled()
-    expect(page.locator('[data-knowledge-page-count]')).to_have_text('本页 1 个考点')
-    assert page.evaluate('calls.at(-1)')=='/api/v1/learning/practice/knowledge-dashboard?page=2&pageSize=60'
-    page.locator('[data-knowledge-prev]').click()
-    expect(page.locator('[data-knowledge-detail-title]')).to_have_text('风险管理 <安全>')
-    checks.append('server totals, 60-page API contract, next/previous page replace and destroy scene')
+    checks.append('whole catalog API contract retains all 81 nodes without pagination')
     # Native modal containment covers forward/backward Tab and Escape return focus.
     page.locator('[data-knowledge-close]').focus();page.keyboard.press('Shift+Tab')
     assert page.evaluate('document.querySelector("dialog").contains(document.activeElement)')
@@ -100,20 +92,28 @@ with sync_playwright() as pw:
     page.evaluate("mode='error'");page.locator('#open').click();expect(page.locator('[data-knowledge-retry]')).to_be_visible()
     assert page.locator('[data-knowledge-list] li').count()==0 and page.locator('canvas').count()==0
     expect(page.locator('[data-knowledge-detail-title]')).to_have_text('选择一个考点')
-    page.evaluate("mode='ready'");page.locator('[data-knowledge-retry]').click();expect(page.locator('[data-knowledge-list] li')).to_have_count(60)
+    page.evaluate("mode='ready'");page.locator('[data-knowledge-retry]').click();expect(page.locator('[data-knowledge-list] li')).to_have_count(81)
     checks.append('network error clears rows/details/canvas and retry recovers')
     page.evaluate("mode='pending';void KGKnowledgeDashboard.open()")
     page.wait_for_function('!!window.resolveOld')
     assert snap()['destroyed'] and page.locator('canvas').count()==0
     expect(page.locator('[data-knowledge-detail-title]')).to_have_text('选择一个考点')
     page.evaluate("owner='B';mode='empty';dispatchEvent(new Event('kg-auth-session-change'))")
-    expect(page.locator('[data-knowledge-status]')).to_contain_text('保存有效作答')
+    expect(page.locator('[data-knowledge-status]')).to_contain_text('暂无已发布')
     page.evaluate("resolveOld({nodes:[{title:'A private'}],topicCount:1})")
     expect(page.locator('[data-knowledge-list] li')).to_have_count(0)
     assert 'A private' not in dialog.inner_text() and page.locator('canvas').count()==0
     page.evaluate("mode='unknown';void KGKnowledgeDashboard.open()")
-    expect(page.locator('[data-knowledge-status]')).to_contain_text('尚未保存可识别')
+    expect(page.locator('[data-knowledge-status]')).to_have_text('当前暂无已发布的知识目录。')
     assert page.locator('canvas').count()==0
+    page.evaluate("mode='historical';void KGKnowledgeDashboard.open()")
+    expect(page.locator('[data-knowledge-list] li')).to_have_count(317)
+    expect(page.locator('[data-knowledge-summary]')).to_contain_text('累计 51 次作答 · 317 个目录节点 · 已点亮 0 个')
+    expect(page.locator('[data-knowledge-summary]')).to_contain_text('23 次作答暂无考点引用')
+    expect(page.locator('[data-knowledge-summary]')).to_contain_text('28 次作答未映射到当前目录')
+    page.evaluate("mode='ancestry';void KGKnowledgeDashboard.open()")
+    expect(page.locator('[data-knowledge-summary]')).to_contain_text('3 个目录节点 · 已点亮 2 个')
+    checks.append('real-response shape 317 nodes/51 historical attempts/23 unknown/28 unmapped shows zero lit; ancestor illumination counted; empty catalog with history stays honest')
     page.evaluate("mode='401';void KGKnowledgeDashboard.open()")
     expect(page.locator('[data-knowledge-status]')).to_contain_text('登录后')
     assert page.locator('canvas').count()==0
@@ -126,7 +126,7 @@ with sync_playwright() as pw:
     assert page.evaluate('calls.length')==prior_calls
     checks.append('account switch invalidates delayed owner data; unknown/empty/401 show no fake nodes; guests make no requests')
     page.evaluate("owner='B';mode='ready';dispatchEvent(new Event('kg-auth-session-change'))")
-    expect(page.locator('[data-knowledge-list] li')).to_have_count(60)
+    expect(page.locator('[data-knowledge-list] li')).to_have_count(81)
     page.wait_for_function('scenes.at(-1).snapshot().settled && !scenes.at(-1).snapshot().running')
     cdp=context.new_cdp_session(page)
     for width,height in ((1440,960),(1440,650),(390,844),(320,568)):
@@ -141,16 +141,16 @@ with sync_playwright() as pw:
         shell=page.locator('.kg-knowledge-shell');shell.evaluate('e=>e.scrollTop=0')
         canvas=page.locator('canvas');canvas.scroll_into_view_if_needed();page.wait_for_timeout(150)
         cb=canvas.bounding_box();sb=shell.bounding_box();x=cb['x']+cb['width']/2;y=(max(cb['y'],sb['y'])+min(cb['y']+cb['height'],sb['y']+sb['height']))/2
-        before=shell.evaluate('e=>e.scrollTop');camera=snap()['camera'];background=page.evaluate('scrollY')
+        can_scroll=shell.evaluate('e=>e.scrollHeight>e.clientHeight');before=shell.evaluate('e=>e.scrollTop');camera=snap()['camera'];background=page.evaluate('scrollY')
         page.mouse.move(x,y);page.mouse.wheel(0,300);page.wait_for_timeout(250)
-        assert shell.evaluate('e=>e.scrollTop')>before and snap()['camera']==camera and page.evaluate('scrollY')==background
+        assert (shell.evaluate('e=>e.scrollTop')>before if can_scroll else shell.evaluate('e=>e.scrollTop')==before) and snap()['camera']==camera and page.evaluate('scrollY')==background
         shell.evaluate('e=>e.scrollTop=0');canvas.scroll_into_view_if_needed();page.wait_for_timeout(150)
         cb=canvas.bounding_box();sb=shell.bounding_box();y=(max(cb['y'],sb['y'])+min(cb['y']+cb['height'],sb['y']+sb['height']))/2;before=shell.evaluate('e=>e.scrollTop')
         cdp.send('Input.dispatchTouchEvent',{'type':'touchStart','touchPoints':[{'x':x,'y':y,'id':1}]})
         for step in range(1,11):
             cdp.send('Input.dispatchTouchEvent',{'type':'touchMove','touchPoints':[{'x':x,'y':y-step*15,'id':1}]});page.wait_for_timeout(20)
         cdp.send('Input.dispatchTouchEvent',{'type':'touchEnd','touchPoints':[]});page.wait_for_timeout(350)
-        assert shell.evaluate('e=>e.scrollTop')>before and snap()['camera']==camera
+        assert (shell.evaluate('e=>e.scrollTop')>before if can_scroll else shell.evaluate('e=>e.scrollTop')==before) and snap()['camera']==camera
         page.screenshot(path=str(OUT/f'dashboard-{width}.png'))
         page.locator('[data-knowledge-node-next]').scroll_into_view_if_needed()
         page.screenshot(path=str(OUT/f'detail-{width}.png'))
@@ -185,16 +185,11 @@ with sync_playwright() as pw:
     # Physical clicks must reach fallback pagination, rather than an overlapping detail overlay.
     for fallback_width in (1440,390):
         page.set_viewport_size({'width':fallback_width,'height':900})
-        page.locator('[data-knowledge-next]').click(timeout=1500)
-        expect(page.locator('[data-knowledge-page]')).to_contain_text('第 2')
-        expect(page.locator('[data-knowledge-detail-title]')).to_have_text('第二页考点')
-        page.locator('[data-knowledge-prev]').click(timeout=1500)
-        expect(page.locator('[data-knowledge-page]')).to_contain_text('第 1')
         page.locator('[data-knowledge-group]').nth(2).click(timeout=1500)
         expect(page.locator('[data-knowledge-detail-subject]')).to_have_text('产品管理')
         page.locator('[data-knowledge-refresh]').click(timeout=1500)
         expect(page.locator('[data-knowledge-list]')).to_be_visible()
-    checks.append('Canvas fallback desktop/mobile physical group, next/previous page and refresh controls remain unobstructed')
+    checks.append('Canvas fallback desktop/mobile physical group, all catalog and refresh controls remain unobstructed')
     page.evaluate('nodes.forEach(node=>node.path=[])')
     page.locator('[data-knowledge-refresh]').click()
     expect(page.locator('[data-knowledge-group]').nth(1)).to_contain_text('PMP · 未分类')

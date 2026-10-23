@@ -24,18 +24,34 @@
 
 **Interfaces:** GET /api/v1/learning/practice/knowledge-universe returns nodes{id,parentId,subject,taxonomyId,primaryNodeId,path,title,attemptCount,lastPracticedAt,brightness,...}, subjects,topicCount,attemptCount,unknownAttemptCount,unmappedAttemptCount. Keep raw attemptCount and create relatedAttemptCount and derived brightness in copied scene nodes. Export the pure derivation for meaningful Node tests.
 
-- [ ] Write failing tests proving nodes beyond60 and zero-practice catalog survive, brightness strictly rises for 0/1/5/20 and saturates, parents aggregate without cross-tree collisions, cycles/invalid counts terminate, inputs unchanged; run and capture expected failures.
-- [ ] Implement shared overlay and universe fetch; remove dashboard slice/pagination and stale recency copy; totals and detail distinguish direct/related attempts. All nodes show dimly when no practices. Server error clears nodes and retry recovers; guests never fetch.
-- [ ] Render true points under overview clusters so all-tree preview is visually useful before zoom; retain actual catalog edges and point selection. Keep labels readable and no unrelated redesign.
-- [ ] Update maintained browser expectations from history pagination to whole-catalog behavior, retain physical fallback controls/account/lifecycle checks; add actual endpoint path and >60 count checks.
-- [ ] Run node --test new-legacy/tests/knowledge-dashboard.test.js new-legacy/tests/knowledge-space-scene.test.js new-legacy/tests/learning-entry-chooser.test.js, dashboard/semantic/scene browsers. Record exact evidence and remaining issues. Do not sync or deploy. Commit source/tests and write report.
+- [x] Write failing tests proving nodes beyond60 and zero-practice catalog survive, brightness strictly rises for 0/1/5/20 and saturates, parents aggregate without cross-tree collisions, cycles/invalid counts terminate, inputs unchanged; run and capture expected failures.
+- [x] Implement shared overlay and universe fetch; remove dashboard slice/pagination and stale recency copy; totals and detail distinguish direct/related attempts. All nodes show dimly when no practices. Server error clears nodes and retry recovers; guests never fetch.
+- [x] Render true points under overview clusters so all-tree preview is visually useful before zoom; retain actual catalog edges and point selection. Keep labels readable and no unrelated redesign.
+- [x] Update maintained browser expectations from history pagination to whole-catalog behavior, retain physical fallback controls/account/lifecycle checks; add actual endpoint path and >60 count checks.
+- [x] Run node --test new-legacy/tests/knowledge-dashboard.test.js new-legacy/tests/knowledge-space-scene.test.js new-legacy/tests/learning-entry-chooser.test.js, dashboard/semantic/scene browsers. Record exact evidence and remaining issues. Do not sync or deploy. Commit source/tests and write report.
 
 ### Task 2: Root preview and acceptance guide
 
 **Files:** docs/verification/2026-10-23-learning-feedback-uat-checklist.md and local ignored preview evidence.
 
-- [ ] Review Task1 specification/quality and resolve important defects; final branch review.
-- [ ] Sync using existing tool, run frontend tests/design and relevant existing backend universe tests; verify no truncated real published catalog in browser desktop/mobile.
-- [ ] Start dedicated local preview against real local database without modifying remote UAT or main. Capture real full-tree screenshot; provide a working preview URL and transparent brightness/empty-state meaning.
-- [ ] Finish pending human UAT382 three-group checklist with entry URLs, operations, expected results, identifiers and pass/fail boxes; distinguish new local preview.
-- [ ] Save verification notes, commit appropriate source/generated/docs, keep feature branch for visual review. No main integration or UAT deployment in this preview step.
+- [x] Review Task1 specification/quality and resolve important defects; final branch review.
+- [x] Sync using existing tool, run frontend tests/design and relevant existing backend universe tests; verify no truncated real published catalog in browser desktop/mobile.
+- [x] Start dedicated local preview against real local database without modifying remote UAT or main. Capture real full-tree screenshot; provide a working preview URL and transparent brightness/empty-state meaning.
+- [x] Finish pending human UAT382 three-group checklist with entry URLs, operations, expected results, identifiers and pass/fail boxes; distinguish new local preview.
+- [x] Save verification notes, commit appropriate source/generated/docs, keep feature branch for visual review. No main integration or UAT deployment in this preview step.
+
+## User visual feedback: enlarge the star network itself
+
+The user rejected the running sample on 2026-10-23: “星空图的大小太小了”. Increase the initial and reset visible star/edge network footprint inside the existing large canvas. For the actual published317-node catalog at1440x960, target at least70% canvas width and75%height with point centers inside a safe margin. For390px retain at least75% width without clipping/overflow. Use responsive spacing/projection/fit as evidence warrants; do not merely enlarge shell or blindly zoom/crop. Explicit camera gestures still persist until reset. Add a real rendered-bounds regression for actual catalog shape (public snapshot may live as named testfixture), preserve320/1000 performance and all lifecycle interactions.
+
+## User visual feedback: lower canvas layer under text
+
+The user additionally requests “星空图的层级可以稍微放下一层，一些其他文字可以叠放在上面”. Put the scene as a lower visual plane across the main shell; header/title/summary and existing details/groups/camera/help may overlay above rather than consume a separate large header band. Preserve existing controls, readable text, accessible close, actual foreground clicks, blank-canvas gestures, mobile native vertical scroll and Canvas-failure normal-flow fallback. Keep source changes scoped shared dashboard/scene/CSS; no unrelated restyle. Verify desktop/mobile rendered geometry and real clicks, not only z-index values.
+
+## User visual feedback: remove top demo and close bands
+
+The user highlighted the full close row plus root-added brightness demo toolbar as unwanted. Remove the reserved full-width close band; float the existing accessible44px close button at top-right above foreground. Header/title/summary/refresh must not overlap it at1440/559/390, and close/Escape/focus/fallback remain usable. Root removes standalone demo toolbar entirely and labels sample brightness in small bottom text; no sample practice data is persisted or presented as real owner history.
+
+## Completion
+
+Local preview is running on5527 (real owner API) and5530 (clearly labeled brightness example, public published317-node snapshot). User visual corrections for larger actual network, background scene, and removal of demo/close bands implemented and directly refreshed in current IAB. Whole-branch source review and scoped P2 summary-scroll fix pass; source40b11e00. See docs/verification/2026-10-23-knowledge-space-full-tree-preview.md. UAT/main unchanged; visual review remains with user.

@@ -9,3 +9,15 @@
 全量树未练节点也显示暗星，初始缩小视图保留全部真实星点作为底图，再叠分类名称和节点数；放大查看/选择节点，分类按钮和详情列表继续可用。没有有效作答但有知识树时仍可看星空；无已发布知识树才显示目录为空。顶部紧凑统计全树/已点亮/作答数，删除“30天新鲜度”和旧分页文案。已有大画布、移动端、滚动、旋转、双指缩放、关闭/重开/刷新、账号隔离、Canvas列表降级保留。不会增加自动播放假数据或模拟用户成绩。
 
 验证包括数量与亮度单测、父子汇总/循环/不修改输入、完整树超过60节点、0作答、刷新、失败重试、切账号、桌面/手机真浏览器缩放与点选、1000节点性能，以及已有相关契约。使用真实本地知识树/API展示预览，若展示亮度差异的隔离样例，必须明确标注样例而非用户作答。补齐前一请求的三组 UAT 人工验收清单，区分 UAT382 与这次本地预览。
+
+## User visual feedback: enlarge the star network itself
+
+The user rejected the running sample on 2026-10-23: “星空图的大小太小了”. Increase the initial and reset visible star/edge network footprint inside the existing large canvas. For the actual published317-node catalog at1440x960, target at least70% canvas width and75%height with point centers inside a safe margin. For390px retain at least75% width without clipping/overflow. Use responsive spacing/projection/fit as evidence warrants; do not merely enlarge shell or blindly zoom/crop. Explicit camera gestures still persist until reset. Add a real rendered-bounds regression for actual catalog shape (public snapshot may live as named testfixture), preserve320/1000 performance and all lifecycle interactions.
+
+## User visual feedback: lower canvas layer under text
+
+The user additionally requests “星空图的层级可以稍微放下一层，一些其他文字可以叠放在上面”. Put the scene as a lower visual plane across the main shell; header/title/summary and existing details/groups/camera/help may overlay above rather than consume a separate large header band. Preserve existing controls, readable text, accessible close, actual foreground clicks, blank-canvas gestures, mobile native vertical scroll and Canvas-failure normal-flow fallback. Keep source changes scoped shared dashboard/scene/CSS; no unrelated restyle. Verify desktop/mobile rendered geometry and real clicks, not only z-index values.
+
+## User visual feedback: remove top demo and close bands
+
+The user highlighted the full close row plus root-added brightness demo toolbar as unwanted. Remove the reserved full-width close band; float the existing accessible44px close button at top-right above foreground. Header/title/summary/refresh must not overlap it at1440/559/390, and close/Escape/focus/fallback remain usable. Root removes standalone demo toolbar entirely and labels sample brightness in small bottom text; no sample practice data is persisted or presented as real owner history.

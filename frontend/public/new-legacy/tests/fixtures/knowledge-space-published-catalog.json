@@ -1,0 +1,4630 @@
+{
+  "description": "Public published PMP catalog snapshot, 317 real nodes; no user practice overlay.",
+  "nodes": [
+    {
+      "id": "7cdd9825068415f8419835d7",
+      "parentId": null,
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-complete",
+      "path": [
+        "PMP"
+      ],
+      "title": "PMP"
+    },
+    {
+      "id": "04ed96d6f2086b72418a6602",
+      "parentId": "7cdd9825068415f8419835d7",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-people",
+      "path": [
+        "PMP",
+        "人"
+      ],
+      "title": "人"
+    },
+    {
+      "id": "b3572d8be79e3fe961f7ad68",
+      "parentId": "04ed96d6f2086b72418a6602",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-1",
+      "path": [
+        "PMP",
+        "人",
+        "利益相关方与沟通管理"
+      ],
+      "title": "利益相关方与沟通管理"
+    },
+    {
+      "id": "a30394674fd6c475881dd57c",
+      "parentId": "b3572d8be79e3fe961f7ad68",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-1-1-1",
+      "path": [
+        "PMP",
+        "人",
+        "利益相关方与沟通管理",
+        "利益相关方识别"
+      ],
+      "title": "利益相关方识别"
+    },
+    {
+      "id": "52283e9a56bb50a059926a16",
+      "parentId": "a30394674fd6c475881dd57c",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-1-1-1-k01",
+      "path": [
+        "PMP",
+        "人",
+        "利益相关方与沟通管理",
+        "利益相关方识别",
+        "概念与重要性"
+      ],
+      "title": "概念与重要性"
+    },
+    {
+      "id": "f3f97e210589e46dcb4e8b63",
+      "parentId": "a30394674fd6c475881dd57c",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-1-1-1-k02",
+      "path": [
+        "PMP",
+        "人",
+        "利益相关方与沟通管理",
+        "利益相关方识别",
+        "分析"
+      ],
+      "title": "分析"
+    },
+    {
+      "id": "9b9896ee56c202b21f9c8b57",
+      "parentId": "a30394674fd6c475881dd57c",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-1-1-1-k03",
+      "path": [
+        "PMP",
+        "人",
+        "利益相关方与沟通管理",
+        "利益相关方识别",
+        "映射"
+      ],
+      "title": "映射"
+    },
+    {
+      "id": "292232ba3e6c13eb0dd21fb1",
+      "parentId": "a30394674fd6c475881dd57c",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-1-1-1-k04",
+      "path": [
+        "PMP",
+        "人",
+        "利益相关方与沟通管理",
+        "利益相关方识别",
+        "登记册"
+      ],
+      "title": "登记册"
+    },
+    {
+      "id": "e941f1d0a9e1525f40a74d68",
+      "parentId": "b3572d8be79e3fe961f7ad68",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-1-1-2",
+      "path": [
+        "PMP",
+        "人",
+        "利益相关方与沟通管理",
+        "规划利益相关方争取"
+      ],
+      "title": "规划利益相关方争取"
+    },
+    {
+      "id": "8f5d941cba1a71f93edf4a47",
+      "parentId": "e941f1d0a9e1525f40a74d68",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-1-1-2-k01",
+      "path": [
+        "PMP",
+        "人",
+        "利益相关方与沟通管理",
+        "规划利益相关方争取",
+        "参与评估矩阵"
+      ],
+      "title": "参与评估矩阵"
+    },
+    {
+      "id": "e9fa5118d098d1afa8ea0390",
+      "parentId": "e941f1d0a9e1525f40a74d68",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-1-1-2-k02",
+      "path": [
+        "PMP",
+        "人",
+        "利益相关方与沟通管理",
+        "规划利益相关方争取",
+        "争取计划"
+      ],
+      "title": "争取计划"
+    },
+    {
+      "id": "86ffd1a9765bf7820a9e5610",
+      "parentId": "b3572d8be79e3fe961f7ad68",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-1-1-3",
+      "path": [
+        "PMP",
+        "人",
+        "利益相关方与沟通管理",
+        "管理与监督利益相关方争取"
+      ],
+      "title": "管理与监督利益相关方争取"
+    },
+    {
+      "id": "a167fa61ecae9c7a42483b7f",
+      "parentId": "86ffd1a9765bf7820a9e5610",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-1-1-3-k01",
+      "path": [
+        "PMP",
+        "人",
+        "利益相关方与沟通管理",
+        "管理与监督利益相关方争取",
+        "沟通技能"
+      ],
+      "title": "沟通技能"
+    },
+    {
+      "id": "c445d5c391d9d33f3f4b8428",
+      "parentId": "86ffd1a9765bf7820a9e5610",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-1-1-3-k02",
+      "path": [
+        "PMP",
+        "人",
+        "利益相关方与沟通管理",
+        "管理与监督利益相关方争取",
+        "人际关系技能"
+      ],
+      "title": "人际关系技能"
+    },
+    {
+      "id": "6b32653ba5e1bf871ab31050",
+      "parentId": "86ffd1a9765bf7820a9e5610",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-1-1-3-k03",
+      "path": [
+        "PMP",
+        "人",
+        "利益相关方与沟通管理",
+        "管理与监督利益相关方争取",
+        "会议"
+      ],
+      "title": "会议"
+    },
+    {
+      "id": "504178dbe52d494ac8c9a585",
+      "parentId": "b3572d8be79e3fe961f7ad68",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-1-1-4",
+      "path": [
+        "PMP",
+        "人",
+        "利益相关方与沟通管理",
+        "项目沟通管理的概念"
+      ],
+      "title": "项目沟通管理的概念"
+    },
+    {
+      "id": "af3ee4e4ae9e611b6aa4dbc9",
+      "parentId": "b3572d8be79e3fe961f7ad68",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-1-1-5",
+      "path": [
+        "PMP",
+        "人",
+        "利益相关方与沟通管理",
+        "规划沟通管理"
+      ],
+      "title": "规划沟通管理"
+    },
+    {
+      "id": "b7360efe9e8713ecc8bd2a35",
+      "parentId": "af3ee4e4ae9e611b6aa4dbc9",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-1-1-5-k01",
+      "path": [
+        "PMP",
+        "人",
+        "利益相关方与沟通管理",
+        "规划沟通管理",
+        "活动分类"
+      ],
+      "title": "活动分类"
+    },
+    {
+      "id": "a7db1a1db04e22144710208e",
+      "parentId": "af3ee4e4ae9e611b6aa4dbc9",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-1-1-5-k02",
+      "path": [
+        "PMP",
+        "人",
+        "利益相关方与沟通管理",
+        "规划沟通管理",
+        "需求分析"
+      ],
+      "title": "需求分析"
+    },
+    {
+      "id": "048677c71ffcf70b8b4bc28c",
+      "parentId": "af3ee4e4ae9e611b6aa4dbc9",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-1-1-5-k03",
+      "path": [
+        "PMP",
+        "人",
+        "利益相关方与沟通管理",
+        "规划沟通管理",
+        "沟通渠道数"
+      ],
+      "title": "沟通渠道数"
+    },
+    {
+      "id": "8575d83849cb26e5da259ea6",
+      "parentId": "af3ee4e4ae9e611b6aa4dbc9",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-1-1-5-k04",
+      "path": [
+        "PMP",
+        "人",
+        "利益相关方与沟通管理",
+        "规划沟通管理",
+        "沟通模型"
+      ],
+      "title": "沟通模型"
+    },
+    {
+      "id": "43b1126a5ddb09f531d18556",
+      "parentId": "af3ee4e4ae9e611b6aa4dbc9",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-1-1-5-k05",
+      "path": [
+        "PMP",
+        "人",
+        "利益相关方与沟通管理",
+        "规划沟通管理",
+        "交互式/拉式/推式"
+      ],
+      "title": "交互式/拉式/推式"
+    },
+    {
+      "id": "2e5154ac14c078f298d90b00",
+      "parentId": "af3ee4e4ae9e611b6aa4dbc9",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-1-1-5-k06",
+      "path": [
+        "PMP",
+        "人",
+        "利益相关方与沟通管理",
+        "规划沟通管理",
+        "沟通管理计划"
+      ],
+      "title": "沟通管理计划"
+    },
+    {
+      "id": "7bbb869c86c38c2f753cec8c",
+      "parentId": "b3572d8be79e3fe961f7ad68",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-1-1-6",
+      "path": [
+        "PMP",
+        "人",
+        "利益相关方与沟通管理",
+        "管理与监督沟通"
+      ],
+      "title": "管理与监督沟通"
+    },
+    {
+      "id": "2dc875ff49dc21bd30ffb044",
+      "parentId": "b3572d8be79e3fe961f7ad68",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-1-1-7",
+      "path": [
+        "PMP",
+        "人",
+        "利益相关方与沟通管理",
+        "区分三类文档"
+      ],
+      "title": "区分三类文档"
+    },
+    {
+      "id": "7501eebe136ea42be7b0c01e",
+      "parentId": "2dc875ff49dc21bd30ffb044",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-1-1-7-k01",
+      "path": [
+        "PMP",
+        "人",
+        "利益相关方与沟通管理",
+        "区分三类文档",
+        "利益相关方登记册"
+      ],
+      "title": "利益相关方登记册"
+    },
+    {
+      "id": "2afe052aa71e17d2539c6325",
+      "parentId": "2dc875ff49dc21bd30ffb044",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-1-1-7-k02",
+      "path": [
+        "PMP",
+        "人",
+        "利益相关方与沟通管理",
+        "区分三类文档",
+        "参与计划"
+      ],
+      "title": "参与计划"
+    },
+    {
+      "id": "b32e6ca569fd9eeec5335e24",
+      "parentId": "2dc875ff49dc21bd30ffb044",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-1-1-7-k03",
+      "path": [
+        "PMP",
+        "人",
+        "利益相关方与沟通管理",
+        "区分三类文档",
+        "沟通管理计划"
+      ],
+      "title": "沟通管理计划"
+    },
+    {
+      "id": "3ab5a7c2bb1510f1192b172a",
+      "parentId": "04ed96d6f2086b72418a6602",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-2",
+      "path": [
+        "PMP",
+        "人",
+        "项目团队与领导力"
+      ],
+      "title": "项目团队与领导力"
+    },
+    {
+      "id": "1987d23f93f9f02f1c21e002",
+      "parentId": "3ab5a7c2bb1510f1192b172a",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-2-2-1",
+      "path": [
+        "PMP",
+        "人",
+        "项目团队与领导力",
+        "项目管理角色"
+      ],
+      "title": "项目管理角色"
+    },
+    {
+      "id": "76cd9dfc081874fba67431d4",
+      "parentId": "1987d23f93f9f02f1c21e002",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-2-2-1-k01",
+      "path": [
+        "PMP",
+        "人",
+        "项目团队与领导力",
+        "项目管理角色",
+        "项目经理"
+      ],
+      "title": "项目经理"
+    },
+    {
+      "id": "2b7485f0825fdc3b1c0ba269",
+      "parentId": "1987d23f93f9f02f1c21e002",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-2-2-1-k02",
+      "path": [
+        "PMP",
+        "人",
+        "项目团队与领导力",
+        "项目管理角色",
+        "项目管理团队"
+      ],
+      "title": "项目管理团队"
+    },
+    {
+      "id": "a846045bdcef4a2db3e9629a",
+      "parentId": "1987d23f93f9f02f1c21e002",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-2-2-1-k03",
+      "path": [
+        "PMP",
+        "人",
+        "项目团队与领导力",
+        "项目管理角色",
+        "PMO"
+      ],
+      "title": "PMO"
+    },
+    {
+      "id": "b2f4d03591f44709c520bcca",
+      "parentId": "1987d23f93f9f02f1c21e002",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-2-2-1-k04",
+      "path": [
+        "PMP",
+        "人",
+        "项目团队与领导力",
+        "项目管理角色",
+        "与项目有关的职能"
+      ],
+      "title": "与项目有关的职能"
+    },
+    {
+      "id": "962ab4c5128212223e76f1b2",
+      "parentId": "3ab5a7c2bb1510f1192b172a",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-2-2-2",
+      "path": [
+        "PMP",
+        "人",
+        "项目团队与领导力",
+        "团队建设与发展"
+      ],
+      "title": "团队建设与发展"
+    },
+    {
+      "id": "528e5f57a7bb86b04cbe17a7",
+      "parentId": "962ab4c5128212223e76f1b2",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-2-2-2-k01",
+      "path": [
+        "PMP",
+        "人",
+        "项目团队与领导力",
+        "团队建设与发展",
+        "高绩效团队"
+      ],
+      "title": "高绩效团队"
+    },
+    {
+      "id": "8567230efa622a1e41718e22",
+      "parentId": "962ab4c5128212223e76f1b2",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-2-2-2-k02",
+      "path": [
+        "PMP",
+        "人",
+        "项目团队与领导力",
+        "团队建设与发展",
+        "集中办公和虚拟团队"
+      ],
+      "title": "集中办公和虚拟团队"
+    },
+    {
+      "id": "119939f4f6abf9aa7301e5bf",
+      "parentId": "962ab4c5128212223e76f1b2",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-2-2-2-k03",
+      "path": [
+        "PMP",
+        "人",
+        "项目团队与领导力",
+        "团队建设与发展",
+        "塔克曼阶梯理论"
+      ],
+      "title": "塔克曼阶梯理论"
+    },
+    {
+      "id": "47889ecede71161ed3cce3b1",
+      "parentId": "962ab4c5128212223e76f1b2",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-2-2-2-k04",
+      "path": [
+        "PMP",
+        "人",
+        "项目团队与领导力",
+        "团队建设与发展",
+        "虚拟协作工具"
+      ],
+      "title": "虚拟协作工具"
+    },
+    {
+      "id": "dd6070cf59818b2cedadfbeb",
+      "parentId": "962ab4c5128212223e76f1b2",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-2-2-2-k05",
+      "path": [
+        "PMP",
+        "人",
+        "项目团队与领导力",
+        "团队建设与发展",
+        "团队绩效评价"
+      ],
+      "title": "团队绩效评价"
+    },
+    {
+      "id": "7a645625c03593ce23409bf4",
+      "parentId": "3ab5a7c2bb1510f1192b172a",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-2-2-3",
+      "path": [
+        "PMP",
+        "人",
+        "项目团队与领导力",
+        "冲突管理及五种解决方法"
+      ],
+      "title": "冲突管理及五种解决方法"
+    },
+    {
+      "id": "7769578adfb4ddd868683d5d",
+      "parentId": "3ab5a7c2bb1510f1192b172a",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-2-2-4",
+      "path": [
+        "PMP",
+        "人",
+        "项目团队与领导力",
+        "激励理论"
+      ],
+      "title": "激励理论"
+    },
+    {
+      "id": "dea4c23065d0e9082facc6a8",
+      "parentId": "3ab5a7c2bb1510f1192b172a",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-2-2-5",
+      "path": [
+        "PMP",
+        "人",
+        "项目团队与领导力",
+        "教练与指导、培训"
+      ],
+      "title": "教练与指导、培训"
+    },
+    {
+      "id": "6927700c0a1a8fce3ee26a33",
+      "parentId": "3ab5a7c2bb1510f1192b172a",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-2-2-6",
+      "path": [
+        "PMP",
+        "人",
+        "项目团队与领导力",
+        "六顶思考帽、认可与奖励"
+      ],
+      "title": "六顶思考帽、认可与奖励"
+    },
+    {
+      "id": "39c4afd30d1c2248892304fd",
+      "parentId": "3ab5a7c2bb1510f1192b172a",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-2-2-7",
+      "path": [
+        "PMP",
+        "人",
+        "项目团队与领导力",
+        "情商与领导力"
+      ],
+      "title": "情商与领导力"
+    },
+    {
+      "id": "6bc9546a180601ea40c4f972",
+      "parentId": "3ab5a7c2bb1510f1192b172a",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-2-2-8",
+      "path": [
+        "PMP",
+        "人",
+        "项目团队与领导力",
+        "谈判、问题解决"
+      ],
+      "title": "谈判、问题解决"
+    },
+    {
+      "id": "429ba8dd27b48017dd89161d",
+      "parentId": "04ed96d6f2086b72418a6602",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-3",
+      "path": [
+        "PMP",
+        "人",
+        "敏捷中的人与团队"
+      ],
+      "title": "敏捷中的人与团队"
+    },
+    {
+      "id": "3fd5023194657fc027ed876e",
+      "parentId": "429ba8dd27b48017dd89161d",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-3-3-1",
+      "path": [
+        "PMP",
+        "人",
+        "敏捷中的人与团队",
+        "Scrum 三个角色"
+      ],
+      "title": "Scrum 三个角色"
+    },
+    {
+      "id": "238063e871f11448227d4f65",
+      "parentId": "3fd5023194657fc027ed876e",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-3-3-1-k01",
+      "path": [
+        "PMP",
+        "人",
+        "敏捷中的人与团队",
+        "Scrum 三个角色",
+        "产品负责人 PO"
+      ],
+      "title": "产品负责人 PO"
+    },
+    {
+      "id": "2fd21a8858e34b2f075cafab",
+      "parentId": "3fd5023194657fc027ed876e",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-3-3-1-k02",
+      "path": [
+        "PMP",
+        "人",
+        "敏捷中的人与团队",
+        "Scrum 三个角色",
+        "敏捷教练 SM"
+      ],
+      "title": "敏捷教练 SM"
+    },
+    {
+      "id": "186fd2fb1730d667428c5402",
+      "parentId": "3fd5023194657fc027ed876e",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-3-3-1-k03",
+      "path": [
+        "PMP",
+        "人",
+        "敏捷中的人与团队",
+        "Scrum 三个角色",
+        "开发团队"
+      ],
+      "title": "开发团队"
+    },
+    {
+      "id": "00f1010f0f7979b8cd80b6fb",
+      "parentId": "429ba8dd27b48017dd89161d",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-3-3-2",
+      "path": [
+        "PMP",
+        "人",
+        "敏捷中的人与团队",
+        "Scrum 五大价值观"
+      ],
+      "title": "Scrum 五大价值观"
+    },
+    {
+      "id": "ce244f7d0f95300e9dc49982",
+      "parentId": "00f1010f0f7979b8cd80b6fb",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-3-3-2-k01",
+      "path": [
+        "PMP",
+        "人",
+        "敏捷中的人与团队",
+        "Scrum 五大价值观",
+        "承诺"
+      ],
+      "title": "承诺"
+    },
+    {
+      "id": "3669cc4e73ae42c09cabd505",
+      "parentId": "00f1010f0f7979b8cd80b6fb",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-3-3-2-k02",
+      "path": [
+        "PMP",
+        "人",
+        "敏捷中的人与团队",
+        "Scrum 五大价值观",
+        "专注"
+      ],
+      "title": "专注"
+    },
+    {
+      "id": "8bd44cac8b69434ce1f18b71",
+      "parentId": "00f1010f0f7979b8cd80b6fb",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-3-3-2-k03",
+      "path": [
+        "PMP",
+        "人",
+        "敏捷中的人与团队",
+        "Scrum 五大价值观",
+        "开放"
+      ],
+      "title": "开放"
+    },
+    {
+      "id": "cfe256046b5f38ecca26c5f2",
+      "parentId": "00f1010f0f7979b8cd80b6fb",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-3-3-2-k04",
+      "path": [
+        "PMP",
+        "人",
+        "敏捷中的人与团队",
+        "Scrum 五大价值观",
+        "尊重"
+      ],
+      "title": "尊重"
+    },
+    {
+      "id": "85b881b6643cd4b8992d26d6",
+      "parentId": "00f1010f0f7979b8cd80b6fb",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-3-3-2-k05",
+      "path": [
+        "PMP",
+        "人",
+        "敏捷中的人与团队",
+        "Scrum 五大价值观",
+        "勇气"
+      ],
+      "title": "勇气"
+    },
+    {
+      "id": "6135a69dcbb8a21b8644d9a3",
+      "parentId": "429ba8dd27b48017dd89161d",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-3-3-3",
+      "path": [
+        "PMP",
+        "人",
+        "敏捷中的人与团队",
+        "自组织团队"
+      ],
+      "title": "自组织团队"
+    },
+    {
+      "id": "700f414ea6378dd9603a5e10",
+      "parentId": "429ba8dd27b48017dd89161d",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-3-3-4",
+      "path": [
+        "PMP",
+        "人",
+        "敏捷中的人与团队",
+        "团队沟通与支持"
+      ],
+      "title": "团队沟通与支持"
+    },
+    {
+      "id": "3d6c5110094e97ac7d7972d0",
+      "parentId": "700f414ea6378dd9603a5e10",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-3-3-4-k01",
+      "path": [
+        "PMP",
+        "人",
+        "敏捷中的人与团队",
+        "团队沟通与支持",
+        "面对面沟通"
+      ],
+      "title": "面对面沟通"
+    },
+    {
+      "id": "9b2d57e612a673d324636171",
+      "parentId": "700f414ea6378dd9603a5e10",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-3-3-4-k02",
+      "path": [
+        "PMP",
+        "人",
+        "敏捷中的人与团队",
+        "团队沟通与支持",
+        "激励团队"
+      ],
+      "title": "激励团队"
+    },
+    {
+      "id": "eb009810cf1ec45d33c3594e",
+      "parentId": "700f414ea6378dd9603a5e10",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-3-3-4-k03",
+      "path": [
+        "PMP",
+        "人",
+        "敏捷中的人与团队",
+        "团队沟通与支持",
+        "给予环境和支持"
+      ],
+      "title": "给予环境和支持"
+    },
+    {
+      "id": "3a1a2077117a9a256b25f016",
+      "parentId": "429ba8dd27b48017dd89161d",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-people-3-3-5",
+      "path": [
+        "PMP",
+        "人",
+        "敏捷中的人与团队",
+        "用户画像与用户故事"
+      ],
+      "title": "用户画像与用户故事"
+    },
+    {
+      "id": "29b71baf2048cf6c553b068c",
+      "parentId": "7cdd9825068415f8419835d7",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-process",
+      "path": [
+        "PMP",
+        "过程"
+      ],
+      "title": "过程"
+    },
+    {
+      "id": "3b0a4b992dac356c700f2c69",
+      "parentId": "29b71baf2048cf6c553b068c",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-1",
+      "path": [
+        "PMP",
+        "过程",
+        "项目管理方法论与生命周期"
+      ],
+      "title": "项目管理方法论与生命周期"
+    },
+    {
+      "id": "6e8da0463da0a1584b6f0a06",
+      "parentId": "3b0a4b992dac356c700f2c69",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-1-1-1",
+      "path": [
+        "PMP",
+        "过程",
+        "项目管理方法论与生命周期",
+        "项目与项目管理"
+      ],
+      "title": "项目与项目管理"
+    },
+    {
+      "id": "eaa04fc1d30002eb862d3dc1",
+      "parentId": "6e8da0463da0a1584b6f0a06",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-1-1-1-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "项目管理方法论与生命周期",
+        "项目与项目管理",
+        "临时性和独特性"
+      ],
+      "title": "临时性和独特性"
+    },
+    {
+      "id": "2ff9ebd9f859025d0071a490",
+      "parentId": "6e8da0463da0a1584b6f0a06",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-1-1-1-k02",
+      "path": [
+        "PMP",
+        "过程",
+        "项目管理方法论与生命周期",
+        "项目与项目管理",
+        "项目的启动背景"
+      ],
+      "title": "项目的启动背景"
+    },
+    {
+      "id": "93f54f88c260d776442f4dfd",
+      "parentId": "3b0a4b992dac356c700f2c69",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-1-1-2",
+      "path": [
+        "PMP",
+        "过程",
+        "项目管理方法论与生命周期",
+        "项目管理方法论"
+      ],
+      "title": "项目管理方法论"
+    },
+    {
+      "id": "855d0d9242fb241a12161b15",
+      "parentId": "93f54f88c260d776442f4dfd",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-1-1-2-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "项目管理方法论与生命周期",
+        "项目管理方法论",
+        "组织级项目管理"
+      ],
+      "title": "组织级项目管理"
+    },
+    {
+      "id": "e74127ddbf8f08e14bb7f9c1",
+      "parentId": "93f54f88c260d776442f4dfd",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-1-1-2-k02",
+      "path": [
+        "PMP",
+        "过程",
+        "项目管理方法论与生命周期",
+        "项目管理方法论",
+        "项目集和项目组合"
+      ],
+      "title": "项目集和项目组合"
+    },
+    {
+      "id": "752203bcf70d864276ecce71",
+      "parentId": "93f54f88c260d776442f4dfd",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-1-1-2-k03",
+      "path": [
+        "PMP",
+        "过程",
+        "项目管理方法论与生命周期",
+        "项目管理方法论",
+        "项目和运营的区别"
+      ],
+      "title": "项目和运营的区别"
+    },
+    {
+      "id": "2c13e9e722e55d98bf9f820d",
+      "parentId": "3b0a4b992dac356c700f2c69",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-1-1-3",
+      "path": [
+        "PMP",
+        "过程",
+        "项目管理方法论与生命周期",
+        "项目生命周期"
+      ],
+      "title": "项目生命周期"
+    },
+    {
+      "id": "7d8b1471e39bd2b7a8ed1d0f",
+      "parentId": "2c13e9e722e55d98bf9f820d",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-1-1-3-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "项目管理方法论与生命周期",
+        "项目生命周期",
+        "预测型"
+      ],
+      "title": "预测型"
+    },
+    {
+      "id": "bb9aa333e1f3c1423305cbfd",
+      "parentId": "2c13e9e722e55d98bf9f820d",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-1-1-3-k02",
+      "path": [
+        "PMP",
+        "过程",
+        "项目管理方法论与生命周期",
+        "项目生命周期",
+        "敏捷型"
+      ],
+      "title": "敏捷型"
+    },
+    {
+      "id": "a5761580aeba55f9311e8c00",
+      "parentId": "2c13e9e722e55d98bf9f820d",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-1-1-3-k03",
+      "path": [
+        "PMP",
+        "过程",
+        "项目管理方法论与生命周期",
+        "项目生命周期",
+        "混合型"
+      ],
+      "title": "混合型"
+    },
+    {
+      "id": "c6c810191fd2030896bd4403",
+      "parentId": "3b0a4b992dac356c700f2c69",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-1-1-4",
+      "path": [
+        "PMP",
+        "过程",
+        "项目管理方法论与生命周期",
+        "项目管理原则 · 概述"
+      ],
+      "title": "项目管理原则 · 概述"
+    },
+    {
+      "id": "b8eb493d7f41061511002168",
+      "parentId": "c6c810191fd2030896bd4403",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-1-1-4-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "项目管理方法论与生命周期",
+        "项目管理原则 · 概述",
+        "项目管理的思维模式"
+      ],
+      "title": "项目管理的思维模式"
+    },
+    {
+      "id": "b189f85ff1bce16086ef6ecb",
+      "parentId": "3b0a4b992dac356c700f2c69",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-1-1-5",
+      "path": [
+        "PMP",
+        "过程",
+        "项目管理方法论与生命周期",
+        "项目管理原则1：采用整体视角"
+      ],
+      "title": "项目管理原则1：采用整体视角"
+    },
+    {
+      "id": "afeccee184fa6ee999d6b083",
+      "parentId": "b189f85ff1bce16086ef6ecb",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-1-1-5-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "项目管理方法论与生命周期",
+        "项目管理原则1：采用整体视角",
+        "系统思考"
+      ],
+      "title": "系统思考"
+    },
+    {
+      "id": "f71680721b600e0e9a034e29",
+      "parentId": "b189f85ff1bce16086ef6ecb",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-1-1-5-k02",
+      "path": [
+        "PMP",
+        "过程",
+        "项目管理方法论与生命周期",
+        "项目管理原则1：采用整体视角",
+        "识别、评估和响应系统交互"
+      ],
+      "title": "识别、评估和响应系统交互"
+    },
+    {
+      "id": "be556cb62806f21d41f3c6ed",
+      "parentId": "3b0a4b992dac356c700f2c69",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-1-1-6",
+      "path": [
+        "PMP",
+        "过程",
+        "项目管理方法论与生命周期",
+        "项目管理原则2：聚焦于价值"
+      ],
+      "title": "项目管理原则2：聚焦于价值"
+    },
+    {
+      "id": "775590091d3fccd0a97a3977",
+      "parentId": "be556cb62806f21d41f3c6ed",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-1-1-6-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "项目管理方法论与生命周期",
+        "项目管理原则2：聚焦于价值",
+        "以价值为导向进行决策"
+      ],
+      "title": "以价值为导向进行决策"
+    },
+    {
+      "id": "83e8e76093667d22bfd110bd",
+      "parentId": "3b0a4b992dac356c700f2c69",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-1-1-7",
+      "path": [
+        "PMP",
+        "过程",
+        "项目管理方法论与生命周期",
+        "项目管理原则3：将质量融入过程和可交付物"
+      ],
+      "title": "项目管理原则3：将质量融入过程和可交付物"
+    },
+    {
+      "id": "dd52518afdab3583d3bedad6",
+      "parentId": "3b0a4b992dac356c700f2c69",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-1-1-8",
+      "path": [
+        "PMP",
+        "过程",
+        "项目管理方法论与生命周期",
+        "项目管理原则4：成为负责任的领导者"
+      ],
+      "title": "项目管理原则4：成为负责任的领导者"
+    },
+    {
+      "id": "d07f5fcf1c2b4ecdc52369c3",
+      "parentId": "dd52518afdab3583d3bedad6",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-1-1-8-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "项目管理方法论与生命周期",
+        "项目管理原则4：成为负责任的领导者",
+        "展现领导力行为"
+      ],
+      "title": "展现领导力行为"
+    },
+    {
+      "id": "cfa22e5c5bf93aa907105802",
+      "parentId": "3b0a4b992dac356c700f2c69",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-1-1-9",
+      "path": [
+        "PMP",
+        "过程",
+        "项目管理方法论与生命周期",
+        "项目管理原则5：将可持续性融入所有项目领域"
+      ],
+      "title": "项目管理原则5：将可持续性融入所有项目领域"
+    },
+    {
+      "id": "bc9f5bd67f86c2870ba54177",
+      "parentId": "3b0a4b992dac356c700f2c69",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-1-1-10",
+      "path": [
+        "PMP",
+        "过程",
+        "项目管理方法论与生命周期",
+        "项目管理原则6：构建赋能型文化"
+      ],
+      "title": "项目管理原则6：构建赋能型文化"
+    },
+    {
+      "id": "93bf7833f8185b5c8f7cc5d5",
+      "parentId": "bc9f5bd67f86c2870ba54177",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-1-1-10-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "项目管理方法论与生命周期",
+        "项目管理原则6：构建赋能型文化",
+        "营造协作的团队氛围"
+      ],
+      "title": "营造协作的团队氛围"
+    },
+    {
+      "id": "5e80cc224a958e46a165c754",
+      "parentId": "29b71baf2048cf6c553b068c",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-2",
+      "path": [
+        "PMP",
+        "过程",
+        "范围管理过程"
+      ],
+      "title": "范围管理过程"
+    },
+    {
+      "id": "bcfcf9e39388c6cf44bfe8db",
+      "parentId": "5e80cc224a958e46a165c754",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-2-2-1",
+      "path": [
+        "PMP",
+        "过程",
+        "范围管理过程",
+        "规划范围管理"
+      ],
+      "title": "规划范围管理"
+    },
+    {
+      "id": "88f18021626112c1ef5f9f15",
+      "parentId": "bcfcf9e39388c6cf44bfe8db",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-2-2-1-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "范围管理过程",
+        "规划范围管理",
+        "需求管理计划"
+      ],
+      "title": "需求管理计划"
+    },
+    {
+      "id": "64dc6807047ed724cbd5dcba",
+      "parentId": "bcfcf9e39388c6cf44bfe8db",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-2-2-1-k02",
+      "path": [
+        "PMP",
+        "过程",
+        "范围管理过程",
+        "规划范围管理",
+        "范围管理计划"
+      ],
+      "title": "范围管理计划"
+    },
+    {
+      "id": "26647b1cfde6b375cf9e60dd",
+      "parentId": "5e80cc224a958e46a165c754",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-2-2-2",
+      "path": [
+        "PMP",
+        "过程",
+        "范围管理过程",
+        "需求启发与分析"
+      ],
+      "title": "需求启发与分析"
+    },
+    {
+      "id": "e4cde674f17d8fd981a2ad79",
+      "parentId": "26647b1cfde6b375cf9e60dd",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-2-2-2-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "范围管理过程",
+        "需求启发与分析",
+        "引导"
+      ],
+      "title": "引导"
+    },
+    {
+      "id": "2d99239c8c33d28f8c76f3d5",
+      "parentId": "26647b1cfde6b375cf9e60dd",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-2-2-2-k02",
+      "path": [
+        "PMP",
+        "过程",
+        "范围管理过程",
+        "需求启发与分析",
+        "亲和图"
+      ],
+      "title": "亲和图"
+    },
+    {
+      "id": "36ef437d8ce69f2ba1603a24",
+      "parentId": "26647b1cfde6b375cf9e60dd",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-2-2-2-k03",
+      "path": [
+        "PMP",
+        "过程",
+        "范围管理过程",
+        "需求启发与分析",
+        "问卷"
+      ],
+      "title": "问卷"
+    },
+    {
+      "id": "4aa71f3e7847b74df2103035",
+      "parentId": "26647b1cfde6b375cf9e60dd",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-2-2-2-k04",
+      "path": [
+        "PMP",
+        "过程",
+        "范围管理过程",
+        "需求启发与分析",
+        "标杆对照"
+      ],
+      "title": "标杆对照"
+    },
+    {
+      "id": "6030b47585e9369587303647",
+      "parentId": "26647b1cfde6b375cf9e60dd",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-2-2-2-k05",
+      "path": [
+        "PMP",
+        "过程",
+        "范围管理过程",
+        "需求启发与分析",
+        "原型法"
+      ],
+      "title": "原型法"
+    },
+    {
+      "id": "4f5480d1dfc24790d3787789",
+      "parentId": "26647b1cfde6b375cf9e60dd",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-2-2-2-k06",
+      "path": [
+        "PMP",
+        "过程",
+        "范围管理过程",
+        "需求启发与分析",
+        "需求文件"
+      ],
+      "title": "需求文件"
+    },
+    {
+      "id": "4d79a20331aa2585a0dbf842",
+      "parentId": "26647b1cfde6b375cf9e60dd",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-2-2-2-k07",
+      "path": [
+        "PMP",
+        "过程",
+        "范围管理过程",
+        "需求启发与分析",
+        "需求跟踪矩阵"
+      ],
+      "title": "需求跟踪矩阵"
+    },
+    {
+      "id": "572f582d7ec3bae1c2aa82c3",
+      "parentId": "5e80cc224a958e46a165c754",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-2-2-3",
+      "path": [
+        "PMP",
+        "过程",
+        "范围管理过程",
+        "定义范围"
+      ],
+      "title": "定义范围"
+    },
+    {
+      "id": "44d86d936aee734d87b576dc",
+      "parentId": "572f582d7ec3bae1c2aa82c3",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-2-2-3-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "范围管理过程",
+        "定义范围",
+        "范围说明书"
+      ],
+      "title": "范围说明书"
+    },
+    {
+      "id": "89b0ad92d891db10050fe30a",
+      "parentId": "572f582d7ec3bae1c2aa82c3",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-2-2-3-k02",
+      "path": [
+        "PMP",
+        "过程",
+        "范围管理过程",
+        "定义范围",
+        "质量管理计划"
+      ],
+      "title": "质量管理计划"
+    },
+    {
+      "id": "3a276be80ab573bea1544db0",
+      "parentId": "5e80cc224a958e46a165c754",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-2-2-4",
+      "path": [
+        "PMP",
+        "过程",
+        "范围管理过程",
+        "制定范围结构"
+      ],
+      "title": "制定范围结构"
+    },
+    {
+      "id": "60acb53961e0bfa3cc5133c1",
+      "parentId": "3a276be80ab573bea1544db0",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-2-2-4-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "范围管理过程",
+        "制定范围结构",
+        "WBS"
+      ],
+      "title": "WBS"
+    },
+    {
+      "id": "a9a6a8c9935f872ab574a624",
+      "parentId": "3a276be80ab573bea1544db0",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-2-2-4-k02",
+      "path": [
+        "PMP",
+        "过程",
+        "范围管理过程",
+        "制定范围结构",
+        "WBS 词典"
+      ],
+      "title": "WBS 词典"
+    },
+    {
+      "id": "74bba5c611eb4ad4d6086a45",
+      "parentId": "3a276be80ab573bea1544db0",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-2-2-4-k03",
+      "path": [
+        "PMP",
+        "过程",
+        "范围管理过程",
+        "制定范围结构",
+        "分解与滚动式规划"
+      ],
+      "title": "分解与滚动式规划"
+    },
+    {
+      "id": "5241e66d73ef1fce5e0209bb",
+      "parentId": "5e80cc224a958e46a165c754",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-2-2-5",
+      "path": [
+        "PMP",
+        "过程",
+        "范围管理过程",
+        "监控范围"
+      ],
+      "title": "监控范围"
+    },
+    {
+      "id": "6d81355571fc2bc9e5b1e291",
+      "parentId": "5241e66d73ef1fce5e0209bb",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-2-2-5-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "范围管理过程",
+        "监控范围",
+        "根本原因分析"
+      ],
+      "title": "根本原因分析"
+    },
+    {
+      "id": "4d93ba1598ed40d57c50dd2a",
+      "parentId": "5241e66d73ef1fce5e0209bb",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-2-2-5-k02",
+      "path": [
+        "PMP",
+        "过程",
+        "范围管理过程",
+        "监控范围",
+        "审计与检查"
+      ],
+      "title": "审计与检查"
+    },
+    {
+      "id": "252cfc7ced39dc01c0c99a6e",
+      "parentId": "5241e66d73ef1fce5e0209bb",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-2-2-5-k03",
+      "path": [
+        "PMP",
+        "过程",
+        "范围管理过程",
+        "监控范围",
+        "绩效审查"
+      ],
+      "title": "绩效审查"
+    },
+    {
+      "id": "32dd9e9d26759898d3901619",
+      "parentId": "5241e66d73ef1fce5e0209bb",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-2-2-5-k04",
+      "path": [
+        "PMP",
+        "过程",
+        "范围管理过程",
+        "监控范围",
+        "范围基准争议处理"
+      ],
+      "title": "范围基准争议处理"
+    },
+    {
+      "id": "ca031086b1858ea5f8a9c9d2",
+      "parentId": "5241e66d73ef1fce5e0209bb",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-2-2-5-k05",
+      "path": [
+        "PMP",
+        "过程",
+        "范围管理过程",
+        "监控范围",
+        "范围蔓延与镀金"
+      ],
+      "title": "范围蔓延与镀金"
+    },
+    {
+      "id": "7430b25b42cfb3ef2f293c3a",
+      "parentId": "5241e66d73ef1fce5e0209bb",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-2-2-5-k06",
+      "path": [
+        "PMP",
+        "过程",
+        "范围管理过程",
+        "监控范围",
+        "有变更走流程"
+      ],
+      "title": "有变更走流程"
+    },
+    {
+      "id": "4cecf7ee40154a2fec56ce44",
+      "parentId": "5e80cc224a958e46a165c754",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-2-2-6",
+      "path": [
+        "PMP",
+        "过程",
+        "范围管理过程",
+        "确认范围"
+      ],
+      "title": "确认范围"
+    },
+    {
+      "id": "1d2fe43cea905cde0641c945",
+      "parentId": "4cecf7ee40154a2fec56ce44",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-2-2-6-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "范围管理过程",
+        "确认范围",
+        "确认范围"
+      ],
+      "title": "确认范围"
+    },
+    {
+      "id": "d931e9520049c30535843eb0",
+      "parentId": "4cecf7ee40154a2fec56ce44",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-2-2-6-k02",
+      "path": [
+        "PMP",
+        "过程",
+        "范围管理过程",
+        "确认范围",
+        "确认依据"
+      ],
+      "title": "确认依据"
+    },
+    {
+      "id": "ea100e68de4932d4a0288fc0",
+      "parentId": "29b71baf2048cf6c553b068c",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-3",
+      "path": [
+        "PMP",
+        "过程",
+        "进度管理过程"
+      ],
+      "title": "进度管理过程"
+    },
+    {
+      "id": "0a286a3b35b273e9151d24c9",
+      "parentId": "ea100e68de4932d4a0288fc0",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-3-3-1",
+      "path": [
+        "PMP",
+        "过程",
+        "进度管理过程",
+        "规划进度管理"
+      ],
+      "title": "规划进度管理"
+    },
+    {
+      "id": "c8c6f323ea5c5ac477ec5274",
+      "parentId": "0a286a3b35b273e9151d24c9",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-3-3-1-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "进度管理过程",
+        "规划进度管理",
+        "进度管理计划"
+      ],
+      "title": "进度管理计划"
+    },
+    {
+      "id": "0af980e71afb1a41607d5123",
+      "parentId": "ea100e68de4932d4a0288fc0",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-3-3-2",
+      "path": [
+        "PMP",
+        "过程",
+        "进度管理过程",
+        "制定进度计划"
+      ],
+      "title": "制定进度计划"
+    },
+    {
+      "id": "1054c13748d4066cfd02aa78",
+      "parentId": "0af980e71afb1a41607d5123",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-3-3-2-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "进度管理过程",
+        "制定进度计划",
+        "定义活动"
+      ],
+      "title": "定义活动"
+    },
+    {
+      "id": "456a235311c9681ed36b1b99",
+      "parentId": "0af980e71afb1a41607d5123",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-3-3-2-k02",
+      "path": [
+        "PMP",
+        "过程",
+        "进度管理过程",
+        "制定进度计划",
+        "确定顺序"
+      ],
+      "title": "确定顺序"
+    },
+    {
+      "id": "b27586884fbc51cf56c23b17",
+      "parentId": "0af980e71afb1a41607d5123",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-3-3-2-k03",
+      "path": [
+        "PMP",
+        "过程",
+        "进度管理过程",
+        "制定进度计划",
+        "估算持续时间"
+      ],
+      "title": "估算持续时间"
+    },
+    {
+      "id": "b74f57d7fe6205daa48a2af1",
+      "parentId": "0af980e71afb1a41607d5123",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-3-3-2-k04",
+      "path": [
+        "PMP",
+        "过程",
+        "进度管理过程",
+        "制定进度计划",
+        "调整进度表"
+      ],
+      "title": "调整进度表"
+    },
+    {
+      "id": "cdff930799a9aff1b33f579b",
+      "parentId": "0af980e71afb1a41607d5123",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-3-3-2-k05",
+      "path": [
+        "PMP",
+        "过程",
+        "进度管理过程",
+        "制定进度计划",
+        "关键路径法"
+      ],
+      "title": "关键路径法"
+    },
+    {
+      "id": "076d0b537527bbe7aa16ebe7",
+      "parentId": "0af980e71afb1a41607d5123",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-3-3-2-k06",
+      "path": [
+        "PMP",
+        "过程",
+        "进度管理过程",
+        "制定进度计划",
+        "进度压缩之快速跟进与赶工"
+      ],
+      "title": "进度压缩之快速跟进与赶工"
+    },
+    {
+      "id": "9e79dba260d309e34bd327ee",
+      "parentId": "0af980e71afb1a41607d5123",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-3-3-2-k07",
+      "path": [
+        "PMP",
+        "过程",
+        "进度管理过程",
+        "制定进度计划",
+        "资源平衡和平滑"
+      ],
+      "title": "资源平衡和平滑"
+    },
+    {
+      "id": "c85ad93cf0fb3f2313c8e540",
+      "parentId": "0af980e71afb1a41607d5123",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-3-3-2-k08",
+      "path": [
+        "PMP",
+        "过程",
+        "进度管理过程",
+        "制定进度计划",
+        "模拟和假设情景"
+      ],
+      "title": "模拟和假设情景"
+    },
+    {
+      "id": "1e08a1f78059f008dd8844e8",
+      "parentId": "ea100e68de4932d4a0288fc0",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-3-3-3",
+      "path": [
+        "PMP",
+        "过程",
+        "进度管理过程",
+        "监控进度"
+      ],
+      "title": "监控进度"
+    },
+    {
+      "id": "b74a46d1f672028bb4796148",
+      "parentId": "1e08a1f78059f008dd8844e8",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-3-3-3-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "进度管理过程",
+        "监控进度",
+        "先评估后行动"
+      ],
+      "title": "先评估后行动"
+    },
+    {
+      "id": "f859b14bd9b605e4ff6ce9e8",
+      "parentId": "1e08a1f78059f008dd8844e8",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-3-3-3-k02",
+      "path": [
+        "PMP",
+        "过程",
+        "进度管理过程",
+        "监控进度",
+        "有变更走流程"
+      ],
+      "title": "有变更走流程"
+    },
+    {
+      "id": "d3bbc0ab97a9ff842c2d26b1",
+      "parentId": "29b71baf2048cf6c553b068c",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-4",
+      "path": [
+        "PMP",
+        "过程",
+        "财务（成本）管理过程"
+      ],
+      "title": "财务（成本）管理过程"
+    },
+    {
+      "id": "ff21e37f1fde0c3bced6ef53",
+      "parentId": "d3bbc0ab97a9ff842c2d26b1",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-4-4-1",
+      "path": [
+        "PMP",
+        "过程",
+        "财务（成本）管理过程",
+        "规划财务管理"
+      ],
+      "title": "规划财务管理"
+    },
+    {
+      "id": "62ebbafe76de2fc15eee97e4",
+      "parentId": "ff21e37f1fde0c3bced6ef53",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-4-4-1-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "财务（成本）管理过程",
+        "规划财务管理",
+        "财务管理计划"
+      ],
+      "title": "财务管理计划"
+    },
+    {
+      "id": "430ffb1f0d9b4f3af410c69b",
+      "parentId": "ff21e37f1fde0c3bced6ef53",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-4-4-1-k02",
+      "path": [
+        "PMP",
+        "过程",
+        "财务（成本）管理过程",
+        "规划财务管理",
+        "资金策略"
+      ],
+      "title": "资金策略"
+    },
+    {
+      "id": "2f753261d36541ce4a9f25bc",
+      "parentId": "d3bbc0ab97a9ff842c2d26b1",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-4-4-2",
+      "path": [
+        "PMP",
+        "过程",
+        "财务（成本）管理过程",
+        "估算成本"
+      ],
+      "title": "估算成本"
+    },
+    {
+      "id": "08f0d897b24698ee306ae30a",
+      "parentId": "2f753261d36541ce4a9f25bc",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-4-4-2-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "财务（成本）管理过程",
+        "估算成本",
+        "多点估算"
+      ],
+      "title": "多点估算"
+    },
+    {
+      "id": "6e3a378f7e88d7058fa8ebc3",
+      "parentId": "2f753261d36541ce4a9f25bc",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-4-4-2-k02",
+      "path": [
+        "PMP",
+        "过程",
+        "财务（成本）管理过程",
+        "估算成本",
+        "类比估算"
+      ],
+      "title": "类比估算"
+    },
+    {
+      "id": "d770cc54b62a8fa5571558f2",
+      "parentId": "2f753261d36541ce4a9f25bc",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-4-4-2-k03",
+      "path": [
+        "PMP",
+        "过程",
+        "财务（成本）管理过程",
+        "估算成本",
+        "自下而上估算"
+      ],
+      "title": "自下而上估算"
+    },
+    {
+      "id": "7bcbcc2023ef10b2f0eab365",
+      "parentId": "2f753261d36541ce4a9f25bc",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-4-4-2-k04",
+      "path": [
+        "PMP",
+        "过程",
+        "财务（成本）管理过程",
+        "估算成本",
+        "成本估算"
+      ],
+      "title": "成本估算"
+    },
+    {
+      "id": "145cb0c01b5f8803dc22efe7",
+      "parentId": "d3bbc0ab97a9ff842c2d26b1",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-4-4-3",
+      "path": [
+        "PMP",
+        "过程",
+        "财务（成本）管理过程",
+        "制定预算"
+      ],
+      "title": "制定预算"
+    },
+    {
+      "id": "3546f525ffb6a94a71cf4bd9",
+      "parentId": "145cb0c01b5f8803dc22efe7",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-4-4-3-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "财务（成本）管理过程",
+        "制定预算",
+        "成本基准"
+      ],
+      "title": "成本基准"
+    },
+    {
+      "id": "0fc094f95357cf4fd7bf9bb9",
+      "parentId": "d3bbc0ab97a9ff842c2d26b1",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-4-4-4",
+      "path": [
+        "PMP",
+        "过程",
+        "财务（成本）管理过程",
+        "监控财务"
+      ],
+      "title": "监控财务"
+    },
+    {
+      "id": "407ca593b0b6eded5e520605",
+      "parentId": "0fc094f95357cf4fd7bf9bb9",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-4-4-4-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "财务（成本）管理过程",
+        "监控财务",
+        "控制成本"
+      ],
+      "title": "控制成本"
+    },
+    {
+      "id": "0c8c5dedd60a60fd4e01de0e",
+      "parentId": "0fc094f95357cf4fd7bf9bb9",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-4-4-4-k02",
+      "path": [
+        "PMP",
+        "过程",
+        "财务（成本）管理过程",
+        "监控财务",
+        "挣值分析"
+      ],
+      "title": "挣值分析"
+    },
+    {
+      "id": "ef4f73efa24f90c01d7f55a5",
+      "parentId": "0fc094f95357cf4fd7bf9bb9",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-4-4-4-k03",
+      "path": [
+        "PMP",
+        "过程",
+        "财务（成本）管理过程",
+        "监控财务",
+        "趋势分析"
+      ],
+      "title": "趋势分析"
+    },
+    {
+      "id": "48ca3b54b908bc2bed4bcb15",
+      "parentId": "0fc094f95357cf4fd7bf9bb9",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-4-4-4-k04",
+      "path": [
+        "PMP",
+        "过程",
+        "财务（成本）管理过程",
+        "监控财务",
+        "收入与成本预测"
+      ],
+      "title": "收入与成本预测"
+    },
+    {
+      "id": "9f8c357c8df9891aba85e9ba",
+      "parentId": "29b71baf2048cf6c553b068c",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-5",
+      "path": [
+        "PMP",
+        "过程",
+        "风险管理过程"
+      ],
+      "title": "风险管理过程"
+    },
+    {
+      "id": "f6b5a62c5606418360a29015",
+      "parentId": "9f8c357c8df9891aba85e9ba",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-5-5-1",
+      "path": [
+        "PMP",
+        "过程",
+        "风险管理过程",
+        "规划风险管理"
+      ],
+      "title": "规划风险管理"
+    },
+    {
+      "id": "a6c6a5b166a6f0ef7e4b2eb6",
+      "parentId": "f6b5a62c5606418360a29015",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-5-5-1-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "风险管理过程",
+        "规划风险管理",
+        "风险管理计划"
+      ],
+      "title": "风险管理计划"
+    },
+    {
+      "id": "bc302ea0ffdf70ec3cab4b8c",
+      "parentId": "9f8c357c8df9891aba85e9ba",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-5-5-2",
+      "path": [
+        "PMP",
+        "过程",
+        "风险管理过程",
+        "识别风险"
+      ],
+      "title": "识别风险"
+    },
+    {
+      "id": "449733eac0cb6c5f5c8f5c84",
+      "parentId": "bc302ea0ffdf70ec3cab4b8c",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-5-5-2-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "风险管理过程",
+        "识别风险",
+        "德尔菲"
+      ],
+      "title": "德尔菲"
+    },
+    {
+      "id": "2c6b13ddeff7a56488370df3",
+      "parentId": "bc302ea0ffdf70ec3cab4b8c",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-5-5-2-k02",
+      "path": [
+        "PMP",
+        "过程",
+        "风险管理过程",
+        "识别风险",
+        "访谈"
+      ],
+      "title": "访谈"
+    },
+    {
+      "id": "bc9498e83f853a22cdfaf3f9",
+      "parentId": "bc302ea0ffdf70ec3cab4b8c",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-5-5-2-k03",
+      "path": [
+        "PMP",
+        "过程",
+        "风险管理过程",
+        "识别风险",
+        "SWOT 分析"
+      ],
+      "title": "SWOT 分析"
+    },
+    {
+      "id": "c97b3588e14663737dd32661",
+      "parentId": "bc302ea0ffdf70ec3cab4b8c",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-5-5-2-k04",
+      "path": [
+        "PMP",
+        "过程",
+        "风险管理过程",
+        "识别风险",
+        "风险登记册"
+      ],
+      "title": "风险登记册"
+    },
+    {
+      "id": "8e6fe3ef769766911214744c",
+      "parentId": "9f8c357c8df9891aba85e9ba",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-5-5-3",
+      "path": [
+        "PMP",
+        "过程",
+        "风险管理过程",
+        "实施风险分析"
+      ],
+      "title": "实施风险分析"
+    },
+    {
+      "id": "4a4e7426c382963848d6d426",
+      "parentId": "8e6fe3ef769766911214744c",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-5-5-3-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "风险管理过程",
+        "实施风险分析",
+        "概率和影响矩阵"
+      ],
+      "title": "概率和影响矩阵"
+    },
+    {
+      "id": "a302bf77d1bff4e9c84cf26e",
+      "parentId": "8e6fe3ef769766911214744c",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-5-5-3-k02",
+      "path": [
+        "PMP",
+        "过程",
+        "风险管理过程",
+        "实施风险分析",
+        "模拟"
+      ],
+      "title": "模拟"
+    },
+    {
+      "id": "b7b03edd3bbb6a9a2e15ca98",
+      "parentId": "8e6fe3ef769766911214744c",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-5-5-3-k03",
+      "path": [
+        "PMP",
+        "过程",
+        "风险管理过程",
+        "实施风险分析",
+        "敏感性分析"
+      ],
+      "title": "敏感性分析"
+    },
+    {
+      "id": "9eb96e80fb42c1cd66d06b42",
+      "parentId": "8e6fe3ef769766911214744c",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-5-5-3-k04",
+      "path": [
+        "PMP",
+        "过程",
+        "风险管理过程",
+        "实施风险分析",
+        "决策树"
+      ],
+      "title": "决策树"
+    },
+    {
+      "id": "23112f4975dcace3861136a1",
+      "parentId": "9f8c357c8df9891aba85e9ba",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-5-5-4",
+      "path": [
+        "PMP",
+        "过程",
+        "风险管理过程",
+        "规划风险应对"
+      ],
+      "title": "规划风险应对"
+    },
+    {
+      "id": "f5d30b2e2e8a0312ab1aa33f",
+      "parentId": "23112f4975dcace3861136a1",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-5-5-4-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "风险管理过程",
+        "规划风险应对",
+        "威胁应对策略"
+      ],
+      "title": "威胁应对策略"
+    },
+    {
+      "id": "bacab810fb5bee4fd237c841",
+      "parentId": "23112f4975dcace3861136a1",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-5-5-4-k02",
+      "path": [
+        "PMP",
+        "过程",
+        "风险管理过程",
+        "规划风险应对",
+        "机会应对策略"
+      ],
+      "title": "机会应对策略"
+    },
+    {
+      "id": "737a97a2b5b3384b03d55da1",
+      "parentId": "23112f4975dcace3861136a1",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-5-5-4-k03",
+      "path": [
+        "PMP",
+        "过程",
+        "风险管理过程",
+        "规划风险应对",
+        "应急应对策略及权变措施"
+      ],
+      "title": "应急应对策略及权变措施"
+    },
+    {
+      "id": "5e3980dd417d62dae86aaef5",
+      "parentId": "9f8c357c8df9891aba85e9ba",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-5-5-5",
+      "path": [
+        "PMP",
+        "过程",
+        "风险管理过程",
+        "实施风险应对"
+      ],
+      "title": "实施风险应对"
+    },
+    {
+      "id": "007b087a9f414b4267f861a5",
+      "parentId": "9f8c357c8df9891aba85e9ba",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-5-5-6",
+      "path": [
+        "PMP",
+        "过程",
+        "风险管理过程",
+        "监督风险"
+      ],
+      "title": "监督风险"
+    },
+    {
+      "id": "d1104b3eae8419bb02b78039",
+      "parentId": "007b087a9f414b4267f861a5",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-5-5-6-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "风险管理过程",
+        "监督风险",
+        "储备分析"
+      ],
+      "title": "储备分析"
+    },
+    {
+      "id": "1bd0cb7c227ade8b97a3131e",
+      "parentId": "007b087a9f414b4267f861a5",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-5-5-6-k02",
+      "path": [
+        "PMP",
+        "过程",
+        "风险管理过程",
+        "监督风险",
+        "风险审计"
+      ],
+      "title": "风险审计"
+    },
+    {
+      "id": "4ed411decf889f385b463733",
+      "parentId": "29b71baf2048cf6c553b068c",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-6",
+      "path": [
+        "PMP",
+        "过程",
+        "资源管理过程"
+      ],
+      "title": "资源管理过程"
+    },
+    {
+      "id": "103d03994af8cee36c704c19",
+      "parentId": "4ed411decf889f385b463733",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-6-6-1",
+      "path": [
+        "PMP",
+        "过程",
+        "资源管理过程",
+        "规划资源管理"
+      ],
+      "title": "规划资源管理"
+    },
+    {
+      "id": "4c9c2b564730ec572eace2b3",
+      "parentId": "103d03994af8cee36c704c19",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-6-6-1-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "资源管理过程",
+        "规划资源管理",
+        "资源分解结构"
+      ],
+      "title": "资源分解结构"
+    },
+    {
+      "id": "2d500437aeefe01274bd80d0",
+      "parentId": "103d03994af8cee36c704c19",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-6-6-1-k02",
+      "path": [
+        "PMP",
+        "过程",
+        "资源管理过程",
+        "规划资源管理",
+        "RACI 矩阵"
+      ],
+      "title": "RACI 矩阵"
+    },
+    {
+      "id": "ec1e71f9d6f5282ec00c999e",
+      "parentId": "103d03994af8cee36c704c19",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-6-6-1-k03",
+      "path": [
+        "PMP",
+        "过程",
+        "资源管理过程",
+        "规划资源管理",
+        "资源管理计划"
+      ],
+      "title": "资源管理计划"
+    },
+    {
+      "id": "b3b4b96e209ba78fbd64a8d9",
+      "parentId": "103d03994af8cee36c704c19",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-6-6-1-k04",
+      "path": [
+        "PMP",
+        "过程",
+        "资源管理过程",
+        "规划资源管理",
+        "团队章程"
+      ],
+      "title": "团队章程"
+    },
+    {
+      "id": "72aeb247cf829c089f91017a",
+      "parentId": "4ed411decf889f385b463733",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-6-6-2",
+      "path": [
+        "PMP",
+        "过程",
+        "资源管理过程",
+        "估算活动资源"
+      ],
+      "title": "估算活动资源"
+    },
+    {
+      "id": "90fbb1623af0dd9c76a11dda",
+      "parentId": "72aeb247cf829c089f91017a",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-6-6-2-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "资源管理过程",
+        "估算活动资源",
+        "资源需求"
+      ],
+      "title": "资源需求"
+    },
+    {
+      "id": "65e3e8e19e1e406e3a34d6ce",
+      "parentId": "72aeb247cf829c089f91017a",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-6-6-2-k02",
+      "path": [
+        "PMP",
+        "过程",
+        "资源管理过程",
+        "估算活动资源",
+        "资源日历"
+      ],
+      "title": "资源日历"
+    },
+    {
+      "id": "e140806923891f95deaedc08",
+      "parentId": "4ed411decf889f385b463733",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-6-6-3",
+      "path": [
+        "PMP",
+        "过程",
+        "资源管理过程",
+        "获取资源"
+      ],
+      "title": "获取资源"
+    },
+    {
+      "id": "df5330bc5cc619a4f33b906a",
+      "parentId": "4ed411decf889f385b463733",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-6-6-4",
+      "path": [
+        "PMP",
+        "过程",
+        "资源管理过程",
+        "监控资源"
+      ],
+      "title": "监控资源"
+    },
+    {
+      "id": "4139eb4eeba5565c571d8035",
+      "parentId": "df5330bc5cc619a4f33b906a",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-6-6-4-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "资源管理过程",
+        "监控资源",
+        "先评估再行动"
+      ],
+      "title": "先评估再行动"
+    },
+    {
+      "id": "aba33ffe311f9d0b6829fd29",
+      "parentId": "df5330bc5cc619a4f33b906a",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-6-6-4-k02",
+      "path": [
+        "PMP",
+        "过程",
+        "资源管理过程",
+        "监控资源",
+        "有变更走流程"
+      ],
+      "title": "有变更走流程"
+    },
+    {
+      "id": "40294bef1b77ddb9fa7d7f79",
+      "parentId": "29b71baf2048cf6c553b068c",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-7",
+      "path": [
+        "PMP",
+        "过程",
+        "治理与整合过程"
+      ],
+      "title": "治理与整合过程"
+    },
+    {
+      "id": "7102094d87f57bd1a2db9112",
+      "parentId": "40294bef1b77ddb9fa7d7f79",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-7-7-1",
+      "path": [
+        "PMP",
+        "过程",
+        "治理与整合过程",
+        "启动项目或阶段"
+      ],
+      "title": "启动项目或阶段"
+    },
+    {
+      "id": "d533dcbfd6347a0e0ff90b65",
+      "parentId": "7102094d87f57bd1a2db9112",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-7-7-1-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "治理与整合过程",
+        "启动项目或阶段",
+        "项目章程编制与审核"
+      ],
+      "title": "项目章程编制与审核"
+    },
+    {
+      "id": "a84d0c266531d7bfb348c870",
+      "parentId": "7102094d87f57bd1a2db9112",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-7-7-1-k02",
+      "path": [
+        "PMP",
+        "过程",
+        "治理与整合过程",
+        "启动项目或阶段",
+        "项目章程内容"
+      ],
+      "title": "项目章程内容"
+    },
+    {
+      "id": "cd2969b0ea072fec961cd3ba",
+      "parentId": "7102094d87f57bd1a2db9112",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-7-7-1-k03",
+      "path": [
+        "PMP",
+        "过程",
+        "治理与整合过程",
+        "启动项目或阶段",
+        "项目章程作用"
+      ],
+      "title": "项目章程作用"
+    },
+    {
+      "id": "562d5f7d3fe4b8d9df109476",
+      "parentId": "7102094d87f57bd1a2db9112",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-7-7-1-k04",
+      "path": [
+        "PMP",
+        "过程",
+        "治理与整合过程",
+        "启动项目或阶段",
+        "假设日志"
+      ],
+      "title": "假设日志"
+    },
+    {
+      "id": "e40978755f2b141ebffe23b5",
+      "parentId": "40294bef1b77ddb9fa7d7f79",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-7-7-2",
+      "path": [
+        "PMP",
+        "过程",
+        "治理与整合过程",
+        "整合与对齐项目计划"
+      ],
+      "title": "整合与对齐项目计划"
+    },
+    {
+      "id": "2d43a99b0b30a32bd9f7f7eb",
+      "parentId": "e40978755f2b141ebffe23b5",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-7-7-2-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "治理与整合过程",
+        "整合与对齐项目计划",
+        "项目管理计划内容"
+      ],
+      "title": "项目管理计划内容"
+    },
+    {
+      "id": "1653e9ce2168636eee0142f9",
+      "parentId": "e40978755f2b141ebffe23b5",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-7-7-2-k02",
+      "path": [
+        "PMP",
+        "过程",
+        "治理与整合过程",
+        "整合与对齐项目计划",
+        "项目管理计划作用"
+      ],
+      "title": "项目管理计划作用"
+    },
+    {
+      "id": "0cfbe7692fbc5944dc03df88",
+      "parentId": "e40978755f2b141ebffe23b5",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-7-7-2-k03",
+      "path": [
+        "PMP",
+        "过程",
+        "治理与整合过程",
+        "整合与对齐项目计划",
+        "开工会议"
+      ],
+      "title": "开工会议"
+    },
+    {
+      "id": "14465a982bfbd177e66b91fc",
+      "parentId": "40294bef1b77ddb9fa7d7f79",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-7-7-3",
+      "path": [
+        "PMP",
+        "过程",
+        "治理与整合过程",
+        "管理项目执行"
+      ],
+      "title": "管理项目执行"
+    },
+    {
+      "id": "e7ab1e8d8488d152b3eb21b8",
+      "parentId": "14465a982bfbd177e66b91fc",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-7-7-3-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "治理与整合过程",
+        "管理项目执行",
+        "指导与管理项目工作"
+      ],
+      "title": "指导与管理项目工作"
+    },
+    {
+      "id": "79a037e08bc5c2c4ce7208ce",
+      "parentId": "14465a982bfbd177e66b91fc",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-7-7-3-k02",
+      "path": [
+        "PMP",
+        "过程",
+        "治理与整合过程",
+        "管理项目执行",
+        "问题日志或解决问题"
+      ],
+      "title": "问题日志或解决问题"
+    },
+    {
+      "id": "3f92b6262f54279f0bfa963c",
+      "parentId": "40294bef1b77ddb9fa7d7f79",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-7-7-4",
+      "path": [
+        "PMP",
+        "过程",
+        "治理与整合过程",
+        "管理质量保证"
+      ],
+      "title": "管理质量保证"
+    },
+    {
+      "id": "a154cdba8587a423cf116ad1",
+      "parentId": "3f92b6262f54279f0bfa963c",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-7-7-4-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "治理与整合过程",
+        "管理质量保证",
+        "质量保证工具与技术"
+      ],
+      "title": "质量保证工具与技术"
+    },
+    {
+      "id": "bd71d5c7851c30fe066a9ff0",
+      "parentId": "3f92b6262f54279f0bfa963c",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-7-7-4-k02",
+      "path": [
+        "PMP",
+        "过程",
+        "治理与整合过程",
+        "管理质量保证",
+        "质量报告"
+      ],
+      "title": "质量报告"
+    },
+    {
+      "id": "7a87efbf1fc7a63427801d94",
+      "parentId": "40294bef1b77ddb9fa7d7f79",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-7-7-5",
+      "path": [
+        "PMP",
+        "过程",
+        "治理与整合过程",
+        "管理项目知识"
+      ],
+      "title": "管理项目知识"
+    },
+    {
+      "id": "e274aa6e0f3e2a3fb36aef21",
+      "parentId": "7a87efbf1fc7a63427801d94",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-7-7-5-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "治理与整合过程",
+        "管理项目知识",
+        "知识管理与信息管理方法"
+      ],
+      "title": "知识管理与信息管理方法"
+    },
+    {
+      "id": "be927794cec3e7f2477835b7",
+      "parentId": "7a87efbf1fc7a63427801d94",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-7-7-5-k02",
+      "path": [
+        "PMP",
+        "过程",
+        "治理与整合过程",
+        "管理项目知识",
+        "经验教训登记册及更新"
+      ],
+      "title": "经验教训登记册及更新"
+    },
+    {
+      "id": "b25e015e516e9c4d1b06e100",
+      "parentId": "40294bef1b77ddb9fa7d7f79",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-7-7-6",
+      "path": [
+        "PMP",
+        "过程",
+        "治理与整合过程",
+        "监控项目绩效"
+      ],
+      "title": "监控项目绩效"
+    },
+    {
+      "id": "1a3c6d5e900e691107bd50d9",
+      "parentId": "b25e015e516e9c4d1b06e100",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-7-7-6-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "治理与整合过程",
+        "监控项目绩效",
+        "工作绩效数据/信息/报告"
+      ],
+      "title": "工作绩效数据/信息/报告"
+    },
+    {
+      "id": "f23dfc13e3990f70fec2aab2",
+      "parentId": "b25e015e516e9c4d1b06e100",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-7-7-6-k02",
+      "path": [
+        "PMP",
+        "过程",
+        "治理与整合过程",
+        "监控项目绩效",
+        "监控方法：偏差、趋势、根因、备选方案、成本效益分析"
+      ],
+      "title": "监控方法：偏差、趋势、根因、备选方案、成本效益分析"
+    },
+    {
+      "id": "4782a8565b1a35281151ca33",
+      "parentId": "40294bef1b77ddb9fa7d7f79",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-7-7-7",
+      "path": [
+        "PMP",
+        "过程",
+        "治理与整合过程",
+        "实施整体变更控制"
+      ],
+      "title": "实施整体变更控制"
+    },
+    {
+      "id": "01100d87f0ab96f163d8b56e",
+      "parentId": "4782a8565b1a35281151ca33",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-7-7-7-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "治理与整合过程",
+        "实施整体变更控制",
+        "变更控制流程作用"
+      ],
+      "title": "变更控制流程作用"
+    },
+    {
+      "id": "4519c857e04278b96d299826",
+      "parentId": "4782a8565b1a35281151ca33",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-7-7-7-k02",
+      "path": [
+        "PMP",
+        "过程",
+        "治理与整合过程",
+        "实施整体变更控制",
+        "变更请求分类"
+      ],
+      "title": "变更请求分类"
+    },
+    {
+      "id": "6764a89979ddc08d154ded8a",
+      "parentId": "4782a8565b1a35281151ca33",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-7-7-7-k03",
+      "path": [
+        "PMP",
+        "过程",
+        "治理与整合过程",
+        "实施整体变更控制",
+        "变更流程"
+      ],
+      "title": "变更流程"
+    },
+    {
+      "id": "c26398a3e3b24e0e442c561b",
+      "parentId": "4782a8565b1a35281151ca33",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-7-7-7-k04",
+      "path": [
+        "PMP",
+        "过程",
+        "治理与整合过程",
+        "实施整体变更控制",
+        "变更日志"
+      ],
+      "title": "变更日志"
+    },
+    {
+      "id": "a3a24d286e98bd95e82d6cec",
+      "parentId": "40294bef1b77ddb9fa7d7f79",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-7-7-8",
+      "path": [
+        "PMP",
+        "过程",
+        "治理与整合过程",
+        "结束项目或阶段"
+      ],
+      "title": "结束项目或阶段"
+    },
+    {
+      "id": "79e60e7cceb94a4c8ffede24",
+      "parentId": "a3a24d286e98bd95e82d6cec",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-7-7-8-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "治理与整合过程",
+        "结束项目或阶段",
+        "收尾内容"
+      ],
+      "title": "收尾内容"
+    },
+    {
+      "id": "6bfd34bd666b0e4af515e8bc",
+      "parentId": "a3a24d286e98bd95e82d6cec",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-7-7-8-k02",
+      "path": [
+        "PMP",
+        "过程",
+        "治理与整合过程",
+        "结束项目或阶段",
+        "收尾变更处理"
+      ],
+      "title": "收尾变更处理"
+    },
+    {
+      "id": "7067652fd0b04e7202bab526",
+      "parentId": "a3a24d286e98bd95e82d6cec",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-7-7-8-k03",
+      "path": [
+        "PMP",
+        "过程",
+        "治理与整合过程",
+        "结束项目或阶段",
+        "最终版文件及报告"
+      ],
+      "title": "最终版文件及报告"
+    },
+    {
+      "id": "e0677c072ae1ea92d6016782",
+      "parentId": "a3a24d286e98bd95e82d6cec",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-7-7-8-k04",
+      "path": [
+        "PMP",
+        "过程",
+        "治理与整合过程",
+        "结束项目或阶段",
+        "成果移交"
+      ],
+      "title": "成果移交"
+    },
+    {
+      "id": "fe7144d7d83cbbc651cc3a58",
+      "parentId": "a3a24d286e98bd95e82d6cec",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-7-7-8-k05",
+      "path": [
+        "PMP",
+        "过程",
+        "治理与整合过程",
+        "结束项目或阶段",
+        "提前终止"
+      ],
+      "title": "提前终止"
+    },
+    {
+      "id": "337bf4f781d5f6aa821bb01a",
+      "parentId": "a3a24d286e98bd95e82d6cec",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-7-7-8-k06",
+      "path": [
+        "PMP",
+        "过程",
+        "治理与整合过程",
+        "结束项目或阶段",
+        "组织过程资产更新"
+      ],
+      "title": "组织过程资产更新"
+    },
+    {
+      "id": "bf00bff7904883eaf3245115",
+      "parentId": "29b71baf2048cf6c553b068c",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-8",
+      "path": [
+        "PMP",
+        "过程",
+        "采购管理过程"
+      ],
+      "title": "采购管理过程"
+    },
+    {
+      "id": "ecbfdc16f6f1749099db3621",
+      "parentId": "bf00bff7904883eaf3245115",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-8-8-1",
+      "path": [
+        "PMP",
+        "过程",
+        "采购管理过程",
+        "规划采购"
+      ],
+      "title": "规划采购"
+    },
+    {
+      "id": "3da4cdba5af904e9619a92a0",
+      "parentId": "ecbfdc16f6f1749099db3621",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-8-8-1-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "采购管理过程",
+        "规划采购",
+        "自制或外购分析"
+      ],
+      "title": "自制或外购分析"
+    },
+    {
+      "id": "710cc4782c4bdf3a797e5fa8",
+      "parentId": "ecbfdc16f6f1749099db3621",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-8-8-1-k02",
+      "path": [
+        "PMP",
+        "过程",
+        "采购管理过程",
+        "规划采购",
+        "采购管理计划"
+      ],
+      "title": "采购管理计划"
+    },
+    {
+      "id": "ccf4f00f8b6cb7a20522c8bf",
+      "parentId": "ecbfdc16f6f1749099db3621",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-8-8-1-k03",
+      "path": [
+        "PMP",
+        "过程",
+        "采购管理过程",
+        "规划采购",
+        "合同支付类型"
+      ],
+      "title": "合同支付类型"
+    },
+    {
+      "id": "42c800f1d98e41bec1b361e1",
+      "parentId": "ecbfdc16f6f1749099db3621",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-8-8-1-k04",
+      "path": [
+        "PMP",
+        "过程",
+        "采购管理过程",
+        "规划采购",
+        "采购工作说明书"
+      ],
+      "title": "采购工作说明书"
+    },
+    {
+      "id": "3896652af3bdf5865a1bdf48",
+      "parentId": "ecbfdc16f6f1749099db3621",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-8-8-1-k05",
+      "path": [
+        "PMP",
+        "过程",
+        "采购管理过程",
+        "规划采购",
+        "供方选择标准"
+      ],
+      "title": "供方选择标准"
+    },
+    {
+      "id": "6c7014923a09dad81c0df921",
+      "parentId": "bf00bff7904883eaf3245115",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-8-8-2",
+      "path": [
+        "PMP",
+        "过程",
+        "采购管理过程",
+        "实施采购"
+      ],
+      "title": "实施采购"
+    },
+    {
+      "id": "fde34677724abb83714534f7",
+      "parentId": "6c7014923a09dad81c0df921",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-8-8-2-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "采购管理过程",
+        "实施采购",
+        "投标人会议"
+      ],
+      "title": "投标人会议"
+    },
+    {
+      "id": "b83d7bae0691461932d50e24",
+      "parentId": "6c7014923a09dad81c0df921",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-8-8-2-k02",
+      "path": [
+        "PMP",
+        "过程",
+        "采购管理过程",
+        "实施采购",
+        "采购建议书及评价"
+      ],
+      "title": "采购建议书及评价"
+    },
+    {
+      "id": "cf79785aae2d5b9565665a8c",
+      "parentId": "6c7014923a09dad81c0df921",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-8-8-2-k03",
+      "path": [
+        "PMP",
+        "过程",
+        "采购管理过程",
+        "实施采购",
+        "协议或合同"
+      ],
+      "title": "协议或合同"
+    },
+    {
+      "id": "33be2eecd35c5f4c519eddf9",
+      "parentId": "bf00bff7904883eaf3245115",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-8-8-3",
+      "path": [
+        "PMP",
+        "过程",
+        "采购管理过程",
+        "控制采购"
+      ],
+      "title": "控制采购"
+    },
+    {
+      "id": "ba1928c2e9c4e86f18b442d9",
+      "parentId": "33be2eecd35c5f4c519eddf9",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-8-8-3-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "采购管理过程",
+        "控制采购",
+        "绩效审查"
+      ],
+      "title": "绩效审查"
+    },
+    {
+      "id": "395a8a49331340709b8010f7",
+      "parentId": "33be2eecd35c5f4c519eddf9",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-8-8-3-k02",
+      "path": [
+        "PMP",
+        "过程",
+        "采购管理过程",
+        "控制采购",
+        "检查"
+      ],
+      "title": "检查"
+    },
+    {
+      "id": "e6a3a8ae1d2e0f42fe3e6724",
+      "parentId": "33be2eecd35c5f4c519eddf9",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-8-8-3-k03",
+      "path": [
+        "PMP",
+        "过程",
+        "采购管理过程",
+        "控制采购",
+        "审计"
+      ],
+      "title": "审计"
+    },
+    {
+      "id": "6669f222bc48153353578988",
+      "parentId": "33be2eecd35c5f4c519eddf9",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-8-8-3-k04",
+      "path": [
+        "PMP",
+        "过程",
+        "采购管理过程",
+        "控制采购",
+        "索赔管理"
+      ],
+      "title": "索赔管理"
+    },
+    {
+      "id": "935988cbe98d6ee6f4a0d6db",
+      "parentId": "33be2eecd35c5f4c519eddf9",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-8-8-3-k05",
+      "path": [
+        "PMP",
+        "过程",
+        "采购管理过程",
+        "控制采购",
+        "采购变更"
+      ],
+      "title": "采购变更"
+    },
+    {
+      "id": "47f62279837e67d76077ed62",
+      "parentId": "33be2eecd35c5f4c519eddf9",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-8-8-3-k06",
+      "path": [
+        "PMP",
+        "过程",
+        "采购管理过程",
+        "控制采购",
+        "终止合同及提前终止"
+      ],
+      "title": "终止合同及提前终止"
+    },
+    {
+      "id": "a887b10a4b3e1bda0d49c033",
+      "parentId": "29b71baf2048cf6c553b068c",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践"
+      ],
+      "title": "敏捷过程与实践"
+    },
+    {
+      "id": "3cde42fc3dcb4767402a27ce",
+      "parentId": "a887b10a4b3e1bda0d49c033",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-1",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "敏捷宣言四大价值观"
+      ],
+      "title": "敏捷宣言四大价值观"
+    },
+    {
+      "id": "4df7b82f1a53972007e14359",
+      "parentId": "3cde42fc3dcb4767402a27ce",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-1-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "敏捷宣言四大价值观",
+        "个体与互动高于流程工具"
+      ],
+      "title": "个体与互动高于流程工具"
+    },
+    {
+      "id": "eaa0a20cf018beec4d47dcaa",
+      "parentId": "3cde42fc3dcb4767402a27ce",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-1-k02",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "敏捷宣言四大价值观",
+        "可工作软件高于详尽文档"
+      ],
+      "title": "可工作软件高于详尽文档"
+    },
+    {
+      "id": "a52c0fb9f7e2e2f6ebd4bbec",
+      "parentId": "3cde42fc3dcb4767402a27ce",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-1-k03",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "敏捷宣言四大价值观",
+        "客户合作高于合同谈判"
+      ],
+      "title": "客户合作高于合同谈判"
+    },
+    {
+      "id": "1f7919c411897b059edc6d67",
+      "parentId": "3cde42fc3dcb4767402a27ce",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-1-k04",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "敏捷宣言四大价值观",
+        "响应变化高于遵循计划"
+      ],
+      "title": "响应变化高于遵循计划"
+    },
+    {
+      "id": "79a088b69d3e93ac1dc49100",
+      "parentId": "a887b10a4b3e1bda0d49c033",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-2",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "敏捷原则1：满足客户"
+      ],
+      "title": "敏捷原则1：满足客户"
+    },
+    {
+      "id": "faaab87b17fd25c8529294fd",
+      "parentId": "79a088b69d3e93ac1dc49100",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-2-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "敏捷原则1：满足客户",
+        "最高优先级是通过尽早和持续交付有价值的软件"
+      ],
+      "title": "最高优先级是通过尽早和持续交付有价值的软件"
+    },
+    {
+      "id": "aa9a6eff79e8e45d34708cd3",
+      "parentId": "a887b10a4b3e1bda0d49c033",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-3",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "敏捷原则2：拥抱变化"
+      ],
+      "title": "敏捷原则2：拥抱变化"
+    },
+    {
+      "id": "a2c684a98e4fa7e3a001a834",
+      "parentId": "aa9a6eff79e8e45d34708cd3",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-3-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "敏捷原则2：拥抱变化",
+        "欢迎需求变化，即使到开发后期"
+      ],
+      "title": "欢迎需求变化，即使到开发后期"
+    },
+    {
+      "id": "88318344c0e75072e6ff8ebb",
+      "parentId": "a887b10a4b3e1bda0d49c033",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-4",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "敏捷原则3：频繁交付"
+      ],
+      "title": "敏捷原则3：频繁交付"
+    },
+    {
+      "id": "75dafc793392481332fa8cb1",
+      "parentId": "88318344c0e75072e6ff8ebb",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-4-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "敏捷原则3：频繁交付",
+        "经常交付可工作软件，倾向于较短的周期"
+      ],
+      "title": "经常交付可工作软件，倾向于较短的周期"
+    },
+    {
+      "id": "bf41a55623d2617bdd49267a",
+      "parentId": "a887b10a4b3e1bda0d49c033",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-5",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "敏捷原则4：协作"
+      ],
+      "title": "敏捷原则4：协作"
+    },
+    {
+      "id": "2661423b5aa721b392fa1180",
+      "parentId": "bf41a55623d2617bdd49267a",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-5-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "敏捷原则4：协作",
+        "业务人员与开发人员每天一起工作"
+      ],
+      "title": "业务人员与开发人员每天一起工作"
+    },
+    {
+      "id": "65e51e5519c00c5479dcc8ef",
+      "parentId": "a887b10a4b3e1bda0d49c033",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-6",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "敏捷原则5：激励团队、给予环境和支持"
+      ],
+      "title": "敏捷原则5：激励团队、给予环境和支持"
+    },
+    {
+      "id": "c54b71fb54176c8ae5e777f5",
+      "parentId": "65e51e5519c00c5479dcc8ef",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-6-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "敏捷原则5：激励团队、给予环境和支持",
+        "围绕有积极性的个人，并信任他们"
+      ],
+      "title": "围绕有积极性的个人，并信任他们"
+    },
+    {
+      "id": "c454194f5a0a70de93a9410e",
+      "parentId": "a887b10a4b3e1bda0d49c033",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-7",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "敏捷原则6：面对面沟通"
+      ],
+      "title": "敏捷原则6：面对面沟通"
+    },
+    {
+      "id": "28e33e9cadf1235ce0b2eef0",
+      "parentId": "c454194f5a0a70de93a9410e",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-7-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "敏捷原则6：面对面沟通",
+        "最有效的沟通方式"
+      ],
+      "title": "最有效的沟通方式"
+    },
+    {
+      "id": "ea2bed066bd1b0bc45fcc6ef",
+      "parentId": "a887b10a4b3e1bda0d49c033",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-8",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "敏捷原则7：可工作的软件"
+      ],
+      "title": "敏捷原则7：可工作的软件"
+    },
+    {
+      "id": "17979b5bb0913e8746a0b27a",
+      "parentId": "ea2bed066bd1b0bc45fcc6ef",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-8-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "敏捷原则7：可工作的软件",
+        "进度的首要度量标准"
+      ],
+      "title": "进度的首要度量标准"
+    },
+    {
+      "id": "181c03f4ec4254976077cfc8",
+      "parentId": "a887b10a4b3e1bda0d49c033",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-9",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "敏捷原则8：可持续步调"
+      ],
+      "title": "敏捷原则8：可持续步调"
+    },
+    {
+      "id": "ac274885a404e587b8a2587c",
+      "parentId": "181c03f4ec4254976077cfc8",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-9-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "敏捷原则8：可持续步调",
+        "发起人、开发者和用户保持恒定步调"
+      ],
+      "title": "发起人、开发者和用户保持恒定步调"
+    },
+    {
+      "id": "e9c2321e2bfcbc20a7edd882",
+      "parentId": "a887b10a4b3e1bda0d49c033",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-10",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "敏捷原则9：精益求精"
+      ],
+      "title": "敏捷原则9：精益求精"
+    },
+    {
+      "id": "e83548983ad09171a6ba2b64",
+      "parentId": "e9c2321e2bfcbc20a7edd882",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-10-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "敏捷原则9：精益求精",
+        "持续关注卓越的技术和良好的设计"
+      ],
+      "title": "持续关注卓越的技术和良好的设计"
+    },
+    {
+      "id": "aaea4b73ea58758d5e52499e",
+      "parentId": "a887b10a4b3e1bda0d49c033",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-11",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "敏捷原则10：简洁"
+      ],
+      "title": "敏捷原则10：简洁"
+    },
+    {
+      "id": "af4c24c9810b54f81395e85a",
+      "parentId": "aaea4b73ea58758d5e52499e",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-11-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "敏捷原则10：简洁",
+        "最大化未完成工作数量的艺术"
+      ],
+      "title": "最大化未完成工作数量的艺术"
+    },
+    {
+      "id": "78cc4121e71426852ca0b706",
+      "parentId": "a887b10a4b3e1bda0d49c033",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-12",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "敏捷原则11：自组织团队"
+      ],
+      "title": "敏捷原则11：自组织团队"
+    },
+    {
+      "id": "f44e740687ab6d973950da6a",
+      "parentId": "78cc4121e71426852ca0b706",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-12-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "敏捷原则11：自组织团队",
+        "最好的架构、需求和设计出自于此"
+      ],
+      "title": "最好的架构、需求和设计出自于此"
+    },
+    {
+      "id": "69c69bc4cb15655df68938a7",
+      "parentId": "a887b10a4b3e1bda0d49c033",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-13",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "敏捷原则12：定期反省"
+      ],
+      "title": "敏捷原则12：定期反省"
+    },
+    {
+      "id": "8ec634391e221a8fe3c699c3",
+      "parentId": "69c69bc4cb15655df68938a7",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-13-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "敏捷原则12：定期反省",
+        "团队定期反省如何更有效，并相应调整"
+      ],
+      "title": "团队定期反省如何更有效，并相应调整"
+    },
+    {
+      "id": "3385cd0b092663d72ab0d50a",
+      "parentId": "a887b10a4b3e1bda0d49c033",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-14",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "Scrum 框架"
+      ],
+      "title": "Scrum 框架"
+    },
+    {
+      "id": "7c72d4395d796bbf6e2845a1",
+      "parentId": "3385cd0b092663d72ab0d50a",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-14-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "Scrum 框架",
+        "三支柱：透明性、检查、适应"
+      ],
+      "title": "三支柱：透明性、检查、适应"
+    },
+    {
+      "id": "b392a34ec14233451919ea2a",
+      "parentId": "3385cd0b092663d72ab0d50a",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-14-k02",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "Scrum 框架",
+        "三工件：Product Backlog、Sprint Backlog、Increment"
+      ],
+      "title": "三工件：Product Backlog、Sprint Backlog、Increment"
+    },
+    {
+      "id": "6515de027d328a46d846195f",
+      "parentId": "3385cd0b092663d72ab0d50a",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-14-k03",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "Scrum 框架",
+        "五事件：Sprint、Sprint Planning、Daily Scrum、Sprint Review、Retrospective"
+      ],
+      "title": "五事件：Sprint、Sprint Planning、Daily Scrum、Sprint Review、Retrospective"
+    },
+    {
+      "id": "e292d55b37941abe981c94c2",
+      "parentId": "a887b10a4b3e1bda0d49c033",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-15",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "敏捷阶段框架"
+      ],
+      "title": "敏捷阶段框架"
+    },
+    {
+      "id": "aefe161af5fc71f3833b7d8e",
+      "parentId": "e292d55b37941abe981c94c2",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-15-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "敏捷阶段框架",
+        "构想、推测、探索、适应、结束"
+      ],
+      "title": "构想、推测、探索、适应、结束"
+    },
+    {
+      "id": "0e91a49f3d2b0a2eb20bd22d",
+      "parentId": "e292d55b37941abe981c94c2",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-15-k02",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "敏捷阶段框架",
+        "构想阶段：产品愿景、项目章程、团队章程"
+      ],
+      "title": "构想阶段：产品愿景、项目章程、团队章程"
+    },
+    {
+      "id": "7948b6e1202921de59809064",
+      "parentId": "a887b10a4b3e1bda0d49c033",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-16",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "产品需求规划"
+      ],
+      "title": "产品需求规划"
+    },
+    {
+      "id": "9f388db39018968ad7f167fd",
+      "parentId": "7948b6e1202921de59809064",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-16-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "产品需求规划",
+        "洋葱圈"
+      ],
+      "title": "洋葱圈"
+    },
+    {
+      "id": "231d8691d51d383ca5175434",
+      "parentId": "7948b6e1202921de59809064",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-16-k02",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "产品需求规划",
+        "产品路线图"
+      ],
+      "title": "产品路线图"
+    },
+    {
+      "id": "3f4d17cab8d5938b3ed2373e",
+      "parentId": "7948b6e1202921de59809064",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-16-k03",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "产品需求规划",
+        "MMF"
+      ],
+      "title": "MMF"
+    },
+    {
+      "id": "c13c7dc5cb4c179655173776",
+      "parentId": "7948b6e1202921de59809064",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-16-k04",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "产品需求规划",
+        "MVP"
+      ],
+      "title": "MVP"
+    },
+    {
+      "id": "86fc5198f2895ab1fed3c660",
+      "parentId": "7948b6e1202921de59809064",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-16-k05",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "产品需求规划",
+        "敏捷发布规划"
+      ],
+      "title": "敏捷发布规划"
+    },
+    {
+      "id": "963886bbd1f18cc5446f296c",
+      "parentId": "7948b6e1202921de59809064",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-16-k06",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "产品需求规划",
+        "时间盒"
+      ],
+      "title": "时间盒"
+    },
+    {
+      "id": "026c0763964dcd3a1703d88f",
+      "parentId": "a887b10a4b3e1bda0d49c033",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-17",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "用户故事与估算"
+      ],
+      "title": "用户故事与估算"
+    },
+    {
+      "id": "86b13c3170725475d98d61e2",
+      "parentId": "026c0763964dcd3a1703d88f",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-17-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "用户故事与估算",
+        "用户故事及 DoD"
+      ],
+      "title": "用户故事及 DoD"
+    },
+    {
+      "id": "302387f118350f625e16d871",
+      "parentId": "026c0763964dcd3a1703d88f",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-17-k02",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "用户故事与估算",
+        "INVEST 原则"
+      ],
+      "title": "INVEST 原则"
+    },
+    {
+      "id": "f54c3d3ee2f55b9a87eb1b17",
+      "parentId": "026c0763964dcd3a1703d88f",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-17-k03",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "用户故事与估算",
+        "理想时间"
+      ],
+      "title": "理想时间"
+    },
+    {
+      "id": "66a3d0aa72dedefcb3b9a2a0",
+      "parentId": "026c0763964dcd3a1703d88f",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-17-k04",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "用户故事与估算",
+        "计划扑克"
+      ],
+      "title": "计划扑克"
+    },
+    {
+      "id": "b4ab1b3d16498322908f89ff",
+      "parentId": "026c0763964dcd3a1703d88f",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-17-k05",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "用户故事与估算",
+        "优先级排序：MoSCoW、KANO、风险四象限、举手表决法"
+      ],
+      "title": "优先级排序：MoSCoW、KANO、风险四象限、举手表决法"
+    },
+    {
+      "id": "2eaed3e1187548abff187df1",
+      "parentId": "a887b10a4b3e1bda0d49c033",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-18",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "敏捷风险与适应"
+      ],
+      "title": "敏捷风险与适应"
+    },
+    {
+      "id": "8dfc78eede14a84a01c5c6e5",
+      "parentId": "2eaed3e1187548abff187df1",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-18-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "敏捷风险与适应",
+        "敏捷风险管理"
+      ],
+      "title": "敏捷风险管理"
+    },
+    {
+      "id": "e73707afccce1ba49fcf64a1",
+      "parentId": "2eaed3e1187548abff187df1",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-18-k02",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "敏捷风险与适应",
+        "风险调整待办事项列表"
+      ],
+      "title": "风险调整待办事项列表"
+    },
+    {
+      "id": "c7c02eea8fc05f7d2aa42d7a",
+      "parentId": "2eaed3e1187548abff187df1",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-18-k03",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "敏捷风险与适应",
+        "刺探 Spike"
+      ],
+      "title": "刺探 Spike"
+    },
+    {
+      "id": "ddb59179db6b5332d8c96fd9",
+      "parentId": "2eaed3e1187548abff187df1",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-18-k04",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "敏捷风险与适应",
+        "速度"
+      ],
+      "title": "速度"
+    },
+    {
+      "id": "658f2956b5a63d0be7c82473",
+      "parentId": "2eaed3e1187548abff187df1",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-18-k05",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "敏捷风险与适应",
+        "燃尽图、燃起图"
+      ],
+      "title": "燃尽图、燃起图"
+    },
+    {
+      "id": "e6cef9c8f91ac1873ecc4866",
+      "parentId": "2eaed3e1187548abff187df1",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-18-k06",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "敏捷风险与适应",
+        "问题解决"
+      ],
+      "title": "问题解决"
+    },
+    {
+      "id": "7df2b5254cd453b3bf00461a",
+      "parentId": "a887b10a4b3e1bda0d49c033",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-19",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "其他敏捷实践"
+      ],
+      "title": "其他敏捷实践"
+    },
+    {
+      "id": "9612695cfaa2ba62905a9a1b",
+      "parentId": "7df2b5254cd453b3bf00461a",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-19-k01",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "其他敏捷实践",
+        "精益价值流图"
+      ],
+      "title": "精益价值流图"
+    },
+    {
+      "id": "9e7d8ea10e0790c06ce76e9f",
+      "parentId": "7df2b5254cd453b3bf00461a",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-19-k02",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "其他敏捷实践",
+        "设计思维"
+      ],
+      "title": "设计思维"
+    },
+    {
+      "id": "e78a990886befabf83fa01a7",
+      "parentId": "7df2b5254cd453b3bf00461a",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-19-k03",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "其他敏捷实践",
+        "看板：累积流图/限制 WIP/任务板/信息发射器"
+      ],
+      "title": "看板：累积流图/限制 WIP/任务板/信息发射器"
+    },
+    {
+      "id": "ad07d7fba51ae14b6e81a087",
+      "parentId": "7df2b5254cd453b3bf00461a",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-19-k04",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "其他敏捷实践",
+        "极限编程 XP"
+      ],
+      "title": "极限编程 XP"
+    },
+    {
+      "id": "89b03a0a7b615f20bed12df1",
+      "parentId": "7df2b5254cd453b3bf00461a",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-process-9-9-19-k05",
+      "path": [
+        "PMP",
+        "过程",
+        "敏捷过程与实践",
+        "其他敏捷实践",
+        "敏捷扩展框架 Scrum of Scrums"
+      ],
+      "title": "敏捷扩展框架 Scrum of Scrums"
+    },
+    {
+      "id": "1bba13fc9201a0e0ef33efbd",
+      "parentId": "7cdd9825068415f8419835d7",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-environment",
+      "path": [
+        "PMP",
+        "环境"
+      ],
+      "title": "环境"
+    },
+    {
+      "id": "928c1f8d37b5a5b50e28b36c",
+      "parentId": "1bba13fc9201a0e0ef33efbd",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-environment-1",
+      "path": [
+        "PMP",
+        "环境",
+        "价值交付系统"
+      ],
+      "title": "价值交付系统"
+    },
+    {
+      "id": "f57a0ef012d1b07479911231",
+      "parentId": "928c1f8d37b5a5b50e28b36c",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-environment-1-1-1",
+      "path": [
+        "PMP",
+        "环境",
+        "价值交付系统",
+        "创造价值"
+      ],
+      "title": "创造价值"
+    },
+    {
+      "id": "c78cba76a853a5e41f293f20",
+      "parentId": "f57a0ef012d1b07479911231",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-environment-1-1-1-k01",
+      "path": [
+        "PMP",
+        "环境",
+        "价值交付系统",
+        "创造价值",
+        "价值交付系统"
+      ],
+      "title": "价值交付系统"
+    },
+    {
+      "id": "7e2eb1521e173498d8e1323d",
+      "parentId": "f57a0ef012d1b07479911231",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-environment-1-1-1-k02",
+      "path": [
+        "PMP",
+        "环境",
+        "价值交付系统",
+        "创造价值",
+        "项目成功标准"
+      ],
+      "title": "项目成功标准"
+    },
+    {
+      "id": "689131d242c80338ea2bf4b2",
+      "parentId": "928c1f8d37b5a5b50e28b36c",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-environment-1-1-2",
+      "path": [
+        "PMP",
+        "环境",
+        "价值交付系统",
+        "产品管理考虑因素"
+      ],
+      "title": "产品管理考虑因素"
+    },
+    {
+      "id": "cb9b5a52bf1dc2d92e3a8a60",
+      "parentId": "1bba13fc9201a0e0ef33efbd",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-environment-2",
+      "path": [
+        "PMP",
+        "环境",
+        "组织与环境因素"
+      ],
+      "title": "组织与环境因素"
+    },
+    {
+      "id": "2749180fb2cdfba28b11884a",
+      "parentId": "cb9b5a52bf1dc2d92e3a8a60",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-environment-2-2-1",
+      "path": [
+        "PMP",
+        "环境",
+        "组织与环境因素",
+        "项目影响因素"
+      ],
+      "title": "项目影响因素"
+    },
+    {
+      "id": "62a1266c1647c6ca5f2d8ed1",
+      "parentId": "2749180fb2cdfba28b11884a",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-environment-2-2-1-k01",
+      "path": [
+        "PMP",
+        "环境",
+        "组织与环境因素",
+        "项目影响因素",
+        "事业环境因素 EEF"
+      ],
+      "title": "事业环境因素 EEF"
+    },
+    {
+      "id": "36997dcc2229a1179add9eb4",
+      "parentId": "2749180fb2cdfba28b11884a",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-environment-2-2-1-k02",
+      "path": [
+        "PMP",
+        "环境",
+        "组织与环境因素",
+        "项目影响因素",
+        "组织过程资产 OPA"
+      ],
+      "title": "组织过程资产 OPA"
+    },
+    {
+      "id": "85a7a2e8dcbb5aa3d8086beb",
+      "parentId": "cb9b5a52bf1dc2d92e3a8a60",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-environment-2-2-2",
+      "path": [
+        "PMP",
+        "环境",
+        "组织与环境因素",
+        "项目组织结构类型"
+      ],
+      "title": "项目组织结构类型"
+    },
+    {
+      "id": "b27bd6d618c9848ce0dea99a",
+      "parentId": "85a7a2e8dcbb5aa3d8086beb",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-environment-2-2-2-k01",
+      "path": [
+        "PMP",
+        "环境",
+        "组织与环境因素",
+        "项目组织结构类型",
+        "职能型"
+      ],
+      "title": "职能型"
+    },
+    {
+      "id": "eb8df84a85c3fabb1301ad20",
+      "parentId": "85a7a2e8dcbb5aa3d8086beb",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-environment-2-2-2-k02",
+      "path": [
+        "PMP",
+        "环境",
+        "组织与环境因素",
+        "项目组织结构类型",
+        "矩阵型"
+      ],
+      "title": "矩阵型"
+    },
+    {
+      "id": "750a61c7e5b45959f7f0b347",
+      "parentId": "85a7a2e8dcbb5aa3d8086beb",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-environment-2-2-2-k03",
+      "path": [
+        "PMP",
+        "环境",
+        "组织与环境因素",
+        "项目组织结构类型",
+        "项目型"
+      ],
+      "title": "项目型"
+    },
+    {
+      "id": "747ea96e6f2edfb009c476ce",
+      "parentId": "cb9b5a52bf1dc2d92e3a8a60",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-environment-2-2-3",
+      "path": [
+        "PMP",
+        "环境",
+        "组织与环境因素",
+        "项目治理"
+      ],
+      "title": "项目治理"
+    },
+    {
+      "id": "d75ce655648dd61a9a23edef",
+      "parentId": "cb9b5a52bf1dc2d92e3a8a60",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-environment-2-2-4",
+      "path": [
+        "PMP",
+        "环境",
+        "组织与环境因素",
+        "项目管理商业文件"
+      ],
+      "title": "项目管理商业文件"
+    },
+    {
+      "id": "2ed3afb04aeff98f03e1f6a3",
+      "parentId": "d75ce655648dd61a9a23edef",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-environment-2-2-4-k01",
+      "path": [
+        "PMP",
+        "环境",
+        "组织与环境因素",
+        "项目管理商业文件",
+        "需求评估"
+      ],
+      "title": "需求评估"
+    },
+    {
+      "id": "2e453d1aacb69924d97a0b5a",
+      "parentId": "d75ce655648dd61a9a23edef",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-environment-2-2-4-k02",
+      "path": [
+        "PMP",
+        "环境",
+        "组织与环境因素",
+        "项目管理商业文件",
+        "商业论证"
+      ],
+      "title": "商业论证"
+    },
+    {
+      "id": "bb5ac29cdb6bdd2d38474ce7",
+      "parentId": "d75ce655648dd61a9a23edef",
+      "subject": "PMP",
+      "taxonomyId": "taxonomy-pmp-complete-v1",
+      "primaryNodeId": "kp-pmp-environment-2-2-4-k03",
+      "path": [
+        "PMP",
+        "环境",
+        "组织与环境因素",
+        "项目管理商业文件",
+        "效益管理计划"
+      ],
+      "title": "效益管理计划"
+    }
+  ]
+}

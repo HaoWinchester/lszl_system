@@ -4,7 +4,10 @@
   "toVersion": "v9.0-p4.1.382",
   "changes": {
     "added": [],
-    "changed": [],
+    "changed": [
+      "styles/knowledge-dashboard.css",
+      "tests/knowledge-space-semantic-browser.py"
+    ],
     "removed": []
   },
   "incompatible": []
