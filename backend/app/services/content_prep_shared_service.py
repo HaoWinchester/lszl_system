@@ -11,6 +11,7 @@ from uuid import uuid4
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.localized_text import localized_text as _localized_text
 from app.models.content_prep import Principle, QuestionTagConfig, SynthesisPreset
 from app.models.course_management import CourseDraft, CourseRelease, LearningTask
 from app.models.paper_release import PaperRelease, PaperReleaseQuestion
@@ -472,12 +473,6 @@ def _validate_taxonomy_nodes(
         nodes[node_id]["level"] = depth
         nodes[node_id]["taxonomyId"] = taxonomy_id
     return list(nodes.values())
-
-
-def _localized_text(value: object) -> str:
-    if isinstance(value, dict):
-        return str(value.get("zh") or value.get("en") or "").strip()
-    return str(value or "").strip()
 
 
 def _payload_references(

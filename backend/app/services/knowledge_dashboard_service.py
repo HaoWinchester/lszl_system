@@ -11,6 +11,7 @@ import json
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.localized_text import localized_text
 from app.core.security import now_utc
 from app.models.training import PracticeSession
 from app.models.teaching_content import ContentSubject
@@ -169,9 +170,9 @@ def _catalog_path(node, nodes):
     current = node
     while current is not None:
         if current.node_id in seen:
-            return None, [node.title]
+            return None, [localized_text(node.title)]
         seen.add(current.node_id)
-        chain.append(current.title)
+        chain.append(localized_text(current.title))
         parent = current.parent_node_id
         if parent and parent not in nodes:
             # An immediate missing parent is a root. Descendants can still
@@ -238,11 +239,11 @@ async def get_universe(db: AsyncSession, owner: str):
             nodes.append({
                 'id': _catalog_id(taxonomy.id, row.node_id),
                 'subject': subject.code, 'subjectId': subject.id,
-                'taxonomyId': taxonomy.id, 'taxonomyTitle': taxonomy.title,
+                'taxonomyId': taxonomy.id, 'taxonomyTitle': localized_text(taxonomy.title),
                 'primaryNodeId': row.node_id,
                 'parentNodeId': parent,
                 'parentId': _catalog_id(taxonomy.id, parent) if parent else None,
-                'path': path, 'title': row.title, 'practiced': practiced,
+                'path': path, 'title': localized_text(row.title), 'practiced': practiced,
                 'attemptCount': attempt_count,
                 'lastPracticedAt': last.isoformat() if last else None,
                 **_proficiency(state['grades'].get((taxonomy.id, row.node_id)), practiced),

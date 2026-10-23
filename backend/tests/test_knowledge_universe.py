@@ -442,3 +442,26 @@ def test_only_completed_sessions_with_valid_saved_server_boolean_grades_score(ca
         assert after['attemptCount'] == before['attemptCount']
         assert node['gradedAttemptCount'] == node['correctCount'] == 2
         assert node['proficiencyScore'] == 35.2 and node['brightness'] == .4816
+
+
+def test_legacy_localized_title_columns_return_readable_catalog_paths(catalog):
+    async def legacy_labels():
+        async with AsyncSessionLocal() as db:
+            for node,title,parent in [('root',"{'zh': 'PMP', 'en': ''}",None),
+                                      ('n1',"{'en': '', 'zh': '过程'}",'root'),
+                                      ('n2','{"zh":"治理与整合","en":"Integration"}','n1')]:
+                await db.execute(update(TaxonomyNode).where(
+                    TaxonomyNode.taxonomy_id==catalog['taxonomies']['current'],
+                    TaxonomyNode.node_id==node).values(title=title,parent_node_id=parent))
+            await db.commit()
+    asyncio.run(legacy_labels())
+    with TestClient(app) as client:
+        login(client,catalog['owners'][0])
+        nodes={n['primaryNodeId']:n for n in own_nodes(read_universe(client),catalog)
+               if n['taxonomyId']==catalog['taxonomies']['current']}
+        assert nodes['root']['title']=='PMP'
+        assert nodes['n1']['title']=='过程'
+        assert nodes['n2']['title']=='治理与整合'
+        assert nodes['n2']['path']==['PMP','过程','治理与整合']
+        assert nodes['n2']['parentId']==nodes['n1']['id']
+        assert nodes['n2']['attemptCount']==0

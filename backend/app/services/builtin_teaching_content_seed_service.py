@@ -11,6 +11,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.localized_text import localized_text as _localized_text
 from app.models.content_prep import Principle, SynthesisPreset
 from app.models.teaching_content import (
     ContentSubject,
@@ -175,12 +176,6 @@ def load_builtin_bundle(seed_dir: Path = SEED_DIR) -> BuiltinTeachingBundle:
         principles=principles,
         synthesis_presets=synthesis_presets,
     )
-
-
-def _localized_text(value: object) -> str:
-    if isinstance(value, dict):
-        return str(value.get("zh") or value.get("en") or "").strip()
-    return str(value or "").strip()
 
 
 async def _available_version(
