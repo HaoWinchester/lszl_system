@@ -55,3 +55,16 @@ The user highlighted the full close row plus root-added brightness demo toolbar 
 ## Completion
 
 Local preview is running on5527 (real owner API) and5530 (clearly labeled brightness example, public published317-node snapshot). User visual corrections for larger actual network, background scene, and removal of demo/close bands implemented and directly refreshed in current IAB. Whole-branch source review and scoped P2 summary-scroll fix pass; source40b11e00. See docs/verification/2026-10-23-knowledge-space-full-tree-preview.md. UAT/main unchanged; visual review remains with user.
+
+### Task 3: Spacious topic popup, anchored controls and semantic text toggle
+
+**Files:** new-legacy/src/practice/knowledge-dashboard.js, knowledge-space-scene.js, styles/knowledge-dashboard.css and their existing Node/browser tests. Reference current repository dialog patterns; no duplicated business module.
+
+**Interfaces:** Existing universe and derivePracticeOverlay unchanged. Extend scene with setLabelsVisible(bool), snapshot label-state evidence and exported pure layout/aggregation helper as needed. Keep shared scene picking/geometry, owner loader and parent/child modal lifecycle coherent.
+
+- [ ] Add failing behavior tests before implementation: large child popup and focus/lifecycle, upper-right stats/lower-right dock, complete label coverage/aggregation/far hide and toggle.
+- [ ] Implement popup by moving existing detail/list content into one accessible native dialog, not copying it. Preserve selected node, full real list, category context, next/previous, all owner invalidation paths and Canvas fallback.
+- [ ] Anchor overview near top right and camera/help near visible bottom right, avoid header close/category collision at1440/559/390, retain full-sized background.
+- [ ] Implement 显示文字 with immediate visible detailed-label result, deterministic screen-space aggregation with complete represented membership, semantic category text on zoom-out and no text below0.75fit; toggle off keeps baseline category/selection context. No silent label slice or business-data mutation.
+- [ ] Run Node/dashboard/semantic/scene/entry relevant browser tests, including1000nodes and physical child-popup/Escape/scroll/focus/foreground controls. Commit source/tests and append task report. Do not sync, change VERSION, or deploy.
+- [ ] Root runs scoped review, syncs preview, refreshes current IAB and verifies screenshot, runs relevant contracts, updates verification/checklist; stop at local visual preview.
