@@ -79,7 +79,7 @@ def main():
             run_with_fresh_db('canvas-ink-browser.py')
             server = start_canvas_server()
             try:
-                for script in ('home-canvas-tools-browser.py', 'workspace-multitab-browser.py', 'file-manager-search-tabs-browser.py', 'graph-interaction-focus-browser.py', 'graph-mindmap-browser.py', 'graph-question-batch-browser.py', 'graph-file-import-permissions-browser.py'):
+                for script in ('home-canvas-tools-browser.py', 'workspace-multitab-browser.py', 'file-manager-search-tabs-browser.py', 'graph-interaction-focus-browser.py', 'learning-graph-route-browser.py', 'graph-edge-bundle-browser.py', 'boardmix-graph-controls-browser.py', 'graph-mindmap-browser.py', 'graph-question-batch-browser.py', 'graph-file-import-permissions-browser.py', 'case-learning-modes-browser.py'):
                     subprocess.run([sys.executable, str(ROOT/'new-legacy/tests'/script), '--base-url', base], cwd=ROOT, check=True)
             finally:
                 stop_canvas_server(server)
