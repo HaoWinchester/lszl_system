@@ -40,3 +40,7 @@
 .kg-knowledge-footer{margin-top:12px;padding-top:10px}.kg-knowledge-groups button{min-height:44px;padding:8px 12px}.kg-knowledge-dialog #kgKnowledgeMeaning{margin-top:10px}
 @media(max-width:850px){.kg-knowledge-header{flex-wrap:wrap}.kg-knowledge-overview{max-width:100%;margin-left:auto}.kg-knowledge-body{display:block}.kg-knowledge-detail{margin:0}.kg-knowledge-network{height:max(400px,calc(100dvh - 390px))}}
 @media(max-width:600px){.kg-knowledge-shell{padding:12px}.kg-knowledge-header{gap:10px}.kg-knowledge-dialog h2{font-size:24px}.kg-knowledge-subtitle{display:none}.kg-knowledge-overview{width:100%;max-width:100%;padding:0;gap:6px;font-size:10px}.kg-knowledge-overview button{padding:6px;max-width:none}.kg-knowledge-body{margin-top:8px}.kg-knowledge-network{height:max(350px,calc(100dvh - 390px))}.kg-knowledge-detail{top:44px;left:4px;width:min(300px,calc(100% - 8px));border-top:1px solid #34465c}.kg-knowledge-camera{justify-content:flex-end}.kg-knowledge-camera button{padding:6px 9px}.kg-knowledge-space-heading{gap:6px}.kg-knowledge-detail-content{max-height:260px}.kg-knowledge-footer{margin-top:10px}.kg-knowledge-groups button{min-width:0}.kg-knowledge-help{font-size:10px}}
+
+/* Without a canvas, details are the main content and must reserve their own space. */
+.kg-knowledge-dialog.kg-knowledge-fallback .kg-knowledge-detail{position:static;width:100%;margin:0 0 16px}
+.kg-knowledge-dialog.kg-knowledge-fallback .kg-knowledge-detail-content{max-height:none}

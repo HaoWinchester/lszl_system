@@ -70,7 +70,7 @@
     }
     function button(label,attribute,value){const element=document.createElement('button');element.type='button';element.textContent=label;element.setAttribute(attribute,value);return element}
     function render(data){
-      scene?.destroy();scene=null;lastData=data;nodes=[];selected=null;activeGroup='';summary.textContent='';network.replaceChildren();list.replaceChildren();groups.replaceChildren();pagination.hidden=true;
+      scene?.destroy();scene=null;dialog.classList.remove('kg-knowledge-fallback');lastData=data;nodes=[];selected=null;activeGroup='';summary.textContent='';network.replaceChildren();list.replaceChildren();groups.replaceChildren();pagination.hidden=true;
       network.hidden=true;find('[data-knowledge-space-empty]').hidden=false;find('.kg-knowledge-detail').open=false;
       setText('detail-title','选择一个考点');setText('detail-number','—');setText('detail-subject','');setText('detail-path','');setText('detail-attempts','—');setText('detail-date','—');setText('page-count','本页 0 个考点');
       for(const control of dialog.querySelectorAll('.kg-knowledge-step button,.kg-knowledge-camera button'))control.disabled=true;
@@ -94,7 +94,7 @@
         try{scene=global.KGKnowledgeSpaceScene?.mount({host:network,nodes,onSelect:(_,index)=>{select(index);find('.kg-knowledge-detail').open=true},onGroup:key=>focusGroup(key,false)})||null}catch(error){scene=null;network.replaceChildren()}
         for(const control of dialog.querySelectorAll('.kg-knowledge-step button'))control.disabled=false;
         for(const control of dialog.querySelectorAll('.kg-knowledge-camera button'))control.disabled=!scene;
-        focusGroup('',false);select(0,false);toggleList(!scene||listOpen);if(!scene)find('.kg-knowledge-detail').open=true;
+        focusGroup('',false);select(0,false);toggleList(!scene||listOpen);if(!scene){dialog.classList.add('kg-knowledge-fallback');find('.kg-knowledge-detail').open=true;}
       }
       pagination.hidden=Number(data.topicCount)<=PAGE_SIZE;find('[data-knowledge-prev]').disabled=page===1;find('[data-knowledge-next]').disabled=!data.hasMore;
       setText('page',`第 ${page} / ${Math.max(1,Math.ceil(Number(data.topicCount)/PAGE_SIZE))} 页`);

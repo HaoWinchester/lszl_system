@@ -182,6 +182,19 @@ with sync_playwright() as pw:
     page.locator('[data-knowledge-list] button').nth(3).click()
     expect(page.locator('[data-knowledge-detail-title]')).to_have_text('项目考点 4')
     assert page.locator('canvas').count()==0
+    # Physical clicks must reach fallback pagination, rather than an overlapping detail overlay.
+    for fallback_width in (1440,390):
+        page.set_viewport_size({'width':fallback_width,'height':900})
+        page.locator('[data-knowledge-next]').click(timeout=1500)
+        expect(page.locator('[data-knowledge-page]')).to_contain_text('第 2')
+        expect(page.locator('[data-knowledge-detail-title]')).to_have_text('第二页考点')
+        page.locator('[data-knowledge-prev]').click(timeout=1500)
+        expect(page.locator('[data-knowledge-page]')).to_contain_text('第 1')
+        page.locator('[data-knowledge-group]').nth(2).click(timeout=1500)
+        expect(page.locator('[data-knowledge-detail-subject]')).to_have_text('产品管理')
+        page.locator('[data-knowledge-refresh]').click(timeout=1500)
+        expect(page.locator('[data-knowledge-list]')).to_be_visible()
+    checks.append('Canvas fallback desktop/mobile physical group, next/previous page and refresh controls remain unobstructed')
     page.evaluate('nodes.forEach(node=>node.path=[])')
     page.locator('[data-knowledge-refresh]').click()
     expect(page.locator('[data-knowledge-group]').nth(1)).to_contain_text('PMP · 未分类')
