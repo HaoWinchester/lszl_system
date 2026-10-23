@@ -271,10 +271,10 @@ test('winning claim renders the update-style dismissible four-choice dialog in t
   assert.equal(tab.document.getElementById('learningEntryTitle').textContent, '从这里开始学习');
   const choices = tab.document.querySelectorAll('[data-learning-entry-choice]');
   assert.deepEqual(Array.from(choices, button => [button.getAttribute('data-learning-entry-choice'), button.getAttribute('data-destination')]), [
-    ['知识图谱', 'index.html'], ['知识回忆', 'knowledge-recall.html'], ['知识归纳', 'question-workspace.html'], ['知识巩固', 'practice-mode.html'],
+    ['知识图谱', 'index.html'], ['深度回忆', 'knowledge-recall.html'], ['多题归纳', 'question-workspace.html'], ['知识星空', 'knowledge-space'],
   ]);
   assert.deepEqual(Array.from(choices, button => button.getAttribute('data-description')), [
-    '梳理知识结构与关系 · 当前首页', '主动回忆关键词与知识线索 · 深度回忆', '多题比较、归纳与连接 · 多题画布', '通过做题检验并巩固掌握 · 做题模式',
+    '梳理知识结构与关系 · 当前首页', '主动回忆关键词与知识线索 · 深度回忆', '多题比较、归纳与连接 · 多题画布', '按科目与分类探索练习足迹',
   ]);
   assert.equal(tab.document.querySelector('[aria-label="关闭学习入口"]'), null, 'the dialog must not contain a close control');
   assert.equal(tab.document.querySelector('.learning-entry-close'), null, 'the dialog must not contain a learning-entry-close element');
@@ -421,3 +421,9 @@ test('fullscreen entry mounts inside the canvas without making its ancestors ine
   assert.equal(unmounted,1);assert.equal(world.inert,false);assert.equal(app.inert,false);
   assert.equal(aside.inert,true);assert.equal(aside.getAttribute('aria-hidden'),'false');assert.equal(doc.activeElement,tab.graph);
 });
+
+ test('knowledge space entry closes chooser and opens existing dashboard without navigation',async()=>{
+ const tab=createChooserDomTab();let opened=0;tab.window.KGKnowledgeDashboard={open:()=>opened++};await tab.init();
+ tab.document.querySelectorAll('[data-learning-entry-choice]')[3].dispatchEvent(new DomEvent('click'));
+ assert.equal(opened,1);assert.equal(tab.document.querySelector('[role="dialog"]'),null);
+ });

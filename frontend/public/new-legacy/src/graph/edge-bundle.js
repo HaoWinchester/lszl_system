@@ -57,7 +57,7 @@
     for(const [,list] of byAxis){
       const sorted=[...list].sort((m,n)=>m.value-n.value),cluster=[];
       const flush=()=>{
-        if(cluster.length>=2){
+        if(cluster.length>=2&&new Set(cluster.map(t=>t.edgeId??t.id)).size>=2){
           const values=cluster.map(t=>t.value).sort((m,n)=>m-n);
           const channel=values[Math.floor(values.length/2)];
           for(const t of cluster)result.set(t.id,channel);
@@ -85,7 +85,23 @@
         lo:horizontal?Math.min(a.y,b.y):Math.min(a.x,b.x),
         hi:horizontal?Math.max(a.y,b.y):Math.max(a.x,b.x)});
     }
-    return {endpoints,channels:snapChannels(trunks)};
+    const segments=[],segmentChannels=new Map();
+    for(const item of Array.isArray(items)?items:[]){
+      if(item.pathStyle!=='elbow'||!Array.isArray(item.waypoints))continue;
+      const guides=global.KGGraphEdgeGeometry?.orthogonalWaypoints?global.KGGraphEdgeGeometry.orthogonalWaypoints(item.a,item.b,item.waypoints,item.fromPort,item.toPort):item.waypoints;
+      for(let i=0;i<guides.length-1;i++){
+        const a=guides[i],b=guides[i+1];
+        if(a.x===b.x&&a.y!==b.y)segments.push({id:JSON.stringify([item.id,i]),edgeId:item.id,index:i,start:a,end:b,axis:'x',value:a.x,lo:Math.min(a.y,b.y),hi:Math.max(a.y,b.y)});
+        else if(a.y===b.y&&a.x!==b.x)segments.push({id:JSON.stringify([item.id,i]),edgeId:item.id,index:i,start:a,end:b,axis:'y',value:a.y,lo:Math.min(a.x,b.x),hi:Math.max(a.x,b.x)});
+      }
+    }
+    const snapped=snapChannels(segments);
+    for(const segment of segments){
+      if(!snapped.has(segment.id))continue;
+      if(!segmentChannels.has(segment.edgeId))segmentChannels.set(segment.edgeId,[]);
+      segmentChannels.get(segment.edgeId).push({index:segment.index,axis:segment.axis,value:snapped.get(segment.id),start:segment.start,end:segment.end});
+    }
+    return {endpoints,channels:snapChannels(trunks),segmentChannels};
   }
   const api=Object.freeze({plan,sectorOf,snapChannels,MERGE_DISTANCE});
   global.KGGraphEdgeBundle=api;

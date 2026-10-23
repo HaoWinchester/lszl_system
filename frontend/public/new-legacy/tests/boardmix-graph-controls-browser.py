@@ -86,14 +86,15 @@ with sync_playwright() as pw:
  grip=page.locator('#edgeQuickStylePanel [data-uc-toolbar-drag]');box=grip.bounding_box();page.mouse.move(box['x']+15,box['y']+15);page.mouse.down();page.mouse.move(box['x']+75,box['y']+65,steps=8);page.mouse.up();assert page.evaluate('selectedEdgeQuickStyleToolbarController.isManual()')
  dock=page.locator('#edgeQuickStylePanel').bounding_box();page.evaluate('()=>{state.viewport.x+=20;applyTransform()}');after=page.locator('#edgeQuickStylePanel').bounding_box();assert abs(dock['x']-after['x'])<2 and abs(dock['y']-after['y'])<2
  grip.dblclick();assert not page.evaluate('selectedEdgeQuickStyleToolbarController.isManual()');page.evaluate('()=>{state.viewport.x=0;applyTransform()}')
- # Deliberately dock near the selected curve; secondary panels must choose a free side.
+ # Approved update: secondary panels stay below their own trigger, including near selected curves.
  for scale in [1,.5,2]:
   page.evaluate('(scale)=>{state.viewport.scale=scale;applyTransform();selectedEdgeQuickStyleToolbarController.setPosition(500,260)}',scale)
   for name in ['color','line','ports']:
    trigger=page.locator('[data-uc-edge-panel='+name+']');trigger.click();panel=page.locator('[data-uc-edge-popover='+name+']');expect(panel).to_be_visible();page.wait_for_timeout(170)
    result=panel.evaluate('''e=>{const p=e.getBoundingClientRect(),s=stage.getBoundingClientRect(),rects=selectedEdgePopoverAvoidRects();return {bounded:p.left>=s.left&&p.right<=s.right&&p.top>=s.top&&p.bottom<=s.bottom,overlap:rects.some(r=>p.left<r.right&&p.right>r.left&&p.top<r.bottom&&p.bottom>r.top)}}''')
    assert page.evaluate('stage.scrollLeft===0&&stage.scrollTop===0'),page.evaluate('({x:stage.scrollLeft,y:stage.scrollTop})')
-   assert result['bounded'] and not result['overlap'],(scale,name,result)
+   t=trigger.bounding_box();p=panel.bounding_box()
+   assert result['bounded'] and abs(p['y']-(t['y']+t['height']+8))<2,(scale,name,result,p,t)
    page.screenshot(path=str(out/f'edge-{scale}-{name}.png'));page.keyboard.press('Escape')
  page.evaluate('()=>{state.viewport.scale=1;applyTransform()}');page.evaluate('selectedEdgeQuickStyleToolbarController.closePanels()');page.wait_for_timeout(180);page.screenshot(path=str(out/'desktop.png'))
  # Fullscreen retains real edge panel hit testing and bounded placement.

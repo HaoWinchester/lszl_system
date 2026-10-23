@@ -265,7 +265,7 @@ function currentEdgeBundlePlan(){
     const points=rawLinkRenderPoints(candidate);if(!points)continue;
     items.push({id:String(candidate.id),fromId:candidate.from,toId:candidate.to,a:points.a,b:points.b,ca:points.ca,cb:points.cb,
       hasFromPort:hasExplicitPort(candidate.fromPort),hasToPort:hasExplicitPort(candidate.toPort),pathStyle:pathStyleForLink(candidate),
-      hasStoredWaypoints:normalizedEdgePoints(candidate.waypoints).length>0});
+      fromPort:candidate.fromPort,toPort:candidate.toPort,waypoints:normalizedEdgePoints(candidate.waypoints),hasStoredWaypoints:normalizedEdgePoints(candidate.waypoints).length>0});
   }
   edgeBundleMemo={time:now,plan:window.KGGraphEdgeBundle.plan(items)};
   return edgeBundleMemo.plan;
@@ -362,9 +362,24 @@ function linkPathGeometry(link,a,b,points=null){
   const detour=fixedStart||fixedEnd?null:overlappingProjectionWaypoints(start,end,points,direction);
   if(style==='elbow'){
     const stored=normalizedEdgePoints(link&&link.waypoints),derived=!stored.length&&!detour;
-    let waypoints=stored.length?stored:(detour||defaultElbowWaypoints(start,end,direction));
+    let waypoints=stored.length?stored:(detour||(fixedStart||fixedEnd?[]:defaultElbowWaypoints(start,end,direction)));
     // 多线汇总：自动派生的折线中间段吸附到共享通道坐标，使近似平行的主干段完全重合（不回写持久数据）。
     if(derived&&points?.mainGraph){const channel=(points.bundlePlan||currentEdgeBundlePlan())?.channels?.get(String(link?.id));if(Number.isFinite(channel)){const axis=Math.abs(end.x-start.x)>=Math.abs(end.y-start.y)?'x':'y';waypoints=waypoints.map(p=>({...p,[axis]:channel}))}}
+    waypoints=window.KGGraphEdgeGeometry.orthogonalWaypoints(start,end,waypoints,link?.fromPort,link?.toPort);
+    if(points?.mainGraph){
+      const overrides=(points.bundlePlan||currentEdgeBundlePlan())?.segmentChannels?.get(String(link?.id));
+      if(overrides?.length){
+        const original=waypoints;waypoints=waypoints.map(p=>({...p}));
+        for(const {index,axis,value,start:plannedStart,end:plannedEnd} of overrides){
+          const a=original[index],b=original[index+1];
+          // An automatic detour may use a different route from the planner.
+          // Apply indices only when they identify the same original segment.
+          if(!a||!b||a.x!==plannedStart.x||a.y!==plannedStart.y||b.x!==plannedEnd.x||b.y!==plannedEnd.y)continue;
+          waypoints[index][axis]=value;waypoints[index+1][axis]=value;
+        }
+      }
+    }
+    waypoints=window.KGGraphEdgeGeometry.orthogonalWaypoints(start,end,waypoints,link?.fromPort,link?.toPort);
     const samples=[start,...waypoints,end];
     return{style,d:edgePathFromPoints(samples),samples,bounds:edgeGeometryBounds(samples),endpoints:[start,end],waypoints,controls:window.KGGraphEdgeGeometry.segmentHandles(start,waypoints,end),derivedWaypoints:!stored.length};
   }
@@ -1142,6 +1157,7 @@ function ensureSelectedEdgeQuickStylePanel(){
 }
 function selectedEdgeQuickScreenPoint(){
   const links=selectedEditableLinks();if(!links.length)return null;
+  if(selectedEdgeQuickStyleAnchorWorld)return{x:selectedEdgeQuickStyleAnchorWorld.x*state.viewport.scale+state.viewport.x,y:selectedEdgeQuickStyleAnchorWorld.y*state.viewport.scale+state.viewport.y,link:links[0]};
   if(links.length===1){
     const geometry=edgeDomById.get(String(links[0].id))?.geometry;
     if(geometry?.style==='curve'&&geometry.curveControls?.length===2){
@@ -1150,7 +1166,6 @@ function selectedEdgeQuickScreenPoint(){
       return{x:(handles[0].x+handles[1].x)/2,y:top>80?top-24:bottom+80,link:links[0]};
     }
   }
-  if(selectedEdgeQuickStyleAnchorWorld)return{x:selectedEdgeQuickStyleAnchorWorld.x*state.viewport.scale+state.viewport.x,y:selectedEdgeQuickStyleAnchorWorld.y*state.viewport.scale+state.viewport.y,link:links[0]};
   const points=[];
   for(const link of links){const point=linkGeometryMidpoint(link);if(point)points.push(point)}
   if(!points.length)return null;
@@ -1374,6 +1389,7 @@ function createGraphRelationPresentation(link,nodeMap,{markerId='kgGraphArrow',i
   return{path,label,geometry};
 }
 function renderEdges(){
+  edgeBundleMemo.plan=null;
   ensureGraphEdgeMarkers();hideEdgeHoverFeedback();
   const nodeMap=getGraphIndex().nodeMap,baseFrag=document.createDocumentFragment(),nextEdgeDom=new Map(),large=isLargeGraphMode(),relationState=largeGraphRelationState();
   const normalLocalMode=!large&&relationState&&(largeGraphRelatedFocusEnabled||largeGraphOverviewEnabled),localIds=large?largeGraphLocalIds():(normalLocalMode?relationState.anchors:new Set());
@@ -1413,6 +1429,7 @@ function updateVisibleLinkGeometryForDrag(link,dom,nodeMap){
   const geometry=linkPathGeometry(link,points.a,points.b,points);dom.geometry=geometry;dom.vis.setAttribute('d',geometry.d);return true;
 }
 function updateLinkedEdgeGeometryNow(nodeIds,{lite=false}={}){
+  edgeBundleMemo.plan=null;
   const ids=new Set((Array.isArray(nodeIds)?nodeIds:[nodeIds]).map(String).filter(Boolean));if(!ids.size)return 0;
   const nodeMap=getGraphIndex().nodeMap,seenLinks=new Set();let count=0;
   for(const id of ids){
@@ -2013,7 +2030,7 @@ function readonlyGraphPresentation(projection,{svg,markerId}={}){
   const graph=sanitizeState({nodes:rawNodes,links:projection.links||[],elements:projection.elements||[]});
   const nodes=graph.nodes,nodeMap=new Map(nodes.map(node=>[node.id,node])),links=graph.links;
   const routes=links.map(link=>({link,points:rawLinkRenderPoints(link,nodeMap,{ignoreGather:true})})).filter(item=>item.points);
-  const bundlePlan=links.length<=600?window.KGGraphEdgeBundle?.plan(routes.map(({link,points})=>({id:String(link.id),fromId:link.from,toId:link.to,...points,hasFromPort:!!link.fromPort&&link.fromPort!=='auto',hasToPort:!!link.toPort&&link.toPort!=='auto',pathStyle:pathStyleForLink(link),hasStoredWaypoints:normalizedEdgePoints(link.waypoints).length>0}))):null;
+  const bundlePlan=links.length<=600?window.KGGraphEdgeBundle?.plan(routes.map(({link,points})=>({id:String(link.id),fromId:link.from,toId:link.to,...points,hasFromPort:!!link.fromPort&&link.fromPort!=='auto',hasToPort:!!link.toPort&&link.toPort!=='auto',pathStyle:pathStyleForLink(link),fromPort:link.fromPort,toPort:link.toPort,waypoints:normalizedEdgePoints(link.waypoints),hasStoredWaypoints:normalizedEdgePoints(link.waypoints).length>0}))):null;
   ensureGraphEdgeMarkers(svg,markerId);
   const edges=routes.map(({link,points})=>{
     const override=bundlePlan?.endpoints?.get(String(link.id)),resolved={...points,a:override?.from||points.a,b:override?.to||points.b,mainGraph:!!bundlePlan,bundlePlan};

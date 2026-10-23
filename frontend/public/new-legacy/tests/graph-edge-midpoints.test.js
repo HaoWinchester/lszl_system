@@ -67,7 +67,11 @@ for(const [first,second] of [
   const curved=context.linkPathGeometry({pathStyle:'curve',curveControls:manual},points.a,points.b,points);
   assert.deepEqual(plain(curved.curveControls),manual);
   assert.deepEqual(plain(curved.controls.filter(p=>p.kind==='curve-control').map(({x,y})=>({x,y}))),plain([curved.samples[8],curved.samples[16]]));
-  assert.deepEqual(plain(context.linkPathGeometry({pathStyle:'elbow',waypoints:manual},points.a,points.b,points).samples),plain([points.a,...manual,points.b]));
+  const elbowLink={pathStyle:'elbow',waypoints:plain(manual)};
+  const elbow=context.linkPathGeometry(elbowLink,points.a,points.b,points);
+  assert.deepEqual(plain(elbow.endpoints),plain([points.a,points.b]));
+  assert.ok(elbow.samples.every((point,index,all)=>!index||point.x===all[index-1].x||point.y===all[index-1].y),'old diagonal guides must render as strictly orthogonal segments');
+  assert.deepEqual(plain(elbowLink.waypoints),manual,'normalizing rendered routes must preserve stored guides');
   assert.equal(context.linkPathGeometry({pathStyle:'straight'},points.a,points.b,points).samples.length,2,'explicit straight style remains one direct segment');
 }
 // Exercise route persistence and actual move/control handlers: rounded routes must not be truncated to two controls.

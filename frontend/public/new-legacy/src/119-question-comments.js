@@ -648,7 +648,14 @@
         closeDrawer(instance)
         return
       }
-      if (action === 'danmaku-toggle') { remember(!enabled()); renderInto(instance); renderOverlay(instance); return }
+      if (action === 'danmaku-toggle') {
+        // 报告中的各题共用一个开关偏好，必须同时同步所有题卡的状态。
+        // 否则换题后仍显示旧状态，用户需要多点一次才能看到预期变化。
+        if (active !== instance) activate(instance)
+        setDanmakuEnabled(!enabled())
+        if (!instance.state.loaded) reload(instance)
+        return
+      }
       if (action === 'danmaku-settings') { openDanmakuSettings(); return }
       if (action === 'emoji-toggle') {
         instance.state.emojiExpanded=!instance.state.emojiExpanded

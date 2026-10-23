@@ -65,3 +65,17 @@ test('plan applies endpoint bundling and channel alignment together',()=>{
   assert.ok(channels.size>=0);
   assert.ok(MERGE_DISTANCE>0);
 });
+
+test('manual trunks share channels without moving fixed endpoints or mutating relations',()=>{
+ const items=[item('manual-a',{hasStoredWaypoints:true,hasFromPort:true,hasToPort:true,waypoints:[{x:100,y:0},{x:100,y:200}]}),item('manual-b',{hasStoredWaypoints:true,waypoints:[{x:112,y:20},{x:112,y:180}]})];
+ const before=JSON.stringify(items),result=plan(items);
+ assert.equal(result.segmentChannels.get('manual-a')[0].value,112);
+ assert.equal(result.segmentChannels.get('manual-b')[0].value,112);
+ assert.equal(JSON.stringify(items),before);
+ assert.equal(result.endpoints.has('manual-a'),false);
+});
+
+test('a single manual relation never bundles its own parallel backtrack segments',()=>{
+ const result=plan([item('alone',{hasStoredWaypoints:true,waypoints:[{x:100,y:0},{x:100,y:200},{x:112,y:200},{x:112,y:0}]})]);
+ assert.equal(result.segmentChannels.size,0);
+});

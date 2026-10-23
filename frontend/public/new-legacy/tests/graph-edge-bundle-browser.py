@@ -179,15 +179,20 @@ def main():
         page.wait_for_timeout(300)
 
         def snapshot():
-            return page.evaluate('''()=>{const read=id=>{const dom=edgeDomById.get(id);if(!dom?.geometry)return null;return{endpoints:dom.geometry.endpoints.map(p=>({x:p.x,y:p.y})),controls:dom.geometry.controls.map(p=>({x:p.x,y:p.y})),d:dom.geometry.d}};return{e1:read('e1'),e2:read('e2'),f1:read('f1'),f2:read('f2'),stored:state.links.map(l=>({id:l.id,waypoints:l.waypoints,curveControls:l.curveControls}))}}''')
+            return page.evaluate('''()=>{const read=id=>{const dom=edgeDomById.get(id);if(!dom?.geometry)return null;return{endpoints:dom.geometry.endpoints.map(p=>({x:p.x,y:p.y})),controls:dom.geometry.controls.map(p=>({x:p.x,y:p.y})),d:dom.geometry.d,samples:dom.geometry.samples}};return{e1:read('e1'),e2:read('e2'),f1:read('f1'),f2:read('f2'),stored:state.links.map(l=>({id:l.id,waypoints:l.waypoints,curveControls:l.curveControls}))}}''')
 
         snap=snapshot()
         assert all(snap[key] for key in ('e1','e2','f1','f2')),snap
         # 场景 A：端点收拢——两条边汇入圆形卡的附着点完全重合。
         assert snap['e1']['endpoints'][1]==snap['e2']['endpoints'][1],snap
         # 场景 B：通道对齐——原本相差 20px 的派生折线主干 x 完全一致。
-        f1x=snap['f1']['controls'][0]['x'];f2x=snap['f2']['controls'][0]['x']
-        assert f1x==f2x,snap
+        def overlaps(a,b):
+            for p,q in zip(a,a[1:]):
+                for r,s in zip(b,b[1:]):
+                    if p['y']==q['y']==r['y']==s['y'] and min(max(p['x'],q['x']),max(r['x'],s['x']))>max(min(p['x'],q['x']),min(r['x'],s['x'])):return True
+                    if p['x']==q['x']==r['x']==s['x'] and min(max(p['y'],q['y']),max(r['y'],s['y']))>max(min(p['y'],q['y']),min(r['y'],s['y'])):return True
+            return False
+        assert overlaps(snap['f1']['samples'],snap['f2']['samples']),snap
         # render-only：持久数据不得被写入 waypoints/curveControls。
         assert all(link['waypoints'] is None and link['curveControls'] is None for link in snap['stored']),snap
         # 刷新后（重新规划）几何保持一致。

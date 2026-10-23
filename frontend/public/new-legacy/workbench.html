@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 
-<html lang="zh-CN" data-release="v9.0-p4.1.380">
+<html lang="zh-CN" data-release="v9.0-p4.1.382">
 <head>
-<link rel="icon" type="image/jpeg" href="/assets/logo.jpg?v=v9.0-p4.1.380">
-<meta name="kg-homepage-bundle-version" content="v9.0-p4.1.380">
-<script src="bundles/home-prelude.js?v=v9.0-p4.1.380"></script>
-<script defer src="bundles/home-shell.js?v=v9.0-p4.1.380"></script><!-- kg-teaching-content-sync:generated -->
+<link rel="icon" type="image/jpeg" href="/assets/logo.jpg?v=v9.0-p4.1.382">
+<meta name="kg-homepage-bundle-version" content="v9.0-p4.1.382">
+<script src="bundles/home-prelude.js?v=v9.0-p4.1.382"></script>
+<script defer src="bundles/home-shell.js?v=v9.0-p4.1.382"></script><!-- kg-teaching-content-sync:generated -->
 <!-- kg-direct-bootstrap-anchor -->
 <!-- kg-runtime:generated -->
 <!-- kg-auth-session:generated -->
@@ -15,7 +15,7 @@
 <!-- kg-feature-usage-clock:generated -->
 <!-- kg-feature-analytics:generated -->
 <!-- kg-homepage-loader:generated -->
-<link rel="stylesheet" href="bundles/home-shell.css?v=v9.0-p4.1.380">
+<link rel="stylesheet" href="bundles/home-shell.css?v=v9.0-p4.1.382">
 
 
 <meta charset="utf-8"/>
@@ -29,6 +29,7 @@
   <meta property="og:url" content="https://lszl.aihuanpu.com/graph"/>
   <title>个人学习工具｜知识图谱与主动回忆</title>
   <link rel="canonical" href="https://lszl.aihuanpu.com/graph"/>
+
 
 
 
@@ -86,7 +87,7 @@
 </button>
 </div>
 <div class="canvas-toolbar-right" data-stage-ui="true">
-<button class="learning-mode-entry" id="learningEntryTopBtn" type="button" title="打开学习入口">学习入口</button>
+<button class="learning-mode-entry" id="learningEntryTopBtn" data-learning-entry-manual type="button" title="打开学习入口">学习入口</button>
 <button class="upgrade-member-btn" id="upgradeMemberBtn" type="button" data-open-subscription-detail>升级会员</button>
 <div class="account-menu-shell" id="accountMenuShell" data-account-help-href="help-center.html">
 <button aria-controls="accountMenu" aria-expanded="false" aria-haspopup="menu" class="auth-status account-menu-trigger" data-account-menu-trigger="true" id="authStatus" title="打开账号菜单" type="button">
@@ -249,6 +250,7 @@
 </div>
 </div>
 <div id="authDialogRoot"></div>
+<button id="learningEntryMobileBtn" data-learning-entry-manual class="learning-entry-mobile" type="button">学习入口</button>
 <div aria-hidden="true" class="modal-backdrop learning-entry-backdrop" id="learningEntryModal" hidden>
   <section aria-labelledby="learningEntryTitle" aria-modal="true" class="modal learning-entry-modal" role="dialog">
     <div class="learning-entry-head">
@@ -256,9 +258,9 @@
     </div>
     <div class="learning-entry-grid">
       <button class="learning-entry-card entry-graph is-current" data-destination="index.html" data-learning-entry-choice="知识图谱" data-description="梳理知识结构与关系 · 当前首页" data-learning-entry="graph" type="button"><span class="learning-entry-avatar">图</span><span class="learning-entry-name">知识图谱</span><span class="learning-entry-id">梳理知识结构与关系 · 当前首页</span></button>
-      <button class="learning-entry-card entry-recall" data-destination="knowledge-recall.html" data-learning-entry-choice="知识回忆" data-description="主动回忆关键词与知识线索 · 深度回忆" data-learning-entry="recall" type="button"><span class="learning-entry-avatar">忆</span><span class="learning-entry-name">知识回忆</span><span class="learning-entry-id">主动回忆关键词与知识线索 · 深度回忆</span></button>
-      <button class="learning-entry-card entry-synthesis" data-destination="question-workspace.html" data-learning-entry-choice="知识归纳" data-description="多题比较、归纳与连接 · 多题画布" data-learning-entry="synthesis" type="button"><span class="learning-entry-avatar">归</span><span class="learning-entry-name">知识归纳</span><span class="learning-entry-id">多题比较、归纳与连接 · 多题画布</span></button>
-      <button hidden class="learning-entry-card entry-practice" data-destination="practice-mode.html" data-learning-entry-choice="知识巩固" data-description="通过做题检验并巩固掌握 · 做题模式" data-learning-entry="practice" type="button"><span class="learning-entry-avatar">练</span><span class="learning-entry-name">知识巩固</span><span class="learning-entry-id">通过做题检验并巩固掌握 · 做题模式</span></button>
+      <button class="learning-entry-card entry-recall" data-destination="knowledge-recall.html" data-learning-entry-choice="深度回忆" data-description="主动回忆关键词与知识线索 · 深度回忆" data-learning-entry="recall" type="button"><span class="learning-entry-avatar">忆</span><span class="learning-entry-name">深度回忆</span><span class="learning-entry-id">主动回忆关键词与知识线索 · 深度回忆</span></button>
+      <button class="learning-entry-card entry-synthesis" data-destination="question-workspace.html" data-learning-entry-choice="多题归纳" data-description="多题比较、归纳与连接 · 多题画布" data-learning-entry="synthesis" type="button"><span class="learning-entry-avatar">归</span><span class="learning-entry-name">多题归纳</span><span class="learning-entry-id">多题比较、归纳与连接 · 多题画布</span></button>
+      <button class="learning-entry-card entry-practice" data-destination="knowledge-space" data-learning-entry-choice="知识星空" data-description="按科目与分类探索练习足迹" data-learning-entry="space" type="button"><span class="learning-entry-avatar">星</span><span class="learning-entry-name">知识星空</span><span class="learning-entry-id">按科目与分类探索练习足迹</span></button>
     </div>
     <p aria-live="polite" class="learning-entry-error" id="learningEntryChooserError"></p>
     <div class="learning-entry-foot"><span>以后可从首页右上角“学习入口”再次打开。</span><button id="learningEntryDismissBtn" type="button" data-learning-entry-focusable>进入知识图谱</button></div>
@@ -398,6 +400,8 @@
 
 
   <!-- Modularized application scripts. Keep this order. -->
+
+
 
 
 

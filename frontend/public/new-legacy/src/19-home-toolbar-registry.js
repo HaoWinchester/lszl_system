@@ -281,7 +281,7 @@
     document.addEventListener('fullscreenchange',reposition);
   }
   function positionSubmenu(shell){
-    window.KGCanvasFloatingToolbarController?.positionPopoverPanel?.({root:shell,host:document.getElementById('stage'),panel:shell.querySelector('.floating-submenu'),trigger:shell.querySelector('.floating-menu-trigger'),preferredSide:'right',getAvoidRects:()=>[document.getElementById('floatingToolbox').getBoundingClientRect()]});
+    window.KGCanvasFloatingToolbarController?.positionPopoverPanel?.({root:shell,host:document.getElementById('stage'),panel:shell.querySelector('.floating-submenu'),trigger:shell.querySelector('.floating-menu-trigger'),preferredSide:'trigger-below',getAvoidRects:()=>[document.getElementById('floatingToolbox').getBoundingClientRect()]});
   }
   function bindHandlers(){
     bindMenuShells();

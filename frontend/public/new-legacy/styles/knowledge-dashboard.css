@@ -25,3 +25,22 @@
 .kg-knowledge-dismiss{position:static;display:flex;justify-content:flex-end;align-items:center;flex-shrink:0;min-height:60px;padding:8px 24px;background:#060b14;border-bottom:1px solid #263341;z-index:2}
 @media(max-width:850px) and (min-width:601px){.kg-knowledge-header{grid-template-columns:minmax(0,1fr)}.kg-knowledge-overview{grid-column:1}}
 @media(max-width:600px){.kg-knowledge-dialog[open]{height:calc(100dvh - 16px)}.kg-knowledge-shell{padding-top:16px}.kg-knowledge-dismiss{padding:8px 16px}.kg-knowledge-header{grid-template-columns:minmax(0,1fr);padding-right:0}.kg-knowledge-overview{grid-column:1}.kg-knowledge-body{min-height:0}}
+
+/* The scene owns the full content area; details expand only when requested. */
+.kg-knowledge-shell{padding:18px 24px}
+.kg-knowledge-header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-right:0}
+.kg-knowledge-dialog h2{font-size:28px}.kg-knowledge-eyebrow{margin-bottom:6px}.kg-knowledge-subtitle{margin-top:6px;font-size:12px}
+.kg-knowledge-overview{display:flex;align-items:center;gap:12px;min-width:0;max-width:65%;padding:0;border:0;background:none;white-space:nowrap;font-size:11px}
+.kg-knowledge-overview p{margin:0;overflow-x:auto}.kg-knowledge-overview button{flex-shrink:0}
+.kg-knowledge-body{display:block;position:relative;margin-top:14px}
+.kg-knowledge-network{height:max(440px,calc(100dvh - 355px));width:100%}
+.kg-knowledge-detail{position:absolute;z-index:1;left:12px;top:48px;padding:0;width:min(330px,calc(100% - 24px));background:#0b1424ed;border:1px solid #34465c;border-radius:4px;box-shadow:0 8px 28px #0006}
+.kg-knowledge-detail:not([open]){width:auto}.kg-knowledge-detail summary{cursor:pointer;min-height:44px;padding:12px 16px;color:#dce9fc;font-size:12px}
+.kg-knowledge-detail-content{padding:0 16px 16px;max-height:370px;overflow-y:auto}.kg-knowledge-number{font-size:38px;margin-bottom:8px}.kg-knowledge-detail h3{font-size:20px;margin:8px 0}.kg-knowledge-path{font-size:12px;margin:8px 0}.kg-knowledge-facts{margin:12px 0;gap:20px}.kg-knowledge-list{max-height:150px}
+.kg-knowledge-footer{margin-top:12px;padding-top:10px}.kg-knowledge-groups button{min-height:44px;padding:8px 12px}.kg-knowledge-dialog #kgKnowledgeMeaning{margin-top:10px}
+@media(max-width:850px){.kg-knowledge-header{flex-wrap:wrap}.kg-knowledge-overview{max-width:100%;margin-left:auto}.kg-knowledge-body{display:block}.kg-knowledge-detail{margin:0}.kg-knowledge-network{height:max(400px,calc(100dvh - 390px))}}
+@media(max-width:600px){.kg-knowledge-shell{padding:12px}.kg-knowledge-header{gap:10px}.kg-knowledge-dialog h2{font-size:24px}.kg-knowledge-subtitle{display:none}.kg-knowledge-overview{width:100%;max-width:100%;padding:0;gap:6px;font-size:10px}.kg-knowledge-overview button{padding:6px;max-width:none}.kg-knowledge-body{margin-top:8px}.kg-knowledge-network{height:max(350px,calc(100dvh - 390px))}.kg-knowledge-detail{top:44px;left:4px;width:min(300px,calc(100% - 8px));border-top:1px solid #34465c}.kg-knowledge-camera{justify-content:flex-end}.kg-knowledge-camera button{padding:6px 9px}.kg-knowledge-space-heading{gap:6px}.kg-knowledge-detail-content{max-height:260px}.kg-knowledge-footer{margin-top:10px}.kg-knowledge-groups button{min-width:0}.kg-knowledge-help{font-size:10px}}
+
+/* Without a canvas, details are the main content and must reserve their own space. */
+.kg-knowledge-dialog.kg-knowledge-fallback .kg-knowledge-detail{position:static;width:100%;margin:0 0 16px}
+.kg-knowledge-dialog.kg-knowledge-fallback .kg-knowledge-detail-content{max-height:none}

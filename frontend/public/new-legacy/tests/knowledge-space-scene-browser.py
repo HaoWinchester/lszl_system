@@ -21,7 +21,7 @@ def assert_fit(page,label):
  return state['camera']
 
 with sync_playwright() as p:
- browser=p.chromium.launch(headless=True)
+ browser=p.chromium.launch(headless=True,channel='chrome')
  for width in (1440,390):
   context=browser.new_context(viewport={'width':width,'height':900},has_touch=True,device_scale_factor=3)
   page=context.new_page();errors=[];page.on('pageerror',lambda error:errors.append(str(error)))
@@ -43,7 +43,7 @@ with sync_playwright() as p:
     ctx.fill=function(...args){if(radius<=9)dotStyles.push(this.fillStyle);return fill.apply(this,args)};
    };
   }''')
-  page.evaluate("()=>{window.scene=KGKnowledgeSpaceScene.mount({host:document.querySelector('#host'),nodes:[.12,.4,.7,1].map((brightness,i)=>({id:String(i),parentId:null,brightness}))});observeDrawing()}")
+  page.evaluate("()=>{window.scene=KGKnowledgeSpaceScene.mount({host:document.querySelector('#host'),nodes:[.12,.4,.7,1].map((brightness,i)=>({id:String(i),parentId:null,brightness}))});observeDrawing();scene.zoomBy(1.5)}")
   page.wait_for_function('scene.snapshot().settled && !scene.snapshot().running')
   styles=page.evaluate('dotStyles')
   assert 'rgba(190, 224, 255, 0.384)' in styles,f'unpractised .12 must remain distinct from .2: {styles}'
@@ -57,16 +57,19 @@ with sync_playwright() as p:
    elapsed=(time.perf_counter()-started)*1000
    state=page.evaluate('scene.snapshot()')
    assert len(state['positions'])==size and all(v['visible'] for v in state['positions'])
-   assert page.evaluate('dotStyles.length')==size and page.evaluate('arcs')==size*2,'every business point must be drawn, without LOD dropping nodes'
+   assert state['mode']=='clusters' and len(state['clusters'])==len(fixture)//40,'overview must aggregate published classifications without dropping business nodes'
+   page.evaluate('scene.zoomBy(1.5)');page.wait_for_function('!scene.snapshot().running')
+   assert page.evaluate('dotStyles.length')==size and page.evaluate('arcs')==size*2,'detailed zoom must draw every real knowledge point'
+   page.evaluate('scene.reset()');page.wait_for_function('!scene.snapshot().running')
    assert_fit(page,f'{width}/{size}-node-catalog')
    costs=sorted(page.evaluate('frameCosts'))
-   metrics.append(dict(width=width,nodes=size,settlementMs=round(elapsed,1),frames=len(costs),callbackP95Ms=round(costs[int((len(costs)-1)*.95)],1),callbackMaxMs=round(max(costs),1),drawnNodes=page.evaluate('dotStyles.length')))
+   metrics.append(dict(width=width,nodes=size,settlementMs=round(elapsed,1),frames=len(costs),callbackP95Ms=round(costs[int((len(costs)-1)*.95)],1),callbackMaxMs=round(max(costs),1),drawnClusters=len(state['clusters']),detailNodes=size))
    page.screenshot(path=str(OUT/f'catalog-{size}-{width}.png'))
    box=page.locator('canvas').bounding_box();cx=box['x']+box['width']/2;cy=box['y']+box['height']/2
    before=state['camera'];page.mouse.move(cx,cy);page.mouse.down();page.mouse.move(cx+40,cy+10,steps=3);page.mouse.up()
    assert page.evaluate('scene.snapshot().camera.yaw')!=before['yaw']
    page.wait_for_function('!scene.snapshot().running')
-   assert page.evaluate('dotStyles.length')==size,'rotation cannot hide points as a performance shortcut'
+   assert len(scene_points:=page.evaluate('scene.snapshot().positions'))==size,'rotation must retain every point for detailed zoom'
    page.evaluate('scene.destroy()')
   for kind in ('single-group','multi-group'):
    fixture=[dict(id=f'fit-{i}',title=f'布局测试考点 {i}',subject='数学' if kind=='single-group' else f'科目 {i//10}',taxonomyId='classification',brightness=.7) for i in range(60)]
@@ -120,13 +123,14 @@ with sync_playwright() as p:
   page.mouse.move(5,650);page.mouse.wheel(0,100);page.wait_for_timeout(100)
   assert page.locator('#modal').evaluate('(e)=>e.scrollTop')>0
   page.evaluate("document.querySelector('#modal').scrollTop=0;scene.reset()");page.wait_for_function('!scene.snapshot().running')
+  page.evaluate('scene.zoomBy(1.5)');page.wait_for_function('!scene.snapshot().running')
   # Select the nearest visible projected node, using actual mouse dispatch and a host offset.
   point=max([v for v in snap()['positions'] if v['visible']],key=lambda v:v['scale'])
   page.mouse.click(box['x']+point['x'],box['y']+point['y']);assert page.evaluate('chosen.length')==1
   assert page.evaluate('chosen[0].index')==point['index'];assert snap()['selected']==point['index']
   page.evaluate('scene.select(7)');assert snap()['selected']==7;assert page.evaluate('chosen.length')==1,'programmatic sync cannot echo selection callback'
   page.evaluate('scene.select(-1);scene.select(999)');assert snap()['selected']==7
-  key='["英语","reading"]';page.evaluate('(key)=>scene.focusGroup(key)',key)
+  key='["英语","reading",""]';page.evaluate('(key)=>scene.focusGroup(key)',key)
   assert all(v['visible']==(v['group']==key) for v in snap()['positions'])
   page.evaluate("scene.focusGroup('missing')");assert not any(v['visible'] for v in snap()['positions'])
   page.evaluate('scene.reset()');assert all(v['visible'] for v in snap()['positions']);assert snap()['camera']==initial['camera'];assert snap()['group']==''
@@ -152,17 +156,11 @@ with sync_playwright() as p:
   touch('touchStart',[(1,cx,cy)]);touch('touchCancel',[]);assert page.evaluate('chosen.length')==count
   page.evaluate('scene.zoomBy(1e9)');upper=snap()['camera']['zoom'];assert upper<100
   page.evaluate('scene.zoomBy(1e-12)');assert 0<snap()['camera']['zoom']<upper
-  # At minimum zoom, overlapping hit targets must pick the frontmost node.
-  points=[v for v in snap()['positions'] if v['visible']]
-  overlap=None
-  for target in points:
-   candidates=[v for v in points if ((v['x']-target['x'])**2+(v['y']-target['y'])**2)**.5<=12]
-   if len(candidates)>1:
-    overlap=(target,min(candidates,key=lambda v:v['depth']));break
-  assert overlap is not None,'fixture must exercise overlapping hit targets'
-  target,front=overlap
+  # Minimum zoom presents classification clusters. Clicking one opens its points.
+  assert snap()['mode']=='clusters'
+  target=snap()['clusters'][0]
   page.mouse.click(box['x']+target['x'],box['y']+target['y'])
-  assert snap()['selected']==front['index'],dict(selected=snap()['selected'],expected=front['index'],scroll=page.locator('#modal').evaluate('(e)=>e.scrollTop'),box=page.locator('canvas').bounding_box(),target=target);count+=1;assert page.evaluate('chosen.length')==count
+  assert snap()['mode']=='points' and page.evaluate('chosen.length')==count
   page.evaluate("document.querySelector('#host').style.height='380px'");page.wait_for_timeout(100)
   assert page.locator('canvas').evaluate('(c)=>c.height')==760
   page.emulate_media(reduced_motion='reduce');page.evaluate('scene.reset()');page.wait_for_function('!scene.snapshot().running')

@@ -14,7 +14,7 @@ if(exists){
   assert.deepEqual(a,b);assert.equal(a.points.length,60);assert.ok(new Set(a.points.map(p=>p.z)).size>1);
   assert.ok(new Set(a.points.map(p=>`${p.x},${p.y},${p.z}`)).size>1);assert.equal(new Set(a.points.map(p=>p.key)).size,60);
   assert.equal(JSON.stringify(nodes),before);assert.equal(a.points[0].node,nodes[0]);
-  assert.equal(a.points[0].group,'["数学",""]');
+  assert.equal(a.points[0].group,'["数学","0",""]');
  });
  test('organization edges only join matching subject and classification',()=>{
   const m=api.createModel(nodes);assert.equal(m.groups.length,6);assert.ok(m.edges.length>0);
@@ -72,3 +72,34 @@ if(exists){
   assert.ok(api.projectPoint({...p,z:-100},camera,800,500).scale>a.scale);assert.equal(JSON.stringify(p),before);
  });
 }
+
+test('semantic zoom retains stable named classification clusters and reveals every point at detail scale',()=>{
+ const api=require(file),input=[
+  {id:'a',subject:'数学',taxonomyId:'opaque',path:['代数','方程','一次方程']},
+  {id:'b',subject:'数学',taxonomyId:'opaque',path:['代数','方程','二次方程']},
+  {id:'c',subject:'英语',taxonomyId:'other',path:['阅读','主旨']},
+ ];
+ const model=api.createModel(input);
+ assert.equal(model.groups[0].label,'数学 · 代数 / 方程');
+ assert.equal(api.semanticView(model,.8).mode,'clusters');
+ assert.deepEqual(api.semanticView(model,.8).items.map(item=>item.count),[2,1]);
+ assert.equal(api.semanticView(model,1.5).mode,'points');
+ assert.deepEqual(api.semanticView(model,1.5).items.map(item=>item.index),[0,1,2]);
+ assert.deepEqual(api.semanticView(model,1.5,model.groups[0].key).items.map(item=>item.index),[0,1]);
+ assert.deepEqual(api.createModel(input).groups,model.groups);
+ assert.ok(!model.groups[0].label.includes('opaque'));
+});
+
+test('one published tree separates readable top-level categories and preserves numeric zero classification identity',()=>{
+ const api=require(file),model=api.createModel([
+  {id:'a',subject:'PMP',taxonomyId:0,path:['PMP','人','团队','考点A']},
+  {id:'b',subject:'PMP',taxonomyId:0,path:['PMP','人','领导','考点B']},
+  {id:'c',subject:'PMP',taxonomyId:0,path:['PMP','过程','风险','考点C']},
+  {id:'d',subject:'PMP',taxonomyId:null,path:['PMP','人','团队','考点D']},
+ ]);
+ assert.equal(model.groups.length,3);
+ assert.deepEqual(model.groups.map(g=>g.indices),[[0,1],[2],[3]]);
+ assert.equal(model.groups[0].label,'PMP · 人');
+ assert.equal(model.groups[1].label,'PMP · 过程 / 风险');
+ assert.notEqual(model.points[0].group,model.points[3].group);
+});

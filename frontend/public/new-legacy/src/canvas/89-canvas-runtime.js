@@ -123,6 +123,10 @@
     height=Math.min(height,Math.max(1,bounds.bottom-bounds.top-pad*2));
     const leftMin=bounds.left+pad,topMin=bounds.top+pad,leftMax=Math.max(leftMin,bounds.right-pad-width),topMax=Math.max(topMin,bounds.bottom-pad-height);
     const centered=alignEnd?anchor.right-width:(anchor.left+anchor.right-width)/2;
+    if(preferredSide==='trigger-below'){
+      const left=Math.max(leftMin,Math.min(centered,leftMax)),top=Math.max(topMin,Math.min(anchor.bottom+gap,topMax));
+      return{left,top,right:left+width,bottom:top+height,width,height,placement:'below'};
+    }
     const candidates=[],add=(left,top,placement)=>candidates.push({left:Math.max(leftMin,Math.min(left,leftMax)),top:Math.max(topMin,Math.min(top,topMax)),placement});
     const around=(rect,axis)=>{
       const vertical=()=>{add(centered,rect.bottom+gap,'below');add(centered,rect.top-height-gap,'above')};
@@ -166,7 +170,7 @@
     panel.style.maxHeight=maxHeight+'px';panel.style.overflowY='auto';
     const main=root?.querySelector?.(options.mainSelector||'.uc-toolbar-main');
     const avoidRects=[...getGlobalAvoidRects(root),...(options.getAvoidRects?.()||[])];if(main)avoidRects.push(main.getBoundingClientRect());
-    const next=placePopover({bounds,anchor:trigger.getBoundingClientRect(),width:panel.offsetWidth||180,height:panel.offsetHeight||80,avoidRects,pad,gap:Number(options.gap)||8,alignEnd:!!options.alignEnd,preferredSide:options.preferredSide});
+    const next=placePopover({bounds,anchor:trigger.getBoundingClientRect(),width:panel.offsetWidth||180,height:panel.offsetHeight||80,avoidRects,pad,gap:Number(options.gap)||8,alignEnd:!!options.alignEnd,preferredSide:options.preferredSide||'trigger-below'});
     if(root)root.dataset.panelPlacement=next.placement;panel.classList.toggle('is-above',next.placement==='above');
     panel.style.left=Math.round(next.left-offsetBox.left)+'px';panel.style.top=Math.round(next.top-offsetBox.top)+'px';return true;
   }
