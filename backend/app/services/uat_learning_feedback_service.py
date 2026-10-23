@@ -65,7 +65,7 @@ async def prepare(db, *, release_id: str, question_id: str, apply: bool = False)
                    'enabledModes': list(dict.fromkeys([*(active.enabled_modes or []), *MODES])),
                    'metadata': deepcopy(active.release_metadata), 'questions': refs,
                    'questionSnapshots': deepcopy(refs)}
-        active = await paper_release_service.publish_from_payload(db, actor, payload)
+        active = await paper_release_service.publish_from_payload(db, actor, payload, exact_resource_revisions=True)
         result['releaseId'] = active.id
     # Service publication commits its transaction. Lock/recount before adding data.
     await db.scalar(select(Question.id).where(Question.id == question_id).with_for_update())
@@ -73,16 +73,26 @@ async def prepare(db, *, release_id: str, question_id: str, apply: bool = False)
         QuestionComment.question_id == question_id, QuestionComment.status != HIDDEN,
         func.char_length(QuestionComment.content) <= 30,
     )) or 0)
+    if current > TARGET:
+        raise ValueError('More than 200 eligible comments already exist; no user comments will be removed')
     added = 0
-    for index in range(1, TARGET+1):
-        if current+added >= TARGET:
-            break
+    index = 0
+    while current+added < TARGET:
+        index += 1
         comment_id = 'uat-feedback-'+sha256(f'{question_id}:{index}'.encode()).hexdigest()[:40]
         if await db.get(QuestionComment, comment_id):
             continue
         db.add(QuestionComment(id=comment_id, question_id=question_id,
                                owner_id=actor.username, content=f'[UAT测试{index:03d}] 先分析影响再采取行动'))
         added += 1
+    await db.flush()
+    actual = int(await db.scalar(select(func.count()).select_from(QuestionComment).where(
+        QuestionComment.question_id == question_id, QuestionComment.status != HIDDEN,
+        func.char_length(QuestionComment.content) <= 30,
+    )) or 0)
+    if actual != TARGET:
+        await db.rollback()
+        raise ValueError('UAT visible comment count verification failed')
     await db.commit()
-    result.update(commentsToAdd=added, eligibleComments=current+added)
+    result.update(commentsToAdd=added, eligibleComments=actual)
     return result

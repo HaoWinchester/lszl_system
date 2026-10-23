@@ -39,6 +39,9 @@ def test_uat_feedback_opens_only_selected_paper_and_seeds_one_question_idempoten
         async with AsyncSessionLocal() as db:
             rows = list((await db.scalars(select(PaperReleaseQuestion).where(PaperReleaseQuestion.release_id == release_id).order_by(PaperReleaseQuestion.order_index))).all())
             original = [deepcopy(row.snapshot) for row in rows]
+            # Changing live material must not alter a release when only opening modes.
+            actor = await db.get(User, ids['teacher'])
+            await save_material(db, actor, MaterialInput(title='后来修改的案例', text='新材料不能替换旧发布快照', revision=1), material['id'])
             qid, other = rows[0].question_id, rows[1].question_id
             db.add(QuestionComment(id='uat-real-'+ids['paper'], question_id=qid, owner_id=ids['student'], content='已有真实留言'))
             db.add(QuestionComment(id='uat-other-'+ids['paper'], question_id=other, owner_id=ids['student'], content='其他题留言'))
@@ -58,4 +61,12 @@ def test_uat_feedback_opens_only_selected_paper_and_seeds_one_question_idempoten
             again = await service.prepare(db, release_id=release_id, question_id=qid, apply=True)
             assert again['releaseId'] == new_id and again['commentsToAdd'] == 0
             assert again['eligibleComments'] == 200
+            for _ in range(2):
+                hidden = await db.scalar(select(QuestionComment).where(QuestionComment.question_id == qid, QuestionComment.id.like('uat-feedback-%'), QuestionComment.status != 'hidden').limit(1))
+                hidden.status = 'hidden'
+                await db.commit()
+                repaired = await service.prepare(db, release_id=release_id, question_id=qid, apply=True)
+                assert repaired['eligibleComments'] == 200 and repaired['commentsToAdd'] == 1
+                await db.refresh(hidden)
+                assert hidden.status == 'hidden'
     asyncio.run(run())

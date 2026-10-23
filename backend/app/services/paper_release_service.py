@@ -743,7 +743,9 @@ async def questions(
     }
 
 
-async def publish_from_payload(db: AsyncSession, actor: User, payload: dict) -> PaperRelease:
+async def publish_from_payload(
+    db: AsyncSession, actor: User, payload: dict, *, exact_resource_revisions: bool = False
+) -> PaperRelease:
     """教师发布入口：接受前端构建的完整发布载荷（题目引用 + 冻结快照）。
 
     与迁移共用同一套归一化校验；发布者以当前登录账号为准，
@@ -764,7 +766,7 @@ async def publish_from_payload(db: AsyncSession, actor: User, payload: dict) -> 
     for question in canonical["questions"]:
         snapshot = dict(question["question"])
         from app.services.question_material_service import freeze_question_resources
-        snapshot = await freeze_question_resources(db, actor, snapshot)
+        snapshot = await freeze_question_resources(db, actor, snapshot, exact_revision=exact_resource_revisions)
         if not paper_service.question_matches_paper_type(
             canonical["paperType"],
             str(snapshot.get("type") or "single_choice"),
