@@ -9,6 +9,7 @@ OUT=ROOT/'artifacts/knowledge-universe-20261020/task-2'
 OUT.mkdir(parents=True,exist_ok=True)
 assert MODULE.exists(), 'knowledge-space-scene.js must exist before browser interactions can run'
 NODES=[dict(id=f'topic-{i}',title=f'真实接口形状测试考点 {i}',subject='数学' if i<12 else '英语',taxonomyId='algebra' if i<12 else 'reading',brightness=.2+i/30) for i in range(24)]
+CATALOG=json.loads((ROOT/'new-legacy/tests/fixtures/knowledge-space-published-catalog.json').read_text())['nodes']
 metrics=[]
 def assert_fit(page,label):
  state=page.evaluate('scene.snapshot()');box=page.locator('canvas').bounding_box()
@@ -48,6 +49,26 @@ with sync_playwright() as p:
   styles=page.evaluate('dotStyles')
   assert 'rgba(190, 224, 255, 0.384)' in styles,f'unpractised .12 must remain distinct from .2: {styles}'
   assert len(set(styles))==4,'incoming practice brightness must remain continuous'
+  page.evaluate('scene.destroy()')
+  page.evaluate("nodes=>{window.scene=KGKnowledgeSpaceScene.mount({host:document.querySelector('#host'),nodes})}",CATALOG)
+  page.wait_for_function('scene.snapshot().settled && !scene.snapshot().running')
+  for phase in ('initial','reset'):
+   if phase=='reset':
+    page.evaluate('scene.rotate(40,15);scene.zoomBy(.7)')
+    manual=page.evaluate('scene.snapshot().camera')
+    page.evaluate("document.querySelector('#host').style.height='500px'");page.wait_for_timeout(100)
+    assert page.evaluate('scene.snapshot().camera')==manual,'real catalog resize must preserve explicit camera'
+    page.evaluate("document.querySelector('#host').style.height='560px'");page.wait_for_timeout(100)
+    page.evaluate('scene.reset()');page.wait_for_function('!scene.snapshot().running')
+   state=page.evaluate('scene.snapshot()');box=page.locator('canvas').bounding_box()
+   xs=[p['x'] for p in state['positions']];ys=[p['y'] for p in state['positions']]
+   ratio_x=(max(xs)-min(xs))/box['width'];ratio_y=(max(ys)-min(ys))/box['height']
+   print(f'real317 {width}/{phase}: footprint {ratio_x:.3f}w x {ratio_y:.3f}h',flush=True)
+   assert ratio_x>=(.70 if width>600 else .75),f'real317 {width}/{phase}: network too narrow ({ratio_x:.3f})'
+   assert ratio_y>=.75,f'real317 {width}/{phase}: network too short ({ratio_y:.3f})'
+   assert min(xs)>=16 and max(xs)<=box['width']-16 and min(ys)>=16 and max(ys)<=box['height']-16,'real catalog points must stay inside canvas'
+   assert len(state['positions'])==317 and all(p['visible'] for p in state['positions'])
+   page.screenshot(path=str(OUT/f'real317-{width}-{phase}.png'))
   page.evaluate('scene.destroy()')
   for size in (320,1000):
    fixture=[dict(id=f'full-{i}',parentId=f'full-{i-1}' if i%40 else None,title=f'完整考点 {i}',subject=f'科目 {i//40}',taxonomyId=f'tree-{i//40}',brightness=(.12,.4,.7,1)[i%4]) for i in range(size)]

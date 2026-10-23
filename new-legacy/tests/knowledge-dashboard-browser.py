@@ -141,16 +141,16 @@ with sync_playwright() as pw:
         shell=page.locator('.kg-knowledge-shell');shell.evaluate('e=>e.scrollTop=0')
         canvas=page.locator('canvas');canvas.scroll_into_view_if_needed();page.wait_for_timeout(150)
         cb=canvas.bounding_box();sb=shell.bounding_box();x=cb['x']+cb['width']/2;y=(max(cb['y'],sb['y'])+min(cb['y']+cb['height'],sb['y']+sb['height']))/2
-        before=shell.evaluate('e=>e.scrollTop');camera=snap()['camera'];background=page.evaluate('scrollY')
+        can_scroll=shell.evaluate('e=>e.scrollHeight>e.clientHeight');before=shell.evaluate('e=>e.scrollTop');camera=snap()['camera'];background=page.evaluate('scrollY')
         page.mouse.move(x,y);page.mouse.wheel(0,300);page.wait_for_timeout(250)
-        assert shell.evaluate('e=>e.scrollTop')>before and snap()['camera']==camera and page.evaluate('scrollY')==background
+        assert (shell.evaluate('e=>e.scrollTop')>before if can_scroll else shell.evaluate('e=>e.scrollTop')==before) and snap()['camera']==camera and page.evaluate('scrollY')==background
         shell.evaluate('e=>e.scrollTop=0');canvas.scroll_into_view_if_needed();page.wait_for_timeout(150)
         cb=canvas.bounding_box();sb=shell.bounding_box();y=(max(cb['y'],sb['y'])+min(cb['y']+cb['height'],sb['y']+sb['height']))/2;before=shell.evaluate('e=>e.scrollTop')
         cdp.send('Input.dispatchTouchEvent',{'type':'touchStart','touchPoints':[{'x':x,'y':y,'id':1}]})
         for step in range(1,11):
             cdp.send('Input.dispatchTouchEvent',{'type':'touchMove','touchPoints':[{'x':x,'y':y-step*15,'id':1}]});page.wait_for_timeout(20)
         cdp.send('Input.dispatchTouchEvent',{'type':'touchEnd','touchPoints':[]});page.wait_for_timeout(350)
-        assert shell.evaluate('e=>e.scrollTop')>before and snap()['camera']==camera
+        assert (shell.evaluate('e=>e.scrollTop')>before if can_scroll else shell.evaluate('e=>e.scrollTop')==before) and snap()['camera']==camera
         page.screenshot(path=str(OUT/f'dashboard-{width}.png'))
         page.locator('[data-knowledge-node-next]').scroll_into_view_if_needed()
         page.screenshot(path=str(OUT/f'detail-{width}.png'))

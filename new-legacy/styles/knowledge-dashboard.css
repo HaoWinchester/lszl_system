@@ -44,3 +44,16 @@
 /* Without a canvas, details are the main content and must reserve their own space. */
 .kg-knowledge-dialog.kg-knowledge-fallback .kg-knowledge-detail{position:static;width:100%;margin:0 0 16px}
 .kg-knowledge-dialog.kg-knowledge-fallback .kg-knowledge-detail-content{max-height:none}
+
+/* Stars span the scrolling shell; foreground text and controls share that space. */
+.kg-knowledge-shell{position:relative;isolation:isolate}
+.kg-knowledge-shell>.kg-knowledge-network{position:absolute;z-index:0;inset:0;width:100%;height:max(620px,100%);pointer-events:auto}
+.kg-knowledge-shell>:where(:not(.kg-knowledge-network)){position:relative;z-index:1;pointer-events:none}
+.kg-knowledge-shell button,.kg-knowledge-shell summary,.kg-knowledge-detail-content,.kg-knowledge-groups{pointer-events:auto}
+.kg-knowledge-header>div,.kg-knowledge-space-heading,.kg-knowledge-help,.kg-knowledge-dialog #kgKnowledgeMeaning{background:#060b14a6;text-shadow:0 1px 5px #000}
+.kg-knowledge-space{background:none;min-height:max(480px,calc(100dvh - 330px))}
+.kg-knowledge-camera{position:absolute;right:0;bottom:48px}
+.kg-knowledge-help{position:absolute;right:0;bottom:0;margin:0;max-width:100%}
+.kg-knowledge-shell>.kg-knowledge-network[hidden]{display:none!important}
+.kg-knowledge-dialog.kg-knowledge-fallback .kg-knowledge-space{min-height:200px}
+@media(max-width:600px){.kg-knowledge-space{min-height:480px}.kg-knowledge-camera{bottom:60px}.kg-knowledge-help{text-align:right}.kg-knowledge-shell>.kg-knowledge-network{height:max(620px,100%)}}

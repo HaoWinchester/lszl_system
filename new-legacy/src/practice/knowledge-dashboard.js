@@ -60,6 +60,7 @@
     document.body.appendChild(dialog);
     const find=selector=>dialog.querySelector(selector);
     const summary=find('[data-knowledge-summary]'),network=find('[data-knowledge-network]'),list=find('[data-knowledge-list]'),status=find('[data-knowledge-status]'),retry=find('[data-knowledge-retry]'),groups=find('[data-knowledge-groups]');
+    find('.kg-knowledge-shell').prepend(network);
     let returnFocus=null,scene=null,nodes=[],selected=null,activeGroup='',listOpen=false;
     const formatDate=value=>{const date=value?new Date(value):null;return !date||Number.isNaN(date.getTime())?'时间未知':date.toLocaleDateString('zh-CN')};
     const setText=(name,value)=>{find(`[data-knowledge-${name}]`).textContent=text(value)};

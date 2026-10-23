@@ -6,8 +6,8 @@ OUT=ROOT/'artifacts/learning-feedback-three-groups/task-3'
 OUT.mkdir(parents=True,exist_ok=True)
 with sync_playwright() as p:
  browser=p.chromium.launch(headless=True,channel='chrome')
- for width in (1440,390):
-  page=browser.new_page(viewport={'width':width,'height':900},reduced_motion='reduce')
+ for width in (1440,559,390):
+  page=browser.new_page(viewport={'width':width,'height':854 if width==559 else 900},reduced_motion='reduce')
   errors=[];page.on('pageerror',lambda e: errors.append(str(e)))
   page.set_content('<button id="open" data-knowledge-dashboard-open>知识星空</button>')
   page.add_style_tag(path=str(ROOT/'new-legacy/styles/knowledge-dashboard.css'))
@@ -20,6 +20,10 @@ with sync_playwright() as p:
   assert page.evaluate('starArcs')>81, 'overview must draw real catalog stars beneath clusters'
   assert page.evaluate('overlay.length===81 && overlay.every(n=>n.brightness===.12 && n.relatedAttemptCount===0)')
   box=page.locator('canvas').bounding_box();shell=page.locator('.kg-knowledge-body').bounding_box()
+  header=page.locator('.kg-knowledge-header').bounding_box()
+  assert box['y']<=header['y'] and box['y']+box['height']>=header['y']+header['height'], 'scene must extend behind foreground header and summary'
+  assert page.locator('h2').evaluate('(e)=>{const r=e.getBoundingClientRect();return document.elementFromPoint(r.x+r.width/2,r.y+r.height/2).tagName==="CANVAS"}'), 'noninteractive heading must let canvas gestures through'
+  assert page.locator('[data-knowledge-refresh]').evaluate('(e)=>{const r=e.getBoundingClientRect();return document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)===e}'), 'foreground refresh must physically receive clicks'
   assert box['width']>=shell['width']*.95
   assert box['height']>= (430 if width>600 else 340)
   assert not page.locator('.kg-knowledge-detail').evaluate('(e)=>e.open')
