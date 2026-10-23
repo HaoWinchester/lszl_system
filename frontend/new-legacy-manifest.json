@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "version": "v9.0-p4.1.382",
+  "version": "v9.0-p4.1.384",
   "bridgeVersion": 2,
   "sourceFiles": {
     "ACTIVITY_SCHEMA_V1.md": "5b42cb917237d6a6eb4e7438ac491543a653918fb172d49e3a2a05b1d98c20b9",
@@ -160,7 +160,7 @@
     "V9.0_P4.1_DATA_INTEGRITY.json": "65a6d63dfac46ce58dfc27d34bbcecad45a019302c419e7967f2e1ed46ead3f4",
     "V9.0_P4.1_HELP_FEEDBACK_MESSAGES_REPORT.md": "edfc028219fece4c0e4893f868470f1f00f8836bce74ec6de3acbc54f3fcc5cd",
     "V9.0_P4.1_QUICK_START.md": "1316de5b831a2109176f627b3e7bbaf1bb030c14f3ae93ba8945b4a83deb864c",
-    "VERSION": "7d717ded36db03259377a81eb4daa874d62dab18d2422a5be65d7a2daddb7880",
+    "VERSION": "d83e9aed9380f968626515709e42e4fb8371eda0bd7a1bfc873d3cfec48c7155",
     "admin-console.html": "d01f621961b4b22b89a154a8c470c04bd42332f45506e94658f6375f0086ca34",
     "admin-operations.html": "0f18529367601116972c255fef04ceae9a814bd27dbbd527f136a05352911c9b",
     "admin-settings.html": "55b95089248dfca96f83a8d98fd5bd2fc3ed1744200dec8e2f22b70f255e238b",
@@ -260,7 +260,7 @@
     "content-prep-studio/baseline/baseline-id-cheatsheet.md": "ec2b2e55b1ba0ede76a1ade2b8263d45339832486eebe80e34e0285ccc02d947",
     "content-prep-studio/baseline/baseline.json": "89733f41e4ce8c7dd8687f2fd0d7c245e778439ef466546b96a61417cd9cb620",
     "content-prep-studio/build.py": "a741984fccdf116dddc493214ca0c035891ba434ac68654676f14503df47958d",
-    "content-prep-studio/dist/content-prep.html": "6edccce05970115ce99b05a6bb3348878d3414eb2837b97e6719a880bdf442ef",
+    "content-prep-studio/dist/content-prep.html": "82f21caacecdf8ba61cd8a0bba130ec2b81ae8af32cbc40bbaf4e18befac56c6",
     "content-prep-studio/scripts/fetch_baseline.py": "2871350494d9ead4b9c77d4c6e81ca87a0efa6117d8522249578da13608bda35",
     "content-prep-studio/src/css/app.css": "f97de0488ee29fbc78cc5c8aa1d7f6ef8564fceebcc5117ecdc795307c71dbae",
     "content-prep-studio/src/index.template.html": "013792aacaea13f1aeb84fae6c343221a0c64b96cdf6f33f52f9d82e8dc72e9b",

@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.382",
-  "toVersion": "v9.0-p4.1.382",
+  "fromVersion": "v9.0-p4.1.384",
+  "toVersion": "v9.0-p4.1.384",
   "changes": {
     "added": [],
     "changed": [
-      "tests/case-card-layout-browser.py"
+      "content-prep-studio/dist/content-prep.html"
     ],
     "removed": []
   },
