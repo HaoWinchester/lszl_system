@@ -84,3 +84,42 @@ test('storage normalization leaves malformed legacy link entries for the sanitiz
   const clean=c.sanitizeState(c.KGGraphPersistence.hydrate(raw));
   assert.equal(clean.links.length,1);assert.deepEqual([clean.links[0].fromPort,clean.links[0].toPort],['left','top']);
 });
+
+test('elbows keep bottom-to-top ports vertical with a horizontal trunk, including stale diagonal waypoints',()=>{
+ const {c}=environment(),a={x:80,y:80},b={x:500,y:240};
+ for(const waypoints of [undefined,[{x:140,y:113},{x:340,y:172}]]){
+  const link={pathStyle:'elbow',fromPort:'bottom',toPort:'top',waypoints},g=c.linkPathGeometry(link,a,b);
+  assert.equal(g.samples[1].x,a.x);assert.ok(g.samples[1].y>a.y);
+  assert.equal(g.samples.at(-2).x,b.x);assert.ok(g.samples.at(-2).y<b.y);
+  for(let i=1;i<g.samples.length;i++)assert.ok(g.samples[i-1].x===g.samples[i].x||g.samples[i-1].y===g.samples[i].y,'all segments must be orthogonal');
+  assert.equal(link.waypoints,waypoints,'rendering must not replace saved route');
+ }
+});
+test('elbow rendering removes forward collinear corners while retaining necessary backtracks',()=>{
+ const {c}=environment(),g=c.linkPathGeometry({pathStyle:'elbow',waypoints:[{x:20,y:0},{x:40,y:0},{x:40,y:100}]},{x:0,y:0},{x:100,y:100});
+ assert.deepEqual(plain(g.samples),[{x:0,y:0},{x:40,y:0},{x:40,y:100},{x:100,y:100}]);
+});
+
+test('edge settings prefer the triggering click over distant cubic control handles',()=>{
+ const {c}=environment();c.selectedEditableLinks=()=>[{id:'edge'}];c.edgeDomById=new Map([['edge',{geometry:{style:'curve',curveControls:[{},{}],controls:[{kind:'curve-control',x:2000,y:2000},{kind:'curve-control',x:3000,y:3000}]}}]]);c.state={viewport:{scale:2,x:10,y:20}};c.selectedEdgeQuickStyleAnchorWorld={x:50,y:60};
+ const src=fs.readFileSync(require('node:path').join(__dirname,'../src/10-graph-editor.js'),'utf8');vm.runInContext(src.slice(src.indexOf('function selectedEdgeQuickScreenPoint('),src.indexOf('function setSelectedEdgeQuickStyleAnchorFromEvent(')),c);
+ const p=c.selectedEdgeQuickScreenPoint();assert.equal(p.x,110);assert.equal(p.y,140);
+});
+
+test('batch elbow conversion and card moves preserve selected ports, ids and every arrow route',()=>{
+ const {c,nodes}=environment();nodes.set('a',{id:'a',x:10,y:20,w:180,h:100});nodes.set('b',{id:'b',x:540,y:280,w:200,h:100});
+ const links=['top','right','bottom','left'].flatMap(fromPort=>['top','right','bottom','left'].map(toPort=>({id:fromPort+'-'+toPort,from:'a',to:'b',fromPort,toPort,pathStyle:'curve',waypoints:[{x:333,y:111},{x:444,y:222}]})));
+ links.forEach(l=>l.pathStyle='elbow');
+ for(const move of [0,730]){
+  nodes.get('a').x=10+move;nodes.get('a').y=20-move/2;
+  for(const link of links){
+   const p=c.linkRenderPoints(link),g=c.linkPathGeometry(link,p.a,p.b,p),samples=g.samples,from=geometry.portDirection(link.fromPort),to=geometry.portDirection(link.toPort);
+   const first=samples[1],last=samples.at(-2);
+   assert.ok((first.x-p.a.x)*from.x+(first.y-p.a.y)*from.y>0,link.id+' outward start');
+   assert.ok((last.x-p.b.x)*to.x+(last.y-p.b.y)*to.y>0,link.id+' outward end');
+   for(let i=1;i<samples.length;i++)assert.ok(samples[i-1].x===samples[i].x||samples[i-1].y===samples[i].y);
+   assert.equal(link.from,'a');assert.equal(link.to,'b');
+  }
+ }
+ assert.equal(new Set(links.map(l=>l.id)).size,16);
+});

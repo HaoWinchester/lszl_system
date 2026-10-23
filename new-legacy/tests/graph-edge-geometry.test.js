@@ -102,3 +102,8 @@ test('a route at the editing budget keeps its whole tail when a new corner canno
  const points=Array.from({length:64},(_,i)=>({x:Math.ceil((i+1)/2)*10,y:Math.floor((i+1)/2)*10}));
  assert.deepEqual(geometry.moveElbowSegment({x:0,y:0},{x:330,y:320},points,0,{x:0,y:-10}),points);
 });
+
+test('dragging a simplified single segment keeps both fixed endpoints and creates two corners',()=>{
+ const g=require('../src/graph/edge-geometry.js');
+ assert.deepEqual(g.moveElbowSegment({x:0,y:0},{x:200,y:0},[],0,{x:0,y:-45}),[{x:0,y:-45},{x:200,y:-45}]);
+});

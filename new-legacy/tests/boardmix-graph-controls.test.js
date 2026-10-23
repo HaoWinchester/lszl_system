@@ -41,3 +41,8 @@ const calls=[];
 const renderer=context.KGGraphRenderer.create({renderEdges:()=>calls.push('edges'),renderEdgeStylePanel:()=>calls.push('panel')});
 renderer.render('edges');assert.deepEqual(calls,['edges','panel'],'path/style changes refresh truthful toolbar state');
 console.log('PASS edge-only render refreshes the current contextual toolbar');
+{
+ const button=rect(520,200,40,40),placed=controller.placePopover({bounds:rect(0,0,1000,700),anchor:button,width:260,height:220,avoidRects:[rect(450,250,300,280)],preferredSide:'trigger-below'});
+ assert.equal(placed.top,button.bottom+8,'submenu stays directly below its own button despite unrelated obstacles');
+ assert.equal((placed.left+placed.right)/2,(button.left+button.right)/2);
+}

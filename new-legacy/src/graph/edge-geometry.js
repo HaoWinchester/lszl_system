@@ -29,7 +29,8 @@
     if(!offset)return waypoints.map(p=>({...p}));
     const movedA={...a,[axis]:a[axis]+offset},movedB={...b,[axis]:b[axis]+offset};
     // Endpoints stay on their cards; an outer segment gains a short orthogonal leg.
-    if(index===0)route.splice(1,1,movedA,movedB);
+    if(route.length===2)route.splice(1,0,movedA,movedB);
+    else if(index===0)route.splice(1,1,movedA,movedB);
     else if(index===route.length-2)route.splice(index,1,movedA,movedB);
     else{route[index]=movedA;route[index+1]=movedB}
     // Remove only redundant forward corners, preserving intentional backtracks.
@@ -40,6 +41,42 @@
     const result=route.slice(1,-1);
     // A bounded editable route must stay whole; dropping its tail creates diagonals.
     return result.length<=MAX_WAYPOINTS?result:waypoints.map(p=>({...p}));
+  }
+  function simplifyOrthogonal(points){
+    const route=[];
+    for(const p of points){
+      if(route.length&&route.at(-1).x===p.x&&route.at(-1).y===p.y)continue;
+      route.push({...p});
+      while(route.length>=3){
+        const [a,b,c]=route.slice(-3),ax=b.x-a.x,ay=b.y-a.y,bx=c.x-b.x,by=c.y-b.y;
+        if((ax===0&&bx===0||ay===0&&by===0)&&ax*bx+ay*by>=0)route.splice(route.length-2,1);else break;
+      }
+    }
+    return route;
+  }
+  // Normalize old routes at the rendering boundary. Explicit ports own the
+  // first/last tangent; the stored interior remains a guide rather than a diagonal.
+  function orthogonalWaypoints(start,end,waypoints=[],fromPort,toPort){
+    const from=portDirection(fromPort),to=portDirection(toPort),gap=24;
+    const vertical=Math.abs(end.y-start.y)>Math.abs(end.x-start.x);
+    const first=from?point(start.x+from.x*gap,start.y+from.y*gap):start;
+    const last=to?point(end.x+to.x*gap,end.y+to.y*gap):end;
+    let guides=waypoints;
+    if(!guides.length){
+      const v=from?!!from.y:to?!!to.y:vertical;
+      guides=v?[point(first.x,(first.y+last.y)/2),point(last.x,(first.y+last.y)/2)]:[point((first.x+last.x)/2,first.y),point((first.x+last.x)/2,last.y)];
+    }
+    const route=[start];if(from)route.push(first);
+    for(const target of [...guides,last]){
+      const prev=route.at(-1);
+      if(prev.x!==target.x&&prev.y!==target.y){
+        const prior=route.at(-2),alongY=prior?prior.x===prev.x:(from?!!from.y:vertical);
+        route.push(alongY?point(prev.x,target.y):point(target.x,prev.y));
+      }
+      route.push({...target});
+    }
+    route.push(end);
+    return simplifyOrthogonal(route).slice(1,-1);
   }
   function controlsFromHandles(start,handles,end){
     // At t=1/3 and 2/3, the two unknown controls have coefficients
@@ -126,7 +163,7 @@
       ?point(center.x+Math.sign(ray.x||1)*width/2,center.y)
       :point(center.x,center.y+Math.sign(ray.y||1)*height/2);
   }
-  const api=Object.freeze({MAX_WAYPOINTS,distanceToPolyline,nearestSegmentIndex,curveMidpoint,bendCurveMidpoint,segmentHandles,moveElbowSegment,curveHandles,controlsFromHandles,constrainWaypointDrag,moveRoute,portPoint,portDirection,nearestPort});
+  const api=Object.freeze({MAX_WAYPOINTS,simplifyOrthogonal,orthogonalWaypoints,distanceToPolyline,nearestSegmentIndex,curveMidpoint,bendCurveMidpoint,segmentHandles,moveElbowSegment,curveHandles,controlsFromHandles,constrainWaypointDrag,moveRoute,portPoint,portDirection,nearestPort});
   global.KGGraphEdgeGeometry=api;
   if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);
