@@ -1906,6 +1906,10 @@
     const element=record.element;
     const compact=record.node?.nodeType==='question-reference'&&element.dataset.displayMode==='compact';
     const synthesis=record.node?.nodeType==='synthesis-card';
+    if(!compact&&!synthesis&&element.querySelector('.qm-card-case-layout')){
+      const size=global.KGQuestionMaterials?.caseCardSize?.({width:element.offsetWidth||record.node.width});
+      if(size?.height)return size.height;
+    }
     const minimum=compact?COMPACT_CARD_HEIGHT:(synthesis?180:FULL_CARD_MIN_HEIGHT);
     const previousHeight=element.style.height;
     const previousOverflow=element.style.overflow;
@@ -3917,6 +3921,21 @@
     const liveNodeIds=new Set(Object.keys(state.workspace?.nodes||{}));
     [...state.sessionHighlights.keys()].forEach(nodeId=>{if(!liveNodeIds.has(String(nodeId)))state.sessionHighlights.delete(nodeId)});
     const nodes=Object.values(state.workspace.nodes||{}).sort((a,b)=>Number(a.createdAt)-Number(b.createdAt));
+    // Adapt legacy default-sized case cards once; later manual widths stay authoritative.
+    let caseLayoutChanged=false;
+    nodes.forEach(node=>{
+      if(node.nodeType!=='question-reference'||node.displayMode==='compact'||node.caseLayoutVersion>=1)return;
+      const question=resolvedQuestionForNode(node)||{};
+      if(!global.KGQuestionMaterials?.extension?.(question).material)return;
+      const size=global.KGQuestionMaterials.caseCardSize({});
+      if(Number(node.width)<=430)Object.assign(node,{width:size.width,height:size.height||node.height});
+      node.caseLayoutVersion=1;caseLayoutChanged=true;
+    });
+    if(caseLayoutChanged&&!state.readonly){
+      state.suppressStoreEvent=true;
+      try{state.workspace=store()?.write?.(state.workspace,{reason:'case-card-reading-layout'})||state.workspace}
+      finally{state.suppressStoreEvent=false}
+    }
     refreshWorldExtent();
     state.kernel.cards.clear();
     state.nodeLayer.innerHTML='';
@@ -4245,8 +4264,8 @@
       releaseId:String(source.paper?.releaseId||source.question?.sourceReleaseId||'')
     }))};
   }
-  function batchQuestionPositions(count,anchor={}){
-    const columns=Math.min(3,Math.max(1,Number(count||0))),width=430,height=420,gapX=34,gapY=42;
+  function batchQuestionPositions(count,anchor={},size={width:430,height:420}){
+    const columns=Math.min(3,Math.max(1,Number(count||0))),width=size.width,height=size.height,gapX=34,gapY=42;
     return Array.from({length:Math.max(0,Number(count||0))},(_,index)=>({
       x:Number(anchor.x||0)+(index%columns)*(width+gapX),
       y:Number(anchor.y||0)+Math.floor(index/columns)*(height+gapY),width,height
@@ -4258,11 +4277,14 @@
     const addable=ordered.filter(item=>!currentNodeByQuestion(item.question,item.bank));
     const skipped=ordered.length-addable.length;
     if(!addable.length){notify('所选 '+skipped+' 道题已在当前画布中，未重复添加。');return {created:[],skipped}}
-    const before=workspaceSnapshot(),positions=batchQuestionPositions(addable.length,anchor||defaultNodePosition()),created=[];
+    const sizes=addable.map(item=>global.KGQuestionMaterials?.extension?.(item.question).material?global.KGQuestionMaterials.caseCardSize({}):{width:430,height:420});
+    const batchSize={width:Math.max(...sizes.map(size=>size.width)),height:Math.max(...sizes.map(size=>size.height||420))};
+    const before=workspaceSnapshot(),positions=batchQuestionPositions(addable.length,anchor||defaultNodePosition(),batchSize),created=[];
     state.suppressStoreEvent=true;
     try{
       addable.forEach((item,index)=>{
-        const preferred=findOpenCardPosition(positions[index],{width:430,height:420});
+        const size={width:sizes[index].width,height:sizes[index].height||420};
+        const preferred={...findOpenCardPosition(positions[index],size),...size};
         const result=store()?.addQuestionReference?.(
           {...item.question,sourcePaperId:String(item.paper?.id||item.question.sourcePaperId||state.paperId||''),sourceReleaseId:String(item.paper?.releaseId||item.question.sourceReleaseId||'')},
           String(item.bank?.id||item.question.sourceBankId||''),preferred,workspaceOptions()

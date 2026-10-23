@@ -21,7 +21,14 @@
   // Both learning canvases keep question content and its media inside the same card.
   function renderCardContent(question,content){
     const media=renderMaterials(question);
-    return media?`<div class="qm-card-layout"><div class="qm-card-columns"><div class="qm-card-main">${content}</div><aside class="qm-card-media" aria-label="题目图表与材料">${media}</aside></div></div>`:content;
+    return media?`<div class="qm-card-layout${extension(question).material?' qm-card-case-layout':''}"><div class="qm-card-columns"><div class="qm-card-main">${content}</div><aside class="qm-card-media" aria-label="题目图表与材料">${media}</aside></div></div>`:content;
+  }
+  // Shared initial footprint; custom canvas widths remain adjustable afterwards.
+  function caseCardSize({viewportWidth=global.innerWidth,viewportHeight=global.innerHeight,width}={}){
+    const vw=Number(viewportWidth)||1440,vh=Number(viewportHeight)||960;
+    const preferred=vw>=1000?Math.min(1360,vw-120,Math.max(540,vh-180)*16/9):Math.min(960,vw-28);
+    const w=Math.max(380,Math.min(1400,Number(width)||preferred));
+    return {width:w,height:w>=760?Math.ceil(w*9/16):Math.max(320,vh-160)};
   }
   function renderMatching(question,{selectedPairs={},readOnly=false,reveal=false}={}){
     const q=extension(question),m=q.matching||{},selected=answer()?.pairs(q,selectedPairs)||{},right=m.right||[];
@@ -73,5 +80,5 @@
     const data=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(',')[1]);reader.onerror=()=>reject(new Error('无法读取图片，请重新选择'));reader.readAsDataURL(file);});
     return (await request('question-assets',{method:'POST',body:{filename:file.name,mimeType:file.type,dataBase64:data,alt}})).asset;
   }
-  global.KGQuestionMaterials=Object.freeze({render,renderMaterials,renderCardContent,renderMatching,bind,bindMedia,extension,safeUrl,request,upload});
+  global.KGQuestionMaterials=Object.freeze({render,renderMaterials,renderCardContent,caseCardSize,renderMatching,bind,bindMedia,extension,safeUrl,request,upload});
 })(typeof window!=='undefined'?window:globalThis);

@@ -164,6 +164,7 @@
       currentStep:Math.max(1,Math.min(5,Number(node.currentStep||1))),
       principleCount:Math.max(0,Number(node.principleCount||0)),
       displayMode:String(node.displayMode||'full')==='compact'?'compact':'full',
+      caseLayoutVersion:Math.max(0,Math.floor(Number(node.caseLayoutVersion)||0)),
       color:normalizeColor(node.color,''),
       practiceForSynthesisId:String(node.practiceForSynthesisId||''),
       practiceLevel:Math.max(1,Math.min(3,Math.floor(Number(node.practiceLevel||1)))),

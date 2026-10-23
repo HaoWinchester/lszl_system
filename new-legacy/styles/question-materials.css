@@ -14,3 +14,35 @@
 .qm-card-media .qm-case summary{padding:10px 12px}
 .qm-card-media .qm-case-body{padding:0 12px 12px}
 @container(max-width:360px){.qm-card-columns{grid-template-columns:minmax(0,1fr);gap:12px}}
+
+/* Shared case reading surface: material first, question second. Image-only cards keep their layout. */
+.qm-card-case-layout .qm-card-columns{grid-template-columns:minmax(0,.96fr) minmax(0,1.04fr);gap:24px}
+.qm-card-case-layout .qm-card-media{grid-column:1;grid-row:1}
+.qm-card-case-layout .qm-card-main{grid-column:2;grid-row:1}
+:is(.kr-question-card,.qw-question-card[data-display-mode="full"]):has(.qm-card-case-layout){--qm-case-width:min(1360px,calc(100vw - 120px),calc(max(540px,100vh - 180px)*16/9))}
+.knowledge-recall-page .kr-question-card:has(.qm-card-case-layout){width:var(--qm-case-width);max-width:none;height:calc(var(--qm-case-width)*9/16);display:flex;flex-direction:column;gap:16px}
+:is(.kr-question-card,.qw-question-card[data-display-mode="full"]) .qm-card-case-layout{flex:1;min-height:0}
+:is(.kr-question-card,.qw-question-card[data-display-mode="full"]) .qm-card-case-layout .qm-card-columns{height:100%;min-height:0;align-items:stretch}
+:is(.kr-question-card,.qw-question-card[data-display-mode="full"]) .qm-card-case-layout :is(.qm-card-main,.qm-card-media){min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin}
+.qm-card-case-layout .qm-card-media .qm-case{display:flex;flex-direction:column;margin:0;height:100%;min-height:0;overflow:auto}
+.qm-card-case-layout .qm-card-media .qm-case:not([open]){height:auto}
+.qm-card-case-layout .qm-case summary{flex:none;line-height:1.6;padding:14px 18px}
+.qm-card-case-layout .qm-card-media .qm-case-body{min-height:0;max-height:none;flex:1;padding:0 18px 18px;overflow:auto;touch-action:pan-y}
+.qw-question-card[data-display-mode="full"]:has(.qm-card-case-layout) .qw-card-body{display:flex;flex-direction:column;flex:1;min-height:0}
+.qw-question-card[data-display-mode="full"]:has(.qm-card-case-layout) .qw-card-content{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden}
+.qw-question-card[data-display-mode="full"]:has(.qm-card-case-layout) .qw-card-actions{flex:none}
+@container(max-width:700px){
+  .qm-card-case-layout .qm-card-columns{grid-template-columns:minmax(0,1fr);height:auto!important;gap:18px}
+  .qm-card-case-layout .qm-card-media{grid-column:1;grid-row:1}
+  .qm-card-case-layout .qm-card-main{grid-column:1;grid-row:2;overflow:visible!important}
+  .qm-card-case-layout .qm-card-media .qm-case{height:auto}
+  .qm-card-case-layout .qm-card-media .qm-case-body{max-height:40vh;flex:auto}
+}
+@media(max-width:999px){
+  .knowledge-recall-page .kr-question-card:has(.qm-card-case-layout){width:min(960px,calc(100vw - 28px));height:auto;max-height:calc(100dvh - 160px);overflow:auto;touch-action:pan-y}
+  :is(.kr-question-card,.qw-question-card[data-display-mode="full"]) .qm-card-case-layout{flex:none}
+  .qw-question-card[data-display-mode="full"]:has(.qm-card-case-layout) .qw-card-content{overflow:auto;touch-action:pan-y}
+}
+/* Native details wraps its body in ::details-content; let that wrapper shrink too. */
+.qm-card-case-layout .qm-case::details-content{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden}
+.knowledge-recall-page .kr-question-card:has(.qm-card-case-layout)>.kr-question-order-badge{align-self:flex-start}

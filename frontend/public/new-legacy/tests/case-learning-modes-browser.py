@@ -57,6 +57,10 @@ with sync_playwright() as p:
             expect(case).to_be_visible(timeout=30000)
             expect(case).to_contain_text('客户提出变更，团队需要共同分析影响后再决策。')
             assert case.get_attribute('data-case-id') == material['id']
+            boxes=card.evaluate("e=>['.qm-card-media','.qm-card-main'].map(s=>e.querySelector(s).getBoundingClientRect().toJSON())")
+            assert boxes[0]['right']<=boxes[1]['left']+1,boxes
+            box=card.bounding_box()
+            assert abs(box['width']/box['height']-16/9)<.03,box
             expect(card).to_contain_text('分析影响')
             expect(card).to_contain_text('直接执行')
             card.locator('[data-qw-action=analysis]').click()
@@ -65,6 +69,14 @@ with sync_playwright() as p:
             expect(card).to_contain_text(stem(order), timeout=30000)
             expect(case).to_contain_text('客户提出变更，团队需要共同分析影响后再决策。')
             assert case.get_attribute('data-case-id') == material['id']
+            if filename=='question-workspace.html':
+                # The one-time legacy/default expansion must not undo a manual narrower width.
+                page.evaluate("""()=>{const card=document.querySelector('.qw-question-card:has(.qm-card-case-layout)'),api=KGMultiQuestionWorkspace;window.caseNodeId=card.dataset.nodeId;}""")
+                node=card.get_attribute('data-node-id')
+                page.evaluate("id=>{const s=KGCanvasWorkspaceStore,w=s.ensure();const node=w.nodes[id];if(node.caseLayoutVersion!==1)throw Error('case migration marker missing');s.updateNodeLayout(id,{x:node.x,y:node.y,width:900,height:507});}",node)
+                page.reload(wait_until='networkidle')
+                expect(card).to_contain_text(stem(order),timeout=30000)
+                assert abs(card.evaluate('e=>e.offsetWidth')-900)<1,'custom width must survive reopen'
             assert not errors, errors
             print('PASS real student case publication/entry/material/analysis/refresh', filename, order)
     browser.close()

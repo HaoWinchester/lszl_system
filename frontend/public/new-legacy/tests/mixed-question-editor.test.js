@@ -1,6 +1,6 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
-const context={console};context.globalThis=context;context.window=context;context.KGTeacherDomains={Core:{clone:v=>JSON.parse(JSON.stringify(v)),result:(ok,value,errors=[],warnings=[])=>({ok,value,errors,warnings})}};vm.createContext(context);
+const context={console,URL};context.globalThis=context;context.window=context;context.KGTeacherDomains={Core:{clone:v=>JSON.parse(JSON.stringify(v)),result:(ok,value,errors=[],warnings=[])=>({ok,value,errors,warnings})}};vm.createContext(context);
 for(const name of ['117-question-answer-set.js','118-question-materials.js','teacher/paper-management/paper-question-picker.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../src',name),'utf8'),context);
 const P=context.KGTeacherDomains.PaperManagement.PaperQuestionPicker,A=context.KGQuestionAnswerSet;
 const rows=[{id:'a',type:'single_choice'},{id:'b',type:'single_choice',caseGroup:{id:'case',order:1,total:3}},{id:'c',type:'single_choice',caseGroup:{id:'case',order:2,total:3}},{id:'d',type:'multiple_choice',caseGroup:{id:'case',order:3,total:3}},{id:'e',type:'matching'}];
