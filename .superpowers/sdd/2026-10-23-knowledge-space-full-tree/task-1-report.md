@@ -45,3 +45,11 @@ Final focused verification:
 - `git diff --check`: passed.
 
 No sync, generated edit, VERSION change or deployment performed in this review fix. Root independently owns local preview sync and real endpoint verification.
+
+### Catalog category-root grouping follow-up
+
+Root's actual 317-node preview showed 人/过程/环境 grouped as 未分类 with the subject root. Updated the existing shared `categoryPath` only for catalog nodes (own `parentId` property): when no non-subject parent label remains, retain the node's own non-subject path label. Thus category roots and descendants share a semantic key. A catalog subject-only root is explicitly labeled 科目总览. Legacy noncatalog grouping remains unchanged.
+
+Added a real-shape root + 人 + child + 过程 regression in `knowledge-space-scene.test.js`: observed expected red (`["PMP","1",""]` did not equal child's `["PMP","1","人"]`), then green. Existing cross-category edge fixture was adjusted to remain cross-category after the corrected root grouping. Added desktop/mobile semantic browser assertions for `PMP · 科目总览 / 1`, `PMP · 人 / 2`, `PMP · 过程 / 1`, with no 未分类 label.
+
+Verification: combined dashboard/scene/learning-entry Node command: 40 passed; semantic browser 1440/390 passed; git diff --check passed. No sync or generated changes by this agent.

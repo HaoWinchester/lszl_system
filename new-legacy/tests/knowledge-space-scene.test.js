@@ -104,6 +104,19 @@ test('one published tree separates readable top-level categories and preserves n
  assert.notEqual(model.points[0].group,model.points[3].group);
 });
 test('catalog parent edges survive semantic category boundaries within the same tree',()=>{
- const model=require(file).createModel([{id:'root',parentId:null,subject:'A',taxonomyId:1,path:['Root']},{id:'child',parentId:'root',subject:'A',taxonomyId:1,path:['Root','Child']}]);
+ const model=require(file).createModel([{id:'root',parentId:null,subject:'A',taxonomyId:1,path:['A']},{id:'child',parentId:'root',subject:'A',taxonomyId:1,path:['A','Child']}]);
  assert.equal(model.groups.length,2);assert.deepEqual(model.edges.map(e=>[e.source,e.target]),[[0,1]]);
+});
+test('published category roots group with descendants while subject root has an explicit overview label',()=>{
+ const api=require(file),nodes=[
+  {id:'r',parentId:null,subject:'PMP',taxonomyId:1,path:['PMP']},
+  {id:'people',parentId:'r',subject:'PMP',taxonomyId:1,path:['PMP','人']},
+  {id:'child',parentId:'people',subject:'PMP',taxonomyId:1,path:['PMP','人','团队']},
+  {id:'process',parentId:'r',subject:'PMP',taxonomyId:1,path:['PMP','过程']},
+ ];
+ const model=api.createModel(nodes);
+ assert.equal(api.groupKey(nodes[1]),api.groupKey(nodes[2]));
+ assert.deepEqual(model.groups.map(g=>g.indices),[[0],[1,2],[3]]);
+ assert.deepEqual(model.groups.map(g=>g.label),['PMP · 科目总览','PMP · 人','PMP · 过程']);
+ assert.equal(api.groupKey({subject:'PMP',path:['PMP','人']}),'["PMP","",""]');
 });

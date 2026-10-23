@@ -46,6 +46,12 @@ with sync_playwright() as p:
   page.locator('[data-knowledge-close]').focus();page.keyboard.press('Escape');expect(page.locator('#open')).to_be_focused()
   assert not errors,errors
   page.locator('#open').click();page.wait_for_function('scenes.at(-1).snapshot().settled');page.screenshot(path=str(OUT/f'space-{width}.png'))
+  page.evaluate('''()=>{KGDomainApi.request=async()=>({attemptCount:0,nodes:[{id:'r',parentId:null,subject:'PMP',taxonomyId:1,path:['PMP']},{id:'people',parentId:'r',subject:'PMP',taxonomyId:1,path:['PMP','人']},{id:'child',parentId:'people',subject:'PMP',taxonomyId:1,path:['PMP','人','团队']},{id:'process',parentId:'r',subject:'PMP',taxonomyId:1,path:['PMP','过程']}]})}''')
+  page.locator('[data-knowledge-refresh]').click()
+  expect(page.locator('[data-knowledge-groups]')).to_contain_text('PMP · 科目总览 / 1')
+  expect(page.locator('[data-knowledge-groups]')).to_contain_text('PMP · 人 / 2')
+  expect(page.locator('[data-knowledge-groups]')).to_contain_text('PMP · 过程 / 1')
+  expect(page.locator('[data-knowledge-groups]')).not_to_contain_text('未分类')
   print(f'{width}: semantic zoom, cluster click, full canvas, drawer/list, refresh/retry, full catalog, auth invalidation, close/reopen passed')
   page.close()
  browser.close()

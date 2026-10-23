@@ -2,12 +2,20 @@
 (function(global){
   const MAX_STEPS=320,CELL=75,DEFAULT_CAMERA={yaw:.24,pitch:-.12,zoom:1};
   const clamp=(value,min,max)=>Math.min(max,Math.max(min,value));
-  const categoryPath=node=>(Array.isArray(node.path)?node.path.slice(0,-1).map(String):[]).filter(value=>value.trim()&&value!==String(node.subject||''));
+  function categoryPath(node){
+    const path=Array.isArray(node.path)?node.path.map(String):[],subject=String(node.subject||'');
+    const parents=path.slice(0,-1).filter(value=>value.trim()&&value!==subject);
+    if(!parents.length&&Object.prototype.hasOwnProperty.call(node,'parentId')){
+      const own=path.at(-1);if(own?.trim()&&own!==subject)return [own];
+    }
+    return parents;
+  }
   const groupKey=node=>JSON.stringify([String(node.subject||''),String(node.taxonomyId??''),categoryPath(node)[0]||'']);
   function classificationLabel(nodes){
     const paths=nodes.map(categoryPath),common=[];
     for(let i=0;i<(paths[0]?.length||0)&&paths.every(path=>path[i]===paths[0][i]);i++)common.push(paths[0][i]);
-    const name=nodes[0]?.taxonomyName||nodes[0]?.categoryName||common.filter(value=>value.trim()).join(' / ')||'未分类';
+    const subjectOverview=nodes.length&&nodes.every(node=>Object.prototype.hasOwnProperty.call(node,'parentId')&&!categoryPath(node).length&&Array.isArray(node.path)&&node.path.includes(String(node.subject||'')));
+    const name=nodes[0]?.taxonomyName||nodes[0]?.categoryName||common.filter(value=>value.trim()).join(' / ')||(subjectOverview?'科目总览':'未分类');
     return `${nodes[0]?.subject||'科目未标注'} · ${name}`;
   }
   function semanticView(model,zoomRatio,group=''){
