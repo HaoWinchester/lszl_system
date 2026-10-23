@@ -1,12 +1,15 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.384",
-  "toVersion": "v9.0-p4.1.385",
+  "fromVersion": "v9.0-p4.1.385",
+  "toVersion": "v9.0-p4.1.387",
   "changes": {
     "added": [],
     "changed": [
       "VERSION",
-      "content-prep-studio/dist/content-prep.html"
+      "content-prep-studio/dist/content-prep.html",
+      "src/practice/knowledge-dashboard.js",
+      "styles/knowledge-dashboard.css",
+      "tests/knowledge-dashboard-browser.py"
     ],
     "removed": []
   },

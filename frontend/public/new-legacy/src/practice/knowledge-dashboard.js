@@ -64,7 +64,7 @@
     // Original-reference.html layout: canvas + vignette/scanlines/noise behind the .ui grid.
     const shell=find('.kg-knowledge-shell'),ui=document.createElement('main');ui.className='ui';
     ui.append(find('.kg-knowledge-header'),find('.kg-knowledge-body'));
-    const stage=document.createElement('section');stage.className='stage';ui.append(stage,find('.kg-knowledge-footer'));
+    const stage=document.createElement('section');stage.className='kg-knowledge-stage';ui.append(stage,find('.kg-knowledge-footer'));
     shell.prepend(network);for(const name of ['vignette','scanlines','noise']){const layer=document.createElement('div');layer.className=name;layer.setAttribute('aria-hidden','true');shell.append(layer)}shell.append(ui);
     const dock=find('.kg-knowledge-footer'),help=document.createElement('details'),helpTitle=document.createElement('summary');
     help.className='kg-knowledge-guidance';helpTitle.textContent='操作与亮度说明';summary.hidden=false;help.append(helpTitle,summary,find('.kg-knowledge-help'),find('#kgKnowledgeMeaning'));

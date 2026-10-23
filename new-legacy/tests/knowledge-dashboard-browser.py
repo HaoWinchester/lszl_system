@@ -42,6 +42,8 @@ with sync_playwright() as pw:
     errors = []
     page.on('pageerror', lambda error: errors.append(str(error)))
     page.set_content('<!doctype html><html lang="zh"><body><button id="open" data-knowledge-dashboard-open>星空知识网络</button></body></html>')
+    # Exercise the actual homepage cascade, including its unrelated graph stage.
+    page.add_style_tag(path=str(ROOT/'new-legacy/styles/main.css'))
     page.add_style_tag(path=str(ROOT/'new-legacy/styles/knowledge-dashboard.css'))
     page.evaluate('''() => {
       window.owner='A'; window.KGAuthCore={currentUser:()=>owner?{username:owner}:null};
@@ -67,6 +69,7 @@ with sync_playwright() as pw:
     page.locator('#open').click()
     dialog = page.get_by_role('dialog', name='星空知识网络')
     expect(dialog).to_be_visible()
+    assert page.locator('#kgKnowledgeDashboard .ui > section').last.evaluate("e=>{const s=getComputedStyle(e);return s.backgroundColor==='rgba(0, 0, 0, 0)'&&s.backgroundImage==='none'}"), 'homepage graph stage background must not cover the star field'
     expect(page.locator('[data-knowledge-close]')).to_be_focused()
     expect(page.locator('[data-knowledge-network] canvas')).to_have_count(1)
     assert page.locator('[data-knowledge-search],[data-knowledge-unpracticed],[data-knowledge-questions]').count()==0
