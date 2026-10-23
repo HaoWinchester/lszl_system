@@ -9916,6 +9916,8 @@ body:not([data-graph-interaction-mode="reading"]) .stage :is(.knowledge-card.mul
 @media(prefers-reduced-motion:reduce){.kg-knowledge-dialog::backdrop,.kg-knowledge-detail::backdrop{backdrop-filter:none}}
 
 @media(max-height:600px){.kg-knowledge-shell>.kg-knowledge-network{min-height:620px}.kg-knowledge-body{min-height:420px}.kg-knowledge-footer{position:fixed!important;left:24px;right:24px;bottom:16px;z-index:2!important}}
+.kg-knowledge-secondary{grid-column:1/-1;display:flex;align-items:center;justify-content:flex-end;gap:14px;pointer-events:auto}.kg-knowledge-secondary>button{min-height:36px;white-space:nowrap}.kg-knowledge-secondary .kg-knowledge-guidance{grid-column:auto}
+@media(max-width:600px){.kg-knowledge-secondary{justify-content:flex-start;gap:12px}}
 /* style: styles/learning-weekly-open-gate.css */
 /* 三学习板块周日 14:00 开放：入口倒计时 + 页面门禁 */
 .learning-entry-card.is-scheduled-closed{filter:saturate(.82);cursor:not-allowed}

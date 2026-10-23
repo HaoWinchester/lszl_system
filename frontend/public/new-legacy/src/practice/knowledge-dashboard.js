@@ -63,10 +63,10 @@
     find('.kg-knowledge-shell').prepend(network);
     const dock=find('.kg-knowledge-footer'),help=document.createElement('details'),helpTitle=document.createElement('summary');
     help.className='kg-knowledge-guidance';helpTitle.textContent='操作与亮度说明';help.append(helpTitle,find('.kg-knowledge-help'),find('#kgKnowledgeMeaning'));
-    dock.append(find('.kg-knowledge-camera'),help);
+    const secondary=document.createElement('div');secondary.className='kg-knowledge-secondary';const autoButton=document.createElement('button');autoButton.type='button';autoButton.setAttribute('data-knowledge-auto-rotate','');autoButton.disabled=true;function rotationState(value){autoButton.textContent=value?'暂停旋转':'开始旋转';autoButton.setAttribute('aria-pressed',String(value))}rotationState(false);secondary.append(autoButton,help);dock.append(find('.kg-knowledge-camera'),secondary);
     const detail=find('.kg-knowledge-detail');let detailReturnFocus=null,labelsVisible=false;
-    function closeDetail(){if(detail.open)detail.close();detailReturnFocus?.focus?.();detailReturnFocus=null}
-    function openDetail(){if(!nodes.length)return;detailReturnFocus=document.activeElement;toggleList(true);if(!detail.open)detail.showModal()}
+    function closeDetail(){if(detail.open)detail.close();scene?.setRotationPaused(false);detailReturnFocus?.focus?.();detailReturnFocus=null}
+    function openDetail(){if(!nodes.length)return;detailReturnFocus=document.activeElement;toggleList(true);if(!detail.open)detail.showModal();scene?.setRotationPaused(true)}
     detail.addEventListener('cancel',event=>{event.preventDefault();event.stopPropagation();closeDetail()});
     let returnFocus=null,scene=null,nodes=[],selected=null,activeGroup='',listOpen=false;
     const formatDate=value=>{const date=value?new Date(value):null;return !date||Number.isNaN(date.getTime())?'时间未知':date.toLocaleDateString('zh-CN')};
@@ -92,12 +92,12 @@
     }
     function button(label,attribute,value){const element=document.createElement('button');element.type='button';element.textContent=label;element.setAttribute(attribute,value);return element}
     function render(data){
-      closeDetail();scene?.destroy();scene=null;dialog.classList.remove('kg-knowledge-fallback');nodes=[];selected=null;activeGroup='';summary.textContent='';network.replaceChildren();list.replaceChildren();groups.replaceChildren();
+      closeDetail();autoButton.disabled=true;rotationState(false);scene?.destroy();scene=null;dialog.classList.remove('kg-knowledge-fallback');nodes=[];selected=null;activeGroup='';summary.textContent='';network.replaceChildren();list.replaceChildren();groups.replaceChildren();
       network.hidden=true;find('[data-knowledge-space-empty]').hidden=false;
       setText('detail-title','选择一个考点');setText('detail-number','—');setText('detail-subject','');setText('detail-path','');setText('detail-attempts','—');setText('detail-related','—');setText('detail-date','—');setText('page-count','全目录 0 个节点');
       for(const control of dialog.querySelectorAll('.kg-knowledge-step button,.kg-knowledge-camera button'))control.disabled=true;
       toggleList(listOpen);if(!data)return;
-      nodes=derivePracticeOverlay(data.nodes);
+      nodes=derivePracticeOverlay(data.nodes).filter(node=>!global.KGKnowledgeSpaceScene?.isSubjectOverviewNode(node));
       summary.textContent=`累计 ${Number(data.attemptCount)||0} 次作答 · ${nodes.length} 个目录节点 · 已点亮 ${nodes.filter(node=>node.relatedAttemptCount>0).length} 个${data.unknownAttemptCount?` · ${Number(data.unknownAttemptCount)} 次作答暂无考点引用`:''}${data.unmappedAttemptCount?` · ${Number(data.unmappedAttemptCount)} 次作答未映射到当前目录`:''}。`;
       setText('page-count',`全目录 ${nodes.length} 个节点`);
       list.start=1;
@@ -113,10 +113,10 @@
           groups.appendChild(button(`${label} / ${members.length}`,'data-knowledge-group',key));
         }
         network.hidden=false;find('[data-knowledge-space-empty]').hidden=true;
-        try{scene=global.KGKnowledgeSpaceScene?.mount({host:network,nodes,insets:()=>{const box=network.getBoundingClientRect(),header=find('.kg-knowledge-body>button').getBoundingClientRect(),footer=dock.getBoundingClientRect();return {plot:dialog.clientWidth<=600,top:Math.max(0,header.bottom-box.top)+38,bottom:Math.max(0,box.bottom-footer.top)+16}},onSelect:(_,index)=>{select(index);openDetail()},onGroup:key=>focusGroup(key,false)})||null}catch(error){scene=null;network.replaceChildren()}
+        try{scene=global.KGKnowledgeSpaceScene?.mount({host:network,nodes,autoRotate:true,onAutoRotateChange:rotationState,insets:()=>{const box=network.getBoundingClientRect(),header=find('.kg-knowledge-body>button').getBoundingClientRect(),footer=dock.getBoundingClientRect();return {plot:dialog.clientWidth<=600,top:Math.max(0,header.bottom-box.top)+38,bottom:Math.max(0,box.bottom-footer.top)+16}},onSelect:(_,index)=>{select(index);openDetail()},onGroup:key=>focusGroup(key,false)})||null}catch(error){scene=null;network.replaceChildren()}
         for(const control of dialog.querySelectorAll('.kg-knowledge-step button'))control.disabled=false;
         for(const control of dialog.querySelectorAll('.kg-knowledge-camera button'))control.disabled=!scene;
-        scene?.setLabelsVisible(labelsVisible);focusGroup('',false);select(0,false);toggleList(!scene||listOpen);if(!scene){dialog.classList.add('kg-knowledge-fallback');}
+        autoButton.disabled=!scene;rotationState(scene?.snapshot().autoRotate||false);scene?.setLabelsVisible(labelsVisible);focusGroup('',false);select(0,false);toggleList(!scene||listOpen);if(!scene){dialog.classList.add('kg-knowledge-fallback');}
       }
     }
     function setState(value){
@@ -136,7 +136,8 @@
     dialog.addEventListener('click',event=>{
       if(event.target===dialog){const rect=dialog.getBoundingClientRect();if(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)close();return}
       const button=event.target.closest('button');if(!button||button.disabled)return;
-      if(button.hasAttribute('data-knowledge-details-close'))closeDetail();
+      if(button.hasAttribute('data-knowledge-auto-rotate'))scene?.setAutoRotate(!scene.snapshot().autoRotate);
+      else if(button.hasAttribute('data-knowledge-details-close'))closeDetail();
       else if(button.hasAttribute('data-knowledge-details-open'))openDetail();
       else if(button.hasAttribute('data-knowledge-labels')){labelsVisible=!labelsVisible;button.setAttribute('aria-pressed',String(labelsVisible));scene?.setLabelsVisible(labelsVisible)}
       else if(button.hasAttribute('data-knowledge-close'))close();

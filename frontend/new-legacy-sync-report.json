@@ -4,11 +4,15 @@
   "toVersion": "v9.0-p4.1.382",
   "changes": {
     "added": [
-      "tests/fixtures/knowledge-space-cluster-baseline.json"
+      "tests/knowledge-space-auto-browser.py"
     ],
     "changed": [
+      "src/practice/knowledge-dashboard.js",
       "src/practice/knowledge-space-scene.js",
-      "tests/knowledge-space-scene-browser.py"
+      "styles/knowledge-dashboard.css",
+      "tests/knowledge-space-scene-browser.py",
+      "tests/knowledge-space-scene.test.js",
+      "tests/knowledge-space-semantic-browser.py"
     ],
     "removed": []
   },

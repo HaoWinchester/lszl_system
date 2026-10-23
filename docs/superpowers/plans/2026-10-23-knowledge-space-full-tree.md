@@ -89,9 +89,9 @@ Local preview is running on5527 (real owner API) and5530 (clearly labeled bright
 
 ### Task 6: Three-category layout and gentle self rotation
 
-- [ ] Add failing shared structural-root filter/layout and explicit automatic-motion lifecycle checks before production edits.
-- [ ] Add shared structural-root predicate; dashboard derives full counts then excludes only structural overview. Render316PMP nodes/threecategories, semantic Process central with People/Environment lower and closer; preserve generic layouts.
-- [ ] Extend scene opt-in selfrotation with shared coordinates, existingRAF/timebased pace, safe fit, pause/resume/hidden/reduce/destroy guards. Default dashboard enabled; staticscene default unchanged.
-- [ ] Add accessible pause/start control in secondary dock row, modal/interaction pause coordination and true status synchronization. Keep prior UI/lifecycle.
-- [ ] Update only invalidated published fixture expectations and old layout-size comparison; verify Node/scene/semantic/dashboard browsers + dedicated normal-motion auto test. Capture actual source316 desktop/phone and inspect motion. Commit source/tests; report. No sync/version/deploy/push.
-- [ ] Root review/sync/samplecaption316/fiveviewport actual checks + contracts + currentIAB observedrotation; update docs andleave preview.
+- [x] Add failing shared structural-root filter/layout and explicit automatic-motion lifecycle checks before production edits.
+- [x] Add shared structural-root predicate; dashboard derives full counts then excludes only structural overview. Render316PMP nodes/threecategories, semantic Process central with People/Environment lower and closer; preserve generic layouts.
+- [x] Extend scene opt-in selfrotation with shared coordinates, existingRAF/timebased pace, safe fit, pause/resume/hidden/reduce/destroy guards. Default dashboard enabled; staticscene default unchanged.
+- [x] Add accessible pause/start control in secondary dock row, modal/interaction pause coordination and true status synchronization. Keep prior UI/lifecycle.
+- [x] Update only invalidated published fixture expectations and old layout-size comparison; verify Node/scene/semantic/dashboard browsers + dedicated normal-motion auto test. Capture actual source316 desktop/phone and inspect motion. Commit source/tests; report. No sync/version/deploy/push.
+- [x] Root review/sync/samplecaption316/fiveviewport actual checks + contracts + currentIAB observedrotation; update docs andleave preview.
