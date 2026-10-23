@@ -23,9 +23,9 @@
     return {mode:'points',items:model.points.filter(point=>!group||point.group===group)};
   }
   // Aggregate nearby members within their semantic category, preserving exact coverage.
-  function layoutLabels({points,width,height,zoomRatio,enabled,title}){
+  function layoutLabels({points,width,height,zoomRatio,enabled,title,labelTop=14,labelBottom=height-14}){
     if(!enabled||zoomRatio<1.35||width<24||height<24)return [];
-    const bins=new Map(),cell=100;
+    const bins=new Map(),cell=100,minY=clamp(labelTop,14,height-14),maxY=clamp(labelBottom,minY,height-14),labelY=bin=>clamp(bin.sumY/bin.indices.length+18,minY,maxY);
     for(const point of points){
       if(!point.visible||point.x<0||point.y<0||point.x>width||point.y>height)continue;
       const key=JSON.stringify([point.group||'',Math.floor(point.x/cell),Math.floor(point.y/64)]);
@@ -34,9 +34,9 @@
     const local=[...bins.values()];
     for(let i=0;i<local.length;i++)for(let j=i+1;j<local.length;j++){
       const a=local[i],b=local[j];
-      if(a.group===b.group&&Math.abs(a.sumX/a.indices.length-b.sumX/b.indices.length)<188&&Math.abs(a.sumY/a.indices.length-b.sumY/b.indices.length)<28){a.indices.push(...b.indices);a.sumX+=b.sumX;a.sumY+=b.sumY;local.splice(j,1);j=i}
+      if(a.group===b.group&&Math.abs(a.sumX/a.indices.length-b.sumX/b.indices.length)<188&&Math.abs(labelY(a)-labelY(b))<28){a.indices.push(...b.indices);a.sumX+=b.sumX;a.sumY+=b.sumY;local.splice(j,1);j=i}
     }
-    return local.map(bin=>{const anchorX=bin.sumX/bin.indices.length,anchorY=bin.sumY/bin.indices.length,w=Math.min(180,width-16);return {anchorX,anchorY,indices:bin.indices,x:clamp(anchorX,w/2+4,width-w/2-4),y:clamp(anchorY+18,14,height-14),width:w,text:bin.indices.length===1?String(title(bin.indices[0])):`${bin.indices.length} 个考点 · ${title(bin.indices[0])} 等`}});
+    return local.map(bin=>{const anchorX=bin.sumX/bin.indices.length,anchorY=bin.sumY/bin.indices.length,w=Math.min(180,width-16);return {anchorX,anchorY,indices:bin.indices,x:clamp(anchorX,w/2+4,width-w/2-4),y:clamp(anchorY+18,minY,maxY),width:w,text:bin.indices.length===1?String(title(bin.indices[0])):`${bin.indices.length} 个考点 · ${title(bin.indices[0])} 等`}});
   }
   function createModel(nodes){
     const points=[],edges=[],groups=[],byKey=new Map();
@@ -115,7 +115,7 @@
     let inertiaX=0,inertiaY=0,pinching=false,pinchDistance=0,autoFit=true,baseZoom=1,horizontalSpread=1,verticalSpread=1;
     const viewCenter={x:0,y:0,z:0},overviewCenter={x:0,y:0,z:0};
     function visible(){return !destroyed&&!document.hidden&&intersecting&&host.isConnected&&width>0&&height>0&&host.getClientRects().length>0&&win.getComputedStyle(host).visibility!=='hidden'}
-    function project(point){const projected=projectPoint(relative(point),camera,width,height);projected.x=width/2+(projected.x-width/2)*horizontalSpread;projected.y=height/2+(projected.y-height/2)*verticalSpread;const safe=safeInsets,top=Number(safe.top)||0,bottom=Number(safe.bottom)||0;projected.y=top+projected.y/height*Math.max(80,height-top-bottom);return projected}
+    function project(point){const projected=projectPoint(relative(point),camera,width,height);projected.x=width/2+(projected.x-width/2)*horizontalSpread;projected.y=height/2+(projected.y-height/2)*verticalSpread;const safe=safeInsets,top=Number(safe.top)||0,bottom=Number(safe.bottom)||0;if(safe.plot!==false)projected.y=top+projected.y/height*Math.max(80,height-top-bottom);return projected}
     function relative(point){return {x:point.x-viewCenter.x,y:point.y-viewCenter.y,z:point.z-viewCenter.z}}
     // Fit once on mount/settlement and reset; explicit camera changes opt out until reset.
     function fitDefault(){
@@ -156,14 +156,14 @@
         }
       }
       for(const label of labelLayout()){
-        ctx.font='12px system-ui, sans-serif';ctx.textAlign='center';ctx.strokeStyle='rgba(151,184,224,.45)';ctx.lineWidth=.7;ctx.beginPath();ctx.moveTo(label.anchorX,label.anchorY);ctx.lineTo(label.x,label.y);ctx.stroke();ctx.fillStyle='rgba(6,11,20,.78)';const backing=Math.min(label.width,ctx.measureText(label.text).width+12);ctx.fillRect(label.x-backing/2,label.y-10,backing,20);ctx.fillStyle='#dbeaff';
+        ctx.font='12px system-ui, sans-serif';ctx.textAlign='center';ctx.strokeStyle='rgba(151,184,224,.45)';ctx.lineWidth=.7;if(Math.hypot(label.anchorX-label.x,label.anchorY-label.y)<=60){ctx.beginPath();ctx.moveTo(label.anchorX,label.anchorY);ctx.lineTo(label.x,label.y);ctx.stroke()}ctx.fillStyle='rgba(6,11,20,.78)';const backing=Math.min(label.width,ctx.measureText(label.text).width+12);ctx.fillRect(label.x-backing/2,label.y-10,backing,20);ctx.fillStyle='#dbeaff';
         let text=label.text;while(text.length>1&&ctx.measureText(text).width>label.width-8)text=text.slice(0,-2)+'…';
         // Counts remain explicit even when a long representative name is shortened.
 
         ctx.fillText(text,label.x,label.y+4,label.width-8);
       }
     }
-    function labelLayout(){return layoutLabels({points:positions(),width,height,zoomRatio:camera.zoom/baseZoom,enabled:labelsVisible,title:index=>model.points[index].node.title||'未命名考点'})}
+    function labelLayout(){return layoutLabels({points:positions(),width,height,zoomRatio:camera.zoom/baseZoom,enabled:labelsVisible,labelTop:(safeInsets.top||0)+8,labelBottom:height-(safeInsets.bottom||0)-8,title:index=>model.points[index].node.title||'未命名考点'})}
     function setLabelsVisible(value){labelsVisible=!!value;if(labelsVisible&&camera.zoom/baseZoom<1.35){autoFit=false;camera.zoom=baseZoom*1.5}mark()}
     function frame(){
       raf=0;if(!visible())return;

@@ -113,7 +113,7 @@
           groups.appendChild(button(`${label} / ${members.length}`,'data-knowledge-group',key));
         }
         network.hidden=false;find('[data-knowledge-space-empty]').hidden=true;
-        try{scene=global.KGKnowledgeSpaceScene?.mount({host:network,nodes,insets:()=>{if(dialog.clientWidth>600)return {};const box=network.getBoundingClientRect(),header=find('.kg-knowledge-body>button').getBoundingClientRect(),footer=dock.getBoundingClientRect();return {top:Math.max(0,header.bottom-box.top)+38,bottom:Math.max(0,box.bottom-footer.top)+16}},onSelect:(_,index)=>{select(index);openDetail()},onGroup:key=>focusGroup(key,false)})||null}catch(error){scene=null;network.replaceChildren()}
+        try{scene=global.KGKnowledgeSpaceScene?.mount({host:network,nodes,insets:()=>{const box=network.getBoundingClientRect(),header=find('.kg-knowledge-body>button').getBoundingClientRect(),footer=dock.getBoundingClientRect();return {plot:dialog.clientWidth<=600,top:Math.max(0,header.bottom-box.top)+38,bottom:Math.max(0,box.bottom-footer.top)+16}},onSelect:(_,index)=>{select(index);openDetail()},onGroup:key=>focusGroup(key,false)})||null}catch(error){scene=null;network.replaceChildren()}
         for(const control of dialog.querySelectorAll('.kg-knowledge-step button'))control.disabled=false;
         for(const control of dialog.querySelectorAll('.kg-knowledge-camera button'))control.disabled=!scene;
         scene?.setLabelsVisible(labelsVisible);focusGroup('',false);select(0,false);toggleList(!scene||listOpen);if(!scene){dialog.classList.add('kg-knowledge-fallback');}

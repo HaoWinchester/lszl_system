@@ -146,3 +146,11 @@ test('nearby label aggregation never mixes semantic categories or creates distan
  const labels=api.layoutLabels({points,width:800,height:600,zoomRatio:1.5,enabled:true,title:i=>String(i)});
  assert.equal(labels.length,2);for(const label of labels){assert.equal(new Set(label.indices.map(i=>points[i].group)).size,1);assert.ok(Math.hypot(label.x-label.anchorX,label.y-label.anchorY)<60)}
 });
+
+test('foreground-safe label band keeps exact visible coverage while clamping and merging edge labels',()=>{
+ const api=require(file),points=Array.from({length:80},(_,index)=>({index,group:index%2?'a':'b',visible:true,x:200+index%8,y:index<40?20+index:540+index%20}));
+ const labels=api.layoutLabels({points,width:800,height:600,zoomRatio:1.5,enabled:true,labelTop:180,labelBottom:420,title:i=>String(i)});
+ assert.ok(labels.every(label=>label.y>=180&&label.y<=420));
+ assert.deepEqual(labels.flatMap(label=>label.indices).sort((a,b)=>a-b),points.map(p=>p.index));
+ for(const label of labels)assert.equal(new Set(label.indices.map(i=>points[i].group)).size,1);
+});
