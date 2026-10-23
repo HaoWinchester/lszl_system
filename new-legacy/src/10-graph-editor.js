@@ -366,9 +366,18 @@ function linkPathGeometry(link,a,b,points=null){
     // 多线汇总：自动派生的折线中间段吸附到共享通道坐标，使近似平行的主干段完全重合（不回写持久数据）。
     if(derived&&points?.mainGraph){const channel=(points.bundlePlan||currentEdgeBundlePlan())?.channels?.get(String(link?.id));if(Number.isFinite(channel)){const axis=Math.abs(end.x-start.x)>=Math.abs(end.y-start.y)?'x':'y';waypoints=waypoints.map(p=>({...p,[axis]:channel}))}}
     waypoints=window.KGGraphEdgeGeometry.orthogonalWaypoints(start,end,waypoints,link?.fromPort,link?.toPort);
-    if(stored.length&&points?.mainGraph){
+    if(points?.mainGraph){
       const overrides=(points.bundlePlan||currentEdgeBundlePlan())?.segmentChannels?.get(String(link?.id));
-      if(overrides?.length){waypoints=waypoints.map(p=>({...p}));for(const {index,axis,value} of overrides){waypoints[index][axis]=value;waypoints[index+1][axis]=value}}
+      if(overrides?.length){
+        const original=waypoints;waypoints=waypoints.map(p=>({...p}));
+        for(const {index,axis,value,start:plannedStart,end:plannedEnd} of overrides){
+          const a=original[index],b=original[index+1];
+          // An automatic detour may use a different route from the planner.
+          // Apply indices only when they identify the same original segment.
+          if(!a||!b||a.x!==plannedStart.x||a.y!==plannedStart.y||b.x!==plannedEnd.x||b.y!==plannedEnd.y)continue;
+          waypoints[index][axis]=value;waypoints[index+1][axis]=value;
+        }
+      }
     }
     waypoints=window.KGGraphEdgeGeometry.orthogonalWaypoints(start,end,waypoints,link?.fromPort,link?.toPort);
     const samples=[start,...waypoints,end];

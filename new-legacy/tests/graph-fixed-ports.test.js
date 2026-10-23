@@ -123,3 +123,32 @@ test('batch elbow conversion and card moves preserve selected ports, ids and eve
  }
  assert.equal(new Set(links.map(l=>l.id)).size,16);
 });
+
+test('actual planner and renderer share generated fixed-port trunks with generated and manual peers',()=>{
+ for(const manual of [[],[1],[0]]){
+  const {c}=environment();vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'../src/graph/edge-bundle.js'),'utf8'),c);
+  const links=[0,1].map(i=>({id:'route-'+i,from:'source-'+i,to:'target-'+i,pathStyle:'elbow',fromPort:'bottom',toPort:'top',arrowStyle:i?'both':'end',...(manual.includes(i)?{waypoints:[{x:i*20,y:100+i*20},{x:200+i*20,y:100+i*20}]}:{})}));
+  const points=links.map((l,i)=>({a:{x:i*20,y:i*20},b:{x:200+i*20,y:200+i*20},ca:{x:i*20,y:i*20-40},cb:{x:200+i*20,y:240+i*20}}));
+  const before=JSON.stringify(links),bundlePlan=c.KGGraphEdgeBundle.plan(links.map((l,i)=>({...l,...points[i],waypoints:l.waypoints||[],hasFromPort:true,hasToPort:true,hasStoredWaypoints:!!l.waypoints})));
+  const rendered=links.map((l,i)=>c.linkPathGeometry(l,points[i].a,points[i].b,{...points[i],mainGraph:true,bundlePlan}));
+  assert.equal(bundlePlan.segmentChannels.size,2,'both independent relations must have planned trunks');
+  for(const g of rendered){
+   const s=g.samples;assert.equal(s[0].x,s[1].x);assert.ok(s[1].y>s[0].y);assert.equal(s.at(-1).x,s.at(-2).x);assert.ok(s.at(-2).y<s.at(-1).y);
+   assert.equal(s[1].y,120,'generated route must consume the planned common channel');
+   for(let i=1;i<s.length;i++)assert.ok(s[i-1].x===s[i].x||s[i-1].y===s[i].y);
+  }
+  assert.equal(JSON.stringify(links),before,'bundling must preserve ports, ids, arrows and manual guides');
+ }
+});
+
+test('mixed generated and manual right-to-left trunks share their planned vertical segment',()=>{
+ const {c}=environment();vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'../src/graph/edge-bundle.js'),'utf8'),c);
+ const links=[{id:'auto',pathStyle:'elbow',fromPort:'right',toPort:'left'},{id:'manual',pathStyle:'elbow',fromPort:'right',toPort:'left',waypoints:[{x:120,y:20},{x:120,y:220}]}];
+ const points=links.map((l,i)=>({a:{x:i*20,y:i*20},b:{x:200+i*20,y:200+i*20},ca:{x:i*20-40,y:i*20},cb:{x:240+i*20,y:200+i*20}}));
+ const bundlePlan=c.KGGraphEdgeBundle.plan(links.map((l,i)=>({...l,...points[i],waypoints:l.waypoints||[],hasFromPort:true,hasToPort:true})));
+ for(const [i,link] of links.entries()){
+  const samples=c.linkPathGeometry(link,points[i].a,points[i].b,{...points[i],mainGraph:true,bundlePlan}).samples;
+  assert.equal(samples[1].x,120);assert.equal(samples[1].y,samples[0].y);assert.ok(samples[1].x>samples[0].x);
+  assert.equal(samples.at(-2).y,samples.at(-1).y);assert.ok(samples.at(-2).x<samples.at(-1).x);
+ }
+});

@@ -91,15 +91,15 @@
       const guides=global.KGGraphEdgeGeometry?.orthogonalWaypoints?global.KGGraphEdgeGeometry.orthogonalWaypoints(item.a,item.b,item.waypoints,item.fromPort,item.toPort):item.waypoints;
       for(let i=0;i<guides.length-1;i++){
         const a=guides[i],b=guides[i+1];
-        if(a.x===b.x&&a.y!==b.y)segments.push({id:JSON.stringify([item.id,i]),edgeId:item.id,index:i,axis:'x',value:a.x,lo:Math.min(a.y,b.y),hi:Math.max(a.y,b.y)});
-        else if(a.y===b.y&&a.x!==b.x)segments.push({id:JSON.stringify([item.id,i]),edgeId:item.id,index:i,axis:'y',value:a.y,lo:Math.min(a.x,b.x),hi:Math.max(a.x,b.x)});
+        if(a.x===b.x&&a.y!==b.y)segments.push({id:JSON.stringify([item.id,i]),edgeId:item.id,index:i,start:a,end:b,axis:'x',value:a.x,lo:Math.min(a.y,b.y),hi:Math.max(a.y,b.y)});
+        else if(a.y===b.y&&a.x!==b.x)segments.push({id:JSON.stringify([item.id,i]),edgeId:item.id,index:i,start:a,end:b,axis:'y',value:a.y,lo:Math.min(a.x,b.x),hi:Math.max(a.x,b.x)});
       }
     }
     const snapped=snapChannels(segments);
     for(const segment of segments){
       if(!snapped.has(segment.id))continue;
       if(!segmentChannels.has(segment.edgeId))segmentChannels.set(segment.edgeId,[]);
-      segmentChannels.get(segment.edgeId).push({index:segment.index,axis:segment.axis,value:snapped.get(segment.id)});
+      segmentChannels.get(segment.edgeId).push({index:segment.index,axis:segment.axis,value:snapped.get(segment.id),start:segment.start,end:segment.end});
     }
     return {endpoints,channels:snapChannels(trunks),segmentChannels};
   }

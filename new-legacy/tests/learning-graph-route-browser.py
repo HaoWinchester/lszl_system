@@ -35,5 +35,21 @@ with sync_playwright() as pw:
  page.reload(wait_until='networkidle');ready();reloaded=verify();assert reloaded==after,(after,reloaded)
  stored=ctx.request.get(base+'/api/v1/files/'+fid).json()['graphData'];assert stored['links'][0]['waypoints']!=stored['links'][1]['waypoints'],'render-only overlap must not alter stored guides'
  assert [l['arrowStyle'] for l in stored['links']]==['both','end'];assert not errors,errors
+ # New fixed-port relations must share nearby trunks before any manual edit.
+ generated={'nodes':[], 'links':[], 'viewport':{'x':0,'y':0,'scale':1}}
+ for i in [0,1]:
+  generated['nodes'] += [{'id':'source-'+str(i),'title':'自动起点','geometry':{'x':250+i*20,'y':180+i*20,'width':180,'height':100}},{'id':'target-'+str(i),'title':'自动终点','geometry':{'x':750+i*20,'y':580+i*20,'width':180,'height':100}}]
+  generated['links'].append({'id':'generated-'+str(i),'from':'source-'+str(i),'to':'target-'+str(i),'pathStyle':'elbow','fromPort':'bottom','toPort':'top','arrowStyle':'both'})
+ response=ctx.request.post(base+'/api/v1/files',data={'name':'generated-trunks-'+uuid.uuid4().hex[:8],'graphData':generated});assert response.ok
+ generated_id=response.json()['file']['id'];assert ctx.request.put(base+'/api/v1/files/current',data={'fileId':generated_id}).ok
+ page.reload(wait_until='networkidle');ready()
+ shapes=page.evaluate('()=>state.links.map(l=>({link:l,samples:edgeDomById.get(l.id).geometry.samples}))')
+ assert len(shapes)==2 and all(not item['link'].get('waypoints') for item in shapes),shapes
+ assert shapes[0]['samples'][1]['y']==shapes[1]['samples'][1]['y']==450,shapes
+ for item in shapes:
+  samples=item['samples'];assert samples[0]['x']==samples[1]['x'] and samples[1]['y']>samples[0]['y'],item
+  assert samples[-1]['x']==samples[-2]['x'] and samples[-2]['y']<samples[-1]['y'],item
+  assert item['link']['arrowStyle']=='both',item
+ assert not errors,errors
  browser.close()
 print('PASS real API/DB: fixed ports, manual shared trunks, independent ids/arrows, refresh, original saved guides, submenu below trigger')
