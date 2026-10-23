@@ -2,6 +2,7 @@
 from pathlib import Path
 import json
 import time
+import math
 from playwright.sync_api import sync_playwright
 ROOT=Path(__file__).resolve().parents[2]
 MODULE=ROOT/'new-legacy/src/practice/knowledge-space-scene.js'
@@ -10,7 +11,31 @@ OUT.mkdir(parents=True,exist_ok=True)
 assert MODULE.exists(), 'knowledge-space-scene.js must exist before browser interactions can run'
 NODES=[dict(id=f'topic-{i}',title=f'真实接口形状测试考点 {i}',subject='数学' if i<12 else '英语',taxonomyId='algebra' if i<12 else 'reading',brightness=.2+i/30) for i in range(24)]
 CATALOG=json.loads((ROOT/'new-legacy/tests/fixtures/knowledge-space-published-catalog.json').read_text())['nodes']
+# Captured from BASE 6fc47d1a using this host and the published 317-node fixture.
+BASELINE=json.loads((ROOT/'new-legacy/tests/fixtures/knowledge-space-cluster-baseline.json').read_text())
 metrics=[]
+cluster_metrics=[]
+def hull(points):
+ points=sorted(set((p['x'],p['y']) for p in points))
+ def cross(o,a,b):return (a[0]-o[0])*(b[1]-o[1])-(a[1]-o[1])*(b[0]-o[0])
+ def half(values):
+  result=[]
+  for p in values:
+   while len(result)>1 and cross(result[-2],result[-1],p)<=0:result.pop()
+   result.append(p)
+  return result
+ return half(points)[:-1]+half(points[::-1])[:-1]
+def hull_gap(a,b):
+ # A separating edge proves an empty strip between the rendered convex hulls.
+ gaps=[]
+ for polygon in (a,b):
+  for i,p in enumerate(polygon):
+   q=polygon[(i+1)%len(polygon)];nx,ny=-(q[1]-p[1]),q[0]-p[0];length=math.hypot(nx,ny)
+   if not length:continue
+   aa=[(v[0]*nx+v[1]*ny)/length for v in a];bb=[(v[0]*nx+v[1]*ny)/length for v in b]
+   gaps.append(max(min(aa)-max(bb),min(bb)-max(aa)))
+ return max(gaps)
+
 def assert_fit(page,label):
  state=page.evaluate('scene.snapshot()');box=page.locator('canvas').bounding_box()
  points=state['positions'];xs=[v['x'] for v in points];ys=[v['y'] for v in points]
@@ -47,8 +72,8 @@ with sync_playwright() as p:
   page.evaluate("()=>{window.scene=KGKnowledgeSpaceScene.mount({host:document.querySelector('#host'),nodes:[.12,.4,.7,1].map((brightness,i)=>({id:String(i),parentId:null,brightness}))});observeDrawing();scene.zoomBy(1.5)}")
   page.wait_for_function('scene.snapshot().settled && !scene.snapshot().running')
   styles=page.evaluate('dotStyles')
-  assert 'rgba(190, 224, 255, 0.45)' in styles,f'unpractised .12 must remain distinct from .2: {styles}'
-  assert len(set(str(style) for style in styles if isinstance(style,str)))==4,'incoming practice brightness must remain continuous'
+  assert 'rgba(190, 224, 255, 0.52)' in styles,f'unpractised .12 must remain distinct from .2: {styles}'
+  assert set(styles)=={f'rgba(190, 224, 255, {alpha})' for alpha in ('0.52','0.66','0.81','0.96')},'practice brightness must remain ordered and continuous through its unchanged maximum'
   page.evaluate('scene.destroy()')
   page.evaluate("nodes=>{window.scene=KGKnowledgeSpaceScene.mount({host:document.querySelector('#host'),nodes})}",CATALOG)
   page.wait_for_function('scene.snapshot().settled && !scene.snapshot().running')
@@ -68,6 +93,22 @@ with sync_playwright() as p:
    assert ratio_y>=.75,f'real317 {width}/{phase}: network too short ({ratio_y:.3f})'
    assert min(xs)>=16 and max(xs)<=box['width']-16 and min(ys)>=16 and max(ys)<=box['height']-16,'real catalog points must stay inside canvas'
    assert len(state['positions'])==317 and all(p['visible'] for p in state['positions'])
+   bounds=[]
+   for cluster in state['clusters']:
+    members=[p for p in state['positions'] if p['group']==cluster['key']]
+    if len(members)<2:continue
+    left=min(p['x'] for p in members);right=max(p['x'] for p in members)
+    top=min(p['y'] for p in members);bottom=max(p['y'] for p in members)
+    before=BASELINE[str(width)][cluster['key']]
+    growth_x=(right-left)/before['width'];growth_y=(bottom-top)/before['height']
+    assert min(growth_x,growth_y)>=1.12,f"{width}/{phase}/{cluster['label']}: interiors remain too small: {growth_x:.3f} x {growth_y:.3f}"
+    bounds.append(hull(members))
+    cluster_metrics.append(dict(viewport=width,phase=phase,group=cluster['label'],width=right-left,height=bottom-top,growthX=growth_x,growthY=growth_y))
+   for i,a in enumerate(bounds):
+    for b in bounds[i+1:]:
+     gap=hull_gap(a,b)
+     assert gap>=8,f'{width}/{phase}: classification interiors lost their visible gap ({gap:.1f}px)'
+
    page.screenshot(path=str(OUT/f'real317-{width}-{phase}.png'))
   page.evaluate('scene.destroy()')
   for size in (320,1000):
@@ -79,6 +120,10 @@ with sync_playwright() as p:
    state=page.evaluate('scene.snapshot()')
    assert len(state['positions'])==size and all(v['visible'] for v in state['positions'])
    assert state['mode']=='clusters' and len(state['clusters'])==len(fixture)//40,'overview must aggregate published classifications without dropping business nodes'
+   outlines=[hull([point for point in state['positions'] if point['group']==cluster['key']]) for cluster in state['clusters']]
+   minimum_gap=min(hull_gap(a,b) for i,a in enumerate(outlines) for b in outlines[i+1:])
+   assert minimum_gap>0,f'{width}/{size}: dense classification outlines overlap ({minimum_gap:.2f}px)'
+   print(f'classification gap {width}/{size}: {minimum_gap:.2f}px',flush=True)
    page.evaluate('scene.zoomBy(1.5)');page.wait_for_function('!scene.snapshot().running')
    assert page.evaluate('dotStyles.length')==size and page.evaluate('arcs')==size*2,'detailed zoom must draw every real knowledge point'
    page.evaluate('scene.reset()');page.wait_for_function('!scene.snapshot().running')
@@ -210,6 +255,7 @@ with sync_playwright() as p:
   assert page.evaluate('fallback===null');assert page.locator('canvas').count()==0
   context.close()
  browser.close()
+ (OUT/'cluster-growth.json').write_text(json.dumps(cluster_metrics,ensure_ascii=False,indent=2))
  (OUT/'performance.json').write_text(json.dumps(metrics,ensure_ascii=False,indent=2))
  print(json.dumps(metrics,ensure_ascii=False))
 print('knowledge-space-scene-browser: 1440/390 full 320/1000 rendering, continuous brightness, initial/reset fit, manual camera preservation, held-pointer RAF stop, native wheel/vertical touch scroll, modified wheel/pinch zoom, horizontal touch/mouse rotation, selection, grouping, resize, reduced motion, visibility, active-touch destroy and Canvas fallback passed')

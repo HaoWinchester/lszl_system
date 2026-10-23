@@ -3,10 +3,12 @@
   "fromVersion": "v9.0-p4.1.382",
   "toVersion": "v9.0-p4.1.382",
   "changes": {
-    "added": [],
+    "added": [
+      "tests/fixtures/knowledge-space-cluster-baseline.json"
+    ],
     "changed": [
       "src/practice/knowledge-space-scene.js",
-      "tests/knowledge-space-semantic-browser.py"
+      "tests/knowledge-space-scene-browser.py"
     ],
     "removed": []
   },

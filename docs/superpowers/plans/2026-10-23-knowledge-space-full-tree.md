@@ -82,7 +82,7 @@ Local preview is running on5527 (real owner API) and5530 (clearly labeled bright
 
 ### Task 5: Larger constellation interiors and modest star lift
 
-- [ ] Capture current actual317 projected cluster sizes/brightness as baseline; add focused failing rendered comparison for larger group interiors with retained gaps/allnodes/fit.
-- [ ] Locally expand within-group coordinates ~1.25, use one coordinate path for fit/draw/pick/anchors. Raise star alpha modestly with existing brightness monotonic; leave edges/dock/modal untouched.
-- [ ] Run sceneNode+scene browser including317/1000, semantic browser because projection/labels touched; inspect desktop andphone samples. Commit only scene/tests, report full commands/results and actual beforeafter sizes. No sync/VERSION/push/deploy.
-- [ ] Root scoped review/sync/actual317fiveviewport capture/contracts/currentIAB, update verification then leave localpreview for user.
+- [x] Capture current actual317 projected cluster sizes/brightness as baseline; add focused failing rendered comparison for larger group interiors with retained gaps/allnodes/fit.
+- [x] Locally expand within-group coordinates ~1.25, use one coordinate path for fit/draw/pick/anchors. Raise star alpha modestly with existing brightness monotonic; leave edges/dock/modal untouched.
+- [x] Run sceneNode+scene browser including317/1000, semantic browser because projection/labels touched; inspect desktop andphone samples. Commit only scene/tests, report full commands/results and actual beforeafter sizes. No sync/VERSION/push/deploy.
+- [x] Root scoped review/sync/actual317fiveviewport capture/contracts/currentIAB, update verification then leave localpreview for user.
