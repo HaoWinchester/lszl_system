@@ -110,3 +110,10 @@ Files: existing new-legacy/src/practice/knowledge-space-scene.js, knowledge-dash
 - [x] Restore original-style selected info area and lightweight module dock using shared select/step; preserve explicit child dialog only, owner/error/fallback/lifecycle and responsive plot space.
 - [x] Send early actual316 desktop+phone screenshots to root; refine against original, then run existing focused Node and serial dashboard/semantic/auto/scene browsers. Commit source/tests and report evidence/limits.
 - [x] Root review spec+quality/visual, sync into existing5530preview, five-size actualsample/source checks, documented frontendcontracts and current IAB inspection. Final integrationreview, verification docs and clean commit. Localpreviewonly.
+
+### Task 9: Direct original-source adaptation after human visual rejection
+
+- [ ] Read the entire original source and compare original vs rejectedTask8 screenshot; transplant original visual structure/CSS/projection/drawing into shared implementation with data/lifecycle adapters.
+- [ ] Preserve316 real nodes/countoverlay/threeanchors/aggregation/explicitchild and ownership/fallback guards; use original true3D geometric constellation framing rather than Task8 scattercloud.
+- [ ] Send early literal-source-provenance +real316 desktop/phone screenshot for root visual gate before broad tests; then focusedfidelity/functional tests, serial browser suites and sourcecommit/report.
+- [ ] Root actualpreview/screenshots + scoped specqualityreview, sync/contracts/lifecyclefinalcheck, user-visibleeffect. No deployment or claim of human visual acceptance.
