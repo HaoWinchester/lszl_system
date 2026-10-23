@@ -103,3 +103,7 @@ test('one published tree separates readable top-level categories and preserves n
  assert.equal(model.groups[1].label,'PMP · 过程 / 风险');
  assert.notEqual(model.points[0].group,model.points[3].group);
 });
+test('catalog parent edges survive semantic category boundaries within the same tree',()=>{
+ const model=require(file).createModel([{id:'root',parentId:null,subject:'A',taxonomyId:1,path:['Root']},{id:'child',parentId:'root',subject:'A',taxonomyId:1,path:['Root','Child']}]);
+ assert.equal(model.groups.length,2);assert.deepEqual(model.edges.map(e=>[e.source,e.target]),[[0,1]]);
+});

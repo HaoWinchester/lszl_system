@@ -11,11 +11,14 @@ with sync_playwright() as p:
   errors=[];page.on('pageerror',lambda e: errors.append(str(e)))
   page.set_content('<button id="open" data-knowledge-dashboard-open>知识星空</button>')
   page.add_style_tag(path=str(ROOT/'new-legacy/styles/knowledge-dashboard.css'))
+  page.evaluate('''()=>{window.starArcs=0;const clear=CanvasRenderingContext2D.prototype.clearRect;CanvasRenderingContext2D.prototype.clearRect=function(...args){starArcs=0;return clear.apply(this,args)};const arc=CanvasRenderingContext2D.prototype.arc;CanvasRenderingContext2D.prototype.arc=function(...args){starArcs++;return arc.apply(this,args)}}''')
   page.add_script_tag(path=str(ROOT/'new-legacy/src/practice/knowledge-space-scene.js'))
-  page.evaluate('''()=>{const real=KGKnowledgeSpaceScene;window.scenes=[];window.KGKnowledgeSpaceScene={...real,mount:o=>{const s=real.mount(o);scenes.push(s);return s}};window.owner='a';window.calls=0;window.fail=false;KGAuthCore={currentUser:()=>owner?{username:owner}:null};KGDomainApi={request:async()=>{calls++;if(fail)throw Error('offline');return {topicCount:61,hasMore:true,attemptCount:9,recentAttemptCount:2,nodes:Array.from({length:24},(_,i)=>({id:String(i),title:'考点'+i,subject:i<12?'数学':'英语',taxonomyId:i<12?'a':'b',path:i<12?['代数','方程','考点'+i]:['阅读','理解','考点'+i],brightness:.6}))}}}}''')
+  page.evaluate('''()=>{const real=KGKnowledgeSpaceScene;window.scenes=[];window.KGKnowledgeSpaceScene={...real,mount:o=>{window.overlay=o.nodes;const s=real.mount(o);scenes.push(s);return s}};window.owner='a';window.calls=0;window.fail=false;KGAuthCore={currentUser:()=>owner?{username:owner}:null};KGDomainApi={request:async()=>{calls++;if(fail)throw Error('offline');return {topicCount:81,attemptCount:9,recentAttemptCount:2,nodes:Array.from({length:81},(_,i)=>({id:String(i),title:'考点'+i,subject:i<12?'数学':'英语',taxonomyId:i<12?'a':'b',path:i<12?['代数','方程','考点'+i]:['阅读','理解','考点'+i],brightness:.6}))}}}}''')
   page.add_script_tag(path=str(ROOT/'new-legacy/src/practice/knowledge-dashboard.js'))
   page.locator('#open').click();page.wait_for_function('scenes.at(-1).snapshot().settled')
   assert page.evaluate('scenes.at(-1).snapshot().mode')=='clusters'
+  assert page.evaluate('starArcs')>81, 'overview must draw real catalog stars beneath clusters'
+  assert page.evaluate('overlay.length===81 && overlay.every(n=>n.brightness===.12 && n.relatedAttemptCount===0)')
   box=page.locator('canvas').bounding_box();shell=page.locator('.kg-knowledge-body').bounding_box()
   assert box['width']>=shell['width']*.95
   assert box['height']>= (430 if width>600 else 340)
@@ -33,7 +36,7 @@ with sync_playwright() as p:
   page.locator('[data-knowledge-node-next]').click();expect(page.locator('[data-knowledge-detail-title]')).to_have_text('考点3')
   page.locator('[data-knowledge-refresh]').click();page.wait_for_function('scenes.at(-1).snapshot().settled')
   expect(page.locator('[data-knowledge-summary]')).to_contain_text('9 次')
-  page.locator('[data-knowledge-next]').click();expect(page.locator('[data-knowledge-page]')).to_contain_text('第 2')
+  expect(page.locator('[data-knowledge-list] button')).to_have_count(81)
   page.evaluate('fail=true');page.locator('[data-knowledge-refresh]').click();expect(page.locator('[data-knowledge-retry]')).to_be_visible()
   page.evaluate('fail=false');page.locator('[data-knowledge-retry]').click();expect(page.locator('canvas')).to_have_count(1)
   page.evaluate("owner='';dispatchEvent(new Event('kg-auth-session-change'))");expect(page.locator('canvas')).to_have_count(0)
@@ -43,6 +46,6 @@ with sync_playwright() as p:
   page.locator('[data-knowledge-close]').focus();page.keyboard.press('Escape');expect(page.locator('#open')).to_be_focused()
   assert not errors,errors
   page.locator('#open').click();page.wait_for_function('scenes.at(-1).snapshot().settled');page.screenshot(path=str(OUT/f'space-{width}.png'))
-  print(f'{width}: semantic zoom, cluster click, full canvas, drawer/list, refresh/retry, pagination, auth invalidation, close/reopen passed')
+  print(f'{width}: semantic zoom, cluster click, full canvas, drawer/list, refresh/retry, full catalog, auth invalidation, close/reopen passed')
   page.close()
  browser.close()

@@ -19,11 +19,6 @@ test('late successful and failed requests cannot overwrite a switched account or
   const old=loader.refresh();owner='B';loader.invalidate();resolve({nodes:[{title:'A private'}]});await old;assert.equal(data,null);
   const newer=loader.refresh();loader.invalidate();reject(Error('stale failure'));await newer;assert.equal(data,null);assert.notEqual(states.at(-1),'error');
 });
-test('pagination requests are independent and carry explicit bounded page size',async()=>{
-  let seen;
-  const loader=api().createLoader({getUser:()=> 'A',load:async page=>{seen=page;return {nodes:[],topicCount:5}},onData:()=>{},onState:()=>{}});
-  await loader.refresh(3);assert.equal(seen,3);
-});
 test('unauthorized and malformed responses never retain private topic data',async()=>{
   for(const result of ['unauthorized','malformed']){
     let data={nodes:[{title:'private'}]},state;
@@ -31,12 +26,30 @@ test('unauthorized and malformed responses never retain private topic data',asyn
     assert.equal(await loader.refresh(),false);assert.equal(data,null);assert.equal(state,result==='unauthorized'?'guest':'error');
   }
 });
-test('newer page data survives delayed success and errors from older pages of the same owner',async()=>{
+test('newer catalog data survives delayed success and errors for the same owner',async()=>{
   for(const fail of [false,true]){
-    let resolve,reject,data,state;
-    const loader=api().createLoader({getUser:()=> 'A',load:page=>page===1?new Promise((r,j)=>{resolve=r;reject=j}):Promise.resolve({nodes:[{title:'page two'}]}),onData:value=>data=value,onState:value=>state=value});
+    let resolve,reject,data,state,calls=0;
+    const loader=api().createLoader({getUser:()=> 'A',load:()=>++calls===1?new Promise((r,j)=>{resolve=r;reject=j}):Promise.resolve({nodes:[{title:'new catalog'}]}),onData:value=>data=value,onState:value=>state=value});
     const old=loader.refresh(1);await loader.refresh(2);
-    if(fail)reject(Error('old failure'));else resolve({nodes:[{title:'page one'}]});await old;
-    assert.equal(data.nodes[0].title,'page two');assert.equal(state,'ready');
+    if(fail)reject(Error('old failure'));else resolve({nodes:[{title:'old catalog'}]});await old;
+    assert.equal(data.nodes[0].title,'new catalog');assert.equal(state,'ready');
   }
+});
+test('full catalog overlay retains unpracticed nodes beyond sixty and leaves input unchanged',()=>{
+  const nodes=Array.from({length:81},(_,i)=>({id:String(i),parentId:null,subject:'A',taxonomyId:'t',attemptCount:0,brightness:1}));
+  const before=JSON.stringify(nodes),result=api().derivePracticeOverlay(nodes);
+  assert.equal(result.length,81);assert.equal(result[80].brightness,.12);assert.equal(JSON.stringify(nodes),before);assert.notEqual(result[0],nodes[0]);
+});
+test('volume brightness rises for 0 1 5 20 and saturates independently of recency',()=>{
+  const result=api().derivePracticeOverlay([0,1,5,20,99].map((attemptCount,id)=>({id,parentId:null,attemptCount})));
+  assert.deepEqual(result.map(n=>n.relatedAttemptCount),[0,1,5,20,99]);
+  for(let i=1;i<4;i++)assert.ok(result[i].brightness>result[i-1].brightness);
+  assert.deepEqual(result.map(n=>n.brightness),[0,1,5,20,99].map(n=>.12+.88*Math.min(Math.log1p(n)/Math.log(21),1)));
+  assert.equal(result[3].brightness,1);assert.equal(result[4].brightness,1);
+});
+test('ancestor overlay scopes ids to subject and taxonomy and terminates invalid parent cycles',()=>{
+  const nodes=[{id:'r',subject:'A',taxonomyId:1,attemptCount:1},{id:'c',parentId:'r',subject:'A',taxonomyId:1,attemptCount:5},{id:'r',subject:'B',taxonomyId:1,attemptCount:2},{id:'c',parentId:'r',subject:'A',taxonomyId:2,attemptCount:9},{id:'x',parentId:'y',attemptCount:3},{id:'y',parentId:'x',attemptCount:4},{id:'bad',parentId:'missing',attemptCount:-1},{id:'nan',attemptCount:Infinity}];
+  const result=api().derivePracticeOverlay(nodes);
+  assert.deepEqual(result.map(n=>n.relatedAttemptCount),[6,5,2,9,7,7,0,0]);
+  assert.equal(result[6].attemptCount,-1);assert.equal(result[7].attemptCount,Infinity);
 });

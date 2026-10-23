@@ -11,7 +11,7 @@ with sync_playwright() as p:
   context=browser.new_context(viewport={'width':width,'height':900},reduced_motion='reduce');page=context.new_page();errors=[]
   page.on('pageerror',lambda e:errors.append(str(e)))
   login=context.request.post(BASE+'/api/v1/auth/login',data={'username':'ink-browser','password':'ink-browser-test'});assert login.ok,login.status
-  data=context.request.get(BASE+'/api/v1/learning/practice/knowledge-dashboard?page=1&pageSize=60').json()
+  data=context.request.get(BASE+'/api/v1/learning/practice/knowledge-universe').json()
   print(f'{width}: loading built index',flush=True)
   page.goto(BASE+'/index.html',wait_until='networkidle')
   print(f'{width}: index loaded',flush=True)
@@ -24,14 +24,14 @@ with sync_playwright() as p:
   assert chooser.locator('[data-learning-entry-choice]:visible').count()==4
   assert chooser.locator('.learning-entry-name').all_text_contents()==['知识图谱','深度回忆','多题归纳','知识星空']
   assert page.locator('[data-knowledge-dashboard-open]').count()==0
-  with page.expect_response(lambda r:'/api/v1/learning/practice/knowledge-dashboard?' in r.url) as response:
+  with page.expect_response(lambda r:'/api/v1/learning/practice/knowledge-universe' in r.url) as response:
    chooser.locator('[data-learning-entry-choice="知识星空"]').click()
   print(f'{width}: dashboard API returned',flush=True)
   assert response.value.ok
   expect(chooser).to_be_hidden();dialog=page.locator('#kgKnowledgeDashboard');expect(dialog).to_be_visible()
   expect(dialog.locator('[data-knowledge-summary]')).to_contain_text(f"累计 {data['attemptCount']} 次作答")
   if data['nodes']:expect(dialog.locator('canvas')).to_have_count(1)
-  else:expect(dialog.locator('[data-knowledge-status]')).to_contain_text('保存')
+  else:expect(dialog.locator('[data-knowledge-status]')).to_contain_text('暂无已发布')
   page.screenshot(path=str(OUT/f'built-entry-{width}.png'))
   page.keyboard.press('Escape');expect(dialog).to_be_hidden()
   if page.locator('[data-home-mobile-readonly-confirm]').is_visible():page.locator('[data-home-mobile-readonly-confirm]').click()

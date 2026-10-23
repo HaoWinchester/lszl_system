@@ -22,18 +22,18 @@
       group.indices.push(index);
       points.push({node,index,key:node.id==null?`index:${index}`:`id:${String(node.id)}:${index}`,group:key,x:0,y:0,z:0,vx:0,vy:0,vz:0});
     }
+    const catalogKey=(node,id)=>JSON.stringify([String(node.subject||''),String(node.taxonomyId??''),String(id)]),catalogIds=new Map();
+    for(const point of points)if(point.node.id!=null){const key=catalogKey(point.node,point.node.id);catalogIds.set(key,catalogIds.has(key)?null:point.index)}
     groups.forEach((group,i)=>{
       group.label=classificationLabel(group.indices.map(index=>points[index].node));
       const angle=i*2.399963229728653,radius=groups.length===1?0:Math.min(185,80+groups.length*10);
       group.x=Math.cos(angle)*radius;group.y=Math.sin(angle)*radius*.7;group.z=Math.sin(angle*.7)*80;
       const catalog=group.indices.some(index=>Object.prototype.hasOwnProperty.call(points[index].node,'parentId'));
-      const byId=new Map();
-      for(const index of group.indices){const id=points[index].node.id;if(id!=null){const key=String(id);byId.set(key,byId.has(key)?null:index)}}
       group.indices.forEach((index,j)=>{
         const p=points[index],a=j*2.399963229728653,r=group.indices.length===1?18:30+Math.sqrt(j)*15;
         p.x=group.x+Math.cos(a)*r;p.y=group.y+Math.sin(a)*r;p.z=group.z+Math.cos(j*1.71)*r*.8;
         if(catalog){
-          const parent=p.node.parentId,source=parent==null?null:byId.get(String(parent));
+          const parent=p.node.parentId,source=parent==null?null:catalogIds.get(catalogKey(p.node,parent));
           if(source!=null&&source!==index)edges.push({source,target:index,group:group.key});
         }else if(j)edges.push({source:group.indices[j-1],target:index,group:group.key});
       });
@@ -108,14 +108,6 @@
       // Tiny unconnected background dots are decoration, never selectable business nodes.
       ctx.fillStyle='rgba(179,203,244,.28)';
       for(let i=0;i<70;i++){const x=((i*173.71)%997)/997*width,y=((i*237.29)%991)/991*height;ctx.fillRect(x,y,i%5===0?1.3:.7,i%5===0?1.3:.7)}
-      if(semanticView(model,camera.zoom/baseZoom,group).mode==='clusters'){
-        for(const cluster of clusterPositions()){
-          const radius=18+Math.min(12,Math.sqrt(cluster.count)*2);
-          ctx.fillStyle='#17304e';ctx.strokeStyle='#82b8ea';ctx.lineWidth=1.2;ctx.beginPath();ctx.arc(cluster.x,cluster.y,radius,0,Math.PI*2);ctx.fill();ctx.stroke();
-          ctx.font='13px system-ui, sans-serif';ctx.textAlign='center';ctx.fillStyle='#e1efff';ctx.fillText(String(cluster.count),cluster.x,cluster.y+4);
-          ctx.fillText(cluster.label,cluster.x,cluster.y+radius+22,Math.max(80,width-24));
-        }return;
-      }
       const projected=positions();ctx.lineWidth=.8;
       for(const edge of model.edges){const a=projected[edge.source],b=projected[edge.target];if(!a.visible||!b.visible)continue;ctx.strokeStyle='rgba(117,161,218,.22)';ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke()}
       for(const p of projected.filter(p=>p.visible).sort((a,b)=>b.depth-a.depth)){
@@ -125,6 +117,15 @@
         if(p.index===selected){ctx.strokeStyle='#e1c594';ctx.lineWidth=1.3;ctx.beginPath();ctx.arc(p.x,p.y,radius+7,0,Math.PI*2);ctx.stroke()}
         if(p.index===selected||projected.length<=12){ctx.font='12px system-ui, sans-serif';ctx.textAlign='center';ctx.fillStyle=p.index===selected?'#f3dfba':'#a2b5d0';const title=String(node.title||'未命名考点');ctx.fillText(title.length>22?title.slice(0,21)+'…':title,p.x,p.y+radius+23,Math.max(30,width-20))}
       }
+      if(semanticView(model,camera.zoom/baseZoom,group).mode==='clusters'){
+        for(const cluster of clusterPositions()){
+          const radius=18+Math.min(12,Math.sqrt(cluster.count)*2);
+          ctx.fillStyle='rgba(23,48,78,.75)';ctx.strokeStyle='#82b8ea';ctx.lineWidth=1.2;ctx.beginPath();ctx.arc(cluster.x,cluster.y,radius,0,Math.PI*2);ctx.fill();ctx.stroke();
+          ctx.font='13px system-ui, sans-serif';ctx.textAlign='center';ctx.fillStyle='#e1efff';ctx.fillText(String(cluster.count),cluster.x,cluster.y+4);
+          ctx.fillText(cluster.label,cluster.x,cluster.y+radius+22,Math.max(80,width-24));
+        }
+      }
+
     }
     function frame(){
       raf=0;if(!visible())return;
