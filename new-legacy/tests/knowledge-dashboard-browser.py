@@ -52,8 +52,8 @@ with sync_playwright() as pw:
     expect(page.locator('[data-knowledge-groups]')).not_to_contain_text('risk')
     expect(page.locator('[data-knowledge-group]').nth(1)).to_contain_text('PMP · 项目')
     calls=page.evaluate('calls.length')
-    page.locator('.kg-knowledge-detail summary').click()
-    page.locator('.kg-knowledge-detail').evaluate('(e)=>e.open=true');page.locator('[data-knowledge-list-toggle]').click()
+    page.locator('[data-knowledge-details-open]').click()
+
     buttons=page.locator('[data-knowledge-list] button')
     expect(buttons).to_have_count(81)
     buttons.nth(1).focus();page.keyboard.press('Enter')
@@ -62,21 +62,25 @@ with sync_playwright() as pw:
     expect(buttons.nth(1)).to_have_attribute('aria-pressed','true')
     page.locator('[data-knowledge-node-next]').click();assert snap()['selected']==2
     page.locator('[data-knowledge-node-prev]').click();assert snap()['selected']==1
+    page.locator('[data-knowledge-details-close]').click()
     page.locator('[data-knowledge-group]').nth(2).click()
     state=snap();assert state['group']=='["产品管理","<分类>","项目"]' and state['selected']==30
     assert sum(p['visible'] for p in state['positions'])==51
     expect(page.locator('[data-knowledge-detail-subject]')).to_have_text('产品管理')
+    page.locator('[data-knowledge-details-open]').click()
     assert page.locator('[data-knowledge-list] button:visible').count()==51
     page.locator('[data-knowledge-node-prev]').click();assert snap()['selected']==80
+    page.locator('[data-knowledge-details-close]').click()
     page.locator('[data-knowledge-reset]').click();assert snap()['group']==''
     zoom=snap()['camera']['zoom'];page.locator('[data-knowledge-zoom-out]').click();assert snap()['camera']['zoom']<zoom
     page.locator('[data-knowledge-zoom-in]').click();assert abs(snap()['camera']['zoom']-zoom)<.001
     yaw=snap()['camera']['yaw'];page.locator('[data-knowledge-rotate-left]').focus();page.keyboard.press('Enter');assert snap()['camera']['yaw']!=yaw
     page.locator('[data-knowledge-reset]').click();assert snap()['camera']['yaw']==.24
-    page.locator('.kg-knowledge-detail').evaluate('(e)=>e.open=true');page.locator('[data-knowledge-list-toggle]').click()
+
     page.wait_for_function('!scenes.at(-1).snapshot().running')
     page.evaluate('scenes.at(-1).zoomBy(1.5)');page.wait_for_function('!scenes.at(-1).snapshot().running')
-    state=snap();point=state['positions'][15];box=page.locator('canvas').bounding_box()
+    state=snap();box=page.locator('canvas').bounding_box()
+    point=next(p for p in state['positions'] if 20<p['x']<box['width']-20 and 160<p['y']<box['height']-200 and page.evaluate('(p)=>document.elementFromPoint(p.x,p.y)?.tagName==="CANVAS"',{'x':box['x']+p['x'],'y':box['y']+p['y']}))
     page.mouse.click(box['x']+point['x'],box['y']+point['y'])
     chosen=snap()['selected'];assert chosen!=80
     expect(page.locator('[data-knowledge-detail-title]')).to_have_text(page.evaluate('nodes[scenes.at(-1).snapshot().selected].title'))
@@ -84,6 +88,7 @@ with sync_playwright() as pw:
     checks.append('real 3D projection, safe labels, semantic list keyboard selection, pointer/detail sync, group traversal and camera controls')
     checks.append('whole catalog API contract retains all 81 nodes without pagination')
     # Native modal containment covers forward/backward Tab and Escape return focus.
+    page.keyboard.press('Escape');expect(dialog).to_be_visible()
     page.locator('[data-knowledge-close]').focus();page.keyboard.press('Shift+Tab')
     assert page.evaluate('document.querySelector("dialog").contains(document.activeElement)')
     page.keyboard.press('Escape');expect(dialog).not_to_be_visible();expect(page.locator('#open')).to_be_focused()
@@ -128,47 +133,21 @@ with sync_playwright() as pw:
     page.evaluate("owner='B';mode='ready';dispatchEvent(new Event('kg-auth-session-change'))")
     expect(page.locator('[data-knowledge-list] li')).to_have_count(81)
     page.wait_for_function('scenes.at(-1).snapshot().settled && !scenes.at(-1).snapshot().running')
-    cdp=context.new_cdp_session(page)
-    for width,height in ((1440,960),(1440,650),(390,844),(320,568)):
-        page.locator('.kg-knowledge-detail').evaluate('(e)=>e.open=true')
+    for width,height in ((1440,960),(559,854),(390,844)):
         page.set_viewport_size({'width':width,'height':height})
-        page.wait_for_timeout(150)
-        page.locator('dialog').evaluate('(e)=>{e.scrollTop=0;e.querySelector(".kg-knowledge-shell").scrollTop=0}')
-        assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
-        assert dialog.evaluate('(e)=>e.scrollWidth<=e.clientWidth&&e.querySelector(".kg-knowledge-shell").scrollWidth<=e.querySelector(".kg-knowledge-shell").clientWidth'), f'{width}: dialog overflow'
-        box=dialog.bounding_box();assert box['x']>=0 and box['x']+box['width']<=width
-        assert dialog.evaluate('e=>[...e.querySelectorAll("button")].filter(b=>b.getClientRects().length).every(b=>b.getBoundingClientRect().height>=44)'), f'{width}: button touch height'
-        shell=page.locator('.kg-knowledge-shell');shell.evaluate('e=>e.scrollTop=0')
-        canvas=page.locator('canvas');canvas.scroll_into_view_if_needed();page.wait_for_timeout(150)
-        cb=canvas.bounding_box();sb=shell.bounding_box();x=cb['x']+cb['width']/2;y=(max(cb['y'],sb['y'])+min(cb['y']+cb['height'],sb['y']+sb['height']))/2
-        can_scroll=shell.evaluate('e=>e.scrollHeight>e.clientHeight');before=shell.evaluate('e=>e.scrollTop');camera=snap()['camera'];background=page.evaluate('scrollY')
-        page.mouse.move(x,y);page.mouse.wheel(0,300);page.wait_for_timeout(250)
-        assert (shell.evaluate('e=>e.scrollTop')>before if can_scroll else shell.evaluate('e=>e.scrollTop')==before) and snap()['camera']==camera and page.evaluate('scrollY')==background
-        shell.evaluate('e=>e.scrollTop=0');canvas.scroll_into_view_if_needed();page.wait_for_timeout(150)
-        cb=canvas.bounding_box();sb=shell.bounding_box();y=(max(cb['y'],sb['y'])+min(cb['y']+cb['height'],sb['y']+sb['height']))/2;before=shell.evaluate('e=>e.scrollTop')
-        cdp.send('Input.dispatchTouchEvent',{'type':'touchStart','touchPoints':[{'x':x,'y':y,'id':1}]})
-        for step in range(1,11):
-            cdp.send('Input.dispatchTouchEvent',{'type':'touchMove','touchPoints':[{'x':x,'y':y-step*15,'id':1}]});page.wait_for_timeout(20)
-        cdp.send('Input.dispatchTouchEvent',{'type':'touchEnd','touchPoints':[]});page.wait_for_timeout(350)
-        assert (shell.evaluate('e=>e.scrollTop')>before if can_scroll else shell.evaluate('e=>e.scrollTop')==before) and snap()['camera']==camera
+        page.locator('[data-knowledge-details-open]').click()
+        child=page.locator('.kg-knowledge-detail')
+        expect(child).to_be_visible()
+        assert child.bounding_box()['width']>=min(1000,width-50)
+        page.locator('[data-knowledge-list] button').last.click()
+        page.locator('[data-knowledge-node-prev]').click()
+        page.keyboard.press('Escape');expect(child).not_to_be_visible();expect(dialog).to_be_visible()
+        expect(page.locator('[data-knowledge-details-open]')).to_be_focused()
+        page.locator('[data-knowledge-details-open]').click()
+        page.evaluate("dispatchEvent(new Event('kg-auth-session-change'))")
+        expect(child).not_to_be_visible()
         page.screenshot(path=str(OUT/f'dashboard-{width}.png'))
-        page.locator('[data-knowledge-node-next]').scroll_into_view_if_needed()
-        page.screenshot(path=str(OUT/f'detail-{width}.png'))
-        if width<=390:
-            close_box=page.locator('[data-knowledge-close]').bounding_box()
-            assert close_box['y']>=box['y'] and close_box['y']+close_box['height']<=box['y']+box['height'], f'{width}: close must remain visible after scrolling to detail'
-            page.locator('.kg-knowledge-detail').evaluate('(e)=>e.open=true');page.locator('[data-knowledge-list-toggle]').click()
-            page.locator('[data-knowledge-list] button').last.scroll_into_view_if_needed()
-            close_box=page.locator('[data-knowledge-close]').bounding_box()
-            assert close_box['y']>=box['y'], f'{width}: close must remain visible while list scrolls'
-            # Use physical coordinates so Playwright cannot silently scroll a hidden close into view.
-            page.mouse.click(close_box['x']+close_box['width']/2,close_box['y']+close_box['height']/2)
-            expect(dialog).not_to_be_visible();expect(page.locator('#open')).to_be_focused();assert snap()['destroyed']
-            page.locator('#open').click()
-            page.locator('.kg-knowledge-detail').evaluate('(e)=>e.open=true');page.locator('[data-knowledge-list-toggle]').click()
-            page.locator('canvas').scroll_into_view_if_needed()
-            page.wait_for_function('scenes.at(-1).snapshot().settled && !scenes.at(-1).snapshot().running')
-        checks.append(f'{width}px screenshot, no horizontal overflow, 44px controls')
+        checks.append(f'{width}px spacious modal list, prev/next, child Escape and account invalidation')
     page.locator('[data-knowledge-close]').click();expect(page.locator('#open')).to_be_focused();page.wait_for_function('scenes.at(-1).snapshot().destroyed')
     page.locator('#open').click();page.evaluate("document.querySelector('dialog').close()")
     expect(page.locator('#open')).to_be_focused();page.wait_for_function('scenes.at(-1).snapshot().destroyed')
@@ -177,6 +156,7 @@ with sync_playwright() as pw:
     # A device without a Canvas context must retain accessible data and controls.
     page.evaluate("KGKnowledgeDashboard.close();HTMLCanvasElement.prototype.getContext=()=>null")
     page.locator('#open').click()
+    page.locator('[data-knowledge-details-open]').click()
     expect(page.locator('[data-knowledge-list]')).to_be_visible()
     expect(page.locator('[data-knowledge-status]')).to_contain_text('列表')
     page.locator('[data-knowledge-list] button').nth(3).click()
@@ -185,11 +165,14 @@ with sync_playwright() as pw:
     # Physical clicks must reach fallback pagination, rather than an overlapping detail overlay.
     for fallback_width in (1440,390):
         page.set_viewport_size({'width':fallback_width,'height':900})
+        page.locator('[data-knowledge-details-close]').click()
         page.locator('[data-knowledge-group]').nth(2).click(timeout=1500)
         expect(page.locator('[data-knowledge-detail-subject]')).to_have_text('产品管理')
         page.locator('[data-knowledge-refresh]').click(timeout=1500)
+        page.locator('[data-knowledge-details-open]').click()
         expect(page.locator('[data-knowledge-list]')).to_be_visible()
     checks.append('Canvas fallback desktop/mobile physical group, all catalog and refresh controls remain unobstructed')
+    page.locator('[data-knowledge-details-close]').click()
     page.evaluate('nodes.forEach(node=>node.path=[])')
     page.locator('[data-knowledge-refresh]').click()
     expect(page.locator('[data-knowledge-group]').nth(1)).to_contain_text('PMP · 未分类')

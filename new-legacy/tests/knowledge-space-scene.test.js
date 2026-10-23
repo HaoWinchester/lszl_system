@@ -120,3 +120,16 @@ test('published category roots group with descendants while subject root has an 
  assert.deepEqual(model.groups.map(g=>g.label),['PMP · 科目总览','PMP · 人','PMP · 过程']);
  assert.equal(api.groupKey({subject:'PMP',path:['PMP','人']}),'["PMP","",""]');
 });
+
+test('label layout covers every visible member deterministically and hides far text',()=>{
+ const api=require(file),points=Array.from({length:1000},(_,index)=>({index,x:40+index%10,y:40+index%8,visible:true}));
+ const options={points,width:800,height:600,zoomRatio:1.5,enabled:true,title:index=>`考点 ${index}`};
+ const started=performance.now(),labels=api.layoutLabels(options);
+ assert.ok(performance.now()-started<100,'1000-member label layout stays below 100ms');
+ assert.ok(labels.every(label=>label.x-label.width/2>=0&&label.x+label.width/2<=options.width&&label.y>=0&&label.y<=options.height));
+ assert.deepEqual(labels,api.layoutLabels(options));
+ assert.deepEqual(labels.flatMap(label=>label.indices).sort((a,b)=>a-b),points.map(p=>p.index));
+ assert.ok(labels.some(label=>label.indices.length>1&&label.text.includes(String(label.indices.length))));
+ assert.deepEqual(api.layoutLabels({...options,zoomRatio:.74}),[]);
+ assert.deepEqual(api.layoutLabels({...options,enabled:false}),[]);
+});
