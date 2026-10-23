@@ -93,6 +93,23 @@ with sync_playwright() as p:
   expect(page.locator('[data-knowledge-groups]')).to_contain_text('PMP · 人 / 2')
   expect(page.locator('[data-knowledge-groups]')).to_contain_text('PMP · 过程 / 1')
   expect(page.locator('[data-knowledge-groups]')).not_to_contain_text('未分类')
+  # Text-on must retain category context when semantic zoom returns to overview.
+  if not page.evaluate('scenes.at(-1).snapshot().labelsVisible'):page.locator('[data-knowledge-labels]').click()
+  page.wait_for_function('!scenes.at(-1).snapshot().running')
+  for action in ('zoom-out','reset'):
+   page.evaluate('drawnLabels=[]')
+   page.locator('[data-knowledge-zoom-out]' if action=='zoom-out' else '[data-knowledge-reset]').click()
+   page.wait_for_function('!scenes.at(-1).snapshot().running')
+   assert page.evaluate('scenes.at(-1).snapshot().labelsVisible && scenes.at(-1).snapshot().mode==="clusters"')
+   assert page.evaluate('drawnLabels.some(t=>t.includes("PMP · 人 · 2"))'), f'text-on {action} must render category name/count on Canvas'
+  page.evaluate('drawnLabels=[]')
+  for _ in range(12):page.locator('[data-knowledge-zoom-out]').click()
+  page.wait_for_function('!scenes.at(-1).snapshot().running')
+  # Capture only the settled far redraw, independent of intermediate wheel/button frames.
+  page.evaluate('drawnLabels=[];scenes.at(-1).rotate(0,0)')
+  page.wait_for_function('!scenes.at(-1).snapshot().running')
+  assert page.evaluate('scenes.at(-1).snapshot().textHidden && drawnLabels.length===0'), 'far zoom must hide all Canvas text even with labels enabled'
+  page.locator('[data-knowledge-reset]').click();page.locator('[data-knowledge-labels]').click()
   if width in (559,390):
    page.evaluate('''()=>{KGDomainApi.request=async()=>({attemptCount:51,unknownAttemptCount:23,unmappedAttemptCount:28,nodes:Array.from({length:317},(_,i)=>({id:String(i),parentId:null,title:'当前目录'+i,attemptCount:0}))})}''')
    page.locator('[data-knowledge-refresh]').click();page.wait_for_function('scenes.at(-1).snapshot().settled && !scenes.at(-1).snapshot().running')
