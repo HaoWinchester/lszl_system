@@ -17,7 +17,7 @@ with sync_playwright() as p:
   page.add_script_tag(path=str(ROOT/'new-legacy/src/practice/knowledge-dashboard.js'))
   page.locator('#open').click();page.wait_for_function('scenes.at(-1).snapshot().settled')
   assert page.evaluate('scenes.at(-1).snapshot().mode')=='clusters'
-  assert page.evaluate('starArcs')>81, 'overview must draw real catalog stars beneath clusters'
+  assert page.evaluate('starArcs')>=162, 'overview must draw real catalog stars beneath clusters'
   assert page.evaluate('overlay.length===81 && overlay.every(n=>n.brightness===.12 && n.relatedAttemptCount===0)')
   box=page.locator('canvas').bounding_box();shell=page.locator('.kg-knowledge-body').bounding_box()
   dialog_box=page.locator('#kgKnowledgeDashboard').bounding_box()
@@ -33,6 +33,17 @@ with sync_playwright() as p:
   assert box['width']>=shell['width']*.95
   assert box['height']>= (430 if width>600 else 340)
   assert not page.locator('.kg-knowledge-detail').evaluate('(e)=>e.open')
+  footer=page.locator('.kg-knowledge-footer').bounding_box()
+  assert footer['y']+footer['height']<=dialog_box['y']+dialog_box['height'] and footer['y']+footer['height']>=dialog_box['y']+dialog_box['height']-30
+  if width<=600:
+   anchors=page.evaluate('scenes.at(-1).snapshot().clusters')
+   control=page.locator('[data-knowledge-details-open]').bounding_box()
+   canvas=page.locator('canvas').bounding_box()
+   assert all(control['y']+control['height']+4<=canvas['y']+anchor['y']-25<=footer['y']-8 for anchor in anchors), 'default category labels must stay between header controls and dock'
+  help_summary=page.locator('.kg-knowledge-guidance summary')
+  page.locator('[data-knowledge-reset]').focus();page.keyboard.press('Tab');expect(help_summary).to_be_focused()
+  page.keyboard.press('Enter');assert page.locator('.kg-knowledge-guidance').evaluate('e=>e.open')
+  page.keyboard.press('Enter');assert not page.locator('.kg-knowledge-guidance').evaluate('e=>e.open')
   cluster=page.evaluate('scenes.at(-1).snapshot().clusters[0]')
   page.mouse.click(box['x']+cluster['x'],box['y']+cluster['y'])
   assert page.evaluate('scenes.at(-1).snapshot().mode')=='points'

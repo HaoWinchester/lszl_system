@@ -61,6 +61,9 @@
     const find=selector=>dialog.querySelector(selector);
     const summary=find('[data-knowledge-summary]'),network=find('[data-knowledge-network]'),list=find('[data-knowledge-list]'),status=find('[data-knowledge-status]'),retry=find('[data-knowledge-retry]'),groups=find('[data-knowledge-groups]');
     find('.kg-knowledge-shell').prepend(network);
+    const dock=find('.kg-knowledge-footer'),help=document.createElement('details'),helpTitle=document.createElement('summary');
+    help.className='kg-knowledge-guidance';helpTitle.textContent='操作与亮度说明';help.append(helpTitle,find('.kg-knowledge-help'),find('#kgKnowledgeMeaning'));
+    dock.append(find('.kg-knowledge-camera'),help);
     const detail=find('.kg-knowledge-detail');let detailReturnFocus=null,labelsVisible=false;
     function closeDetail(){if(detail.open)detail.close();detailReturnFocus?.focus?.();detailReturnFocus=null}
     function openDetail(){if(!nodes.length)return;detailReturnFocus=document.activeElement;toggleList(true);if(!detail.open)detail.showModal()}
@@ -110,7 +113,7 @@
           groups.appendChild(button(`${label} / ${members.length}`,'data-knowledge-group',key));
         }
         network.hidden=false;find('[data-knowledge-space-empty]').hidden=true;
-        try{scene=global.KGKnowledgeSpaceScene?.mount({host:network,nodes,onSelect:(_,index)=>{select(index);openDetail()},onGroup:key=>focusGroup(key,false)})||null}catch(error){scene=null;network.replaceChildren()}
+        try{scene=global.KGKnowledgeSpaceScene?.mount({host:network,nodes,insets:()=>{if(dialog.clientWidth>600)return {};const box=network.getBoundingClientRect(),header=find('.kg-knowledge-body>button').getBoundingClientRect(),footer=dock.getBoundingClientRect();return {top:Math.max(0,header.bottom-box.top)+38,bottom:Math.max(0,box.bottom-footer.top)+16}},onSelect:(_,index)=>{select(index);openDetail()},onGroup:key=>focusGroup(key,false)})||null}catch(error){scene=null;network.replaceChildren()}
         for(const control of dialog.querySelectorAll('.kg-knowledge-step button'))control.disabled=false;
         for(const control of dialog.querySelectorAll('.kg-knowledge-camera button'))control.disabled=!scene;
         scene?.setLabelsVisible(labelsVisible);focusGroup('',false);select(0,false);toggleList(!scene||listOpen);if(!scene){dialog.classList.add('kg-knowledge-fallback');}
@@ -151,7 +154,7 @@
     });
     dialog.addEventListener('keydown',event=>{
       if(detail.open||event.key!=='Tab')return;
-      const buttons=[...dialog.querySelectorAll('button:not(:disabled)')].filter(button=>!button.closest('[hidden]')&&button.getClientRects().length);
+      const buttons=[...dialog.querySelectorAll('button:not(:disabled),summary')].filter(button=>!button.closest('[hidden]')&&button.getClientRects().length);
       const first=buttons[0],last=buttons.at(-1);
       if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus()}
       else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus()}

@@ -22,17 +22,21 @@
     if(zoomRatio<1.35)return {mode:'clusters',items:model.groups.filter(item=>!group||item.key===group).map(item=>({...item,count:item.indices.length}))};
     return {mode:'points',items:model.points.filter(point=>!group||point.group===group)};
   }
-  // Fixed screen cells keep label rectangles disjoint and preserve every on-screen member.
+  // Aggregate nearby members within their semantic category, preserving exact coverage.
   function layoutLabels({points,width,height,zoomRatio,enabled,title}){
     if(!enabled||zoomRatio<1.35||width<24||height<24)return [];
-    const top=Math.min(220,height*.28),bottom=Math.min(340,height*.4),available=Math.max(24,height-top-bottom);
-    const columns=Math.max(1,Math.floor(width/240)),rows=Math.max(1,Math.floor(available/64)),cellWidth=width/columns,cellHeight=available/rows,bins=new Map();
+    const bins=new Map(),cell=100;
     for(const point of points){
       if(!point.visible||point.x<0||point.y<0||point.x>width||point.y>height)continue;
-      const column=Math.min(columns-1,Math.floor(point.x/cellWidth)),row=clamp(Math.floor((point.y-top)/cellHeight),0,rows-1),key=row*columns+column;
-      if(!bins.has(key))bins.set(key,{column,row,indices:[],sumX:0,sumY:0});const bin=bins.get(key);bin.indices.push(point.index);bin.sumX+=point.x;bin.sumY+=point.y;
+      const key=JSON.stringify([point.group||'',Math.floor(point.x/cell),Math.floor(point.y/64)]);
+      if(!bins.has(key))bins.set(key,{group:point.group,indices:[],sumX:0,sumY:0});const bin=bins.get(key);bin.indices.push(point.index);bin.sumX+=point.x;bin.sumY+=point.y;
     }
-    return [...bins.entries()].sort((a,b)=>a[0]-b[0]).map(([,bin])=>({anchorX:bin.sumX/bin.indices.length,anchorY:bin.sumY/bin.indices.length,indices:bin.indices,x:(bin.column+.5)*cellWidth,y:top+(bin.row+.5)*cellHeight,width:cellWidth-12,text:bin.indices.length===1?String(title(bin.indices[0])):`${bin.indices.length} 个考点 · ${title(bin.indices[0])} 等`}));
+    const local=[...bins.values()];
+    for(let i=0;i<local.length;i++)for(let j=i+1;j<local.length;j++){
+      const a=local[i],b=local[j];
+      if(a.group===b.group&&Math.abs(a.sumX/a.indices.length-b.sumX/b.indices.length)<188&&Math.abs(a.sumY/a.indices.length-b.sumY/b.indices.length)<28){a.indices.push(...b.indices);a.sumX+=b.sumX;a.sumY+=b.sumY;local.splice(j,1);j=i}
+    }
+    return local.map(bin=>{const anchorX=bin.sumX/bin.indices.length,anchorY=bin.sumY/bin.indices.length,w=Math.min(180,width-16);return {anchorX,anchorY,indices:bin.indices,x:clamp(anchorX,w/2+4,width-w/2-4),y:clamp(anchorY+18,14,height-14),width:w,text:bin.indices.length===1?String(title(bin.indices[0])):`${bin.indices.length} 个考点 · ${title(bin.indices[0])} 等`}});
   }
   function createModel(nodes){
     const points=[],edges=[],groups=[],byKey=new Map();
@@ -46,18 +50,21 @@
     for(const point of points)if(point.node.id!=null){const key=catalogKey(point.node,point.node.id);catalogIds.set(key,catalogIds.has(key)?null:point.index)}
     groups.forEach((group,i)=>{
       group.label=classificationLabel(group.indices.map(index=>points[index].node));
-      const angle=i*2.399963229728653,radius=groups.length===1?0:Math.min(185,80+groups.length*10);
-      group.x=Math.cos(angle)*radius;group.y=Math.sin(angle)*radius*.7;group.z=Math.sin(angle*.7)*80;
+      const columns=Math.ceil(Math.sqrt(groups.length)),spacing=440;
+      group.radius=165;group.x=(i%columns-(columns-1)/2)*spacing;group.y=(Math.floor(i/columns)-(Math.ceil(groups.length/columns)-1)/2)*spacing;group.z=0;
       const catalog=group.indices.some(index=>Object.prototype.hasOwnProperty.call(points[index].node,'parentId'));
       group.indices.forEach((index,j)=>{
-        const p=points[index],a=j*2.399963229728653,r=group.indices.length===1?18:30+Math.sqrt(j)*15;
-        p.x=group.x+Math.cos(a)*r;p.y=group.y+Math.sin(a)*r;p.z=group.z+Math.cos(j*1.71)*r*.8;
+        const p=points[index],a=j*2.399963229728653,r=group.indices.length===1?0:25+120*Math.sqrt(j/Math.max(1,group.indices.length-1));
+        p.x=group.x+Math.cos(a)*r;p.y=group.y+Math.sin(a)*r;p.z=group.z+Math.cos(j*1.71)*r*.18;
         if(catalog){
           const parent=p.node.parentId,source=parent==null?null:catalogIds.get(catalogKey(p.node,parent));
           if(source!=null&&source!==index)edges.push({source,target:index,group:group.key});
         }else if(j)edges.push({source:group.indices[j-1],target:index,group:group.key});
       });
     });
+    const layoutScale=Math.min(1,2/Math.sqrt(Math.max(1,groups.length)));
+    for(const item of [...points,...groups])for(const axis of ['x','y','z'])item[axis]*=layoutScale;
+    for(const group of groups)group.radius*=layoutScale;
     return {points,edges,groups,steps:0,quiet:0,settled:points.length===0};
   }
   function stepModel(model){
@@ -80,11 +87,11 @@
       const key=`${x},${y},${z}`;let bucket=buckets.get(key);if(!bucket){bucket=[];buckets.set(key,bucket)}bucket.push(a);
     }
     for(const edge of edges){
-      const a=points[edge.source],b=points[edge.target],dx=b.x-a.x,dy=b.y-a.y,dz=b.z-a.z,d=Math.max(1,Math.hypot(dx,dy,dz)),f=(d-48)*.003/d;
+      const a=points[edge.source],b=points[edge.target];if(a.group!==b.group)continue;const dx=b.x-a.x,dy=b.y-a.y,dz=b.z-a.z,d=Math.max(1,Math.hypot(dx,dy,dz)),f=(d-48)*.003/d;
       a.vx+=dx*f;a.vy+=dy*f;a.vz+=dz*f;b.vx-=dx*f;b.vy-=dy*f;b.vz-=dz*f;
     }
     let speed=0;
-    for(const p of points){for(const axis of ['x','y','z']){const velocity='v'+axis;p[velocity]=clamp(p[velocity]*.81,-5,5);p[axis]+=p[velocity]}speed=Math.max(speed,Math.hypot(p.vx,p.vy,p.vz))}
+    for(const p of points){for(const axis of ['x','y','z']){const velocity='v'+axis;p[velocity]=clamp(p[velocity]*.81,-5,5);p[axis]+=p[velocity]}const c=centers.get(p.group),distance=Math.hypot(p.x-c.x,p.y-c.y);if(distance>c.radius){p.x=c.x+(p.x-c.x)*c.radius/distance;p.y=c.y+(p.y-c.y)*c.radius/distance}p.z=clamp(p.z,c.z-36,c.z+36);speed=Math.max(speed,Math.hypot(p.vx,p.vy,p.vz))}
     model.steps++;model.quiet=speed<.035?model.quiet+1:0;
     if(model.steps>=MAX_STEPS||model.quiet>=12){model.settled=true;for(const p of points)p.vx=p.vy=p.vz=0}
     return !model.settled;
@@ -95,7 +102,7 @@
     const depth=Math.max(120,700+rz),scale=700/depth*Math.min(width,height)/650*camera.zoom;
     return {x:width/2+x*scale,y:height/2+y*scale,scale,depth};
   }
-  function mount({host,nodes,onSelect,onGroup}={}){
+  function mount({host,nodes,onSelect,onGroup,insets}={}){
     if(!host?.ownerDocument?.createElement||!host.appendChild)return null;
     const document=host.ownerDocument,win=document.defaultView||global,canvas=document.createElement('canvas');
     let ctx;try{ctx=canvas.getContext('2d')}catch(error){return null}if(!ctx)return null;
@@ -103,12 +110,12 @@
     canvas.style.cssText='display:block;width:100%;height:100%;touch-action:pan-y;cursor:grab';host.appendChild(canvas);
     const model=createModel(nodes),camera={...DEFAULT_CAMERA},pointers=new Map(),listeners=[];
     const motion=win.matchMedia?.('(prefers-reduced-motion: reduce)');
-    let labelsVisible=false;
+    let labelsVisible=false,safeInsets={};
     let width=0,height=0,raf=0,destroyed=false,selected=null,group='',dirty=true,intersecting=true,reduced=!!motion?.matches;
     let inertiaX=0,inertiaY=0,pinching=false,pinchDistance=0,autoFit=true,baseZoom=1,horizontalSpread=1,verticalSpread=1;
     const viewCenter={x:0,y:0,z:0},overviewCenter={x:0,y:0,z:0};
     function visible(){return !destroyed&&!document.hidden&&intersecting&&host.isConnected&&width>0&&height>0&&host.getClientRects().length>0&&win.getComputedStyle(host).visibility!=='hidden'}
-    function project(point){const projected=projectPoint(relative(point),camera,width,height);projected.x=width/2+(projected.x-width/2)*horizontalSpread;projected.y=height/2+(projected.y-height/2)*verticalSpread;return projected}
+    function project(point){const projected=projectPoint(relative(point),camera,width,height);projected.x=width/2+(projected.x-width/2)*horizontalSpread;projected.y=height/2+(projected.y-height/2)*verticalSpread;const safe=safeInsets,top=Number(safe.top)||0,bottom=Number(safe.bottom)||0;projected.y=top+projected.y/height*Math.max(80,height-top-bottom);return projected}
     function relative(point){return {x:point.x-viewCenter.x,y:point.y-viewCenter.y,z:point.z-viewCenter.z}}
     // Fit once on mount/settlement and reset; explicit camera changes opt out until reset.
     function fitDefault(){
@@ -117,13 +124,13 @@
       Object.assign(overviewCenter,viewCenter);
       const projected=model.points.map(point=>projectPoint(relative(point),{...DEFAULT_CAMERA},width,height));
       const extentX=Math.max(...projected.map(point=>Math.abs(point.x-width/2))),extentY=Math.max(...projected.map(point=>Math.abs(point.y-height/2)));
-      const padding=Math.max(24,Math.min(width,height)*.08);
+      const padding=Math.max(22,Math.min(width,height)*.06);
       camera.zoom=clamp(Math.min(Math.max(1,width/2-padding)/Math.max(1,extentX),Math.max(1,height/2-padding)/Math.max(1,extentY)),.45,3);baseZoom=camera.zoom;
       // Fill the available aspect ratio without cropping; drawing and picking share this projection.
       horizontalSpread=Math.max(1,(width/2-padding)/Math.max(1,extentX*camera.zoom));
       verticalSpread=Math.max(1,(height/2-padding)/Math.max(1,extentY*camera.zoom));
     }
-    function positions(){return model.points.map(point=>({...project(point),index:point.index,key:point.key,group:point.group,visible:!group||point.group===group}))}
+    function positions(){safeInsets=insets?.()||{};return model.points.map(point=>({...project(point),index:point.index,key:point.key,group:point.group,visible:!group||point.group===group}))}
     function clusterPositions(){return model.groups.filter(item=>!group||item.key===group).map(item=>({...item,count:item.indices.length,...project(item)}))}
     function stop(){if(raf)win.cancelAnimationFrame(raf);raf=0}
     function request(){if(!destroyed&&!raf&&visible()&&(dirty||!model.settled||(!reduced&&pointers.size===0&&Math.abs(inertiaX)+Math.abs(inertiaY)>.02)))raf=win.requestAnimationFrame(frame)}
@@ -134,21 +141,18 @@
       ctx.fillStyle='rgba(179,203,244,.28)';
       for(let i=0;i<70;i++){const x=((i*173.71)%997)/997*width,y=((i*237.29)%991)/991*height;ctx.fillRect(x,y,i%5===0?1.3:.7,i%5===0?1.3:.7)}
       const projected=positions();ctx.lineWidth=.8;
-      for(const edge of model.edges){const a=projected[edge.source],b=projected[edge.target];if(!a.visible||!b.visible)continue;ctx.strokeStyle='rgba(117,161,218,.22)';ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke()}
+      for(const edge of model.edges){const a=projected[edge.source],b=projected[edge.target];if(!a.visible||!b.visible)continue;const related=selected!==null&&(edge.source===selected||edge.target===selected);ctx.strokeStyle=related?'rgba(204,185,142,.5)':selected!==null?'rgba(117,161,218,.025)':'rgba(117,161,218,.04)';ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke()}
       for(const p of projected.filter(p=>p.visible).sort((a,b)=>b.depth-a.depth)){
-        const node=model.points[p.index].node,value=Number(node.brightness),brightness=Number.isFinite(value)?clamp(value,.12,1):.12,radius=clamp(4*p.scale,2.5,9),halo=radius*5;
-        const glow=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,halo);glow.addColorStop(0,`rgba(143,199,255,${brightness*.45})`);glow.addColorStop(1,'rgba(72,139,255,0)');ctx.fillStyle=glow;ctx.beginPath();ctx.arc(p.x,p.y,halo,0,Math.PI*2);ctx.fill();
-        ctx.fillStyle=`rgba(190,224,255,${.3+brightness*.7})`;ctx.beginPath();ctx.arc(p.x,p.y,radius,0,Math.PI*2);ctx.fill();
+        const node=model.points[p.index].node,value=Number(node.brightness),brightness=Number.isFinite(value)?clamp(value,.12,1):.12,radius=clamp((1+brightness*1.2)*p.scale,1,3),halo=radius*(brightness>.2?4:2);
+        const glow=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,halo);glow.addColorStop(0,`rgba(143,199,255,${brightness*.25})`);glow.addColorStop(1,'rgba(72,139,255,0)');ctx.fillStyle=glow;ctx.beginPath();ctx.arc(p.x,p.y,halo,0,Math.PI*2);ctx.fill();
+        ctx.fillStyle=`rgba(190,224,255,${.38+brightness*.58})`;ctx.beginPath();ctx.arc(p.x,p.y,radius,0,Math.PI*2);ctx.fill();
         if(p.index===selected){ctx.strokeStyle='#e1c594';ctx.lineWidth=1.3;ctx.beginPath();ctx.arc(p.x,p.y,radius+7,0,Math.PI*2);ctx.stroke()}
         if(camera.zoom/baseZoom>=.75&&!labelsVisible&&p.index===selected){ctx.font='12px system-ui, sans-serif';ctx.textAlign='center';ctx.fillStyle=p.index===selected?'#f3dfba':'#a2b5d0';const title=String(node.title||'未命名考点');ctx.fillText(title.length>22?title.slice(0,21)+'…':title,p.x,p.y+radius+23,Math.max(30,width-20))}
       }
-      if(semanticView(model,camera.zoom/baseZoom,group).mode==='clusters'){
+      if(camera.zoom/baseZoom>=.75&&!labelsVisible){
         for(const cluster of clusterPositions()){
-          const radius=18+Math.min(12,Math.sqrt(cluster.count)*2);
-          ctx.fillStyle='rgba(23,48,78,.75)';ctx.strokeStyle='#82b8ea';ctx.lineWidth=1.2;ctx.beginPath();ctx.arc(cluster.x,cluster.y,radius,0,Math.PI*2);ctx.fill();ctx.stroke();
-          if(camera.zoom/baseZoom<.75)continue;
-          ctx.font='13px system-ui, sans-serif';ctx.textAlign='center';ctx.fillStyle='#e1efff';ctx.fillText(String(cluster.count),cluster.x,cluster.y+4);
-          ctx.fillText(cluster.label,cluster.x,cluster.y+radius+22,Math.max(80,width-24));
+          ctx.font='11px system-ui, sans-serif';ctx.textAlign='center';ctx.fillStyle='#a6bdd7';
+          ctx.fillText(`${cluster.label} · ${cluster.count}`,cluster.x,cluster.y-25,Math.max(80,width-24));
         }
       }
       for(const label of labelLayout()){
@@ -175,7 +179,7 @@
     }
     function applyRotation(dx,dy){camera.yaw+=dx*.006;camera.pitch=clamp(camera.pitch+dy*.006,-1.35,1.35)}
     function rotate(dx,dy){if(destroyed||!Number.isFinite(dx)||!Number.isFinite(dy))return;autoFit=false;applyRotation(dx,dy);mark()}
-    function zoomBy(factor){if(destroyed||!Number.isFinite(factor)||factor<=0)return;autoFit=false;camera.zoom=clamp(camera.zoom*factor,.45,9);if(camera.zoom/baseZoom<1.35&&group){group='';Object.assign(viewCenter,overviewCenter);onGroup?.('')}mark()}
+    function zoomBy(factor){if(destroyed||!Number.isFinite(factor)||factor<=0)return;autoFit=false;camera.zoom=clamp(camera.zoom*factor,Math.min(.45,baseZoom*.35),9);if(camera.zoom/baseZoom<1.35&&group){group='';Object.assign(viewCenter,overviewCenter);onGroup?.('')}mark()}
     function select(index){if(destroyed||!Number.isInteger(index)||!model.points[index])return;selected=index;camera.zoom=Math.max(camera.zoom,baseZoom*1.5);autoFit=false;mark()}
     function focusGroup(key){if(destroyed)return;group=String(key||'');const target=model.groups.find(item=>item.key===group);if(target){autoFit=false;Object.assign(viewCenter,{x:target.x,y:target.y,z:target.z});camera.zoom=Math.min(9,baseZoom*1.6)}else if(!group)Object.assign(viewCenter,overviewCenter);mark()}
     function reset(){if(destroyed)return;Object.assign(camera,DEFAULT_CAMERA);autoFit=true;fitDefault();group='';inertiaX=inertiaY=0;mark()}

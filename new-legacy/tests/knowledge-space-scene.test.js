@@ -133,3 +133,16 @@ test('label layout covers every visible member deterministically and hides far t
  assert.deepEqual(api.layoutLabels({...options,zoomRatio:.74}),[]);
  assert.deepEqual(api.layoutLabels({...options,enabled:false}),[]);
 });
+
+test('settled categories retain separate bounded neighborhoods despite cross-category parents',()=>{
+ const api=require(file),nodes=Array.from({length:300},(_,i)=>({id:String(i),parentId:i?String(i-1):null,subject:'PMP',taxonomyId:1,path:['PMP',['人','过程','环境'][Math.floor(i/100)],String(i)]})),model=api.createModel(nodes);
+ while(!model.settled)api.stepModel(model);
+ for(const g of model.groups)for(const p of model.points.filter(p=>p.group===g.key))assert.ok(Math.hypot(p.x-g.x,p.y-g.y)<=g.radius+1);
+ for(let i=0;i<model.groups.length;i++)for(let j=0;j<i;j++){const a=model.groups[i],b=model.groups[j];assert.ok(Math.hypot(a.x-b.x,a.y-b.y)>a.radius+b.radius+50)}
+ assert.equal(model.points.length,300);assert.equal(model.edges.length,299);
+});
+test('nearby label aggregation never mixes semantic categories or creates distant leaders',()=>{
+ const api=require(file),points=[{index:0,group:'a',x:120,y:240,visible:true},{index:1,group:'b',x:121,y:241,visible:true},{index:2,group:'a',x:130,y:245,visible:true}];
+ const labels=api.layoutLabels({points,width:800,height:600,zoomRatio:1.5,enabled:true,title:i=>String(i)});
+ assert.equal(labels.length,2);for(const label of labels){assert.equal(new Set(label.indices.map(i=>points[i].group)).size,1);assert.ok(Math.hypot(label.x-label.anchorX,label.y-label.anchorY)<60)}
+});
