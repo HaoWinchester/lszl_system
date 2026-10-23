@@ -87,6 +87,9 @@ with sync_playwright() as pw:
     assert page.evaluate('calls.length')==calls, 'selection, group and camera must never refetch'
     checks.append('real 3D projection, safe labels, semantic list keyboard selection, pointer/detail sync, group traversal and camera controls')
     checks.append('whole catalog API contract retains all 81 nodes without pagination')
+    # Star selection leaves the child closed; explicit details retains layered Escape.
+    expect(page.locator('.kg-knowledge-detail')).not_to_be_visible()
+    page.locator('[data-knowledge-details-open]').click()
     # Native modal containment covers forward/backward Tab and Escape return focus.
     page.keyboard.press('Escape');expect(dialog).to_be_visible()
     page.locator('[data-knowledge-close]').focus();page.keyboard.press('Shift+Tab')

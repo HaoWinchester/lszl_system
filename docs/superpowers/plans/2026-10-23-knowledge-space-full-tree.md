@@ -95,3 +95,8 @@ Local preview is running on5527 (real owner API) and5530 (clearly labeled bright
 - [x] Add accessible pause/start control in secondary dock row, modal/interaction pause coordination and true status synchronization. Keep prior UI/lifecycle.
 - [x] Update only invalidated published fixture expectations and old layout-size comparison; verify Node/scene/semantic/dashboard browsers + dedicated normal-motion auto test. Capture actual source316 desktop/phone and inspect motion. Commit source/tests; report. No sync/version/deploy/push.
 - [x] Root review/sync/samplecaption316/fiveviewport actual checks + contracts + currentIAB observedrotation; update docs andleave preview.
+
+### Task 7: Select a star without opening the catalog
+
+- [x] Actual star click selects and updates existing detail state without opening child dialog; explicit detail/list button opens selected node. Retain category focus and motion lifecycle.
+- [x] Update maintained actual click regression; verify minimal source/shared integration, sync and current preview. No deployment.

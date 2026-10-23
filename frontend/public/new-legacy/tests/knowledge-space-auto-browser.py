@@ -12,7 +12,7 @@ with sync_playwright() as p:
   page.set_content('<button id="open" data-knowledge-dashboard-open>知识星空</button>')
   page.add_style_tag(path=str(ROOT/'new-legacy/styles/knowledge-dashboard.css'))
   page.add_script_tag(path=str(ROOT/'new-legacy/src/practice/knowledge-space-scene.js'))
-  page.evaluate('''nodes=>{const api=KGKnowledgeSpaceScene;KGKnowledgeSpaceScene={...api,mount:o=>window.scene=api.mount(o)};KGAuthCore={currentUser:()=>({username:'test'})};KGDomainApi={request:async()=>({nodes,attemptCount:0})}}''',NODES)
+  page.evaluate('''nodes=>{const api=KGKnowledgeSpaceScene;KGKnowledgeSpaceScene={...api,mount:o=>{window.sceneNodes=o.nodes;return window.scene=api.mount(o)}};KGAuthCore={currentUser:()=>({username:'test'})};KGDomainApi={request:async()=>({nodes,attemptCount:0})}}''',NODES)
   page.add_script_tag(path=str(ROOT/'new-legacy/src/practice/knowledge-dashboard.js'))
   page.click('#open');page.wait_for_function('scene.snapshot().settled');page.wait_for_timeout(3200)
   state=page.evaluate('scene.snapshot()');assert len(state['positions'])==316;assert len(state['clusters'])==3
@@ -27,8 +27,18 @@ with sync_playwright() as p:
   hit=page.evaluate('''()=>{const points=scene.snapshot().positions.filter(p=>p.visible),p=points.find(p=>p.x>30&&p.y>240&&p.x<innerWidth-30&&p.y<innerHeight-240)||points[0];const expected=points.filter(q=>Math.hypot(q.x-p.x,q.y-p.y)<=Math.max(12,7*q.scale)).sort((a,b)=>a.depth-b.depth)[0];return {x:p.x,y:p.y,index:expected.index}}''')
   canvas=page.locator('canvas').bounding_box();page.mouse.click(canvas['x']+hit['x'],canvas['y']+hit['y'])
   assert page.evaluate('scene.snapshot().selected')==hit['index']
+  assert not page.locator('.kg-knowledge-detail').evaluate('e=>e.open'), 'star selection must not open the catalog'
+  selected=page.evaluate('scene.snapshot()')
+  assert selected['resumePending'] and not selected['rotationPaused'], 'star picking only temporarily suspends rotation'
+  before=selected['phase'];page.wait_for_timeout(150);assert page.evaluate('scene.snapshot().phase')==before
+  page.click('[data-knowledge-details-open]')
   assert page.locator('.kg-knowledge-detail').evaluate('e=>e.open')
-  page.click('[data-knowledge-details-close]');page.evaluate('scene.reset()');page.wait_for_timeout(3150)
+  assert page.locator('[data-knowledge-detail-title]').inner_text()==page.evaluate('(index)=>sceneNodes[index].title',hit['index'])
+  assert page.evaluate('scene.snapshot().rotationPaused')
+  before=page.evaluate('scene.snapshot().phase');page.wait_for_timeout(150);assert page.evaluate('scene.snapshot().phase')==before
+  page.click('[data-knowledge-details-close]');page.wait_for_timeout(3150)
+  assert page.evaluate('scene.snapshot().phase')>before
+  page.evaluate('scene.reset()');page.wait_for_timeout(3150)
   page.click('[data-knowledge-auto-rotate]');page.wait_for_timeout(100);state=page.evaluate('scene.snapshot()');assert not state['autoRotate'] and not state['running'] and not state['resumePending']
   page.click('[data-knowledge-auto-rotate]');page.click('[data-knowledge-details-open]');before=page.evaluate('scene.snapshot().phase');page.wait_for_timeout(150);assert page.evaluate('scene.snapshot().phase')==before
   page.click('[data-knowledge-details-close]');page.wait_for_timeout(150);assert page.evaluate('scene.snapshot().phase')>before
