@@ -51,8 +51,8 @@
       <header class="kg-knowledge-header"><div><p class="kg-knowledge-eyebrow">我的学习足迹 · KNOWLEDGE SPACE</p><h2 id="kgKnowledgeTitle">星空知识网络</h2><p class="kg-knowledge-subtitle">从每一次练习，看到知识的连接。</p></div><div class="kg-knowledge-overview"><p data-knowledge-summary></p><button type="button" data-knowledge-refresh>刷新数据</button></div></header>
       <p data-knowledge-status role="status" aria-live="polite"></p><button type="button" data-knowledge-retry hidden>重试</button>
       <div class="kg-knowledge-body">
-        <details class="kg-knowledge-detail" aria-label="选中考点详情"><summary>考点详情与列表</summary><div class="kg-knowledge-detail-content"><p class="kg-knowledge-eyebrow" data-knowledge-detail-subject></p><p class="kg-knowledge-number" data-knowledge-detail-number>—</p><h3 data-knowledge-detail-title>选择一个考点</h3><p class="kg-knowledge-path" data-knowledge-detail-path></p><dl class="kg-knowledge-facts"><div><dt>直接作答</dt><dd data-knowledge-detail-attempts>—</dd></div><div><dt>含下级作答</dt><dd data-knowledge-detail-related>—</dd></div><div><dt>最近直接练习</dt><dd data-knowledge-detail-date>—</dd></div></dl><div class="kg-knowledge-step"><button type="button" data-knowledge-node-prev>← 上一个</button><button type="button" data-knowledge-node-next>下一个 →</button><button type="button" data-knowledge-list-toggle aria-expanded="false" aria-controls="kgKnowledgeList">考点列表</button></div><ol id="kgKnowledgeList" data-knowledge-list class="kg-knowledge-list" hidden></ol></div></details>
-        <section class="kg-knowledge-space" aria-label="知识星空探索"><div class="kg-knowledge-space-heading"><span data-knowledge-page-count>全目录 0 个节点</span><span>练习次数 · 含下级</span></div><div data-knowledge-network class="kg-knowledge-network" hidden></div><div class="kg-knowledge-space-empty" data-knowledge-space-empty>每一次练习，都留下足迹</div><div class="kg-knowledge-camera" role="group" aria-label="星空视角"><button type="button" data-knowledge-rotate-left aria-label="向左旋转星空">↶</button><button type="button" data-knowledge-rotate-right aria-label="向右旋转星空">↷</button><button type="button" data-knowledge-zoom-out aria-label="缩小星空">−</button><button type="button" data-knowledge-zoom-in aria-label="放大星空">＋</button><button type="button" data-knowledge-reset>复位视角</button></div><p class="kg-knowledge-help">横向拖动旋转 · 上下滚动浏览 · Ctrl / ⌘ 滚轮或双指缩放 · 缩小看分类，放大看考点<br>也可使用视角按钮和考点列表探索</p></section>
+        <button type="button" data-knowledge-details-open>考点详情与列表</button><dialog class="kg-knowledge-detail" aria-label="考点详情与列表"><button type="button" data-knowledge-details-close autofocus>返回星空 ×</button><div class="kg-knowledge-detail-content"><p class="kg-knowledge-eyebrow" data-knowledge-detail-subject></p><p class="kg-knowledge-number" data-knowledge-detail-number>—</p><h3 data-knowledge-detail-title>选择一个考点</h3><p class="kg-knowledge-path" data-knowledge-detail-path></p><dl class="kg-knowledge-facts"><div><dt>直接作答</dt><dd data-knowledge-detail-attempts>—</dd></div><div><dt>含下级作答</dt><dd data-knowledge-detail-related>—</dd></div><div><dt>最近直接练习</dt><dd data-knowledge-detail-date>—</dd></div></dl><div class="kg-knowledge-step"><button type="button" data-knowledge-node-prev>← 上一个</button><button type="button" data-knowledge-node-next>下一个 →</button><button type="button" data-knowledge-list-toggle aria-expanded="false" aria-controls="kgKnowledgeList">考点列表</button></div><ol id="kgKnowledgeList" data-knowledge-list class="kg-knowledge-list" hidden></ol></div></dialog>
+        <section class="kg-knowledge-space" aria-label="知识星空探索"><div class="kg-knowledge-space-heading"><span data-knowledge-page-count>全目录 0 个节点</span><span>练习次数 · 含下级</span></div><div data-knowledge-network class="kg-knowledge-network" hidden></div><div class="kg-knowledge-space-empty" data-knowledge-space-empty>每一次练习，都留下足迹</div><div class="kg-knowledge-camera" role="group" aria-label="星空视角"><button type="button" data-knowledge-rotate-left aria-label="向左旋转星空">↶</button><button type="button" data-knowledge-rotate-right aria-label="向右旋转星空">↷</button><button type="button" data-knowledge-zoom-out aria-label="缩小星空">−</button><button type="button" data-knowledge-zoom-in aria-label="放大星空">＋</button><button type="button" data-knowledge-labels aria-pressed="false">显示文字</button><button type="button" data-knowledge-reset>复位视角</button></div><p class="kg-knowledge-help">横向拖动旋转 · 上下滚动浏览 · Ctrl / ⌘ 滚轮或双指缩放 · 缩小看分类，放大看考点<br>也可使用视角按钮和考点列表探索</p></section>
       </div>
       <footer class="kg-knowledge-footer"><div class="kg-knowledge-groups" data-knowledge-groups role="group" aria-label="全部科目和分类"></div></footer>
       <p id="kgKnowledgeMeaning">亮度表示节点及其下级的累计练习次数，20 次及以上最亮，不代表掌握程度。未练习节点也会显示。连线表示目录上下级关系。没有考点引用的作答只计入总数。</p>
@@ -61,6 +61,10 @@
     const find=selector=>dialog.querySelector(selector);
     const summary=find('[data-knowledge-summary]'),network=find('[data-knowledge-network]'),list=find('[data-knowledge-list]'),status=find('[data-knowledge-status]'),retry=find('[data-knowledge-retry]'),groups=find('[data-knowledge-groups]');
     find('.kg-knowledge-shell').prepend(network);
+    const detail=find('.kg-knowledge-detail');let detailReturnFocus=null,labelsVisible=false;
+    function closeDetail(){if(detail.open)detail.close();detailReturnFocus?.focus?.();detailReturnFocus=null}
+    function openDetail(){if(!nodes.length)return;detailReturnFocus=document.activeElement;toggleList(true);if(!detail.open)detail.showModal()}
+    detail.addEventListener('cancel',event=>{event.preventDefault();event.stopPropagation();closeDetail()});
     let returnFocus=null,scene=null,nodes=[],selected=null,activeGroup='',listOpen=false;
     const formatDate=value=>{const date=value?new Date(value):null;return !date||Number.isNaN(date.getTime())?'时间未知':date.toLocaleDateString('zh-CN')};
     const setText=(name,value)=>{find(`[data-knowledge-${name}]`).textContent=text(value)};
@@ -85,8 +89,8 @@
     }
     function button(label,attribute,value){const element=document.createElement('button');element.type='button';element.textContent=label;element.setAttribute(attribute,value);return element}
     function render(data){
-      scene?.destroy();scene=null;dialog.classList.remove('kg-knowledge-fallback');nodes=[];selected=null;activeGroup='';summary.textContent='';network.replaceChildren();list.replaceChildren();groups.replaceChildren();
-      network.hidden=true;find('[data-knowledge-space-empty]').hidden=false;find('.kg-knowledge-detail').open=false;
+      closeDetail();scene?.destroy();scene=null;dialog.classList.remove('kg-knowledge-fallback');nodes=[];selected=null;activeGroup='';summary.textContent='';network.replaceChildren();list.replaceChildren();groups.replaceChildren();
+      network.hidden=true;find('[data-knowledge-space-empty]').hidden=false;
       setText('detail-title','选择一个考点');setText('detail-number','—');setText('detail-subject','');setText('detail-path','');setText('detail-attempts','—');setText('detail-related','—');setText('detail-date','—');setText('page-count','全目录 0 个节点');
       for(const control of dialog.querySelectorAll('.kg-knowledge-step button,.kg-knowledge-camera button'))control.disabled=true;
       toggleList(listOpen);if(!data)return;
@@ -106,10 +110,10 @@
           groups.appendChild(button(`${label} / ${members.length}`,'data-knowledge-group',key));
         }
         network.hidden=false;find('[data-knowledge-space-empty]').hidden=true;
-        try{scene=global.KGKnowledgeSpaceScene?.mount({host:network,nodes,onSelect:(_,index)=>{select(index);find('.kg-knowledge-detail').open=true},onGroup:key=>focusGroup(key,false)})||null}catch(error){scene=null;network.replaceChildren()}
+        try{scene=global.KGKnowledgeSpaceScene?.mount({host:network,nodes,onSelect:(_,index)=>{select(index);openDetail()},onGroup:key=>focusGroup(key,false)})||null}catch(error){scene=null;network.replaceChildren()}
         for(const control of dialog.querySelectorAll('.kg-knowledge-step button'))control.disabled=false;
         for(const control of dialog.querySelectorAll('.kg-knowledge-camera button'))control.disabled=!scene;
-        focusGroup('',false);select(0,false);toggleList(!scene||listOpen);if(!scene){dialog.classList.add('kg-knowledge-fallback');find('.kg-knowledge-detail').open=true;}
+        scene?.setLabelsVisible(labelsVisible);focusGroup('',false);select(0,false);toggleList(!scene||listOpen);if(!scene){dialog.classList.add('kg-knowledge-fallback');}
       }
     }
     function setState(value){
@@ -129,7 +133,10 @@
     dialog.addEventListener('click',event=>{
       if(event.target===dialog){const rect=dialog.getBoundingClientRect();if(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)close();return}
       const button=event.target.closest('button');if(!button||button.disabled)return;
-      if(button.hasAttribute('data-knowledge-close'))close();
+      if(button.hasAttribute('data-knowledge-details-close'))closeDetail();
+      else if(button.hasAttribute('data-knowledge-details-open'))openDetail();
+      else if(button.hasAttribute('data-knowledge-labels')){labelsVisible=!labelsVisible;button.setAttribute('aria-pressed',String(labelsVisible));scene?.setLabelsVisible(labelsVisible)}
+      else if(button.hasAttribute('data-knowledge-close'))close();
       else if(button.hasAttribute('data-knowledge-retry')||button.hasAttribute('data-knowledge-refresh'))void loader.refresh();
       else if(button.hasAttribute('data-knowledge-node'))select(Number(button.dataset.knowledgeNode));
       else if(button.hasAttribute('data-knowledge-group'))focusGroup(button.dataset.knowledgeGroup);
@@ -143,13 +150,13 @@
       else if(button.hasAttribute('data-knowledge-rotate-right'))scene?.rotate(30,0);
     });
     dialog.addEventListener('keydown',event=>{
-      if(event.key!=='Tab')return;
+      if(detail.open||event.key!=='Tab')return;
       const buttons=[...dialog.querySelectorAll('button:not(:disabled)')].filter(button=>!button.closest('[hidden]')&&button.getClientRects().length);
       const first=buttons[0],last=buttons.at(-1);
       if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus()}
       else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus()}
     });
-    dialog.addEventListener('cancel',event=>{event.preventDefault();close()});
+    dialog.addEventListener('cancel',event=>{if(event.target!==dialog)return;event.preventDefault();close()});
     dialog.addEventListener('close',()=>{if(!dialog.open){loader.invalidate();unlockBackground();restoreFocus()}});
     global.addEventListener?.('kg-auth-session-change',()=>{loader.invalidate();if(dialog.open){void loader.refresh()}});
     global.addEventListener?.('pagehide',close);

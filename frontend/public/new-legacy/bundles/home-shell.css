@@ -9937,6 +9937,27 @@ body:not([data-graph-interaction-mode="reading"]) .stage :is(.knowledge-card.mul
 .kg-knowledge-dismiss{position:absolute;top:0;right:0;min-height:0;padding:8px;background:none;border:0;z-index:3}
 .kg-knowledge-header{padding-right:82px}
 @media(max-width:600px){.kg-knowledge-header{padding-right:76px}}
+
+/* A single native child modal owns both the full list and the selected details. */
+.kg-knowledge-detail{position:fixed;inset:0;margin:auto!important;width:min(1120px,calc(100vw - 40px))!important;height:min(780px,calc(100dvh - 48px));max-height:calc(100dvh - 48px);padding:24px!important;overflow:auto;color:#ecf2fb;background:#0b1424;border:1px solid #52647c;pointer-events:auto!important}
+.kg-knowledge-detail::backdrop{background:#020610bd;backdrop-filter:blur(5px)}
+.kg-knowledge-detail:not([open]){display:none!important}
+.kg-knowledge-detail-content{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,1fr);grid-template-rows:repeat(6,max-content);align-content:start;align-items:start;gap:8px 32px;padding:20px 0 0;max-height:none;overflow:visible}
+.kg-knowledge-detail-content>*{grid-column:1;min-width:0}.kg-knowledge-detail-content>.kg-knowledge-list{grid-column:2;grid-row:1/8;height:calc(min(780px,100dvh - 48px) - 118px);max-height:calc(min(780px,100dvh - 48px) - 118px);margin:0;overflow:auto}
+.kg-knowledge-detail h3{font-size:30px}.kg-knowledge-detail .kg-knowledge-path{font-size:15px}.kg-knowledge-detail .kg-knowledge-number{font-size:58px}
+.kg-knowledge-header{align-items:flex-start}.kg-knowledge-overview{align-self:flex-start;white-space:normal;max-width:55%;text-align:right}.kg-knowledge-overview p{overflow:visible}
+.kg-knowledge-dialog{position:fixed}.kg-knowledge-shell{padding-bottom:190px}
+.kg-knowledge-camera{position:fixed;right:36px;bottom:84px;max-width:calc(100vw - 80px);z-index:2;pointer-events:auto}
+.kg-knowledge-help{position:fixed;right:36px;bottom:36px;max-width:calc(100vw - 80px);z-index:2}
+@media(max-width:850px){.kg-knowledge-header{flex-wrap:nowrap}.kg-knowledge-overview{max-width:60%;font-size:10px}.kg-knowledge-overview button{padding:6px}.kg-knowledge-header>div:first-child{max-width:40%}}
+@media(max-width:600px){.kg-knowledge-header{flex-wrap:wrap;padding-right:76px}.kg-knowledge-header>div:first-child{max-width:100%}.kg-knowledge-overview{width:100%;max-width:100%;margin:0;text-align:left}.kg-knowledge-shell{padding-bottom:210px}.kg-knowledge-camera{right:24px;bottom:86px;gap:4px;max-width:calc(100vw - 48px)}.kg-knowledge-help{right:24px;bottom:26px;max-width:calc(100vw - 48px)}.kg-knowledge-detail{width:calc(100vw - 24px)!important;height:calc(100dvh - 32px);padding:18px!important}.kg-knowledge-detail-content{display:block}.kg-knowledge-detail-content>.kg-knowledge-list{max-height:380px}.kg-knowledge-detail h3{font-size:26px}}
+.kg-knowledge-dialog.kg-knowledge-fallback .kg-knowledge-detail{position:fixed;margin:auto!important}
+@media(max-width:600px){.kg-knowledge-overview p{white-space:nowrap;overflow-x:auto;min-width:0;max-width:100%;overscroll-behavior-x:contain}.kg-knowledge-overview{min-width:0}.kg-knowledge-overview button{flex-shrink:0}}
+/* Foreground categories and explanation finish above the fixed camera dock. */
+.kg-knowledge-space{min-height:max(300px,calc(100dvh - 480px))}
+@media(max-width:600px){.kg-knowledge-space{min-height:360px}}
+
+.kg-knowledge-detail .kg-knowledge-step{align-self:start;align-items:flex-start}
 /* style: styles/learning-weekly-open-gate.css */
 /* 三学习板块周日 14:00 开放：入口倒计时 + 页面门禁 */
 .learning-entry-card.is-scheduled-closed{filter:saturate(.82);cursor:not-allowed}

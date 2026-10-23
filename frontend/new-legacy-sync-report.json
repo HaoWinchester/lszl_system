@@ -5,7 +5,9 @@
   "changes": {
     "added": [],
     "changed": [
+      "src/practice/knowledge-space-scene.js",
       "styles/knowledge-dashboard.css",
+      "tests/knowledge-dashboard-browser.py",
       "tests/knowledge-space-semantic-browser.py"
     ],
     "removed": []

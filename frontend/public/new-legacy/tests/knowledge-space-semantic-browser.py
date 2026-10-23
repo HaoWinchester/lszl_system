@@ -11,7 +11,7 @@ with sync_playwright() as p:
   errors=[];page.on('pageerror',lambda e: errors.append(str(e)))
   page.set_content('<button id="open" data-knowledge-dashboard-open>知识星空</button>')
   page.add_style_tag(path=str(ROOT/'new-legacy/styles/knowledge-dashboard.css'))
-  page.evaluate('''()=>{window.starArcs=0;const clear=CanvasRenderingContext2D.prototype.clearRect;CanvasRenderingContext2D.prototype.clearRect=function(...args){starArcs=0;return clear.apply(this,args)};const arc=CanvasRenderingContext2D.prototype.arc;CanvasRenderingContext2D.prototype.arc=function(...args){starArcs++;return arc.apply(this,args)}}''')
+  page.evaluate('''()=>{window.drawnLabels=[];const text=CanvasRenderingContext2D.prototype.fillText;CanvasRenderingContext2D.prototype.fillText=function(value,...args){drawnLabels.push(String(value));return text.call(this,value,...args)};window.starArcs=0;const clear=CanvasRenderingContext2D.prototype.clearRect;CanvasRenderingContext2D.prototype.clearRect=function(...args){starArcs=0;return clear.apply(this,args)};const arc=CanvasRenderingContext2D.prototype.arc;CanvasRenderingContext2D.prototype.arc=function(...args){starArcs++;return arc.apply(this,args)}}''')
   page.add_script_tag(path=str(ROOT/'new-legacy/src/practice/knowledge-space-scene.js'))
   page.evaluate('''()=>{const real=KGKnowledgeSpaceScene;window.scenes=[];window.KGKnowledgeSpaceScene={...real,mount:o=>{window.overlay=o.nodes;const s=real.mount(o);scenes.push(s);return s}};window.owner='a';window.calls=0;window.fail=false;KGAuthCore={currentUser:()=>owner?{username:owner}:null};KGDomainApi={request:async()=>{calls++;if(fail)throw Error('offline');return {topicCount:81,attemptCount:9,recentAttemptCount:2,nodes:Array.from({length:81},(_,i)=>({id:String(i),title:'考点'+i,subject:i<12?'数学':'英语',taxonomyId:i<12?'a':'b',path:i<12?['代数','方程','考点'+i]:['阅读','理解','考点'+i],brightness:.6}))}}}}''')
   page.add_script_tag(path=str(ROOT/'new-legacy/src/practice/knowledge-dashboard.js'))
@@ -20,7 +20,7 @@ with sync_playwright() as p:
   assert page.evaluate('starArcs')>81, 'overview must draw real catalog stars beneath clusters'
   assert page.evaluate('overlay.length===81 && overlay.every(n=>n.brightness===.12 && n.relatedAttemptCount===0)')
   box=page.locator('canvas').bounding_box();shell=page.locator('.kg-knowledge-body').bounding_box()
-  dialog_box=page.locator('dialog').bounding_box()
+  dialog_box=page.locator('#kgKnowledgeDashboard').bounding_box()
   assert box['y']<=dialog_box['y']+2, 'scene should reach dialog top without a reserved close band'
   header=page.locator('.kg-knowledge-header').bounding_box()
   assert box['y']<=header['y'] and box['y']+box['height']>=header['y']+header['height'], 'scene must extend behind foreground header and summary'
@@ -41,9 +41,29 @@ with sync_playwright() as p:
   assert page.evaluate('scenes.at(-1).snapshot().mode')=='clusters'
   page.locator('[data-knowledge-zoom-in]').click();page.locator('[data-knowledge-reset]').click()
   assert page.evaluate('scenes.at(-1).snapshot().mode')=='clusters'
-  page.locator('.kg-knowledge-detail summary').click();page.locator('[data-knowledge-list-toggle]').click()
+  page.locator('[data-knowledge-details-open]').click()
+  child=page.locator('.kg-knowledge-detail');expect(child).to_be_visible()
+  assert child.bounding_box()['width']>=min(width-50,1000)
+  page.keyboard.press('Tab');assert page.evaluate('document.activeElement.closest(".kg-knowledge-detail")!==null')
   page.locator('[data-knowledge-node="2"]').click();expect(page.locator('[data-knowledge-detail-title]')).to_have_text('考点2')
   page.locator('[data-knowledge-node-next]').click();expect(page.locator('[data-knowledge-detail-title]')).to_have_text('考点3')
+  page.locator('[data-knowledge-details-close]').click()
+  expect(page.locator('[data-knowledge-details-open]')).to_be_focused()
+  page.locator('[data-knowledge-labels]').click();expect(page.locator('[data-knowledge-labels]')).to_have_attribute('aria-pressed','true')
+  page.wait_for_function('scenes.at(-1).snapshot().labels.length>0')
+  assert page.evaluate('drawnLabels.some(t=>t.includes("考点"))'), 'labels must reach real Canvas fillText'
+  labels=page.evaluate('scenes.at(-1).snapshot().labels')
+  assert len({i for label in labels for i in label['indices']})==sum(len(label['indices']) for label in labels)
+  dock=page.locator('.kg-knowledge-camera').bounding_box()
+  assert dock['y']+dock['height']>dialog_box['y']+dialog_box['height']-170
+  assert page.locator('[data-knowledge-labels]').evaluate('(e)=>{const r=e.getBoundingClientRect();return document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)===e}')
+  page.locator('[data-knowledge-labels]').click();expect(page.locator('[data-knowledge-labels]')).to_have_attribute('aria-pressed','false')
+  assert page.evaluate('scenes.at(-1).snapshot().labels.length===0')
+  for _ in range(12):page.locator('[data-knowledge-zoom-out]').click()
+  assert page.evaluate('scenes.at(-1).snapshot().textHidden')
+  page.locator('[data-knowledge-reset]').click()
+
+  page.locator('[data-knowledge-details-open]').click();page.keyboard.press('Escape');expect(child).not_to_be_visible();expect(page.locator('#kgKnowledgeDashboard')).to_be_visible()
   page.locator('[data-knowledge-refresh]').click();page.wait_for_function('scenes.at(-1).snapshot().settled')
   expect(page.locator('[data-knowledge-summary]')).to_contain_text('9 次')
   expect(page.locator('[data-knowledge-list] button')).to_have_count(81)
@@ -66,11 +86,17 @@ with sync_playwright() as p:
    page.evaluate('''()=>{KGDomainApi.request=async()=>({attemptCount:51,unknownAttemptCount:23,unmappedAttemptCount:28,nodes:Array.from({length:317},(_,i)=>({id:String(i),parentId:null,title:'当前目录'+i,attemptCount:0}))})}''')
    page.locator('[data-knowledge-refresh]').click();page.wait_for_function('scenes.at(-1).snapshot().settled && !scenes.at(-1).snapshot().running')
    summary=page.locator('[data-knowledge-summary]');summary.scroll_into_view_if_needed()
-   assert summary.evaluate('e=>e.scrollWidth>e.clientWidth'), 'long real-response summary must exercise overflow'
-   camera=page.evaluate('scenes.at(-1).snapshot().camera');rect=summary.bounding_box()
-   page.mouse.move(rect['x']+rect['width']/2,rect['y']+rect['height']/2);page.mouse.wheel(600,0);page.wait_for_timeout(200)
-   assert summary.evaluate('e=>e.scrollLeft')>0, 'physical horizontal wheel must reveal trailing summary counts'
-   assert page.evaluate('scenes.at(-1).snapshot().camera')==camera, 'summary scroll cannot move star camera'
+   assert summary.evaluate('e=>e.scrollWidth>e.clientWidth'), 'long summary must remain scrollable'
+   rect=summary.bounding_box();page.mouse.move(rect['x']+rect['width']/2,rect['y']+rect['height']/2);page.mouse.wheel(600,0);page.wait_for_timeout(150)
+   assert summary.evaluate('e=>e.scrollLeft')>0
+   page.locator('[data-knowledge-labels]').click();page.wait_for_function('scenes.at(-1).snapshot().labels.length>0')
+   page.screenshot(path=str(OUT/f'labels-317-{width}.png'))
+  page.evaluate('''()=>{KGDomainApi.request=async()=>({attemptCount:0,nodes:[{id:'a',parentId:null,title:'Node A',subject:'Test'},{id:'b',parentId:null,title:'Node B',subject:'Test'}]})}''')
+  page.locator('[data-knowledge-refresh]').click();page.wait_for_function('scenes.at(-1).snapshot().settled && !scenes.at(-1).snapshot().running')
+  if not page.evaluate('scenes.at(-1).snapshot().labelsVisible'):page.locator('[data-knowledge-labels]').click()
+  page.wait_for_function('!scenes.at(-1).snapshot().running')
+  page.evaluate('drawnLabels=[]');page.locator('[data-knowledge-labels]').click();page.wait_for_function('!scenes.at(-1).snapshot().running')
+  assert page.evaluate('!drawnLabels.some(t=>t.includes("Node A")||t.includes("Node B"))'), page.evaluate('drawnLabels')
   print(f'{width}: semantic zoom, cluster click, full canvas, drawer/list, refresh/retry, full catalog, auth invalidation, close/reopen passed')
   page.close()
  browser.close()

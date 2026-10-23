@@ -22,6 +22,18 @@
     if(zoomRatio<1.35)return {mode:'clusters',items:model.groups.filter(item=>!group||item.key===group).map(item=>({...item,count:item.indices.length}))};
     return {mode:'points',items:model.points.filter(point=>!group||point.group===group)};
   }
+  // Fixed screen cells keep label rectangles disjoint and preserve every on-screen member.
+  function layoutLabels({points,width,height,zoomRatio,enabled,title}){
+    if(!enabled||zoomRatio<1.35||width<24||height<24)return [];
+    const top=Math.min(220,height*.28),bottom=Math.min(340,height*.4),available=Math.max(24,height-top-bottom);
+    const columns=Math.max(1,Math.floor(width/240)),rows=Math.max(1,Math.floor(available/64)),cellWidth=width/columns,cellHeight=available/rows,bins=new Map();
+    for(const point of points){
+      if(!point.visible||point.x<0||point.y<0||point.x>width||point.y>height)continue;
+      const column=Math.min(columns-1,Math.floor(point.x/cellWidth)),row=clamp(Math.floor((point.y-top)/cellHeight),0,rows-1),key=row*columns+column;
+      if(!bins.has(key))bins.set(key,{column,row,indices:[],sumX:0,sumY:0});const bin=bins.get(key);bin.indices.push(point.index);bin.sumX+=point.x;bin.sumY+=point.y;
+    }
+    return [...bins.entries()].sort((a,b)=>a[0]-b[0]).map(([,bin])=>({anchorX:bin.sumX/bin.indices.length,anchorY:bin.sumY/bin.indices.length,indices:bin.indices,x:(bin.column+.5)*cellWidth,y:top+(bin.row+.5)*cellHeight,width:cellWidth-12,text:bin.indices.length===1?String(title(bin.indices[0])):`${bin.indices.length} 个考点 · ${title(bin.indices[0])} 等`}));
+  }
   function createModel(nodes){
     const points=[],edges=[],groups=[],byKey=new Map();
     for(const [index,node] of (Array.isArray(nodes)?nodes:[]).entries()){
@@ -91,6 +103,7 @@
     canvas.style.cssText='display:block;width:100%;height:100%;touch-action:pan-y;cursor:grab';host.appendChild(canvas);
     const model=createModel(nodes),camera={...DEFAULT_CAMERA},pointers=new Map(),listeners=[];
     const motion=win.matchMedia?.('(prefers-reduced-motion: reduce)');
+    let labelsVisible=false;
     let width=0,height=0,raf=0,destroyed=false,selected=null,group='',dirty=true,intersecting=true,reduced=!!motion?.matches;
     let inertiaX=0,inertiaY=0,pinching=false,pinchDistance=0,autoFit=true,baseZoom=1,horizontalSpread=1,verticalSpread=1;
     const viewCenter={x:0,y:0,z:0},overviewCenter={x:0,y:0,z:0};
@@ -127,18 +140,27 @@
         const glow=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,halo);glow.addColorStop(0,`rgba(143,199,255,${brightness*.45})`);glow.addColorStop(1,'rgba(72,139,255,0)');ctx.fillStyle=glow;ctx.beginPath();ctx.arc(p.x,p.y,halo,0,Math.PI*2);ctx.fill();
         ctx.fillStyle=`rgba(190,224,255,${.3+brightness*.7})`;ctx.beginPath();ctx.arc(p.x,p.y,radius,0,Math.PI*2);ctx.fill();
         if(p.index===selected){ctx.strokeStyle='#e1c594';ctx.lineWidth=1.3;ctx.beginPath();ctx.arc(p.x,p.y,radius+7,0,Math.PI*2);ctx.stroke()}
-        if(p.index===selected||projected.length<=12){ctx.font='12px system-ui, sans-serif';ctx.textAlign='center';ctx.fillStyle=p.index===selected?'#f3dfba':'#a2b5d0';const title=String(node.title||'未命名考点');ctx.fillText(title.length>22?title.slice(0,21)+'…':title,p.x,p.y+radius+23,Math.max(30,width-20))}
+        if(camera.zoom/baseZoom>=.75&&!labelsVisible&&p.index===selected){ctx.font='12px system-ui, sans-serif';ctx.textAlign='center';ctx.fillStyle=p.index===selected?'#f3dfba':'#a2b5d0';const title=String(node.title||'未命名考点');ctx.fillText(title.length>22?title.slice(0,21)+'…':title,p.x,p.y+radius+23,Math.max(30,width-20))}
       }
       if(semanticView(model,camera.zoom/baseZoom,group).mode==='clusters'){
         for(const cluster of clusterPositions()){
           const radius=18+Math.min(12,Math.sqrt(cluster.count)*2);
           ctx.fillStyle='rgba(23,48,78,.75)';ctx.strokeStyle='#82b8ea';ctx.lineWidth=1.2;ctx.beginPath();ctx.arc(cluster.x,cluster.y,radius,0,Math.PI*2);ctx.fill();ctx.stroke();
+          if(camera.zoom/baseZoom<.75)continue;
           ctx.font='13px system-ui, sans-serif';ctx.textAlign='center';ctx.fillStyle='#e1efff';ctx.fillText(String(cluster.count),cluster.x,cluster.y+4);
           ctx.fillText(cluster.label,cluster.x,cluster.y+radius+22,Math.max(80,width-24));
         }
       }
+      for(const label of labelLayout()){
+        ctx.font='12px system-ui, sans-serif';ctx.textAlign='center';ctx.strokeStyle='rgba(151,184,224,.45)';ctx.lineWidth=.7;ctx.beginPath();ctx.moveTo(label.anchorX,label.anchorY);ctx.lineTo(label.x,label.y);ctx.stroke();ctx.fillStyle='rgba(6,11,20,.78)';const backing=Math.min(label.width,ctx.measureText(label.text).width+12);ctx.fillRect(label.x-backing/2,label.y-10,backing,20);ctx.fillStyle='#dbeaff';
+        let text=label.text;while(text.length>1&&ctx.measureText(text).width>label.width-8)text=text.slice(0,-2)+'…';
+        // Counts remain explicit even when a long representative name is shortened.
 
+        ctx.fillText(text,label.x,label.y+4,label.width-8);
+      }
     }
+    function labelLayout(){return layoutLabels({points:positions(),width,height,zoomRatio:camera.zoom/baseZoom,enabled:labelsVisible,title:index=>model.points[index].node.title||'未命名考点'})}
+    function setLabelsVisible(value){labelsVisible=!!value;if(labelsVisible&&camera.zoom/baseZoom<1.35){autoFit=false;camera.zoom=baseZoom*1.5}mark()}
     function frame(){
       raf=0;if(!visible())return;
       if(!model.settled){for(let i=0;i<3&&!model.settled;i++)stepModel(model);if(model.settled&&autoFit)fitDefault();dirty=true}
@@ -204,9 +226,9 @@
     const visibilityObserver=win.MutationObserver?new win.MutationObserver(()=>{if(visible())mark();else{stop();releasePointers()}}):null;
     for(let element=host;element&&visibilityObserver;element=element.parentElement)visibilityObserver.observe(element,{attributes:true,attributeFilter:['style','class','hidden','open']});
     function destroy(){if(destroyed)return;destroyed=true;stop();releasePointers();resizeObserver?.disconnect();intersectionObserver?.disconnect();visibilityObserver?.disconnect();for(const remove of listeners)remove();canvas.remove()}
-    function snapshot(){return {camera:{...camera},positions:positions(),mode:semanticView(model,camera.zoom/baseZoom,group).mode,clusters:clusterPositions(),selected,group,settled:model.settled,running:!!raf,destroyed}}
-    resize();return Object.freeze({select,focusGroup,rotate,zoomBy,reset,destroy,snapshot});
+    function snapshot(){return {labelsVisible,labels:labelLayout(),textHidden:camera.zoom/baseZoom<.75,camera:{...camera},positions:positions(),mode:semanticView(model,camera.zoom/baseZoom,group).mode,clusters:clusterPositions(),selected,group,settled:model.settled,running:!!raf,destroyed}}
+    resize();return Object.freeze({setLabelsVisible,select,focusGroup,rotate,zoomBy,reset,destroy,snapshot});
   }
-  const api=Object.freeze({createModel,stepModel,projectPoint,groupKey,classificationLabel,semanticView,mount});
+  const api=Object.freeze({createModel,stepModel,projectPoint,groupKey,classificationLabel,semanticView,layoutLabels,mount});
   global.KGKnowledgeSpaceScene=api;if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);
