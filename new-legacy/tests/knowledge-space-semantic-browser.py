@@ -20,9 +20,15 @@ with sync_playwright() as p:
   assert page.evaluate('starArcs')>81, 'overview must draw real catalog stars beneath clusters'
   assert page.evaluate('overlay.length===81 && overlay.every(n=>n.brightness===.12 && n.relatedAttemptCount===0)')
   box=page.locator('canvas').bounding_box();shell=page.locator('.kg-knowledge-body').bounding_box()
+  dialog_box=page.locator('dialog').bounding_box()
+  assert box['y']<=dialog_box['y']+2, 'scene should reach dialog top without a reserved close band'
   header=page.locator('.kg-knowledge-header').bounding_box()
   assert box['y']<=header['y'] and box['y']+box['height']>=header['y']+header['height'], 'scene must extend behind foreground header and summary'
   assert page.locator('h2').evaluate('(e)=>{const r=e.getBoundingClientRect();return document.elementFromPoint(r.x+r.width/2,r.y+r.height/2).tagName==="CANVAS"}'), 'noninteractive heading must let canvas gestures through'
+  close_box=page.locator('[data-knowledge-close]').bounding_box();refresh_box=page.locator('[data-knowledge-refresh]').bounding_box()
+  assert refresh_box['x']+refresh_box['width']<=close_box['x'] or refresh_box['y']>=close_box['y']+close_box['height'], 'refresh must not overlap floating close'
+  assert close_box['width']>=44 and close_box['height']>=44
+  assert page.locator('[data-knowledge-close]').evaluate('(e)=>{const r=e.getBoundingClientRect();return document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)===e}')
   assert page.locator('[data-knowledge-refresh]').evaluate('(e)=>{const r=e.getBoundingClientRect();return document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)===e}'), 'foreground refresh must physically receive clicks'
   assert box['width']>=shell['width']*.95
   assert box['height']>= (430 if width>600 else 340)

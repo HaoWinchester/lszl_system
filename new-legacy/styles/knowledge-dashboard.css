@@ -57,3 +57,7 @@
 .kg-knowledge-shell>.kg-knowledge-network[hidden]{display:none!important}
 .kg-knowledge-dialog.kg-knowledge-fallback .kg-knowledge-space{min-height:200px}
 @media(max-width:600px){.kg-knowledge-space{min-height:480px}.kg-knowledge-camera{bottom:60px}.kg-knowledge-help{text-align:right}.kg-knowledge-shell>.kg-knowledge-network{height:max(620px,100%)}}
+/* Floating close keeps the scene at the top while staying reachable during scroll. */
+.kg-knowledge-dismiss{position:absolute;top:0;right:0;min-height:0;padding:8px;background:none;border:0;z-index:3}
+.kg-knowledge-header{padding-right:82px}
+@media(max-width:600px){.kg-knowledge-header{padding-right:76px}}

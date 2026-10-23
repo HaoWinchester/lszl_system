@@ -76,3 +76,11 @@ Green evidence:
 Evidence images: `artifacts/knowledge-universe-20261020/task-2/real317-{1440,390}-{initial,reset}.png`; layered foreground `artifacts/learning-feedback-three-groups/task-3/space-{1440,559,390}.png`. No source VERSION change, sync, generated edit, deployment or UAT acceptance by this agent.
 
 Clean semantic rerun `PYTHONUNBUFFERED=1 python3 new-legacy/tests/knowledge-space-semantic-browser.py` completed1440/559/390 and Chromium teardown successfully with exit0; the earlier teardown hang is transient, not an outstanding failure.
+
+### Floating-close follow-up
+
+User explicitly rejected the reserved top close row. Existing close button now floats at dialog top-right with no full-width background/border/reserved height; the shell and network start at dialog top. Header reserves82px on desktop/76px on mobile for the44px-or-larger close target. Root owns removing the sample-only toolbar; production contains no new demo toolbar.
+
+New semantic test first failed `scene should reach dialog top without a reserved close band`, then passed after CSS change.1440/559×854/390 verify canvas reaches dialog top, refresh/close do not overlap, both physically receive pointer hits, and close target remains at least44px. Existing physical close, native focus/Escape restoration, scroll reachability and fallback checks retained.
+
+`python3 new-legacy/tests/knowledge-dashboard-browser.py`:14 passed after floating close, including390/320 physical close after list/detail scrolling, no overflow and Canvas fallback controls. Semantic assertions passed all1440/559/390 viewports. `git diff --check` passed. This follow-up changes only existing CSS and maintained browser assertions; no sync/deploy by this agent.
