@@ -10,6 +10,34 @@ checks = []
 with sync_playwright() as pw:
     browser = pw.chromium.launch(headless=True, channel='chrome')
     context=browser.new_context(viewport={'width':1440,'height':960},reduced_motion='reduce',has_touch=True)
+    # A missing optional scene asset differs from an unavailable Canvas context.
+    missing=context.new_page()
+    missing.set_content('<button id="open" data-knowledge-dashboard-open>知识星空</button>')
+    missing.add_style_tag(path=str(ROOT/'new-legacy/styles/knowledge-dashboard.css'))
+    missing.evaluate("""()=>{window.fallbackCalls=0;KGAuthCore={currentUser:()=>({username:'fallback'})};KGDomainApi={request:async()=>{fallbackCalls++;return {attemptCount:3,nodes:[{id:'one',title:'第一个考点',subject:'PMP',path:['PMP','过程','第一个考点'],attemptCount:1},{id:'two',title:'第二个考点',subject:'PMP',path:['PMP','过程','第二个考点'],attemptCount:2}]}}}}""")
+    missing.add_script_tag(path=str(ROOT/'new-legacy/src/practice/knowledge-dashboard.js'))
+    missing.click('#open')
+    expect(missing.locator('[data-knowledge-list] button')).to_have_count(2)
+    expect(missing.locator('[data-knowledge-status]')).to_contain_text('列表')
+    expect(missing.locator('[data-knowledge-retry]')).not_to_be_visible()
+    assert missing.locator('[data-knowledge-focus-subject]').evaluate('e=>getComputedStyle(e).color')=='rgb(129, 147, 168)'
+    missing.click('[data-knowledge-details-open]')
+    missing.locator('[data-knowledge-list] button').nth(1).click()
+    expect(missing.locator('[data-knowledge-detail-title]')).to_have_text('第二个考点')
+    expect(missing.locator('[data-knowledge-focus-title]')).to_have_text('第二个考点')
+    expect(missing.locator('[data-knowledge-detail-attempts]')).to_have_text('2 次')
+    expect(missing.locator('[data-knowledge-focus-attempts]')).to_have_text('2 次')
+    missing.keyboard.press('Escape')
+    expect(missing.locator('[data-knowledge-details-open]')).to_be_focused()
+    assert missing.locator('canvas').count()==0 and missing.evaluate('fallbackCalls')==1
+    missing.add_script_tag(path=str(ROOT/'new-legacy/src/practice/knowledge-space-scene.js'))
+    missing.click('[data-knowledge-refresh]')
+    expect(missing.locator('canvas')).to_have_count(1)
+    expect(missing.locator('[data-knowledge-list] button')).to_have_count(2)
+    expect(missing.locator('[data-knowledge-retry]')).not_to_be_visible()
+    assert missing.evaluate('fallbackCalls')==2
+    missing.close()
+    checks.append('missing optional scene script retains catalog, neutral inline color, usable child selection and refresh recovery after scene loads')
     page=context.new_page()
     errors = []
     page.on('pageerror', lambda error: errors.append(str(error)))

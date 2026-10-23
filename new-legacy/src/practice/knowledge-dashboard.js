@@ -41,6 +41,7 @@
     return global.KGDomainApi.request({path:'/api/v1/learning/practice/knowledge-universe'});
   }
   const groupKey=node=>global.KGKnowledgeSpaceScene?.groupKey(node)||JSON.stringify([text(node.subject||''),text(node.taxonomyId??'')]);
+  const categoryColor=key=>global.KGKnowledgeSpaceScene?.categoryColor?.(key)||'#8193a8';
   let instance;
   function init(options={}){
     if(instance)return instance;
@@ -78,7 +79,7 @@
     function select(index,reveal=true){
       const node=nodes[index];if(!node)return;
       selected=index;scene?.select(index,reveal);
-      setText('detail-subject',node.subject||'科目未标注');find('[data-knowledge-focus-subject]').textContent=[node.subject,JSON.parse(groupKey(node))[2]].filter(Boolean).join(' · ');reading.style.setProperty('--category-color',global.KGKnowledgeSpaceScene.categoryColor(groupKey(node)));setText('detail-number',String(index+1).padStart(2,'0'));
+      setText('detail-subject',node.subject||'科目未标注');find('[data-knowledge-focus-subject]').textContent=[node.subject,JSON.parse(groupKey(node))[2]].filter(Boolean).join(' · ');reading.style.setProperty('--category-color',categoryColor(groupKey(node)));setText('detail-number',String(index+1).padStart(2,'0'));
       setText('detail-title',node.title||'未命名考点');setText('detail-path',Array.isArray(node.path)?node.path.map(text).join(' / ')||'无路径标签':'无路径标签');
       setText('detail-attempts',`${Number(node.attemptCount)||0} 次`);setText('detail-related',`${node.relatedAttemptCount} 次`);setText('detail-date',formatDate(node.lastPracticedAt));
       for(const button of list.querySelectorAll('button'))button.setAttribute('aria-pressed',String(Number(button.dataset.knowledgeNode)===index));
@@ -113,7 +114,7 @@
         const seen=new Map();for(const node of nodes){const key=groupKey(node);if(!seen.has(key))seen.set(key,[]);seen.get(key).push(node)}
         for(const [key,members] of seen){
           const label=global.KGKnowledgeSpaceScene?.classificationLabel(members)||`${members[0].subject||'科目未标注'} · 未分类`;
-          const category=button(`${label} / ${members.length}`,'data-knowledge-group',key);category.style.setProperty('--category-color',global.KGKnowledgeSpaceScene.categoryColor(key));groups.appendChild(category);
+          const category=button(`${label} / ${members.length}`,'data-knowledge-group',key);category.style.setProperty('--category-color',categoryColor(key));groups.appendChild(category);
         }
         network.hidden=false;find('[data-knowledge-space-empty]').hidden=true;
         try{scene=global.KGKnowledgeSpaceScene?.mount({host:network,nodes,autoRotate:true,onAutoRotateChange:rotationState,insets:()=>{const box=network.getBoundingClientRect(),header=find('.kg-knowledge-body>button').getBoundingClientRect(),footer=dock.getBoundingClientRect();return {plot:true,left:dialog.clientWidth>850?Math.min(410,box.width*.30):0,right:16,top:dialog.clientWidth>600?155:Math.max(0,header.bottom-box.top)+16,bottom:Math.max(0,box.bottom-footer.top)+16}},onSelect:(_,index)=>select(index),onGroup:key=>focusGroup(key,false)})||null}catch(error){scene=null;network.replaceChildren()}
