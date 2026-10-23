@@ -173,7 +173,7 @@ with sync_playwright() as pw:
             for step in range(1,9):
                 cdp.send('Input.dispatchTouchEvent',{'type':'touchMove','touchPoints':[{'x':x,'y':y-step*12,'id':1}]});page.wait_for_timeout(20)
             cdp.send('Input.dispatchTouchEvent',{'type':'touchEnd','touchPoints':[]});page.wait_for_timeout(180)
-            assert shell.evaluate('e=>e.scrollTop')>0 and snap()['camera']==camera, 'native vertical touch scroll must preserve camera'
+            assert shell.evaluate('e=>e.scrollTop')>0 and snap()['camera']==camera, f'native vertical touch scroll must preserve camera: scroll={shell.evaluate("e=>e.scrollTop")}, before={camera}, after={snap()["camera"]}'
             cdp.detach()
         close_box=page.locator('[data-knowledge-close]').bounding_box();box=dialog.bounding_box()
         assert box['y']<=close_box['y'] and close_box['y']+close_box['height']<=box['y']+box['height']

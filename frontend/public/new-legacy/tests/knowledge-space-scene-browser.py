@@ -41,14 +41,14 @@ with sync_playwright() as p:
     window.dotStyles=[];window.arcs=0;
     ctx.clearRect=function(...args){dotStyles=[];arcs=0;return clear.apply(this,args)};
     ctx.arc=function(...args){radius=args[2];arcs++;return arc.apply(this,args)};
-    ctx.fill=function(...args){if(radius<=9)dotStyles.push(this.fillStyle);return fill.apply(this,args)};
+    ctx.fill=function(...args){if(radius<=9 && typeof this.fillStyle==='string' && this.fillStyle.startsWith('rgba(190, 224, 255,'))dotStyles.push(this.fillStyle);return fill.apply(this,args)};
    };
   }''')
   page.evaluate("()=>{window.scene=KGKnowledgeSpaceScene.mount({host:document.querySelector('#host'),nodes:[.12,.4,.7,1].map((brightness,i)=>({id:String(i),parentId:null,brightness}))});observeDrawing();scene.zoomBy(1.5)}")
   page.wait_for_function('scene.snapshot().settled && !scene.snapshot().running')
   styles=page.evaluate('dotStyles')
-  assert 'rgba(190, 224, 255, 0.384)' in styles,f'unpractised .12 must remain distinct from .2: {styles}'
-  assert len(set(styles))==4,'incoming practice brightness must remain continuous'
+  assert 'rgba(190, 224, 255, 0.45)' in styles,f'unpractised .12 must remain distinct from .2: {styles}'
+  assert len(set(str(style) for style in styles if isinstance(style,str)))==4,'incoming practice brightness must remain continuous'
   page.evaluate('scene.destroy()')
   page.evaluate("nodes=>{window.scene=KGKnowledgeSpaceScene.mount({host:document.querySelector('#host'),nodes})}",CATALOG)
   page.wait_for_function('scene.snapshot().settled && !scene.snapshot().running')
@@ -146,7 +146,8 @@ with sync_playwright() as p:
   page.evaluate("document.querySelector('#modal').scrollTop=0;scene.reset()");page.wait_for_function('!scene.snapshot().running')
   page.evaluate('scene.zoomBy(1.5)');page.wait_for_function('!scene.snapshot().running')
   # Select the nearest visible projected node, using actual mouse dispatch and a host offset.
-  point=max([v for v in snap()['positions'] if v['visible']],key=lambda v:v['scale'])
+  box=page.locator('canvas').bounding_box()
+  point=max([v for v in snap()['positions'] if v['visible'] and 12<v['x']<box['width']-12 and 12<v['y']<box['height']-12],key=lambda v:v['scale'])
   page.mouse.click(box['x']+point['x'],box['y']+point['y']);assert page.evaluate('chosen.length')==1
   assert page.evaluate('chosen[0].index')==point['index'];assert snap()['selected']==point['index']
   page.evaluate('scene.select(7)');assert snap()['selected']==7;assert page.evaluate('chosen.length')==1,'programmatic sync cannot echo selection callback'

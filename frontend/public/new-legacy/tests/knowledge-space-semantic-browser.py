@@ -17,7 +17,7 @@ with sync_playwright() as p:
   page.add_script_tag(path=str(ROOT/'new-legacy/src/practice/knowledge-dashboard.js'))
   page.locator('#open').click();page.wait_for_function('scenes.at(-1).snapshot().settled')
   assert page.evaluate('scenes.at(-1).snapshot().mode')=='clusters'
-  assert page.evaluate('starArcs')>81, 'overview must draw real catalog stars beneath clusters'
+  assert page.evaluate('starArcs')>=162, 'overview must draw real catalog stars beneath clusters'
   assert page.evaluate('overlay.length===81 && overlay.every(n=>n.brightness===.12 && n.relatedAttemptCount===0)')
   box=page.locator('canvas').bounding_box();shell=page.locator('.kg-knowledge-body').bounding_box()
   dialog_box=page.locator('#kgKnowledgeDashboard').bounding_box()
@@ -33,6 +33,17 @@ with sync_playwright() as p:
   assert box['width']>=shell['width']*.95
   assert box['height']>= (430 if width>600 else 340)
   assert not page.locator('.kg-knowledge-detail').evaluate('(e)=>e.open')
+  footer=page.locator('.kg-knowledge-footer').bounding_box()
+  assert footer['y']+footer['height']<=dialog_box['y']+dialog_box['height'] and footer['y']+footer['height']>=dialog_box['y']+dialog_box['height']-30
+  if width<=600:
+   anchors=page.evaluate('scenes.at(-1).snapshot().clusters')
+   control=page.locator('[data-knowledge-details-open]').bounding_box()
+   canvas=page.locator('canvas').bounding_box()
+   assert all(control['y']+control['height']+4<=canvas['y']+anchor['y']-25<=footer['y']-8 for anchor in anchors), 'default category labels must stay between header controls and dock'
+  help_summary=page.locator('.kg-knowledge-guidance summary')
+  page.locator('[data-knowledge-reset]').focus();page.keyboard.press('Tab');expect(help_summary).to_be_focused()
+  page.keyboard.press('Enter');assert page.locator('.kg-knowledge-guidance').evaluate('e=>e.open')
+  page.keyboard.press('Enter');assert not page.locator('.kg-knowledge-guidance').evaluate('e=>e.open')
   cluster=page.evaluate('scenes.at(-1).snapshot().clusters[0]')
   page.mouse.click(box['x']+cluster['x'],box['y']+cluster['y'])
   assert page.evaluate('scenes.at(-1).snapshot().mode')=='points'
@@ -82,6 +93,23 @@ with sync_playwright() as p:
   expect(page.locator('[data-knowledge-groups]')).to_contain_text('PMP · 人 / 2')
   expect(page.locator('[data-knowledge-groups]')).to_contain_text('PMP · 过程 / 1')
   expect(page.locator('[data-knowledge-groups]')).not_to_contain_text('未分类')
+  # Text-on must retain category context when semantic zoom returns to overview.
+  if not page.evaluate('scenes.at(-1).snapshot().labelsVisible'):page.locator('[data-knowledge-labels]').click()
+  page.wait_for_function('!scenes.at(-1).snapshot().running')
+  for action in ('zoom-out','reset'):
+   page.evaluate('drawnLabels=[]')
+   page.locator('[data-knowledge-zoom-out]' if action=='zoom-out' else '[data-knowledge-reset]').click()
+   page.wait_for_function('!scenes.at(-1).snapshot().running')
+   assert page.evaluate('scenes.at(-1).snapshot().labelsVisible && scenes.at(-1).snapshot().mode==="clusters"')
+   assert page.evaluate('drawnLabels.some(t=>t.includes("PMP · 人 · 2"))'), f'text-on {action} must render category name/count on Canvas'
+  page.evaluate('drawnLabels=[]')
+  for _ in range(12):page.locator('[data-knowledge-zoom-out]').click()
+  page.wait_for_function('!scenes.at(-1).snapshot().running')
+  # Capture only the settled far redraw, independent of intermediate wheel/button frames.
+  page.evaluate('drawnLabels=[];scenes.at(-1).rotate(0,0)')
+  page.wait_for_function('!scenes.at(-1).snapshot().running')
+  assert page.evaluate('scenes.at(-1).snapshot().textHidden && drawnLabels.length===0'), 'far zoom must hide all Canvas text even with labels enabled'
+  page.locator('[data-knowledge-reset]').click();page.locator('[data-knowledge-labels]').click()
   if width in (559,390):
    page.evaluate('''()=>{KGDomainApi.request=async()=>({attemptCount:51,unknownAttemptCount:23,unmappedAttemptCount:28,nodes:Array.from({length:317},(_,i)=>({id:String(i),parentId:null,title:'当前目录'+i,attemptCount:0}))})}''')
    page.locator('[data-knowledge-refresh]').click();page.wait_for_function('scenes.at(-1).snapshot().settled && !scenes.at(-1).snapshot().running')
