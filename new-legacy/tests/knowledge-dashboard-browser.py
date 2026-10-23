@@ -103,7 +103,7 @@ with sync_playwright() as pw:
     zoom=snap()['camera']['zoom'];page.locator('[data-knowledge-zoom-out]').click();assert snap()['camera']['zoom']<zoom
     page.locator('[data-knowledge-zoom-in]').click();assert abs(snap()['camera']['zoom']-zoom)<.001
     yaw=snap()['camera']['yaw'];page.locator('[data-knowledge-rotate-left]').focus();page.keyboard.press('Enter');assert snap()['camera']['yaw']!=yaw
-    page.locator('[data-knowledge-reset]').click();assert snap()['camera']['yaw']==.24
+    page.locator('[data-knowledge-reset]').click();assert snap()['camera']['yaw']==.10
 
     page.wait_for_function('!scenes.at(-1).snapshot().running')
     page.evaluate('scenes.at(-1).zoomBy(1.5)');page.wait_for_function('!scenes.at(-1).snapshot().running')
@@ -206,6 +206,7 @@ with sync_playwright() as pw:
             cdp.send('Input.dispatchTouchEvent',{'type':'touchEnd','touchPoints':[]});page.wait_for_timeout(180)
             assert shell.evaluate('e=>e.scrollTop')>0 and snap()['camera']==camera, f'native vertical touch scroll must preserve camera: scroll={shell.evaluate("e=>e.scrollTop")}, before={camera}, after={snap()["camera"]}'
             cdp.detach()
+        page.locator('[data-knowledge-close]').scroll_into_view_if_needed()
         close_box=page.locator('[data-knowledge-close]').bounding_box();box=dialog.bounding_box()
         assert box['y']<=close_box['y'] and close_box['y']+close_box['height']<=box['y']+box['height']
         page.screenshot(path=str(OUT/f'dashboard-{width}.png'))

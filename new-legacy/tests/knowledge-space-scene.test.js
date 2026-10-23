@@ -16,17 +16,15 @@ if(exists){
   assert.equal(JSON.stringify(nodes),before);assert.equal(a.points[0].node,nodes[0]);
   assert.equal(a.points[0].group,'["数学","0",""]');
  });
- test('organization edges only join matching subject and classification',()=>{
-  const m=api.createModel(nodes);assert.equal(m.groups.length,6);assert.ok(m.edges.length>0);
+ test('unreferenced legacy nodes never invent organization edges',()=>{
+  const m=api.createModel(nodes);assert.equal(m.groups.length,6);assert.equal(m.edges.length,0);
   for(const edge of m.edges){const a=m.points[edge.source],b=m.points[edge.target];assert.equal(a.group,b.group);assert.equal(edge.group,a.group)}
  });
- test('bounded gravity converges without nonfinite or collapsed coordinates',()=>{
-  const m=api.createModel(nodes),initial=m.points.map(p=>[p.x,p.y,p.z]);let moving=true,steps=0;
-  while(moving&&steps<1000){moving=api.stepModel(m);steps++}
-  assert.equal(moving,false);assert.ok(steps<1000);assert.ok(steps>1);assert.notDeepEqual(m.points.map(p=>[p.x,p.y,p.z]),initial);
-  assert.ok(m.points.every(p=>[p.x,p.y,p.z,p.vx,p.vy,p.vz].every(Number.isFinite)));
+ test('original geometric constellation is immediately settled, deterministic and volumetric',()=>{
+  const m=api.createModel(nodes),initial=JSON.stringify(m);
+  assert.equal(m.settled,true);assert.equal(api.stepModel(m),false);assert.equal(JSON.stringify(m),initial);
+  assert.ok(m.points.every(p=>[p.x,p.y,p.z].every(Number.isFinite)));
   for(let i=0;i<m.points.length;i++)for(let j=0;j<i;j++)assert.ok(Math.hypot(m.points[i].x-m.points[j].x,m.points[i].y-m.points[j].y,m.points[i].z-m.points[j].z)>1);
-  const settled=JSON.stringify(m);assert.equal(api.stepModel(m),false);assert.equal(JSON.stringify(m),settled);
  });
  test('empty and single node input are safe',()=>{
   const empty=api.createModel([]);assert.deepEqual(empty.points,[]);assert.equal(api.stepModel(empty),false);
@@ -34,7 +32,7 @@ if(exists){
   assert.equal(moving,false);assert.ok(single.points.every(p=>[p.x,p.y,p.z].every(Number.isFinite)));
   assert.equal(api.mount({host:null,nodes:[]}),null);
  });
- for(const size of [320,1000])test(`all ${size} catalog nodes survive bounded deterministic solving`,()=>{
+ for(const size of [320,1000])test(`all ${size} catalog nodes retain unique deterministic geometry and exact real edges`,()=>{
   const input=Object.freeze(Array.from({length:size},(_,i)=>Object.freeze({id:String(i),parentId:i%40?String(i-1):null,subject:`科目 ${Math.floor(i/40)}`,taxonomyId:Math.floor(i/40),brightness:i%5?.12:1})));
   const before=JSON.stringify(input),started=performance.now(),m=api.createModel(input);
   assert.equal(m.points.length,size);assert.equal(m.edges.length,size-Math.ceil(size/40));
@@ -58,12 +56,12 @@ if(exists){
   const m=api.createModel(input);
   assert.deepEqual(m.edges.map(e=>[e.source,e.target]),[[1,0]]);
  });
- test('legacy organization fallback stays within wholly legacy groups',()=>{
+ test('missing parent references never fabricate legacy organization edges',()=>{
   const m=api.createModel([
    {id:'a',subject:'legacy'},{id:'b',subject:'legacy'},{id:'c',subject:'other'},
    {id:'catalog',subject:'mixed',parentId:null},{id:'legacy-mixed',subject:'mixed'},
   ]);
-  assert.deepEqual(m.edges.map(e=>[e.source,e.target]),[[0,1]]);
+  assert.deepEqual(m.edges.map(e=>[e.source,e.target]),[]);
  });
  test('perspective has depth and camera rotation/zoom affect projection',()=>{
   const camera={yaw:0,pitch:0,zoom:1},p={x:100,y:50,z:50},before=JSON.stringify(p);
@@ -134,12 +132,18 @@ test('label layout covers every visible member deterministically and hides far t
  assert.deepEqual(api.layoutLabels({...options,enabled:false}),[]);
 });
 
-test('settled categories retain separate bounded neighborhoods despite cross-category parents',()=>{
- const api=require(file),nodes=Array.from({length:300},(_,i)=>({id:String(i),parentId:i?String(i-1):null,subject:'PMP',taxonomyId:1,path:['PMP',['人','过程','环境'][Math.floor(i/100)],String(i)]})),model=api.createModel(nodes);
- while(!model.settled)api.stepModel(model);
- for(const g of model.groups)for(const p of model.points.filter(p=>p.group===g.key))assert.ok(Math.hypot(p.x-g.x,p.y-g.y)<=g.radius+1);
- for(let i=0;i<model.groups.length;i++)for(let j=0;j<i;j++){const a=model.groups[i],b=model.groups[j];assert.ok(Math.hypot(a.x-b.x,a.y-b.y)>a.radius+b.radius+50)}
- assert.equal(model.points.length,300);assert.equal(model.edges.length,299);
+test('real second-level branches retain separate geometric centers and truthful parent links',()=>{
+ const api=require(file),nodes=require('./fixtures/knowledge-space-published-catalog.json').nodes,model=api.createModel(nodes);
+ const process=model.groups.find(g=>JSON.parse(g.key)[2]==='过程');assert.equal(process.branches.length,9);
+ assert.equal(new Set(process.branches.map(b=>`${b.center.x},${b.center.y},${b.center.z}`)).size,9);
+ assert.deepEqual(process.branches.flatMap(b=>b.indices).sort((a,b)=>a-b),process.indices.filter(i=>model.points[i].node.path.length>2));
+ for(const e of model.edges)assert.equal(model.points[e.target].node.parentId,model.points[e.source].node.id);
+ assert.equal(model.edges.length,313);
+});
+test('desktop projection retains original 0.69W/0.50H origin, focal length and camera distance',()=>{
+ const api=require(file),camera={yaw:0,pitch:0,zoom:1};
+ assert.deepEqual(api.projectPoint({x:0,y:0,z:0},camera,1440,960),{x:1440*.69,y:480,scale:960*1.05/900,depth:900});
+ const p=api.projectPoint({x:120,y:80,z:100},camera,1440,960);assert.equal(p.x,1440*.69+120*1.008);assert.equal(p.y,480+80*1.008);assert.equal(p.depth,1000);
 });
 test('nearby label aggregation never mixes semantic categories or creates distant leaders',()=>{
  const api=require(file),points=[{index:0,group:'a',x:120,y:240,visible:true},{index:1,group:'b',x:121,y:241,visible:true},{index:2,group:'a',x:130,y:245,visible:true}];
@@ -176,7 +180,7 @@ test('published constellation retains volumetric depth after settling',()=>{
 
 test('full Y-rotation remains inside the fitted 3D envelope at every phase',()=>{
  const api=require(file),m=api.createModel(require('./fixtures/knowledge-space-published-catalog.json').nodes);while(!m.settled)api.stepModel(m);
- const camera={yaw:.24,pitch:-.12,zoom:1},envelope=api.rotationEnvelope(m).map(p=>api.projectPoint(p,camera,1440,960));
+ const camera={yaw:.10,pitch:-.02,zoom:1},envelope=api.rotationEnvelope(m).map(p=>api.projectPoint(p,camera,1440,960));
  const bounds={x:[Math.min(...envelope.map(p=>p.x)),Math.max(...envelope.map(p=>p.x))],y:[Math.min(...envelope.map(p=>p.y)),Math.max(...envelope.map(p=>p.y))]};
  for(let phase=0;phase<Math.PI*2;phase+=Math.PI/24)for(const group of m.groups)for(const index of group.indices){const p=api.projectPoint(api.rotateLocal(m.points[index],group,phase),camera,1440,960);for(const axis of ['x','y'])assert.ok(p[axis]>=bounds[axis][0]&&p[axis]<=bounds[axis][1],`phase ${phase}: ${axis} escapes fit`)}
  assert.equal(api.categoryColor('["PMP","","人"]'),'#ffd58b');assert.equal(api.categoryColor('["PMP","","过程"]'),'#8bdcff');assert.equal(api.categoryColor('["PMP","","环境"]'),'#80f0b8');
@@ -186,5 +190,19 @@ test('real category hulls keep a gap throughout automatic Y rotation',()=>{
  const api=require(file),m=api.createModel(require('./fixtures/knowledge-space-published-catalog.json').nodes);while(!m.settled)api.stepModel(m);
  const hull=points=>{points.sort((a,b)=>a.x-b.x||a.y-b.y);const cross=(o,a,b)=>(a.x-o.x)*(b.y-o.y)-(a.y-o.y)*(b.x-o.x),half=ps=>{const h=[];for(const p of ps){while(h.length>1&&cross(h.at(-2),h.at(-1),p)<=0)h.pop();h.push(p)}return h.slice(0,-1)};return [...half(points),...half([...points].reverse())]};
  const gap=(a,b)=>Math.max(...[a,b].flatMap(p=>p.map((v,i)=>{const q=p[(i+1)%p.length],x=-(q.y-v.y),y=q.x-v.x,l=Math.hypot(x,y),aa=a.map(p=>(p.x*x+p.y*y)/l),bb=b.map(p=>(p.x*x+p.y*y)/l);return Math.max(Math.min(...aa)-Math.max(...bb),Math.min(...bb)-Math.max(...aa))})));
- for(let phase=0;phase<Math.PI*2;phase+=Math.PI/24){const hulls=m.groups.map(g=>hull(g.indices.map(i=>api.projectPoint(api.rotateLocal(m.points[i],g,phase),{yaw:.24,pitch:-.12,zoom:1},650,650))));for(let i=0;i<hulls.length;i++)for(let j=i+1;j<hulls.length;j++)assert.ok(gap(hulls[i],hulls[j])>0,`category overlap at phase ${phase}`)}
+ for(let phase=0;phase<Math.PI*2;phase+=Math.PI/24){const hulls=m.groups.map(g=>hull(g.indices.map(i=>api.projectPoint(api.rotateLocal(m.points[i],g,phase),{yaw:.10,pitch:-.02,zoom:1},1440,960))));for(let i=0;i<hulls.length;i++)for(let j=i+1;j<hulls.length;j++)assert.ok(gap(hulls[i],hulls[j])>0,`category ${i}/${j} overlap at phase ${phase}`)}
+});
+
+test('invalid duplicate and cyclic catalog placement terminates with finite selectable coordinates',()=>{
+ const api=require(file),path=['PMP','过程','测试分支'];
+ const nodes=[{id:'a',parentId:'b'},{id:'b',parentId:'a'},{id:'a',parentId:'b'},{id:'orphan',parentId:'missing'}].map(n=>({...n,subject:'PMP',path:[...path,n.id]}));
+ const model=api.createModel(nodes);assert.equal(model.points.length,4);assert.ok(model.points.every(p=>[p.x,p.y,p.z].every(Number.isFinite)));
+ assert.equal(new Set(model.points.map(p=>`${p.x},${p.y},${p.z}`)).size,4);
+});
+
+test('malformed and missing paths retain every node with finite fallback geometry',()=>{
+ const api=require(file),nodes=['bad path',{title:'bad'},null,undefined].map((path,i)=>({id:String(i),parentId:null,title:`Node ${i}`,subject:'PMP',path}));
+ const before=JSON.stringify(nodes),model=api.createModel(nodes);
+ assert.equal(model.points.length,4);assert.equal(JSON.stringify(nodes),before);assert.equal(new Set(model.points.map(p=>`${p.x},${p.y},${p.z}`)).size,4);
+ assert.ok(model.points.every(p=>[p.x,p.y,p.z].every(Number.isFinite)));
 });

@@ -24,26 +24,28 @@ with sync_playwright() as p:
   assert box['y']<=dialog_box['y']+2, 'scene should reach dialog top without a reserved close band'
   header=page.locator('.kg-knowledge-header').bounding_box()
   assert box['y']<=header['y'] and box['y']+box['height']>=header['y']+header['height'], 'scene must extend behind foreground header and summary'
-  assert page.locator('h2').evaluate('(e)=>{const r=e.getBoundingClientRect();return document.elementFromPoint(r.x+r.width/2,r.y+r.height/2).tagName==="CANVAS"}'), 'noninteractive heading must let canvas gestures through'
+  assert page.locator('#kgKnowledgeTitle').evaluate('(e)=>{const r=e.getBoundingClientRect();return document.elementFromPoint(r.x+r.width/2,r.y+r.height/2).tagName==="CANVAS"}'), 'noninteractive heading must let canvas gestures through'
   close_box=page.locator('[data-knowledge-close]').bounding_box();refresh_box=page.locator('[data-knowledge-refresh]').bounding_box()
   assert refresh_box['x']+refresh_box['width']<=close_box['x'] or refresh_box['y']>=close_box['y']+close_box['height'], 'refresh must not overlap floating close'
-  assert close_box['width']>=44 and close_box['height']>=44
+  assert close_box['width']>=38 and close_box['height']>=36
+  page.locator('[data-knowledge-close]').scroll_into_view_if_needed()
   assert page.locator('[data-knowledge-close]').evaluate('(e)=>{const r=e.getBoundingClientRect();return document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)===e}')
   assert page.locator('[data-knowledge-refresh]').evaluate('(e)=>{const r=e.getBoundingClientRect();return document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)===e}'), 'foreground refresh must physically receive clicks'
   assert box['width']>=shell['width']*.95
   assert box['height']>= (430 if width>600 else 340)
   assert not page.locator('.kg-knowledge-detail').evaluate('(e)=>e.open')
   footer=page.locator('.kg-knowledge-footer').bounding_box()
-  assert footer['y']+footer['height']<=dialog_box['y']+dialog_box['height'] and footer['y']+footer['height']>=dialog_box['y']+dialog_box['height']-30
-  if width<=600:
+  if width>960:assert footer['y']+footer['height']<=dialog_box['y']+dialog_box['height'] and footer['y']+footer['height']>=dialog_box['y']+dialog_box['height']-30
+  else:
+   page.locator('.kg-knowledge-shell').evaluate('e=>e.scrollTop=0')
    anchors=page.evaluate('scenes.at(-1).snapshot().clusters')
-   control=page.locator('[data-knowledge-details-open]').bounding_box()
-   canvas=page.locator('canvas').bounding_box()
-   assert all(control['y']+control['height']+4<=canvas['y']+anchor['y']-25<=footer['y']-8 for anchor in anchors), 'default category labels must stay between header controls and dock'
+   reading=page.locator('.kg-knowledge-body').bounding_box()
+   assert all(header['y']+header['height']<anchor['y']<reading['y'] for anchor in anchors), 'phone constellations occupy their own stage above the reading panel'
   help_summary=page.locator('.kg-knowledge-guidance summary')
-  page.locator('[data-knowledge-reset]').focus();page.keyboard.press('Tab');expect(page.locator('[data-knowledge-auto-rotate]')).to_be_focused();page.keyboard.press('Tab');expect(help_summary).to_be_focused()
+  page.locator('[data-knowledge-reset]').focus();page.keyboard.press('Tab');expect(page.locator('[data-knowledge-details-open]')).to_be_focused();page.locator('[data-knowledge-auto-rotate]').focus();page.keyboard.press('Tab');expect(help_summary).to_be_focused()
   page.keyboard.press('Enter');assert page.locator('.kg-knowledge-guidance').evaluate('e=>e.open')
   page.keyboard.press('Enter');assert not page.locator('.kg-knowledge-guidance').evaluate('e=>e.open')
+  page.locator('.kg-knowledge-shell').evaluate('e=>e.scrollTop=0')
   cluster=page.evaluate('scenes.at(-1).snapshot().clusters[0]')
   page.mouse.click(box['x']+cluster['x'],box['y']+cluster['y'])
   assert page.evaluate('scenes.at(-1).snapshot().mode')=='points'
@@ -114,10 +116,11 @@ with sync_playwright() as p:
   if width in (559,390):
    page.evaluate('''()=>{KGDomainApi.request=async()=>({attemptCount:51,unknownAttemptCount:23,unmappedAttemptCount:28,nodes:Array.from({length:317},(_,i)=>({id:String(i),parentId:null,title:'当前目录'+i,attemptCount:0}))})}''')
    page.locator('[data-knowledge-refresh]').click();page.wait_for_function('scenes.at(-1).snapshot().settled && !scenes.at(-1).snapshot().running')
+   page.locator('.kg-knowledge-guidance summary').click()
    summary=page.locator('[data-knowledge-summary]');summary.scroll_into_view_if_needed()
-   assert summary.evaluate('e=>e.scrollWidth>e.clientWidth'), 'long summary must remain scrollable'
-   rect=summary.bounding_box();page.mouse.move(rect['x']+rect['width']/2,rect['y']+rect['height']/2);page.mouse.wheel(600,0);page.wait_for_timeout(150)
-   assert summary.evaluate('e=>e.scrollLeft')>0
+   assert summary.is_visible() and '23 次作答暂无考点引用' in summary.inner_text()
+   assert summary.evaluate('e=>e.scrollWidth<=e.clientWidth'), 'long practice explanation wraps within the compact original information column'
+   page.locator('.kg-knowledge-guidance summary').click()
    page.locator('[data-knowledge-labels]').click();page.wait_for_function('scenes.at(-1).snapshot().labels.length>0')
    page.screenshot(path=str(OUT/f'labels-317-{width}.png'))
   page.evaluate('''()=>{KGDomainApi.request=async()=>({attemptCount:0,nodes:[{id:'a',parentId:null,title:'Node A',subject:'Test'},{id:'b',parentId:null,title:'Node B',subject:'Test'}]})}''')

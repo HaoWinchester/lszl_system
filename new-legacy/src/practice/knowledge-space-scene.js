@@ -1,6 +1,6 @@
 'use strict';
 (function(global){
-  const MAX_STEPS=320,CELL=75,DEFAULT_CAMERA={yaw:.24,pitch:-.12,zoom:1};
+  const TAU=Math.PI*2,DEFAULT_CAMERA={yaw:.10,pitch:-.02,zoom:1};
   const clamp=(value,min,max)=>Math.min(max,Math.max(min,value));
   function isSubjectOverviewNode(node){return !!node&&Object.prototype.hasOwnProperty.call(node,'parentId')&&node.parentId===null&&!!String(node.subject||'').trim()&&Array.isArray(node.path)&&node.path.length===1&&node.path[0]===node.subject}
   function categoryPath(node){
@@ -13,7 +13,6 @@
   }
   const groupKey=node=>JSON.stringify([String(node.subject||''),String(node.taxonomyId??''),categoryPath(node)[0]||'']);
   function categoryColor(key){const name=JSON.parse(key||'["","",""]')[2];return name==='人'?'#ffd58b':name==='环境'?'#80f0b8':'#8bdcff'}
-  function colorChannels(key){return categoryColor(key).slice(1).match(/../g).map(value=>parseInt(value,16)).join(',')}
   function rotateLocal(point,center,phase,scale=1){const x=point.x-center.x,y=point.y-center.y,z=point.z-center.z,c=Math.cos(phase),s=Math.sin(phase);return {x:center.x+(x*c-z*s)*scale,y:center.y+y*scale,z:center.z+(x*s+z*c)*scale}}
   // A circumscribed 24-sided cylinder contains every local Y rotation, including between samples.
   function rotationEnvelope(model){return model.groups.flatMap(center=>{const members=center.indices.map(index=>model.points[index]),radius=Math.max(...members.map(p=>Math.hypot(p.x-center.x,p.z-center.z)))/Math.cos(Math.PI/24),ys=members.map(p=>p.y);return Array.from({length:24},(_,i)=>i*Math.PI/12).flatMap(angle=>[Math.min(...ys),Math.max(...ys)].map(y=>({group:center.key,x:center.x+Math.cos(angle)*radius,y,z:center.z+Math.sin(angle)*radius})))})}
@@ -54,64 +53,62 @@
     }
     const catalogKey=(node,id)=>JSON.stringify([String(node.subject||''),String(node.taxonomyId??''),String(id)]),catalogIds=new Map();
     for(const point of points)if(point.node.id!=null){const key=catalogKey(point.node,point.node.id);catalogIds.set(key,catalogIds.has(key)?null:point.index)}
-    const three=groups.length===3&&new Set(groups.map(g=>JSON.parse(g.key)[2])).size===3&&['人','过程','环境'].every(name=>groups.some(g=>JSON.parse(g.key)[2]===name))&&new Set(groups.map(g=>JSON.stringify([g.subject,g.taxonomyId]))).size===1;
+    const three=groups.length===3&&['人','过程','环境'].every(name=>groups.some(g=>JSON.parse(g.key)[2]===name))&&new Set(groups.map(g=>JSON.stringify([g.subject,g.taxonomyId]))).size===1;
+    // Original moduleCenters / nodes (original-reference.html:301–311): geometric
+    // elliptical constellations. The catalog supplies membership and real edges.
     groups.forEach((group,i)=>{
+      const name=JSON.parse(group.key)[2],a=-1.45+i*(TAU/Math.max(1,groups.length));
       group.label=classificationLabel(group.indices.map(index=>points[index].node));
-      const columns=Math.ceil(Math.sqrt(groups.length)),spacing=440;
-      group.radius=165;group.depth=three?170:36;group.x=(i%columns-(columns-1)/2)*spacing;group.y=(Math.floor(i/columns)-(Math.ceil(groups.length/columns)-1)/2)*spacing;group.z=0;
-      if(three){const name=JSON.parse(group.key)[2];group.radius=name==='过程'?205:135;group.y=name==='过程'?-55:290;group.x=name==='过程'?0:name==='人'?-195:195}
-      const catalog=group.indices.some(index=>Object.prototype.hasOwnProperty.call(points[index].node,'parentId'));
-      const neighborhoods=[...new Set(group.indices.map(index=>categoryPath(points[index].node)[1]||points[index].node.title))];
-      group.indices.forEach((index,j)=>{
-        const p=points[index],a=j*2.399963229728653;
-        const branch=neighborhoods.indexOf(categoryPath(p.node)[1]||p.node.title),angle=branch*2.399963229728653,spread=group.radius*.72,local=18+32*Math.sqrt((j%13)/12);
-        p.x=group.x+Math.cos(angle)*spread+Math.cos(a)*local;p.y=group.y+Math.sin(angle)*spread+Math.sin(a)*local;p.z=group.z+(Math.sin(branch*1.91)*95+Math.cos(j*1.71)*55)*(three?1:.22);
-        p.home={x:p.x,y:p.y,z:p.z};
-        if(catalog){
-          const parent=p.node.parentId,source=parent==null?null:catalogIds.get(catalogKey(p.node,parent));
-          if(source!=null&&source!==index)edges.push({source,target:index,group:group.key});
-        }else if(j)edges.push({source:group.indices[j-1],target:index,group:group.key});
-      });
-    });
-    const layoutScale=Math.min(1,2/Math.sqrt(Math.max(1,groups.length)));
-    for(const item of [...points,...groups])for(const axis of ['x','y','z']){item[axis]*=layoutScale;if(item.home)item.home[axis]*=layoutScale}
-    for(const group of groups){group.radius*=layoutScale;group.depth*=layoutScale}
-    return {points,edges,groups,steps:0,quiet:0,settled:points.length===0};
-  }
-  function stepModel(model){
-    if(model.settled)return false;
-    const {points,groups,edges}=model,centers=new Map(groups.map(group=>[group.key,group]));
-    for(const p of points){const c=p.home;p.vx+=(c.x-p.x)*.025;p.vy+=(c.y-p.y)*.025;p.vz+=(c.z-p.z)*.025}
-    // Visit only the 27 neighboring cells; insert after visiting so each pair acts once.
-    const buckets=new Map();
-    for(const a of points){
-      const x=Math.floor(a.x/CELL),y=Math.floor(a.y/CELL),z=Math.floor(a.z/CELL);
-      for(let ox=-1;ox<=1;ox++)for(let oy=-1;oy<=1;oy++)for(let oz=-1;oz<=1;oz++){
-        const neighbors=buckets.get(`${x+ox},${y+oy},${z+oz}`);if(!neighbors)continue;
-        for(const b of neighbors){
-          const dx=a.x-b.x,dy=a.y-b.y,dz=a.z-b.z,squared=dx*dx+dy*dy+dz*dz;
-          if(squared>=CELL*CELL)continue;
-          const d=Math.max(1,Math.sqrt(squared)),force=Math.min(1.6,(CELL-d)*.035)/d;
-          a.vx+=dx*force;a.vy+=dy*force;a.vz+=dz*force;b.vx-=dx*force;b.vy-=dy*force;b.vz-=dz*force;
-        }
+      group.x=three?(name==='过程'?0:name==='人'?-190:190):Math.cos(a)*240;
+      group.y=three?(name==='过程'?-55:290):Math.sin(a)*200;group.z=0;
+      group.radius=three&&name==='过程'?270:130;group.depth=200;
+      const branchNames=[...new Set(group.indices.map(index=>{const n=points[index].node;return (Array.isArray(n.path)?n.path:[]).filter(v=>v!==n.subject)[1]||''}).filter(Boolean))];
+      const branches=new Map(branchNames.map((name,bi)=>[name,{name,indices:[],angle:-1.45+bi*TAU/branchNames.length}]));
+      for(const index of group.indices){const point=points[index],path=(Array.isArray(point.node.path)?point.node.path:[]).filter(v=>v!==point.node.subject);
+        const branch=branches.get(path[1]);if(branch)branch.indices.push(index);else Object.assign(point,{x:group.x,y:group.y,z:group.z});
       }
-      const key=`${x},${y},${z}`;let bucket=buckets.get(key);if(!bucket){bucket=[];buckets.set(key,bucket)}bucket.push(a);
-    }
-    for(const edge of edges){
-      const a=points[edge.source],b=points[edge.target];if(a.group!==b.group)continue;const dx=b.x-a.x,dy=b.y-a.y,dz=b.z-a.z,d=Math.max(1,Math.hypot(dx,dy,dz)),f=(d-48)*.003/d;
-      a.vx+=dx*f;a.vy+=dy*f;a.vz+=dz*f;b.vx-=dx*f;b.vy-=dy*f;b.vz-=dz*f;
-    }
-    let speed=0;
-    for(const p of points){for(const axis of ['x','y','z']){const velocity='v'+axis;p[velocity]=clamp(p[velocity]*.81,-5,5);p[axis]+=p[velocity]}const c=centers.get(p.group),distance=Math.hypot(p.x-c.x,p.y-c.y);if(distance>c.radius){p.x=c.x+(p.x-c.x)*c.radius/distance;p.y=c.y+(p.y-c.y)*c.radius/distance}p.z=clamp(p.z,c.z-c.depth,c.z+c.depth);speed=Math.max(speed,Math.hypot(p.vx,p.vy,p.vz))}
-    model.steps++;model.quiet=speed<.035?model.quiet+1:0;
-    if(model.steps>=MAX_STEPS||model.quiet>=12){model.settled=true;for(const p of points)p.vx=p.vy=p.vz=0}
-    return !model.settled;
+      for(const [bi,branch] of [...branches.values()].entries()){
+        const extent=three&&name==='过程'?205:75,c={x:group.x+Math.cos(branch.angle)*extent,y:group.y+Math.sin(branch.angle)*extent*.76,z:Math.sin(branch.angle*1.72)*150};
+        branch.center=c;branch.group=group.key;
+        const byParent=new Map();for(const index of branch.indices){const point=points[index],parent=point.node.parentId;if(!byParent.has(parent))byParent.set(parent,[]);byParent.get(parent).push(index)}
+        const placed=new Set(),branchIds=new Set(branch.indices.map(index=>points[index].node.id));
+        const roots=branch.indices.filter(index=>!branchIds.has(points[index].node.parentId));
+        // Iterative traversal also handles deep, cyclic and duplicate-id catalogs.
+        const queue=roots.map((index,j)=>({index,center:c,depth:roots.length===1?0:1,local:j,total:roots.length}));
+        const drain=()=>{for(let cursor=0;cursor<queue.length;cursor++){
+          const {index,center,depth,local,total}=queue[cursor];if(placed.has(index))continue;placed.add(index);
+          const point=points[index],a=local*TAU/Math.max(3,total)+bi*.29,rr=depth===0?0:depth===1?62:Math.max(10,30/Math.pow(1.65,depth-2));
+          Object.assign(point,{x:center.x+Math.cos(a)*rr,y:center.y+Math.sin(a)*rr*.66,z:center.z+Math.sin(a*1.37)*rr*.85});
+          const children=catalogIds.get(catalogKey(point.node,point.node.id))===index?(byParent.get(point.node.id)||[]):[];children.forEach((child,j)=>{if(!placed.has(child))queue.push({index:child,center:point,depth:depth+1,local:j,total:children.length})});
+        }queue.length=0};drain();
+        // Cycles have no roots: give each unvisited component a real selectable position.
+        const remaining=branch.indices.filter(index=>!placed.has(index));remaining.forEach((index,j)=>{if(!placed.has(index)){queue.push({index,center:c,depth:1,local:j,total:remaining.length});drain()}});
+
+      }
+      // Non-catalog data uses the same original polygon vocabulary, without fake edges.
+      const loose=group.indices.filter(index=>!Object.prototype.hasOwnProperty.call(points[index].node,'parentId')||(!Array.isArray(points[index].node.path)||!points[index].node.path.length));
+      loose.forEach((index,j)=>{const a=j*TAU/Math.max(5,loose.length),rr=72+(j%2)*18;Object.assign(points[index],{x:group.x+Math.cos(a)*rr,y:group.y+Math.sin(a)*rr*.66,z:group.z+Math.sin(a*1.37)*70})});
+      if(three&&name!=='过程')for(const point of [...group.indices.map(index=>points[index]),...[...branches.values()].map(branch=>branch.center)])for(const axis of ['x','y','z'])point[axis]=group[axis]+(point[axis]-group[axis])*.78;
+      group.layoutScale=three?1:Math.min(1,3/groups.length);
+      if(group.layoutScale<1)for(const point of [...group.indices.map(index=>points[index]),...[...branches.values()].map(branch=>branch.center)])for(const axis of ['x','y','z'])point[axis]=group[axis]+(point[axis]-group[axis])*group.layoutScale;
+      group.branches=[...branches.values()];
+      for(const index of group.indices){const point=points[index],parent=point.node.parentId,source=parent==null?null:catalogIds.get(catalogKey(point.node,parent));if(source!=null&&source!==index)edges.push({source,target:index,group:group.key})}
+    });
+    return {points,edges,groups,steps:0,quiet:0,settled:true};
+  }
+  // A static constellation has no force solver. Retain the public settling API.
+  function stepModel(){return false}
+  // Verbatim original rot(), original-reference.html:332–335.
+  function rot(x,y,z,ax,ay){
+    const cy=Math.cos(ay),sy=Math.sin(ay),x1=x*cy+z*sy,z1=-x*sy+z*cy;
+    const cx=Math.cos(ax),sx=Math.sin(ax);return {x:x1,y:y*cx-z1*sx,z:y*sx+z1*cx};
   }
   function projectPoint(point,camera,width,height){
-    const cy=Math.cos(camera.yaw),sy=Math.sin(camera.yaw),cp=Math.cos(camera.pitch),sp=Math.sin(camera.pitch);
-    const x=point.x*cy-point.z*sy,z=point.x*sy+point.z*cy,y=point.y*cp-z*sp,rz=point.y*sp+z*cp;
-    const depth=Math.max(120,700+rz),scale=700/depth*Math.min(width,height)/650*camera.zoom;
-    return {x:width/2+x*scale,y:height/2+y*scale,scale,depth};
+    const p=rot(point.x,point.y,point.z,camera.pitch,camera.yaw),W=width,H=height,zoom=900/camera.zoom;
+    // Original project(), lines 336–339. Phones shift the origin and uniformly
+    // change camera distance; never independently stretch x/y or compress insets.
+    const f=Math.min(W,H)*1.05,z=p.z+zoom,sc=f/Math.max(240,z);
+    return {x:W*(W<=960?.50:.69)+p.x*sc,y:H*(W<=960?.60:.50)+p.y*sc,scale:sc,depth:z};
   }
   function mount({host,nodes,onSelect,onGroup,insets,autoRotate=false,onAutoRotateChange}={}){
     if(!host?.ownerDocument?.createElement||!host.appendChild)return null;
@@ -130,60 +127,75 @@
     function setAutoRotate(value){if(destroyed)return;autoEnabled=!!value;lastFrame=0;clearWake();onAutoRotateChange?.(autoEnabled);if(autoEnabled){wake();mark()}else if(model.settled&&!dirty&&!inertiaX&&!inertiaY)stop()}
     function setRotationPaused(value){if(destroyed)return;rotationPaused=!!value;lastFrame=0;clearWake();if(rotationPaused)stop();else{wake();mark()}}
     let width=0,height=0,raf=0,destroyed=false,selected=null,group='',dirty=true,intersecting=true,reduced=!!motion?.matches;
-    let inertiaX=0,inertiaY=0,pinching=false,pinchDistance=0,autoFit=true,baseZoom=1,interiorScale=1.30,horizontalSpread=1,verticalSpread=1;
+    let inertiaX=0,inertiaY=0,pinching=false,pinchDistance=0,autoFit=true,baseZoom=1,interiorScale=1;
     const viewCenter={x:0,y:0,z:0},overviewCenter={x:0,y:0,z:0};
     function visible(){return !destroyed&&!document.hidden&&intersecting&&host.isConnected&&width>0&&height>0&&host.getClientRects().length>0&&win.getComputedStyle(host).visibility!=='hidden'}
-    function project(point){const projected=projectPoint(relative(point),camera,width,height);projected.x=width/2+(projected.x-width/2)*horizontalSpread;projected.y=height/2+(projected.y-height/2)*verticalSpread;const safe=safeInsets,top=Number(safe.top)||0,bottom=Number(safe.bottom)||0;if(safe.plot!==false)projected.y=top+projected.y/height*Math.max(80,height-top-bottom);const left=Number(safe.left)||0,right=Number(safe.right)||0;projected.x=left+projected.x/width*Math.max(80,width-left-right);return projected}
-    // Enlarge constellation interiors around their fixed semantic anchors. All view paths share this position.
+    function project(point){return projectPoint(relative(point),camera,width,height)}
     function displayPoint(point){const center=centers.get(point.group);return center?rotateLocal(point,center,phase,interiorScale):point}
     function relative(point){const displayed=displayPoint(point);return {x:displayed.x-viewCenter.x,y:displayed.y-viewCenter.y,z:displayed.z-viewCenter.z}}
-    // Fit once on mount/settlement and reset; explicit camera changes opt out until reset.
     function fitDefault(){
-      if(!model.points.length||width<=0||height<=0)return;
-      // Keep a 3% gap between default-view group envelopes; crowded layouts retain their original size.
-      const baselineCenter={};
-      for(const axis of ['x','y','z']){const values=model.points.map(point=>point[axis]);baselineCenter[axis]=(Math.min(...values)+Math.max(...values))/2}
-      const overview=point=>projectPoint({x:point.x-baselineCenter.x,y:point.y-baselineCenter.y,z:point.z-baselineCenter.z},DEFAULT_CAMERA,650,650);
-      const envelopes=new Map(model.groups.map(item=>[item.key,{...overview(item),radius:0}]));
-      for(const point of model.points){const projected=overview(point),envelope=envelopes.get(point.group);envelope.radius=Math.max(envelope.radius,Math.hypot(projected.x-envelope.x,projected.y-envelope.y))}
-      const neighborhoods=[...envelopes.values()];interiorScale=1.30;
-      for(let i=0;i<neighborhoods.length;i++)for(let j=i+1;j<neighborhoods.length;j++){const a=neighborhoods[i],b=neighborhoods[j],radii=a.radius+b.radius;if(radii>0)interiorScale=Math.min(interiorScale,.97*Math.hypot(a.x-b.x,a.y-b.y)/radii)}
-      interiorScale=autoRotate?1:clamp(interiorScale,1,1.30);
-      const fitPoints=autoRotate?rotationEnvelope(model):model.points;
-      for(const axis of ['x','y','z']){const values=fitPoints.map(point=>displayPoint(point)[axis]);viewCenter[axis]=(Math.min(...values)+Math.max(...values))/2}
-      Object.assign(overviewCenter,viewCenter);
-      const projected=fitPoints.map(point=>projectPoint(relative(point),{...DEFAULT_CAMERA},width,height));
-      const extentX=Math.max(...projected.map(point=>Math.abs(point.x-width/2))),extentY=Math.max(...projected.map(point=>Math.abs(point.y-height/2)));
-      const padding=Math.max(20,Math.min(width,height)*.05);
-      camera.zoom=clamp(Math.min(Math.max(1,width/2-padding)/Math.max(1,extentX),Math.max(1,height/2-padding)/Math.max(1,extentY)),.45,3);baseZoom=camera.zoom;
-      // Fill the available aspect ratio without cropping; drawing and picking share this projection.
-      horizontalSpread=Math.max(1,(width/2-padding)/Math.max(1,extentX*camera.zoom));
-      verticalSpread=Math.max(1,(height/2-padding)/Math.max(1,extentY*camera.zoom));
+      Object.assign(viewCenter,{x:0,y:0,z:0});Object.assign(overviewCenter,viewCenter);
+      camera.zoom=width<=650?.88:width<=960?1.05:1;baseZoom=camera.zoom;
     }
     function positions(){safeInsets=insets?.()||{};return model.points.map(point=>({...project(point),index:point.index,key:point.key,group:point.group,visible:!group||point.group===group}))}
     function clusterPositions(){return model.groups.filter(item=>!group||item.key===group).map(item=>({...item,count:item.indices.length,...project(item)}))}
     function stop(){if(raf)win.cancelAnimationFrame(raf);raf=0;lastFrame=0;clearWake()}
     function request(){if(!destroyed&&!raf&&visible()&&(dirty||!model.settled||automatic()||(!reduced&&pointers.size===0&&Math.abs(inertiaX)+Math.abs(inertiaY)>.02)))raf=win.requestAnimationFrame(frame)}
     function mark(){dirty=true;request()}
+    // Verbatim distributions from original-reference.html:322–323, stable per mount.
+    const stars=Array.from({length:350},()=>({x:(Math.random()*2-1)*1000,y:(Math.random()*2-1)*700,z:(Math.random()*2-1)*700,a:.12+Math.random()*.55,s:.3+Math.random()*1.4}));
+    const dust=Array.from({length:180},()=>({x:(Math.random()*2-1)*560,y:(Math.random()*2-1)*330,z:(Math.random()*2-1)*430,a:.08+Math.random()*.32}));
+    function hexrgba(hex,a){const n=parseInt(hex.slice(1),16);return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`}
     function draw(){
-      ctx.clearRect(0,0,width,height);ctx.fillStyle='#04070c';ctx.fillRect(0,0,width,height);
-      const atmosphere=ctx.createRadialGradient(width*.69,height*.48,20,width*.69,height*.48,Math.max(width,height)*.6);atmosphere.addColorStop(0,'rgba(72,137,207,.10)');atmosphere.addColorStop(.42,'rgba(18,46,78,.045)');atmosphere.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=atmosphere;ctx.fillRect(0,0,width,height);
-      // Tiny unconnected background dots are decoration, never selectable business nodes.
-      ctx.fillStyle='rgba(179,203,244,.16)';
-      for(let i=0;i<220;i++){const x=(((i*173.71)%997)/997*width+Math.sin(camera.yaw+phase)*i*.025+width)%width,y=((i*237.29)%991)/991*height;ctx.fillRect(x,y,i%5===0?1.3:.7,i%5===0?1.3:.7)}
-      const projected=positions();ctx.lineWidth=.8;
-      for(const edge of model.edges){const a=projected[edge.source],b=projected[edge.target];if(!a.visible||!b.visible)continue;const related=selected!==null&&(edge.source===selected||edge.target===selected);ctx.strokeStyle=related?'rgba(204,185,142,.5)':selected!==null?'rgba(117,161,218,.055)':'rgba(117,161,218,.075)';ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke()}
-      for(const p of projected.filter(p=>p.visible).sort((a,b)=>b.depth-a.depth)){
-        const node=model.points[p.index].node,value=Number(node.brightness),brightness=Number.isFinite(value)?clamp(value,.12,1):.12,practiced=brightness>.12,color=colorChannels(p.group),depthAlpha=clamp(1.35-p.depth/1300,.24,.9),radius=clamp(3.6*p.scale,.8,8),halo=radius*(3+brightness*3);
-        if(practiced){const glow=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,halo);glow.addColorStop(0,`rgba(${color},${brightness*.38})`);glow.addColorStop(.3,`rgba(${color},${brightness*.10})`);glow.addColorStop(1,`rgba(${color},0)`);ctx.fillStyle=glow;ctx.beginPath();ctx.arc(p.x,p.y,halo,0,Math.PI*2);ctx.fill()}
-        ctx.fillStyle=practiced?`rgba(${color},${depthAlpha*(.5+brightness*.5)})`:`rgba(98,108,120,${depthAlpha*.8})`;ctx.beginPath();ctx.arc(p.x,p.y,radius,0,Math.PI*2);ctx.fill();
-        if(p.index===selected){ctx.lineWidth=1;for(const [factor,alpha] of [[2.5,.7],[4.2,.16]]){ctx.strokeStyle=`rgba(${color},${alpha})`;ctx.beginPath();ctx.arc(p.x,p.y,radius*factor+3,0,Math.PI*2);ctx.stroke()}}
-
+      const W=width,H=height,yaw=camera.yaw+phase,pitch=camera.pitch,t=phase*12;
+      ctx.clearRect(0,0,W,H);
+      // Original draw atmosphere, stars, dust and perspective grid (lines 461–480).
+      const glow=ctx.createRadialGradient(W*.69,H*.5,30,W*.69,H*.5,Math.max(W,H)*.55);
+      glow.addColorStop(0,"rgba(72,137,207,.085)");glow.addColorStop(.42,"rgba(18,46,78,.035)");glow.addColorStop(1,"rgba(0,0,0,0)");
+      ctx.fillStyle=glow;ctx.fillRect(0,0,W,H);
+      const backgroundProject=p=>projectPoint(p,{yaw:0,pitch:0,zoom:camera.zoom},W,H);
+      for(const s of stars){
+        const r=rot(s.x,s.y,s.z,pitch*.16,yaw*.12),p=backgroundProject({x:r.x,y:r.y,z:r.z+120});
+        const a=s.a*Math.max(.12,Math.min(1,p.scale*.85));ctx.fillStyle=`rgba(181,211,239,${a})`;ctx.fillRect(p.x,p.y,s.s,s.s);
+      }
+      for(const d of dust){
+        const r=rot(d.x,d.y,d.z,pitch,yaw),p=backgroundProject(r);
+        ctx.fillStyle=`rgba(121,169,214,${d.a*Math.min(1,p.scale)})`;ctx.fillRect(p.x,p.y,1,1);
+      }
+      ctx.save();ctx.globalAlpha=.12;ctx.strokeStyle="rgba(106,161,218,.34)";ctx.lineWidth=.65;
+      const gy=H*.77;for(let i=-8;i<=8;i++){ctx.beginPath();ctx.moveTo(W*.69,gy);ctx.lineTo(W*.69+i*95,H);ctx.stroke()}
+      for(let j=0;j<6;j++){const y=gy+(H-gy)*(j/6);ctx.beginPath();ctx.moveTo(W*.36,y);ctx.lineTo(W,y);ctx.stroke()}ctx.restore();
+      const projected=positions();ctx.lineWidth=.75;ctx.textAlign='start';
+      for(const edge of model.edges){const a=projected[edge.source],b=projected[edge.target];if(!a.visible||!b.visible)continue;
+        const on=Number(model.points[a.index].node.relatedAttemptCount)>0&&Number(model.points[b.index].node.relatedAttemptCount)>0;
+        ctx.strokeStyle=on?hexrgba(categoryColor(a.group),.26):"rgba(123,153,186,.07)";
+        ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
+      }
+      // Original depth sorting, radii, opacity, category glows and double selection rings.
+      // The adapter's logarithmic practice brightness replaces mastered/locked business state.
+      for(const n of projected.filter(p=>p.visible).sort((a,b)=>b.depth-a.depth)){
+        const node=model.points[n.index].node,value=Number(node.brightness),brightness=Number.isFinite(value)?clamp(value,.12,1):.12;
+        const on=brightness>.12,sel=n.index===selected,rr=Math.max(2.6,5.1*n.scale),a=Math.max(.2,Math.min(1,1.18-n.depth/1800)),color=categoryColor(n.group);
+        if(on){
+          const gr=rr*(sel?6.3:4.3),g=ctx.createRadialGradient(n.x,n.y,0,n.x,n.y,gr);g.addColorStop(0,hexrgba(color,.38*brightness));g.addColorStop(.2,hexrgba(color,.11*brightness));g.addColorStop(1,hexrgba(color,0));
+          ctx.fillStyle=g;ctx.beginPath();ctx.arc(n.x,n.y,gr,0,TAU);ctx.fill();
+        }
+        if(sel){
+          ctx.strokeStyle=hexrgba(color,.7);ctx.lineWidth=1;ctx.beginPath();ctx.arc(n.x,n.y,rr*3.1+Math.sin(t*3)*1.5,0,TAU);ctx.stroke();
+          ctx.strokeStyle=hexrgba(color,.14);ctx.beginPath();ctx.arc(n.x,n.y,rr*5.2+Math.cos(t*2.6)*2,0,TAU);ctx.stroke();
+        }
+        ctx.shadowBlur=on?13*brightness:0;ctx.shadowColor=on?color:"transparent";ctx.fillStyle=on?hexrgba(color,.92*a*brightness):`rgba(98,108,120,${.7*a})`;
+        ctx.beginPath();ctx.arc(n.x,n.y,rr*(sel?1.34:1),0,TAU);ctx.fill();ctx.shadowBlur=0;
+        if(sel&&camera.zoom/baseZoom>=.75){ctx.font=`${Math.max(7,8.5*n.scale)}px ui-monospace,monospace`;ctx.fillStyle=on?hexrgba("#dceeff",.58):"rgba(130,143,157,.36)";ctx.fillText(String(n.index+1).padStart(2,"0"),n.x+rr*1.7,n.y-rr*1.1)}
       }
       if(camera.zoom/baseZoom>=.75&&(!labelsVisible||semanticView(model,camera.zoom/baseZoom,group).mode==='clusters')){
         for(const cluster of clusterPositions()){
-          ctx.font='11px system-ui, sans-serif';ctx.textAlign='center';ctx.fillStyle=categoryColor(cluster.key);
-          ctx.fillText(`${cluster.label} · ${cluster.count}`,cluster.x,cluster.y-25,Math.max(80,width-24));
+          ctx.font='600 11px ui-sans-serif,system-ui';ctx.fillStyle=hexrgba(categoryColor(cluster.key),.62);
+          ctx.fillText(`${cluster.label} · ${cluster.count}`,cluster.x+12,cluster.y-17,Math.max(80,width-24));
+        }
+        for(const category of model.groups.filter(item=>!group||item.key===group))for(const [i,branch] of category.branches.entries()){
+          const p=project({...branch.center,group:category.key});if(p.x<(W<=960?12:W*.37)||p.x>W-30||p.y<95||p.y>H-85)continue;
+          ctx.font=`600 ${Math.max(8,10*p.scale)}px ui-sans-serif,system-ui`;ctx.fillStyle=hexrgba(categoryColor(category.key),.28);ctx.fillText(`${String(i+1).padStart(2,'0')} ${branch.name}`,p.x+12,p.y-17);
         }
       }
       for(const label of labelLayout()){
@@ -213,7 +225,7 @@
     function rotate(dx,dy){if(destroyed||!Number.isFinite(dx)||!Number.isFinite(dy))return;pauseInteraction();autoFit=false;applyRotation(dx,dy);mark()}
     function zoomBy(factor){if(destroyed||!Number.isFinite(factor)||factor<=0)return;pauseInteraction();autoFit=false;camera.zoom=clamp(camera.zoom*factor,Math.min(.45,baseZoom*.35),9);if(camera.zoom/baseZoom<1.35&&group){group='';Object.assign(viewCenter,overviewCenter);onGroup?.('')}mark()}
     function select(index,reveal=true){if(destroyed||!Number.isInteger(index)||!model.points[index])return;pauseInteraction();selected=index;if(reveal){camera.zoom=Math.max(camera.zoom,baseZoom*1.5);autoFit=false}mark()}
-    function focusGroup(key){if(destroyed)return;pauseInteraction();group=String(key||'');const target=model.groups.find(item=>item.key===group);if(target){autoFit=false;Object.assign(viewCenter,{x:target.x,y:target.y,z:target.z});camera.zoom=Math.min(9,baseZoom*1.6)}else if(!group)Object.assign(viewCenter,overviewCenter);mark()}
+    function focusGroup(key){if(destroyed)return;pauseInteraction();group=String(key||'');const target=model.groups.find(item=>item.key===group);if(target){autoFit=false;Object.assign(viewCenter,{x:target.x,y:target.y,z:target.z});camera.zoom=Math.min(9,baseZoom*Math.max(1.6,1.6/target.layoutScale))}else if(!group)Object.assign(viewCenter,overviewCenter);mark()}
     function reset(){if(destroyed)return;pauseInteraction();phase=0;Object.assign(camera,DEFAULT_CAMERA);autoFit=true;fitDefault();group='';inertiaX=inertiaY=0;mark()}
     function listen(target,type,handler,options){target.addEventListener(type,handler,options);listeners.push(()=>target.removeEventListener(type,handler,options))}
     function distance(){const values=[...pointers.values()];return values.length<2?0:Math.hypot(values[0].x-values[1].x,values[0].y-values[1].y)}
@@ -241,7 +253,7 @@
       if(click){const rect=canvas.getBoundingClientRect(),x=event.clientX-rect.left,y=event.clientY-rect.top;
         if(semanticView(model,camera.zoom/baseZoom,group).mode==='clusters'){
           const cluster=clusterPositions().filter(p=>Math.hypot(p.x-x,p.y-y)<=34).sort((a,b)=>a.depth-b.depth)[0];
-          if(cluster){focusGroup(cluster.key);onGroup?.(cluster.key)}return;
+          if(cluster){focusGroup(cluster.key);onGroup?.(cluster.key);return;}
         }
         const hit=positions().filter(p=>p.visible&&Math.hypot(p.x-x,p.y-y)<=Math.max(12,7*p.scale)).sort((a,b)=>a.depth-b.depth)[0];
         if(hit){select(hit.index);if(typeof onSelect==='function')onSelect(model.points[hit.index].node,hit.index)}
