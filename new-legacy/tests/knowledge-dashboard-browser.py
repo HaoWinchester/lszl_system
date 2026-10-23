@@ -24,7 +24,9 @@ with sync_playwright() as pw:
         if(mode==='401')throw Object.assign(Error('unauthorized'),{status:401});
         if(mode==='pending')return new Promise(resolve=>window.resolveOld=resolve);
         if(mode==='empty')return {nodes:[],topicCount:0,attemptCount:0};
-        if(mode==='unknown')return {nodes:[],topicCount:0,attemptCount:7,unknownAttemptCount:7};
+        if(mode==='unknown')return {nodes:[],topicCount:0,attemptCount:51,unknownAttemptCount:23,unmappedAttemptCount:28};
+        if(mode==='historical')return {nodes:Array.from({length:317},(_,i)=>({id:'current-'+i,parentId:null,title:'当前目录 '+i,attemptCount:0})),topicCount:317,attemptCount:51,unknownAttemptCount:23,unmappedAttemptCount:28};
+        if(mode==='ancestry')return {nodes:[{id:'parent',parentId:null,title:'父节点',attemptCount:0},{id:'child',parentId:'parent',title:'子节点',attemptCount:1},{id:'unlit',parentId:null,title:'未练习',attemptCount:0}],attemptCount:1};
         return {nodes,topicCount:81,attemptCount:200,recentAttemptCount:12,unknownAttemptCount:1};
       }};
     }''')
@@ -102,8 +104,16 @@ with sync_playwright() as pw:
     expect(page.locator('[data-knowledge-list] li')).to_have_count(0)
     assert 'A private' not in dialog.inner_text() and page.locator('canvas').count()==0
     page.evaluate("mode='unknown';void KGKnowledgeDashboard.open()")
-    expect(page.locator('[data-knowledge-status]')).to_contain_text('尚未保存可识别')
+    expect(page.locator('[data-knowledge-status]')).to_have_text('当前暂无已发布的知识目录。')
     assert page.locator('canvas').count()==0
+    page.evaluate("mode='historical';void KGKnowledgeDashboard.open()")
+    expect(page.locator('[data-knowledge-list] li')).to_have_count(317)
+    expect(page.locator('[data-knowledge-summary]')).to_contain_text('累计 51 次作答 · 317 个目录节点 · 已点亮 0 个')
+    expect(page.locator('[data-knowledge-summary]')).to_contain_text('23 次作答暂无考点引用')
+    expect(page.locator('[data-knowledge-summary]')).to_contain_text('28 次作答未映射到当前目录')
+    page.evaluate("mode='ancestry';void KGKnowledgeDashboard.open()")
+    expect(page.locator('[data-knowledge-summary]')).to_contain_text('3 个目录节点 · 已点亮 2 个')
+    checks.append('real-response shape 317 nodes/51 historical attempts/23 unknown/28 unmapped shows zero lit; ancestor illumination counted; empty catalog with history stays honest')
     page.evaluate("mode='401';void KGKnowledgeDashboard.open()")
     expect(page.locator('[data-knowledge-status]')).to_contain_text('登录后')
     assert page.locator('canvas').count()==0

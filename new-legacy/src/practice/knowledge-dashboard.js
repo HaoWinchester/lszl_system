@@ -60,7 +60,7 @@
     document.body.appendChild(dialog);
     const find=selector=>dialog.querySelector(selector);
     const summary=find('[data-knowledge-summary]'),network=find('[data-knowledge-network]'),list=find('[data-knowledge-list]'),status=find('[data-knowledge-status]'),retry=find('[data-knowledge-retry]'),groups=find('[data-knowledge-groups]');
-    let returnFocus=null,lastData=null,scene=null,nodes=[],selected=null,activeGroup='',listOpen=false;
+    let returnFocus=null,scene=null,nodes=[],selected=null,activeGroup='',listOpen=false;
     const formatDate=value=>{const date=value?new Date(value):null;return !date||Number.isNaN(date.getTime())?'时间未知':date.toLocaleDateString('zh-CN')};
     const setText=(name,value)=>{find(`[data-knowledge-${name}]`).textContent=text(value)};
     function toggleList(value){listOpen=value;list.hidden=!value||!nodes.length;find('[data-knowledge-list-toggle]').setAttribute('aria-expanded',String(!list.hidden))}
@@ -84,13 +84,13 @@
     }
     function button(label,attribute,value){const element=document.createElement('button');element.type='button';element.textContent=label;element.setAttribute(attribute,value);return element}
     function render(data){
-      scene?.destroy();scene=null;dialog.classList.remove('kg-knowledge-fallback');lastData=data;nodes=[];selected=null;activeGroup='';summary.textContent='';network.replaceChildren();list.replaceChildren();groups.replaceChildren();
+      scene?.destroy();scene=null;dialog.classList.remove('kg-knowledge-fallback');nodes=[];selected=null;activeGroup='';summary.textContent='';network.replaceChildren();list.replaceChildren();groups.replaceChildren();
       network.hidden=true;find('[data-knowledge-space-empty]').hidden=false;find('.kg-knowledge-detail').open=false;
       setText('detail-title','选择一个考点');setText('detail-number','—');setText('detail-subject','');setText('detail-path','');setText('detail-attempts','—');setText('detail-related','—');setText('detail-date','—');setText('page-count','全目录 0 个节点');
       for(const control of dialog.querySelectorAll('.kg-knowledge-step button,.kg-knowledge-camera button'))control.disabled=true;
       toggleList(listOpen);if(!data)return;
       nodes=derivePracticeOverlay(data.nodes);
-      summary.textContent=`累计 ${Number(data.attemptCount)||0} 次作答 · ${nodes.length} 个目录节点${data.unknownAttemptCount?` · ${Number(data.unknownAttemptCount)} 次作答暂无考点引用`:''}。`;
+      summary.textContent=`累计 ${Number(data.attemptCount)||0} 次作答 · ${nodes.length} 个目录节点 · 已点亮 ${nodes.filter(node=>node.relatedAttemptCount>0).length} 个${data.unknownAttemptCount?` · ${Number(data.unknownAttemptCount)} 次作答暂无考点引用`:''}${data.unmappedAttemptCount?` · ${Number(data.unmappedAttemptCount)} 次作答未映射到当前目录`:''}。`;
       setText('page-count',`全目录 ${nodes.length} 个节点`);
       list.start=1;
       for(const [index,node] of nodes.entries()){
@@ -112,7 +112,7 @@
       }
     }
     function setState(value){
-      status.textContent=({loading:'正在读取全部知识目录与练习记录…',guest:'登录后查看自己的知识星空。',empty:lastData?.attemptCount?'这些作答尚未保存可识别的考点引用，暂时无法形成知识星空。':'当前暂无已发布的知识目录。',error:'知识星空暂时无法读取，请重试。',ready:scene?'':'当前设备无法显示三维星空，请通过考点列表查看详情。'})[value]||'';
+      status.textContent=({loading:'正在读取全部知识目录与练习记录…',guest:'登录后查看自己的知识星空。',empty:'当前暂无已发布的知识目录。',error:'知识星空暂时无法读取，请重试。',ready:scene?'':'当前设备无法显示三维星空，请通过考点列表查看详情。'})[value]||'';
       retry.hidden=value!=='error';network.hidden=value!=='ready'||!scene;
       find('[data-knowledge-refresh]').disabled=value==='loading';dialog.setAttribute('aria-busy',String(value==='loading'));
     }

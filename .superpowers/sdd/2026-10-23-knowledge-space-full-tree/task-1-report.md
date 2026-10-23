@@ -27,3 +27,21 @@ Browser:
 - `python3 new-legacy/tests/knowledge-space-scene-browser.py`: desktop/mobile 320/1000 nodes, real Canvas, selection, camera, native scroll/touch, visibility lifecycle and Canvas failure passed. 1000-node p95 callback: 14.7ms desktop / 14.8ms mobile; 109 frames, ~1.9 seconds settlement. Evidence: artifacts/knowledge-universe-20261020/task-2.
 
 Limitations: browser source tests use isolated, explicitly API-shaped sample fixtures; root owns real catalog/owner local preview and entry API verification. Backend untouched, so proficiency/scoring API contract unchanged. Last practice remains explicitly labeled direct practice date. No UAT business acceptance is claimed.
+
+## Review round 1 — 2026-10-23
+
+Addressed both P2 findings and the recommended unmapped count in `knowledge-dashboard.js`; maintained browser fixture/assertions in `knowledge-dashboard-browser.py`.
+
+- Header now includes all catalog nodes, lit nodes (`relatedAttemptCount > 0`, including ancestors) and total saved attempts. Explicit unmapped historical attempts explain historical activity that illuminates no current node.
+- Empty universe always says `当前暂无已发布的知识目录。`, independent of historical attempt/reference counts. Removed the now-unused lastData state.
+- Browser coverage uses the exact observed response shape: 317 nodes, 51 attempts, 23 unknown references, 28 unmapped references, zero current practiced nodes; verifies zero lit and both explanations. An additional parent/child fixture verifies one directly practiced child lights two nodes, while a third stays dark. Empty catalog with 51 historical attempts verifies published-directory empty state.
+
+Red → green: first `python3 new-legacy/tests/knowledge-dashboard-browser.py` failed at empty history state, showing the old missing-reference explanation instead of the expected empty-directory message. After fixing only that state, reran and observed the expected missing `已点亮 0 个` header assertion failure for the 317/51 response. Added header counts/explanation; reran green.
+
+Final focused verification:
+- `node --test new-legacy/tests/knowledge-dashboard.test.js`: 8 passed, 0 failed.
+- `python3 new-legacy/tests/knowledge-dashboard-browser.py`: 14 checks passed, including exact real-response scenario, ancestry counting, empty history and all retained privacy/mobile/fallback checks. Results: `artifacts/star-original-restore-20261020/ui/results.json`.
+- `python3 new-legacy/tests/knowledge-space-semantic-browser.py`: 1440/390 passed.
+- `git diff --check`: passed.
+
+No sync, generated edit, VERSION change or deployment performed in this review fix. Root independently owns local preview sync and real endpoint verification.
