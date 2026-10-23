@@ -16,10 +16,13 @@ with sync_playwright() as p:
     assert material_response.ok, material_response.text()
     material = material_response.json()['material']
     snapshots = []
+    case_key = uuid.uuid4().hex[:8]
+    def stem(order):
+        return f'第{order}小题，应如何处理变更？（{case_key}）'
     for order in (1, 2, 3):
         response = teacher.request.post(base+'/api/v1/banks/ink-bank/questions', data={
             'type': 'single_choice', 'title': f'案例跨模式小题{order}', 'scope': 'public', 'subject': 'PMP',
-            'stemParts': [{'text': f'第{order}小题，应如何处理变更？'}],
+            'stemParts': [{'text': stem(order)}],
             'options': [{'id': 'A', 'text': '分析影响', 'correct': True}, {'id': 'B', 'text': '直接执行'}],
             'correctAnswer': 'A', 'analysis': '先评估，再按流程处理。',
             'material': material, 'caseGroup': {'id': material['id'], 'order': order, 'total': 3}})
@@ -39,18 +42,29 @@ with sync_playwright() as p:
     page = student.new_page()
     errors = []
     page.on('pageerror', lambda error: errors.append(str(error)))
-    query = urlencode({'paperId': release['paperId'], 'releaseId': release['releaseId'], 'questionId': snapshots[0]['questionId'], 'bankId': 'ink-bank'})
-    for filename in ('knowledge-recall.html', 'question-workspace.html'):
-        page.goto(base+'/'+filename+'?'+query, wait_until='networkidle')
-        if filename == 'question-workspace.html' and not page.locator('.qm-case').count():
-            page.locator('#qwQuestionDockBtn').click()
-            page.locator('#qwQuestionList [data-add-index]').first.click()
-            page.locator('#qwQuestionDrawerClose').click()
-        expect(page.locator('.qm-case').first).to_be_visible(timeout=30000)
-        expect(page.locator('.qm-case').first).to_contain_text('客户提出变更，团队需要共同分析影响后再决策。')
-        assert page.locator('.qm-case').first.get_attribute('data-case-id') == material['id']
-        page.reload(wait_until='networkidle')
-        expect(page.locator('.qm-case').first).to_be_visible(timeout=30000)
-        assert not errors, errors
-        print('PASS real student case publication/entry/material/refresh', filename)
+    for row in snapshots:
+        order = row['order']
+        query = urlencode({'paperId': release['paperId'], 'releaseId': release['releaseId'], 'questionId': row['questionId'], 'bankId': 'ink-bank'})
+        for filename in ('knowledge-recall.html', 'question-workspace.html'):
+            page.goto(base+'/'+filename+'?'+query, wait_until='networkidle')
+            card = page.locator('#krQuestionCard') if filename == 'knowledge-recall.html' else page.locator('.qw-question-card').filter(has_text=stem(order)).first
+            if filename == 'question-workspace.html' and not card.count():
+                page.locator('#qwQuestionDockBtn').click()
+                page.locator('#qwQuestionList [data-add-index]').nth(order-1).click()
+                page.locator('#qwQuestionDrawerClose').click()
+            expect(card).to_contain_text(stem(order), timeout=30000)
+            case = card.locator('.qm-case').first
+            expect(case).to_be_visible(timeout=30000)
+            expect(case).to_contain_text('客户提出变更，团队需要共同分析影响后再决策。')
+            assert case.get_attribute('data-case-id') == material['id']
+            expect(card).to_contain_text('分析影响')
+            expect(card).to_contain_text('直接执行')
+            card.locator('[data-qw-action=analysis]').click()
+            expect(page.locator('.qw-analysis-content').filter(has_text='先评估，再按流程处理。').first).to_be_visible()
+            page.reload(wait_until='networkidle')
+            expect(card).to_contain_text(stem(order), timeout=30000)
+            expect(case).to_contain_text('客户提出变更，团队需要共同分析影响后再决策。')
+            assert case.get_attribute('data-case-id') == material['id']
+            assert not errors, errors
+            print('PASS real student case publication/entry/material/analysis/refresh', filename, order)
     browser.close()
