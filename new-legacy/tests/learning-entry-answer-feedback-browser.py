@@ -81,7 +81,7 @@ with sync_playwright() as playwright:
         assert all(
             label in text
             for label, text in zip(
-                ("知识图谱", "知识回忆", "知识归纳", "知识巩固"), choice_text
+                ("知识图谱", "深度回忆", "多题归纳", "知识星空"), choice_text
             )
         ), choice_text
         page.locator("[data-learning-entry-choice='知识图谱']").click()

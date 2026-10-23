@@ -13,9 +13,9 @@
   const ERROR_TEXT = "该学习页面暂时不可用，请稍后重试";
   const CHOICES = [
     { label: "知识图谱", description: "梳理知识结构与关系 · 当前首页", destination: "index.html" },
-    { label: "知识回忆", description: "主动回忆关键词与知识线索 · 深度回忆", destination: "knowledge-recall.html" },
-    { label: "知识归纳", description: "多题比较、归纳与连接 · 多题画布", destination: "question-workspace.html" },
-    { label: "知识巩固", description: "通过做题检验并巩固掌握 · 做题模式", destination: "practice-mode.html" },
+    { label: "深度回忆", description: "主动回忆关键词与知识线索 · 深度回忆", destination: "knowledge-recall.html" },
+    { label: "多题归纳", description: "多题比较、归纳与连接 · 多题画布", destination: "question-workspace.html" },
+    { label: "知识星空", description: "按科目与分类探索练习足迹", destination: "knowledge-space" },
   ];
   let active = null;
 
@@ -156,6 +156,7 @@
   }
   async function choose(button, choice) {
     if (!active || button.disabled) return;
+    if (choice.destination === "knowledge-space") { closeDialog(); void global.KGKnowledgeDashboard?.open(); return; }
     if (choice.destination === "index.html") { closeDialog({ focusGraph: true }); return; }
     if (global.KGLearningWeeklyOpen && !global.KGLearningWeeklyOpen.isDestinationOpen(choice.destination)) {
       errorMessage(global.KGLearningWeeklyOpen.countdownLabel() || "该学习板块尚未开放");
@@ -193,8 +194,8 @@
       const choices = element(doc, "div", { class: "learning-entry-grid" });
       const error = element(doc, "p", { class: "learning-entry-error", id: "learningEntryChooserError", "aria-live": "polite" });
       CHOICES.forEach(choice => {
-        const style = { "知识图谱": "entry-graph is-current", "知识回忆": "entry-recall", "知识归纳": "entry-synthesis", "知识巩固": "entry-practice" }[choice.label];
-        const avatar = { "知识图谱": "图", "知识回忆": "忆", "知识归纳": "归", "知识巩固": "练" }[choice.label];
+        const style = { "知识图谱": "entry-graph is-current", "深度回忆": "entry-recall", "多题归纳": "entry-synthesis", "知识星空": "entry-practice" }[choice.label];
+        const avatar = { "知识图谱": "图", "深度回忆": "忆", "多题归纳": "归", "知识星空": "星" }[choice.label];
         const button = element(doc, "button", { type: "button", class: `learning-entry-card ${style}`, "data-learning-entry": choice.label, "data-learning-entry-choice": choice.label, "data-destination": choice.destination, "data-description": choice.description });
         button.append(element(doc, "span", { class: "learning-entry-avatar" }, avatar), element(doc, "span", { class: "learning-entry-name" }, choice.label), element(doc, "span", { class: "learning-entry-id" }, choice.description)); choices.append(button);
       });
@@ -248,11 +249,11 @@
 
   function bindManualEntry() {
     const doc = global.document;
-    const trigger = doc && doc.getElementById ? doc.getElementById("learningEntryTopBtn") : null;
-    bindOnce(trigger, "click", event => {
+    const triggers = doc && doc.getElementById ? [doc.getElementById("learningEntryTopBtn"),doc.getElementById("learningEntryMobileBtn")] : [];
+    triggers.forEach(trigger=>bindOnce(trigger, "click", event => {
       event.preventDefault();
       showDialog({ document: doc, location: global.location });
-    });
+    }));
   }
 
   if (global.document) {

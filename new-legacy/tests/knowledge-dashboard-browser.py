@@ -52,7 +52,8 @@ with sync_playwright() as pw:
     expect(page.locator('[data-knowledge-groups]')).not_to_contain_text('risk')
     expect(page.locator('[data-knowledge-group]').nth(1)).to_contain_text('PMP · 项目')
     calls=page.evaluate('calls.length')
-    page.locator('[data-knowledge-list-toggle]').click()
+    page.locator('.kg-knowledge-detail summary').click()
+    page.locator('.kg-knowledge-detail').evaluate('(e)=>e.open=true');page.locator('[data-knowledge-list-toggle]').click()
     buttons=page.locator('[data-knowledge-list] button')
     expect(buttons).to_have_count(60)
     buttons.nth(1).focus();page.keyboard.press('Enter')
@@ -62,7 +63,7 @@ with sync_playwright() as pw:
     page.locator('[data-knowledge-node-next]').click();assert snap()['selected']==2
     page.locator('[data-knowledge-node-prev]').click();assert snap()['selected']==1
     page.locator('[data-knowledge-group]').nth(2).click()
-    state=snap();assert state['group']=='["产品管理","<分类>"]' and state['selected']==30
+    state=snap();assert state['group']=='["产品管理","<分类>","项目"]' and state['selected']==30
     assert sum(p['visible'] for p in state['positions'])==30
     expect(page.locator('[data-knowledge-detail-subject]')).to_have_text('产品管理')
     assert page.locator('[data-knowledge-list] button:visible').count()==30
@@ -72,8 +73,9 @@ with sync_playwright() as pw:
     page.locator('[data-knowledge-zoom-in]').click();assert abs(snap()['camera']['zoom']-zoom)<.001
     yaw=snap()['camera']['yaw'];page.locator('[data-knowledge-rotate-left]').focus();page.keyboard.press('Enter');assert snap()['camera']['yaw']!=yaw
     page.locator('[data-knowledge-reset]').click();assert snap()['camera']['yaw']==.24
-    page.locator('[data-knowledge-list-toggle]').click()
+    page.locator('.kg-knowledge-detail').evaluate('(e)=>e.open=true');page.locator('[data-knowledge-list-toggle]').click()
     page.wait_for_function('!scenes.at(-1).snapshot().running')
+    page.evaluate('scenes.at(-1).zoomBy(1.5)');page.wait_for_function('!scenes.at(-1).snapshot().running')
     state=snap();point=state['positions'][15];box=page.locator('canvas').bounding_box()
     page.mouse.click(box['x']+point['x'],box['y']+point['y'])
     chosen=snap()['selected'];assert chosen!=59
@@ -128,6 +130,7 @@ with sync_playwright() as pw:
     page.wait_for_function('scenes.at(-1).snapshot().settled && !scenes.at(-1).snapshot().running')
     cdp=context.new_cdp_session(page)
     for width,height in ((1440,960),(1440,650),(390,844),(320,568)):
+        page.locator('.kg-knowledge-detail').evaluate('(e)=>e.open=true')
         page.set_viewport_size({'width':width,'height':height})
         page.wait_for_timeout(150)
         page.locator('dialog').evaluate('(e)=>{e.scrollTop=0;e.querySelector(".kg-knowledge-shell").scrollTop=0}')
@@ -154,7 +157,7 @@ with sync_playwright() as pw:
         if width<=390:
             close_box=page.locator('[data-knowledge-close]').bounding_box()
             assert close_box['y']>=box['y'] and close_box['y']+close_box['height']<=box['y']+box['height'], f'{width}: close must remain visible after scrolling to detail'
-            page.locator('[data-knowledge-list-toggle]').click()
+            page.locator('.kg-knowledge-detail').evaluate('(e)=>e.open=true');page.locator('[data-knowledge-list-toggle]').click()
             page.locator('[data-knowledge-list] button').last.scroll_into_view_if_needed()
             close_box=page.locator('[data-knowledge-close]').bounding_box()
             assert close_box['y']>=box['y'], f'{width}: close must remain visible while list scrolls'
@@ -162,7 +165,7 @@ with sync_playwright() as pw:
             page.mouse.click(close_box['x']+close_box['width']/2,close_box['y']+close_box['height']/2)
             expect(dialog).not_to_be_visible();expect(page.locator('#open')).to_be_focused();assert snap()['destroyed']
             page.locator('#open').click()
-            page.locator('[data-knowledge-list-toggle]').click()
+            page.locator('.kg-knowledge-detail').evaluate('(e)=>e.open=true');page.locator('[data-knowledge-list-toggle]').click()
             page.locator('canvas').scroll_into_view_if_needed()
             page.wait_for_function('scenes.at(-1).snapshot().settled && !scenes.at(-1).snapshot().running')
         checks.append(f'{width}px screenshot, no horizontal overflow, 44px controls')
@@ -181,7 +184,7 @@ with sync_playwright() as pw:
     assert page.locator('canvas').count()==0
     page.evaluate('nodes.forEach(node=>node.path=[])')
     page.locator('[data-knowledge-refresh]').click()
-    expect(page.locator('[data-knowledge-group]').nth(1)).to_contain_text('PMP · 分类 1')
+    expect(page.locator('[data-knowledge-group]').nth(1)).to_contain_text('PMP · 未分类')
     expect(page.locator('[data-knowledge-groups]')).not_to_contain_text('risk')
     expect(page.locator('[data-knowledge-detail-path]')).to_have_text('无路径标签')
     checks.append('readable common frozen category paths, honest unnamed fallback and explicit refresh')

@@ -89,7 +89,7 @@ with sync_playwright() as pw:
     assert {node['primaryNodeId'] for node in saved['nodes']}=={f'risk-{i+1}' for i in range(20)}
     assert all(node['attemptCount']==1 and node['subject']=='PMP' and node['path'][:2]==['项目管理','风险管理'] for node in saved['nodes'])
     with page.expect_response(lambda response:dashboard_path in response.url) as opened:
-        page.locator('#practiceKnowledgeDashboardOpen').click()
+        page.evaluate('KGKnowledgeDashboard.open()')
     actual=opened.value.json();assert actual['topicCount']==20 and actual['attemptCount']==20
     knowledge=page.get_by_role('dialog',name='星空知识网络');expect(knowledge).to_be_visible()
     expect(knowledge.locator('canvas')).to_have_count(1)
@@ -98,6 +98,7 @@ with sync_playwright() as pw:
     first=actual['nodes'][0]
     expect(knowledge.locator('[data-knowledge-detail-title]')).to_have_text(first['title'])
     expect(knowledge.locator('[data-knowledge-detail-path]')).to_have_text(' / '.join(first['path']))
+    knowledge.locator('.kg-knowledge-detail summary').click()
     knowledge.locator('[data-knowledge-list-toggle]').click()
     expect(knowledge.locator('[data-knowledge-list] button')).to_have_count(20)
     knowledge.locator('[data-knowledge-list] button').nth(1).click()
@@ -105,9 +106,9 @@ with sync_playwright() as pw:
     expect(knowledge.locator('[data-knowledge-detail-attempts]')).to_have_text('1 次')
     page.screenshot(path=str(OUT/'knowledge-space-real-api.png'),full_page=True)
     knowledge.locator('[data-knowledge-close]').click();expect(knowledge).to_be_hidden()
-    expect(page.locator('#practiceKnowledgeDashboardOpen')).to_be_focused()
+    assert page.locator('#practiceKnowledgeDashboardOpen').count()==0
     with page.expect_response(lambda response:dashboard_path in response.url) as reopened:
-        page.locator('#practiceKnowledgeDashboardOpen').click()
+        page.evaluate('KGKnowledgeDashboard.open()')
     persisted=reopened.value.json()
     assert (persisted['attemptCount'],persisted['topicCount'])==(20,20)
     assert {node['id'] for node in persisted['nodes']}=={node['id'] for node in actual['nodes']}
