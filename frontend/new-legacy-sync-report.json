@@ -6,7 +6,14 @@
     "added": [],
     "changed": [
       "src/practice/knowledge-dashboard.js",
-      "tests/knowledge-dashboard-browser.py"
+      "src/practice/knowledge-space-scene.js",
+      "styles/knowledge-dashboard.css",
+      "tests/knowledge-dashboard-browser.py",
+      "tests/knowledge-space-auto-browser.py",
+      "tests/knowledge-space-original-browser.py",
+      "tests/knowledge-space-scene-browser.py",
+      "tests/knowledge-space-scene.test.js",
+      "tests/knowledge-space-semantic-browser.py"
     ],
     "removed": []
   },

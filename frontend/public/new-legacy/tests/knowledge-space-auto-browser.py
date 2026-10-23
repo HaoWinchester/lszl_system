@@ -42,6 +42,7 @@ with sync_playwright() as p:
   page.click('[data-knowledge-auto-rotate]');page.wait_for_timeout(100);state=page.evaluate('scene.snapshot()');assert not state['autoRotate'] and not state['running'] and not state['resumePending']
   page.click('[data-knowledge-auto-rotate]');page.click('[data-knowledge-details-open]');before=page.evaluate('scene.snapshot().phase');page.wait_for_timeout(150);assert page.evaluate('scene.snapshot().phase')==before
   page.click('[data-knowledge-details-close]');page.wait_for_timeout(150);assert page.evaluate('scene.snapshot().phase')>before
+  page.locator('.kg-knowledge-shell').evaluate('e=>e.scrollTop=0');page.wait_for_timeout(50)
   box=page.locator('canvas').bounding_box();page.mouse.move(box['x']+box['width']/2,box['y']+box['height']/2);page.mouse.down();page.wait_for_timeout(100)
   state=page.evaluate('scene.snapshot()');assert not state['running'] and not state['resumePending'];page.mouse.up();assert page.evaluate('scene.snapshot().resumePending')
   page.evaluate("Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'))")
