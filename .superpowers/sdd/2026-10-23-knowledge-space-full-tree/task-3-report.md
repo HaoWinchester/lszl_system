@@ -33,3 +33,21 @@ Inspected `artifacts/learning-feedback-three-groups/task-3/labels-317-390.png`. 
 ## Scope / concerns
 
 No API/business scoring/storage changes; no sync, VERSION change, deployment, push, main/uat change or server termination. Existing 5527/5530 servers left alone. Root's checklist edit excluded from commit. Labels represent visible on-screen nodes; offscreen nodes remain accessible by camera/group/list. Aggregates use screen proximity only and do not create knowledge edges. Final source-only state needs root sync plus real entry validation before user preview. Automated checks are not UAT acceptance.
+
+## Review fix round 1 (BASE 479f0e06)
+
+Read `task-3-review.md`, reproduced both important findings before changing production code:
+
+- New rendered 317-entry desktop modal regression failed with navigation button bounds `{x:185,y:480.6875,width:78.25,height:470.3125}` (expected height44–70px).
+- New actual Canvas small-catalog on→off regression failed with `drawnLabels=['Node A','Node B']` despite labels disabled.
+
+Fixed popup grid rows to six content-sized rows, start-aligned navigation and list height constrained by the modal's capped height rather than viewport alone. Removed the <=12-node ordinary-label exception; off now leaves selected/category context only.
+
+Validation commands/results:
+
+- `python3 new-legacy/tests/knowledge-dashboard-browser.py` —14 grouped checks passed. Added 317-entry long title/path fixture; desktop navigation height44–70px and list-bottom/modal bounds; desktop/mobile/short390x568 no-horizontal-overflow and44px touch targets; physical child-list wheel, parent-shell wheel, short-mobile vertical touch scrolling with unchanged camera, and scrolled-close reachability. Existing lifecycle, owners and fallback checks retained.
+- `python3 new-legacy/tests/knowledge-space-semantic-browser.py` —1440/559/390 passed including actual fillText absence after on→off for a two-node catalog.
+- `node --test new-legacy/tests/knowledge-dashboard.test.js new-legacy/tests/knowledge-space-scene.test.js` —23 passed.
+- `git diff --check` —clean.
+
+Scene geometry/interaction browser suite was not repeated in this fix round: no geometry, picking, camera or lifecycle changed; actual Canvas label behavior is covered by semantic browser checks. Root-owned staged generated outputs/checklist excluded from fix commit. No sync, version, deploy, push or server changes.

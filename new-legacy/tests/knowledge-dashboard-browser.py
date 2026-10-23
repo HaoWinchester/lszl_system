@@ -25,7 +25,7 @@ with sync_playwright() as pw:
         if(mode==='pending')return new Promise(resolve=>window.resolveOld=resolve);
         if(mode==='empty')return {nodes:[],topicCount:0,attemptCount:0};
         if(mode==='unknown')return {nodes:[],topicCount:0,attemptCount:51,unknownAttemptCount:23,unmappedAttemptCount:28};
-        if(mode==='historical')return {nodes:Array.from({length:317},(_,i)=>({id:'current-'+i,parentId:null,title:'当前目录 '+i,attemptCount:0})),topicCount:317,attemptCount:51,unknownAttemptCount:23,unmappedAttemptCount:28};
+        if(mode==='historical')return {nodes:Array.from({length:317},(_,i)=>({id:'current-'+i,parentId:null,title:i===0?'长考点标题：项目团队与相关方沟通、风险识别和持续改进的完整知识路径':'当前目录 '+i,path:['当前目录','长路径：团队协作与项目交付过程中的知识组织和练习记录'],attemptCount:0})),topicCount:317,attemptCount:51,unknownAttemptCount:23,unmappedAttemptCount:28};
         if(mode==='ancestry')return {nodes:[{id:'parent',parentId:null,title:'父节点',attemptCount:0},{id:'child',parentId:'parent',title:'子节点',attemptCount:1},{id:'unlit',parentId:null,title:'未练习',attemptCount:0}],attemptCount:1};
         return {nodes,topicCount:81,attemptCount:200,recentAttemptCount:12,unknownAttemptCount:1};
       }};
@@ -133,12 +133,26 @@ with sync_playwright() as pw:
     page.evaluate("owner='B';mode='ready';dispatchEvent(new Event('kg-auth-session-change'))")
     expect(page.locator('[data-knowledge-list] li')).to_have_count(81)
     page.wait_for_function('scenes.at(-1).snapshot().settled && !scenes.at(-1).snapshot().running')
-    for width,height in ((1440,960),(559,854),(390,844)):
+    page.evaluate("mode='historical';void KGKnowledgeDashboard.init().refresh()")
+    expect(page.locator('[data-knowledge-list] button')).to_have_count(317)
+    for width,height in ((1440,960),(559,854),(390,844),(390,568)):
         page.set_viewport_size({'width':width,'height':height})
         page.locator('[data-knowledge-details-open]').click()
         child=page.locator('.kg-knowledge-detail')
         expect(child).to_be_visible()
         assert child.bounding_box()['width']>=min(1000,width-50)
+        assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+        assert child.evaluate('e=>e.scrollWidth<=e.clientWidth')
+        for control in child.locator('.kg-knowledge-step button').all():
+            bounds=control.bounding_box();assert 44<=bounds['height']<=70, bounds
+        if width>850:
+            cb=child.bounding_box();lb=page.locator('[data-knowledge-list]').bounding_box()
+            assert lb['y']+lb['height']<=cb['y']+cb['height']-10, (cb,lb)
+        assert child.evaluate('e=>[...e.querySelectorAll("button")].filter(b=>b.getClientRects().length).every(b=>b.getBoundingClientRect().height>=44)')
+        listing=page.locator('[data-knowledge-list]');listing.scroll_into_view_if_needed()
+        listing.evaluate('e=>e.scrollTop=0');r=listing.bounding_box()
+        page.mouse.move(r['x']+r['width']/2,r['y']+min(r['height']/2,150));page.mouse.wheel(0,260);page.wait_for_timeout(180)
+        assert listing.evaluate('e=>e.scrollTop')>0, 'native child list wheel scroll'
         page.locator('[data-knowledge-list] button').last.click()
         page.locator('[data-knowledge-node-prev]').click()
         page.keyboard.press('Escape');expect(child).not_to_be_visible();expect(dialog).to_be_visible()
@@ -146,8 +160,26 @@ with sync_playwright() as pw:
         page.locator('[data-knowledge-details-open]').click()
         page.evaluate("dispatchEvent(new Event('kg-auth-session-change'))")
         expect(child).not_to_be_visible()
+        shell=page.locator('.kg-knowledge-shell');shell.evaluate('e=>e.scrollTop=0')
+        assert dialog.evaluate('e=>e.scrollWidth<=e.clientWidth&&e.querySelector(".kg-knowledge-shell").scrollWidth<=e.querySelector(".kg-knowledge-shell").clientWidth')
+        before=shell.evaluate('e=>e.scrollTop');camera=snap()['camera'];r=shell.bounding_box()
+        page.mouse.move(r['x']+r['width']/2,r['y']+r['height']/2);page.mouse.wheel(0,300);page.wait_for_timeout(180)
+        if shell.evaluate('e=>e.scrollHeight>e.clientHeight'):assert shell.evaluate('e=>e.scrollTop')>before
+        assert snap()['camera']==camera
+        if height<600:
+            shell.evaluate('e=>e.scrollTop=0');cdp=context.new_cdp_session(page)
+            x=r['x']+r['width']/2;y=r['y']+r['height']/2
+            cdp.send('Input.dispatchTouchEvent',{'type':'touchStart','touchPoints':[{'x':x,'y':y,'id':1}]})
+            for step in range(1,9):
+                cdp.send('Input.dispatchTouchEvent',{'type':'touchMove','touchPoints':[{'x':x,'y':y-step*12,'id':1}]});page.wait_for_timeout(20)
+            cdp.send('Input.dispatchTouchEvent',{'type':'touchEnd','touchPoints':[]});page.wait_for_timeout(180)
+            assert shell.evaluate('e=>e.scrollTop')>0 and snap()['camera']==camera, 'native vertical touch scroll must preserve camera'
+            cdp.detach()
+        close_box=page.locator('[data-knowledge-close]').bounding_box();box=dialog.bounding_box()
+        assert box['y']<=close_box['y'] and close_box['y']+close_box['height']<=box['y']+box['height']
         page.screenshot(path=str(OUT/f'dashboard-{width}.png'))
         checks.append(f'{width}px spacious modal list, prev/next, child Escape and account invalidation')
+    page.evaluate("mode='ready'")
     page.locator('[data-knowledge-close]').click();expect(page.locator('#open')).to_be_focused();page.wait_for_function('scenes.at(-1).snapshot().destroyed')
     page.locator('#open').click();page.evaluate("document.querySelector('dialog').close()")
     expect(page.locator('#open')).to_be_focused();page.wait_for_function('scenes.at(-1).snapshot().destroyed')

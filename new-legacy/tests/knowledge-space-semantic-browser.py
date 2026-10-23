@@ -91,6 +91,12 @@ with sync_playwright() as p:
    assert summary.evaluate('e=>e.scrollLeft')>0
    page.locator('[data-knowledge-labels]').click();page.wait_for_function('scenes.at(-1).snapshot().labels.length>0')
    page.screenshot(path=str(OUT/f'labels-317-{width}.png'))
+  page.evaluate('''()=>{KGDomainApi.request=async()=>({attemptCount:0,nodes:[{id:'a',parentId:null,title:'Node A',subject:'Test'},{id:'b',parentId:null,title:'Node B',subject:'Test'}]})}''')
+  page.locator('[data-knowledge-refresh]').click();page.wait_for_function('scenes.at(-1).snapshot().settled && !scenes.at(-1).snapshot().running')
+  if not page.evaluate('scenes.at(-1).snapshot().labelsVisible'):page.locator('[data-knowledge-labels]').click()
+  page.wait_for_function('!scenes.at(-1).snapshot().running')
+  page.evaluate('drawnLabels=[]');page.locator('[data-knowledge-labels]').click();page.wait_for_function('!scenes.at(-1).snapshot().running')
+  assert page.evaluate('!drawnLabels.some(t=>t.includes("Node A")||t.includes("Node B"))'), page.evaluate('drawnLabels')
   print(f'{width}: semantic zoom, cluster click, full canvas, drawer/list, refresh/retry, full catalog, auth invalidation, close/reopen passed')
   page.close()
  browser.close()
