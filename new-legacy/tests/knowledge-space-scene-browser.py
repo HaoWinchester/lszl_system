@@ -65,14 +65,15 @@ with sync_playwright() as p:
     window.dotStyles=[];window.arcs=0;
     ctx.clearRect=function(...args){dotStyles=[];arcs=0;return clear.apply(this,args)};
     ctx.arc=function(...args){radius=args[2];arcs++;return arc.apply(this,args)};
-    ctx.fill=function(...args){if(radius<=9 && typeof this.fillStyle==='string' && this.fillStyle.startsWith('rgba(190, 224, 255,'))dotStyles.push(this.fillStyle);return fill.apply(this,args)};
+    ctx.fill=function(...args){if(radius<=9 && typeof this.fillStyle==='string' && (this.fillStyle.startsWith('rgba(139, 220, 255,')||this.fillStyle.startsWith('rgba(98, 108, 120,')))dotStyles.push(this.fillStyle);return fill.apply(this,args)};
    };
   }''')
   page.evaluate("()=>{window.scene=KGKnowledgeSpaceScene.mount({host:document.querySelector('#host'),nodes:[.12,.4,.7,1].map((brightness,i)=>({id:String(i),parentId:null,brightness}))});observeDrawing();scene.zoomBy(1.5)}")
   page.wait_for_function('scene.snapshot().settled && !scene.snapshot().running')
   styles=page.evaluate('dotStyles')
-  assert 'rgba(190, 224, 255, 0.52)' in styles,f'unpractised .12 must remain distinct from .2: {styles}'
-  assert set(styles)=={f'rgba(190, 224, 255, {alpha})' for alpha in ('0.52','0.66','0.81','0.96')},'practice brightness must remain ordered and continuous through its unchanged maximum'
+  assert any(s.startswith('rgba(98, 108, 120,') for s in styles),f'unpractised points remain neutral: {styles}'
+  lit=[s for s in styles if s.startswith('rgba(139, 220, 255,')]
+  assert len(lit)==3 and len(set(lit))==3, 'practice brightness and depth must retain distinct lit levels'
   page.evaluate('scene.destroy()')
   page.evaluate("nodes=>{window.scene=KGKnowledgeSpaceScene.mount({host:document.querySelector('#host'),nodes})}",CATALOG)
   page.wait_for_function('scene.snapshot().settled && !scene.snapshot().running')
@@ -121,7 +122,7 @@ with sync_playwright() as p:
    assert minimum_gap>0,f'{width}/{size}: dense classification outlines overlap ({minimum_gap:.2f}px)'
    print(f'classification gap {width}/{size}: {minimum_gap:.2f}px',flush=True)
    page.evaluate('scene.zoomBy(1.5)');page.wait_for_function('!scene.snapshot().running')
-   assert page.evaluate('dotStyles.length')==size and page.evaluate('arcs')==size*2,'detailed zoom must draw every real knowledge point'
+   assert page.evaluate('dotStyles.length')==size and page.evaluate('arcs')==size+sum(n['brightness']>.12 for n in fixture),'detailed zoom must draw every real knowledge point'
    page.evaluate('scene.reset()');page.wait_for_function('!scene.snapshot().running')
    assert_fit(page,f'{width}/{size}-node-catalog')
    costs=sorted(page.evaluate('frameCosts'))

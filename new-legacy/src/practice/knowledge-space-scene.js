@@ -12,6 +12,11 @@
     return parents;
   }
   const groupKey=node=>JSON.stringify([String(node.subject||''),String(node.taxonomyId??''),categoryPath(node)[0]||'']);
+  function categoryColor(key){const name=JSON.parse(key||'["","",""]')[2];return name==='人'?'#ffd58b':name==='环境'?'#80f0b8':'#8bdcff'}
+  function colorChannels(key){return categoryColor(key).slice(1).match(/../g).map(value=>parseInt(value,16)).join(',')}
+  function rotateLocal(point,center,phase,scale=1){const x=point.x-center.x,y=point.y-center.y,z=point.z-center.z,c=Math.cos(phase),s=Math.sin(phase);return {x:center.x+(x*c-z*s)*scale,y:center.y+y*scale,z:center.z+(x*s+z*c)*scale}}
+  // A circumscribed 24-sided cylinder contains every local Y rotation, including between samples.
+  function rotationEnvelope(model){return model.groups.flatMap(center=>{const members=center.indices.map(index=>model.points[index]),radius=Math.max(...members.map(p=>Math.hypot(p.x-center.x,p.z-center.z)))/Math.cos(Math.PI/24),ys=members.map(p=>p.y);return Array.from({length:24},(_,i)=>i*Math.PI/12).flatMap(angle=>[Math.min(...ys),Math.max(...ys)].map(y=>({group:center.key,x:center.x+Math.cos(angle)*radius,y,z:center.z+Math.sin(angle)*radius})))})}
   function classificationLabel(nodes){
     const paths=nodes.map(categoryPath),common=[];
     for(let i=0;i<(paths[0]?.length||0)&&paths.every(path=>path[i]===paths[0][i]);i++)common.push(paths[0][i]);
@@ -53,12 +58,15 @@
     groups.forEach((group,i)=>{
       group.label=classificationLabel(group.indices.map(index=>points[index].node));
       const columns=Math.ceil(Math.sqrt(groups.length)),spacing=440;
-      group.radius=165;group.x=(i%columns-(columns-1)/2)*spacing;group.y=(Math.floor(i/columns)-(Math.ceil(groups.length/columns)-1)/2)*spacing;group.z=0;
-      if(three){const name=JSON.parse(group.key)[2];group.x=name==='过程'?0:name==='人'?-180:180;group.y=name==='过程'?0:330;group.radius=145}
+      group.radius=165;group.depth=three?170:36;group.x=(i%columns-(columns-1)/2)*spacing;group.y=(Math.floor(i/columns)-(Math.ceil(groups.length/columns)-1)/2)*spacing;group.z=0;
+      if(three){const name=JSON.parse(group.key)[2];group.radius=name==='过程'?205:135;group.y=name==='过程'?-55:290;group.x=name==='过程'?0:name==='人'?-195:195}
       const catalog=group.indices.some(index=>Object.prototype.hasOwnProperty.call(points[index].node,'parentId'));
+      const neighborhoods=[...new Set(group.indices.map(index=>categoryPath(points[index].node)[1]||points[index].node.title))];
       group.indices.forEach((index,j)=>{
-        const p=points[index],a=j*2.399963229728653,r=group.indices.length===1?0:25+120*Math.sqrt(j/Math.max(1,group.indices.length-1));
-        p.x=group.x+Math.cos(a)*r;p.y=group.y+Math.sin(a)*r;p.z=group.z+Math.cos(j*1.71)*r*.18;
+        const p=points[index],a=j*2.399963229728653;
+        const branch=neighborhoods.indexOf(categoryPath(p.node)[1]||p.node.title),angle=branch*2.399963229728653,spread=group.radius*.72,local=18+32*Math.sqrt((j%13)/12);
+        p.x=group.x+Math.cos(angle)*spread+Math.cos(a)*local;p.y=group.y+Math.sin(angle)*spread+Math.sin(a)*local;p.z=group.z+(Math.sin(branch*1.91)*95+Math.cos(j*1.71)*55)*(three?1:.22);
+        p.home={x:p.x,y:p.y,z:p.z};
         if(catalog){
           const parent=p.node.parentId,source=parent==null?null:catalogIds.get(catalogKey(p.node,parent));
           if(source!=null&&source!==index)edges.push({source,target:index,group:group.key});
@@ -66,14 +74,14 @@
       });
     });
     const layoutScale=Math.min(1,2/Math.sqrt(Math.max(1,groups.length)));
-    for(const item of [...points,...groups])for(const axis of ['x','y','z'])item[axis]*=layoutScale;
-    for(const group of groups)group.radius*=layoutScale;
+    for(const item of [...points,...groups])for(const axis of ['x','y','z']){item[axis]*=layoutScale;if(item.home)item.home[axis]*=layoutScale}
+    for(const group of groups){group.radius*=layoutScale;group.depth*=layoutScale}
     return {points,edges,groups,steps:0,quiet:0,settled:points.length===0};
   }
   function stepModel(model){
     if(model.settled)return false;
     const {points,groups,edges}=model,centers=new Map(groups.map(group=>[group.key,group]));
-    for(const p of points){const c=centers.get(p.group);p.vx+=(c.x-p.x)*.006;p.vy+=(c.y-p.y)*.006;p.vz+=(c.z-p.z)*.006}
+    for(const p of points){const c=p.home;p.vx+=(c.x-p.x)*.025;p.vy+=(c.y-p.y)*.025;p.vz+=(c.z-p.z)*.025}
     // Visit only the 27 neighboring cells; insert after visiting so each pair acts once.
     const buckets=new Map();
     for(const a of points){
@@ -94,7 +102,7 @@
       a.vx+=dx*f;a.vy+=dy*f;a.vz+=dz*f;b.vx-=dx*f;b.vy-=dy*f;b.vz-=dz*f;
     }
     let speed=0;
-    for(const p of points){for(const axis of ['x','y','z']){const velocity='v'+axis;p[velocity]=clamp(p[velocity]*.81,-5,5);p[axis]+=p[velocity]}const c=centers.get(p.group),distance=Math.hypot(p.x-c.x,p.y-c.y);if(distance>c.radius){p.x=c.x+(p.x-c.x)*c.radius/distance;p.y=c.y+(p.y-c.y)*c.radius/distance}p.z=clamp(p.z,c.z-36,c.z+36);speed=Math.max(speed,Math.hypot(p.vx,p.vy,p.vz))}
+    for(const p of points){for(const axis of ['x','y','z']){const velocity='v'+axis;p[velocity]=clamp(p[velocity]*.81,-5,5);p[axis]+=p[velocity]}const c=centers.get(p.group),distance=Math.hypot(p.x-c.x,p.y-c.y);if(distance>c.radius){p.x=c.x+(p.x-c.x)*c.radius/distance;p.y=c.y+(p.y-c.y)*c.radius/distance}p.z=clamp(p.z,c.z-c.depth,c.z+c.depth);speed=Math.max(speed,Math.hypot(p.vx,p.vy,p.vz))}
     model.steps++;model.quiet=speed<.035?model.quiet+1:0;
     if(model.steps>=MAX_STEPS||model.quiet>=12){model.settled=true;for(const p of points)p.vx=p.vy=p.vz=0}
     return !model.settled;
@@ -125,9 +133,9 @@
     let inertiaX=0,inertiaY=0,pinching=false,pinchDistance=0,autoFit=true,baseZoom=1,interiorScale=1.30,horizontalSpread=1,verticalSpread=1;
     const viewCenter={x:0,y:0,z:0},overviewCenter={x:0,y:0,z:0};
     function visible(){return !destroyed&&!document.hidden&&intersecting&&host.isConnected&&width>0&&height>0&&host.getClientRects().length>0&&win.getComputedStyle(host).visibility!=='hidden'}
-    function project(point){const projected=projectPoint(relative(point),camera,width,height);projected.x=width/2+(projected.x-width/2)*horizontalSpread;projected.y=height/2+(projected.y-height/2)*verticalSpread;const safe=safeInsets,top=Number(safe.top)||0,bottom=Number(safe.bottom)||0;if(safe.plot!==false)projected.y=top+projected.y/height*Math.max(80,height-top-bottom);return projected}
+    function project(point){const projected=projectPoint(relative(point),camera,width,height);projected.x=width/2+(projected.x-width/2)*horizontalSpread;projected.y=height/2+(projected.y-height/2)*verticalSpread;const safe=safeInsets,top=Number(safe.top)||0,bottom=Number(safe.bottom)||0;if(safe.plot!==false)projected.y=top+projected.y/height*Math.max(80,height-top-bottom);const left=Number(safe.left)||0,right=Number(safe.right)||0;projected.x=left+projected.x/width*Math.max(80,width-left-right);return projected}
     // Enlarge constellation interiors around their fixed semantic anchors. All view paths share this position.
-    function displayPoint(point){const center=centers.get(point.group);if(!center)return point;const x=point.x-center.x,y=point.y-center.y,c=Math.cos(phase),s=Math.sin(phase);return {x:center.x+(x*c-y*s)*interiorScale,y:center.y+(x*s+y*c)*interiorScale,z:center.z+(point.z-center.z)*interiorScale}}
+    function displayPoint(point){const center=centers.get(point.group);return center?rotateLocal(point,center,phase,interiorScale):point}
     function relative(point){const displayed=displayPoint(point);return {x:displayed.x-viewCenter.x,y:displayed.y-viewCenter.y,z:displayed.z-viewCenter.z}}
     // Fit once on mount/settlement and reset; explicit camera changes opt out until reset.
     function fitDefault(){
@@ -140,8 +148,8 @@
       for(const point of model.points){const projected=overview(point),envelope=envelopes.get(point.group);envelope.radius=Math.max(envelope.radius,Math.hypot(projected.x-envelope.x,projected.y-envelope.y))}
       const neighborhoods=[...envelopes.values()];interiorScale=1.30;
       for(let i=0;i<neighborhoods.length;i++)for(let j=i+1;j<neighborhoods.length;j++){const a=neighborhoods[i],b=neighborhoods[j],radii=a.radius+b.radius;if(radii>0)interiorScale=Math.min(interiorScale,.97*Math.hypot(a.x-b.x,a.y-b.y)/radii)}
-      interiorScale=clamp(interiorScale,1,1.30);
-      const fitPoints=autoRotate?model.groups.flatMap(center=>{const radius=Math.max(...center.indices.map(index=>Math.hypot(model.points[index].x-center.x,model.points[index].y-center.y)));return Array.from({length:24},(_,i)=>({group:center.key,x:center.x+radius*Math.cos(i*Math.PI/12),y:center.y+radius*Math.sin(i*Math.PI/12),z:center.z+(i%2?36:-36)}))}):model.points;
+      interiorScale=autoRotate?1:clamp(interiorScale,1,1.30);
+      const fitPoints=autoRotate?rotationEnvelope(model):model.points;
       for(const axis of ['x','y','z']){const values=fitPoints.map(point=>displayPoint(point)[axis]);viewCenter[axis]=(Math.min(...values)+Math.max(...values))/2}
       Object.assign(overviewCenter,viewCenter);
       const projected=fitPoints.map(point=>projectPoint(relative(point),{...DEFAULT_CAMERA},width,height));
@@ -158,22 +166,23 @@
     function request(){if(!destroyed&&!raf&&visible()&&(dirty||!model.settled||automatic()||(!reduced&&pointers.size===0&&Math.abs(inertiaX)+Math.abs(inertiaY)>.02)))raf=win.requestAnimationFrame(frame)}
     function mark(){dirty=true;request()}
     function draw(){
-      ctx.clearRect(0,0,width,height);ctx.fillStyle='#060b16';ctx.fillRect(0,0,width,height);
+      ctx.clearRect(0,0,width,height);ctx.fillStyle='#04070c';ctx.fillRect(0,0,width,height);
+      const atmosphere=ctx.createRadialGradient(width*.69,height*.48,20,width*.69,height*.48,Math.max(width,height)*.6);atmosphere.addColorStop(0,'rgba(72,137,207,.10)');atmosphere.addColorStop(.42,'rgba(18,46,78,.045)');atmosphere.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=atmosphere;ctx.fillRect(0,0,width,height);
       // Tiny unconnected background dots are decoration, never selectable business nodes.
-      ctx.fillStyle='rgba(179,203,244,.28)';
-      for(let i=0;i<70;i++){const x=((i*173.71)%997)/997*width,y=((i*237.29)%991)/991*height;ctx.fillRect(x,y,i%5===0?1.3:.7,i%5===0?1.3:.7)}
+      ctx.fillStyle='rgba(179,203,244,.16)';
+      for(let i=0;i<220;i++){const x=(((i*173.71)%997)/997*width+Math.sin(camera.yaw+phase)*i*.025+width)%width,y=((i*237.29)%991)/991*height;ctx.fillRect(x,y,i%5===0?1.3:.7,i%5===0?1.3:.7)}
       const projected=positions();ctx.lineWidth=.8;
-      for(const edge of model.edges){const a=projected[edge.source],b=projected[edge.target];if(!a.visible||!b.visible)continue;const related=selected!==null&&(edge.source===selected||edge.target===selected);ctx.strokeStyle=related?'rgba(204,185,142,.5)':selected!==null?'rgba(117,161,218,.025)':'rgba(117,161,218,.04)';ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke()}
+      for(const edge of model.edges){const a=projected[edge.source],b=projected[edge.target];if(!a.visible||!b.visible)continue;const related=selected!==null&&(edge.source===selected||edge.target===selected);ctx.strokeStyle=related?'rgba(204,185,142,.5)':selected!==null?'rgba(117,161,218,.055)':'rgba(117,161,218,.075)';ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke()}
       for(const p of projected.filter(p=>p.visible).sort((a,b)=>b.depth-a.depth)){
-        const node=model.points[p.index].node,value=Number(node.brightness),brightness=Number.isFinite(value)?clamp(value,.12,1):.12,radius=clamp((1+brightness*1.2)*p.scale,1,3),halo=radius*(brightness>.2?4:2);
-        const glow=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,halo);glow.addColorStop(0,`rgba(143,199,255,${brightness*.25})`);glow.addColorStop(1,'rgba(72,139,255,0)');ctx.fillStyle=glow;ctx.beginPath();ctx.arc(p.x,p.y,halo,0,Math.PI*2);ctx.fill();
-        ctx.fillStyle=`rgba(190,224,255,${.46+brightness*.50})`;ctx.beginPath();ctx.arc(p.x,p.y,radius,0,Math.PI*2);ctx.fill();
-        if(p.index===selected){ctx.strokeStyle='#e1c594';ctx.lineWidth=1.3;ctx.beginPath();ctx.arc(p.x,p.y,radius+7,0,Math.PI*2);ctx.stroke()}
-        if(camera.zoom/baseZoom>=.75&&!labelsVisible&&p.index===selected){ctx.font='12px system-ui, sans-serif';ctx.textAlign='center';ctx.fillStyle=p.index===selected?'#f3dfba':'#a2b5d0';const title=String(node.title||'未命名考点');ctx.fillText(title.length>22?title.slice(0,21)+'…':title,p.x,p.y+radius+23,Math.max(30,width-20))}
+        const node=model.points[p.index].node,value=Number(node.brightness),brightness=Number.isFinite(value)?clamp(value,.12,1):.12,practiced=brightness>.12,color=colorChannels(p.group),depthAlpha=clamp(1.35-p.depth/1300,.24,.9),radius=clamp(3.6*p.scale,.8,8),halo=radius*(3+brightness*3);
+        if(practiced){const glow=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,halo);glow.addColorStop(0,`rgba(${color},${brightness*.38})`);glow.addColorStop(.3,`rgba(${color},${brightness*.10})`);glow.addColorStop(1,`rgba(${color},0)`);ctx.fillStyle=glow;ctx.beginPath();ctx.arc(p.x,p.y,halo,0,Math.PI*2);ctx.fill()}
+        ctx.fillStyle=practiced?`rgba(${color},${depthAlpha*(.5+brightness*.5)})`:`rgba(98,108,120,${depthAlpha*.8})`;ctx.beginPath();ctx.arc(p.x,p.y,radius,0,Math.PI*2);ctx.fill();
+        if(p.index===selected){ctx.lineWidth=1;for(const [factor,alpha] of [[2.5,.7],[4.2,.16]]){ctx.strokeStyle=`rgba(${color},${alpha})`;ctx.beginPath();ctx.arc(p.x,p.y,radius*factor+3,0,Math.PI*2);ctx.stroke()}}
+
       }
       if(camera.zoom/baseZoom>=.75&&(!labelsVisible||semanticView(model,camera.zoom/baseZoom,group).mode==='clusters')){
         for(const cluster of clusterPositions()){
-          ctx.font='11px system-ui, sans-serif';ctx.textAlign='center';ctx.fillStyle='#a6bdd7';
+          ctx.font='11px system-ui, sans-serif';ctx.textAlign='center';ctx.fillStyle=categoryColor(cluster.key);
           ctx.fillText(`${cluster.label} · ${cluster.count}`,cluster.x,cluster.y-25,Math.max(80,width-24));
         }
       }
@@ -203,7 +212,7 @@
     function applyRotation(dx,dy){camera.yaw+=dx*.006;camera.pitch=clamp(camera.pitch+dy*.006,-1.35,1.35)}
     function rotate(dx,dy){if(destroyed||!Number.isFinite(dx)||!Number.isFinite(dy))return;pauseInteraction();autoFit=false;applyRotation(dx,dy);mark()}
     function zoomBy(factor){if(destroyed||!Number.isFinite(factor)||factor<=0)return;pauseInteraction();autoFit=false;camera.zoom=clamp(camera.zoom*factor,Math.min(.45,baseZoom*.35),9);if(camera.zoom/baseZoom<1.35&&group){group='';Object.assign(viewCenter,overviewCenter);onGroup?.('')}mark()}
-    function select(index){if(destroyed||!Number.isInteger(index)||!model.points[index])return;pauseInteraction();selected=index;camera.zoom=Math.max(camera.zoom,baseZoom*1.5);autoFit=false;mark()}
+    function select(index,reveal=true){if(destroyed||!Number.isInteger(index)||!model.points[index])return;pauseInteraction();selected=index;if(reveal){camera.zoom=Math.max(camera.zoom,baseZoom*1.5);autoFit=false}mark()}
     function focusGroup(key){if(destroyed)return;pauseInteraction();group=String(key||'');const target=model.groups.find(item=>item.key===group);if(target){autoFit=false;Object.assign(viewCenter,{x:target.x,y:target.y,z:target.z});camera.zoom=Math.min(9,baseZoom*1.6)}else if(!group)Object.assign(viewCenter,overviewCenter);mark()}
     function reset(){if(destroyed)return;pauseInteraction();phase=0;Object.assign(camera,DEFAULT_CAMERA);autoFit=true;fitDefault();group='';inertiaX=inertiaY=0;mark()}
     function listen(target,type,handler,options){target.addEventListener(type,handler,options);listeners.push(()=>target.removeEventListener(type,handler,options))}
@@ -256,6 +265,6 @@
     function snapshot(){return {autoRotate:autoEnabled,rotationPaused,phase,resumePending:!!resumeTimer,labelsVisible,labels:labelLayout(),textHidden:camera.zoom/baseZoom<.75,camera:{...camera},positions:positions(),mode:semanticView(model,camera.zoom/baseZoom,group).mode,clusters:clusterPositions(),selected,group,settled:model.settled,running:!!raf,destroyed}}
     resize();return Object.freeze({setAutoRotate,setRotationPaused,setLabelsVisible,select,focusGroup,rotate,zoomBy,reset,destroy,snapshot});
   }
-  const api=Object.freeze({isSubjectOverviewNode,createModel,stepModel,projectPoint,groupKey,classificationLabel,semanticView,layoutLabels,mount});
+  const api=Object.freeze({categoryColor,rotateLocal,rotationEnvelope,isSubjectOverviewNode,createModel,stepModel,projectPoint,groupKey,classificationLabel,semanticView,layoutLabels,mount});
   global.KGKnowledgeSpaceScene=api;if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);

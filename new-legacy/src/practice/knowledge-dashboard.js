@@ -64,18 +64,21 @@
     const dock=find('.kg-knowledge-footer'),help=document.createElement('details'),helpTitle=document.createElement('summary');
     help.className='kg-knowledge-guidance';helpTitle.textContent='操作与亮度说明';help.append(helpTitle,find('.kg-knowledge-help'),find('#kgKnowledgeMeaning'));
     const secondary=document.createElement('div');secondary.className='kg-knowledge-secondary';const autoButton=document.createElement('button');autoButton.type='button';autoButton.setAttribute('data-knowledge-auto-rotate','');autoButton.disabled=true;function rotationState(value){autoButton.textContent=value?'暂停旋转':'开始旋转';autoButton.setAttribute('aria-pressed',String(value))}rotationState(false);secondary.append(autoButton,help);dock.append(find('.kg-knowledge-camera'),secondary);
+    const reading=document.createElement('section');reading.className='kg-knowledge-focus';reading.setAttribute('aria-label','当前考点');
+    reading.innerHTML='<p class="kg-knowledge-eyebrow" data-knowledge-focus-subject></p><p class="kg-knowledge-focus-number" data-knowledge-focus-number>—</p><h3 data-knowledge-focus-title>选择一个考点</h3><p class="kg-knowledge-path" data-knowledge-focus-path></p><dl class="kg-knowledge-facts"><div><dt>直接作答</dt><dd data-knowledge-focus-attempts>—</dd></div><div><dt>含下级作答</dt><dd data-knowledge-focus-related>—</dd></div></dl>';
+    find('.kg-knowledge-body').prepend(reading);
     const detail=find('.kg-knowledge-detail');let detailReturnFocus=null,labelsVisible=false;
     function closeDetail(){if(detail.open)detail.close();scene?.setRotationPaused(false);detailReturnFocus?.focus?.();detailReturnFocus=null}
     function openDetail(){if(!nodes.length)return;detailReturnFocus=document.activeElement;toggleList(true);if(!detail.open)detail.showModal();scene?.setRotationPaused(true)}
     detail.addEventListener('cancel',event=>{event.preventDefault();event.stopPropagation();closeDetail()});
     let returnFocus=null,scene=null,nodes=[],selected=null,activeGroup='',listOpen=false;
     const formatDate=value=>{const date=value?new Date(value):null;return !date||Number.isNaN(date.getTime())?'时间未知':date.toLocaleDateString('zh-CN')};
-    const setText=(name,value)=>{find(`[data-knowledge-${name}]`).textContent=text(value)};
+    const setText=(name,value)=>{find(`[data-knowledge-${name}]`).textContent=text(value);const inline=find(`[data-knowledge-${name.replace('detail-','focus-')}]`);if(inline)inline.textContent=text(value)};
     function toggleList(value){listOpen=value;list.hidden=!value||!nodes.length;find('[data-knowledge-list-toggle]').setAttribute('aria-expanded',String(!list.hidden))}
     function select(index,reveal=true){
       const node=nodes[index];if(!node)return;
-      selected=index;if(reveal)scene?.select(index);
-      setText('detail-subject',node.subject||'科目未标注');setText('detail-number',String(index+1).padStart(2,'0'));
+      selected=index;scene?.select(index,reveal);
+      setText('detail-subject',node.subject||'科目未标注');find('[data-knowledge-focus-subject]').textContent=[node.subject,JSON.parse(groupKey(node))[2]].filter(Boolean).join(' · ');reading.style.setProperty('--category-color',global.KGKnowledgeSpaceScene.categoryColor(groupKey(node)));setText('detail-number',String(index+1).padStart(2,'0'));
       setText('detail-title',node.title||'未命名考点');setText('detail-path',Array.isArray(node.path)?node.path.map(text).join(' / ')||'无路径标签':'无路径标签');
       setText('detail-attempts',`${Number(node.attemptCount)||0} 次`);setText('detail-related',`${node.relatedAttemptCount} 次`);setText('detail-date',formatDate(node.lastPracticedAt));
       for(const button of list.querySelectorAll('button'))button.setAttribute('aria-pressed',String(Number(button.dataset.knowledgeNode)===index));
@@ -110,10 +113,10 @@
         const seen=new Map();for(const node of nodes){const key=groupKey(node);if(!seen.has(key))seen.set(key,[]);seen.get(key).push(node)}
         for(const [key,members] of seen){
           const label=global.KGKnowledgeSpaceScene?.classificationLabel(members)||`${members[0].subject||'科目未标注'} · 未分类`;
-          groups.appendChild(button(`${label} / ${members.length}`,'data-knowledge-group',key));
+          const category=button(`${label} / ${members.length}`,'data-knowledge-group',key);category.style.setProperty('--category-color',global.KGKnowledgeSpaceScene.categoryColor(key));groups.appendChild(category);
         }
         network.hidden=false;find('[data-knowledge-space-empty]').hidden=true;
-        try{scene=global.KGKnowledgeSpaceScene?.mount({host:network,nodes,autoRotate:true,onAutoRotateChange:rotationState,insets:()=>{const box=network.getBoundingClientRect(),header=find('.kg-knowledge-body>button').getBoundingClientRect(),footer=dock.getBoundingClientRect();return {plot:dialog.clientWidth<=600,top:Math.max(0,header.bottom-box.top)+38,bottom:Math.max(0,box.bottom-footer.top)+16}},onSelect:(_,index)=>select(index),onGroup:key=>focusGroup(key,false)})||null}catch(error){scene=null;network.replaceChildren()}
+        try{scene=global.KGKnowledgeSpaceScene?.mount({host:network,nodes,autoRotate:true,onAutoRotateChange:rotationState,insets:()=>{const box=network.getBoundingClientRect(),header=find('.kg-knowledge-body>button').getBoundingClientRect(),footer=dock.getBoundingClientRect();return {plot:true,left:dialog.clientWidth>850?Math.min(410,box.width*.30):0,right:16,top:dialog.clientWidth>600?155:Math.max(0,header.bottom-box.top)+16,bottom:Math.max(0,box.bottom-footer.top)+16}},onSelect:(_,index)=>select(index),onGroup:key=>focusGroup(key,false)})||null}catch(error){scene=null;network.replaceChildren()}
         for(const control of dialog.querySelectorAll('.kg-knowledge-step button'))control.disabled=false;
         for(const control of dialog.querySelectorAll('.kg-knowledge-camera button'))control.disabled=!scene;
         autoButton.disabled=!scene;rotationState(scene?.snapshot().autoRotate||false);scene?.setLabelsVisible(labelsVisible);focusGroup('',false);select(0,false);toggleList(!scene||listOpen);if(!scene){dialog.classList.add('kg-knowledge-fallback');}
