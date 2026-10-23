@@ -108,23 +108,34 @@
     let ctx;try{ctx=canvas.getContext('2d')}catch(error){return null}if(!ctx)return null;
     canvas.className='kg-knowledge-space-canvas';canvas.setAttribute('role','img');canvas.setAttribute('aria-label','知识点三维知识星空，考点详情可通过列表选择');
     canvas.style.cssText='display:block;width:100%;height:100%;touch-action:pan-y;cursor:grab';host.appendChild(canvas);
-    const model=createModel(nodes),camera={...DEFAULT_CAMERA},pointers=new Map(),listeners=[];
+    const model=createModel(nodes),centers=new Map(model.groups.map(item=>[item.key,item])),camera={...DEFAULT_CAMERA},pointers=new Map(),listeners=[];
     const motion=win.matchMedia?.('(prefers-reduced-motion: reduce)');
     let labelsVisible=false,safeInsets={};
     let width=0,height=0,raf=0,destroyed=false,selected=null,group='',dirty=true,intersecting=true,reduced=!!motion?.matches;
-    let inertiaX=0,inertiaY=0,pinching=false,pinchDistance=0,autoFit=true,baseZoom=1,horizontalSpread=1,verticalSpread=1;
+    let inertiaX=0,inertiaY=0,pinching=false,pinchDistance=0,autoFit=true,baseZoom=1,interiorScale=1.30,horizontalSpread=1,verticalSpread=1;
     const viewCenter={x:0,y:0,z:0},overviewCenter={x:0,y:0,z:0};
     function visible(){return !destroyed&&!document.hidden&&intersecting&&host.isConnected&&width>0&&height>0&&host.getClientRects().length>0&&win.getComputedStyle(host).visibility!=='hidden'}
     function project(point){const projected=projectPoint(relative(point),camera,width,height);projected.x=width/2+(projected.x-width/2)*horizontalSpread;projected.y=height/2+(projected.y-height/2)*verticalSpread;const safe=safeInsets,top=Number(safe.top)||0,bottom=Number(safe.bottom)||0;if(safe.plot!==false)projected.y=top+projected.y/height*Math.max(80,height-top-bottom);return projected}
-    function relative(point){return {x:point.x-viewCenter.x,y:point.y-viewCenter.y,z:point.z-viewCenter.z}}
+    // Enlarge constellation interiors around their fixed semantic anchors. All view paths share this position.
+    function displayPoint(point){const center=centers.get(point.group);return center?{x:center.x+(point.x-center.x)*interiorScale,y:center.y+(point.y-center.y)*interiorScale,z:center.z+(point.z-center.z)*interiorScale}:point}
+    function relative(point){const displayed=displayPoint(point);return {x:displayed.x-viewCenter.x,y:displayed.y-viewCenter.y,z:displayed.z-viewCenter.z}}
     // Fit once on mount/settlement and reset; explicit camera changes opt out until reset.
     function fitDefault(){
       if(!model.points.length||width<=0||height<=0)return;
-      for(const axis of ['x','y','z']){const values=model.points.map(point=>point[axis]);viewCenter[axis]=(Math.min(...values)+Math.max(...values))/2}
+      // Keep a 3% gap between default-view group envelopes; crowded layouts retain their original size.
+      const baselineCenter={};
+      for(const axis of ['x','y','z']){const values=model.points.map(point=>point[axis]);baselineCenter[axis]=(Math.min(...values)+Math.max(...values))/2}
+      const overview=point=>projectPoint({x:point.x-baselineCenter.x,y:point.y-baselineCenter.y,z:point.z-baselineCenter.z},DEFAULT_CAMERA,650,650);
+      const envelopes=new Map(model.groups.map(item=>[item.key,{...overview(item),radius:0}]));
+      for(const point of model.points){const projected=overview(point),envelope=envelopes.get(point.group);envelope.radius=Math.max(envelope.radius,Math.hypot(projected.x-envelope.x,projected.y-envelope.y))}
+      const neighborhoods=[...envelopes.values()];interiorScale=1.30;
+      for(let i=0;i<neighborhoods.length;i++)for(let j=i+1;j<neighborhoods.length;j++){const a=neighborhoods[i],b=neighborhoods[j],radii=a.radius+b.radius;if(radii>0)interiorScale=Math.min(interiorScale,.97*Math.hypot(a.x-b.x,a.y-b.y)/radii)}
+      interiorScale=clamp(interiorScale,1,1.30);
+      for(const axis of ['x','y','z']){const values=model.points.map(point=>displayPoint(point)[axis]);viewCenter[axis]=(Math.min(...values)+Math.max(...values))/2}
       Object.assign(overviewCenter,viewCenter);
       const projected=model.points.map(point=>projectPoint(relative(point),{...DEFAULT_CAMERA},width,height));
       const extentX=Math.max(...projected.map(point=>Math.abs(point.x-width/2))),extentY=Math.max(...projected.map(point=>Math.abs(point.y-height/2)));
-      const padding=Math.max(22,Math.min(width,height)*.06);
+      const padding=Math.max(20,Math.min(width,height)*.05);
       camera.zoom=clamp(Math.min(Math.max(1,width/2-padding)/Math.max(1,extentX),Math.max(1,height/2-padding)/Math.max(1,extentY)),.45,3);baseZoom=camera.zoom;
       // Fill the available aspect ratio without cropping; drawing and picking share this projection.
       horizontalSpread=Math.max(1,(width/2-padding)/Math.max(1,extentX*camera.zoom));
@@ -145,7 +156,7 @@
       for(const p of projected.filter(p=>p.visible).sort((a,b)=>b.depth-a.depth)){
         const node=model.points[p.index].node,value=Number(node.brightness),brightness=Number.isFinite(value)?clamp(value,.12,1):.12,radius=clamp((1+brightness*1.2)*p.scale,1,3),halo=radius*(brightness>.2?4:2);
         const glow=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,halo);glow.addColorStop(0,`rgba(143,199,255,${brightness*.25})`);glow.addColorStop(1,'rgba(72,139,255,0)');ctx.fillStyle=glow;ctx.beginPath();ctx.arc(p.x,p.y,halo,0,Math.PI*2);ctx.fill();
-        ctx.fillStyle=`rgba(190,224,255,${.38+brightness*.58})`;ctx.beginPath();ctx.arc(p.x,p.y,radius,0,Math.PI*2);ctx.fill();
+        ctx.fillStyle=`rgba(190,224,255,${.46+brightness*.50})`;ctx.beginPath();ctx.arc(p.x,p.y,radius,0,Math.PI*2);ctx.fill();
         if(p.index===selected){ctx.strokeStyle='#e1c594';ctx.lineWidth=1.3;ctx.beginPath();ctx.arc(p.x,p.y,radius+7,0,Math.PI*2);ctx.stroke()}
         if(camera.zoom/baseZoom>=.75&&!labelsVisible&&p.index===selected){ctx.font='12px system-ui, sans-serif';ctx.textAlign='center';ctx.fillStyle=p.index===selected?'#f3dfba':'#a2b5d0';const title=String(node.title||'未命名考点');ctx.fillText(title.length>22?title.slice(0,21)+'…':title,p.x,p.y+radius+23,Math.max(30,width-20))}
       }
