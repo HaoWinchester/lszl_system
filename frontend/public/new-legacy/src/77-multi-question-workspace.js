@@ -3710,7 +3710,8 @@
     const outOfBounds=[],oversized=[];
     visible.forEach(record=>{
       const rect=recordRect(record);
-      if(rect.width>1200||rect.height>4200){oversized.push({nodeId:String(record.id),rect});record.element?.classList.add('has-layout-warning')}
+      const maxWidth=record.element?.querySelector('.qm-card-case-layout')?1400:1200;
+      if(rect.width>maxWidth||rect.height>4200){oversized.push({nodeId:String(record.id),rect});record.element?.classList.add('has-layout-warning')}
     });
     const groupOverflow=[];
     (state.workspace?.groups||[]).filter(group=>!group.collapsed).forEach(group=>{

@@ -93,15 +93,56 @@ def check_account_switch(p, browser, base):
         server_owner.dispose()
 
 
+def check_case_width_diagnostics(p, browser, base):
+    """Supported wide case cards must not be diagnosed as corrupt geometry."""
+    teacher = browser.new_context()
+    student = browser.new_context(viewport={'width':1440,'height':1000})
+    try:
+        assert teacher.request.post(base+'/api/v1/auth/login',data={'username':'ink-browser','password':'ink-browser-test'}).ok
+        result=teacher.request.post(base+'/api/v1/question-materials',data={'title':'案例尺寸检查','text':'案例材料：先分析再行动。'})
+        assert result.ok,result.text()
+        material=result.json()['material'];token=uuid4().hex;rows=[]
+        for order in (1,2,0):
+            question={'type':'single_choice','title':f'尺寸检查{order}-{token}','scope':'public','subject':'PMP','stemParts':[{'text':'如何处理变更？'}],'options':[{'id':'A','text':'先分析','correct':True},{'id':'B','text':'直接执行'}],'correctAnswer':'A','analysis':'先分析再按流程处理。'}
+            if order:question.update(material=material,caseGroup={'id':material['id'],'order':order,'total':2})
+            response=teacher.request.post(base+'/api/v1/banks/ink-bank/questions',data=question)
+            assert response.ok,response.text()
+            q=response.json()['question'];rows.append({'questionId':q['id'],'bankId':'ink-bank','question':q,'order':len(rows)+1})
+        response=teacher.request.post(base+'/api/v1/paper-releases/publish-payload',data={'releaseId':'width-release-'+token,'paperId':'width-paper-'+token,'name':'案例尺寸验证','subject':'PMP','paperType':'mixed','publishedBy':'ink-browser','enabledModes':['multi_question_canvas'],'allowedRoles':['teacher','student'],'questions':rows,'questionSnapshots':rows})
+        assert response.ok,response.text()
+        release=response.json()['release']
+        assert student.request.post(base+'/api/v1/auth/login',data={'username':'ink-student','password':'ink-browser-test'}).ok
+        page=student.new_page()
+        page.goto(base+'/question-workspace.html?paperId='+release['paperId']+'&releaseId='+release['releaseId']+'&workspace=width-'+token,wait_until='networkidle')
+        page.wait_for_function('window.KGMultiQuestionWorkspace?.getState().questionCount===3 && !KGMultiQuestionWorkspace.getState().readonly')
+        for row in rows:
+            page.evaluate('(r)=>KGMultiQuestionWorkspace.addQuestionByReference(r)',{'questionId':row['questionId'],'bankId':'ink-bank','paperId':release['paperId'],'releaseId':release['releaseId']})
+        expect(page.locator('.qw-question-card')).to_have_count(3)
+        assert page.evaluate('KGMultiQuestionWorkspace.diagnoseLayout().oversized.length')==0,'default 16:9 case cards are supported sizes'
+        ids=page.evaluate('''()=>{const nodes=Object.values(KGMultiQuestionWorkspace.activeWorkspace().nodes);return {caseId:nodes.find(n=>document.querySelector('[data-node-id="'+n.id+'"] .qm-card-case-layout')).id,plainId:nodes.find(n=>!document.querySelector('[data-node-id="'+n.id+'"] .qm-card-case-layout')).id}}''')
+        page.evaluate('''ids=>{const s=KGCanvasWorkspaceStore;for(const [id,width] of [[ids.caseId,1400],[ids.plainId,1320]]){const n=s.ensure().nodes[id];s.updateNodeLayout(id,{x:n.x,y:n.y,width,height:Math.ceil(width*9/16)});}}''',ids)
+        page.wait_for_function("id=>document.querySelector('[data-node-id=\"'+id+'\"]').offsetWidth===1400",arg=ids['caseId'])
+        flagged=page.evaluate('KGMultiQuestionWorkspace.diagnoseLayout().oversized.map(x=>x.nodeId)')
+        assert flagged==[ids['plainId']],flagged
+        print('PASS: default/max-width case cards avoid false warnings; oversized ordinary cards remain diagnosed',flush=True)
+    finally:
+        student.close();teacher.close()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--base-url', required=True)
     parser.add_argument('--account-switch-only', action='store_true')
+    parser.add_argument('--case-diagnostics-only', action='store_true')
     args = parser.parse_args()
     base = args.base_url.rstrip('/')
     assert urlparse(base).hostname in ('localhost', '127.0.0.1'), 'Local disposable server only'
     with sync_playwright() as p:
         browser = p.chromium.launch(executable_path='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless=True)
+        if args.case_diagnostics_only:
+            check_case_width_diagnostics(p, browser, base)
+            browser.close()
+            return
         if args.account_switch_only:
             check_account_switch(p, browser, base)
             browser.close()
@@ -162,6 +203,7 @@ def main():
         print('PASS: published catalog and release-history updates still refresh cards', flush=True)
         assert not errors, errors
         check_account_switch(p, browser, base)
+        check_case_width_diagnostics(p, browser, base)
         browser.close()
 
 
