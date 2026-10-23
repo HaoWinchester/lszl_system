@@ -86,3 +86,12 @@ Local preview is running on5527 (real owner API) and5530 (clearly labeled bright
 - [x] Locally expand within-group coordinates ~1.25, use one coordinate path for fit/draw/pick/anchors. Raise star alpha modestly with existing brightness monotonic; leave edges/dock/modal untouched.
 - [x] Run sceneNode+scene browser including317/1000, semantic browser because projection/labels touched; inspect desktop andphone samples. Commit only scene/tests, report full commands/results and actual beforeafter sizes. No sync/VERSION/push/deploy.
 - [x] Root scoped review/sync/actual317fiveviewport capture/contracts/currentIAB, update verification then leave localpreview for user.
+
+### Task 6: Three-category layout and gentle self rotation
+
+- [ ] Add failing shared structural-root filter/layout and explicit automatic-motion lifecycle checks before production edits.
+- [ ] Add shared structural-root predicate; dashboard derives full counts then excludes only structural overview. Render316PMP nodes/threecategories, semantic Process central with People/Environment lower and closer; preserve generic layouts.
+- [ ] Extend scene opt-in selfrotation with shared coordinates, existingRAF/timebased pace, safe fit, pause/resume/hidden/reduce/destroy guards. Default dashboard enabled; staticscene default unchanged.
+- [ ] Add accessible pause/start control in secondary dock row, modal/interaction pause coordination and true status synchronization. Keep prior UI/lifecycle.
+- [ ] Update only invalidated published fixture expectations and old layout-size comparison; verify Node/scene/semantic/dashboard browsers + dedicated normal-motion auto test. Capture actual source316 desktop/phone and inspect motion. Commit source/tests; report. No sync/version/deploy/push.
+- [ ] Root review/sync/samplecaption316/fiveviewport actual checks + contracts + currentIAB observedrotation; update docs andleave preview.
