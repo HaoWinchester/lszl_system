@@ -1,19 +1,10 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.380",
+  "fromVersion": "v9.0-p4.1.382",
   "toVersion": "v9.0-p4.1.382",
   "changes": {
     "added": [],
-    "changed": [
-      "VERSION",
-      "content-prep-studio/dist/content-prep.html",
-      "src/practice/knowledge-dashboard.js",
-      "styles/knowledge-dashboard.css",
-      "tests/case-learning-modes-browser.py",
-      "tests/graph-edge-midpoints.test.js",
-      "tests/graph-fixed-ports.test.js",
-      "tests/knowledge-dashboard-browser.py"
-    ],
+    "changed": [],
     "removed": []
   },
   "incompatible": []

@@ -23,11 +23,11 @@
 
 **Interfaces:** Keep existing persisted from/to ids, fromPort/toPort and waypoints compatible. Render-only bundling must not destroy relations or relocate explicit ports.
 
-- [ ] Add failing geometry/controller regressions for batch elbow conversion, arbitrary old waypoints, explicit endpoints, drag/rebind and redundant collinear corners.
-- [ ] Implement strictly horizontal/vertical elbow routes. Image two is the desired pattern: leave a bottom port vertically, traverse horizontally, approach a top port vertically. Do not override user-selected source/target ports by nearest-edge-center routing.
-- [ ] Support same-route collinear simplification and overlapping shared trunks across independent relations, including manually dragged routes. Preserve all edge ids, arrows, direction and bindings. Move cards and save/refresh without losing relations. Keep intentional backtracks when necessary for explicit port direction.
-- [ ] Anchor edge settings near the triggering control and every toolbar submenu below its own button, with viewport clamping. Cover graph and shared learning canvases.
-- [ ] Run existing graph geometry, bundle, fixed-port, feedback and toolbar tests plus actual browser regression; document failures and results.
+- [x] Add failing geometry/controller regressions for batch elbow conversion, arbitrary old waypoints, explicit endpoints, drag/rebind and redundant collinear corners.
+- [x] Implement strictly horizontal/vertical elbow routes. Image two is the desired pattern: leave a bottom port vertically, traverse horizontally, approach a top port vertically. Do not override user-selected source/target ports by nearest-edge-center routing.
+- [x] Support same-route collinear simplification and overlapping shared trunks across independent relations, including manually dragged routes. Preserve all edge ids, arrows, direction and bindings. Move cards and save/refresh without losing relations. Keep intentional backtracks when necessary for explicit port direction.
+- [x] Anchor edge settings near the triggering control and every toolbar submenu below its own button, with viewport clamping. Cover graph and shared learning canvases.
+- [x] Run existing graph geometry, bundle, fixed-port, feedback and toolbar tests plus actual browser regression; document failures and results.
 
 ### Task 2: New case learning, practice controls, UAT sample and external references
 
@@ -35,12 +35,12 @@
 
 **Interfaces:** Existing database question payloads, case material/group metadata, matching/multiple/single question types and learning APIs; no automatic external question import.
 
-- [ ] Reproduce and add failing tests for existing case questions entering multi-question induction and deep recall; preserve case material and answer contracts through both paths. Do not fake unavailable author-created recall materials.
-- [ ] Reproduce report review -> next wrong question -> danmaku toggle; one click must reflect the new enabled state and playback. Extend the shared comment controller/mount behavior rather than copying implementations.
-- [ ] Move report actions to the top of the wrong-answer list and keep them sticky during scrolling without covering questions. Verify at desktop/mobile sizes.
-- [ ] Search authoritative external PMP new-type/sample pages, verify links and write a short Chinese source list for user review. Do not import any external questions until user selection.
-- [ ] Seed exactly one clearly identified UAT test question to a total of 200 tagged test comments, idempotently. Do not change production or other questions. Record question/paper identifiers for acceptance. Prefer a dedicated test paper/question over real user questions; preserve existing real comments.
-- [ ] Run focused unit/API/browser tests and record results.
+- [x] Reproduce and add failing tests for existing case questions entering multi-question induction and deep recall; preserve case material and answer contracts through both paths. Do not fake unavailable author-created recall materials.
+- [x] Reproduce report review -> next wrong question -> danmaku toggle; one click must reflect the new enabled state and playback. Extend the shared comment controller/mount behavior rather than copying implementations.
+- [x] Move report actions to the top of the wrong-answer list and keep them sticky during scrolling without covering questions. Verify at desktop/mobile sizes.
+- [x] Search authoritative external PMP new-type/sample pages, verify links and write a short Chinese source list for user review. Do not import any external questions until user selection.
+- [x] Seed exactly one clearly identified UAT test question to a total of 200 tagged test comments, idempotently. Do not change production or other questions. Record question/paper identifiers for acceptance. Prefer a dedicated test paper/question over real user questions; preserve existing real comments.
+- [x] Run focused unit/API/browser tests and record results.
 
 ### Task 3: Knowledge-space aggregation and four learning entries
 
@@ -48,18 +48,22 @@
 
 **Interfaces:** Preserve real knowledge-dashboard API data, pagination, accessible list, selection, refresh/retry and scene cleanup. One entry opens the existing knowledge-space dialog.
 
-- [ ] Add failing scene tests for semantic zoom: zoomed-out class clusters; zoomed-in individual points; stable grouping by subject/category; cluster click/zoom usability.
-- [ ] Implement cluster display using existing model; retain per-point selection at detailed scale. Label clusters meaningfully using available classification names/paths, not opaque ids.
-- [ ] Expand the entire scene canvas to the large main content area in the user screenshot. Keep details accessible without a permanently wide left column. Convert overview statistics to a compact top-right line and retain refresh functionality. Keep responsive controls within the viewport.
-- [ ] Place exactly four entries together at the learning entry: 知识图谱、多题归纳、深度回忆、知识星空. Remove duplicate star entry where appropriate. Preserve auth and empty-state behavior.
-- [ ] Run scene/dashboard/entry unit tests and real browser layout, zoom, selection, keyboard/list, close/reopen/refresh regressions.
+- [x] Add failing scene tests for semantic zoom: zoomed-out class clusters; zoomed-in individual points; stable grouping by subject/category; cluster click/zoom usability.
+- [x] Implement cluster display using existing model; retain per-point selection at detailed scale. Label clusters meaningfully using available classification names/paths, not opaque ids.
+- [x] Expand the entire scene canvas to the large main content area in the user screenshot. Keep details accessible without a permanently wide left column. Convert overview statistics to a compact top-right line and retain refresh functionality. Keep responsive controls within the viewport.
+- [x] Place exactly four entries together at the learning entry: 知识图谱、多题归纳、深度回忆、知识星空. Remove duplicate star entry where appropriate. Preserve auth and empty-state behavior.
+- [x] Run scene/dashboard/entry unit tests and real browser layout, zoom, selection, keyboard/list, close/reopen/refresh regressions.
 
 ### Task 4: Integration, release and UAT
 
-- [ ] Review each task and the complete diff for spec compliance and quality; resolve significant findings before release.
-- [ ] Run frontend pnpm test, pnpm test:design, backend .venv/bin/python -m pytest tests/ -q, relevant browser tests and release validation.
-- [ ] Before release, compare current active site file inventory against source/sync and candidate. Confirm admin-console.html and all prior paths remain. Use manage-new-legacy.js update; never hand-copy site files.
-- [ ] Commit source/generated manifests and release metadata. Merge the tested feature branch to uat, push using command-scoped http://127.0.0.1:7897 proxy, verify remote ref.
-- [ ] Back up remote UAT code and database, validate nonempty archives/dump, write manifest and retain previous image. Deploy only UAT through deploy/update-uat.sh. If release generation changes tracked files, commit and push those results and verify the deployed commit baseline.
-- [ ] Verify public version, health, static hashes and file inventory, test the acceptance paths, seed the designated test question, and record backup path. Confirm main ref and production version remain unchanged.
-- [ ] Report UAT URL/version, test question location, PMP source list, tests and material limitations. Wait for user acceptance; preserve the feature branch.
+- [x] Review each task and the complete diff for spec compliance and quality; resolve significant findings before release.
+- [x] Run frontend pnpm test, pnpm test:design, backend .venv/bin/python -m pytest tests/ -q, relevant browser tests and release validation.
+- [x] Before release, compare current active site file inventory against source/sync and candidate. Confirm admin-console.html and all prior paths remain. Use manage-new-legacy.js update; never hand-copy site files.
+- [x] Commit source/generated manifests and release metadata. Merge the tested feature branch to uat, push using command-scoped http://127.0.0.1:7897 proxy, verify remote ref.
+- [x] Back up remote UAT code and database, validate nonempty archives/dump, write manifest and retain previous image. Deploy only UAT through deploy/update-uat.sh. If release generation changes tracked files, commit and push those results and verify the deployed commit baseline.
+- [x] Verify public version, health, static hashes and file inventory, test the acceptance paths, seed the designated test question, and record backup path. Confirm main ref and production version remain unchanged.
+- [x] Report UAT URL/version, test question location, PMP source list, tests and material limitations. Wait for user acceptance; preserve the feature branch.
+
+## Completion evidence
+
+Development self-checks and UAT deployment completed on 2026-10-23. See `docs/verification/2026-10-23-learning-feedback-three-groups-uat.md` for exact tests, deployment deviations, backup, data identifiers and limitations. UAT business acceptance is pending; main unchanged.
