@@ -84,3 +84,11 @@ User explicitly rejected the reserved top close row. Existing close button now f
 New semantic test first failed `scene should reach dialog top without a reserved close band`, then passed after CSS change.1440/559×854/390 verify canvas reaches dialog top, refresh/close do not overlap, both physically receive pointer hits, and close target remains at least44px. Existing physical close, native focus/Escape restoration, scroll reachability and fallback checks retained.
 
 `python3 new-legacy/tests/knowledge-dashboard-browser.py`:14 passed after floating close, including390/320 physical close after list/detail scrolling, no overflow and Canvas fallback controls. Semantic assertions passed all1440/559/390 viewports. `git diff --check` passed. This follow-up changes only existing CSS and maintained browser assertions; no sync/deploy by this agent.
+
+## Final P2 — scrolling foreground summary
+
+Restored pointer events only for the existing horizontal-scroll `[data-knowledge-summary]` paragraph; single-line compact layout and noninteractive title gesture passthrough remain. No other production changes.
+
+Added real-response317 nodes/51 attempts/23 unknown/28 unmapped semantic browser cases at559 and390: prove paragraph overflows, physically dispatch horizontal wheel over its bounding box, require positive scrollLeft, and require unchanged scene camera. Existing title hit-test still resolves to Canvas, with all floating-close/refresh/fallback/lifecycle coverage retained.
+
+Red: semantic browser passed1440 then failed559 at `physical horizontal wheel must reveal trailing summary counts` (scrollLeft remained0). Green: scoped pointer-events fix;559 and390 physical summary wheel assertions passed while title passthrough and camera invariance passed. `python3 new-legacy/tests/knowledge-dashboard-browser.py`:14 checks passed. `git diff --check`:passed. No sync/deployment by this agent.

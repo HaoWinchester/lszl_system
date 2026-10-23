@@ -62,6 +62,15 @@ with sync_playwright() as p:
   expect(page.locator('[data-knowledge-groups]')).to_contain_text('PMP · 人 / 2')
   expect(page.locator('[data-knowledge-groups]')).to_contain_text('PMP · 过程 / 1')
   expect(page.locator('[data-knowledge-groups]')).not_to_contain_text('未分类')
+  if width in (559,390):
+   page.evaluate('''()=>{KGDomainApi.request=async()=>({attemptCount:51,unknownAttemptCount:23,unmappedAttemptCount:28,nodes:Array.from({length:317},(_,i)=>({id:String(i),parentId:null,title:'当前目录'+i,attemptCount:0}))})}''')
+   page.locator('[data-knowledge-refresh]').click();page.wait_for_function('scenes.at(-1).snapshot().settled && !scenes.at(-1).snapshot().running')
+   summary=page.locator('[data-knowledge-summary]');summary.scroll_into_view_if_needed()
+   assert summary.evaluate('e=>e.scrollWidth>e.clientWidth'), 'long real-response summary must exercise overflow'
+   camera=page.evaluate('scenes.at(-1).snapshot().camera');rect=summary.bounding_box()
+   page.mouse.move(rect['x']+rect['width']/2,rect['y']+rect['height']/2);page.mouse.wheel(600,0);page.wait_for_timeout(200)
+   assert summary.evaluate('e=>e.scrollLeft')>0, 'physical horizontal wheel must reveal trailing summary counts'
+   assert page.evaluate('scenes.at(-1).snapshot().camera')==camera, 'summary scroll cannot move star camera'
   print(f'{width}: semantic zoom, cluster click, full canvas, drawer/list, refresh/retry, full catalog, auth invalidation, close/reopen passed')
   page.close()
  browser.close()

@@ -49,7 +49,7 @@
 .kg-knowledge-shell{position:relative;isolation:isolate}
 .kg-knowledge-shell>.kg-knowledge-network{position:absolute;z-index:0;inset:0;width:100%;height:max(620px,100%);pointer-events:auto}
 .kg-knowledge-shell>:where(:not(.kg-knowledge-network)){position:relative;z-index:1;pointer-events:none}
-.kg-knowledge-shell button,.kg-knowledge-shell summary,.kg-knowledge-detail-content,.kg-knowledge-groups{pointer-events:auto}
+.kg-knowledge-shell button,.kg-knowledge-shell summary,.kg-knowledge-detail-content,.kg-knowledge-groups,.kg-knowledge-shell [data-knowledge-summary]{pointer-events:auto}
 .kg-knowledge-header>div,.kg-knowledge-space-heading,.kg-knowledge-help,.kg-knowledge-dialog #kgKnowledgeMeaning{background:#060b14a6;text-shadow:0 1px 5px #000}
 .kg-knowledge-space{background:none;min-height:max(480px,calc(100dvh - 330px))}
 .kg-knowledge-camera{position:absolute;right:0;bottom:48px}
