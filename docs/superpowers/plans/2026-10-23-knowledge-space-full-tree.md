@@ -79,3 +79,10 @@ Local preview is running on5527 (real owner API) and5530 (clearly labeled bright
 - [x] Reorganize existing DOM into unified responsive bottom dock. Keep original IDs/data attributes and detail native dialog; compact one total summary, real accessible expandable help, no mid-height horizontal cut. Clean conflicting rules in touched CSS rather than append another contradictory patch.
 - [x] Verify existing Node/dashboard/semantic/scene browsers, real317 source screenshots at1440/1280/559/390/shortphone. Inspect and refine visual composition before reporting. Commit source/tests; report TDD commands/results/screenshots/concerns. No sync/VERSION/push/deploy.
 - [x] Root independent visual+source review, sync preview, inspect same real317 sample desktop/mobile, run relevant contracts, update current IAB and docs. Leave local preview for user.
+
+### Task 5: Larger constellation interiors and modest star lift
+
+- [ ] Capture current actual317 projected cluster sizes/brightness as baseline; add focused failing rendered comparison for larger group interiors with retained gaps/allnodes/fit.
+- [ ] Locally expand within-group coordinates ~1.25, use one coordinate path for fit/draw/pick/anchors. Raise star alpha modestly with existing brightness monotonic; leave edges/dock/modal untouched.
+- [ ] Run sceneNode+scene browser including317/1000, semantic browser because projection/labels touched; inspect desktop andphone samples. Commit only scene/tests, report full commands/results and actual beforeafter sizes. No sync/VERSION/push/deploy.
+- [ ] Root scoped review/sync/actual317fiveviewport capture/contracts/currentIAB, update verification then leave localpreview for user.
