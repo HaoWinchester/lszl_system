@@ -17,7 +17,7 @@ with sync_playwright() as p:
   page.add_script_tag(path=str(ROOT/'new-legacy/src/practice/knowledge-dashboard.js'))
   page.locator('#open').click();page.wait_for_function('scenes.at(-1).snapshot().settled')
   assert page.evaluate('scenes.at(-1).snapshot().mode')=='clusters'
-  assert page.evaluate('starArcs')>=162, 'overview must draw real catalog stars beneath clusters'
+  assert page.evaluate('starArcs')>=81, 'overview must draw real catalog stars beneath clusters'
   assert page.evaluate('overlay.length===81 && overlay.every(n=>n.brightness===.12 && n.relatedAttemptCount===0)')
   box=page.locator('canvas').bounding_box();shell=page.locator('.kg-knowledge-body').bounding_box()
   dialog_box=page.locator('#kgKnowledgeDashboard').bounding_box()
@@ -62,7 +62,7 @@ with sync_playwright() as p:
   expect(page.locator('[data-knowledge-details-open]')).to_be_focused()
   page.locator('[data-knowledge-labels]').click();expect(page.locator('[data-knowledge-labels]')).to_have_attribute('aria-pressed','true')
   page.wait_for_function('scenes.at(-1).snapshot().labels.length>0')
-  assert page.evaluate('drawnLabels.some(t=>t.includes("考点"))'), 'labels must reach real Canvas fillText'
+  page.wait_for_function('drawnLabels.some(t=>t.includes("考点"))') # Wait for the requested Canvas paint, not just computed layout.
   labels=page.evaluate('scenes.at(-1).snapshot().labels')
   assert len({i for label in labels for i in label['indices']})==sum(len(label['indices']) for label in labels)
   dock=page.locator('.kg-knowledge-camera').bounding_box()

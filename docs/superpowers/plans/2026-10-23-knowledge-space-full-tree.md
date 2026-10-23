@@ -105,8 +105,8 @@ Local preview is running on5527 (real owner API) and5530 (clearly labeled bright
 
 Files: existing new-legacy/src/practice/knowledge-space-scene.js, knowledge-dashboard.js, styles/knowledge-dashboard.css and maintained knowledge-space tests.
 
-- [ ] Read original visual authority and source/current desktop screenshots. Add failing inline selection/depth/style regression before production changes.
-- [ ] Restore original Canvas atmosphere, depth, restrained category color and selected/practiced emphasis using shared projection, all316 real nodes/edges and three fixed anchors. Keep generic support and phase bounds.
-- [ ] Restore original-style selected info area and lightweight module dock using shared select/step; preserve explicit child dialog only, owner/error/fallback/lifecycle and responsive plot space.
-- [ ] Send early actual316 desktop+phone screenshots to root; refine against original, then run existing focused Node and serial dashboard/semantic/auto/scene browsers. Commit source/tests and report evidence/limits.
-- [ ] Root review spec+quality/visual, sync into existing5530preview, five-size actualsample/source checks, documented frontendcontracts and current IAB inspection. Final integrationreview, verification docs and clean commit. Localpreviewonly.
+- [x] Read original visual authority and source/current desktop screenshots. Add failing inline selection/depth/style regression before production changes.
+- [x] Restore original Canvas atmosphere, depth, restrained category color and selected/practiced emphasis using shared projection, all316 real nodes/edges and three fixed anchors. Keep generic support and phase bounds.
+- [x] Restore original-style selected info area and lightweight module dock using shared select/step; preserve explicit child dialog only, owner/error/fallback/lifecycle and responsive plot space.
+- [x] Send early actual316 desktop+phone screenshots to root; refine against original, then run existing focused Node and serial dashboard/semantic/auto/scene browsers. Commit source/tests and report evidence/limits.
+- [x] Root review spec+quality/visual, sync into existing5530preview, five-size actualsample/source checks, documented frontendcontracts and current IAB inspection. Final integrationreview, verification docs and clean commit. Localpreviewonly.

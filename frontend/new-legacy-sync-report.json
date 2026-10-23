@@ -6,8 +6,7 @@
     "added": [],
     "changed": [
       "src/practice/knowledge-dashboard.js",
-      "tests/knowledge-dashboard-browser.py",
-      "tests/knowledge-space-auto-browser.py"
+      "tests/knowledge-dashboard-browser.py"
     ],
     "removed": []
   },

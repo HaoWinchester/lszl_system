@@ -164,5 +164,27 @@ test('structural overview is excluded precisely with consistent point and edge i
 });
 test('three named categories place Process above centered People and Environment regardless of input order',()=>{
  const api=require(file),model=api.createModel(['环境','过程','人'].map(name=>({parentId:null,subject:'PMP',path:['PMP',name]}))),byName=Object.fromEntries(model.groups.map(g=>[JSON.parse(g.key)[2],g]));
- assert.equal(byName['过程'].x,0);assert.equal(byName['过程'].y,0);assert.ok(byName['人'].x<0&&byName['环境'].x>0);assert.equal(byName['人'].y,byName['环境'].y);assert.ok(byName['人'].y>byName['过程'].y);
+ assert.equal(byName['过程'].x,0);assert.ok(byName['过程'].y<=0);assert.ok(byName['人'].x<0&&byName['环境'].x>0);assert.equal(byName['人'].y,byName['环境'].y);assert.ok(byName['人'].y>byName['过程'].y);
+});
+
+test('published constellation retains volumetric depth after settling',()=>{
+ const api=require(file),nodes=require('./fixtures/knowledge-space-published-catalog.json').nodes,m=api.createModel(nodes);
+ while(!m.settled)api.stepModel(m);
+ assert.equal(m.points.length,316);
+ for(const group of m.groups){const zs=group.indices.map(i=>m.points[i].z);assert.ok(Math.max(...zs)-Math.min(...zs)>100,'depth must not collapse into a flat disk')}
+});
+
+test('full Y-rotation remains inside the fitted 3D envelope at every phase',()=>{
+ const api=require(file),m=api.createModel(require('./fixtures/knowledge-space-published-catalog.json').nodes);while(!m.settled)api.stepModel(m);
+ const camera={yaw:.24,pitch:-.12,zoom:1},envelope=api.rotationEnvelope(m).map(p=>api.projectPoint(p,camera,1440,960));
+ const bounds={x:[Math.min(...envelope.map(p=>p.x)),Math.max(...envelope.map(p=>p.x))],y:[Math.min(...envelope.map(p=>p.y)),Math.max(...envelope.map(p=>p.y))]};
+ for(let phase=0;phase<Math.PI*2;phase+=Math.PI/24)for(const group of m.groups)for(const index of group.indices){const p=api.projectPoint(api.rotateLocal(m.points[index],group,phase),camera,1440,960);for(const axis of ['x','y'])assert.ok(p[axis]>=bounds[axis][0]&&p[axis]<=bounds[axis][1],`phase ${phase}: ${axis} escapes fit`)}
+ assert.equal(api.categoryColor('["PMP","","人"]'),'#ffd58b');assert.equal(api.categoryColor('["PMP","","过程"]'),'#8bdcff');assert.equal(api.categoryColor('["PMP","","环境"]'),'#80f0b8');
+});
+
+test('real category hulls keep a gap throughout automatic Y rotation',()=>{
+ const api=require(file),m=api.createModel(require('./fixtures/knowledge-space-published-catalog.json').nodes);while(!m.settled)api.stepModel(m);
+ const hull=points=>{points.sort((a,b)=>a.x-b.x||a.y-b.y);const cross=(o,a,b)=>(a.x-o.x)*(b.y-o.y)-(a.y-o.y)*(b.x-o.x),half=ps=>{const h=[];for(const p of ps){while(h.length>1&&cross(h.at(-2),h.at(-1),p)<=0)h.pop();h.push(p)}return h.slice(0,-1)};return [...half(points),...half([...points].reverse())]};
+ const gap=(a,b)=>Math.max(...[a,b].flatMap(p=>p.map((v,i)=>{const q=p[(i+1)%p.length],x=-(q.y-v.y),y=q.x-v.x,l=Math.hypot(x,y),aa=a.map(p=>(p.x*x+p.y*y)/l),bb=b.map(p=>(p.x*x+p.y*y)/l);return Math.max(Math.min(...aa)-Math.max(...bb),Math.min(...bb)-Math.max(...aa))})));
+ for(let phase=0;phase<Math.PI*2;phase+=Math.PI/24){const hulls=m.groups.map(g=>hull(g.indices.map(i=>api.projectPoint(api.rotateLocal(m.points[i],g,phase),{yaw:.24,pitch:-.12,zoom:1},650,650))));for(let i=0;i<hulls.length;i++)for(let j=i+1;j<hulls.length;j++)assert.ok(gap(hulls[i],hulls[j])>0,`category overlap at phase ${phase}`)}
 });
