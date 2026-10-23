@@ -216,6 +216,7 @@ python3 new-legacy/tests/practice-danmaku-recovery-browser.py
 python3 new-legacy/tests/comment-composer-popover-browser.py
 python3 new-legacy/tests/practice-answer-sheet-browser.py
 python3 new-legacy/tests/practice-result-report-browser.py
+python3 new-legacy/tests/practice-report-feedback-browser.py
 python3 new-legacy/tests/practice-instant-feedback-browser.py
 python3 new-legacy/tests/practice-lobby-fidelity-browser.py
 python3 new-legacy/tests/practice-side-nav-comments-browser.py

@@ -729,3 +729,8 @@ body.practice-mode-page[data-practice-view="lobby"] .practice-exp-fab{display:no
 .practice-answer-sheet-legend i.is-answered{background:#98a2b3}
 .practice-explanation-toggle:has(input:disabled){opacity:.55}
 #practiceInstantFeedbackHint{font-size:12px;color:#667085}
+
+/* 错题操作在列表顶部吸顶；保留正常文档流，题目不会被覆盖。 */
+.practice-report-actions{position:sticky;top:64px;z-index:20;background:var(--practice-bg,#f6f8fb);border:1px solid var(--practice-border,#e2e8f0);border-radius:12px}
+.practice-report-review{scroll-margin-top:160px}
+@media(max-width:520px){.practice-report-actions{flex-direction:row;flex-wrap:wrap;padding:10px;gap:6px}.practice-report-actions button{width:auto;flex:1;min-width:95px;font-size:11px}}
