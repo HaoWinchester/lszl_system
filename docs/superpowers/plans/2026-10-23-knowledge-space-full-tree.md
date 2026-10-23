@@ -68,3 +68,14 @@ Local preview is running on5527 (real owner API) and5530 (clearly labeled bright
 - [x] Implement 显示文字 with immediate visible detailed-label result, deterministic screen-space aggregation with complete represented membership, semantic category text on zoom-out and no text below0.75fit; toggle off keeps baseline category/selection context. No silent label slice or business-data mutation.
 - [x] Run Node/dashboard/semantic/scene/entry relevant browser tests, including1000nodes and physical child-popup/Escape/scroll/focus/foreground controls. Commit source/tests and append task report. Do not sync, change VERSION, or deploy.
 - [x] Root runs scoped review, syncs preview, refreshes current IAB and verifies screenshot, runs relevant contracts, updates verification/checklist; stop at local visual preview.
+
+### Task 4: User-approved constellation composition and bottom dock
+
+**Files:** Existing shared knowledge-dashboard.js, knowledge-space-scene.js, knowledge-dashboard.css and their maintained Node/browser tests; source-only implementer, root sync/artifacts/docs.
+
+- [ ] Read exact approved latest spec section. Add meaningful failing checks for whole-catalog separated groups, compact star rendering/semantic labels, unified visible bottom dock at desktop/mobile; preserve lifecycle/negative checks.
+- [ ] Extend existing scene model/projection/drawing to keep categories spatially distinct, small dim stars and restrained brightness emphasis, quieter real edges and selected-path emphasis. All nodes/edges identities preserved; initial fit/reset and1000-node cost remain bounded.
+- [ ] Refine labels toward their members with semantic grouping, deterministic exact coverage and readable positioning; retain toggle/off/far-hide, picking and rotation.
+- [ ] Reorganize existing DOM into unified responsive bottom dock. Keep original IDs/data attributes and detail native dialog; compact one total summary, real accessible expandable help, no mid-height horizontal cut. Clean conflicting rules in touched CSS rather than append another contradictory patch.
+- [ ] Verify existing Node/dashboard/semantic/scene browsers, real317 source screenshots at1440/1280/559/390/shortphone. Inspect and refine visual composition before reporting. Commit source/tests; report TDD commands/results/screenshots/concerns. No sync/VERSION/push/deploy.
+- [ ] Root independent visual+source review, sync preview, inspect same real317 sample desktop/mobile, run relevant contracts, update current IAB and docs. Leave local preview for user.

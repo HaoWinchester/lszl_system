@@ -33,3 +33,19 @@ Align summary/refresh at the upper right near the top edge, reserve floating-clo
 Add 显示文字 toggle with aria-pressed. Enabling must visibly reveal detailed node labels (advance to existing detail zoom if the scene is in cluster overview), without changing node identity/data. Labels for all visible nodes must be represented, either individual text when space allows or screen-space grouped labels with exact member counts; do not silently take the first N. Aggregation should be deterministic and readable, and members remain selectable at sufficient zoom/list. At middle scale show semantic category/group labels; below0.75 of fit zoom hide canvas text. Existing detail/clustering boundary1.35 remains unless tested evidence needs a coordinated change. Toggle off removes ordinary detailed labels while keeping existing category/selected context; far zoom hides all canvas text. Labels must not overlap unreadably, overflow viewport or fabricate knowledge links. Large1000-node responsiveness and existing picking/rotation/fit remain. UI preference only, no business storage or backend change.
 
 Validate real rendered labels and physical interactions: popup full list/details, long content/mobile, list selection/prev-next, child Escape vs parent Escape/focus, repeated open/close/refresh, account/error invalidation, Canvas failure; upper/lower bounding positions and collision-free controls; toggle true/false, zoom individual->aggregate->hidden, aggregate membership coverage,1000-node cost. Sourceonly then sync for local preview, no UAT/main deployment.
+
+## User-approved visual redesign: classification constellations and unified bottom dock
+
+2026-10-23用户明确同意上一轮视觉评审建议：“就按你说的改，保留全部知识节点和大画布，把分类星团、连线和底部布局整理好，改完先给我看效果。”该批准覆盖本次视觉调整，无需重复设计确认。本轮仍只更新本地效果预览，禁止部署UAT/main。
+
+目标是能直接辨认分类结构、有主次、留白和完整构图。保留全部真实已发布节点、练习量亮度口径、目录关系、3D探索、大画布和上一轮详情大弹窗，不靠删除未练节点或截取前N个换取简洁。
+
+- 星空：沿现有groupKey分类，使同类节点形成有明确间隔的星团；PMP人/过程/环境在默认及复位视角可辨认。分组布局应可推广至多个科目、任意分类数量及1000节点。分类间的父子弹力不能将各星团拖成同一个线团。组内节点有局部组织和受控深度，分类中心、真实节点身份和父子边不变；初始/复位仍完整容纳图，用户旋转/缩放后不强制重排相机。
+- 星点：普通未练点显著缩小、减弱，保留可见性；练习点更亮，选中点有克制的金色强调。分类锚点用紧凑名称/数量而非大圆盘遮挡下级。分类名称在正常概览、以及文字关闭的常用细节视角仍有锚点；低于0.75fit隐藏全部Canvas文字的规则保留。
+- 连线：保留真实model边；概览里默认轻淡，不让长线贯穿全屏抢夺注意力。细节/选中时强调相关真实关系（不造连接），非当前关系退后。点击选择、分类导航与完整列表仍能到所有节点。
+- 文字：已有显示文字、语义缩放和完整代表成员数量继续可用。密集标签按分类/屏幕邻近聚合，标签贴近所属节点/星团，避免固定格子中等距排列和跨图长引线；精确保留visible成员覆盖，无first-N截断，不能混淆不同科目分类。
+- 构图：Canvas仍覆盖整个弹窗底层，不恢复宽侧栏/大顶栏，不变成小图。标题和底部工具背后用局部渐隐保持可读；主星团初始构图有安全边距、不会默认被窗口切掉。
+- 底部：复用原分类导航和视角控件，组成贴近可见弹窗真实底边的一组工具区。桌面分类左、视角右；窄屏上下排/分类横向可滚，44px点击目标、无横向整页溢出。不要在2/3高度留下横穿画布的分类分隔线和长说明。帮助和亮度解释收为同区域可展开的简洁说明，复用原文/ID和DOM而非复制；对键盘、点击、关闭均真实可用，底部固定工具不挡列表弹窗。总节点数只保留一处视觉统计，样例身份继续明确，不把样例当成绩。
+- 兼容：owner迟到请求保护、刷新/错误/空目录、Canvas失败列表、详情子弹窗焦点/Escape/滚动、关闭重开、普通纵向滚动和触控手势不回退。
+
+验收：使用真实317目录样例，1440x960、1280x720、559x854、390x844及短390x568观察概览/文字开/选中/弹窗。截图必须能看出星团间隔、小星点、弱连线和贴底工具；不再以功能通过替代视觉判断。先为分组分离/全量成员/近邻标签/底部位置补失败行为检查，再实现；运行现有Node、dashboard/semantic/scene浏览器（含1000性能）以及根控制器同步后的预览/前端契约。只在当前功能分支写源，生成文件仅由root同步，VERSION及active release不变。
