@@ -2,6 +2,7 @@
 (function(global){
   const MAX_STEPS=320,CELL=75,DEFAULT_CAMERA={yaw:.24,pitch:-.12,zoom:1};
   const clamp=(value,min,max)=>Math.min(max,Math.max(min,value));
+  function isSubjectOverviewNode(node){return !!node&&Object.prototype.hasOwnProperty.call(node,'parentId')&&node.parentId===null&&!!String(node.subject||'').trim()&&Array.isArray(node.path)&&node.path.length===1&&node.path[0]===node.subject}
   function categoryPath(node){
     const path=Array.isArray(node.path)?node.path.map(String):[],subject=String(node.subject||'');
     const parents=path.slice(0,-1).filter(value=>value.trim()&&value!==subject);
@@ -40,7 +41,7 @@
   }
   function createModel(nodes){
     const points=[],edges=[],groups=[],byKey=new Map();
-    for(const [index,node] of (Array.isArray(nodes)?nodes:[]).entries()){
+    for(const [index,node] of (Array.isArray(nodes)?nodes:[]).filter(node=>!isSubjectOverviewNode(node)).entries()){
       const key=groupKey(node);let group=byKey.get(key);
       if(!group){group={key,subject:String(node.subject||''),taxonomyId:String(node.taxonomyId??''),indices:[],x:0,y:0,z:0};groups.push(group);byKey.set(key,group)}
       group.indices.push(index);
@@ -48,10 +49,12 @@
     }
     const catalogKey=(node,id)=>JSON.stringify([String(node.subject||''),String(node.taxonomyId??''),String(id)]),catalogIds=new Map();
     for(const point of points)if(point.node.id!=null){const key=catalogKey(point.node,point.node.id);catalogIds.set(key,catalogIds.has(key)?null:point.index)}
+    const three=groups.length===3&&new Set(groups.map(g=>JSON.parse(g.key)[2])).size===3&&['人','过程','环境'].every(name=>groups.some(g=>JSON.parse(g.key)[2]===name))&&new Set(groups.map(g=>JSON.stringify([g.subject,g.taxonomyId]))).size===1;
     groups.forEach((group,i)=>{
       group.label=classificationLabel(group.indices.map(index=>points[index].node));
       const columns=Math.ceil(Math.sqrt(groups.length)),spacing=440;
       group.radius=165;group.x=(i%columns-(columns-1)/2)*spacing;group.y=(Math.floor(i/columns)-(Math.ceil(groups.length/columns)-1)/2)*spacing;group.z=0;
+      if(three){const name=JSON.parse(group.key)[2];group.x=name==='过程'?0:name==='人'?-180:180;group.y=name==='过程'?0:330;group.radius=145}
       const catalog=group.indices.some(index=>Object.prototype.hasOwnProperty.call(points[index].node,'parentId'));
       group.indices.forEach((index,j)=>{
         const p=points[index],a=j*2.399963229728653,r=group.indices.length===1?0:25+120*Math.sqrt(j/Math.max(1,group.indices.length-1));
@@ -102,7 +105,7 @@
     const depth=Math.max(120,700+rz),scale=700/depth*Math.min(width,height)/650*camera.zoom;
     return {x:width/2+x*scale,y:height/2+y*scale,scale,depth};
   }
-  function mount({host,nodes,onSelect,onGroup,insets}={}){
+  function mount({host,nodes,onSelect,onGroup,insets,autoRotate=false,onAutoRotateChange}={}){
     if(!host?.ownerDocument?.createElement||!host.appendChild)return null;
     const document=host.ownerDocument,win=document.defaultView||global,canvas=document.createElement('canvas');
     let ctx;try{ctx=canvas.getContext('2d')}catch(error){return null}if(!ctx)return null;
@@ -110,14 +113,21 @@
     canvas.style.cssText='display:block;width:100%;height:100%;touch-action:pan-y;cursor:grab';host.appendChild(canvas);
     const model=createModel(nodes),centers=new Map(model.groups.map(item=>[item.key,item])),camera={...DEFAULT_CAMERA},pointers=new Map(),listeners=[];
     const motion=win.matchMedia?.('(prefers-reduced-motion: reduce)');
-    let labelsVisible=false,safeInsets={};
+    let labelsVisible=false,safeInsets={},autoEnabled=!!autoRotate&&!motion?.matches,phase=0,lastFrame=0,resumeTimer=0,pauseUntil=0,rotationPaused=false;
+    const now=()=>win.performance.now();
+    function clearWake(){if(resumeTimer)win.clearTimeout(resumeTimer);resumeTimer=0}
+    function automatic(){return autoEnabled&&!rotationPaused&&!pointers.size&&now()>=pauseUntil}
+    function wake(){clearWake();if(autoEnabled&&!rotationPaused&&!pointers.size&&visible()&&pauseUntil>now())resumeTimer=win.setTimeout(()=>{resumeTimer=0;lastFrame=0;mark()},pauseUntil-now())}
+    function pauseInteraction(){pauseUntil=now()+3000;lastFrame=0;wake()}
+    function setAutoRotate(value){if(destroyed)return;autoEnabled=!!value;lastFrame=0;clearWake();onAutoRotateChange?.(autoEnabled);if(autoEnabled){wake();mark()}else if(model.settled&&!dirty&&!inertiaX&&!inertiaY)stop()}
+    function setRotationPaused(value){if(destroyed)return;rotationPaused=!!value;lastFrame=0;clearWake();if(rotationPaused)stop();else{wake();mark()}}
     let width=0,height=0,raf=0,destroyed=false,selected=null,group='',dirty=true,intersecting=true,reduced=!!motion?.matches;
     let inertiaX=0,inertiaY=0,pinching=false,pinchDistance=0,autoFit=true,baseZoom=1,interiorScale=1.30,horizontalSpread=1,verticalSpread=1;
     const viewCenter={x:0,y:0,z:0},overviewCenter={x:0,y:0,z:0};
     function visible(){return !destroyed&&!document.hidden&&intersecting&&host.isConnected&&width>0&&height>0&&host.getClientRects().length>0&&win.getComputedStyle(host).visibility!=='hidden'}
     function project(point){const projected=projectPoint(relative(point),camera,width,height);projected.x=width/2+(projected.x-width/2)*horizontalSpread;projected.y=height/2+(projected.y-height/2)*verticalSpread;const safe=safeInsets,top=Number(safe.top)||0,bottom=Number(safe.bottom)||0;if(safe.plot!==false)projected.y=top+projected.y/height*Math.max(80,height-top-bottom);return projected}
     // Enlarge constellation interiors around their fixed semantic anchors. All view paths share this position.
-    function displayPoint(point){const center=centers.get(point.group);return center?{x:center.x+(point.x-center.x)*interiorScale,y:center.y+(point.y-center.y)*interiorScale,z:center.z+(point.z-center.z)*interiorScale}:point}
+    function displayPoint(point){const center=centers.get(point.group);if(!center)return point;const x=point.x-center.x,y=point.y-center.y,c=Math.cos(phase),s=Math.sin(phase);return {x:center.x+(x*c-y*s)*interiorScale,y:center.y+(x*s+y*c)*interiorScale,z:center.z+(point.z-center.z)*interiorScale}}
     function relative(point){const displayed=displayPoint(point);return {x:displayed.x-viewCenter.x,y:displayed.y-viewCenter.y,z:displayed.z-viewCenter.z}}
     // Fit once on mount/settlement and reset; explicit camera changes opt out until reset.
     function fitDefault(){
@@ -131,9 +141,10 @@
       const neighborhoods=[...envelopes.values()];interiorScale=1.30;
       for(let i=0;i<neighborhoods.length;i++)for(let j=i+1;j<neighborhoods.length;j++){const a=neighborhoods[i],b=neighborhoods[j],radii=a.radius+b.radius;if(radii>0)interiorScale=Math.min(interiorScale,.97*Math.hypot(a.x-b.x,a.y-b.y)/radii)}
       interiorScale=clamp(interiorScale,1,1.30);
-      for(const axis of ['x','y','z']){const values=model.points.map(point=>displayPoint(point)[axis]);viewCenter[axis]=(Math.min(...values)+Math.max(...values))/2}
+      const fitPoints=autoRotate?model.groups.flatMap(center=>{const radius=Math.max(...center.indices.map(index=>Math.hypot(model.points[index].x-center.x,model.points[index].y-center.y)));return Array.from({length:24},(_,i)=>({group:center.key,x:center.x+radius*Math.cos(i*Math.PI/12),y:center.y+radius*Math.sin(i*Math.PI/12),z:center.z+(i%2?36:-36)}))}):model.points;
+      for(const axis of ['x','y','z']){const values=fitPoints.map(point=>displayPoint(point)[axis]);viewCenter[axis]=(Math.min(...values)+Math.max(...values))/2}
       Object.assign(overviewCenter,viewCenter);
-      const projected=model.points.map(point=>projectPoint(relative(point),{...DEFAULT_CAMERA},width,height));
+      const projected=fitPoints.map(point=>projectPoint(relative(point),{...DEFAULT_CAMERA},width,height));
       const extentX=Math.max(...projected.map(point=>Math.abs(point.x-width/2))),extentY=Math.max(...projected.map(point=>Math.abs(point.y-height/2)));
       const padding=Math.max(20,Math.min(width,height)*.05);
       camera.zoom=clamp(Math.min(Math.max(1,width/2-padding)/Math.max(1,extentX),Math.max(1,height/2-padding)/Math.max(1,extentY)),.45,3);baseZoom=camera.zoom;
@@ -143,8 +154,8 @@
     }
     function positions(){safeInsets=insets?.()||{};return model.points.map(point=>({...project(point),index:point.index,key:point.key,group:point.group,visible:!group||point.group===group}))}
     function clusterPositions(){return model.groups.filter(item=>!group||item.key===group).map(item=>({...item,count:item.indices.length,...project(item)}))}
-    function stop(){if(raf)win.cancelAnimationFrame(raf);raf=0}
-    function request(){if(!destroyed&&!raf&&visible()&&(dirty||!model.settled||(!reduced&&pointers.size===0&&Math.abs(inertiaX)+Math.abs(inertiaY)>.02)))raf=win.requestAnimationFrame(frame)}
+    function stop(){if(raf)win.cancelAnimationFrame(raf);raf=0;lastFrame=0;clearWake()}
+    function request(){if(!destroyed&&!raf&&visible()&&(dirty||!model.settled||automatic()||(!reduced&&pointers.size===0&&Math.abs(inertiaX)+Math.abs(inertiaY)>.02)))raf=win.requestAnimationFrame(frame)}
     function mark(){dirty=true;request()}
     function draw(){
       ctx.clearRect(0,0,width,height);ctx.fillStyle='#060b16';ctx.fillRect(0,0,width,height);
@@ -175,9 +186,10 @@
       }
     }
     function labelLayout(){return layoutLabels({points:positions(),width,height,zoomRatio:camera.zoom/baseZoom,enabled:labelsVisible,labelTop:(safeInsets.top||0)+8,labelBottom:height-(safeInsets.bottom||0)-8,title:index=>model.points[index].node.title||'未命名考点'})}
-    function setLabelsVisible(value){labelsVisible=!!value;if(labelsVisible&&camera.zoom/baseZoom<1.35){autoFit=false;camera.zoom=baseZoom*1.5}mark()}
-    function frame(){
-      raf=0;if(!visible())return;
+    function setLabelsVisible(value){pauseInteraction();labelsVisible=!!value;if(labelsVisible&&camera.zoom/baseZoom<1.35){autoFit=false;camera.zoom=baseZoom*1.5}mark()}
+    function frame(timestamp){
+      raf=0;if(!visible()){lastFrame=0;return}
+      if(automatic()){if(lastFrame){phase+=Math.min(64,Math.max(0,timestamp-lastFrame))*Math.PI*2/540000;dirty=true}lastFrame=timestamp}else lastFrame=0;
       if(!model.settled){for(let i=0;i<3&&!model.settled;i++)stepModel(model);if(model.settled&&autoFit)fitDefault();dirty=true}
       if(!reduced&&pointers.size===0&&(Math.abs(inertiaX)+Math.abs(inertiaY)>.02)){applyRotation(inertiaX,inertiaY);inertiaX*=.88;inertiaY*=.88;dirty=true}
       else if(reduced){inertiaX=0;inertiaY=0}
@@ -189,17 +201,17 @@
       const dpr=Math.min(2,win.devicePixelRatio||1);canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);if(autoFit)fitDefault();mark();if(!visible())stop();
     }
     function applyRotation(dx,dy){camera.yaw+=dx*.006;camera.pitch=clamp(camera.pitch+dy*.006,-1.35,1.35)}
-    function rotate(dx,dy){if(destroyed||!Number.isFinite(dx)||!Number.isFinite(dy))return;autoFit=false;applyRotation(dx,dy);mark()}
-    function zoomBy(factor){if(destroyed||!Number.isFinite(factor)||factor<=0)return;autoFit=false;camera.zoom=clamp(camera.zoom*factor,Math.min(.45,baseZoom*.35),9);if(camera.zoom/baseZoom<1.35&&group){group='';Object.assign(viewCenter,overviewCenter);onGroup?.('')}mark()}
-    function select(index){if(destroyed||!Number.isInteger(index)||!model.points[index])return;selected=index;camera.zoom=Math.max(camera.zoom,baseZoom*1.5);autoFit=false;mark()}
-    function focusGroup(key){if(destroyed)return;group=String(key||'');const target=model.groups.find(item=>item.key===group);if(target){autoFit=false;Object.assign(viewCenter,{x:target.x,y:target.y,z:target.z});camera.zoom=Math.min(9,baseZoom*1.6)}else if(!group)Object.assign(viewCenter,overviewCenter);mark()}
-    function reset(){if(destroyed)return;Object.assign(camera,DEFAULT_CAMERA);autoFit=true;fitDefault();group='';inertiaX=inertiaY=0;mark()}
+    function rotate(dx,dy){if(destroyed||!Number.isFinite(dx)||!Number.isFinite(dy))return;pauseInteraction();autoFit=false;applyRotation(dx,dy);mark()}
+    function zoomBy(factor){if(destroyed||!Number.isFinite(factor)||factor<=0)return;pauseInteraction();autoFit=false;camera.zoom=clamp(camera.zoom*factor,Math.min(.45,baseZoom*.35),9);if(camera.zoom/baseZoom<1.35&&group){group='';Object.assign(viewCenter,overviewCenter);onGroup?.('')}mark()}
+    function select(index){if(destroyed||!Number.isInteger(index)||!model.points[index])return;pauseInteraction();selected=index;camera.zoom=Math.max(camera.zoom,baseZoom*1.5);autoFit=false;mark()}
+    function focusGroup(key){if(destroyed)return;pauseInteraction();group=String(key||'');const target=model.groups.find(item=>item.key===group);if(target){autoFit=false;Object.assign(viewCenter,{x:target.x,y:target.y,z:target.z});camera.zoom=Math.min(9,baseZoom*1.6)}else if(!group)Object.assign(viewCenter,overviewCenter);mark()}
+    function reset(){if(destroyed)return;pauseInteraction();phase=0;Object.assign(camera,DEFAULT_CAMERA);autoFit=true;fitDefault();group='';inertiaX=inertiaY=0;mark()}
     function listen(target,type,handler,options){target.addEventListener(type,handler,options);listeners.push(()=>target.removeEventListener(type,handler,options))}
     function distance(){const values=[...pointers.values()];return values.length<2?0:Math.hypot(values[0].x-values[1].x,values[0].y-values[1].y)}
     function releasePointers(){for(const id of pointers.keys()){try{if(canvas.hasPointerCapture(id))canvas.releasePointerCapture(id)}catch(error){/* Detached pointers need no release. */}}pointers.clear();pinching=false;pinchDistance=0;inertiaX=inertiaY=0;canvas.style.cursor='grab'}
     listen(canvas,'pointerdown',event=>{
       if(event.pointerType==='mouse'&&event.button!==0)return;
-      inertiaX=inertiaY=0;pointers.set(event.pointerId,{x:event.clientX,y:event.clientY,startX:event.clientX,startY:event.clientY,moved:false,touch:event.pointerType==='touch',direction:''});
+      pauseInteraction();clearWake();inertiaX=inertiaY=0;pointers.set(event.pointerId,{x:event.clientX,y:event.clientY,startX:event.clientX,startY:event.clientY,moved:false,touch:event.pointerType==='touch',direction:''});
       try{canvas.setPointerCapture(event.pointerId)}catch(error){/* Capture may be unavailable after a cancelled contact. */}
       if(pointers.size>1){pinching=true;pinchDistance=distance();for(const point of pointers.values())point.moved=true}canvas.style.cursor='grabbing';
     });
@@ -216,7 +228,7 @@
     function finish(event,cancelled){
       const point=pointers.get(event.pointerId);if(!point)return;
       const click=!cancelled&&!pinching&&!point.moved&&Math.hypot(event.clientX-point.startX,event.clientY-point.startY)<=5;
-      pointers.delete(event.pointerId);try{if(canvas.hasPointerCapture(event.pointerId))canvas.releasePointerCapture(event.pointerId)}catch(error){/* Already released by the browser. */}
+      pointers.delete(event.pointerId);pauseInteraction();try{if(canvas.hasPointerCapture(event.pointerId))canvas.releasePointerCapture(event.pointerId)}catch(error){/* Already released by the browser. */}
       if(click){const rect=canvas.getBoundingClientRect(),x=event.clientX-rect.left,y=event.clientY-rect.top;
         if(semanticView(model,camera.zoom/baseZoom,group).mode==='clusters'){
           const cluster=clusterPositions().filter(p=>Math.hypot(p.x-x,p.y-y)<=34).sort((a,b)=>a.depth-b.depth)[0];
@@ -230,20 +242,20 @@
     }
     listen(canvas,'pointerup',event=>finish(event,false));listen(canvas,'pointercancel',event=>finish(event,true));
     listen(canvas,'lostpointercapture',event=>{if(pointers.has(event.pointerId))finish(event,true)});
-    listen(canvas,'wheel',event=>{if(!event.ctrlKey&&!event.metaKey)return;event.preventDefault();zoomBy(Math.exp(clamp(-event.deltaY*.0015,-1,1)))},{passive:false});
-    listen(document,'visibilitychange',()=>{if(document.hidden){stop();releasePointers()}else mark()});
+    listen(canvas,'wheel',event=>{pauseInteraction();if(!event.ctrlKey&&!event.metaKey)return;event.preventDefault();zoomBy(Math.exp(clamp(-event.deltaY*.0015,-1,1)))},{passive:false});
+    listen(document,'visibilitychange',()=>{if(document.hidden){stop();releasePointers()}else{lastFrame=0;wake();mark()}});
     listen(win,'pagehide',destroy);
-    if(motion){const changed=()=>{reduced=motion.matches;if(reduced)inertiaX=inertiaY=0;mark()};listen(motion,'change',changed)}
+    if(motion){const changed=()=>{reduced=motion.matches;if(reduced){inertiaX=inertiaY=0;setAutoRotate(false)}mark()};listen(motion,'change',changed)}
     const resizeObserver=win.ResizeObserver?new win.ResizeObserver(resize):null;resizeObserver?.observe(host);
     if(!resizeObserver)listen(win,'resize',resize);
-    const intersectionObserver=win.IntersectionObserver?new win.IntersectionObserver(entries=>{intersecting=entries[0]?.isIntersecting!==false;if(intersecting)mark();else{stop();releasePointers()}}):null;intersectionObserver?.observe(host);
+    const intersectionObserver=win.IntersectionObserver?new win.IntersectionObserver(entries=>{intersecting=entries[0]?.isIntersecting!==false;if(intersecting){wake();mark()}else{stop();releasePointers()}}):null;intersectionObserver?.observe(host);
     // Dialog open/close and CSS visibility changes may not change intersection or size.
-    const visibilityObserver=win.MutationObserver?new win.MutationObserver(()=>{if(visible())mark();else{stop();releasePointers()}}):null;
+    const visibilityObserver=win.MutationObserver?new win.MutationObserver(()=>{if(visible()){wake();mark()}else{stop();releasePointers()}}):null;
     for(let element=host;element&&visibilityObserver;element=element.parentElement)visibilityObserver.observe(element,{attributes:true,attributeFilter:['style','class','hidden','open']});
     function destroy(){if(destroyed)return;destroyed=true;stop();releasePointers();resizeObserver?.disconnect();intersectionObserver?.disconnect();visibilityObserver?.disconnect();for(const remove of listeners)remove();canvas.remove()}
-    function snapshot(){return {labelsVisible,labels:labelLayout(),textHidden:camera.zoom/baseZoom<.75,camera:{...camera},positions:positions(),mode:semanticView(model,camera.zoom/baseZoom,group).mode,clusters:clusterPositions(),selected,group,settled:model.settled,running:!!raf,destroyed}}
-    resize();return Object.freeze({setLabelsVisible,select,focusGroup,rotate,zoomBy,reset,destroy,snapshot});
+    function snapshot(){return {autoRotate:autoEnabled,rotationPaused,phase,resumePending:!!resumeTimer,labelsVisible,labels:labelLayout(),textHidden:camera.zoom/baseZoom<.75,camera:{...camera},positions:positions(),mode:semanticView(model,camera.zoom/baseZoom,group).mode,clusters:clusterPositions(),selected,group,settled:model.settled,running:!!raf,destroyed}}
+    resize();return Object.freeze({setAutoRotate,setRotationPaused,setLabelsVisible,select,focusGroup,rotate,zoomBy,reset,destroy,snapshot});
   }
-  const api=Object.freeze({createModel,stepModel,projectPoint,groupKey,classificationLabel,semanticView,layoutLabels,mount});
+  const api=Object.freeze({isSubjectOverviewNode,createModel,stepModel,projectPoint,groupKey,classificationLabel,semanticView,layoutLabels,mount});
   global.KGKnowledgeSpaceScene=api;if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);

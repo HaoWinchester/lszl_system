@@ -41,7 +41,7 @@ with sync_playwright() as p:
    canvas=page.locator('canvas').bounding_box()
    assert all(control['y']+control['height']+4<=canvas['y']+anchor['y']-25<=footer['y']-8 for anchor in anchors), 'default category labels must stay between header controls and dock'
   help_summary=page.locator('.kg-knowledge-guidance summary')
-  page.locator('[data-knowledge-reset]').focus();page.keyboard.press('Tab');expect(help_summary).to_be_focused()
+  page.locator('[data-knowledge-reset]').focus();page.keyboard.press('Tab');expect(page.locator('[data-knowledge-auto-rotate]')).to_be_focused();page.keyboard.press('Tab');expect(help_summary).to_be_focused()
   page.keyboard.press('Enter');assert page.locator('.kg-knowledge-guidance').evaluate('e=>e.open')
   page.keyboard.press('Enter');assert not page.locator('.kg-knowledge-guidance').evaluate('e=>e.open')
   cluster=page.evaluate('scenes.at(-1).snapshot().clusters[0]')
@@ -89,7 +89,8 @@ with sync_playwright() as p:
   page.locator('#open').click();page.wait_for_function('scenes.at(-1).snapshot().settled');page.screenshot(path=str(OUT/f'space-{width}.png'))
   page.evaluate('''()=>{KGDomainApi.request=async()=>({attemptCount:0,nodes:[{id:'r',parentId:null,subject:'PMP',taxonomyId:1,path:['PMP']},{id:'people',parentId:'r',subject:'PMP',taxonomyId:1,path:['PMP','人']},{id:'child',parentId:'people',subject:'PMP',taxonomyId:1,path:['PMP','人','团队']},{id:'process',parentId:'r',subject:'PMP',taxonomyId:1,path:['PMP','过程']}]})}''')
   page.locator('[data-knowledge-refresh]').click()
-  expect(page.locator('[data-knowledge-groups]')).to_contain_text('PMP · 科目总览 / 1')
+  expect(page.locator('[data-knowledge-groups]')).not_to_contain_text('科目总览')
+  assert page.evaluate('scenes.at(-1).snapshot().positions.length')==3
   expect(page.locator('[data-knowledge-groups]')).to_contain_text('PMP · 人 / 2')
   expect(page.locator('[data-knowledge-groups]')).to_contain_text('PMP · 过程 / 1')
   expect(page.locator('[data-knowledge-groups]')).not_to_contain_text('未分类')

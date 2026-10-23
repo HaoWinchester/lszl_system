@@ -104,10 +104,10 @@ test('one published tree separates readable top-level categories and preserves n
  assert.notEqual(model.points[0].group,model.points[3].group);
 });
 test('catalog parent edges survive semantic category boundaries within the same tree',()=>{
- const model=require(file).createModel([{id:'root',parentId:null,subject:'A',taxonomyId:1,path:['A']},{id:'child',parentId:'root',subject:'A',taxonomyId:1,path:['A','Child']}]);
+ const model=require(file).createModel([{id:'root',parentId:null,subject:'A',taxonomyId:1,path:['A','Parent']},{id:'child',parentId:'root',subject:'A',taxonomyId:1,path:['A','Child']}]);
  assert.equal(model.groups.length,2);assert.deepEqual(model.edges.map(e=>[e.source,e.target]),[[0,1]]);
 });
-test('published category roots group with descendants while subject root has an explicit overview label',()=>{
+test('published category roots group with descendants while structural overview stays out of display',()=>{
  const api=require(file),nodes=[
   {id:'r',parentId:null,subject:'PMP',taxonomyId:1,path:['PMP']},
   {id:'people',parentId:'r',subject:'PMP',taxonomyId:1,path:['PMP','人']},
@@ -116,8 +116,8 @@ test('published category roots group with descendants while subject root has an 
  ];
  const model=api.createModel(nodes);
  assert.equal(api.groupKey(nodes[1]),api.groupKey(nodes[2]));
- assert.deepEqual(model.groups.map(g=>g.indices),[[0],[1,2],[3]]);
- assert.deepEqual(model.groups.map(g=>g.label),['PMP · 科目总览','PMP · 人','PMP · 过程']);
+ assert.deepEqual(model.groups.map(g=>g.indices),[[0,1],[2]]);
+ assert.deepEqual(model.groups.map(g=>g.label),['PMP · 人','PMP · 过程']);
  assert.equal(api.groupKey({subject:'PMP',path:['PMP','人']}),'["PMP","",""]');
 });
 
@@ -153,4 +153,16 @@ test('foreground-safe label band keeps exact visible coverage while clamping and
  assert.ok(labels.every(label=>label.y>=180&&label.y<=420));
  assert.deepEqual(labels.flatMap(label=>label.indices).sort((a,b)=>a-b),points.map(p=>p.index));
  for(const label of labels)assert.equal(new Set(label.indices.map(i=>points[i].group)).size,1);
+});
+
+test('structural overview is excluded precisely with consistent point and edge indices',()=>{
+ const api=require(file),root={id:'r',parentId:null,subject:'PMP',path:['PMP']};
+ assert.equal(api.isSubjectOverviewNode(root),true);
+ for(const node of [{subject:'PMP',path:['PMP']},{parentId:null,subject:'PMP',path:['PMP','人']},{parentId:null,subject:'',path:[]}])assert.equal(api.isSubjectOverviewNode(node),false);
+ const model=api.createModel([root,{id:'p',parentId:'r',subject:'PMP',path:['PMP','人']},{id:'c',parentId:'p',subject:'PMP',path:['PMP','人','团队']}]);
+ assert.equal(model.points.length,2);assert.deepEqual(model.edges.map(e=>[e.source,e.target]),[[0,1]]);
+});
+test('three named categories place Process above centered People and Environment regardless of input order',()=>{
+ const api=require(file),model=api.createModel(['环境','过程','人'].map(name=>({parentId:null,subject:'PMP',path:['PMP',name]}))),byName=Object.fromEntries(model.groups.map(g=>[JSON.parse(g.key)[2],g]));
+ assert.equal(byName['过程'].x,0);assert.equal(byName['过程'].y,0);assert.ok(byName['人'].x<0&&byName['环境'].x>0);assert.equal(byName['人'].y,byName['环境'].y);assert.ok(byName['人'].y>byName['过程'].y);
 });
