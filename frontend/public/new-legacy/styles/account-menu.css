@@ -162,6 +162,8 @@
     white-space:nowrap;
   }
   .account-menu-trigger .role-dot,
+  .account-menu-trigger .account-menu-status-dot,
+  .account-menu-trigger .account-menu-trigger-label,
   .account-menu-trigger .auth-status-label{display:none!important}
   .account-menu-chevron{
     width:13px;

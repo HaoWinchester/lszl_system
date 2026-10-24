@@ -85,8 +85,11 @@ scenario = '''
     page.evaluate('__rows=[]');page.evaluate('__dashboard.refresh()');expect(page.locator('.practice-recent-table')).to_be_hidden()
     expect(page.locator('#practiceRecentStatus')).to_contain_text('完成或保存')
     page.set_viewport_size({'width':390,'height':844})
-    # A viewport resize can arrive before the responsive layout/transition settles.
-    # Keep the no-overflow requirement, retrying it across rendered frames.
+    # Let Chrome lay out closed native details at the new viewport before checking overflow.
+    page.evaluate('() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))')
+    trigger_box=page.locator('#authStatus').bounding_box()
+    chevron_box=page.locator('#authStatus .account-menu-chevron').bounding_box()
+    assert chevron_box['x']+chevron_box['width']<=trigger_box['x']+trigger_box['width'], ('account arrow overflows capsule',trigger_box,chevron_box)
     page.wait_for_function('document.documentElement.scrollWidth<=innerWidth', timeout=5000)
     assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
     page.screenshot(path=str(OUT / ('ui-'+args.capture+'-mobile.png')),full_page=True)
@@ -99,6 +102,12 @@ scenario = '''
             box=action.bounding_box()
             assert box and box['x']>=0 and box['x']+box['width']<=width, ('unreachable header action',width,action.get_attribute('id'),box)
 
+    # The compact account entry remains usable, including before auth label hydration.
+    page.add_script_tag(content=(ROOT / 'src/41-account-menu.js').read_text())
+    page.locator('#authStatus').click()
+    expect(page.locator('#accountMenu')).to_be_visible()
+    page.keyboard.press('Escape')
+    expect(page.locator('#accountMenu')).to_be_hidden()
     assert not errors,errors
     browser.close()
 print('practice lobby fidelity: 5 control computed/hover skins, 4 equal mode cards, keyboard tabs, 3 action callbacks, error/retry/empty and mobile passed')
