@@ -85,6 +85,9 @@ scenario = '''
     page.evaluate('__rows=[]');page.evaluate('__dashboard.refresh()');expect(page.locator('.practice-recent-table')).to_be_hidden()
     expect(page.locator('#practiceRecentStatus')).to_contain_text('完成或保存')
     page.set_viewport_size({'width':390,'height':844})
+    # A viewport resize can arrive before the responsive layout/transition settles.
+    # Keep the no-overflow requirement, retrying it across rendered frames.
+    page.wait_for_function('document.documentElement.scrollWidth<=innerWidth', timeout=5000)
     assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
     page.screenshot(path=str(OUT / ('ui-'+args.capture+'-mobile.png')),full_page=True)
     # Every mobile header action must be reachable through native horizontal scroll.
