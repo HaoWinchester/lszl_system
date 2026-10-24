@@ -54,3 +54,7 @@
 验收入口：UAT 首页“学习入口”→“深度回忆”或“多题归纳”→“新题型体验卷（图表·案例·连线）”。第1题检查图表左栏与放大，案例2检查案例阅读滚动。人工清单 P11–P14 均保留未勾选，等待老师本人确认。
 
 证据位于 `artifacts/media-left-toolbar-20261024/`：`deploy.log`、`container.json`、`container-files.json`、`uat-public.json`、`uat.json`、`source.json`、`sync-equality.json`、`layout.log`、`materials.log` 及截图。首轮失败与独立复测日志一并保留，未掩盖失败记录。
+
+## 后续正式发布
+
+2026-10-24 老师明确回复“好的，部署到正式环境”，已授权当前UAT内容合入main并正式发布。现已完成v394正式上线；上文“未合main/等待验收”等描述为UAT交付当时状态。完整备份与上线核验见 [正式发布记录](2026-10-24-production-v394.md)。
