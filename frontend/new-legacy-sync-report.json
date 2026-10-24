@@ -4,10 +4,7 @@
   "toVersion": "v9.0-p4.1.394",
   "changes": {
     "added": [],
-    "changed": [
-      "src/118-question-materials.js",
-      "tests/case-card-layout-browser.py"
-    ],
+    "changed": [],
     "removed": []
   },
   "incompatible": []
