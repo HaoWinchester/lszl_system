@@ -3,13 +3,13 @@ from pathlib import Path
 import json
 import time
 import math
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import sync_playwright, expect
 ROOT=Path(__file__).resolve().parents[2]
 MODULE=ROOT/'new-legacy/src/practice/knowledge-space-scene.js'
 OUT=ROOT/'artifacts/knowledge-universe-20261020/task-2'
 OUT.mkdir(parents=True,exist_ok=True)
 assert MODULE.exists(), 'knowledge-space-scene.js must exist before browser interactions can run'
-NODES=[dict(id=f'topic-{i}',title=f'真实接口形状测试考点 {i}',subject='数学' if i<12 else '英语',taxonomyId='algebra' if i<12 else 'reading',brightness=.2+i/30) for i in range(24)]
+NODES=[dict(id=f'topic-{i}',title=f'真实接口形状测试考点 {i}',subject='数学' if i<12 else '英语',taxonomyId='algebra' if i<12 else 'reading',brightness=.2+i/30,relatedAttemptCount=i+2) for i in range(24)]
 CATALOG=json.loads((ROOT/'new-legacy/tests/fixtures/knowledge-space-published-catalog.json').read_text())['nodes']
 # API fixture retains the structural root; the shared scene predicate filters display.
 metrics=[]
@@ -52,6 +52,7 @@ with sync_playwright() as p:
   context=browser.new_context(viewport={'width':width,'height':900},has_touch=True,device_scale_factor=3)
   page=context.new_page();errors=[];page.on('pageerror',lambda error:errors.append(str(error)))
   page.set_content('''<style>body{margin:0;background:#050914;color:#eef;font:14px sans-serif}#modal{height:760px;overflow-y:auto;overscroll-behavior:contain}#host{margin:40px 16px;width:calc(100% - 32px);height:560px;overflow:hidden;border:1px solid #234}</style><div id="modal"><div id="host"></div><div style="height:1200px">场景外滚动区域</div></div>''')
+  page.add_style_tag(path=str(ROOT/'new-legacy/styles/knowledge-dashboard.css'))
   page.wait_for_load_state('networkidle');page.add_script_tag(content=MODULE.read_text())
   # Instrument actual Canvas operations and RAF callbacks without replacing rendering.
   page.evaluate('''()=>{
@@ -163,8 +164,23 @@ with sync_playwright() as p:
   initial=snap();assert len(initial['positions'])==24;assert initial['selected'] is None
   assert_fit(page,f'{width}/24-node-initial')
   assert page.locator('canvas').evaluate('(c)=>c.width')<=2*(width-30)
+  tooltip=page.locator('[role="tooltip"]')
+  def assert_hover():
+   state=snap();box=page.locator('canvas').bounding_box()
+   point=max([p for p in state['positions'] if p['visible'] and 14<p['x']<box['width']-14 and 14<p['y']<box['height']-14],key=lambda p:p['scale'])
+   page.mouse.move(2,2);page.mouse.move(box['x']+point['x'],box['y']+point['y'])
+   if width>700:
+    expect(tooltip).to_be_visible()
+    expect(tooltip.locator('strong')).to_have_text(NODES[point['index']]['title'])
+    expect(tooltip.locator('small')).to_contain_text(f"累计练习 {point['index']+2} 次")
+    r=tooltip.bounding_box();assert 0<=r['x'] and r['x']+r['width']<=width and 0<=r['y'] and r['y']+r['height']<=900
+   else:expect(tooltip).not_to_be_visible()
+  assert_hover();assert snap()['selected'] is None and page.evaluate('chosen')==[], 'hover cannot select or open details'
+  page.mouse.move(2,2);expect(tooltip).not_to_be_visible()
+
   box=page.locator('canvas').bounding_box();cx=box['x']+box['width']/2;cy=box['y']+box['height']/2
   page.mouse.move(cx,cy);page.mouse.down();page.mouse.move(cx+80,cy+35,steps=8)
+  expect(tooltip).not_to_be_visible()
   held=snap()['camera'];page.wait_for_timeout(400)
   assert snap()['camera']==held,'holding still must not move camera'
   assert not snap()['running'],'settled scene must stop RAF while a dragged pointer is held still'
@@ -172,18 +188,22 @@ with sync_playwright() as p:
   assert snap()['camera']['yaw']!=initial['camera']['yaw'];assert page.evaluate('chosen')==[], 'drag cannot select'
   page.wait_for_function('!scene.snapshot().running')
   assert snap()['camera']!=held,'released pointer should resume its bounded inertia'
-  # Ordinary wheel belongs to the scrollable modal; only modified wheel zooms.
-  before=snap()['camera'];page.mouse.move(cx,cy);page.mouse.wheel(0,150);page.wait_for_timeout(160)
-  assert page.locator('#modal').evaluate('(e)=>e.scrollTop')>0,'ordinary wheel over Canvas must scroll modal'
-  assert snap()['camera']==before,'ordinary wheel cannot change camera'
-  page.mouse.wheel(0,-150);page.wait_for_timeout(160)
-  assert page.locator('#modal').evaluate('(e)=>e.scrollTop')==0
-  for modifier in ('Control','Meta'):
-   before=snap()['camera']['zoom'];page.keyboard.down(modifier);page.mouse.wheel(0,150);page.keyboard.up(modifier);page.wait_for_timeout(80)
-   assert snap()['camera']['zoom']<before
-   before=snap()['camera']['zoom'];page.keyboard.down(modifier);page.mouse.wheel(0,-150);page.keyboard.up(modifier);page.wait_for_timeout(80)
-   assert snap()['camera']['zoom']>before
-   assert page.locator('#modal').evaluate('(e)=>e.scrollTop')==0,'modified wheel must not scroll modal'
+  # Every wheel over the star canvas zooms only its camera, including unmodified wheel.
+  for modifier in (None,'Control','Meta'):
+   before=snap()['camera']['zoom'];page.mouse.move(cx,cy)
+   if modifier:page.keyboard.down(modifier)
+   page.mouse.wheel(0,150)
+   if modifier:page.keyboard.up(modifier)
+   page.wait_for_timeout(100);assert snap()['camera']['zoom']<before
+   before=snap()['camera']['zoom']
+   if modifier:page.keyboard.down(modifier)
+   page.mouse.wheel(0,-150)
+   if modifier:page.keyboard.up(modifier)
+   page.wait_for_timeout(100);assert snap()['camera']['zoom']>before
+   assert page.locator('#modal').evaluate('(e)=>e.scrollTop')==0, 'canvas wheel must not scroll its parent'
+  assert_hover()
+  page.mouse.dblclick(box['x']+3,box['y']+3);page.wait_for_function('!scene.snapshot().running')
+  assert snap()['camera']==initial['camera'] and snap()['group']=='', 'original double-click reset must restore the overview camera'
   page.mouse.move(5,650);page.mouse.wheel(0,100);page.wait_for_timeout(100)
   assert page.locator('#modal').evaluate('(e)=>e.scrollTop')>0
   page.evaluate("document.querySelector('#modal').scrollTop=0;scene.reset()");page.wait_for_function('!scene.snapshot().running')
@@ -197,6 +217,7 @@ with sync_playwright() as p:
   page.evaluate('scene.select(-1);scene.select(999)');assert snap()['selected']==7
   key='["英语","reading",""]';page.evaluate('(key)=>scene.focusGroup(key)',key)
   assert all(v['visible']==(v['group']==key) for v in snap()['positions'])
+  page.wait_for_function('!scene.snapshot().running');assert_hover()
   page.evaluate("scene.focusGroup('missing')");assert not any(v['visible'] for v in snap()['positions'])
   page.evaluate('scene.reset()');assert all(v['visible'] for v in snap()['positions']);assert snap()['camera']==initial['camera'];assert snap()['group']==''
   # Real browser touch events produce PointerEvents. A pinch must not emit node selection.
@@ -244,10 +265,22 @@ with sync_playwright() as p:
   touch('touchStart',[(1,cx,cy)])
   page.evaluate("window.draws=0;const ctx=document.querySelector('canvas').getContext('2d');const fn=ctx.clearRect;ctx.clearRect=function(...a){draws++;return fn.apply(this,a)};scene.rotate(12,3);scene.destroy();window.atDestroy=draws;scene.rotate(20,10);scene.zoomBy(2);scene.select(0);scene.reset()")
   touch('touchMove',[(1,cx+20,cy)]);touch('touchEnd',[])
+  assert tooltip.count()==0, 'scene destruction removes hover UI'
   dead=snap();assert dead['destroyed'] and not dead['running'];assert page.locator('canvas').count()==0
   page.evaluate("document.querySelector('#host').style.height='200px';document.dispatchEvent(new Event('visibilitychange'))")
   page.wait_for_timeout(150);assert page.evaluate('draws===atDestroy');assert snap()==dead;assert page.evaluate('chosen.length')==count
   assert errors==[],errors
+  # Literal titles remain text, and a stationary pointer is re-picked after camera motion.
+  page.evaluate("()=>{window.scene=KGKnowledgeSpaceScene.mount({host:document.querySelector('#host'),nodes:[{id:'safe',title:'<img src=x onerror=window.hoverInjected=true>',subject:'PMP',relatedAttemptCount:7}]})}")
+  page.wait_for_function('!scene.snapshot().running');box=page.locator('canvas').bounding_box();point=snap()['positions'][0]
+  page.mouse.move(box['x']+point['x'],box['y']+point['y'])
+  if width>700:
+   expect(tooltip).to_be_visible();expect(tooltip.locator('strong')).to_have_text('<img src=x onerror=window.hoverInjected=true>')
+   assert page.locator('img').count()==0 and not page.evaluate('window.hoverInjected')
+   page.evaluate('scene.rotate(500,0)');page.wait_for_function('!scene.snapshot().running');expect(tooltip).not_to_be_visible()
+   page.evaluate('scene.rotate(-500,0)');page.wait_for_function('!scene.snapshot().running');expect(tooltip).to_be_visible()
+  else:expect(tooltip).not_to_be_visible()
+  page.evaluate('scene.destroy()');assert tooltip.count()==0
   # Canvas unavailable must return fallback without leaving a canvas behind.
   page.evaluate("HTMLCanvasElement.prototype.getContext=()=>null;window.fallback=KGKnowledgeSpaceScene.mount({host:document.querySelector('#host'),nodes:[]})")
   assert page.evaluate('fallback===null');assert page.locator('canvas').count()==0
@@ -256,4 +289,4 @@ with sync_playwright() as p:
  (OUT/'cluster-growth.json').write_text(json.dumps(cluster_metrics,ensure_ascii=False,indent=2))
  (OUT/'performance.json').write_text(json.dumps(metrics,ensure_ascii=False,indent=2))
  print(json.dumps(metrics,ensure_ascii=False))
-print('knowledge-space-scene-browser: 1440/390 full 320/1000 rendering, continuous brightness, initial/reset fit, manual camera preservation, held-pointer RAF stop, native wheel/vertical touch scroll, modified wheel/pinch zoom, horizontal touch/mouse rotation, selection, grouping, resize, reduced motion, visibility, active-touch destroy and Canvas fallback passed')
+print('knowledge-space-scene-browser: 1440/390 full 320/1000 rendering, continuous brightness, initial/reset fit, manual camera preservation, held-pointer RAF stop, native vertical touch scroll, ordinary/modified wheel and pinch zoom, hover, horizontal touch/mouse rotation, selection, grouping, resize, reduced motion, visibility, active-touch destroy and Canvas fallback passed')

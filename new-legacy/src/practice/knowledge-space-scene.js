@@ -2,6 +2,7 @@
 (function(global){
   const TAU=Math.PI*2,DEFAULT_CAMERA={yaw:.10,pitch:-.02,zoom:1};
   const clamp=(value,min,max)=>Math.min(max,Math.max(min,value));
+  let tooltipSequence=0;
   function isSubjectOverviewNode(node){return !!node&&Object.prototype.hasOwnProperty.call(node,'parentId')&&node.parentId===null&&!!String(node.subject||'').trim()&&Array.isArray(node.path)&&node.path.length===1&&node.path[0]===node.subject}
   function categoryPath(node){
     const path=Array.isArray(node.path)?node.path.map(String):[],subject=String(node.subject||'');
@@ -116,6 +117,9 @@
     let ctx;try{ctx=canvas.getContext('2d')}catch(error){return null}if(!ctx)return null;
     canvas.className='kg-knowledge-space-canvas';canvas.setAttribute('role','img');canvas.setAttribute('aria-label','知识点三维知识星空，考点详情可通过列表选择');
     canvas.style.cssText='display:block;width:100%;height:100%;touch-action:pan-y;cursor:grab';host.appendChild(canvas);
+    const tooltip=document.createElement('div'),tooltipMeta=document.createElement('small'),tooltipTitle=document.createElement('strong');
+    tooltip.className='kg-knowledge-tooltip';tooltip.id=`kg-knowledge-hover-${++tooltipSequence}`;tooltip.setAttribute('role','tooltip');tooltip.hidden=true;tooltip.append(tooltipMeta,tooltipTitle);
+    (host.closest('dialog')||host).appendChild(tooltip);
     const model=createModel(nodes),centers=new Map(model.groups.map(item=>[item.key,item])),camera={...DEFAULT_CAMERA},pointers=new Map(),listeners=[];
     const motion=win.matchMedia?.('(prefers-reduced-motion: reduce)');
     let labelsVisible=false,safeInsets={},autoEnabled=!!autoRotate&&!motion?.matches,phase=0,lastFrame=0,resumeTimer=0,pauseUntil=0,rotationPaused=false;
@@ -125,9 +129,9 @@
     function wake(){clearWake();if(autoEnabled&&!rotationPaused&&!pointers.size&&visible()&&pauseUntil>now())resumeTimer=win.setTimeout(()=>{resumeTimer=0;lastFrame=0;mark()},pauseUntil-now())}
     function pauseInteraction(){pauseUntil=now()+3000;lastFrame=0;wake()}
     function setAutoRotate(value){if(destroyed)return;autoEnabled=!!value;lastFrame=0;clearWake();onAutoRotateChange?.(autoEnabled);if(autoEnabled){wake();mark()}else if(model.settled&&!dirty&&!inertiaX&&!inertiaY)stop()}
-    function setRotationPaused(value){if(destroyed)return;rotationPaused=!!value;lastFrame=0;clearWake();if(rotationPaused)stop();else{wake();mark()}}
+    function setRotationPaused(value){if(destroyed)return;rotationPaused=!!value;lastFrame=0;clearWake();if(rotationPaused){clearHover();stop()}else{wake();mark()}}
     let width=0,height=0,raf=0,destroyed=false,selected=null,group='',dirty=true,intersecting=true,reduced=!!motion?.matches;
-    let inertiaX=0,inertiaY=0,pinching=false,pinchDistance=0,autoFit=true,baseZoom=1,interiorScale=1;
+    let inertiaX=0,inertiaY=0,pinching=false,pinchDistance=0,autoFit=true,baseZoom=1,interiorScale=1,hoverPointer=null;
     const viewCenter={x:0,y:0,z:0},overviewCenter={x:0,y:0,z:0};
     function visible(){return !destroyed&&!document.hidden&&intersecting&&host.isConnected&&width>0&&height>0&&host.getClientRects().length>0&&win.getComputedStyle(host).visibility!=='hidden'}
     function project(point){return projectPoint(relative(point),camera,width,height)}
@@ -139,6 +143,22 @@
     }
     function positions(){safeInsets=insets?.()||{};return model.points.map(point=>({...project(point),index:point.index,key:point.key,group:point.group,visible:!group||point.group===group}))}
     function clusterPositions(){return model.groups.filter(item=>!group||item.key===group).map(item=>({...item,count:item.indices.length,...project(item)}))}
+    // Hover and click share projection/depth picking, so the shown title matches the selected point.
+    function pickNode(x,y){return positions().filter(p=>p.visible&&Math.hypot(p.x-x,p.y-y)<=Math.max(12,7*p.scale)).sort((a,b)=>a.depth-b.depth)[0]}
+    function hideTooltip(){tooltip.hidden=true;canvas.removeAttribute('aria-describedby')}
+    function clearHover(){hoverPointer=null;hideTooltip()}
+    function updateHover(){
+      if(!hoverPointer||rotationPaused||pointers.size||win.innerWidth<=700||!visible()){hideTooltip();return}
+      const rect=canvas.getBoundingClientRect(),x=hoverPointer.x-rect.left,y=hoverPointer.y-rect.top;
+      const hit=x>=0&&x<=width&&y>=0&&y<=height?pickNode(x,y):null;
+      if(!hit){hideTooltip();return}
+      const point=model.points[hit.index],node=point.node,raw=Number(node.relatedAttemptCount??node.attemptCount),count=Number.isFinite(raw)&&raw>0?raw:0;
+      tooltipMeta.textContent=`${String(hit.index+1).padStart(2,'0')} · ${centers.get(point.group).label} · 累计练习 ${count} 次`;
+      tooltipTitle.textContent=String(node.title||'未命名考点');tooltip.hidden=false;canvas.setAttribute('aria-describedby',tooltip.id);
+      const tip=tooltip.getBoundingClientRect();
+      tooltip.style.left=clamp(hoverPointer.x+16,8,Math.max(8,win.innerWidth-tip.width-8))+'px';
+      tooltip.style.top=clamp(hoverPointer.y+16,8,Math.max(8,win.innerHeight-tip.height-8))+'px';
+    }
     function stop(){if(raf)win.cancelAnimationFrame(raf);raf=0;lastFrame=0;clearWake()}
     function request(){if(!destroyed&&!raf&&visible()&&(dirty||!model.settled||automatic()||(!reduced&&pointers.size===0&&Math.abs(inertiaX)+Math.abs(inertiaY)>.02)))raf=win.requestAnimationFrame(frame)}
     function mark(){dirty=true;request()}
@@ -214,7 +234,7 @@
       if(!model.settled){for(let i=0;i<3&&!model.settled;i++)stepModel(model);if(model.settled&&autoFit)fitDefault();dirty=true}
       if(!reduced&&pointers.size===0&&(Math.abs(inertiaX)+Math.abs(inertiaY)>.02)){applyRotation(inertiaX,inertiaY);inertiaX*=.88;inertiaY*=.88;dirty=true}
       else if(reduced){inertiaX=0;inertiaY=0}
-      if(dirty){draw();dirty=false}request();
+      if(dirty){draw();dirty=false}updateHover();request();
     }
     function resize(){
       if(destroyed)return;
@@ -229,15 +249,17 @@
     function reset(){if(destroyed)return;pauseInteraction();phase=0;Object.assign(camera,DEFAULT_CAMERA);autoFit=true;fitDefault();group='';inertiaX=inertiaY=0;mark()}
     function listen(target,type,handler,options){target.addEventListener(type,handler,options);listeners.push(()=>target.removeEventListener(type,handler,options))}
     function distance(){const values=[...pointers.values()];return values.length<2?0:Math.hypot(values[0].x-values[1].x,values[0].y-values[1].y)}
-    function releasePointers(){for(const id of pointers.keys()){try{if(canvas.hasPointerCapture(id))canvas.releasePointerCapture(id)}catch(error){/* Detached pointers need no release. */}}pointers.clear();pinching=false;pinchDistance=0;inertiaX=inertiaY=0;canvas.style.cursor='grab'}
+    function releasePointers(){clearHover();for(const id of pointers.keys()){try{if(canvas.hasPointerCapture(id))canvas.releasePointerCapture(id)}catch(error){/* Detached pointers need no release. */}}pointers.clear();pinching=false;pinchDistance=0;inertiaX=inertiaY=0;canvas.style.cursor='grab'}
     listen(canvas,'pointerdown',event=>{
       if(event.pointerType==='mouse'&&event.button!==0)return;
+      if(event.pointerType==='touch')clearHover();else hoverPointer={x:event.clientX,y:event.clientY};hideTooltip();
       pauseInteraction();clearWake();inertiaX=inertiaY=0;pointers.set(event.pointerId,{x:event.clientX,y:event.clientY,startX:event.clientX,startY:event.clientY,moved:false,touch:event.pointerType==='touch',direction:''});
       try{canvas.setPointerCapture(event.pointerId)}catch(error){/* Capture may be unavailable after a cancelled contact. */}
       if(pointers.size>1){pinching=true;pinchDistance=distance();for(const point of pointers.values())point.moved=true}canvas.style.cursor='grabbing';
     });
     listen(canvas,'pointermove',event=>{
-      const point=pointers.get(event.pointerId);if(!point)return;
+      if(event.pointerType!=='touch')hoverPointer={x:event.clientX,y:event.clientY};
+      const point=pointers.get(event.pointerId);if(!point){updateHover();return}hideTooltip();
       const dx=event.clientX-point.x,dy=event.clientY-point.y;point.x=event.clientX;point.y=event.clientY;
       if(Math.hypot(point.x-point.startX,point.y-point.startY)>5)point.moved=true;
       if(pointers.size>1){const next=distance();if(pinchDistance>0)zoomBy(next/pinchDistance);pinchDistance=next;return}
@@ -255,7 +277,7 @@
           const cluster=clusterPositions().filter(p=>Math.hypot(p.x-x,p.y-y)<=34).sort((a,b)=>a.depth-b.depth)[0];
           if(cluster){focusGroup(cluster.key);onGroup?.(cluster.key);return;}
         }
-        const hit=positions().filter(p=>p.visible&&Math.hypot(p.x-x,p.y-y)<=Math.max(12,7*p.scale)).sort((a,b)=>a.depth-b.depth)[0];
+        const hit=pickNode(x,y);
         if(hit){select(hit.index);if(typeof onSelect==='function')onSelect(model.points[hit.index].node,hit.index)}
       }
       if(cancelled){inertiaX=inertiaY=0;for(const p of pointers.values())p.moved=true}
@@ -263,7 +285,9 @@
     }
     listen(canvas,'pointerup',event=>finish(event,false));listen(canvas,'pointercancel',event=>finish(event,true));
     listen(canvas,'lostpointercapture',event=>{if(pointers.has(event.pointerId))finish(event,true)});
-    listen(canvas,'wheel',event=>{pauseInteraction();if(!event.ctrlKey&&!event.metaKey)return;event.preventDefault();zoomBy(Math.exp(clamp(-event.deltaY*.0015,-1,1)))},{passive:false});
+    listen(canvas,'dblclick',()=>{reset();onGroup?.('')});
+    listen(canvas,'pointerleave',clearHover);listen(win,'blur',clearHover);listen(document,'scroll',clearHover,true);
+    listen(canvas,'wheel',event=>{pauseInteraction();event.preventDefault();zoomBy(Math.exp(clamp(-event.deltaY*.0015,-1,1)))},{passive:false});
     listen(document,'visibilitychange',()=>{if(document.hidden){stop();releasePointers()}else{lastFrame=0;wake();mark()}});
     listen(win,'pagehide',destroy);
     if(motion){const changed=()=>{reduced=motion.matches;if(reduced){inertiaX=inertiaY=0;setAutoRotate(false)}mark()};listen(motion,'change',changed)}
@@ -273,7 +297,7 @@
     // Dialog open/close and CSS visibility changes may not change intersection or size.
     const visibilityObserver=win.MutationObserver?new win.MutationObserver(()=>{if(visible()){wake();mark()}else{stop();releasePointers()}}):null;
     for(let element=host;element&&visibilityObserver;element=element.parentElement)visibilityObserver.observe(element,{attributes:true,attributeFilter:['style','class','hidden','open']});
-    function destroy(){if(destroyed)return;destroyed=true;stop();releasePointers();resizeObserver?.disconnect();intersectionObserver?.disconnect();visibilityObserver?.disconnect();for(const remove of listeners)remove();canvas.remove()}
+    function destroy(){if(destroyed)return;destroyed=true;stop();releasePointers();resizeObserver?.disconnect();intersectionObserver?.disconnect();visibilityObserver?.disconnect();for(const remove of listeners)remove();tooltip.remove();canvas.remove()}
     function snapshot(){return {autoRotate:autoEnabled,rotationPaused,phase,resumePending:!!resumeTimer,labelsVisible,labels:labelLayout(),textHidden:camera.zoom/baseZoom<.75,camera:{...camera},positions:positions(),mode:semanticView(model,camera.zoom/baseZoom,group).mode,clusters:clusterPositions(),selected,group,settled:model.settled,running:!!raf,destroyed}}
     resize();return Object.freeze({setAutoRotate,setRotationPaused,setLabelsVisible,select,focusGroup,rotate,zoomBy,reset,destroy,snapshot});
   }

@@ -76,6 +76,13 @@ with sync_playwright() as pw:
     page.wait_for_function('scenes.at(-1).snapshot().settled && !scenes.at(-1).snapshot().running')
     snap=lambda:page.evaluate('scenes.at(-1).snapshot()')
     assert len(snap()['positions'])==81 and len(set(p['depth'] for p in snap()['positions']))>10
+    point=max([p for p in snap()['positions'] if page.evaluate('(p)=>document.elementFromPoint(p.x,p.y)?.tagName==="CANVAS"',p)],key=lambda p:p['scale'])
+    page.mouse.move(point['x'],point['y'])
+    expect(dialog.locator('[role="tooltip"]')).to_be_visible()
+    assert snap()['selected']==0 and not page.locator('.kg-knowledge-detail').evaluate('e=>e.open')
+    page.mouse.move(2,2);expect(dialog.locator('[role="tooltip"]')).not_to_be_visible()
+    checks.append('original hover tooltip stays in native top layer without selecting or opening details')
+
     expect(page.locator('[data-knowledge-detail-title]')).to_have_text('风险管理 <安全>')
     expect(page.locator('[data-knowledge-page-count]')).to_have_text('全目录 81 个节点')
     expect(page.locator('[data-knowledge-summary]')).to_contain_text('81 个目录节点')
@@ -102,6 +109,9 @@ with sync_playwright() as pw:
     assert page.locator('[data-knowledge-list] button:visible').count()==51
     page.locator('[data-knowledge-node-prev]').click();assert snap()['selected']==80
     page.locator('[data-knowledge-details-close]').click()
+    page.mouse.dblclick(3,3);page.wait_for_function('!scenes.at(-1).snapshot().running')
+    assert snap()['group']=='' and snap()['camera']['yaw']==.10
+    expect(page.locator('[data-knowledge-group]').first).to_have_attribute('aria-pressed','true')
     page.locator('[data-knowledge-reset]').click();assert snap()['group']==''
     zoom=snap()['camera']['zoom'];page.locator('[data-knowledge-zoom-out]').click();assert snap()['camera']['zoom']<zoom
     page.locator('[data-knowledge-zoom-in]').click();assert abs(snap()['camera']['zoom']-zoom)<.001
@@ -197,9 +207,15 @@ with sync_playwright() as pw:
         shell=page.locator('.kg-knowledge-shell');shell.evaluate('e=>e.scrollTop=0')
         assert dialog.evaluate('e=>e.scrollWidth<=e.clientWidth&&e.querySelector(".kg-knowledge-shell").scrollWidth<=e.querySelector(".kg-knowledge-shell").clientWidth')
         before=shell.evaluate('e=>e.scrollTop');camera=snap()['camera'];r=shell.bounding_box()
-        page.mouse.move(r['x']+r['width']/2,r['y']+r['height']/2);page.mouse.wheel(0,300);page.wait_for_timeout(180)
-        if shell.evaluate('e=>e.scrollHeight>e.clientHeight'):assert shell.evaluate('e=>e.scrollTop')>before
-        assert snap()['camera']==camera
+        at={'x':r['x']+r['width']/2,'y':r['y']+r['height']/2}
+        over_canvas=page.evaluate('(p)=>document.elementFromPoint(p.x,p.y)?.tagName==="CANVAS"',at)
+        page.mouse.move(at['x'],at['y']);page.mouse.wheel(0,300);page.wait_for_timeout(180)
+        if over_canvas:
+            assert snap()['camera']['zoom']<camera['zoom'] and shell.evaluate('e=>e.scrollTop')==before
+        else:
+            if shell.evaluate('e=>e.scrollHeight>e.clientHeight'):assert shell.evaluate('e=>e.scrollTop')>before
+            assert snap()['camera']==camera
+        camera=snap()['camera']
         if height<600:
             shell.evaluate('e=>e.scrollTop=0');cdp=context.new_cdp_session(page)
             x=r['x']+r['width']/2;y=r['y']+r['height']/2
