@@ -201,6 +201,12 @@ with sync_playwright() as pw:
         assert target['id'] in page.evaluate("KGDevicePreferences.getString('kg_question_danmaku_hidden_v1__ink-browser')")
         assert any(c['id']==target['id'] for c in call(ctx,'get',comments_url)['comments'])
         click_tool(page, '#practiceDanmakuToggle')
+        # Make the answered-session prerequisite durable through the real save UI.
+        # Unload writes are covered by practice_resumable_report; this checks device preferences.
+        click_tool(page, '#practiceExitBtn')
+        with page.expect_response(lambda response: response.url.endswith('/pause') and response.request.method == 'POST' and response.ok):
+            page.locator('#practiceSaveExitBtn').click()
+        page.wait_for_function("document.body.dataset.practiceView==='lobby'")
         # A full page reload must preserve device toggle + hidden IDs; server has no hide mutation.
         page.reload(wait_until='networkidle')
         assert page.evaluate('KGQuestionComments.danmakuEnabled()') is False
