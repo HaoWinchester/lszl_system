@@ -85,11 +85,10 @@ scenario = '''
     page.evaluate('__rows=[]');page.evaluate('__dashboard.refresh()');expect(page.locator('.practice-recent-table')).to_be_hidden()
     expect(page.locator('#practiceRecentStatus')).to_contain_text('完成或保存')
     page.set_viewport_size({'width':390,'height':844})
-    # Let Chrome lay out closed native details at the new viewport before checking overflow.
+    # Let Chrome complete responsive layout before checking header geometry.
     page.evaluate('() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))')
-    trigger_box=page.locator('#authStatus').bounding_box()
-    chevron_box=page.locator('#authStatus .account-menu-chevron').bounding_box()
-    assert chevron_box['x']+chevron_box['width']<=trigger_box['x']+trigger_box['width'], ('account arrow overflows capsule',trigger_box,chevron_box)
+    # Compare both rectangles in one rendered frame; separate protocol reads can straddle a resize.
+    page.wait_for_function("""()=>{const trigger=document.querySelector('#authStatus');return trigger.querySelector('.account-menu-chevron').getBoundingClientRect().right<=trigger.getBoundingClientRect().right}""", timeout=5000)
     page.wait_for_function('document.documentElement.scrollWidth<=innerWidth', timeout=5000)
     assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
     page.screenshot(path=str(OUT / ('ui-'+args.capture+'-mobile.png')),full_page=True)

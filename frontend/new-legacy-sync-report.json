@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.391",
-  "toVersion": "v9.0-p4.1.392",
+  "fromVersion": "v9.0-p4.1.392",
+  "toVersion": "v9.0-p4.1.393",
   "changes": {
     "added": [],
     "changed": [
       "VERSION",
       "content-prep-studio/dist/content-prep.html",
-      "tests/danmaku-api-browser.py"
+      "tests/practice-lobby-fidelity-browser.py"
     ],
     "removed": []
   },
