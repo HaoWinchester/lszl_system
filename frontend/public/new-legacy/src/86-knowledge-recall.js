@@ -1696,8 +1696,8 @@
     window.KGRecallInk=inkController;
     const ui=window.KGCanvasToolbar,tools=$('krInkBtn')?.parentElement;
     if(ui&&tools){
-      ui.group(tools,'绘制',[[ $('krInkBtn'),'pen','画笔']]);
-      ui.group(tools,'视图',[[ $('krCaptureBtn'),'camera','截图'],[$('krNodeSearchBtn'),'select','搜索'],[$('krResetBtn'),'undo','重置']]);
+      ui.group(tools,'绘制',[[ $('krInkBtn'),'pen','画笔']],{iconOnly:true});
+      ui.group(tools,'视图',[[ $('krCaptureBtn'),'camera','截图'],[$('krNodeSearchBtn'),'search','搜索'],[$('krResetBtn'),'undo','重置']],{iconOnly:true});
     }
 
     // 可编辑表格：state.tables 读写 + saveProgress 持久化；历史由控制器内部命令栈承载。

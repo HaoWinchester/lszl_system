@@ -10134,9 +10134,9 @@ button[aria-label="关闭"]:not(.engagement-close):focus-visible{
 .qm-matching .qm-target,.qm-matching .qm-candidate{white-space:normal;overflow-wrap:anywhere;min-width:0}
 .qm-target b,.qm-target span{min-width:0}
 
-/* Canvas cards: text/options left, original question media right, one shared frame. */
+/* Canvas cards: original media first, question/options second, one shared frame. */
 .qm-card-layout{container-type:inline-size;min-width:0;width:100%}
-.qm-card-columns{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:18px;align-items:start}
+.qm-card-columns{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.35fr);gap:18px;align-items:start}
 .qm-card-main,.qm-card-media{min-width:0;overflow-wrap:anywhere}
 .qm-card-media .qm-image{margin:0 0 14px}
 .qm-card-media .qm-zoom{width:100%}
@@ -10145,7 +10145,7 @@ button[aria-label="关闭"]:not(.engagement-close):focus-visible{
 .qm-card-media .qm-case-body{padding:0 12px 12px}
 @container(max-width:360px){.qm-card-columns{grid-template-columns:minmax(0,1fr);gap:12px}}
 
-/* Shared case reading surface: material first, question second. Image-only cards keep their layout. */
+/* Case materials use a wider reading column and retain their 16:9 surface. */
 .qm-card-case-layout .qm-card-columns{grid-template-columns:minmax(0,.96fr) minmax(0,1.04fr);gap:24px}
 .qm-card-case-layout .qm-card-media{grid-column:1;grid-row:1}
 .qm-card-case-layout .qm-card-main{grid-column:2;grid-row:1}

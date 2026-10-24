@@ -21,7 +21,7 @@
   // Both learning canvases keep question content and its media inside the same card.
   function renderCardContent(question,content){
     const media=renderMaterials(question);
-    return media?`<div class="qm-card-layout${extension(question).material?' qm-card-case-layout':''}"><div class="qm-card-columns"><div class="qm-card-main">${content}</div><aside class="qm-card-media" aria-label="题目图表与材料">${media}</aside></div></div>`:content;
+    return media?`<div class="qm-card-layout${extension(question).material?' qm-card-case-layout':''}"><div class="qm-card-columns"><aside class="qm-card-media" aria-label="题目图表与材料">${media}</aside><div class="qm-card-main">${content}</div></div></div>`:content;
   }
   // Shared initial footprint; custom canvas widths remain adjustable afterwards.
   function caseCardSize({viewportWidth=global.innerWidth,viewportHeight=global.innerHeight,width}={}){
@@ -40,6 +40,8 @@
   function bindMedia(container){
     if(!container||container.dataset.qmMediaBound)return;
     container.dataset.qmMediaBound='true';
+    // Reading columns own native wheel scrolling; the parent canvas owns zoom elsewhere.
+    container.addEventListener('wheel',event=>{if(event.target.closest?.('.qm-card-case-layout'))event.stopPropagation();},{passive:true});
     container.addEventListener('error',event=>{if(event.target.tagName==='IMG'){const retry=event.target.closest('.qm-image')?.querySelector('[data-qm-retry]');if(retry)retry.hidden=false;}},true);
     container.addEventListener('load',event=>{if(event.target.tagName==='IMG'){const retry=event.target.closest('.qm-image')?.querySelector('[data-qm-retry]');if(retry)retry.hidden=true;}},true);
     container.addEventListener('click',event=>{

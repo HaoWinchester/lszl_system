@@ -19,6 +19,7 @@ with sync_playwright() as p:
     # Real coarse-pointer QW uses a scrolling document flow, not recall's centered world.
     page.add_style_tag(content='#card{transform:none;margin:14px;width:calc(100% - 28px)!important}.kr-viewport{overflow:auto;touch-action:pan-y}')
    page.add_script_tag(path=str(ROOT/'src/118-question-materials.js'))
+   page.locator('.kr-viewport').evaluate("e=>e.addEventListener('wheel',event=>{window.canvasWheelCount=(window.canvasWheelCount||0)+1;event.preventDefault()},{passive:false})")
    def render(q,content=CONTENT):
     page.evaluate('''({q,content,mode})=>{const c=document.querySelector('#card');const material=KGQuestionMaterials.renderCardContent(q,content);c.style.width='';c.style.height='';c.innerHTML=mode==='recall'?'<span class="kr-question-order-badge"><b>3</b><small>/5</small></span>'+material+'<div class="qw-card-actions qw-card-learning-actions"><button>解析</button></div>':'<header class="qw-card-header"><b>3/5</b></header><div class="qw-card-body"><div class="qw-card-content">'+material+'</div><div class="qw-card-actions"><button>解析</button></div></div>';if(mode==='workspace'){const size=KGQuestionMaterials.caseCardSize({});c.style.width=size.width+'px';if(q.material&&size.height)c.style.height=size.height+'px'}KGQuestionMaterials.bindMedia(c)}''',{'q':q,'content':content,'mode':mode})
    render(CASE)
@@ -33,6 +34,7 @@ with sync_playwright() as p:
    body=page.locator('.qm-case-body');assert body.evaluate('e=>e.scrollHeight>e.clientHeight'),page.locator('#card').evaluate("e=>[e,...e.querySelectorAll('.qm-card-layout,.qm-card-columns,.qm-card-media,.qm-case,.qm-case-body')].map(x=>({c:x.className,h:x.clientHeight,sh:x.scrollHeight,display:getComputedStyle(x).display,overflow:getComputedStyle(x).overflow,flex:getComputedStyle(x).flex}))")
    if w>=1000:
     body.hover();page.mouse.wheel(0,350);page.wait_for_function("document.querySelector('.qm-case-body').scrollTop>0",timeout=3000)
+    assert page.evaluate('!window.canvasWheelCount'),'case reading wheel must not zoom its parent canvas'
    else:
     box=body.bounding_box();x=box['x']+box['width']/2;y=box['y']+min(box['height']-25,200)
     cdp=page.context.new_cdp_session(page)
@@ -53,7 +55,7 @@ with sync_playwright() as p:
    render({'images':[{'url':'/api/v1/question-assets/test','alt':'图表'}]})
    expect(page.locator('.qm-card-case-layout')).to_have_count(0)
    if w>=1000:
-    main=page.locator('.qm-card-main').bounding_box();media=page.locator('.qm-card-media').bounding_box();assert media['x']>=main['x']+main['width']-1
+    main=page.locator('.qm-card-main').bounding_box();media=page.locator('.qm-card-media').bounding_box();assert media['x']+media['width']<=main['x']+1
    assert not errors,errors
    print(mode,w,h,'case-left/wide/16:9-or-stack/scroll/collapse/plain+image fallback PASS',flush=True)
    page.close()

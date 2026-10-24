@@ -41,7 +41,7 @@ with sync_playwright() as p:
         assert context.request.get(BASE+image.get_attribute('src')).ok
         page.wait_for_timeout(600)
         boxes=target.evaluate("e=>['.qm-card-main','.qm-card-media'].map(s=>e.querySelector(s).getBoundingClientRect().toJSON())")
-        assert boxes[1]['x']>=boxes[0]['right']-1, boxes
+        assert boxes[1]['right']<=boxes[0]['x']+1, boxes
         target.locator('[data-qm-zoom]').first.click()
         expect(page.locator('.qm-image-dialog')).to_be_visible()
         page.keyboard.press('Escape')
@@ -53,12 +53,12 @@ with sync_playwright() as p:
         target.evaluate("e=>{e.style.width='330px';e.style.minWidth='0'}")
         page.wait_for_timeout(300)
         boxes=target.evaluate("e=>['.qm-card-main','.qm-card-media'].map(s=>e.querySelector(s).getBoundingClientRect().toJSON())")
-        assert boxes[1]['top']>=boxes[0]['bottom']-1,boxes
+        assert boxes[1]['bottom']<=boxes[0]['top']+1,boxes
         assert target.locator('.qm-card-layout').evaluate('e=>e.scrollWidth<=e.clientWidth+1'), target.evaluate('e=>({w:e.clientWidth,sw:e.scrollWidth,children:[...e.querySelectorAll("*")].filter(n=>n.scrollWidth>n.clientWidth+1).map(n=>({class:n.className,w:n.clientWidth,sw:n.scrollWidth}))})')
         page.set_viewport_size({'width':390,'height':844})
         page.screenshot(path=str(OUT/(prefix+'-390.png')))
         assert not errors, errors
-        results.append({'page':name,'imageLoaded':True,'rightColumn':True,'narrowStack':True,'zoomEscape':True,'pageErrors':errors,'sourceOverride':OVERRIDE})
+        results.append({'page':name,'imageLoaded':True,'leftColumn':True,'narrowStack':True,'zoomEscape':True,'pageErrors':errors,'sourceOverride':OVERRIDE})
         page.close()
     (OUT/(('source' if OVERRIDE else 'uat')+'-media-results.json')).write_text(json.dumps(results,ensure_ascii=False,indent=2))
     print(json.dumps(results,ensure_ascii=False))

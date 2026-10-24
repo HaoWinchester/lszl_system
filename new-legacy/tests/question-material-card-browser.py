@@ -14,7 +14,7 @@ with sync_playwright() as p:
     page.route('**/api/v1/question-assets/*', asset)
     page.goto('http://materials.test/')
     page.add_style_tag(path=str(ROOT/'styles/question-materials.css'))
-    page.add_style_tag(content='#card{width:720px;padding:24px;border:1px solid;box-sizing:border-box} .stem{line-height:1.8}')
+    page.add_style_tag(content='#card{width:960px;padding:24px;border:1px solid;box-sizing:border-box} .stem{line-height:1.8}')
     page.add_script_tag(path=str(ROOT/'src/118-question-materials.js'))
     def render(question):
         page.evaluate('''q=>{const card=document.querySelector('#card');card.innerHTML=KGQuestionMaterials.renderCardContent(q,'<p class="stem">带有图表的题干与选项</p><button class="option">选项 A</button>');KGQuestionMaterials.bindMedia(card)}''', question)
@@ -24,19 +24,16 @@ with sync_playwright() as p:
         expect(page.locator('.qm-image img')).to_be_visible()
         page.wait_for_function("document.querySelector('.qm-image img').naturalWidth===600")
         rects=page.evaluate('''()=>['.qm-card-main','.qm-card-media'].map(s=>document.querySelector(s).getBoundingClientRect().toJSON())''')
-        if question.get('material'):
-            assert rects[1]['bottom'] <= rects[0]['top'], rects  # narrow case: material before question
-        else:
-            assert rects[1]['x'] >= rects[0]['right'], rects  # image-only compatibility
+        assert rects[1]['right'] <= rects[0]['x'], rects  # media before question for both image and case cards
         page.get_by_role('button',name='放大图表：回归图表').click()
         expect(page.locator('.qm-image-dialog')).to_be_visible()
         page.keyboard.press('Escape')
         expect(page.locator('.qm-image-dialog')).to_have_count(0)
         page.locator('#card').evaluate("e=>e.style.width='300px'")
         rects=page.evaluate('''()=>['.qm-card-main','.qm-card-media'].map(s=>document.querySelector(s).getBoundingClientRect().toJSON())''')
-        assert (rects[1]['bottom'] <= rects[0]['top'] if question.get('material') else rects[1]['top'] >= rects[0]['bottom']), rects
+        assert rects[1]['bottom'] <= rects[0]['top'], rects
         assert page.locator('#card').evaluate('e=>e.scrollWidth<=e.clientWidth'), 'card overflow'
-        page.locator('#card').evaluate("e=>e.style.width='720px'")
+        page.locator('#card').evaluate("e=>e.style.width='960px'")
     render({})
     expect(page.locator('.qm-card-media')).to_have_count(0)
     expect(page.locator('.option')).to_be_visible()
@@ -50,4 +47,4 @@ with sync_playwright() as p:
     page.wait_for_function("document.querySelector('.qm-image img').naturalWidth===600")
     expect(page.locator('[data-qm-retry]')).to_be_hidden()
     browser.close()
-print('PASS: image-only right column; case before question; narrow stack; no-media; zoom; safe URLs; retry')
+print('PASS: image-only left column; case before question; narrow stack; no-media; zoom; safe URLs; retry')
