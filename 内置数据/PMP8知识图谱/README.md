@@ -45,12 +45,12 @@
 
 核对日期：2026-10-25。内容为原创中文学习说明与案例，非 PMI 官方译文、官方试题或考纲完整映射。PMBOK 第八版知识框架与 PMP 考试大纲分开理解；这里没有把“人、过程、商业环境”当作第八版七个绩效域。
 
-该内容包已完成本地验证；UAT 发布与验收状态见 `docs/verification/pmp8-foundation-uat/README.md`。未经用户 UAT 验收通过，不合入 main 或发布正式环境。
+该内容包已完成本地和 UAT 验证，用户已于 2026-10-25 确认并要求发布正式环境。UAT 记录见 `docs/verification/pmp8-foundation-uat/README.md`，正式发布记录见 `docs/verification/pmp8-foundation-production/README.md`。
 
 
 ## UAT 基础模板发布
 
-`publish-uat.py` 只针对 `ENV=uat` 且数据库为 `kg_graph_uat` 的运行后端，通过现有文件与模板服务创建免费、已上架的基础模板，维护来源为管理员 `admin`。默认执行只读计划，明确传入 `--apply` 才会写入。
+`publish-uat.py` 通过现有文件与模板服务创建免费、已上架的基础模板，维护来源为管理员 `admin`。默认目标为 `ENV=uat` / `kg_graph_uat`，执行只读计划，明确传入 `--apply` 才会写入。只有显式指定 `--environment prod` 才接受 `ENV=prod` / `kg_graph`，交叉环境或开发库一律拒绝。
 
 发布前先备份 UAT 当前代码、运行资产与数据库，校验备份非空且可读取，再将 `catalog.json`、`graphs/` 与该脚本传到 UAT 后端的临时包目录。该操作不需要重建镜像或重启服务。
 
@@ -60,3 +60,12 @@ python /tmp/pmp8-foundation/publish-uat.py --apply --report /tmp/pmp8-foundation
 ```
 
 已有同一批次且内容相同的模板会复用；名称、归属或内容冲突会中止，不覆盖已有模板。模板更新不会修改学员已加载的副本。
+
+正式发布必须先取得用户 UAT 验收与正式发布授权，并备份正式代码、运行资产与 `kg_graph` 数据库，确认非空、归档可读并生成 manifest；之后使用同一内容包：
+
+```text
+python /tmp/pmp8-foundation/publish-uat.py --environment prod --report /tmp/pmp8-foundation/plan.json
+python /tmp/pmp8-foundation/publish-uat.py --environment prod --apply --report /tmp/pmp8-foundation/published.json
+```
+
+这是内容数据发布；不替换 active release、不运行站点构建或数据库迁移、不重启应用。

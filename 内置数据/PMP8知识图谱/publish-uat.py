@@ -1,6 +1,7 @@
-"""Publish this authored package as free UAT templates, using existing services.
+"""Publish this authored package as free templates, using existing services.
 
-Default is read-only planning. --apply requires ENV=uat and kg_graph_uat.
+Default is read-only UAT planning. Production requires --environment prod.
+Every target requires its exact ENV and database; --apply enables writes.
 Existing publications are reused only when their immutable content matches;
 name/content conflicts stop the run instead of replacing any user's template.
 """
@@ -18,6 +19,13 @@ FOLDER_NAME = 'PMP8 · 基础模板源文件'
 
 def fingerprint(value):
     return hashlib.sha256(json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+
+
+def validate_target(target, actual_environment, database):
+    expected_database = {'uat': 'kg_graph_uat', 'prod': 'kg_graph'}.get(target)
+    if expected_database is None or actual_environment != target or database != expected_database:
+        raise ValueError('Refusing publication outside the explicitly selected environment/database')
+    return expected_database
 
 
 def read_package():
@@ -56,15 +64,13 @@ async def run(args, catalog, graphs):
     from app.schemas.graph_template import PublicationInput
     from app.services import file_service, graph_template_service as templates
 
-    if settings.ENV != 'uat' or make_url(settings.DATABASE_URL).database != 'kg_graph_uat':
-        raise ValueError('Refusing publication outside ENV=uat / kg_graph_uat')
+    database = validate_target(args.environment, settings.ENV, make_url(settings.DATABASE_URL).database)
     try:
         async with AsyncSessionLocal() as db:
-            if await db.scalar(text('select current_database()')) != 'kg_graph_uat':
-                raise ValueError('Connected database is not UAT')
+            validate_target(args.environment, settings.ENV, await db.scalar(text('select current_database()')))
             user = await db.get(User, args.owner)
             if not user or user.role != 'admin' or user.status != 'active':
-                raise ValueError('An existing active UAT administrator is required')
+                raise ValueError('An existing active administrator is required')
             # Validate the complete batch and every conflict before any mutation.
             plan = []
             for item, graph in graphs:
@@ -87,7 +93,7 @@ async def run(args, catalog, graphs):
                     if source.status != 'active' or not content or fingerprint(templates.published_graph(content.graph_data)) != digest:
                         raise ValueError('Existing source differs; no overwrite allowed: '+item['name'])
                 plan.append({'topicId': item['id'], 'name': item['name'], 'action': 'unchanged' if row else 'create', 'sourceKey': key, 'fileId': source.id if source else None, 'templateId': row.id if row else None, 'sha256': digest})
-            result = {'environment': 'uat', 'database': 'kg_graph_uat', 'packageId': catalog['packageId'], 'owner': user.username, 'apply': args.apply, 'created': 0, 'unchanged': sum(p['action'] == 'unchanged' for p in plan), 'templates': plan}
+            result = {'environment': args.environment, 'database': database, 'packageId': catalog['packageId'], 'owner': user.username, 'apply': args.apply, 'created': 0, 'unchanged': sum(p['action'] == 'unchanged' for p in plan), 'templates': plan}
             if args.apply:
                 folders = (await db.scalars(select(Folder).where(Folder.owner_id == user.username, Folder.name == FOLDER_NAME, Folder.status == 'active'))).all()
                 if len(folders) > 1:
@@ -116,6 +122,7 @@ async def run(args, catalog, graphs):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--owner', default='admin')
+    parser.add_argument('--environment', choices=('uat', 'prod'), default='uat')
     parser.add_argument('--apply', action='store_true')
     parser.add_argument('--check-package', action='store_true')
     parser.add_argument('--report')
