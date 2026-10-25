@@ -1,0 +1,48 @@
+{
+  "environment": "prod",
+  "database": "kg_graph",
+  "published": 30,
+  "originalTemplatesPreserved": [
+    "gt_69a38dd1bb0944be94076254d0b0b617",
+    "gt_8ac6ddd955314b388497aa2167c476c7",
+    "gt_20196c010e3b4d2d99be8e98a91bfc96",
+    "gt_955ea8b7ae884b2abe3d3655eacb0226",
+    "gt_ce410c5070604d82a72287f8c5db580a",
+    "gt_27caeaff49614392a72ca466be6e2b34"
+  ],
+  "copyChecks": [
+    {
+      "topicId": "01",
+      "fileId": "f_fa70c1d0b2e445f0bc6538b33b11ba03",
+      "remappedIds": true,
+      "editable": true,
+      "sourceUnchanged": true,
+      "templateUnchanged": true,
+      "testCopyStatus": "trashed"
+    },
+    {
+      "topicId": "20",
+      "fileId": "f_65ef10697dea423aad92e58808d292d9",
+      "remappedIds": true,
+      "editable": true,
+      "sourceUnchanged": true,
+      "templateUnchanged": true,
+      "testCopyStatus": "trashed"
+    },
+    {
+      "topicId": "25",
+      "fileId": "f_63960f278cd245169c54e4364cdee481",
+      "remappedIds": true,
+      "editable": true,
+      "sourceUnchanged": true,
+      "templateUnchanged": true,
+      "testCopyStatus": "trashed"
+    }
+  ],
+  "studentCatalogFreeTemplates": 30,
+  "templateCount": 36,
+  "nodeCount": 330,
+  "linkCount": 342,
+  "allPublishedHashesMatch": true,
+  "currentFileUnchangedByServiceChecks": true
+}

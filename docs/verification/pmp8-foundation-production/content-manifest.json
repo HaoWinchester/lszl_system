@@ -1,0 +1,23 @@
+{
+  "kind": "content-only-publication",
+  "environment": "prod",
+  "database": "kg_graph",
+  "verifiedAt": "2026-10-25T10:32:39Z",
+  "packageId": "pmp8-knowledge-graphs-20261025",
+  "contentCommit": "78f986ac2320284858d30db613465d12e3b2063d",
+  "templateCount": 30,
+  "totalTemplateCount": 36,
+  "originalTemplatesPreserved": 6,
+  "nodeCount": 330,
+  "linkCount": 342,
+  "listed": true,
+  "memberOnly": false,
+  "runtimeRelease": "v9.0-p4.1.394",
+  "runtimeCodeChanged": false,
+  "containerRestarted": false,
+  "backupDirectory": "/home/ubuntu/lszl-backups/pmp8-20261025102702Z",
+  "contentDirectory": "/home/ubuntu/lszl-content-imports/pmp8-20261025102702Z",
+  "uatAcceptance": "user-approved-production-publication",
+  "userAuthorization": "好的，继续放在正式环境上",
+  "health": "ok"
+}
