@@ -1,0 +1,519 @@
+{
+  "graphs": [
+    {
+      "id": "01",
+      "name": "PMP8 · 01 第八版知识导航",
+      "nodes": 11,
+      "links": 12,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "02",
+      "name": "PMP8 · 02 整体观与系统思维",
+      "nodes": 11,
+      "links": 12,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "03",
+      "name": "PMP8 · 03 聚焦价值与收益",
+      "nodes": 11,
+      "links": 10,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "04",
+      "name": "PMP8 · 04 质量融入过程与成果",
+      "nodes": 11,
+      "links": 10,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "05",
+      "name": "PMP8 · 05 担当型领导与职业责任",
+      "nodes": 11,
+      "links": 12,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "06",
+      "name": "PMP8 · 06 可持续性融入项目",
+      "nodes": 11,
+      "links": 12,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "07",
+      "name": "PMP8 · 07 建立赋能文化",
+      "nodes": 11,
+      "links": 12,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "08",
+      "name": "PMP8 · 08 治理绩效域",
+      "nodes": 11,
+      "links": 12,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "09",
+      "name": "PMP8 · 09 范围绩效域",
+      "nodes": 11,
+      "links": 11,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "10",
+      "name": "PMP8 · 10 进度绩效域",
+      "nodes": 11,
+      "links": 11,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "11",
+      "name": "PMP8 · 11 财务绩效域",
+      "nodes": 11,
+      "links": 10,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "12",
+      "name": "PMP8 · 12 相关方绩效域",
+      "nodes": 11,
+      "links": 12,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "13",
+      "name": "PMP8 · 13 资源绩效域",
+      "nodes": 11,
+      "links": 12,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "14",
+      "name": "PMP8 · 14 风险绩效域",
+      "nodes": 11,
+      "links": 10,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "15",
+      "name": "PMP8 · 15 预测与敏捷变更对照",
+      "nodes": 11,
+      "links": 12,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "16",
+      "name": "PMP8 · 16 需求到验收追踪链",
+      "nodes": 11,
+      "links": 10,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "17",
+      "name": "PMP8 · 17 WBS与工作包",
+      "nodes": 11,
+      "links": 12,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "18",
+      "name": "PMP8 · 18 关键路径与浮动时间",
+      "nodes": 11,
+      "links": 11,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "19",
+      "name": "PMP8 · 19 赶工与快速跟进",
+      "nodes": 11,
+      "links": 12,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "20",
+      "name": "PMP8 · 20 挣值基础与绩效判断",
+      "nodes": 11,
+      "links": 12,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "21",
+      "name": "PMP8 · 21 完工估算与剩余效率",
+      "nodes": 11,
+      "links": 12,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "22",
+      "name": "PMP8 · 22 风险与问题及储备",
+      "nodes": 11,
+      "links": 12,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "23",
+      "name": "PMP8 · 23 威胁与机会响应",
+      "nodes": 11,
+      "links": 12,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "24",
+      "name": "PMP8 · 24 沟通与冲突协作",
+      "nodes": 11,
+      "links": 12,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "25",
+      "name": "PMP8 · 25 敏捷价值交付循环",
+      "nodes": 11,
+      "links": 11,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "26",
+      "name": "PMP8 · 26 看板与流动效率",
+      "nodes": 11,
+      "links": 10,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "27",
+      "name": "PMP8 · 27 采购与合同风险",
+      "nodes": 11,
+      "links": 12,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "28",
+      "name": "PMP8 · 28 AI辅助项目管理",
+      "nodes": 11,
+      "links": 11,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "29",
+      "name": "PMP8 · 29 PMO与组织能力",
+      "nodes": 11,
+      "links": 12,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "30",
+      "name": "PMP8 · 30 收尾与知识移交",
+      "nodes": 11,
+      "links": 11,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    }
+  ],
+  "totalGraphs": 30,
+  "totalNodes": 330,
+  "totalLinks": 342,
+  "cardObstructions": 0,
+  "edgeCrossings": 0
+}

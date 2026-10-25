@@ -1,0 +1,343 @@
+{
+  "schemaVersion": "pmp8-knowledge-graph-catalog-v1",
+  "packageId": "pmp8-knowledge-graphs-20261025",
+  "createdAt": "2026-10-25",
+  "sourceUrls": [
+    "https://www.pmi.org/standards/pmbok"
+  ],
+  "graphCount": 30,
+  "nodeCount": 330,
+  "linkCount": 342,
+  "graphs": [
+    {
+      "id": "01",
+      "name": "PMP8 · 01 第八版知识导航",
+      "category": "总览",
+      "layout": "hub",
+      "file": "graphs/01-第八版知识导航.json",
+      "nodeCount": 11,
+      "linkCount": 12,
+      "visualLayout": "bilateral-branches",
+      "description": "六项核心原则、七个绩效域、价值交付系统、开发方法裁剪、焦点领域、技术与实践、扩展主题"
+    },
+    {
+      "id": "02",
+      "name": "PMP8 · 02 整体观与系统思维",
+      "category": "六项原则",
+      "layout": "hub",
+      "file": "graphs/02-整体观与系统思维.json",
+      "nodeCount": 11,
+      "linkCount": 12,
+      "visualLayout": "bilateral-branches",
+      "description": "项目系统边界、相互依赖、整体影响分析、反馈回路、复杂性识别、接口协调、整体最优"
+    },
+    {
+      "id": "03",
+      "name": "PMP8 · 03 聚焦价值与收益",
+      "category": "六项原则",
+      "layout": "flow",
+      "file": "graphs/03-聚焦价值与收益.json",
+      "nodeCount": 11,
+      "linkCount": 10,
+      "visualLayout": "guided-flow",
+      "description": "战略目标、业务论证、价值假设、价值排序、可用交付、收益指标、收益持续跟踪"
+    },
+    {
+      "id": "04",
+      "name": "PMP8 · 04 质量融入过程与成果",
+      "category": "六项原则",
+      "layout": "flow",
+      "file": "graphs/04-质量融入过程与成果.json",
+      "nodeCount": 11,
+      "linkCount": 10,
+      "visualLayout": "guided-flow",
+      "description": "质量要求、验收标准、预防缺陷、过程质量、成果验证、根因改进、质量成本"
+    },
+    {
+      "id": "05",
+      "name": "PMP8 · 05 担当型领导与职业责任",
+      "category": "六项原则",
+      "layout": "hub",
+      "file": "graphs/05-担当型领导与职业责任.json",
+      "nodeCount": 11,
+      "linkCount": 12,
+      "visualLayout": "bilateral-branches",
+      "description": "责任与授权、透明与诚信、伦理判断、服务与引导、决策可追溯、及时升级、以身作则"
+    },
+    {
+      "id": "06",
+      "name": "PMP8 · 06 可持续性融入项目",
+      "category": "六项原则",
+      "layout": "hub",
+      "file": "graphs/06-可持续性融入项目.json",
+      "nodeCount": 11,
+      "linkCount": 12,
+      "visualLayout": "bilateral-branches",
+      "description": "全生命周期视角、环境影响、社会影响、经济可持续性、可持续采购、权衡与透明、测量与改进"
+    },
+    {
+      "id": "07",
+      "name": "PMP8 · 07 建立赋能文化",
+      "category": "六项原则",
+      "layout": "hub",
+      "file": "graphs/07-建立赋能文化.json",
+      "nodeCount": 11,
+      "linkCount": 12,
+      "visualLayout": "bilateral-branches",
+      "description": "共同目标、心理安全、团队自主、能力发展、多样性与包容、障碍移除、持续反馈"
+    },
+    {
+      "id": "08",
+      "name": "PMP8 · 08 治理绩效域",
+      "category": "七个绩效域",
+      "layout": "hub",
+      "file": "graphs/08-治理绩效域.json",
+      "nodeCount": 11,
+      "linkCount": 12,
+      "visualLayout": "bilateral-branches",
+      "description": "战略对齐、治理框架、授权边界、决策关口、变更治理、合规与保证、绩效透明"
+    },
+    {
+      "id": "09",
+      "name": "PMP8 · 09 范围绩效域",
+      "category": "七个绩效域",
+      "layout": "flow",
+      "file": "graphs/09-范围绩效域.json",
+      "nodeCount": 11,
+      "linkCount": 11,
+      "visualLayout": "guided-flow",
+      "description": "需求获取、需求分析、范围定义、工作分解、需求追踪、确认范围、控制范围"
+    },
+    {
+      "id": "10",
+      "name": "PMP8 · 10 进度绩效域",
+      "category": "七个绩效域",
+      "layout": "flow",
+      "file": "graphs/10-进度绩效域.json",
+      "nodeCount": 11,
+      "linkCount": 11,
+      "visualLayout": "guided-flow",
+      "description": "活动定义、逻辑依赖、持续时间估算、关键路径、进度基准、进度监控、进度应对"
+    },
+    {
+      "id": "11",
+      "name": "PMP8 · 11 财务绩效域",
+      "category": "七个绩效域",
+      "layout": "flow",
+      "file": "graphs/11-财务绩效域.json",
+      "nodeCount": 11,
+      "linkCount": 10,
+      "visualLayout": "guided-flow",
+      "description": "财务目标、成本估算、成本基准、资金需求、挣值度量、完工预测、财务纠偏"
+    },
+    {
+      "id": "12",
+      "name": "PMP8 · 12 相关方绩效域",
+      "category": "七个绩效域",
+      "layout": "hub",
+      "file": "graphs/12-相关方绩效域.json",
+      "nodeCount": 11,
+      "linkCount": 12,
+      "visualLayout": "bilateral-branches",
+      "description": "持续识别、分析诉求、参与目标、沟通设计、参与实施、冲突处理、效果反馈"
+    },
+    {
+      "id": "13",
+      "name": "PMP8 · 13 资源绩效域",
+      "category": "七个绩效域",
+      "layout": "hub",
+      "file": "graphs/13-资源绩效域.json",
+      "nodeCount": 11,
+      "linkCount": 12,
+      "visualLayout": "bilateral-branches",
+      "description": "资源需求、资源获取、角色职责、团队发展、资源日历、容量平衡、资源绩效"
+    },
+    {
+      "id": "14",
+      "name": "PMP8 · 14 风险绩效域",
+      "category": "七个绩效域",
+      "layout": "flow",
+      "file": "graphs/14-风险绩效域.json",
+      "nodeCount": 11,
+      "linkCount": 10,
+      "visualLayout": "guided-flow",
+      "description": "风险识别、定性分析、定量分析、响应规划、响应实施、风险监控、整体风险"
+    },
+    {
+      "id": "15",
+      "name": "PMP8 · 15 预测与敏捷变更对照",
+      "category": "专题应用",
+      "layout": "compare",
+      "file": "graphs/15-预测与敏捷变更对照.json",
+      "nodeCount": 11,
+      "linkCount": 12,
+      "visualLayout": "bilateral-branches",
+      "description": "预测型基准、变更请求、整体影响分析、授权审批、产品待办管理、迭代目标保护、反馈后调整"
+    },
+    {
+      "id": "16",
+      "name": "PMP8 · 16 需求到验收追踪链",
+      "category": "专题应用",
+      "layout": "flow",
+      "file": "graphs/16-需求到验收追踪链.json",
+      "nodeCount": 11,
+      "linkCount": 10,
+      "visualLayout": "guided-flow",
+      "description": "业务需要、需求表达、需求优先级、交付映射、验证用例、验收证据、变更追踪"
+    },
+    {
+      "id": "17",
+      "name": "PMP8 · 17 WBS与工作包",
+      "category": "专题应用",
+      "layout": "hub",
+      "file": "graphs/17-WBS与工作包.json",
+      "nodeCount": 11,
+      "linkCount": 12,
+      "visualLayout": "bilateral-branches",
+      "description": "交付成果分解、百分之百规则、工作包、WBS词典、规划包、活动分解、范围基准"
+    },
+    {
+      "id": "18",
+      "name": "PMP8 · 18 关键路径与浮动时间",
+      "category": "专题应用",
+      "layout": "flow",
+      "file": "graphs/18-关键路径与浮动时间.json",
+      "nodeCount": 11,
+      "linkCount": 11,
+      "visualLayout": "guided-flow",
+      "description": "网络逻辑、正推计算、逆推计算、总浮动时间、自由浮动时间、关键路径变化、多路径风险"
+    },
+    {
+      "id": "19",
+      "name": "PMP8 · 19 赶工与快速跟进",
+      "category": "专题应用",
+      "layout": "compare",
+      "file": "graphs/19-赶工与快速跟进.json",
+      "nodeCount": 11,
+      "linkCount": 12,
+      "visualLayout": "bilateral-branches",
+      "description": "偏差诊断、赶工、快速跟进、单位压缩成本、关键路径约束、资源与质量检查、授权与更新"
+    },
+    {
+      "id": "20",
+      "name": "PMP8 · 20 挣值基础与绩效判断",
+      "category": "专题应用",
+      "layout": "compare",
+      "file": "graphs/20-挣值基础与绩效判断.json",
+      "nodeCount": 11,
+      "linkCount": 12,
+      "visualLayout": "bilateral-branches",
+      "description": "计划价值PV、挣值EV、实际成本AC、成本偏差CV、进度偏差SV、成本指数CPI、进度指数SPI"
+    },
+    {
+      "id": "21",
+      "name": "PMP8 · 21 完工估算与剩余效率",
+      "category": "专题应用",
+      "layout": "compare",
+      "file": "graphs/21-完工估算与剩余效率.json",
+      "nodeCount": 11,
+      "linkCount": 12,
+      "visualLayout": "bilateral-branches",
+      "description": "完工预算BAC、一次性偏差预测、持续成本效率预测、成本进度联合预测、自下而上重估、完工偏差VAC、尚需绩效指数TCPI"
+    },
+    {
+      "id": "22",
+      "name": "PMP8 · 22 风险与问题及储备",
+      "category": "专题应用",
+      "layout": "compare",
+      "file": "graphs/22-风险与问题及储备.json",
+      "nodeCount": 11,
+      "linkCount": 12,
+      "visualLayout": "bilateral-branches",
+      "description": "未来风险、现实问题、触发条件、风险责任人、应急储备、管理储备、残余与次生风险"
+    },
+    {
+      "id": "23",
+      "name": "PMP8 · 23 威胁与机会响应",
+      "category": "专题应用",
+      "layout": "compare",
+      "file": "graphs/23-威胁与机会响应.json",
+      "nodeCount": 11,
+      "linkCount": 12,
+      "visualLayout": "bilateral-branches",
+      "description": "规避威胁、减轻威胁、转移威胁、开拓机会、提高与分享、接受风险、升级风险"
+    },
+    {
+      "id": "24",
+      "name": "PMP8 · 24 沟通与冲突协作",
+      "category": "专题应用",
+      "layout": "hub",
+      "file": "graphs/24-沟通与冲突协作.json",
+      "nodeCount": 11,
+      "linkCount": 12,
+      "visualLayout": "bilateral-branches",
+      "description": "信息需要、沟通渠道、反馈闭环、积极倾听、协作解决、情境化策略、约定与跟踪"
+    },
+    {
+      "id": "25",
+      "name": "PMP8 · 25 敏捷价值交付循环",
+      "category": "专题应用",
+      "layout": "flow",
+      "file": "graphs/25-敏捷价值交付循环.json",
+      "nodeCount": 11,
+      "linkCount": 11,
+      "visualLayout": "guided-flow",
+      "description": "产品目标、待办细化、迭代规划、每日协作、可用增量、评审反馈、回顾改进"
+    },
+    {
+      "id": "26",
+      "name": "PMP8 · 26 看板与流动效率",
+      "category": "专题应用",
+      "layout": "flow",
+      "file": "graphs/26-看板与流动效率.json",
+      "nodeCount": 11,
+      "linkCount": 10,
+      "visualLayout": "guided-flow",
+      "description": "工作可视化、在制品限制、拉动系统、周期时间、吞吐量、瓶颈识别、反馈改进"
+    },
+    {
+      "id": "27",
+      "name": "PMP8 · 27 采购与合同风险",
+      "category": "专题应用",
+      "layout": "compare",
+      "file": "graphs/27-采购与合同风险.json",
+      "nodeCount": 11,
+      "linkCount": 12,
+      "visualLayout": "bilateral-branches",
+      "description": "自制或外购、采购工作说明、固定总价合同、成本补偿合同、工料合同、供应商评估、合同管理"
+    },
+    {
+      "id": "28",
+      "name": "PMP8 · 28 AI辅助项目管理",
+      "category": "扩展主题",
+      "layout": "flow",
+      "file": "graphs/28-AI辅助项目管理.json",
+      "nodeCount": 11,
+      "linkCount": 11,
+      "visualLayout": "guided-flow",
+      "description": "使用场景、数据质量、隐私与权限、人工核验、偏差与可解释性、试点与评估、责任与治理"
+    },
+    {
+      "id": "29",
+      "name": "PMP8 · 29 PMO与组织能力",
+      "category": "扩展主题",
+      "layout": "hub",
+      "file": "graphs/29-PMO与组织能力.json",
+      "nodeCount": 11,
+      "linkCount": 12,
+      "visualLayout": "bilateral-branches",
+      "description": "组织价值定位、支持与赋能、治理与一致性、组合信息、能力发展、知识复用、服务效果"
+    },
+    {
+      "id": "30",
+      "name": "PMP8 · 30 收尾与知识移交",
+      "category": "专题应用",
+      "layout": "flow",
+      "file": "graphs/30-收尾与知识移交.json",
+      "nodeCount": 11,
+      "linkCount": 11,
+      "visualLayout": "guided-flow",
+      "description": "收尾条件、成果移交、验收与记录、合同关闭、收益责任移交、经验教训、资源与归档"
+    }
+  ]
+}
