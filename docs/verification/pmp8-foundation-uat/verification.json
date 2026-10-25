@@ -1,0 +1,41 @@
+{
+  "environment": "uat",
+  "published": 30,
+  "originalTemplatesPreserved": [
+    "gt_4117a553cee04894a54d96c06493f76d",
+    "gt_decddb4338254d63a59e33a2ca82cb29",
+    "gt_90ba51470c17498f97efb83c29928cf1"
+  ],
+  "copyChecks": [
+    {
+      "topicId": "01",
+      "fileId": "f_e82edf64abc84eb4a7535f7d3c4c6d36",
+      "remappedIds": true,
+      "editable": true,
+      "sourceUnchanged": true,
+      "templateUnchanged": true,
+      "testCopyStatus": "trashed"
+    },
+    {
+      "topicId": "20",
+      "fileId": "f_3965f9a38e6d4382957179b4bcb046b4",
+      "remappedIds": true,
+      "editable": true,
+      "sourceUnchanged": true,
+      "templateUnchanged": true,
+      "testCopyStatus": "trashed"
+    },
+    {
+      "topicId": "25",
+      "fileId": "f_3dd2feeee1c7457599926ca5c7d9dec2",
+      "remappedIds": true,
+      "editable": true,
+      "sourceUnchanged": true,
+      "templateUnchanged": true,
+      "testCopyStatus": "trashed"
+    }
+  ],
+  "studentCatalogFreeTemplates": 30,
+  "templateCount": 33,
+  "allPublishedHashesMatch": true
+}

@@ -1,0 +1,311 @@
+{
+  "environment": "uat",
+  "database": "kg_graph_uat",
+  "packageId": "pmp8-knowledge-graphs-20261025",
+  "owner": "admin",
+  "apply": true,
+  "created": 30,
+  "unchanged": 0,
+  "templates": [
+    {
+      "topicId": "01",
+      "name": "PMP8 · 01 第八版知识导航",
+      "action": "create",
+      "sourceKey": "pmp8-knowledge-graphs-20261025:01",
+      "fileId": "f_fd94f2a54a874e12b7ad480aaa1f7a8d",
+      "templateId": "gt_b008aeb7dee449a39c67d3eb0a6fb405",
+      "sha256": "ebaab53827e52a83e9e5b2ebfdad27fbe21ab95e5d0accbc1668d67b791fabb7",
+      "version": 1
+    },
+    {
+      "topicId": "02",
+      "name": "PMP8 · 02 整体观与系统思维",
+      "action": "create",
+      "sourceKey": "pmp8-knowledge-graphs-20261025:02",
+      "fileId": "f_4a4dd05d8a5445b98c288fdb9d995db0",
+      "templateId": "gt_53767d8df7804eedb0e2d3e0363d3a1e",
+      "sha256": "230b31ac0ef51586a76cb07836e67bde2a059cb438fa9854c807156a55f74eb4",
+      "version": 1
+    },
+    {
+      "topicId": "03",
+      "name": "PMP8 · 03 聚焦价值与收益",
+      "action": "create",
+      "sourceKey": "pmp8-knowledge-graphs-20261025:03",
+      "fileId": "f_48efa9a86d48473b9210dc6ef8f70e91",
+      "templateId": "gt_2dfbfb65af114dc68dd99691c8c06e87",
+      "sha256": "f4cafb1691d47f4fd2950d684e65500912b4cc18e58e13b66f6608c816aa3cf8",
+      "version": 1
+    },
+    {
+      "topicId": "04",
+      "name": "PMP8 · 04 质量融入过程与成果",
+      "action": "create",
+      "sourceKey": "pmp8-knowledge-graphs-20261025:04",
+      "fileId": "f_1b824b183d454acbb6c0f37bb0dc73b5",
+      "templateId": "gt_8b2e65216a0045ba9b24d19a09d86dca",
+      "sha256": "6f2fac333c0db43ff1851fdaa55a2280f1abcfda072553ece15698544f2893d0",
+      "version": 1
+    },
+    {
+      "topicId": "05",
+      "name": "PMP8 · 05 担当型领导与职业责任",
+      "action": "create",
+      "sourceKey": "pmp8-knowledge-graphs-20261025:05",
+      "fileId": "f_ec853d4ef80f4e3f85366772e7701b05",
+      "templateId": "gt_587bc13fa5244323afd47d74b143a478",
+      "sha256": "4362b6d6a4ffd7880fdca468e8d2584cb88632e8619f7e5dccc51af3612891e1",
+      "version": 1
+    },
+    {
+      "topicId": "06",
+      "name": "PMP8 · 06 可持续性融入项目",
+      "action": "create",
+      "sourceKey": "pmp8-knowledge-graphs-20261025:06",
+      "fileId": "f_9b786aeb8dc9471db5e324fd02ccdb85",
+      "templateId": "gt_d0690f539165402da0fe48276c2f8739",
+      "sha256": "e0dcd6dd2519049290f153e23043aa20250f10dfc0bcedb244d5db6c90ae6d60",
+      "version": 1
+    },
+    {
+      "topicId": "07",
+      "name": "PMP8 · 07 建立赋能文化",
+      "action": "create",
+      "sourceKey": "pmp8-knowledge-graphs-20261025:07",
+      "fileId": "f_03f0c70c656a4c98abfb0cbc55505f82",
+      "templateId": "gt_4666ee71cd734d21a596a2cfb3edddfa",
+      "sha256": "2fe3b4b0368aa7706a47dd8bdd1d30313d6b927b94ff4f8a4344c344d1352b79",
+      "version": 1
+    },
+    {
+      "topicId": "08",
+      "name": "PMP8 · 08 治理绩效域",
+      "action": "create",
+      "sourceKey": "pmp8-knowledge-graphs-20261025:08",
+      "fileId": "f_e7f1ea32a82843d294806902dc45c6d7",
+      "templateId": "gt_c9b6d7bbbf404e25a3c4ea8988bd2f8d",
+      "sha256": "45994df82ac4b8f5e48404e2171341673aee898eb8e20c0d8dc5585ac9b25b74",
+      "version": 1
+    },
+    {
+      "topicId": "09",
+      "name": "PMP8 · 09 范围绩效域",
+      "action": "create",
+      "sourceKey": "pmp8-knowledge-graphs-20261025:09",
+      "fileId": "f_0b58f342b7754d7cb7c642a0dbf9458d",
+      "templateId": "gt_bb2052be612540ea859da7dfcf3797d2",
+      "sha256": "d97472ee2738b3a0bb0b349ba7280d6eb838d888361429d7e67e0c21134e095e",
+      "version": 1
+    },
+    {
+      "topicId": "10",
+      "name": "PMP8 · 10 进度绩效域",
+      "action": "create",
+      "sourceKey": "pmp8-knowledge-graphs-20261025:10",
+      "fileId": "f_a6ec539d253d4f35bdc723eef37d7868",
+      "templateId": "gt_ed7a60bec5574351beacab13ec26dabc",
+      "sha256": "598678d5f3e9ec9597b6ef7f4a4ea6e2eb56951fc88de9bd894522527a6e5af7",
+      "version": 1
+    },
+    {
+      "topicId": "11",
+      "name": "PMP8 · 11 财务绩效域",
+      "action": "create",
+      "sourceKey": "pmp8-knowledge-graphs-20261025:11",
+      "fileId": "f_8f44b38ee41944a59ef43bbf9fa42c6c",
+      "templateId": "gt_efae7362ed8042088024426be6e928ae",
+      "sha256": "6668c4bbc95b1a01eb978abb8f86af08170ec77bbfc2c61d296fde4729df4558",
+      "version": 1
+    },
+    {
+      "topicId": "12",
+      "name": "PMP8 · 12 相关方绩效域",
+      "action": "create",
+      "sourceKey": "pmp8-knowledge-graphs-20261025:12",
+      "fileId": "f_5e08a51f65774a2ab13dfc84cfda65f2",
+      "templateId": "gt_99ec8d67acef4f0896a83ff76d85f95c",
+      "sha256": "b4143803180ed285de03d06bdcdb3680c302acf554a6ebfca67255b6db8a50e4",
+      "version": 1
+    },
+    {
+      "topicId": "13",
+      "name": "PMP8 · 13 资源绩效域",
+      "action": "create",
+      "sourceKey": "pmp8-knowledge-graphs-20261025:13",
+      "fileId": "f_ffe60b45662d4082b2cf358ad5ae8f96",
+      "templateId": "gt_37a63c8be2fc45d59b782642c240853e",
+      "sha256": "9829662e88ea67db0ad52fffd1d28f33b32cd1ec4512f843f78649b224232b9b",
+      "version": 1
+    },
+    {
+      "topicId": "14",
+      "name": "PMP8 · 14 风险绩效域",
+      "action": "create",
+      "sourceKey": "pmp8-knowledge-graphs-20261025:14",
+      "fileId": "f_bbdfea24832e480589abfafdcda30975",
+      "templateId": "gt_57a46e3fa306491584d18ea014cd1c26",
+      "sha256": "579183bac75c1ab3d718b253cc6872e6f0231a22d0e4660aec24298b6853260f",
+      "version": 1
+    },
+    {
+      "topicId": "15",
+      "name": "PMP8 · 15 预测与敏捷变更对照",
+      "action": "create",
+      "sourceKey": "pmp8-knowledge-graphs-20261025:15",
+      "fileId": "f_d33b8dad8d654d088a8decddf7f523ea",
+      "templateId": "gt_e9bb6149d936427680199c9c768386b5",
+      "sha256": "9af3681b90014bfc264c0df65deaae5cf597aff1c0781cc3079f7269e9c84e8a",
+      "version": 1
+    },
+    {
+      "topicId": "16",
+      "name": "PMP8 · 16 需求到验收追踪链",
+      "action": "create",
+      "sourceKey": "pmp8-knowledge-graphs-20261025:16",
+      "fileId": "f_79a1e27dce0849b69c148b784a080cc2",
+      "templateId": "gt_c834c68f16244f15a1d6e070fcd068cd",
+      "sha256": "7d84a090eabd1a61b4032e53da1721facb1176bb09154c3e0b17d13a1c54d083",
+      "version": 1
+    },
+    {
+      "topicId": "17",
+      "name": "PMP8 · 17 WBS与工作包",
+      "action": "create",
+      "sourceKey": "pmp8-knowledge-graphs-20261025:17",
+      "fileId": "f_f682935f47a14844899f676baeb653d4",
+      "templateId": "gt_3a55f9c6a1254e2abdd18c235c22b10a",
+      "sha256": "c9ab31eaa074fec1818394eec7895db0c8d445ae01df048b38c9277f4ea4fc11",
+      "version": 1
+    },
+    {
+      "topicId": "18",
+      "name": "PMP8 · 18 关键路径与浮动时间",
+      "action": "create",
+      "sourceKey": "pmp8-knowledge-graphs-20261025:18",
+      "fileId": "f_3c2335e974f345ffb0bbb05d1004c4c7",
+      "templateId": "gt_9c23004591824e67a213b73a8f6fa2a0",
+      "sha256": "c12db4ee835b6dc98e8ab56d6fbf70e38e09a2fe257ba4d44d394091c513dce6",
+      "version": 1
+    },
+    {
+      "topicId": "19",
+      "name": "PMP8 · 19 赶工与快速跟进",
+      "action": "create",
+      "sourceKey": "pmp8-knowledge-graphs-20261025:19",
+      "fileId": "f_c1e5a53dc4ad4a0ba97e0398ae8426a7",
+      "templateId": "gt_9dcfc29f789842888f9a3612e430c7d3",
+      "sha256": "d06f7fad8bde8a101c5ebf78ba77fb1f8c565afb030d042d0baecbfa054231ed",
+      "version": 1
+    },
+    {
+      "topicId": "20",
+      "name": "PMP8 · 20 挣值基础与绩效判断",
+      "action": "create",
+      "sourceKey": "pmp8-knowledge-graphs-20261025:20",
+      "fileId": "f_a40630353b14449c8e4355556bb7eea5",
+      "templateId": "gt_69525c7491f04a3880ef913aba33ce41",
+      "sha256": "4ac60857ed833c8536c741022d85429c50fe84ef15dcd1ec1590bc2c90ea8d80",
+      "version": 1
+    },
+    {
+      "topicId": "21",
+      "name": "PMP8 · 21 完工估算与剩余效率",
+      "action": "create",
+      "sourceKey": "pmp8-knowledge-graphs-20261025:21",
+      "fileId": "f_2a23b40bc1fc4cd5aacb41b07d0af9f7",
+      "templateId": "gt_cbf7ccacaf3742b68301c0a07af2809a",
+      "sha256": "2a700d4a7cce839fa1dd02958ad7a1bf39dce88c783cf2b58f9a2e5f5590996f",
+      "version": 1
+    },
+    {
+      "topicId": "22",
+      "name": "PMP8 · 22 风险与问题及储备",
+      "action": "create",
+      "sourceKey": "pmp8-knowledge-graphs-20261025:22",
+      "fileId": "f_6b4457f6dad24e52a265dd117f6b0d2d",
+      "templateId": "gt_eab7e0810a2245b38d7ba6a4667730f8",
+      "sha256": "a21812cac363f7eeb9f1322b418cc8dfd20e360533ab35f748591751dc3bc01f",
+      "version": 1
+    },
+    {
+      "topicId": "23",
+      "name": "PMP8 · 23 威胁与机会响应",
+      "action": "create",
+      "sourceKey": "pmp8-knowledge-graphs-20261025:23",
+      "fileId": "f_f4f1854a9ae94617a8f4ff58523b8e52",
+      "templateId": "gt_407acf38c283436db3379a393607d3c9",
+      "sha256": "476ea05fe211556b405901eb463228ac7aa51d91e37c2daa45a4a5fde3e2b064",
+      "version": 1
+    },
+    {
+      "topicId": "24",
+      "name": "PMP8 · 24 沟通与冲突协作",
+      "action": "create",
+      "sourceKey": "pmp8-knowledge-graphs-20261025:24",
+      "fileId": "f_1c7ab41e9c08466a8ad3112ed79ce105",
+      "templateId": "gt_921cbdf4c66c43cb834764f14094c450",
+      "sha256": "47de3a6f568c7a70ee74301b27abaa6f600ba2025752340a5100ff938f2caf60",
+      "version": 1
+    },
+    {
+      "topicId": "25",
+      "name": "PMP8 · 25 敏捷价值交付循环",
+      "action": "create",
+      "sourceKey": "pmp8-knowledge-graphs-20261025:25",
+      "fileId": "f_d7e169baa45f46a29c1c6dfd4d7bdcea",
+      "templateId": "gt_f1b8c414f5034caf85a97116bf6357fc",
+      "sha256": "767256ed8183352f391d256f9796aeb14eae65fa1341d5c8cba0de3fc8fcbcad",
+      "version": 1
+    },
+    {
+      "topicId": "26",
+      "name": "PMP8 · 26 看板与流动效率",
+      "action": "create",
+      "sourceKey": "pmp8-knowledge-graphs-20261025:26",
+      "fileId": "f_bedc0690642e4517be73ab9704cbe43b",
+      "templateId": "gt_9ad709c9ed764787bb31d90738fb1044",
+      "sha256": "e2f34e06a3be51aace30fe9d9b818643500940757f608096d20fd4974b193305",
+      "version": 1
+    },
+    {
+      "topicId": "27",
+      "name": "PMP8 · 27 采购与合同风险",
+      "action": "create",
+      "sourceKey": "pmp8-knowledge-graphs-20261025:27",
+      "fileId": "f_61f27fd2864645c683125c71f456694b",
+      "templateId": "gt_9fd4ebbc11fa4d0ea06be058f5b4ac2f",
+      "sha256": "9f19bfab06198ecf3caf604c0ee6370285aaa5a7c7abdc7ac6f44feb1631c8cf",
+      "version": 1
+    },
+    {
+      "topicId": "28",
+      "name": "PMP8 · 28 AI辅助项目管理",
+      "action": "create",
+      "sourceKey": "pmp8-knowledge-graphs-20261025:28",
+      "fileId": "f_98f52185c1374064ae3b65d5fdfaa40a",
+      "templateId": "gt_ae4f2caa2df045f481fed126d3b95735",
+      "sha256": "0eb693a960bc417729a802d70a721786de2c82ff85d87072ccc87de60e888a65",
+      "version": 1
+    },
+    {
+      "topicId": "29",
+      "name": "PMP8 · 29 PMO与组织能力",
+      "action": "create",
+      "sourceKey": "pmp8-knowledge-graphs-20261025:29",
+      "fileId": "f_bc0eb07613504db9b960a49c699c0676",
+      "templateId": "gt_328bfba3be7a4b51a5c16f5ca2930a14",
+      "sha256": "f809b6a7e4f3a12187f727e253420fa179ea11c77193fa6a64c9292f71692c10",
+      "version": 1
+    },
+    {
+      "topicId": "30",
+      "name": "PMP8 · 30 收尾与知识移交",
+      "action": "create",
+      "sourceKey": "pmp8-knowledge-graphs-20261025:30",
+      "fileId": "f_fd08b7f9c4d54f7295b7f4bf9fd9a306",
+      "templateId": "gt_d625eaf861ae4e87aded18c7da6a9f1a",
+      "sha256": "77ff1d3b804c9c138240adb28744086ace1122104c59bb52939cb577e3a7761a",
+      "version": 1
+    }
+  ]
+}

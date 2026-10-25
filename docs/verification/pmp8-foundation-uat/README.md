@@ -21,4 +21,26 @@ UAT 运行中的页面版本经 HTTP 实测为 `v9.0-p4.1.394`。宿主机旧 re
 
 备份目录：`/home/ubuntu/lszl-uat-backups/pmp8-20261025091010Z`，目录内含 `manifest.json`、`uat-host-code.tar.gz`、`uat-runtime-code.tar.gz`、`kg_graph_uat.dump`。
 
-本文件将在发布后的验证完成后补充最终结果。用户 UAT 业务验收尚未完成；main 和正式环境保持原状。
+## 发布结果（2026-10-25）
+
+- 入口：[UAT 图谱](https://uat.aihuanpu.com/graph) → 左侧「模板」→ `PMP8 · 01` 至 `PMP8 · 30` → 预览或「加载为新图谱」。
+- 首次发布新增 30 套，全部为免费、上架、v1；现有 3 套保留，模板库共 33 套。原有 3 套的名称、归属、上架/会员设置、版本及正文哈希均与发布前一致。
+- 再次执行发布：新增 0 套、原样复用 30 套，没有重复创建或升级版本。
+- 30 套模板的发布快照与源文件哈希完全匹配；每套 11 张卡片。学生角色可见全部 30 套免费模板。
+- 抽查知识导航、挣值判断、敏捷循环三种内容：加载会重建对象 ID，副本可以保存修改，源文件与已发布模板均保持原样。三个服务验证副本已移入可恢复的回收站。
+- Chrome 实际访问 UAT：看到了 30 套免费模板，打开知识导航、敏捷循环预览，并通过「加载为新图谱」打开知识导航副本。该浏览器副本保留供继续查看。
+- `uat-overview-preview.png`、`uat-agile-preview.png`、`uat-loaded-graph.png` 为 UAT 实际浏览器截图。
+- `published.json` 为首次发布回执，`recheck.json` 为重复导入回执，`verification.json` 为数据一致性与副本隔离检查结果。
+
+内容提交：`7596876edb1779feacfc6df83ff3db80ff0c154c`，已合入并推送 `uat`。本次为内容数据发布，运行中代码版本与 `.deploy-state/git-commit` 保持原样；单独的 `content-manifest.json` 记录内容提交与备份。
+
+服务器内容与回执留存：`/home/ubuntu/lszl-uat-imports/pmp8-20261025091010Z`。管理员的模板源文件统一位于「PMP8 · 基础模板源文件」文件夹。
+
+## 自动检查与验收边界
+
+- `cd frontend && pnpm test`：378 项 Node 测试、9 项契约测试及 4 组部署脚本测试全部通过。
+- `cd backend && .venv/bin/python -m pytest tests/test_graph_templates.py tests/test_graph_assets.py -q`：21 项通过；有 1 条现有 multipart 弃用警告。
+- `node 内置数据/PMP8知识图谱/validate-layout.mjs`：30 套图谱，连线交叉 0、穿卡 0、默认灰图标 0。
+- 本次未运行全部后端测试；UAT 浏览器抽查不替代用户逐项业务验收。
+
+当前停在 UAT 待用户验收。没有合入或推送 main，没有修改正式环境。
