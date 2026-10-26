@@ -37,6 +37,10 @@ def package(legacy=False):
     catalog=deepcopy(catalog);graphs=deepcopy(graphs[:2]);prefix=uuid4().hex[:8]
     for item,graph in graphs:
         item['name']=prefix+' '+item['name'];graph['meta']['title']=item['name']
+        if legacy:
+            item['id']=prefix+'-'+item['id']
+            item['sourceKey']=catalog['packageId']+':'+item['id']
+            graph['meta']['topicId']=item['id']
         if not legacy:
             catalog['packageId']='test-'+prefix
             item['sourceKey']=catalog['packageId']+':'+item['id'];graph['meta']['contentPackageId']=catalog['packageId']
@@ -46,6 +50,14 @@ def package(legacy=False):
 
 async def counts(db):
     return tuple([await db.scalar(select(func.count()).select_from(model)) for model in (GraphFile,FileContent,GraphTemplate,GraphTemplateVersion)])
+
+
+async def database_state(db):
+    result=[]
+    for model in (GraphFile, FileContent, GraphTemplate, GraphTemplateVersion):
+        rows=(await db.scalars(select(model).order_by(*model.__table__.primary_key))).all()
+        result.append([tuple(deepcopy(getattr(row,column.name)) for column in model.__table__.columns) for row in rows])
+    return result
 
 
 def test_dry_run_apply_idempotence_category_and_source_conflict():
@@ -107,7 +119,7 @@ async def old_sources(db):
         content=await db.get(FileContent,source.id)
         normalized=deepcopy(content.graph_data)
         normalized['meta']={k:v for k,v in normalized['meta'].items() if k in {'title','subject','audience','description'}}
-        normalized['defaults']={'nodeWidth':128};normalized.pop('resources',None)
+        normalized['defaults']=deepcopy(pub.EDITOR_DEFAULTS);normalized.pop('resources',None)
         content.graph_data=normalized;await db.commit()
     personal=await file_service.create_file(db,user.username,name=graphs[0][0]['name'],graph_data={'nodes':[],'links':[]},source='template',source_file_id=receipt['graphs'][0]['templateId'])
     db.add(CurrentFile(owner_id=user.username,file_id=personal.id));await db.commit()
@@ -119,13 +131,20 @@ async def snapshot(db,receipt,personal):
     for fid in [r['fileId'] for r in receipt['graphs']]+[personal]:
         source=await db.get(GraphFile,fid);content=await db.get(FileContent,fid)
         values.append((fid,deepcopy(content.graph_data),deepcopy(content.learning_state),content.revision,content.saved_at,source.revision,source.updated_at,source.created_at))
-    return values,await counts(db),(await db.get(CurrentFile,(await db.get(GraphFile,personal)).owner_id)).file_id
+    versions=[(v.id,v.template_id,v.version,v.source_file_id,v.source_revision,v.asset_owner,deepcopy(v.graph_data),deepcopy(v.bindings)) for v in (await db.scalars(select(GraphTemplateVersion).where(GraphTemplateVersion.template_id.in_([r['templateId'] for r in receipt['graphs']])).order_by(GraphTemplateVersion.id))).all()]
+    return values,await counts(db),(await db.get(CurrentFile,(await db.get(GraphFile,personal)).owner_id)).file_id,versions
 
 
-def test_local_repair_roundtrip_preserves_everything_and_publication_rerun(tmp_path,monkeypatch):
+@pytest.mark.parametrize('snapshot_roundtrip',[False,True])
+def test_local_repair_roundtrip_preserves_everything_and_publication_rerun(tmp_path,monkeypatch,snapshot_roundtrip):
     async def scenario():
         async with AsyncSessionLocal() as db:
             user,catalog,graphs,receipt,personal=await old_sources(db)
+            if snapshot_roundtrip:
+                for entry in receipt['graphs']:
+                    version=await db.scalar(select(GraphTemplateVersion).where(GraphTemplateVersion.template_id==entry['templateId']))
+                    graph=deepcopy(version.graph_data);graph['defaults']=deepcopy(pub.EDITOR_DEFAULTS);graph.pop('resources',None);version.graph_data=graph
+                await db.commit()
             before=await snapshot(db,receipt,personal)
             result=await pub.repair_receipt(db,user,catalog,graphs,receipt)
             assert all(p['action']=='repair' for p in result['templates']) and before==await snapshot(db,receipt,personal)
@@ -199,4 +218,80 @@ def test_complete_preflight_prevents_earlier_creations(fault):
             before=await counts(db)
             with pytest.raises(ValueError):await pub.apply_publication(db,user,catalog,graphs,apply=True)
             assert await counts(db)==before
+    run(scenario())
+
+
+@pytest.mark.parametrize('fault',['renamed','wrongOwner','historical','ambiguous'])
+def test_source_bound_publication_identity_drift_aborts_before_writes(fault):
+    async def scenario():
+        async with AsyncSessionLocal() as db:
+            user=await actor(db);catalog,graphs=package()
+            result=await pub.apply_publication(db,user,catalog,graphs,apply=True)
+            first=await db.get(GraphTemplate,result['templates'][0]['templateId']);first.category='general'
+            entry=result['templates'][-1];row=await db.get(GraphTemplate,entry['templateId'])
+            if fault=='renamed':row.name='renamed '+row.name
+            if fault=='wrongOwner':
+                other=await actor(db);row.name='other '+row.name;row.owner_id=other.username
+            if fault=='historical':
+                # Catalog source remains bound to historical version1; current
+                # publication name and source have both moved to another file.
+                other=await file_service.create_file(db,user.username,name='new publication source',graph_data=graphs[-1][1],source='created')
+                from app.schemas.graph_template import PublicationInput
+                await graph_template_service.publish(db,user,PublicationInput(sourceFileId=other.id,expectedFileRevision=other.revision,name='moved publication'),template_id=row.id)
+            if fault=='ambiguous':
+                from app.schemas.graph_template import PublicationInput
+                await graph_template_service.publish(db,user,PublicationInput(sourceFileId=entry['fileId'],expectedFileRevision=1,name='duplicate source publication'))
+            await db.commit()
+            before=await counts(db)
+            before_state=await database_state(db)
+            with pytest.raises(ValueError):await pub.apply_publication(db,user,catalog,graphs,apply=True)
+            assert await counts(db)==before
+            assert before_state==await database_state(db)
+    run(scenario())
+
+
+@pytest.mark.parametrize('fault',['mindmap','unknownMeta','retainedAuthoringMeta','unknownGraphField','defaults','flashReviews','importedFlashcards','fileLearningState','snapshotAuthoringMeta'])
+def test_repair_rejects_non_roundtrip_graph_edits(tmp_path,monkeypatch,fault):
+    async def scenario():
+        async with AsyncSessionLocal() as db:
+            user,catalog,graphs,receipt,personal=await old_sources(db)
+            content=await db.get(FileContent,receipt['graphs'][-1]['fileId'])
+            graph=deepcopy(content.graph_data)
+            if fault=='mindmap':graph['mindmap']={'rootIds':[graph['nodes'][1]['id']],'themeId':'mint','direction':'left'}
+            if fault=='unknownMeta':graph['meta']['customTeachingNote']='personal edit'
+            if fault=='retainedAuthoringMeta':graph['meta']['edition']='changed edition'
+            if fault=='unknownGraphField':graph['unrecognizedPersistedContent']={'edited':True}
+            if fault=='defaults':graph['defaults']['nodeColor']='#ff0000'
+            if fault=='flashReviews':graph['flashReviews']={graph['nodes'][0]['id']:{'reviewCount':1}}
+            if fault=='importedFlashcards':graph['importedFlashcards']=[{'id':'studied'}]
+            if fault=='fileLearningState':content.learning_state={'reviewCount':1}
+            if fault=='snapshotAuthoringMeta':
+                version=await db.scalar(select(GraphTemplateVersion).where(GraphTemplateVersion.template_id==receipt['graphs'][-1]['templateId']))
+                edited=deepcopy(version.graph_data);edited['meta']['edition']='changed snapshot edition';version.graph_data=edited
+            content.graph_data=graph;await db.commit()
+            before=await snapshot(db,receipt,personal);before_state=await database_state(db);evidence=backup(tmp_path,monkeypatch)
+            with pytest.raises(ValueError):await pub.repair_receipt(db,user,catalog,graphs,receipt,apply=True,backup_evidence=evidence)
+            assert before==await snapshot(db,receipt,personal)
+            assert before_state==await database_state(db)
+            assert (await db.get(GraphFile,receipt['graphs'][0]['fileId'])).source=='imported'
+    run(scenario())
+
+
+@pytest.mark.parametrize('fault',['mindmap','unknownMeta','authoringMeta','defaults','studyState'])
+def test_repaired_legacy_rerun_refuses_source_drift(tmp_path,monkeypatch,fault):
+    async def scenario():
+        async with AsyncSessionLocal() as db:
+            user,catalog,graphs,receipt,personal=await old_sources(db)
+            await pub.repair_receipt(db,user,catalog,graphs,receipt,apply=True,backup_evidence=backup(tmp_path,monkeypatch))
+            content=await db.get(FileContent,receipt['graphs'][-1]['fileId']);graph=deepcopy(content.graph_data)
+            if fault=='mindmap':graph['mindmap']={'rootIds':['changed']}
+            if fault=='unknownMeta':graph['meta']['customNote']='changed'
+            if fault=='authoringMeta':graph['meta']['layout']='changed'
+            if fault=='defaults':graph['defaults']['linkColor']='#ff0000'
+            if fault=='studyState':graph['flashReviews']={'studied':{'reviewCount':1}}
+            content.graph_data=graph;await db.commit()
+            before=await snapshot(db,receipt,personal)
+            with pytest.raises(ValueError,match='source differs'):
+                await pub.apply_publication(db,user,catalog,graphs,apply=True)
+            assert before==await snapshot(db,receipt,personal)
     run(scenario())

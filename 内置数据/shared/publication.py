@@ -96,10 +96,85 @@ def read_package(directory):
     return catalog, graphs
 
 
-def semantic_graph(graph):
-    """Only documented editor roundtrip differences; never strip card content."""
-    return {**{key: graph.get(key, []) for key in ('nodes','links','elements','tables','strokes','resources')},
-            'meta': {key: graph.get('meta', {}).get(key) for key in ('title','subject','audience','description')}}
+# Historical editor roundtrip observed in the exact 2026-10-26 dev audit.
+# Frozen compatibility data: do not load mutable frontend defaults at runtime.
+EDITOR_DEFAULTS = {'nodeSize': '',
+ 'linkColor': '#2563eb',
+ 'linkStyle': 'solid',
+ 'nodeColor': '#64748b',
+ 'nodeFontSize': 15,
+ 'linkPathStyle': 'curve',
+ 'nodeCardStyle': 'standard',
+ 'nodeFillColor': '#ffffff',
+ 'nodeFontStyle': 'normal',
+ 'nodeTextAlign': 'center',
+ 'nodeTextColor': '#0f172a',
+ 'nodeUnderline': False,
+ 'nodeFontFamily': 'system',
+ 'nodeFontWeight': 'bold',
+ 'nodeLineHeight': 1.25,
+ 'flashSwipeSpeed': 2,
+ 'nodeBorderColor': '#cbd5e1',
+ 'nodeBorderStyle': 'solid',
+ 'nodeBorderWidth': 1,
+ 'nodeFillOpacity': 1,
+ 'nodeBorderOpacity': 1,
+ 'nodeBorderVisible': True,
+ 'nodeLetterSpacing': 0,
+ 'nodeStrikeThrough': False,
+ 'textElementFontSize': 20,
+ 'textElementFontStyle': 'normal',
+ 'textElementTextAlign': 'center',
+ 'textElementTextColor': '#0f172a',
+ 'textElementUnderline': False,
+ 'textElementFontFamily': 'system',
+ 'textElementFontWeight': 'bold',
+ 'textElementLineHeight': 1.45,
+ 'nodeTextBackgroundColor': '#ffffff',
+ 'textElementLetterSpacing': 0,
+ 'textElementStrikeThrough': False,
+ 'nodeTextBackgroundOpacity': 0,
+ 'textElementTextBackgroundColor': '#ffffff',
+ 'textElementTextBackgroundOpacity': 0}
+AUTHORING_META_KEYS = {'contentPackageId', 'topicId', 'edition', 'sourceUrls', 'contentNote', 'layout', 'visualRevision'}
+EDITOR_UI_FIELDS = {'viewport', 'focusMode', 'linkSourceId', 'selectedNodeId', 'selectedLinkId', 'selectedElementId'}
+EMPTY_STUDY_FIELDS = {'flashReviews': {}, 'importedFlashcards': [], 'learningState': {},
+                      'learning_state': {}, 'history': [], 'attempts': [], 'progress': {}, 'mastery': {}}
+
+
+def semantic_matches(actual, canonical):
+    """Accept only audited editor additions/omissions; retain every other field.
+
+    Missing known authoring metadata is allowed, but retained values must equal
+    the canonical package. Unknown meta, mindmap and unknown graph fields survive
+    comparison. Nonempty personal study content is never reclassified as builtin.
+    """
+    actual, canonical = deepcopy(actual), deepcopy(canonical)
+    for graph in (actual, canonical):
+        for key in EDITOR_UI_FIELDS:
+            graph.pop(key, None)
+        for key, empty in EMPTY_STUDY_FIELDS.items():
+            if key in graph:
+                if graph[key] != empty:
+                    return False
+                graph.pop(key)
+        for key in ('nodes', 'links', 'elements', 'tables', 'strokes', 'resources'):
+            graph.setdefault(key, [])
+    actual_meta, canonical_meta = actual.get('meta', {}), canonical.get('meta', {})
+    if not isinstance(actual_meta, dict) or not isinstance(canonical_meta, dict):
+        return False
+    for key in AUTHORING_META_KEYS:
+        if key in actual_meta and (key not in canonical_meta or actual_meta[key] != canonical_meta[key]):
+            return False
+        actual_meta.pop(key, None)
+        canonical_meta.pop(key, None)
+    # The only accepted defaults addition is the complete audited 37-field map.
+    # Preserve any canonical defaults and compare them normally when present.
+    if 'defaults' not in canonical and 'defaults' in actual:
+        if fingerprint(actual['defaults']) != fingerprint(EDITOR_DEFAULTS):
+            return False
+        actual.pop('defaults')
+    return actual == canonical
 
 
 def verify_backup(evidence_path):
@@ -146,7 +221,14 @@ async def plan_publication(db, user, catalog, graphs):
         templates.remap_graph(graph)
         file_service.validate_graph_tables(graph); file_service.validate_graph_strokes(graph)
         sources = (await db.scalars(select(GraphFile).where(or_(GraphFile.source_file_id == item['sourceKey'], (GraphFile.owner_id == user.username) & (GraphFile.name == item['name']) & (GraphFile.source != 'template'))).with_for_update())).all()
-        rows = (await db.scalars(select(GraphTemplate).where(GraphTemplate.name == item['name']).with_for_update())).all()
+        source_template_ids = []
+        if sources:
+            source_template_ids = list((await db.scalars(select(GraphTemplateVersion.template_id).where(
+                GraphTemplateVersion.source_file_id.in_([source.id for source in sources])).distinct())).all())
+        # Historical bindings are identities too: renaming or moving a current
+        # version must never let a package source produce another publication.
+        rows = (await db.scalars(select(GraphTemplate).where(or_(
+            GraphTemplate.name == item['name'], GraphTemplate.id.in_(source_template_ids))).with_for_update())).all()
         if len(sources)>1 or len(rows)>1:
             raise ValueError('Ambiguous source/publication: '+item['name'])
         source = sources[0] if sources else None
@@ -154,12 +236,13 @@ async def plan_publication(db, user, catalog, graphs):
         digest = fingerprint(templates.published_graph(graph))
         if source:
             content = await db.get(FileContent,source.id)
-            source_matches = content is not None and (fingerprint(templates.published_graph(content.graph_data)) == digest or (catalog['packageId'] == LEGACY_PACKAGE and semantic_graph(content.graph_data) == semantic_graph(graph)))
-            if source.owner_id != user.username or source.source != SOURCE_KIND or source.source_file_id != item['sourceKey'] or source.status != 'active' or source.name != item['name'] or not source_matches:
+            source_matches = content is not None and (semantic_matches(content.graph_data, graph) if catalog['packageId'] == LEGACY_PACKAGE else fingerprint(templates.published_graph(content.graph_data)) == digest)
+            if source.owner_id != user.username or source.source != SOURCE_KIND or source.source_file_id != item['sourceKey'] or source.status != 'active' or source.name != item['name'] or not source_matches or content.learning_state:
                 raise ValueError('Existing source differs; refusing overwrite: '+item['name'])
         if row:
             version = await db.scalar(select(GraphTemplateVersion).where(GraphTemplateVersion.template_id == row.id, GraphTemplateVersion.version == row.current_version))
-            if row.owner_id != user.username or not source or not version or version.source_file_id != source.id or version.asset_owner != user.username or fingerprint(version.graph_data) != digest or any(version.bindings.values()) or row.member_only or not row.listed:
+            snapshot_matches = version is not None and (fingerprint(version.graph_data) == digest or (catalog['packageId'] == LEGACY_PACKAGE and version.graph_data.get('meta', {}).get('contentPackageId') == catalog['packageId'] and semantic_matches(version.graph_data, graph)))
+            if row.name != item['name'] or row.owner_id != user.username or not source or not version or version.source_file_id != source.id or version.asset_owner != user.username or not snapshot_matches or any(version.bindings.values()) or row.member_only or not row.listed:
                 raise ValueError('Existing publication differs; refusing overwrite: '+item['name'])
         plan.append({'topicId':item['id'],'name':item['name'],'sourceKey':item['sourceKey'],'sha256':digest,'fileId':source.id if source else None,'templateId':row.id if row else None,'action':'create' if not row else ('category' if row.category != item['category'] else 'unchanged')})
     return folder_name, folders[0].id if folders else None, plan
@@ -238,11 +321,12 @@ async def repair_receipt(db, user, catalog, graphs, receipt, *, apply=False, bac
         content=await db.get(FileContent,receipt_row['fileId'])
         versions=(await db.scalars(select(GraphTemplateVersion).where(GraphTemplateVersion.template_id==receipt_row['templateId']))).all()
         version=next((v for v in versions if v.version==receipt_row.get('version')),None)
-        if not source or not template or not content or not version or template.current_version!=version.version or source.owner_id!=user.username or template.owner_id!=user.username or version.asset_owner!=user.username or any(version.bindings.values()) or source.name!=item['name'] or template.name!=item['name'] or receipt_row.get('name')!=item['name'] or source.folder_id!=receipt.get('folderId') or source.status!='active' or source.source not in {'imported',SOURCE_KIND} or source.source_file_id not in {None,item['sourceKey']} or version.source_file_id!=source.id or any(v.source_file_id!=source.id for v in versions) or version.graph_data.get('meta',{}).get('contentPackageId')!=catalog['packageId'] or semantic_graph(version.graph_data)!=semantic_graph(graph) or semantic_graph(content.graph_data)!=semantic_graph(graph):
+        if not source or not template or not content or not version or template.current_version!=version.version or source.owner_id!=user.username or template.owner_id!=user.username or version.asset_owner!=user.username or any(version.bindings.values()) or source.name!=item['name'] or template.name!=item['name'] or receipt_row.get('name')!=item['name'] or source.folder_id!=receipt.get('folderId') or source.status!='active' or source.source not in {'imported',SOURCE_KIND} or source.source_file_id not in {None,item['sourceKey']} or version.source_file_id!=source.id or any(v.source_file_id!=source.id for v in versions) or version.graph_data.get('meta',{}).get('contentPackageId')!=catalog['packageId'] or not semantic_matches(version.graph_data,graph) or not semantic_matches(content.graph_data,graph) or content.learning_state:
             raise ValueError('Receipt/source/snapshot mismatch: '+item['name'])
         collisions=(await db.scalars(select(GraphFile).where(GraphFile.source_file_id==item['sourceKey'],GraphFile.id!=source.id))).all()
         names=(await db.scalars(select(GraphTemplate).where(GraphTemplate.name==item['name']))).all()
-        if collisions or len(names)!=1:raise ValueError('Repair source/publication collision: '+item['name'])
+        bound_templates=set((await db.scalars(select(GraphTemplateVersion.template_id).where(GraphTemplateVersion.source_file_id==source.id))).all())
+        if collisions or len(names)!=1 or bound_templates!={template.id}:raise ValueError('Repair source/publication collision: '+item['name'])
         changed=source.source!=SOURCE_KIND or source.source_file_id!=item['sourceKey'] or template.category!=item['category']
         plan.append({'topicId':item['id'],'fileId':source.id,'templateId':template.id,'sourceKey':item['sourceKey'],'category':item['category'],'action':'repair' if changed else 'unchanged'})
     if apply:

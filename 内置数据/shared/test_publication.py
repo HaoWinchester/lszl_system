@@ -81,4 +81,27 @@ class BackupGuards(unittest.TestCase):
             package=directory/'package';package.mkdir();(package/'graph.json').symlink_to(outside)
             with self.assertRaises(ValueError):self.module.confined_file(package,'graph.json')
 
+class PreciseRoundtrip(unittest.TestCase):
+    def test_known_roundtrip_preserves_unknown_and_validates_retained_meta(self):
+        module=importlib.util.module_from_spec(SPEC);SPEC.loader.exec_module(module)
+        _,graphs=module.read_package(ROOT/'内置数据/PMP8知识图谱')
+        canonical=graphs[0][1];original=copy.deepcopy(canonical)
+        actual=copy.deepcopy(canonical)
+        for key in module.AUTHORING_META_KEYS:actual['meta'].pop(key)
+        actual['defaults']=copy.deepcopy(module.EDITOR_DEFAULTS)
+        actual.pop('resources',None)
+        actual.update(viewport={'x':2,'y':3,'scale':1},focusMode=True,selectedNodeId='n')
+        self.assertTrue(module.semantic_matches(actual,canonical))
+        for key,value in [('mindmap',{'rootIds':['edited']}),('unknownGraphField',True),('flashReviews',{'studied':1})]:
+            modified=copy.deepcopy(actual);modified[key]=value
+            self.assertFalse(module.semantic_matches(modified,canonical),key)
+        for key,value in [('edition','edited'),('customNote','edited')]:
+            modified=copy.deepcopy(actual);modified['meta'][key]=value
+            self.assertFalse(module.semantic_matches(modified,canonical),key)
+        for key in module.AUTHORING_META_KEYS:
+            modified=copy.deepcopy(actual);modified['meta'][key]=canonical['meta'][key]
+            self.assertTrue(module.semantic_matches(modified,canonical),key)
+        self.assertEqual(canonical,original)
+
+
 if __name__=='__main__':unittest.main()
