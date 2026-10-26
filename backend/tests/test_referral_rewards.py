@@ -309,24 +309,24 @@ def test_real_member_only_template_access_unlocks_after_referral_payment():
             response=client.post(path,json={'requestId':uuid4().hex,'version':template['version']})
             assert response.status_code==201,response.text
 
-@pytest.mark.parametrize('state',['mismatch','cancelled','failed','zero','unverified','historical'])
+@pytest.mark.parametrize('state',['mismatch','cancelled','failed','failed_unverified','cancelled_unverified','refunded','zero','unverified','historical'])
 def test_payment_validation_and_historical_receipt_do_not_issue_new_gift(state):
     from app.models.subscription import SubscriptionOrder
     with TestClient(app) as inviter,TestClient(app) as child:
         parent,code=owner(inviter);name,response=register_only(child,code);assert response.status_code==200
         key=uuid4().hex
         async def setup(db):
-            db.add(SubscriptionOrder(id=key,username=name,plan_id='monthly',status='cancelled' if state=='cancelled' else 'pending',pay_status='failed' if state=='failed' else 'pending',amount=0 if state=='zero' else 100))
+            db.add(SubscriptionOrder(id=key,username=name,plan_id='monthly',status='cancelled' if state in ('cancelled','cancelled_unverified') else 'pending',pay_status='refunded' if state=='refunded' else ('failed' if state in ('failed','failed_unverified') else 'pending'),amount=0 if state=='zero' else 100))
             if state=='historical':(await db.get(ReferralBinding,name)).rewards_granted_at=NOW-timedelta(days=10)
         run(setup)
         async def activate(db):
             if state=='unverified':return await subscription_service.approve_order(db,key,'fixture-admin')
-            return await subscription_service.activate_paid_order(db,key,'tx',99 if state=='mismatch' else (0 if state=='zero' else 100),True)
-        if state in ('mismatch','cancelled','failed'):
+            return await subscription_service.activate_paid_order(db,key,'tx',99 if state=='mismatch' else (0 if state=='zero' else 100),state not in ('failed_unverified','cancelled_unverified'))
+        if state in ('mismatch','failed_unverified','cancelled_unverified','refunded'):
             with pytest.raises(ValueError):run(activate)
         else:run(activate)
         assert sub(parent) is None
-        if state=='historical':assert sub(name)['expires_at']==NOW+timedelta(days=30)
+        if state in ('historical','cancelled','failed'):assert sub(name)['expires_at']==NOW+timedelta(days=30)
 
 
 def test_cross_referral_concurrent_payments_and_repeated_notifications_do_not_deadlock():
@@ -343,3 +343,32 @@ def test_cross_referral_concurrent_payments_and_repeated_notifications_do_not_de
             futures=[pool.submit(notify,key) for key in keys*2]
             for future in futures:future.result(timeout=20)
         for username in (parent,name):assert sub(username)['expires_at']==NOW+timedelta(days=44)
+
+@pytest.mark.parametrize('cancel_by', ['self', 'admin'])
+def test_verified_payment_after_local_cancellation_delivers_base_plan_once_without_referral_gift(monkeypatch, cancel_by):
+    """Local cancellation does not close the provider order: SUCCESS must reconcile it."""
+    from app.models.subscription import SubscriptionOrder
+    from app.services import system_service, wechat_pay_service
+    with TestClient(app) as inviter, TestClient(app) as child:
+        parent,code=owner(inviter);name,response=register_only(child,code);assert response.status_code==200
+        key=uuid4().hex
+        async def setup(db):
+            db.add(SubscriptionOrder(id=key,username=name,plan_id='monthly',status='pending',pay_status='pending',amount=100))
+        run(setup)
+        if cancel_by=='self':run(lambda db:subscription_service.cancel_own_order(db,key,name))
+        else:run(lambda db:subscription_service.cancel_order(db,key,name))
+        async def config(db):return {'apiV3Key':'fixture-key'}
+        monkeypatch.setattr(system_service,'get_wechat_pay_config',config)
+        monkeypatch.setattr(wechat_pay_service,'verify_signature',lambda *args:True)
+        monkeypatch.setattr(wechat_pay_service,'decrypt_resource',lambda *args:{'trade_state':'SUCCESS','out_trade_no':key,'transaction_id':'provider-'+key,'amount':{'total':100}})
+        for _ in range(2):
+            response=child.post('/api/v1/subscriptions/wechat-pay/notify',json={'resource':{}})
+            assert response.status_code==200,response.text
+            assert sub(name)['expires_at']==NOW+timedelta(days=30)
+        assert sub(parent) is None
+        assert sub(name)['source']=='wechat_pay' and sub(name)['order_id']==key
+        async def persisted(db):
+            paid=await db.get(SubscriptionOrder,key)
+            assert paid.pay_status=='paid' and paid.status=='approved'
+            assert (await db.get(ReferralBinding,name)).rewards_granted_at is None
+        run(persisted)

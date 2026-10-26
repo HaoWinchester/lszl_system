@@ -347,7 +347,11 @@ async def activate_paid_order(
         return o
     if validate_amount and not payment_amount_matches(o.amount, received_amount_fen):
         raise ValueError("支付金额不匹配")
-    if o.status == "cancelled" or o.pay_status in ("failed", "refunded"):
+    confirmed_payment = bool(validate_amount and isinstance(o.amount, int) and o.amount > 0 and transaction_id)
+    referral_eligible = o.status != "cancelled" and o.pay_status not in ("failed", "refunded")
+    # Local cancellation does not close the provider order. A verified SUCCESS
+    # still delivers the purchased plan, but cancelled/failed attempts earn no gift.
+    if o.pay_status == "refunded" or (not referral_eligible and not confirmed_payment):
         raise ValueError("订单已取消或支付失败")
     already_activated = o.status == "approved"
     o.pay_status = "paid"
@@ -360,7 +364,7 @@ async def activate_paid_order(
         s.status = "active"
         s.source = "wechat_pay"
         s.order_id = o.id
-    if validate_amount and isinstance(o.amount, int) and o.amount > 0 and transaction_id:
+    if confirmed_payment and referral_eligible:
         # The durable binding receipt also suppresses historical registration gifts.
         await referral_service.grant_paid_referral_rewards(db, owner)
     await db.commit()
