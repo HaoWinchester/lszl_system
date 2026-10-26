@@ -28,7 +28,7 @@
         if(!nodeId||!point||!self||!other)continue;
         if(side==='to'?item.hasToPort:item.hasFromPort)continue; // 显式端口优先，不收拢
         const sector=sectorOf(other,self);if(!sector)continue;
-        const key=nodeId+'|'+sector;
+        const key=JSON.stringify([nodeId,sector,item.bundleKey||'']);
         if(!groups.has(key))groups.set(key,[]);
         groups.get(key).push({id:item.id,point});
       }
@@ -50,8 +50,9 @@
   function snapChannels(trunks){
     const byAxis=new Map();
     for(const trunk of trunks){
-      if(!byAxis.has(trunk.axis))byAxis.set(trunk.axis,[]);
-      byAxis.get(trunk.axis).push(trunk);
+      const key=JSON.stringify([trunk.axis,trunk.direction||0,trunk.bundleKey||'']);
+      if(!byAxis.has(key))byAxis.set(key,[]);
+      byAxis.get(key).push(trunk);
     }
     const result=new Map();
     for(const [,list] of byAxis){
@@ -80,7 +81,7 @@
       if(item.pathStyle!=='elbow'||item.hasStoredWaypoints||item.hasFromPort||item.hasToPort)continue;
       const a=item.a,b=item.b;if(!a||!b)continue;
       const horizontal=Math.abs(item.cb.x-item.ca.x)>=Math.abs(item.cb.y-item.ca.y);
-      trunks.push({id:item.id,axis:horizontal?'x':'y',
+      trunks.push({id:item.id,axis:horizontal?'x':'y',bundleKey:item.bundleKey,direction:Math.sign(horizontal?b.y-a.y:b.x-a.x),
         value:horizontal?(a.x+b.x)/2:(a.y+b.y)/2,
         lo:horizontal?Math.min(a.y,b.y):Math.min(a.x,b.x),
         hi:horizontal?Math.max(a.y,b.y):Math.max(a.x,b.x)});
@@ -91,8 +92,8 @@
       const guides=global.KGGraphEdgeGeometry?.orthogonalWaypoints?global.KGGraphEdgeGeometry.orthogonalWaypoints(item.a,item.b,item.waypoints,item.fromPort,item.toPort):item.waypoints;
       for(let i=0;i<guides.length-1;i++){
         const a=guides[i],b=guides[i+1];
-        if(a.x===b.x&&a.y!==b.y)segments.push({id:JSON.stringify([item.id,i]),edgeId:item.id,index:i,start:a,end:b,axis:'x',value:a.x,lo:Math.min(a.y,b.y),hi:Math.max(a.y,b.y)});
-        else if(a.y===b.y&&a.x!==b.x)segments.push({id:JSON.stringify([item.id,i]),edgeId:item.id,index:i,start:a,end:b,axis:'y',value:a.y,lo:Math.min(a.x,b.x),hi:Math.max(a.x,b.x)});
+        if(a.x===b.x&&a.y!==b.y)segments.push({id:JSON.stringify([item.id,i]),edgeId:item.id,index:i,start:a,end:b,axis:'x',bundleKey:item.bundleKey,direction:Math.sign(b.y-a.y),value:a.x,lo:Math.min(a.y,b.y),hi:Math.max(a.y,b.y)});
+        else if(a.y===b.y&&a.x!==b.x)segments.push({id:JSON.stringify([item.id,i]),edgeId:item.id,index:i,start:a,end:b,axis:'y',bundleKey:item.bundleKey,direction:Math.sign(b.x-a.x),value:a.y,lo:Math.min(a.x,b.x),hi:Math.max(a.x,b.x)});
       }
     }
     const snapped=snapChannels(segments);

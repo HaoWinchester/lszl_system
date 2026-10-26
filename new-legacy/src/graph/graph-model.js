@@ -262,6 +262,7 @@
   function normalizeNode(raw={},options={}){
     const base=raw&&typeof raw==='object'?clone(raw):{};
     base.id=text(base.id||options.id||'', '',120).trim()||(typeof options.idFactory==='function'?options.idFactory():'');
+    if(typeof base.groupId==='string'&&base.groupId.trim())base.groupId=base.groupId.trim().slice(0,120);else delete base.groupId;
     return syncLegacy(base);
   }
   function normalizeNodes(nodes=[],options={}){

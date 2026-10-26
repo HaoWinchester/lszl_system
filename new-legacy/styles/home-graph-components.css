@@ -830,3 +830,6 @@
 /* Invisible zoom sliders must not intercept the scrollable rail above the dock. */
 #stage .canvas-zoom-dock:not(.slider-open) .canvas-zoom-slider-popover,
 #stage .canvas-zoom-dock:not(.slider-open) .canvas-zoom-slider-popover *{pointer-events:none!important;visibility:hidden}
+
+/* Hidden contextual actions must override the toolbar button display grid. */
+.node-style-toolbar .node-toolbar-btn[hidden]{display:none!important}

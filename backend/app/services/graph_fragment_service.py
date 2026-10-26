@@ -20,6 +20,21 @@ PASTE_ID_PREFIXES = {'nodes': 'n', 'links': 'l', 'elements': 't', 'tables': 't'}
 STRIPPED_NODE_FIELDS = ('questionIds', 'questions', 'bindings', 'linkedQuestions')
 
 
+def _remap_card_groups(nodes):
+    """Each paste owns its group identities; partial singleton copies are ungrouped."""
+    members = {}
+    for node in nodes:
+        group = node.pop('groupId', None)
+        if isinstance(group, str) and group.strip():
+            members.setdefault(group.strip()[:120], []).append(node)
+    for group_nodes in members.values():
+        if len(group_nodes) < 2:
+            continue
+        new_id = uid('g')
+        for node in group_nodes:
+            node['groupId'] = new_id
+
+
 def fail(code, status=404):
     raise HTTPException(status, detail={'code': code})
 
@@ -116,6 +131,7 @@ async def paste_fragment(db, user, target_file_id, data):
         link['from'] = id_map.get(extra.get('from'), extra.get('from'))
         link['to'] = id_map.get(extra.get('to'), extra.get('to'))
 
+    _remap_card_groups(payload['nodes'])
     graph.setdefault('nodes', []).extend(payload['nodes'])
     graph.setdefault('links', []).extend(payload['links'])
     graph.setdefault('elements', []).extend(payload['elements'])

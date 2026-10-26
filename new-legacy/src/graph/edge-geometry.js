@@ -33,24 +33,23 @@
     else if(index===0)route.splice(1,1,movedA,movedB);
     else if(index===route.length-2)route.splice(index,1,movedA,movedB);
     else{route[index]=movedA;route[index+1]=movedB}
-    // Remove only redundant forward corners, preserving intentional backtracks.
-    for(let i=1;i<route.length-1;){
-      const p=route[i-1],q=route[i],r=route[i+1],ax=q.x-p.x,ay=q.y-p.y,bx=r.x-q.x,by=r.y-q.y;
-      if((ax===0&&bx===0||ay===0&&by===0)&&ax*bx+ay*by>=0)route.splice(i,1);else i++;
-    }
-    const result=route.slice(1,-1);
+    const result=simplifyOrthogonal(route).slice(1,-1);
     // A bounded editable route must stay whole; dropping its tail creates diagonals.
     return result.length<=MAX_WAYPOINTS?result:waypoints.map(p=>({...p}));
   }
-  function simplifyOrthogonal(points){
+  function simplifyOrthogonal(points,{preserveStartTangent=false,preserveEndTangent=false}={}){
     const route=[];
-    for(const p of points){
+    for(let i=0;i<points.length;i++){
+      const p=points[i];
       if(route.length&&route.at(-1).x===p.x&&route.at(-1).y===p.y)continue;
       route.push({...p});
       while(route.length>=3){
         const [a,b,c]=route.slice(-3),ax=b.x-a.x,ay=b.y-a.y,bx=c.x-b.x,by=c.y-b.y;
-        if((ax===0&&bx===0||ay===0&&by===0)&&ax*bx+ay*by>=0)route.splice(route.length-2,1);else break;
+        const reversing=ax*bx+ay*by<0;
+        if(reversing&&(preserveStartTangent&&route.length===3||preserveEndTangent&&i===points.length-1))break;
+        if(ax===0&&bx===0||ay===0&&by===0)route.splice(route.length-2,1);else break;
       }
+      if(route.length>1&&route.at(-1).x===route.at(-2).x&&route.at(-1).y===route.at(-2).y)route.pop();
     }
     return route;
   }
@@ -76,7 +75,7 @@
       route.push({...target});
     }
     route.push(end);
-    return simplifyOrthogonal(route).slice(1,-1);
+    return simplifyOrthogonal(route,{preserveStartTangent:!!from,preserveEndTangent:!!to}).slice(1,-1);
   }
   function controlsFromHandles(start,handles,end){
     // At t=1/3 and 2/3, the two unknown controls have coefficients

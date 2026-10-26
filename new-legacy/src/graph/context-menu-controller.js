@@ -30,6 +30,8 @@
       root.innerHTML=`<div class="graph-context-menu-list">
         ${actionButton('copy','复制',ICONS.copy,'role="menuitem"')}
         ${actionButton('paste','粘贴',ICONS.paste,'role="menuitem"')}
+        ${actionButton('group','组合卡片',ICONS.layers,'role="menuitem"')}
+        ${actionButton('ungroup','取消组合',ICONS.layers,'role="menuitem"')}
         <div class="graph-context-submenu-wrap" data-graph-context-layer-wrap>
           ${actionButton('layer','层级',ICONS.layers,'role="menuitem" aria-haspopup="true" aria-expanded="false"')}
           <span class="graph-context-chevron">${ICONS.chevron}</span>
@@ -63,6 +65,8 @@
       setVisible('copy',showCopy);
       setVisible('paste',showPaste);
       setEnabled('paste',canPaste&&!locked);
+      setVisible('group',actionAllowed('group')&&type==='node'&&!locked&&!!context.canGroup);
+      setVisible('ungroup',actionAllowed('ungroup')&&type==='node'&&!locked&&!!context.canUngroup);
       const layerWrap=root.querySelector('[data-graph-context-layer-wrap]');if(layerWrap)layerWrap.hidden=!showLayer;
       root.setAttribute('aria-label',type==='canvas'?'画布快捷菜单':locked?'锁定节点快捷菜单':'节点快捷菜单');
       return showCopy||showPaste||showLayer;

@@ -38,6 +38,22 @@ def bind_payload(question_ids):
     return {'expectedFileRevision': 1, 'questionIds': question_ids}
 
 
+def test_fragment_paste_remaps_card_groups_without_joining_existing_groups(data):
+    with TestClient(app) as c:
+        login(c, data, 'teacher')
+        target = c.post('/api/v1/files', json={'name': 'groups', 'graphData': {
+            'nodes': [{'id': 'existing-a', 'groupId': 'source-group'}, {'id': 'existing-b', 'groupId': 'source-group'}], 'links': []}}).json()['file']['id']
+        body = fragment([{'id': 'a', 'groupId': 'source-group'}, {'id': 'b', 'groupId': 'source-group'}, {'id': 'c', 'groupId': 'single'}])
+        first = paste(c, target, {'fragment': body})
+        assert first.status_code == 200, first.text
+        nodes = first.json()['fragment']['nodes']
+        assert nodes[0]['groupId'] == nodes[1]['groupId'] != 'source-group'
+        assert 'groupId' not in nodes[2]
+        second = paste(c, target, {'fragment': body})
+        assert second.status_code == 200, second.text
+        assert second.json()['fragment']['nodes'][0]['groupId'] != nodes[0]['groupId']
+
+
 def test_paste_inherits_bindings_and_ignores_client_question_fields(data):
     with TestClient(app) as c:
         login(c, data, 'teacher')
