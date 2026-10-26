@@ -447,7 +447,7 @@
   async function renderReferralBox(user,{create=false}={}){
     const panel=$('ucReferralBox'),owner=currentUsername(),request=++referralRequest;
     if(!panel||!owner)return;
-    const heading='<div class="uc-card-content"><h3>我的推荐码</h3><p>新用户通过有效推荐码注册成功后，双方各赠 7 天会员。已有未到期会员顺延，永久会员权益保持不变。</p>';
+    const heading='<div class="uc-card-icon uc-card-icon-membership" aria-hidden="true">♧</div><div class="uc-card-content"><h3>我的推荐码</h3><p>好友首次付费后，双方各得 7 天会员。注册仅绑定推荐关系；未到期会员顺延，永久会员权益保持不变。</p>';
     panel.innerHTML=heading+'<p role="status">正在读取推荐信息…</p></div>';
     const isCurrent=()=>request===referralRequest&&owner===currentUsername();
     try{
@@ -459,17 +459,17 @@
         if(isCurrent()){renderSubscriptionBox(user);subscriptionApi()?.decorateSubscriptionElements?.()}
       })()]);
       if(!isCurrent())return;
-      const code=String(result.code||''),count=Math.max(0,Math.floor(Number(result.registeredCount)||0));
+      const code=String(result.code||''),count=Math.max(0,Math.floor(Number(result.registeredCount)||0)),rewarded=Math.max(0,Math.floor(Number(result.rewardedCount)||0));
       if(code&&!/^[A-F0-9]{16}$/.test(code))throw new Error('推荐信息读取失败，请重试');
       let fields='';
       if(code){
         const link=new URL('/practice-mode.html',window.location.href);link.searchParams.set('referralCode',code);
         fields='<label class="uc-field"><span>我的推荐码</span><div><input id="ucReferralCode" readonly value="'+escapeHTML(code)+'"/></div></label>'+
-          '<button type="button" class="uc-button uc-button-secondary" data-referral-copy="ucReferralCode">复制推荐码</button>'+
+          '<button type="button" class="uc-button uc-button-outline uc-button-compact" data-referral-copy="ucReferralCode">复制推荐码</button>'+
           '<label class="uc-field"><span>推荐注册链接</span><div><input id="ucReferralLink" readonly value="'+escapeHTML(link.href)+'"/></div></label>'+
-          '<button type="button" class="uc-button uc-button-secondary" data-referral-copy="ucReferralLink">复制推荐链接</button>';
-      }else fields='<button type="button" class="uc-button uc-button-secondary" id="ucReferralGenerate">获取推荐码</button>';
-      panel.innerHTML=heading+'<p>通过我的推荐码已注册 '+count+' 人</p>'+fields+'<p role="status" id="ucReferralStatus"></p></div>';
+          '<button type="button" class="uc-button uc-button-outline uc-button-compact" data-referral-copy="ucReferralLink">复制推荐链接</button>';
+      }else fields='<button type="button" class="uc-button uc-button-outline uc-button-compact" id="ucReferralGenerate">获取推荐码</button>';
+      panel.innerHTML=heading+'<p>通过我的推荐码已注册 '+count+' 人 · 已完成奖励 '+rewarded+' 人</p><div class="uc-referral-fields">'+fields+'</div>'+'<p role="status" id="ucReferralStatus"></p></div>';
       $('ucReferralGenerate')?.addEventListener('click',()=>{if(isCurrent())void renderReferralBox(user,{create:true})});
       panel.querySelectorAll('[data-referral-copy]').forEach(button=>button.addEventListener('click',async()=>{
         if(!isCurrent())return;
@@ -482,7 +482,7 @@
       }));
     }catch(error){
       if(!isCurrent())return;
-      panel.innerHTML=heading+'<p role="status">推荐及会员信息读取失败，请重试。</p><button type="button" class="uc-button uc-button-secondary" id="ucReferralRetry">重试</button></div>';
+      panel.innerHTML=heading+'<p role="status">推荐及会员信息读取失败，请重试。</p><button type="button" class="uc-button uc-button-outline uc-button-compact" id="ucReferralRetry">重试</button></div>';
       $('ucReferralRetry')?.addEventListener('click',()=>{if(isCurrent())void renderReferralBox(user,{create})});
     }
   }
@@ -506,7 +506,7 @@
         <div class="uc-status-row"><span class="uc-status-chip uc-role" id="ucRoleChip">角色：—</span><span class="uc-status-chip uc-normal" id="ucStatusChip">状态：—</span></div>
         <section class="uc-info-card uc-binding-card" id="ucWechatBox" aria-label="微信登录"></section>
         <section class="uc-info-card uc-membership-card" id="ucSubscriptionBox" aria-label="我的订阅"></section>
-        <section class="uc-info-card" id="ucReferralBox" aria-label="我的推荐码"></section>
+        <section class="uc-info-card uc-binding-card uc-referral-card" id="ucReferralBox" aria-label="我的推荐码"></section>
         <label class="uc-field uc-notes-field"><span>个人备注 / 学习说明</span><div class="uc-textarea-wrap"><textarea id="ucNote" maxlength="500" placeholder="例如：所在班级、学习目标、备考进度等，保存后会同步到服务器。"></textarea><em id="ucNoteCount">0/500</em></div></label>
         <section class="uc-password-card"><h3>安全设置 · 修改密码（可选）</h3><p id="ucPasswordHelp">不修改密码时请留空。已有密码须填写当前密码；首次设置须在微信登录后 10 分钟内完成。</p><div class="uc-form-grid uc-password-grid"><label class="uc-field"><span>当前密码</span><div><input id="ucCurrentPassword" type="password" autocomplete="current-password" placeholder="修改密码时填写" /></div></label><label class="uc-field"><span>新密码</span><div><input id="ucNewPassword" type="password" autocomplete="new-password" placeholder="至少 4 位" /></div></label><label class="uc-field"><span>确认新密码</span><div><input id="ucConfirmPassword" type="password" autocomplete="new-password" placeholder="再次输入新密码" /></div></label></div></section>
         </div>

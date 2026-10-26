@@ -32,7 +32,7 @@ def test_referral_requires_login_and_never_binds_existing_accounts():
         name,response=signup(client);assert response.status_code==200
         assert client.put(PREFIX+'/me',json={'referralCode':'ABCDEF1234567890'}).status_code==422
         assert client.post(PREFIX+'/me/referral/bind',json={'referralCode':'ABCDEF1234567890'}).status_code in (404,405)
-        assert client.get(PREFIX+'/me/referral').json()=={'code':None,'registeredCount':0,'rewardEnabled':True,'rewardDays':7}
+        assert client.get(PREFIX+'/me/referral').json()=={'code':None,'registeredCount':0,'rewardedCount':0,'rewardEnabled':True,'rewardDays':7}
 
 def test_code_is_random_unique_persistent_and_summary_contains_no_invitee_identity():
     with TestClient(app) as inviter,TestClient(app) as invitee:
@@ -42,13 +42,13 @@ def test_code_is_random_unique_persistent_and_summary_contains_no_invitee_identi
         assert inviter.post(PREFIX+'/me/referral').json()['code']==code
         child,result=signup(invitee,code='  '+code.lower()+'  ');assert result.status_code==200,result.text
         result=inviter.get(PREFIX+'/me/referral?username='+child)
-        assert result.json()=={'code':code,'registeredCount':1,'rewardEnabled':True,'rewardDays':7}
+        assert result.json()=={'code':code,'registeredCount':1,'rewardedCount':0,'rewardEnabled':True,'rewardDays':7}
         assert child not in result.text
         assert invitee.get(PREFIX+'/me/referral').json()['registeredCount']==0
         child_code=invitee.post(PREFIX+'/me/referral').json()['code'];assert child_code!=code
         assert stored('SELECT inviter_username FROM referral_bindings WHERE invitee_username=:name',{'name':child})==[(owner,)]
         assert stored('SELECT count(*) FROM subscription_orders WHERE username=:name',{'name':owner})==[(0,)]
-        assert stored('SELECT count(*) FROM subscriptions WHERE username=:name AND plan_id != :plan',{'name':owner,'plan':'free'})==[(1,)]
+        assert stored('SELECT count(*) FROM subscriptions WHERE username=:name AND plan_id != :plan',{'name':owner,'plan':'free'})==[(0,)]
         inviter.post(PREFIX+'/logout')
         assert inviter.get(PREFIX+'/me/referral').status_code==401
         inviter.post(PREFIX+'/login',json={'username':owner,'password':'test-only-password'})

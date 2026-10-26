@@ -190,7 +190,7 @@ async def grant_membership_days(db: AsyncSession, username: str, *, days: int,
         subscription.source = source
     if subscription.status != 'paused':
         subscription.status = 'active'
-    note = f"推荐注册赠送 {days} 天会员" if source == 'referral' else f"赠送 {days} 天会员"
+    note = f"推荐首次付费赠送 {days} 天会员" if source == 'referral' else f"赠送 {days} 天会员"
     subscription.note = '\n'.join(value for value in (subscription.note, note) if value)
     await db.flush()
     return subscription
@@ -327,7 +327,14 @@ async def activate_paid_order(
     owner = (await db.execute(select(SubscriptionOrder.username).where(SubscriptionOrder.id == order_id))).scalar_one_or_none()
     if not owner:
         raise ValueError("订单不存在")
-    await _lock_subscription_account(db, owner)
+    # Acquire every participant account before any order/binding/subscription row.
+    # Cross referrals must use the same global account order to avoid deadlocks.
+    from app.models.referral import ReferralBinding
+    from app.services import referral_service
+    inviter = (await db.execute(select(ReferralBinding.inviter_username).where(
+        ReferralBinding.invitee_username == owner))).scalar_one_or_none()
+    for recipient in sorted({owner, inviter} - {None}):
+        await _lock_subscription_account(db, recipient)
     result = await db.execute(
         select(SubscriptionOrder)
         .where(SubscriptionOrder.id == order_id)
@@ -340,6 +347,8 @@ async def activate_paid_order(
         return o
     if validate_amount and not payment_amount_matches(o.amount, received_amount_fen):
         raise ValueError("支付金额不匹配")
+    if o.status == "cancelled" or o.pay_status in ("failed", "refunded"):
+        raise ValueError("订单已取消或支付失败")
     already_activated = o.status == "approved"
     o.pay_status = "paid"
     o.transaction_id = transaction_id
@@ -351,6 +360,9 @@ async def activate_paid_order(
         s.status = "active"
         s.source = "wechat_pay"
         s.order_id = o.id
+    if validate_amount and isinstance(o.amount, int) and o.amount > 0 and transaction_id:
+        # The durable binding receipt also suppresses historical registration gifts.
+        await referral_service.grant_paid_referral_rewards(db, owner)
     await db.commit()
     await db.refresh(o)
     return o

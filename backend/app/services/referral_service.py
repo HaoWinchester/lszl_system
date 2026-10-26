@@ -18,7 +18,8 @@ REFERRAL_REWARD_DAYS = 7
 async def summary(db: AsyncSession, username: str) -> dict:
     code = (await db.execute(select(ReferralCode.code).where(ReferralCode.username == username))).scalar_one_or_none()
     count = (await db.execute(select(func.count()).select_from(ReferralBinding).where(ReferralBinding.inviter_username == username))).scalar_one()
-    return {'code': code, 'registeredCount': count, 'rewardEnabled': True, 'rewardDays': REFERRAL_REWARD_DAYS}
+    rewarded = (await db.execute(select(func.count()).select_from(ReferralBinding).where(ReferralBinding.inviter_username == username, ReferralBinding.rewards_granted_at.is_not(None)))).scalar_one()
+    return {'code': code, 'registeredCount': count, 'rewardedCount': rewarded, 'rewardEnabled': True, 'rewardDays': REFERRAL_REWARD_DAYS}
 
 
 async def ensure_code(db: AsyncSession, username: str) -> str:
@@ -56,11 +57,10 @@ async def bind_registration(db: AsyncSession, user: User, code: str) -> None:
         raise ValueError('该账号已绑定推荐关系')
     db.add(ReferralBinding(invitee_username=user.username, inviter_username=inviter))
     await db.flush()
-    await grant_registration_rewards(db, user.username)
 
 
-async def grant_registration_rewards(db: AsyncSession, invitee_username: str) -> bool:
-    """Issue both gifts once; caller commits registration and this receipt together."""
+async def grant_paid_referral_rewards(db: AsyncSession, invitee_username: str) -> bool:
+    """Issue both gifts once; caller owns confirmed payment and this receipt."""
     binding = (await db.execute(select(ReferralBinding)
         .where(ReferralBinding.invitee_username == invitee_username)
         .with_for_update().execution_options(populate_existing=True))).scalar_one_or_none()
