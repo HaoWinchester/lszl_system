@@ -39,6 +39,7 @@ test('successful publication remains explicit when the following catalog refresh
   const h=publicationHarness();const fetch=h.context.fetch;let posted=false;
   h.context.fetch=async(url,options)=>{if(options.method==='POST')posted=true;else if(posted)throw new Error('catalog offline');return fetch(url,options)};
   await h.send();assert.equal(h.dialog.children.includes(h.form),false);assert.match(h.status.textContent,/已.*发布/);assert.match(h.status.textContent,/刷新失败/);
+  category(h,'all').onclick();search(h,'学习');assert.match(h.status.textContent,/已.*发布/);assert.match(h.status.textContent,/刷新失败/);assert.equal(h.find(h.dialog,n=>n.dataset.templateRetry!==undefined).hidden,false);
 });
 test('publication waits for save acknowledgement and commits active text drafts first',async()=>{
   const h=publicationHarness();let resolveSave;
@@ -153,4 +154,35 @@ test('only visible thumbnails are fetched with four requests at most and obsolet
   category(h,'pmp').onclick();assert.ok(pending.slice(1).every(p=>p.options.signal.aborted));
   category(h,'all').onclick();const next=h.context.observed.at(-1);next.callback(next.targets.map(target=>({target,isIntersecting:true})));await tick();const active=pending.slice(5);assert.equal(active.length,4);
   h.actor.username='other';h.context.listeners['kg-auth-session-change']();assert.ok(active.every(p=>p.options.signal.aborted));assert.equal(h.dialog.parent.children.includes(h.dialog),false);
+});
+
+test('successful listing changes keep catalog recovery and operation result through filtering until retry updates the card',async()=>{
+  for(const listed of [true,false]){
+    const item={...fixtures[0],listed,canMaintain:true};
+    const h=publicationHarness({openForm:false,templates:[item]});await tick();
+    const original=h.context.fetch;let patched=false,patchCount=0,failCatalog=true;
+    h.context.fetch=async(url,options)=>{
+      if(options.method==='PATCH'){
+        patchCount++;assert.equal(JSON.parse(options.body).listed,!listed);patched=true;
+        return {ok:true,json:async()=>({template:{...item,listed:!listed}})};
+      }
+      if(url==='/api/v1/graph-templates'&&patched){
+        if(failCatalog){if(!listed)throw Error('目录连接中断');return {ok:false,status:503,json:async()=>({detail:'目录临时离线'})}}
+        return {ok:true,json:async()=>({templates:[{...item,listed:!listed}]})};
+      }
+      return original(url,options);
+    };
+    await h.find(cards(h)[0],n=>n.tag==='button'&&n.textContent===(listed?'下架':'重新上架')).onclick();
+    const retry=h.find(h.dialog,n=>n.dataset.templateRetry!==undefined);
+    assert.equal(patchCount,1);assert.equal(retry.hidden,false);
+    const expected=listed?/已下架/:/已重新上架/;
+    assert.match(h.status.textContent,expected);assert.match(h.status.textContent,/刷新失败/);
+    category(h,'prince2').onclick();search(h,'治理');
+    assert.equal(retry.hidden,false);assert.match(h.status.textContent,expected);assert.match(h.status.textContent,/刷新失败/);
+    failCatalog=false;await retry.onclick();
+    assert.equal(patchCount,1,'catalog recovery must not repeat the successful PATCH');assert.equal(retry.hidden,true);
+    assert.ok(h.find(cards(h)[0],n=>n.tag==='button'&&n.textContent===(listed?'重新上架':'下架')));
+    assert.equal(h.find(cards(h)[0],n=>n.dataset.templateLoad!==undefined).disabled,listed);
+    assert.doesNotMatch(h.status.textContent,/刷新失败/);
+  }
 });

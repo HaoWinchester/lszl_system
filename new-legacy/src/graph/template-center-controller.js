@@ -63,7 +63,7 @@
     for(const [id,label] of categories){const button=el('button',label);button.type='button';button.dataset.templateCategory=id;button.onclick=()=>{selectedCategory=id;renderCatalog()};categoryButtons.set(id,button);tabs.append(button)}
     search.oninput=()=>renderCatalog();reset.onclick=()=>{search.value='';renderCatalog();search.focus()};
     retry.onclick=()=>refresh().catch(showCatalogError);
-    function showCatalogError(error){if(!isCurrent())return;catalogError=error;status.textContent=error.message;retry.hidden=false}
+    function showCatalogError(error,success=''){if(!isCurrent())return;catalogError=success?new Error(success+'模板列表刷新失败，请点击重试加载。'+error.message):error;status.textContent=catalogError.message;retry.hidden=false}
     async function refresh(){
       if(!isCurrent())return;cancelThumbnails();catalogRequest?.abort();const controller=new AbortController();catalogRequest=controller;retry.hidden=true;status.textContent='正在加载模板…';
       try{const data=await request('',{signal:controller.signal});if(!isCurrent()||controller.signal.aborted)return;catalog=data.templates;catalogError=null;renderCatalog()}
@@ -109,7 +109,10 @@
         const task={item,key,thumbnail,retry:thumbRetry,generation:renderGeneration,visible:!observer,controller:null,queued:false};thumbnailTasks.add(task);thumbnail.templateThumbnailTask=task;
         thumbRetry.onclick=()=>{thumbRetry.hidden=true;thumbnail.textContent='正在生成预览…';queueThumbnail(task)};
         if(thumbnailCache.has(key))global.KGTemplatePreview.mount(thumbnail,thumbnailCache.get(key).preview);else if(observer)observer.observe(thumbnail);else queueThumbnail(task);
-        if(item.canMaintain){const management=el('details');management.className='template-card-management';const summary=el('summary','管理模板'),update=el('button','更新为新版本'),toggle=el('button',item.listed?'下架':'重新上架');update.type=toggle.type='button';management.append(summary,update,toggle);body.append(management);update.onclick=()=>form(item);toggle.onclick=()=>execute(async()=>{await request('/'+encodeURIComponent(item.id),{method:'PATCH',body:{listed:!item.listed},signal:lifetime.signal});if(isCurrent())await refresh()})}
+        if(item.canMaintain){const management=el('details');management.className='template-card-management';const summary=el('summary','管理模板'),update=el('button','更新为新版本'),toggle=el('button',item.listed?'下架':'重新上架');update.type=toggle.type='button';management.append(summary,update,toggle);body.append(management);update.onclick=()=>form(item);toggle.onclick=()=>execute(async()=>{await request('/'+encodeURIComponent(item.id),{method:'PATCH',body:{listed:!item.listed},signal:lifetime.signal});if(!isCurrent())return;
+          const success=item.listed?'模板已下架。':'模板已重新上架。';
+          try{await refresh();if(isCurrent())status.textContent=success}catch(error){showCatalogError(error,success)}
+        })}
       }
     }
     async function showPreview(item,fetchPreview,load){
@@ -170,7 +173,7 @@
         const latest=context();
         await request(item?'/'+encodeURIComponent(item.id)+'/versions':'',{method:'POST',body:{sourceFileId:latest.fileId,expectedFileRevision:latest.revision,name:cleanName,description:description.value,memberOnly:member.checked,category:category.value},signal:lifetime.signal});
         editor.remove();publicationForm=null;const success=item?'新版本已发布，旧副本保留。':'模板已直接发布。';
-        try{await refresh();status.textContent=success}catch(error){showCatalogError(error);status.textContent=success+'模板列表刷新失败，请点击重试加载。'}
+        try{await refresh();status.textContent=success}catch(error){showCatalogError(error,success)}
       }).finally(()=>{submit.disabled=false;cancel.disabled=false})};
     }
     refresh().catch(showCatalogError);
