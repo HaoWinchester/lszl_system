@@ -1,3 +1,4 @@
+from app.models.graph_template import TemplateCategory
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 class PublicationInput(BaseModel):
@@ -7,6 +8,14 @@ class PublicationInput(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     description: str = Field(default='', max_length=3000)
     member_only: bool = Field(default=False, alias='memberOnly')
+    category: TemplateCategory | None = None
+
+    @field_validator('category')
+    @classmethod
+    def category_must_be_explicit(cls, value):
+        if value is None:
+            raise ValueError('category cannot be null')
+        return value
 
     @field_validator('name', mode='before')
     @classmethod

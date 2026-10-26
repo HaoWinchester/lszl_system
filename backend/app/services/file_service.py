@@ -8,7 +8,7 @@ import hashlib
 import json
 from app.services.graph_asset_service import validate_graph_assets
 
-from sqlalchemy import case, func, or_, select, update
+from sqlalchemy import and_, case, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import now_utc, uid
@@ -22,6 +22,11 @@ from app.models.file import (
     Tag,
     TRASHED,
 )
+
+
+def personal_file_predicate(owner: str):
+    """Only explicitly marked library sources are excluded; loaded copies stay personal."""
+    return and_(GraphFile.owner_id == owner, GraphFile.source.is_distinct_from("builtin-template"))
 
 
 class FileRevisionConflict(ValueError):
@@ -172,7 +177,7 @@ async def list_files(
     page: int = 1,
     page_size: int = 50,
 ):
-    q = select(GraphFile).where(GraphFile.owner_id == owner, GraphFile.status == status)
+    q = select(GraphFile).where(personal_file_predicate(owner), GraphFile.status == status)
     if folder_id is not None:
         q = q.where(GraphFile.folder_id == folder_id)
     if query:
@@ -201,7 +206,7 @@ async def list_files(
 async def reorder_files(db: AsyncSession, owner: str, ordered_ids: list[str]) -> list[str] | None:
     # Lock in a stable order, validate the complete request before any write.
     files = (await db.execute(select(GraphFile).where(
-        GraphFile.owner_id == owner, GraphFile.status == ACTIVE,
+        personal_file_predicate(owner), GraphFile.status == ACTIVE,
     ).order_by(GraphFile.id).with_for_update())).scalars().all()
     existing = {file.id for file in files}
     if not set(ordered_ids).issubset(existing):
@@ -211,7 +216,7 @@ async def reorder_files(db: AsyncSession, owner: str, ordered_ids: list[str]) ->
     final_ids = [*ordered_ids, *(file.id for file in files if file.id not in requested)]
     # Only index order changes: preserve content revision, edit time and current file.
     await db.execute(update(GraphFile).where(
-        GraphFile.owner_id == owner, GraphFile.status == ACTIVE, GraphFile.id.in_(final_ids),
+        personal_file_predicate(owner), GraphFile.status == ACTIVE, GraphFile.id.in_(final_ids),
     ).values(
         order_index=case({file_id: (index + 1) * 1000 for index, file_id in enumerate(final_ids)}, value=GraphFile.id),
         updated_at=GraphFile.updated_at,
@@ -227,7 +232,7 @@ async def get_meta(
     *,
     status: str | None = None,
 ) -> GraphFile | None:
-    query = select(GraphFile).where(GraphFile.owner_id == owner, GraphFile.id == file_id)
+    query = select(GraphFile).where(personal_file_predicate(owner), GraphFile.id == file_id)
     if status is not None:
         query = query.where(GraphFile.status == status)
     r = await db.execute(query)
@@ -310,7 +315,7 @@ async def save_file(
 ) -> GraphFile | None:
     f = await db.scalar(
         select(GraphFile).where(
-            GraphFile.owner_id == owner,
+            personal_file_predicate(owner),
             GraphFile.id == file_id,
             GraphFile.status == ACTIVE,
         ).with_for_update()
@@ -407,7 +412,7 @@ async def trash_file(db: AsyncSession, owner: str, file_id: str) -> bool:
         replacement = await db.scalar(
             select(GraphFile)
             .where(
-                GraphFile.owner_id == owner,
+                personal_file_predicate(owner),
                 GraphFile.status == ACTIVE,
                 GraphFile.id != file_id,
             )
@@ -459,7 +464,7 @@ async def delete_permanent(db: AsyncSession, owner: str, file_id: str) -> bool:
 
 async def empty_trash(db: AsyncSession, owner: str) -> dict[str, int]:
     files = (
-        await db.execute(select(GraphFile).where(GraphFile.owner_id == owner, GraphFile.status == TRASHED))
+        await db.execute(select(GraphFile).where(personal_file_predicate(owner), GraphFile.status == TRASHED))
     ).scalars().all()
     deleted_files = 0
     for f in files:
@@ -478,6 +483,8 @@ async def empty_trash(db: AsyncSession, owner: str) -> dict[str, int]:
     current = await db.get(CurrentFile, owner)
     if current and any(file.id == current.file_id for file in files):
         current.file_id = None
+    _, _, library_folders = await _library_folder_ancestors(db, owner)
+    folders = [folder for folder in folders if folder.id not in library_folders]
     # 先断开自引用，再删除，避免 ORM 将父子 DELETE 合并成无序 executemany。
     for folder in folders:
         folder.parent_id = None
@@ -516,6 +523,34 @@ async def duplicate_file(db: AsyncSession, owner: str, file_id: str, name: str |
     )
 
 
+async def _library_folder_ancestors(db: AsyncSession, owner: str) -> tuple[dict, set, set]:
+    """Classify by stored source, never folder names; include ancestors of personal descendants."""
+    folders = {folder.id: folder.parent_id for folder in (await db.scalars(
+        select(Folder).where(Folder.owner_id == owner)
+    )).all()}
+    personal, library = set(), set()
+    rows = (await db.execute(select(GraphFile.folder_id, GraphFile.source).where(
+        GraphFile.owner_id == owner, GraphFile.folder_id.is_not(None)
+    ))).all()
+    for folder_id, source in rows:
+        ancestors = library if source == "builtin-template" else personal
+        seen = set()
+        while folder_id in folders and folder_id not in seen:
+            seen.add(folder_id)
+            ancestors.add(folder_id)
+            folder_id = folders[folder_id]
+    return folders, personal, library
+
+
+async def _library_only_folder_ids(db: AsyncSession, owner: str) -> set[str]:
+    folders, personal, library = await _library_folder_ancestors(db, owner)
+    hidden = library - personal
+    # Empty children of a hidden source folder must not become orphan rows in the UI.
+    while children := {fid for fid, parent in folders.items() if parent in hidden} - hidden:
+        hidden.update(children)
+    return hidden
+
+
 # ---------- 文件夹 ----------
 async def list_folders(db: AsyncSession, owner: str, status: str = ACTIVE) -> list[Folder]:
     r = await db.execute(
@@ -523,7 +558,8 @@ async def list_folders(db: AsyncSession, owner: str, status: str = ACTIVE) -> li
         .where(Folder.owner_id == owner, Folder.status == status)
         .order_by(Folder.order_index, Folder.created_at, Folder.id)
     )
-    return list(r.scalars().all())
+    hidden = await _library_only_folder_ids(db, owner)
+    return [folder for folder in r.scalars().all() if folder.id not in hidden]
 
 
 async def get_folder(
@@ -533,6 +569,8 @@ async def get_folder(
     *,
     status: str | None = None,
 ) -> Folder | None:
+    if folder_id in await _library_only_folder_ids(db, owner):
+        return None
     query = select(Folder).where(Folder.owner_id == owner, Folder.id == folder_id)
     if status is not None:
         query = query.where(Folder.status == status)
@@ -609,7 +647,7 @@ async def delete_folder(db: AsyncSession, owner: str, folder_id: str) -> bool:
     root = await get_folder(db, owner, folder_id, status=ACTIVE)
     if not root:
         return False
-    affected = {folder_id} | await _folder_descendant_ids(db, owner, folder_id)
+    affected = ({folder_id} | await _folder_descendant_ids(db, owner, folder_id)) - await _library_only_folder_ids(db, owner)
     now = now_utc()
     folders = list((await db.scalars(select(Folder).where(
         Folder.owner_id == owner,
@@ -622,7 +660,7 @@ async def delete_folder(db: AsyncSession, owner: str, folder_id: str) -> bool:
             folder.restore_parent_id = folder.parent_id
             folder.parent_id = None
     files = (await db.execute(select(GraphFile).where(
-        GraphFile.owner_id == owner,
+        personal_file_predicate(owner),
         GraphFile.folder_id.in_(affected),
         GraphFile.status == ACTIVE,
     ))).scalars().all()
@@ -633,7 +671,7 @@ async def delete_folder(db: AsyncSession, owner: str, folder_id: str) -> bool:
     if current and any(file.id == current.file_id for file in files):
         replacement = await db.scalar(
             select(GraphFile)
-            .where(GraphFile.owner_id == owner, GraphFile.status == ACTIVE)
+            .where(personal_file_predicate(owner), GraphFile.status == ACTIVE)
             .order_by(GraphFile.order_index, GraphFile.created_at, GraphFile.id)
         )
         current.file_id = replacement.id if replacement else None
@@ -649,7 +687,7 @@ async def restore_folder(
     root = await get_folder(db, owner, folder_id, status=TRASHED)
     if root is None:
         return None
-    affected = {folder_id} | await _folder_descendant_ids(db, owner, folder_id)
+    affected = ({folder_id} | await _folder_descendant_ids(db, owner, folder_id)) - await _library_only_folder_ids(db, owner)
     desired_parent_id = root.restore_parent_id
     if desired_parent_id is not None and await get_folder(
         db, owner, desired_parent_id, status=ACTIVE
@@ -666,7 +704,7 @@ async def restore_folder(
             folder.parent_id = desired_parent_id
             folder.restore_parent_id = None
     files = list((await db.scalars(select(GraphFile).where(
-        GraphFile.owner_id == owner,
+        personal_file_predicate(owner),
         GraphFile.folder_id.in_(affected),
         GraphFile.status == TRASHED,
     ))).all())
@@ -689,7 +727,7 @@ async def delete_folder_permanent(
     affected = {folder_id} | await _folder_descendant_ids(db, owner, folder_id)
     file_count = int((await db.execute(
         select(func.count()).select_from(GraphFile).where(
-            GraphFile.owner_id == owner,
+            GraphFile.owner_id == owner,  # Retain source-folder FK integrity too.
             GraphFile.folder_id.in_(affected),
         )
     )).scalar() or 0)
@@ -770,13 +808,33 @@ async def set_file_tag(db: AsyncSession, owner: str, file_id: str, tag_id: str |
 # ---------- 当前文件 ----------
 async def get_current(db: AsyncSession, owner: str) -> str | None:
     r = await db.get(CurrentFile, owner)
-    return r.file_id if r else None
+    # Missing/explicitly cleared browsing preference is intentional, not a recovery trigger.
+    if r is None or r.file_id is None:
+        return None
+    file = await get_meta(db, owner, r.file_id, status=ACTIVE)
+    if file is not None:
+        return file.id
+    # Recovery alone locks/reloads the pointer: a concurrent explicit selection wins.
+    r = await db.scalar(select(CurrentFile).where(CurrentFile.owner_id == owner)
+        .with_for_update().execution_options(populate_existing=True))
+    if r is None or r.file_id is None:
+        return None
+    file = await get_meta(db, owner, r.file_id, status=ACTIVE)
+    if file is not None:
+        return file.id
+    replacement = await db.scalar(select(GraphFile).where(
+        personal_file_predicate(owner), GraphFile.status == ACTIVE,
+    ).order_by(GraphFile.last_opened_at.desc().nulls_last(), GraphFile.updated_at.desc(), GraphFile.id))
+    replacement_id = replacement.id if replacement else None
+    r.file_id = replacement_id
+    await db.commit()
+    return replacement_id
 
 
 async def set_current(db: AsyncSession, owner: str, file_id: str | None) -> bool:
     if file_id is not None:
         file = await db.scalar(select(GraphFile).where(
-            GraphFile.id == file_id, GraphFile.owner_id == owner, GraphFile.status == ACTIVE
+            GraphFile.id == file_id, personal_file_predicate(owner), GraphFile.status == ACTIVE
         ))
         if file is None:
             return False
@@ -791,7 +849,7 @@ async def set_current(db: AsyncSession, owner: str, file_id: str | None) -> bool
 
 # ---------- 统计 ----------
 async def storage_stats(db: AsyncSession, owner: str) -> dict:
-    base = select(GraphFile).where(GraphFile.owner_id == owner)
+    base = select(GraphFile).where(personal_file_predicate(owner))
     active_q = base.where(GraphFile.status == ACTIVE)
     trashed_q = base.where(GraphFile.status == TRASHED)
     active = (await db.execute(active_q)).scalars().all()

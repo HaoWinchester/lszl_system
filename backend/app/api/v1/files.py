@@ -42,6 +42,8 @@ async def list_files(
 
 @router.post("", dependencies=[Depends(file_import_submission_guard)])
 async def create_file(body: dict, db: DB, user: GraphWriter):
+    if body.get("source") == "builtin-template":
+        raise HTTPException(status_code=422, detail={"code": "RESERVED_FILE_SOURCE"})
     try:
         f = await file_service.create_file(
             db,

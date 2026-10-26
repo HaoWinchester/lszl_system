@@ -1,17 +1,35 @@
 """Versioned server-owned graph publications and independent load receipts."""
-from sqlalchemy import Boolean, ForeignKey, Integer, String, Text, UniqueConstraint
+from enum import Enum
+from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.base import Base
 
+class TemplateCategory(str, Enum):
+    pmp = 'pmp'
+    prince2 = 'prince2'
+    cspm = 'cspm'
+    gaoxiang = 'gaoxiang'
+    general = 'general'
+
+
+CATEGORY_LABELS = {
+    TemplateCategory.pmp: 'PMP', TemplateCategory.prince2: 'PRINCE2',
+    TemplateCategory.cspm: 'CSPM', TemplateCategory.gaoxiang: '高项',
+    TemplateCategory.general: '通用学习',
+}
+
+
 class GraphTemplate(Base):
     __tablename__ = 'graph_templates'
+    __table_args__ = (CheckConstraint("category IN (" + ", ".join(repr(category.value) for category in TemplateCategory) + ")", name='ck_graph_templates_category'),)
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     owner_id: Mapped[str] = mapped_column(String(64), ForeignKey('users.username'), index=True)
     name: Mapped[str] = mapped_column(String(200))
     description: Mapped[str] = mapped_column(Text, default='')
     member_only: Mapped[bool] = mapped_column(Boolean, default=False)
     listed: Mapped[bool] = mapped_column(Boolean, default=True)
+    category: Mapped[str] = mapped_column(String(16), default=TemplateCategory.general.value, server_default='general')
     current_version: Mapped[int] = mapped_column(Integer, default=1)
 
 class GraphTemplateVersion(Base):

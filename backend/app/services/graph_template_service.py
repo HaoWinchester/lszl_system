@@ -12,7 +12,7 @@ from app.core.security import uid
 from app.models.file import GraphFile, FileContent
 from app.models.user import User
 from app.models.subscription import Subscription
-from app.models.graph_template import GraphTemplate as Template, GraphTemplateVersion as Version, GraphTemplateLoad as Load
+from app.models.graph_template import CATEGORY_LABELS, TemplateCategory, GraphTemplate as Template, GraphTemplateVersion as Version, GraphTemplateLoad as Load
 from app.services import teaching_content_revision_service as revisions, graph_question_service as questions, graph_asset_service as assets, file_service, subscription_service
 
 
@@ -30,10 +30,27 @@ def publisher(user):
         fail('TEMPLATE_PUBLISHER_REQUIRED', 403)
 
 
-def summary(row, user):
+def summary(row, user, publisher_name=None, is_builtin=False):
     return {'id': row.id, 'name': row.name, 'description': row.description,
+            'category': row.category, 'categoryLabel': CATEGORY_LABELS[row.category],
+            'publisherName': publisher_name or '用户模板', 'isBuiltin': is_builtin,
             'memberOnly': row.member_only, 'listed': row.listed, 'version': row.current_version,
             'canMaintain': user.role == 'admin' or (user.role == 'teacher' and row.owner_id == user.username)}
+
+
+async def summaries(db, rows, user):
+    if not rows:
+        return []
+    # Only index metadata joins: catalog never reads graph_data or card bodies.
+    metadata = (await db.execute(select(Template.id, User.display_name, User.role, GraphFile.source)
+        .join(User, User.username == Template.owner_id)
+        .outerjoin(Version, (Version.template_id == Template.id) & (Version.version == Template.current_version))
+        .outerjoin(GraphFile, (GraphFile.id == Version.source_file_id) & (GraphFile.owner_id == Version.asset_owner))
+        .where(Template.id.in_([row.id for row in rows])))).all()
+    by_id = {tid: (display_name or ('幻谱基础模板' if source == 'builtin-template' else
+                      '教师模板' if role in {'admin', 'teacher'} else '用户模板'), source == 'builtin-template')
+             for tid, display_name, role, source in metadata}
+    return [summary(row, user, *by_id.get(row.id, ('用户模板', False))) for row in rows]
 
 
 async def catalog(db, user):
@@ -44,7 +61,7 @@ async def catalog(db, user):
     elif user.role == 'teacher':
         visible = or_(visible, Template.owner_id == user.username)
     rows = (await db.scalars(select(Template).where(visible).order_by(Template.name, Template.id))).all()
-    return {'templates': [summary(r, user) for r in rows]}
+    return {'templates': await summaries(db, rows, user)}
 
 
 async def maintain(db, user, template_id):
@@ -137,6 +154,10 @@ async def publish(db, user, data, template_id=None):
         db.add(row)
     # 发布新版本不改变上下架状态；已下架的模板保持下架，由显式 set_listing 重新公开。
     row.name, row.description, row.member_only = data.name, data.description, data.member_only
+    if data.category is not None:
+        row.category = data.category.value
+    elif row.category is None:
+        row.category = TemplateCategory.general.value
     row.current_version += 1
     await db.flush()
     db.add(Version(id=uid('gtv_'), template_id=row.id, version=row.current_version,
@@ -144,7 +165,7 @@ async def publish(db, user, data, template_id=None):
                    graph_data=graph, bindings=descriptors))
     await db.commit()
     await db.refresh(row)
-    return {'template': summary(row, user)}
+    return {'template': (await summaries(db, [row], user))[0]}
 
 
 async def set_listing(db, user, template_id, data):
@@ -153,7 +174,7 @@ async def set_listing(db, user, template_id, data):
     row.listed = data.listed
     await db.commit()
     await db.refresh(row)
-    return {'template': summary(row, user)}
+    return {'template': (await summaries(db, [row], user))[0]}
 
 
 async def preview(db, user, template_id):
@@ -164,7 +185,7 @@ async def preview(db, user, template_id):
     version = await db.scalar(select(Version).where(Version.template_id == row.id, Version.version == row.current_version))
     if version is None:
         fail('TEMPLATE_VERSION_NOT_FOUND')
-    return {'template': summary(row, user), 'preview': preview_projection(version.graph_data, version.version)}
+    return {'template': (await summaries(db, [row], user))[0], 'preview': preview_projection(version.graph_data, version.version)}
 
 
 def preview_projection(graph, version):
