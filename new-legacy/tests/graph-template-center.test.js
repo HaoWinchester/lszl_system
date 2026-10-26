@@ -7,12 +7,12 @@ test('source homepage and bundled homepage register shared template center',()=>
 
 
 // Exercise the actual publication form, including persistence and request ordering.
-function publicationHarness({openForm=true,templates=[]}={}){
+function publicationHarness({openForm=true,templates=[],observe=false}={}){
   const vm=require('node:vm'),calls=[];
-  function element(tag){return{tag,children:[],dataset:{},classList:{add(){}},setAttribute(key,value){this[key]=value},append(...nodes){for(const node of nodes){node.parent=this;this.children.push(node)}},prepend(node){node.parent=this;this.children.unshift(node)},insertBefore(node,before){node.parent=this;this.children.splice(this.children.indexOf(before),0,node)},replaceChildren(...nodes){this.children=[];this.append(...nodes)},remove(){this.parent.children=this.parent.children.filter(node=>node!==this)},focus(){},addEventListener(){},showModal(){},close(){}}}
+  function element(tag){return{tag,children:[],dataset:{},classList:{add(){}},setAttribute(key,value){this[key]=value},append(...nodes){for(const node of nodes){node.parent=this;this.children.push(node)}},prepend(node){node.parent=this;this.children.unshift(node)},insertBefore(node,before){node.parent=this;this.children.splice(this.children.indexOf(before),0,node)},replaceChildren(...nodes){this.children=[];this.append(...nodes)},remove(){this.parent.children=this.parent.children.filter(node=>node!==this)},focus(){},addEventListener(type,handler){(this.listeners||(this.listeners={}))[type]=handler},showModal(){},close(){}}}
   const body=element('body'),capabilities={serverFiles:true},state={fileId:'source',revision:1},actor={username:'teacher',role:'teacher'};
   const context={console,AbortController,document:{body,createElement:element},KGAuthCore:{currentUser:()=>actor},KGTemplatePreview:{mount(){}},KGGraphFileEditorStoreBridge:{fragmentSource:()=>({...state}),isRemote:()=>capabilities.serverFiles},KGGraphFileRemoteAdapter:{flush:async()=>{calls.push('flush')}},KGGraphFileAutosave:{saveAcknowledged:async(options,isCurrent)=>{calls.push('save');assert.equal(options.force,true);assert.equal(isCurrent(),true);state.revision=2;return true}},fetch:async(url,options)=>{calls.push({url,options});return{ok:true,json:async()=>options.method==='POST'?{template:{id:'created'}}:{templates}}}};
-  context.window=context;vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'../src/graph/template-center-controller.js'),'utf8'),context);
+  context.listeners={};context.addEventListener=(type,handler)=>context.listeners[type]=handler;context.observed=[];if(observe)context.IntersectionObserver=class{constructor(callback){this.callback=callback;context.observed.push(this)}observe(target){(this.targets||(this.targets=[])).push(target)}disconnect(){this.disconnected=true} };context.window=context;vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'../src/graph/template-center-controller.js'),'utf8'),context);
   const find=(root,predicate)=>predicate(root)?root:root.children.map(node=>find(node,predicate)).find(Boolean);
   context.KGGraphTemplateCenter.open();const dialog=body.children[0];if(openForm)find(dialog,node=>node.dataset.templatePublish!==undefined).onclick();
   const form=find(dialog,node=>node.tag==='form'),submit=form?find(form,node=>node.type==='submit'):null;
@@ -104,4 +104,53 @@ test('publication rejects blank names before saving and trims valid names',async
   await blank.send();assert.equal(blank.calls.includes('save'),false);assert.equal(blank.calls.some(call=>call.options?.method==='POST'),false);assert.match(blank.status.textContent,/名称/);
   const valid=publicationHarness();valid.find(valid.form,node=>node.name==='name').value='  个人学习  ';await valid.send();
   assert.equal(JSON.parse(valid.calls.find(call=>call.options?.method==='POST').options.body).name,'个人学习');
+});
+
+const tick=()=>new Promise(resolve=>setImmediate(resolve));
+const fixtures=[
+  {id:'one',name:'阶段管理',description:'治理',category:'prince2',categoryLabel:'PRINCE2',publisherName:'佩奇老师',listed:true,version:1},
+  {id:'two',name:'风险管理',description:'治理',category:'pmp',categoryLabel:'PMP',listed:true,version:1},
+  {id:'three',name:'个人笔记',description:'复习',listed:true,version:1},
+];
+function all(root,predicate){return [...(predicate(root)?[root]:[]),...root.children.flatMap(node=>all(node,predicate))]}
+function cards(h){return all(h.dialog,n=>n.dataset.templateId!==undefined)}
+function category(h,id){return h.find(h.dialog,n=>n.dataset.templateCategory===id)}
+function search(h,value){const field=h.find(h.dialog,n=>n.type==='search');assert.ok(field);field.value=value;field.oninput()}
+test('gallery combines persistent search with server categories and reports category counts',async()=>{
+  const h=publicationHarness({openForm:false,templates:fixtures});await tick();
+  assert.equal(cards(h).length,3);assert.ok(category(h,'prince2'),'category control is present');assert.match(category(h,'prince2').textContent,/1/);assert.match(category(h,'general').textContent,/1/);
+  search(h,'治理');category(h,'prince2').onclick();assert.deepEqual(cards(h).map(n=>n.dataset.templateId),['one']);assert.equal(category(h,'prince2')['aria-pressed'],'true');
+  category(h,'cspm').onclick();assert.equal(cards(h).length,0);assert.match(h.status.textContent,/没有/);
+  h.find(h.dialog,n=>n.dataset.templateReset!==undefined).onclick();assert.equal(h.find(h.dialog,n=>n.type==='search').value,'');
+  category(h,'general').onclick();assert.deepEqual(cards(h).map(n=>n.dataset.templateId),['three']);
+});
+test('catalog failure exposes retry that really reloads the catalog',async()=>{
+  const h=publicationHarness({openForm:false});await tick();const original=h.context.fetch;let failed=true;
+  h.context.fetch=async(...args)=>{if(failed)throw Error('服务离线');return original(...args)};
+  const retry=h.find(h.dialog,n=>n.dataset.templateRetry!==undefined);assert.ok(retry,'catalog offers an explicit retry');retry.onclick();await tick();assert.match(h.status.textContent,/服务离线/);
+  category(h,'pmp').onclick();assert.equal(retry.hidden,false);assert.match(h.status.textContent,/服务离线/);
+  failed=false;h.find(h.dialog,n=>n.dataset.templateRetry!==undefined).onclick();await tick();assert.match(h.status.textContent,/暂无模板/);
+});
+test('publication submits the selected category and keeps it on failed submission',async()=>{
+  const h=publicationHarness();const field=h.find(h.form,n=>n.name==='category');assert.ok(field);field.value='cspm';
+  const fetch=h.context.fetch;h.context.fetch=(url,options)=>options.method==='POST'?Promise.resolve({ok:false,status:503,json:async()=>({detail:'稍后重试'})}):fetch(url,options);
+  await h.send();assert.equal(field.value,'cspm');assert.equal(h.dialog.children.includes(h.form),true);
+  h.context.fetch=fetch;await h.send();assert.equal(JSON.parse(h.calls.find(c=>c.options?.method==='POST').options.body).category,'cspm');
+});
+test('load receipt survives filtering and repeated loads use one request identity',async()=>{
+  const h=publicationHarness({openForm:false,templates:fixtures});await tick();
+  let ids=[];const fetch=h.context.fetch;h.context.fetch=async(url,options)=>{if(url.endsWith('/loads')){ids.push(JSON.parse(options.body).requestId);return {ok:true,json:async()=>({fileId:'copy'})}}return fetch(url,options)};
+  await h.find(cards(h)[0],n=>n.dataset.templateLoad!==undefined).onclick();await tick();
+  category(h,'pmp').onclick();category(h,'prince2').onclick();assert.ok(h.find(cards(h)[0],n=>n.dataset.templateResult==='copy'));
+  await h.find(cards(h)[0],n=>n.dataset.templateLoad!==undefined).onclick();await tick();assert.equal(ids.length,2);assert.equal(ids[0],ids[1]);
+});
+test('only visible thumbnails are fetched with four requests at most and obsolete account requests abort',async()=>{
+  const many=Array.from({length:9},(_,i)=>({...fixtures[0],id:String(i)}));const h=publicationHarness({openForm:false,templates:many,observe:true});await tick();
+  assert.equal(h.calls.filter(c=>c.url?.match(/graph-templates\//)).length,0);assert.equal(h.context.observed.length,1);
+  const pending=[];h.context.fetch=(url,options)=>new Promise((resolve,reject)=>{pending.push({url,options,resolve});options.signal.addEventListener('abort',()=>reject(Object.assign(Error('aborted'),{name:'AbortError'})))});
+  const observer=h.context.observed[0];observer.callback(observer.targets.map(target=>({target,isIntersecting:true})));await tick();assert.equal(pending.length,4);
+  pending[0].resolve({ok:true,json:async()=>({preview:{},template:many[0]})});await tick();assert.equal(pending.length,5);
+  category(h,'pmp').onclick();assert.ok(pending.slice(1).every(p=>p.options.signal.aborted));
+  category(h,'all').onclick();const next=h.context.observed.at(-1);next.callback(next.targets.map(target=>({target,isIntersecting:true})));await tick();const active=pending.slice(5);assert.equal(active.length,4);
+  h.actor.username='other';h.context.listeners['kg-auth-session-change']();assert.ok(active.every(p=>p.options.signal.aborted));assert.equal(h.dialog.parent.children.includes(h.dialog),false);
 });
