@@ -186,11 +186,6 @@
           </aside>
         </section>
 
-        <section class="practice-recent" aria-label="最近学习">
-          <header><div role="tablist" aria-label="最近学习类别"><button type="button" role="tab" id="practiceRecentHistoryTab" data-recent-tab="history" aria-selected="true" aria-controls="practiceRecentPanel">学习记录</button><button type="button" role="tab" id="practiceRecentFavoritesTab" data-recent-tab="favorites" aria-selected="false" tabindex="-1" aria-controls="practiceRecentPanel">我的收藏</button></div><button type="button" class="practice-recent-more" data-lobby-open="recent">查看更多 →</button></header>
-          <div id="practiceRecentPanel" role="tabpanel" aria-labelledby="practiceRecentHistoryTab"><div class="practice-recent-table-wrap"><table class="practice-recent-table" hidden><thead><tr><th>时间</th><th>试卷 / 题目</th><th>题量</th><th>已答正确率</th><th>用时</th><th>操作</th></tr></thead><tbody id="practiceRecentBody"></tbody></table></div><p id="practiceRecentStatus" role="status">登录后查看你的学习记录和收藏。</p><button type="button" class="practice-secondary-btn" data-recent-retry hidden>重新读取</button></div>
-        </section>
-
         <div class="practice-empty" id="practiceEmpty" hidden>
           <strong>暂时没有可练习的已发布试卷</strong>
           <p>请先让教师在“教师工作台 → 试卷管理”中完成选题并发布。</p>
@@ -358,10 +353,12 @@
   <div class="practice-drawer-backdrop" id="practiceFavoritesDrawer" hidden aria-hidden="true">
     <aside class="practice-drawer practice-favorites-drawer" role="dialog" aria-modal="true" aria-labelledby="practiceFavoritesTitle">
       <header class="practice-drawer-head">
-        <div><span>MY FAVORITES</span><h2 id="practiceFavoritesTitle">我的收藏</h2><p>收藏的题目与解析都在这里，随时回看</p></div>
+        <div><span>MY FAVORITES</span><h2 id="practiceFavoritesTitle">我的收藏</h2><p>收藏的题目与评论都在这里，随时回看</p></div>
         <button type="button" class="practice-drawer-close" id="practiceFavoritesCloseBtn" aria-label="关闭我的收藏">×</button>
       </header>
       <div class="practice-drawer-toolbar practice-favorites-toolbar">
+        <div role="group" aria-label="收藏分类"><button type="button" data-favorites-kind="questions" aria-pressed="true">题目</button><button type="button" data-favorites-kind="comments" aria-pressed="false">评论</button></div>
+        <button type="button" id="practiceFavoritesRetry">重新读取</button>
         <label class="practice-favorites-search" for="practiceFavoritesSearch">搜索收藏题目
           <input id="practiceFavoritesSearch" type="search" placeholder="搜索题干、解析关键词" autocomplete="off"/>
         </label>

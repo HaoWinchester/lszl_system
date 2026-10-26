@@ -129,16 +129,17 @@
   }
 
   /* —— 抽屉列表状态：搜索 + 游标分页 + 详情弹层 —— */
-  const drawerState = { search: '', items: [], nextCursor: null, controls: null, loading: false }
+  const drawerState = { kind: 'questions', search: '', items: [], nextCursor: null, controls: null, loading: false }
 
-  const boundControls = new Set()
+  const boundControls = new WeakSet()
   let detailRequest = 0
   let listRequest = 0
 
   function bindControls(controls) {
     if (!controls) return
     // 宿主每次打开抽屉都会传入新的 controls 字面量；按元素去重避免重复绑定监听器
-    const key = [controls.searchInput, controls.moreBtn, controls.detail, controls.list].map(node => node || '').join('|')
+    const key = controls.list
+    if (!key) return
     if (boundControls.has(key)) { drawerState.controls = controls; return }
     boundControls.add(key)
     drawerState.controls = controls
@@ -147,6 +148,7 @@
       controls.searchInput.addEventListener('input', () => {
         global.clearTimeout(timer)
         timer = global.setTimeout(() => {
+          if(drawerState.kind==='comments')return
           drawerState.search = text(controls.searchInput.value).trim()
           loadFirstPage().catch(() => {})
         }, 280)
@@ -166,6 +168,18 @@
       controls.list.addEventListener('click', event => {
         const open = event.target.closest('[data-favorite-open]')
         if (open) openDetail(text(open.dataset.favoriteOpen))
+        const commentOpen=event.target.closest('[data-comment-favorite-open]')
+        const remove=event.target.closest('[data-comment-favorite-remove]')
+        if(commentOpen) {
+          const item=drawerState.items.find(row=>text(row.id)===commentOpen.dataset.commentFavoriteOpen)
+          commentOpen.disabled=true
+          global.KGQuestionComments.openFavorite(item).catch(error=>drawerState.controls?.onToast?.(error.message || '原题或评论暂不可访问，请重试')).finally(()=>{commentOpen.disabled=false})
+        }
+        if(remove) {
+          const item=drawerState.items.find(row=>text(row.id)===remove.dataset.commentFavoriteRemove)
+          remove.disabled=true
+          global.KGQuestionComments.removeFavorite(item).then(()=>loadFirstPage()).catch(error=>{drawerState.controls?.onToast?.(error.message || '取消收藏失败，请重试');remove.disabled=false})
+        }
       })
     }
     document.addEventListener('keydown', event => {
@@ -182,7 +196,7 @@
       controls.moreBtn.textContent = drawerState.loading ? '正在加载…' : '加载更多'
     }
     const knownTotal = drawerState.items.length + (drawerState.nextCursor ? '+' : '')
-    if (controls.summary && drawerState.items.length) controls.summary.textContent = `共收藏 ${knownTotal} 道题`
+    if (drawerState.kind==='questions' && controls.summary && drawerState.items.length) controls.summary.textContent = `共收藏 ${knownTotal} 道题`
   }
 
   async function loadFirstPage() {
@@ -190,6 +204,9 @@
     drawerState.loading = false
     drawerState.items = []
     drawerState.nextCursor = null
+    if(drawerState.controls?.list)drawerState.controls.list.innerHTML=''
+    if(drawerState.controls?.summary)drawerState.controls.summary.textContent='正在读取收藏…'
+    if(drawerState.controls?.empty)drawerState.controls.empty.hidden=true
     await fetchPage(true)
   }
 
@@ -204,13 +221,19 @@
     const requestId = ++listRequest
     syncControls()
     try {
-      const payload = await fetchList(reset ? null : drawerState.nextCursor, 50, drawerState.search)
+      const payload = drawerState.kind==='comments' ? await global.KGQuestionComments.listFavorites(reset?null:drawerState.nextCursor) : await fetchList(reset ? null : drawerState.nextCursor, 50, drawerState.search)
       if (requestId !== listRequest) return
-      const items = payload.favorites || []
-      items.forEach(item => remember(item.questionId, true))
+      const items = (drawerState.kind==='comments'?payload.comments:payload.favorites) || []
+      if(drawerState.kind==='questions')items.forEach(item => remember(item.questionId, true))
       drawerState.items = reset ? items : drawerState.items.concat(items)
       drawerState.nextCursor = payload.nextCursor || null
       renderDrawerList()
+    } catch(error) {
+      if(requestId===listRequest){
+        if(controls.empty){controls.empty.hidden=false;controls.empty.textContent=error.message==='UNAUTHENTICATED'?'请登录后重新读取收藏':'收藏读取失败，请点击重新读取重试。'}
+        if(controls.summary)controls.summary.textContent='收藏读取失败'
+      }
+      throw error
     } finally {
       if (requestId === listRequest) { drawerState.loading = false; syncControls() }
     }
@@ -220,7 +243,12 @@
     const controls = drawerState.controls
     if (!controls) return
     const items = drawerState.items
-    if (controls.list) controls.list.innerHTML = items.map(favoriteItemMarkup).join('')
+    if (controls.list) controls.list.innerHTML = items.map(drawerState.kind==='comments'?commentFavoriteMarkup:favoriteItemMarkup).join('')
+    if(drawerState.kind==='comments'){
+      if(controls.empty){controls.empty.hidden=items.length>0;controls.empty.textContent='还没有收藏的评论。在题目讨论中收藏后会显示在这里。'}
+      if(controls.summary)controls.summary.textContent=`已读取 ${items.length}${drawerState.nextCursor?'+':''} 条评论`
+      return
+    }
     if (controls.empty) {
       controls.empty.hidden = items.length > 0
       if (!items.length) {
@@ -318,7 +346,13 @@
     }
   }
 
+  function commentFavoriteMarkup(item){
+    return `<article class="practice-favorite-card"><header class="practice-favorite-card-head"><span>评论</span><span>${escapeHTML(item.author)}</span></header><p class="practice-favorite-stem">${escapeHTML(item.content)}</p><p class="practice-favorite-source">原题：${escapeHTML(item.questionTitle || item.question?.title || item.questionId)}</p><footer class="practice-favorite-card-foot"><button type="button" data-comment-favorite-open="${escapeHTML(item.id)}">查看原题评论</button><button type="button" data-comment-favorite-remove="${escapeHTML(item.id)}">取消收藏</button></footer></article>`
+  }
+
   async function renderList(target, emptyTarget, summaryTarget, controls) {
+    drawerState.kind=controls?.kind==='comments'?'comments':'questions'
+    if(controls?.searchInput)controls.searchInput.disabled=drawerState.kind==='comments'
     bindControls({ ...controls, list: target, empty: emptyTarget, summary: summaryTarget })
     await loadFirstPage()
     return { total: drawerState.items.length }

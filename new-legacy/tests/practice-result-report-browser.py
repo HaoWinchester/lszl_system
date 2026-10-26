@@ -34,6 +34,7 @@ with sync_playwright() as playwright:
     browser = playwright.chromium.launch(**launch)
     page = browser.new_page(viewport={"width": 1280, "height": 1100})
     page.set_content('<!doctype html><html><body><section id="report"></section></body></html>')
+    page.add_style_tag(content=(ROOT / "styles/main.css").read_text(encoding="utf-8"))
     page.add_style_tag(content=(ROOT / "styles/practice-mode.css").read_text(encoding="utf-8"))
     page.add_script_tag(content=(ROOT / "src/113-practice-result-report.js").read_text(encoding="utf-8"))
     page.evaluate(
@@ -118,7 +119,8 @@ with sync_playwright() as playwright:
     assert "未评估" in short_text
     assert "PASS" not in short_text and "FAIL" not in short_text
     assert page.locator(".practice-report-band-scale").count() == 0
-    assert page.locator(".practice-report-pie").count() == 0
+    assert page.locator(".practice-report-pie").count() == 1
+    assert "人员 · 10 题 · 100%" in short_text
 
     # Old reports are immutable; the view must remove an old simulated verdict
     # when its frozen ten-question count shows that it was a short practice.
@@ -170,6 +172,23 @@ with sync_playwright() as playwright:
             assert page.locator('[data-report-review-wrong]').count() == 0
             if mode == "revenge":
                 assert "待验证或已掌握" in page.locator('.practice-report-next').inner_text()
+    # Actual observed count distribution, compact accessible entry, responsive layout.
+    distribution={**short, 'domains':{'people':{'total':2},'process':{'total':3},'business-environment':{'total':5}}}
+    page.evaluate("report=>KGPracticeResultReport.render(document.querySelector('#report'),report)", distribution)
+    evidence=ROOT.parent / '.superpowers/sdd/2026-10-26-practice-graph-referral/evidence'
+    evidence.mkdir(parents=True, exist_ok=True)
+    for width in [1280,390]:
+        page.set_viewport_size({'width':width,'height':900})
+        page.locator('[data-report-summary]').focus()
+        assert page.locator('[data-report-summary] span').evaluate('(node)=>getComputedStyle(node).opacity') == '1'
+        bounds=page.locator('[data-report-summary]').bounding_box()
+        assert bounds['x'] > width-70
+        page.locator('[data-report-summary]').click()
+        page.screenshot(path=str(evidence / f'practice-summary-{width}.png'))
+        page.locator('.practice-report-breakdown').screenshot(path=str(evidence / f'practice-distribution-{width}.png'))
+        assert page.locator('.practice-report-pie path').count()==3
+        assert '人员 · 2 题 · 20%' in page.locator('#report').inner_text()
+        assert page.locator('#report').evaluate('(node)=>node.scrollWidth<=node.clientWidth+1')
     browser.close()
 
 print("practice-result-report-browser-ok")

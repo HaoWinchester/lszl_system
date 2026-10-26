@@ -188,3 +188,10 @@ body.practice-mode-page[data-practice-view="game"] .practice-answer-sheet-legend
 body.practice-mode-page[data-practice-view="game"] .practice-answer-sheet-legend i.is-current{background:#fff;border:2px solid #8e79ad}
 @media(max-width:600px){body.practice-mode-page[data-practice-view="game"] .practice-answer-sheet-drawer .practice-answer-number-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}body.practice-mode-page[data-practice-view="game"] .practice-answer-number{min-height:88px;padding:11px 8px}body.practice-mode-page[data-practice-view="game"] .practice-answer-number.is-marked{padding-top:9px}body.practice-mode-page[data-practice-view="game"] .practice-answer-sheet-drawer .practice-drawer-body{padding:18px 16px max(20px,env(safe-area-inset-bottom))}body.practice-mode-page[data-practice-view="game"] .practice-own-selection{padding:10px 12px;font-size:12px}}
 @media(max-width:360px){body.practice-mode-page[data-practice-view="game"] .practice-answer-sheet-drawer .practice-answer-number-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Keep ordinary answering on the same primary / neutral palette. Result colours stay distinct. */
+body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-question-type{background:#f4f4f5;color:#52525b}
+body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-option:not(.is-correct):not(.is-wrong){background:#fff;border-color:#e4e4e7;color:#27272a;opacity:1}
+body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-option:is(.is-selected,.is-pending):not(.is-correct):not(.is-wrong){background:var(--practice-accent-soft,#eaf0ff);border-color:var(--practice-accent,#3865ff);box-shadow:inset 3px 0 var(--practice-accent,#3865ff);color:#27272a}
+body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-option:is(.is-selected,.is-pending) .practice-option-key{background:#fff;color:var(--practice-accent,#3865ff)}
+body.practice-mode-page[data-learning-skin][data-practice-view="game"] .practice-option:focus-visible{outline:2px solid var(--practice-accent,#3865ff);outline-offset:3px}

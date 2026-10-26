@@ -72,6 +72,24 @@
     })
     return `<svg class="practice-report-pie" viewBox="0 0 560 368" role="img" aria-label="PMP 领域占比与表现等级">${paths.join('')}${labels.join('')}</svg>`
   }
+  // Ordinary practice uses observed counts; exam scoring and its frozen weights stay separate.
+  function coverageMarkup(report) {
+    const total = Math.max(0, number(report?.counts?.total))
+    if (!total) return '<p role="status">暂无题目领域分布</p>'
+    const colors = {people:'#7465b0',process:'#728ca8','business-environment':'#8a9d87',unknown:'#a1a1aa'}
+    const entries = Object.keys(DOMAIN_LABELS).map(domain => ({domain,count:Math.max(0,number(report.domains?.[domain]?.total))}))
+    const unknown = Math.max(0,total-entries.reduce((sum,row)=>sum+row.count,0))
+    if (unknown) entries.push({domain:'unknown',count:unknown})
+    let angle=0
+    const rows=entries.filter(row=>row.count>0)
+    const label=row=>`${DOMAIN_LABELS[row.domain] || '未标注'} · ${row.count} 题 · ${Number((row.count/total*100).toFixed(2))}%`
+    const paths=rows.map(row=>{
+      const end=angle+row.count/total*360
+      const markup=`<path data-domain="${row.domain}" data-count="${row.count}" data-ratio="${row.count/total}" d="${slicePath(160,160,140,angle,end)}" fill="${colors[row.domain]}" stroke="#fff" stroke-width="2"><title>${label(row)}</title></path>`
+      angle=end;return markup
+    }).join('')
+    return `<svg class="practice-report-pie" viewBox="0 0 320 320" role="img" aria-label="本次题目领域分布">${paths}</svg><ul class="practice-report-legend">${rows.map(row=>`<li><i style="--band-color:${colors[row.domain]}"></i>${label(row)}</li>`).join('')}</ul>`
+  }
   function legendMarkup() {
     return `<ul class="practice-report-legend">${Object.keys(BAND_LABELS).map(band => `<li><i style="--band-color:${BAND_COLORS[band]}"></i>${BAND_LABELS[band]}</li>`).join('')}</ul>`
   }
@@ -159,7 +177,7 @@
       const label = questionNumbers[id] ? `第 ${questionNumbers[id]} 题` : text(id)
       return `<button type="button" data-review-question="${escapeHTML(id)}" aria-label="回看${escapeHTML(label)}">${escapeHTML(label)}</button>`
     }).join('')
-    root.innerHTML = `<article class="practice-result-report">
+    root.innerHTML = `<article class="practice-result-report"><button type="button" class="practice-summary-fab" data-report-summary aria-label="返回练习摘要" title="返回练习摘要"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M5 20V10h3v10zm6 0V4h3v16zm6 0v-7h3v7z" fill="currentColor"/></svg><span>练习摘要</span></button>
       <header class="practice-report-header"><img class="practice-report-logo" src="/assets/logo.jpg" alt="logo"/><div><span>${isSimulation ? 'SIMULATION REPORT' : 'PRACTICE SUMMARY'}</span><h1>${isSimulation ? 'PMP 模拟成绩分析报告' : '本次练习摘要'}</h1></div></header>
       <section class="practice-report-meta"><div><span>学员</span><strong>${escapeHTML(report.learner || '当前学员')}</strong></div><div><span>试卷</span><strong>${escapeHTML(report.paperName || 'PMP 模拟练习')}</strong></div><div><span>日期</span><strong>${escapeHTML(report.examDate || report.completedAt || '')}</strong></div><div><span>报告编号</span><strong>${escapeHTML(report.reportNumber || report.sessionId || '')}</strong></div></section>
       <section class="practice-report-overall ${isSimulation ? resultClass : ''}"><div><span>${isSimulation ? 'OVERALL PERFORMANCE' : 'PRACTICE COVERAGE'}</span><h2>${isSimulation ? escapeHTML(report.resultLabel || `模拟考试结果：${report.passed ? 'PASS' : 'FAIL'}`) : '本次练习摘要'}</h2><p>${isSimulation ? '本结果按本次会话的冻结规则生成。' : '仅反映本次抽取题目的表现。'}</p></div><div class="practice-report-score"><strong>${isSimulation ? score.toFixed(2).replace(/\.00$/, '') : number(report.accuracyPercent).toFixed(2).replace(/\.00$/, '')}</strong><span>${isSimulation ? `模拟分 / 100${report.maxScore ? ` · ${number(report.rawScore)} / ${number(report.maxScore)} 原始分` : ''}` : '本次正确率 / 100'}</span></div></section>
@@ -170,13 +188,14 @@
         ? `<section class="practice-report-breakdown"><header><span>EXAM BREAKDOWN</span><h2>考试领域分析</h2><p>扇区大小代表领域占比，颜色代表本领域的模拟表现等级。</p>${legendMarkup()}</header>${pieMarkup(report)}</section>
       <section class="practice-report-domains"><h2>各领域成绩</h2><div class="practice-report-table-scroll"><table class="practice-report-domain-table"><thead><tr><th>领域</th><th>占比</th><th>答对 / 总数</th><th>得分率</th><th>表现</th></tr></thead><tbody>${domainRows(report, true)}</tbody></table></div></section>`
         : isSimulation ? '<section class="practice-report-domain-unavailable" role="status"><h2>领域分析暂不可用</h2><p>本试卷包含未标注 PMP 领域的历史题目；总体成绩仍按全部题目计算，为避免误导，本次不展示领域饼图与领域等级。</p></section>'
-        : `<section class="practice-report-domains"><h2>本次领域覆盖</h2><div class="practice-report-table-scroll"><table class="practice-report-domain-table"><thead><tr><th>领域</th><th>覆盖</th><th>答对 / 总数</th><th>本次正确率</th><th>状态</th></tr></thead><tbody>${domainRows(report, false)}</tbody></table></div>${domainDataComplete ? '' : '<p>部分历史题目缺少领域标注；只显示已标注题目的覆盖情况。</p>'}</section>`}
+        : `<section class="practice-report-breakdown"><header><h2>本次题目领域分布</h2><p>按实际题数统计，颜色仅用于区分领域。</p></header>${coverageMarkup(report)}</section><section class="practice-report-domains"><h2>本次领域覆盖</h2><div class="practice-report-table-scroll"><table class="practice-report-domain-table"><thead><tr><th>领域</th><th>覆盖</th><th>答对 / 总数</th><th>本次正确率</th><th>状态</th></tr></thead><tbody>${domainRows(report, false)}</tbody></table></div>${domainDataComplete ? '' : '<p>部分历史题目缺少领域标注，已计入上方“未标注”题量。</p>'}</section>`}
       <nav aria-label="报告操作" class="practice-report-actions">${options.onReviewAll || Array.isArray(options.questions) ? '<button type="button" class="practice-secondary-btn" data-report-review-all="true">回看全部题目与解析</button>' : ''}<button type="button" class="practice-primary-btn" data-report-again="true">再练一次</button><button type="button" class="practice-secondary-btn" data-report-lobby="true">返回大厅</button></nav>
       <section class="practice-report-wrong"><div><h2>本次错题</h2><p>${wrongIds.length ? `共 ${wrongIds.length} 道，${Array.isArray(options.questions) ? '下方已统一展开错题与解析，也可筛选全部或答对的题目。' : '点击题号只读回看答案与解析。'}` : '本次作答没有错题。'}</p></div><div class="practice-report-wrong-list">${wrongButtons}</div></section>
       ${Array.isArray(options.questions) ? '<section class="practice-report-review" data-question-review></section>' : ''}
       <p class="practice-report-disclaimer">${isSimulation ? escapeHTML(report.disclaimer || '平台模拟判定，不代表 PMI 官方考试成绩') : '本报告只反映本次练习题目，不代表考试通过情况'}</p>
       <div class="practice-report-page">${escapeHTML(report.pageNumber || '1 / 1')}</div>
     </article>`
+    root.querySelector('[data-report-summary]')?.addEventListener('click',()=>root.querySelector('.practice-report-header')?.scrollIntoView({behavior:'smooth',block:'start'}))
     root.querySelectorAll('[data-review-question]').forEach(button => button.addEventListener('click', () => options.onReviewWrong?.(button.dataset.reviewQuestion)))
     if (!Array.isArray(options.questions)) root.querySelector('[data-report-review-all]')?.addEventListener('click', () => options.onReviewAll?.())
     if (!Array.isArray(options.questions)) root.querySelector('[data-report-review-wrong]')?.addEventListener('click',()=>options.onReviewWrong?.(wrongIds[0]))

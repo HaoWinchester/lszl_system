@@ -782,8 +782,7 @@
   function renderOwnSelection(question,answer){
     let panel=dom.options.parentElement.querySelector('.practice-own-selection');
     if(!panel){panel=document.createElement('p');panel.className='practice-own-selection';panel.setAttribute('role','status');panel.setAttribute('aria-live','polite');dom.options.insertAdjacentElement('afterend',panel);}
-    const summary=global.KGPracticeAnswerSheet.selectionSummary(question,answer);
-    panel.hidden=!summary;panel.textContent=summary?'我的选择：'+summary:'';
+    panel.hidden=true;panel.textContent='';
   }
   function renderPracticeExplanation(question,correct,neutral=false){
     const panel=$('practiceExplanationPanel');if(!panel)return;
@@ -1324,6 +1323,7 @@
   // 我的收藏：与学习记录同一套抽屉开关体系（遮罩点击 / Escape / body 锁滚动）。
   function openFavoritesDrawer(){setDrawerOpen(dom.favoritesDrawer,true,dom.favoritesCloseBtn);renderFavorites()}
   function closeFavoritesDrawer(){setDrawerOpen(dom.favoritesDrawer,false);dom.favoritesOpenBtn?.focus?.()}
+  let favoritesKind='questions';
   async function renderFavorites(){
     const favorites=global.KGQuestionFavorites;
     if(!favorites||!hasAuthenticatedUser()){
@@ -1333,7 +1333,7 @@
     try{
       // 搜索/分页/详情由模块托管；搜索词在抽屉会话内保留，重开抽屉不丢
       await favorites.renderList(dom.favoritesList,dom.favoritesEmpty,dom.favoritesSummary,{
-        searchInput:$('practiceFavoritesSearch'),moreBtn:$('practiceFavoritesMore'),detail:$('practiceFavoriteDetail'),onToast:showToast,
+        kind:favoritesKind,searchInput:$('practiceFavoritesSearch'),moreBtn:$('practiceFavoritesMore'),detail:$('practiceFavoriteDetail'),onToast:showToast,
       });
     }catch(error){
       if(text(error.message)==='UNAUTHENTICATED')return;
@@ -1570,6 +1570,8 @@
     dom.libraryClear?.addEventListener('click',()=>{state.librarySearch='';state.librarySubject='';state.libraryFilter='all';if(dom.librarySearch)dom.librarySearch.value='';renderPaperLibrary()});
     dom.libraryMoreBtn?.addEventListener('click',openPaperDrawer);dom.paperDrawerClose?.addEventListener('click',closePaperDrawer);
     dom.historyOpenBtn?.addEventListener('click',openHistoryDrawer);dom.historyCloseBtn?.addEventListener('click',closeHistoryDrawer);dom.clearHistoryBtn?.addEventListener('click',clearHistory);
+    document.querySelectorAll('[data-favorites-kind]').forEach(button=>button.addEventListener('click',()=>{favoritesKind=button.dataset.favoritesKind;document.querySelectorAll('[data-favorites-kind]').forEach(tab=>tab.setAttribute('aria-pressed',String(tab===button)));renderFavorites()}));
+    $('practiceFavoritesRetry')?.addEventListener('click',renderFavorites);
     dom.favoritesOpenBtn?.addEventListener('click',openFavoritesDrawer);dom.favoritesCloseBtn?.addEventListener('click',closeFavoritesDrawer);
     dom.favoritesDrawer?.addEventListener('click',event=>{if(event.target===dom.favoritesDrawer)closeFavoritesDrawer()});
     dom.favoritesList?.addEventListener('click',async event=>{
