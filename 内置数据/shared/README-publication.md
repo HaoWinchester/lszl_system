@@ -32,7 +32,7 @@ ENV=dev .venv/bin/python ../内置数据/项目管理基础图谱/import-local.p
 
 ## 精确修复旧本地 receipt
 
-仅接受显式 `--repair-receipt`，只作用于该 receipt 中完整且唯一的 topic/file/template ID。必须匹配 owner、文件夹、当前版本号及源身份，原件与不可变快照的持久图谱字段（含 mindmap）、未知顶层字段和未知 meta 均须与规范包一致，快照必须含准确 contentPackageId。只容忍审计确认的编辑器差异：空集合省略、七个作者 meta 键缺失（contentPackageId/topicId/edition/sourceUrls/contentNote/layout/visualRevision；保留时值必须与规范包相同）、精确的37字段历史默认值对象，以及 viewport/focusMode/选择态等已知界面状态。任意其他 defaults、mindmap 或 meta 编辑均拒绝。图谱和 FileContent 中存在非空学习/复习状态也拒绝修复，保留为个人原件。任一编辑/身份冲突整批中止。更改仅为 GraphFile.source/source_file_id 和模板 category，显式保留 updated_at；正文、defaults、学习状态、revision、所有版本、时间戳、个人副本和当前指针均不改动。
+仅接受显式 `--repair-receipt`，只作用于该 receipt 中完整且唯一的 topic/file/template ID。必须匹配 owner、文件夹、当前版本号及源身份，原件与不可变快照的持久图谱字段（含 mindmap）、未知顶层字段和未知 meta 均须与规范包一致，快照必须含准确 contentPackageId。只容忍审计确认的编辑器差异：空集合省略、七个作者 meta 键缺失（contentPackageId/topicId/edition/sourceUrls/contentNote/layout/visualRevision；保留时值必须与规范包相同）、精确的38字段历史默认值对象，以及 viewport/focusMode/选择态等已知界面状态。任意其他 defaults、mindmap 或 meta 编辑均拒绝。图谱和 FileContent 中存在非空学习/复习状态也拒绝修复，保留为个人原件。任一编辑/身份冲突整批中止。更改仅为 GraphFile.source/source_file_id 和模板 category，显式保留 updated_at；正文、defaults、学习状态、revision、所有版本、时间戳、个人副本和当前指针均不改动。
 
 只读检查无需备份：
 

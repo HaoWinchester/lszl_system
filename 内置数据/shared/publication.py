@@ -168,7 +168,7 @@ def semantic_matches(actual, canonical):
             return False
         actual_meta.pop(key, None)
         canonical_meta.pop(key, None)
-    # The only accepted defaults addition is the complete audited 37-field map.
+    # The only accepted defaults addition is the complete audited 38-field map.
     # Preserve any canonical defaults and compare them normally when present.
     if 'defaults' not in canonical and 'defaults' in actual:
         if fingerprint(actual['defaults']) != fingerprint(EDITOR_DEFAULTS):
