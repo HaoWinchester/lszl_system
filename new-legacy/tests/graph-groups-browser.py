@@ -108,6 +108,32 @@ with sync_playwright() as pw:
         page.mouse.move(end['x']+end['width']+14, end['y']+end['height']+14, steps=16)
         page.mouse.up()
         assert page.evaluate('selectedNodeIds.size') == count
+        toolbar = page.locator('#nodeStyleToolbar')
+        expect(toolbar).to_be_visible()
+        if count == 2:
+            assert page.evaluate('selectedLinkIds.has("ab")'), 'fixture must include the connecting line in the marquee'
+            for action in ['fill', 'node-size', 'group']:
+                button = toolbar.locator('[data-node-toolbar-action="'+action+'"]')
+                expect(button).to_be_visible()
+                assert button.evaluate('(button)=>getComputedStyle(button).pointerEvents') != 'none', action+' must be clickable after marquee'
+                assert float(button.evaluate('(button)=>getComputedStyle(button).opacity')) == 1, action+' must use normal toolbar colors'
+            group = toolbar.locator('[data-node-toolbar-action="group"]')
+            assert '组合' in group.inner_text(), 'group action needs a visible label'
+            sizes = page.evaluate('state.nodes.map(node=>KGGraphModel.geometryOf(node))')
+            line_before = page.evaluate('JSON.parse(JSON.stringify(state.links[0]))')
+            toolbar.locator('[data-node-toolbar-action="node-size"]').click()
+            toolbar.locator('[data-node-toolbar-action="node-size:big"]').click()
+            changed = page.evaluate('state.nodes.map(node=>KGGraphModel.geometryOf(node))')
+            assert changed[0]['width'] != sizes[0]['width'] and changed[1]['width'] != sizes[1]['width']
+            assert changed[2] == sizes[2], 'card tools must not affect unselected cards'
+            assert page.evaluate('JSON.parse(JSON.stringify(state.links[0]))') == line_before, 'card styles must not modify selected line data'
+            page.keyboard.press('Control+z')
+            assert page.evaluate('state.nodes.map(node=>KGGraphModel.geometryOf(node))') == sizes
+            page.screenshot(path=str(out / 'marquee-toolbar.png'))
+            group.click()
+            assert page.evaluate('!!state.nodes[0].groupId && state.nodes[0].groupId===state.nodes[1].groupId')
+            toolbar.locator('[data-node-toolbar-action="ungroup"]').click()
+            assert page.evaluate('state.nodes.every(node=>!node.groupId)')
         page.evaluate('refreshSelectionUI()')
         assert not page.locator('#detailPanel').evaluate('(panel)=>panel.classList.contains("show")'), 'marquee details must stay hidden after refresh'
         page.evaluate('clearSelection();refreshSelectionUI()')

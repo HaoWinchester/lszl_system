@@ -9414,6 +9414,7 @@ body.qw-selection-toolbar-motion .uc-selection-bounds,.stage.graph-card-dragging
 
 /* Hidden contextual actions must override the toolbar button display grid. */
 .node-style-toolbar .node-toolbar-btn[hidden]{display:none!important}
+.node-style-toolbar .node-toolbar-labeled{display:inline-flex;align-items:center;justify-content:center;width:auto;gap:5px;padding:0 9px;white-space:nowrap;font-size:12px;font-weight:600}
 /* style: styles/home-canvas-performance.css */
 /* V9.0-P4.3.6 · 首页画布独立关系线、轮廓悬浮与稳定便签阴影 */
 .stage .edge-visible{

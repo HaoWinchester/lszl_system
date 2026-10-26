@@ -833,3 +833,4 @@
 
 /* Hidden contextual actions must override the toolbar button display grid. */
 .node-style-toolbar .node-toolbar-btn[hidden]{display:none!important}
+.node-style-toolbar .node-toolbar-labeled{display:inline-flex;align-items:center;justify-content:center;width:auto;gap:5px;padding:0 9px;white-space:nowrap;font-size:12px;font-weight:600}

@@ -3496,7 +3496,9 @@ function updateCardQuickActions(){
   if(!graphModeAllows('nodeToolbar')){if(nodeStyleToolbarController)nodeStyleToolbarController.hide();else if(cardQuickActionsEl)cardQuickActionsEl.classList.remove('show');return}
   const ids=nodeToolbarSelectedIds(),primary=nodeToolbarPrimaryNode(),textItem=nodeToolbarTextElement();
   const filter=window.KGHomeCanvasRuntime?.selectionFilter,snapshot=filter?.snapshot?.()||{total:ids.length+(textItem?1:0),categories:[]};
-  const activeType=filter?.getActiveType?.()||'',mixed=!activeType&&snapshot.categories?.length>1;
+  // Card actions already target nodeToolbarSelectedIds. Incidental edges or text
+  // in the marquee must not disable the selected cards' own toolbar.
+  const activeType=filter?.getActiveType?.()||'',mixed=!ids.length&&!activeType&&snapshot.categories?.length>1;
   const total=Math.max(Number(snapshot.total)||0,ids.length+selectedTextElementIds.size+selectedLinkIds.size);
   if(boxSelect||cardDrag||stage.classList.contains('graph-box-selecting')||(!textItem&&(!ids.length||!primary))||isCanvasPanMode()||document.body.classList.contains('auth-readonly')){if(nodeStyleToolbarController)nodeStyleToolbarController.hide();else if(cardQuickActionsEl)cardQuickActionsEl.classList.remove('show');return}
   const el=ensureCardQuickActions();if(!el)return;if(!nodeStyleToolbarController){el.classList.remove('show');return}

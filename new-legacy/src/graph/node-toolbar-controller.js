@@ -22,8 +22,8 @@
     more:'<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.5"></circle><circle cx="12" cy="12" r="1.5"></circle><circle cx="19" cy="12" r="1.5"></circle></svg>',
     grip:'<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="7" r="1"></circle><circle cx="16" cy="7" r="1"></circle><circle cx="8" cy="12" r="1"></circle><circle cx="16" cy="12" r="1"></circle><circle cx="8" cy="17" r="1"></circle><circle cx="16" cy="17" r="1"></circle></svg>'
   });
-  function button(action,label,icon,extra=''){
-    return `<button type="button" class="node-toolbar-btn uc-toolbar-btn" data-node-toolbar-action="${action}" aria-label="${label}" data-tooltip="${label}" ${extra}>${icon}</button>`;
+  function button(action,label,icon,extra='',caption=''){
+    return `<button type="button" class="node-toolbar-btn uc-toolbar-btn${caption?' node-toolbar-labeled':''}" data-node-toolbar-action="${action}" aria-label="${label}" data-tooltip="${label}" ${extra}>${icon}${caption?`<span>${caption}</span>`:''}</button>`;
   }
   function create(options={}){
     const stage=options.stage;
@@ -46,8 +46,8 @@
         ${button('align','节点对齐',ICONS.align,'data-node-toolbar-panel="align" aria-haspopup="true" aria-expanded="false"')}
         ${button('lock','完全锁定节点',ICONS.unlock,'aria-pressed="false"')}
         ${button('related-canvas','打开相关画布',ICONS.relatedCanvas)}
-        ${button('group','组合卡片（Ctrl/⌘ G）',ICONS.nodeSize,'hidden')}
-        ${button('ungroup','取消组合（Ctrl/⌘ Shift G）',ICONS.layers||ICONS.nodeSize,'hidden')}
+        ${button('group','组合卡片（Ctrl/⌘ G）',ICONS.nodeSize,'hidden','组合')}
+        ${button('ungroup','取消组合（Ctrl/⌘ Shift G）',ICONS.layers||ICONS.nodeSize,'hidden','取消组合')}
         ${button('more','更多设置',ICONS.more,'data-node-toolbar-panel="more" aria-haspopup="true" aria-expanded="false"')}
       </div><div class="node-style-toolbar-panels uc-toolbar-panels"></div>`;
       root.addEventListener('pointerdown',event=>event.stopPropagation());
