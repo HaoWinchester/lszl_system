@@ -1825,6 +1825,7 @@ function startBoxSelection(e){
   updateSelectionBoxVisual({left:e.clientX-r.left,top:e.clientY-r.top,width:0,height:0,right:e.clientX-r.left,bottom:e.clientY-r.top});
   hideSelectedEdgeQuickStylePanel();hideEdgeInlineLabelEditor();
   nodeStyleToolbarController?.hide();stage.classList.add('graph-box-selecting');
+  renderDetails();
   stage.classList.remove('panning');
   e.preventDefault();
   e.stopPropagation();
@@ -3512,8 +3513,9 @@ window.addEventListener('kg-home-interaction-mode-change',()=>{updateCardQuickAc
 
 let graphQuestionDrawer=null;
 function renderDetails(){
-  graphQuestionDrawer?.syncNode(state.selectedNodeId||hoverDetailNodeId);
-  const l=linkById(state.selectedLinkId),n=nodeById(state.selectedNodeId||(!state.selectedLinkId?hoverDetailNodeId:null)),isHoverPreview=!state.selectedNodeId&&!state.selectedLinkId&&!!hoverDetailNodeId;
+  const batchSelection=!!boxSelect||selectedNodeIds.size>0||selectedLinkIds.size>0||selectedTextElementIds.size>0;
+  graphQuestionDrawer?.syncNode(batchSelection?null:state.selectedNodeId||hoverDetailNodeId);
+  const l=batchSelection?null:linkById(state.selectedLinkId),n=batchSelection?null:nodeById(state.selectedNodeId||(!state.selectedLinkId?hoverDetailNodeId:null)),isHoverPreview=!batchSelection&&!state.selectedNodeId&&!state.selectedLinkId&&!!hoverDetailNodeId;
   if(!n&&!l){detailPanel.classList.remove('show','hover-preview','detail-actions-expanded');detailPanel.innerHTML='';return}
   detailPanel.classList.remove('detail-actions-expanded');
   detailPanel.classList.toggle('hover-preview',!!isHoverPreview);

@@ -1,11 +1,14 @@
 {
   "schemaVersion": 1,
   "fromVersion": "v9.0-p4.1.397",
-  "toVersion": "v9.0-p4.1.397",
+  "toVersion": "v9.0-p4.1.398",
   "changes": {
     "added": [],
     "changed": [
-      "content-prep-studio/dist/content-prep.html"
+      "VERSION",
+      "content-prep-studio/dist/content-prep.html",
+      "src/10-graph-editor.js",
+      "tests/graph-groups-browser.py"
     ],
     "removed": []
   },

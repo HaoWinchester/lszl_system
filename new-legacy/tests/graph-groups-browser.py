@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 parser = argparse.ArgumentParser()
 parser.add_argument('--base-url', default='http://127.0.0.1:5173')
 parser.add_argument('--output', default=str(ROOT / '.superpowers/sdd/2026-10-26-practice-graph-referral/groups-browser'))
+parser.add_argument('--served', action='store_true', help='Verify actual release bundles without source overlays')
 args = parser.parse_args()
 out = Path(args.output)
 out.mkdir(parents=True, exist_ok=True)
@@ -64,11 +65,13 @@ with sync_playwright() as pw:
         if not any(row[0] == name for row in rows):
             rows.insert(0, [name, (ROOT / 'new-legacy' / name).read_text()+'\n//# sourceURL='+name])
         route.fulfill(response=response, body=prefix+'\n})('+json.dumps(rows)+');\n')
-    ctx.route('**/bundles/home-graph.js*', bundle)
+    if not args.served:
+        ctx.route('**/bundles/home-graph.js*', bundle)
     def css(route):
         response = route.fetch()
         route.fulfill(response=response, body=response.text()+'\n'+(ROOT / 'new-legacy/styles/home-graph-components.css').read_text())
-    ctx.route('**/bundles/home-shell.css*', css)
+    if not args.served:
+        ctx.route('**/bundles/home-shell.css*', css)
     page = ctx.new_page()
     page.on('pageerror', lambda error: errors.append(str(error)))
     def ready():
@@ -94,10 +97,28 @@ with sync_playwright() as pw:
         page.wait_for_timeout(180)
     page.goto(args.base_url+'/index.html?mode=free', wait_until='networkidle')
     ready()
+    # Marquee selection must never open the primary card's content, even for one card.
+    card('a').click(position={'x': 45, 'y': 90})
+    expect(page.locator('#detailPanel')).to_have_class(re.compile(r'\bshow\b'))
+    for last, count in [('a', 1), ('b', 2)]:
+        a, end = card('a').bounding_box(), card(last).bounding_box()
+        page.mouse.move(a['x']-14, a['y']-14)
+        page.mouse.down()
+        assert not page.locator('#detailPanel').evaluate('(panel)=>panel.classList.contains("show")'), 'starting a marquee must hide existing detail'
+        page.mouse.move(end['x']+end['width']+14, end['y']+end['height']+14, steps=16)
+        page.mouse.up()
+        assert page.evaluate('selectedNodeIds.size') == count
+        page.evaluate('refreshSelectionUI()')
+        assert not page.locator('#detailPanel').evaluate('(panel)=>panel.classList.contains("show")'), 'marquee details must stay hidden after refresh'
+        page.evaluate('clearSelection();refreshSelectionUI()')
+    card('b').click(position={'x': 45, 'y': 90})
+    expect(page.locator('#detailPanel')).to_have_class(re.compile(r'\bshow\b'))
+    page.evaluate('clearSelection();refreshSelectionUI()')
     # Actual modifier clicks, toolbar action and member drag.
     card('a').click(position={'x': 45, 'y': 90}, modifiers=['Control'])
     card('b').click(position={'x': 45, 'y': 90}, modifiers=['Control'])
     assert page.evaluate('selectedNodeIds.size') == 2
+    assert not page.locator('#detailPanel').evaluate('(panel)=>panel.classList.contains("show")')
     group = page.locator('[data-node-toolbar-action="group"]')
     expect(group).to_be_visible()
     group.click()
