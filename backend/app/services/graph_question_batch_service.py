@@ -31,8 +31,8 @@ def node_terms(node):
     return title, terms
 
 
-async def load_graph(db, user, file_id, node_ids, revision, *, lock=False):
-    file, content = await cards.card(db, user, file_id, node_ids[0], lock=lock, expected=revision)
+async def load_graph(db, user, file_id, node_ids, revision, *, lock=False, personal=False):
+    file, content = await cards.card(db, user, file_id, node_ids[0], lock=lock, expected=revision, personal=personal)
     nodes = {n['id']: n for n in content.graph_data.get('nodes', []) if isinstance(n, dict) and n.get('id')}
     if any(n not in nodes for n in node_ids):
         cards.fail('GRAPH_NODE_NOT_FOUND')
@@ -134,7 +134,7 @@ async def apply(db, user, file_id, data):
     if not any(selected.values()):
         error('GRAPH_BATCH_SELECTION_EMPTY', '请至少选择一道匹配题目。')
     await teaching_content_revision_service.acquire_lock(db)
-    file, content, _ = await load_graph(db, user, file_id, list(selected), payload['revision'], lock=True)
+    file, content, _ = await load_graph(db, user, file_id, list(selected), payload['revision'], lock=True, personal=True)
     # Validate every selected source before any writes; all grants share one transaction.
     revisions = {q: payload['cards'][n][q] for n, ids in selected.items() for q in ids}
     sources = (await db.scalars(select(Question).where(Question.id.in_(revisions)).order_by(Question.id).with_for_update())).all()

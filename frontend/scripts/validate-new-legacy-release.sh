@@ -233,6 +233,7 @@ fi
 if new_legacy_validation_group_enabled "$VALIDATION_PROFILE" canvas-e2e; then
   deployment_timing_stage canvas-browser
   python3 frontend/e2e/canvas_release_regression.py --release-root "$VALIDATION_ROOT/releases"
+  python3 new-legacy/tests/graph-empty-current-browser.py --base-url "http://127.0.0.1:$INTEGRATED_PORT" --output "$VALIDATION_ROOT/empty-current"
 fi
 if new_legacy_validation_group_enabled "$VALIDATION_PROFILE" cross-domain-e2e; then
   deployment_timing_stage cross-domain-browser

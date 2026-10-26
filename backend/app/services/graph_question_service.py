@@ -12,7 +12,7 @@ from app.models.user import User
 from app.services import question_answer_service as answers, question_catalog_service as catalog
 from app.services.question_material_service import freeze_question_resources
 from app.services.question_access_service import TEACHING_MANAGER_ROLES
-from app.services import teaching_content_revision_service
+from app.services import teaching_content_revision_service, file_service
 
 
 def fail(code, status=404):
@@ -24,10 +24,14 @@ def require_editor(user):
         fail('GRAPH_QUESTION_EDITOR_REQUIRED', 403)
 
 
-async def card(db, user, file_id, node_id, *, lock=False, expected=None):
+async def card(db, user, file_id, node_id, *, lock=False, expected=None, personal=False):
     if user.role not in {'admin', 'teacher', 'student'}:
         fail('GRAPH_QUESTION_READER_REQUIRED', 403)
     stmt = select(GraphFile).where(GraphFile.id == file_id, GraphFile.owner_id == user.username, GraphFile.status == 'active')
+    # Public binding mutations are personal edits; trusted export/publication
+    # readers deliberately retain owner-scoped access to internal source cards.
+    if personal:
+        stmt = stmt.where(file_service.personal_file_predicate(user.username))
     if lock:
         stmt = stmt.with_for_update()
     file = await db.scalar(stmt)
@@ -125,7 +129,7 @@ async def write_card_bindings(db, user, file_id, node_id, question_ids):
 async def set_bindings(db, user, file_id, node_id, data):
     require_editor(user)
     await teaching_content_revision_service.acquire_lock(db)
-    file, content = await card(db, user, file_id, node_id, lock=True, expected=data.expected_file_revision)
+    file, content = await card(db, user, file_id, node_id, lock=True, expected=data.expected_file_revision, personal=True)
     await write_card_bindings(db, user, file_id, node_id, data.question_ids)
     file.revision += 1
     content.revision = file.revision
@@ -137,7 +141,7 @@ async def set_bindings(db, user, file_id, node_id, data):
 async def revise_binding(db, user, file_id, node_id, binding_id, data, *, refresh=False):
     require_editor(user)
     await teaching_content_revision_service.acquire_lock(db)
-    file, content = await card(db, user, file_id, node_id, lock=True, expected=data.expected_file_revision)
+    file, content = await card(db, user, file_id, node_id, lock=True, expected=data.expected_file_revision, personal=True)
     row = await authorized_binding(db, user, file_id, node_id, binding_id, data.source_version, lock=True)
     if refresh:
         row.snapshot = await freeze_source(db, row.question_id)

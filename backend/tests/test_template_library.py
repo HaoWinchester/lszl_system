@@ -306,3 +306,75 @@ def test_fragment_paste_protects_library_target_and_keeps_personal_template_copy
             assert after['meta']['nodeCount'] == 1
             assert after['graph']['nodes'][0]['title'] == '个人新增卡片'
             assert after['graph']['nodes'][0]['id'] == response.json()['idMap']['pasted-node']
+
+
+@pytest.mark.parametrize('operation', ['empty-set', 'set', 'refresh', 'revoke', 'batch', 'batch-empty'])
+@pytest.mark.parametrize('target_source', ['builtin-template', 'template'])
+def test_question_binding_writes_protect_library_and_preserve_personal_copies(data, operation, target_source):
+    from sqlalchemy import select
+    from app.models.graph_question import GraphQuestionBinding as Binding
+    from app.services import graph_question_service as cards
+    from app.services.graph_question_batch_service import serializer
+    from test_graph_question_access import path
+
+    async def setup():
+        async with AsyncSessionLocal() as db:
+            file = await file_service.create_file(db, data.teacher, name='绑定目标', source=target_source,
+                graph_data={'nodes': [{'id': 'n', 'title': '主题'}], 'links': []})
+            user = await db.get(User, data.teacher)
+            # Existing internal grants predate the public write boundary.
+            await cards.write_card_bindings(db, user, file.id, 'n', [data.q])
+            await db.commit()
+            await db.refresh(file)
+            return file.id
+
+    target = run(setup())
+
+    async def snapshot():
+        async with AsyncSessionLocal() as db:
+            file, content = await db.get(GraphFile, target), await db.get(FileContent, target)
+            rows = (await db.scalars(select(Binding).where(Binding.file_id == target).order_by(Binding.id))).all()
+            return {'meta': file_service.file_meta(file), 'body': content.graph_data,
+                    'revision': content.revision, 'savedAt': content.saved_at,
+                    'bindings': [{col.name: getattr(row, col.name) for col in Binding.__table__.columns} for row in rows]}
+
+    before = run(snapshot())
+    binding = before['bindings'][0]
+    with TestClient(app) as c:
+        login(c, data, 'teacher')
+        if operation in ('set', 'empty-set'):
+            response = c.put(path(target), json={'expectedFileRevision': 1,
+                'questionIds': [data.multi] if operation == 'set' else []})
+        elif operation in ('refresh', 'revoke'):
+            response = c.post(path(target)+'/'+binding['id']+'/'+operation,
+                json={'expectedFileRevision': 1, 'sourceVersion': binding['source_version']})
+        else:
+            # A genuine signed preview may have been issued before the target became internal.
+            token = serializer().dumps({'owner': data.teacher, 'file': target, 'revision': 1,
+                                       'cards': {'n': {data.multi: 1}}})
+            response = c.post('/api/v1/graph-questions/files/'+target+'/batch-apply', json={
+                'previewToken': token, 'selections': [{'nodeId': 'n', 'questionIds': [] if operation == 'batch-empty' else [data.multi]}]})
+        after = run(snapshot())
+        if operation == 'batch-empty':
+            assert response.status_code == 422, response.text
+            assert after == before
+            return
+        if target_source == 'builtin-template':
+            assert response.status_code == 404, response.text
+            assert after == before
+            async def exported():
+                async with AsyncSessionLocal() as db:
+                    return await cards.export_card_bindings(db, await db.get(User, data.teacher), target, 'n')
+            assert run(exported())[0]['snapshot'] == binding['snapshot']
+            template = publish(c, publication(target))
+            assert template['isBuiltin'] is True
+            copied = load(c, template).json()['fileId']
+            node_id = c.get('/api/v1/files/'+copied).json()['graphData']['nodes'][0]['id']
+            bindings = c.get('/api/v1/graph-questions/files/'+copied+'/nodes/'+node_id+'/bindings')
+            assert bindings.status_code == 200, bindings.text
+            assert bindings.json()['bindings'][0]['questionId'] == data.q
+        else:
+            assert response.status_code == 200, response.text
+            assert after['meta']['revision'] == after['revision'] == 2
+            assert after['body'] == before['body']
+            assert after['bindings'] != before['bindings']

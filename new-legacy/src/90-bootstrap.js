@@ -40,9 +40,8 @@ window.KGHomepageGraphBootstrap=(async function bootstrapKnowledgeGraphApp(){
   async function syncRemoteGraphSession(event){
     if(!remote||!remote.handleSessionChange)return;
     try{
-      const file=await remote.handleSessionChange(event);
+      await remote.handleSessionChange(event);
       if(window.KGGraphFileTabs&&typeof window.KGGraphFileTabs.refresh==='function')await window.KGGraphFileTabs.refresh({currentOnly:true});
-      if(!file&&event&&event.detail&&event.detail.authenticated===true)return;
       if(event&&event.detail&&event.detail.authenticated===false){
         if(typeof baseState==='function')state=baseState();
         lastSavedSnapshot='';
