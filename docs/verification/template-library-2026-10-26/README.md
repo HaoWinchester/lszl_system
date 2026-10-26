@@ -1,12 +1,12 @@
 # 模板中心分类与个人图谱隔离验证
 
-日期：2026-10-26。设计已由用户确认。本记录覆盖本地开发自检，UAT 部署及用户业务验收由后续阶段完成；main/uat 在 Task 4A 与本次最终修复中均未修改。
+日期：2026-10-26。设计已由用户确认。本记录覆盖本地开发自检和 UAT 部署自检；用户业务验收仍待完成。功能已合入并推送 uat，main 与正式环境保持原状。
 
 ## 本地实际运行版本与回滚来源
 
 - 本地 active release：`v9.0-p4.1.396`；previous：已核验的 `v9.0-p4.1.394`。395 保留在磁盘作为历史验证版本。
 - 本次先通过官方管理器 promote accepted 394，再构建/验证 396，未手工修改 site 或指针。396 共 1243 文件，保留 394 全部 1241 路径及 `admin-console.html`；两个新增文件为 `tests/template-gallery-browser.py` 和 `tests/graph-empty-current-browser.py`。
-- 最初的本地预览 394 已整体保存在忽略目录 `.superpowers/sdd/2026-10-26-template-library/local-preview-394-release`。通过官方管理器先 promote 388，再从已核验的 Git 归档重建 accepted 394，随后发布 395；未手工复制 site 或编辑 release 指针。
+- 最初的本地预览 394 已整体保存在忽略归档 `artifacts/template-gallery/sdd-archive/local-preview-394-release`。通过官方管理器先 promote 388，再从已核验的 Git 归档重建 accepted 394，随后发布 395；未手工复制 site 或编辑 release 指针。
 - accepted 394 与远端已接受版本 sourceHash 一致：`26aad91c2d602f59a2ed179176d229d692314f55cae9587fb6c11f79ae7d9fb2`。
 - 394 为 1241 文件；395 为 1242 文件，保留全部原有 1241 路径和 `admin-console.html`；新增路径仅 `tests/template-gallery-browser.py`。文件数变化有明确来源。
 - 395 的 VERSION、content-prep dist、同步产物、manifest、sync report 与 guided-course seed 均由现有官方构建/同步脚本产生。
@@ -41,7 +41,7 @@
 - `/Users/menghao/Documents/幻谱/佩奇老师/测试环境/lszl_system/artifacts/template-gallery/design-395.log`
 - `/Users/menghao/Documents/幻谱/佩奇老师/测试环境/lszl_system/artifacts/template-gallery/release-395-full.log`
 - `/Users/menghao/Documents/幻谱/佩奇老师/测试环境/lszl_system/frontend/new-legacy-releases/v9.0-p4.1.395/validation.json`
-- `/Users/menghao/Documents/幻谱/佩奇老师/测试环境/lszl_system/.superpowers/sdd/2026-10-26-template-library/local-after-qa-state.json`
+- `/Users/menghao/Documents/幻谱/佩奇老师/测试环境/lszl_system/artifacts/template-gallery/sdd-archive/local-after-qa-state.json`
 
 实际界面截图（根控制器等待所有分类缩略图完成后采集）：
 
@@ -81,6 +81,26 @@
 - [396 登录后空白画布](/Users/menghao/Documents/幻谱/佩奇老师/测试环境/lszl_system/artifacts/template-gallery/empty-current-396/login.png)
 - [396 切换账户后空白画布](/Users/menghao/Documents/幻谱/佩奇老师/测试环境/lszl_system/artifacts/template-gallery/empty-current-396/account-switch.png)
 
-## 仍待完成
+## UAT 已交付，等待用户业务验收
 
-独立最终分支审查后，由控制器执行 UAT 合并、代理推送、远端代码与数据库备份、部署及内容发布，并保存远端回执。自动化自检不代表 UAT 业务验收；必须停止在 UAT 阶段等待用户明确确认，不合入 main。
+- 地址：[https://uat.aihuanpu.com/graph](https://uat.aihuanpu.com/graph)，版本 `v9.0-p4.1.396`，previous 为 accepted 394。
+- 独立最终复审通过，两项 P2 均已解决，无新增修复范围问题。应用与生成产物提交为 `a92f240e`、`bc3ff54c`。
+- 已 fast-forward 合入 uat，使用命令级代理推送并核对远端引用；部署脚本标记的代码提交为 `bc3ff54ca840a4bb0e856fa358b552a70d47d3d5`。main 仍为 `056c95ca617825fbd408b17af464db349d4e0380`。
+- 部署前备份目录：`/home/ubuntu/lszl-uat-backups/template-library-20261026T061606Z`。代码归档、运行时归档及 `kg_graph_uat` dump 均非空、可读，manifest 记录 SHA256；保留回滚镜像 `lszl-kg-backend:uat-template-library-20261026T061606Z`。未删除旧备份。
+- `bash deploy/update-uat.sh` exit 0，96 秒。管理器复用已核验的完整 396 回执；迁移、容器健康、助手就绪和公网版本检查通过。新运行时包含 396 与已核验 394；未手工覆盖 site。
+- 发布工具首先 dry-run：新 18 套均为 create，旧 PMP 30 套均为 unchanged。新包 apply 创建 18；再次 apply 创建 0/unchanged 18；旧 PMP apply 创建 0/unchanged 30。全部强校验 ENV=uat、数据库=kg_graph_uat。
+- UAT 目录共 51 套：PMP 30、PRINCE2 6、CSPM 6、高项 6、既有通用学习 3。保留环境实存数量，未人为补删既有模板。
+- 发布后及实际浏览器检查后两次比较均通过：原有 33 个模板 ID/当前版本/上架权限、33 个不可变版本、317 个文件的来源/正文哈希/revision 全部不变；仅新增 18 个模板、18 个版本和 18 个源文件。
+- UAT 真实 Chrome：48 个内置源不在个人文件/页签中，逐个直接读取均 404；5 个现有个人文件保留，刷新恢复当前个人图谱。分类、组合搜索/空结果/清除、真实预览缩放、390px 单列无横向溢出通过；预览不创建副本、不切换当前文件。此轮远端页面检查没有文件或模板写请求，没有 pageerror。独立副本的创建/编辑/保存/刷新已在本地真实 API 验证；未在 UAT 创建测试副本。
+- 正式环境容器 image 与启动时间部署前后相同；本轮未同步正式目录、重启正式容器、写正式数据库或合入 main。
+
+UAT 证据位于 `artifacts/template-gallery/deploy/` 的 `uat-deploy.log`、`uat-backup-final.json`、内容发布回执、`preservation-result.json` 与 `preservation-after-browser.json`，以及 `artifacts/template-gallery/uat/result.json`。受保护的临时运维会话仅用于只读页面验看，已清除本地会话文件，未修改账户密码；没有提交会话、密钥、数据库内容或用户正文。
+
+- [UAT PRINCE2 桌面](/Users/menghao/Documents/幻谱/佩奇老师/测试环境/lszl_system/artifacts/template-gallery/uat/prince2-desktop.png)
+- [UAT CSPM 桌面](/Users/menghao/Documents/幻谱/佩奇老师/测试环境/lszl_system/artifacts/template-gallery/uat/cspm-desktop.png)
+- [UAT 高项桌面](/Users/menghao/Documents/幻谱/佩奇老师/测试环境/lszl_system/artifacts/template-gallery/uat/gaoxiang-desktop.png)
+- [UAT 手机](/Users/menghao/Documents/幻谱/佩奇老师/测试环境/lszl_system/artifacts/template-gallery/uat/prince2-narrow.png)
+
+自动化自检不等于用户 UAT 业务验收。当前停止在 UAT，等待用户明确确认后才可合入 main；保留功能分支及 main/uat 两个永久分支。
+
+开发过程的 SDD 审查、回归脚本及本地来源审计已整体保存在忽略目录 `artifacts/template-gallery/sdd-archive/`；上文历史命令保留执行时的原始路径。临时 Git exclude 将恢复原始字节，既有 `docs/local-preview/`、`docs/promo/` 不纳入本轮提交且原样保留。
