@@ -187,7 +187,7 @@ with sync_playwright() as playwright:
     # Unified comment collection, paginated original-comment location and recovery.
     comment = dict(id='c-old', questionId='q1', content='收藏的深入讨论', questionTitle='以下哪个是正确选项？',
                    question=dict(title='原题', stemParts=[dict(text='原题题干')], options=[], analysis='原题解析'),
-                   author='同学', createdAt='2026-10-26T01:00:00Z', myFavorite=True)
+                   author='同学', createdAt='2026-10-26T01:00:00Z', myFavorite=True, parentId='c-reply')
     mode = {'state': 'ready', 'removed': False}
     def comment_favorites(route):
         if mode['state'] == 'error':
@@ -202,7 +202,8 @@ with sync_playwright() as playwright:
             route.fulfill(content_type='application/json', body='{"comments":[],"nextCursor":null}')
         else:
             page_two='cursor=' in route.request.url
-            route.fulfill(content_type='application/json', body=json.dumps({'comments':[comment] if page_two else [], 'nextCursor':None if page_two else 'page-two'}))
+            ancestors=[dict(id='c-root',questionId='q1',content='主评论'),dict(id='c-reply',questionId='q1',parentId='c-root',content='一级回复')]
+            route.fulfill(content_type='application/json', body=json.dumps({'comments':[comment] if page_two else ancestors, 'nextCursor':None if page_two else 'page-two'}))
     page.route('**/api/v1/questions/q1/comments*', original_comments)
     def remove_comment(route):
         mode['removed'] = True

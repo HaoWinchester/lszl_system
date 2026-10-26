@@ -1041,7 +1041,11 @@
     }
     activate(focused)
     Object.assign(focused.state,{expanded:true,favoritesMode:false,comments,commentsCursor:cursor,nextCursor:cursor,loaded:true,error:false})
-    if(comment.parentId)focused.state.expandedReplies.add(comment.parentId)
+    const byId=new Map(comments.map(row=>[row.id,row])),ancestors=new Set()
+    let parent=byId.get(comment.id)?.parentId
+    while(parent&&!ancestors.has(parent)){
+      ancestors.add(parent);focused.state.expandedReplies.add(parent);parent=byId.get(parent)?.parentId
+    }
     renderInto(focused)
     const target=focused.drawer?.querySelector(`[data-comment-id="${CSS.escape(comment.id)}"]`)
     if(target){target.tabIndex=-1;target.scrollIntoView({block:'center'});target.focus()}
