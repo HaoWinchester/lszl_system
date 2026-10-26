@@ -59,7 +59,7 @@ async def paste_fragment(db, user, target_file_id, data):
     await revisions.acquire_lock(db)  # MUST precede every source/target read or row lock.
     fragment: GraphFragmentInput = data.fragment
     target = await db.scalar(select(GraphFile).where(
-        GraphFile.id == target_file_id, GraphFile.owner_id == user.username,
+        GraphFile.id == target_file_id, file_service.personal_file_predicate(user.username),
         GraphFile.status == 'active').with_for_update())
     if not target:
         fail('GRAPH_FILE_NOT_FOUND')

@@ -273,3 +273,36 @@ def test_admin_publication_keeps_builtin_provenance_on_teacher_owned_template(da
         preview = c.get('/api/v1/graph-templates/'+template['id']).json()
         assert preview['template']['isBuiltin'] is True
         assert preview['template']['canMaintain'] is True
+
+
+@pytest.mark.parametrize('target_source', ['builtin-template', 'template'])
+def test_fragment_paste_protects_library_target_and_keeps_personal_template_copy(data, target_source):
+    with TestClient(app) as c:
+        login(c, data, 'teacher')
+        target = source(data.teacher) if target_source == 'builtin-template' else create(c, source='template')
+
+        async def snapshot():
+            async with AsyncSessionLocal() as db:
+                index = await db.get(GraphFile, target)
+                content = await db.get(FileContent, target)
+                return {'meta': file_service.file_meta(index), 'graph': content.graph_data,
+                        'contentRevision': content.revision, 'savedAt': content.saved_at}
+
+        before = run(snapshot())
+        response = c.post('/api/v1/files/'+target+'/fragments', json={
+            'expectedFileRevision': 1,
+            'fragment': {'format': 'kg-graph-fragment', 'version': 1,
+                         'nodes': [{'id': 'pasted-node', 'title': '个人新增卡片'}],
+                         'links': [], 'elements': [], 'tables': [], 'source': {'nodeIds': []}},
+        })
+        after = run(snapshot())
+        if target_source == 'builtin-template':
+            assert response.status_code == 404, response.text
+            assert after == before
+        else:
+            assert response.status_code == 200, response.text
+            assert after['meta']['source'] == 'template'
+            assert after['meta']['revision'] == after['contentRevision'] == 2
+            assert after['meta']['nodeCount'] == 1
+            assert after['graph']['nodes'][0]['title'] == '个人新增卡片'
+            assert after['graph']['nodes'][0]['id'] == response.json()['idMap']['pasted-node']
