@@ -4,6 +4,8 @@
   function el(tag,text){const node=document.createElement(tag);if(text!==undefined)node.textContent=text;return node}
   function previewWindowPosition(left,top,width,height,viewportWidth,viewportHeight){return{left:Math.max(0,Math.min(Math.max(0,viewportWidth-width),left)),top:Math.max(0,Math.min(Math.max(0,viewportHeight-height),top))}}
   function canPublish(role){return role==='teacher'||role==='admin'}
+  const categories=[['all','全部'],['pmp','PMP'],['prince2','PRINCE2'],['cspm','CSPM'],['gaoxiang','高项'],['general','通用学习']];
+  function categoryOf(item){return categories.some(([id])=>id!=='all'&&id===item.category)?item.category:'general'}
   let active=null;
   const onlineFilesRequired='当前为临时图谱模式，暂不能发布或加载模板。请先导出学习包保留内容，再联系管理员恢复在线图谱后重新打开。';
   function requireOnlineFiles(){if(global.KGGraphFileEditorStoreBridge?.isRemote?.()!==true)throw new Error(onlineFilesRequired)}
@@ -20,9 +22,15 @@
   function open(){
     if(active)return;
     const dialog=el('dialog');dialog.id='graphTemplateCenter';dialog.className='graph-template-center';dialog.setAttribute('aria-label','知识图谱模板中心');
-    const heading=el('h2','知识图谱模板中心'),intro=el('p','加载会创建独立的新图谱。模板更新或下架不会修改已加载的副本。'),status=el('p'),list=el('div'),actions=el('div'),close=el('button','关闭');status.setAttribute('role','status');actions.className='template-center-actions';actions.append(close);dialog.append(heading,intro,status,list,actions);
+    const heading=el('h2','知识图谱模板中心'),intro=el('p','选择一个起点，加载后生成可独立编辑的个人图谱。已有图谱与副本会保留。'),status=el('p'),list=el('div'),actions=el('div'),close=el('button','关闭');
+    status.setAttribute('role','status');list.className='template-gallery';actions.className='template-center-actions';actions.append(close);
+    const searchLabel=el('label'),search=el('input');searchLabel.className='template-search';searchLabel.append(el('span','搜索模板'));search.type='search';search.placeholder='搜索标题或描述';search.setAttribute('aria-label','搜索模板');searchLabel.append(search);
+    const tabs=el('nav');tabs.className='template-categories';tabs.setAttribute('aria-label','模板分类');
+    const section=el('h3');section.className='template-section-title';
+    const recovery=el('div'),retry=el('button','重试加载'),reset=el('button','清除搜索');recovery.className='template-recovery';retry.dataset.templateRetry='';reset.dataset.templateReset='';retry.hidden=true;reset.hidden=true;recovery.append(retry,reset);
+    dialog.append(heading,intro,searchLabel,tabs,section,status,recovery,list,actions);
     let disposed=false,busy=false,publicationForm=null,unmount=()=>{},closePreview=()=>{};const lifetime=new AbortController();active=dialog;
-    function finish(force=false){if(busy&&!force)return;disposed=true;lifetime.abort();closePreview();unmount();dialog.close();dialog.remove();active=null}
+    function finish(force=false){if(busy&&!force)return;disposed=true;lifetime.abort();cancelThumbnails();catalogRequest?.abort();closePreview();unmount();dialog.close();dialog.remove();active=null}
     close.onclick=()=>finish();dialog.addEventListener('cancel',e=>{e.preventDefault();finish()});
     dialog.addEventListener('keydown',event=>{event.stopPropagation();if(event.key==='Escape'){event.preventDefault();finish()}});
     (document.fullscreenElement||document.body).append(dialog);
@@ -37,39 +45,74 @@
       const publish=el('button','发布当前图谱');publish.dataset.templatePublish='';actions.prepend(publish);publish.onclick=()=>form(null);
     }
     async function execute(action){if(busy||!isCurrent())return;busy=true;close.disabled=true;try{await action()}catch(error){if(!disposed)status.textContent=isCurrent()?error.message:'当前账号已切换，请关闭后重试。'}finally{busy=false;close.disabled=false}}
-    async function refresh(){if(!isCurrent())return;status.textContent='正在加载模板…';const data=await request('',{signal:lifetime.signal});if(!isCurrent())return;list.replaceChildren();if(!data.templates.length)status.textContent='暂无模板，教师可发布当前图谱。';else status.textContent='点击图谱预览，可拖动、缩放或全屏查看。';if(global.KGGraphFileEditorStoreBridge?.isRemote?.()!==true)status.textContent=onlineFilesRequired;
-      for(const item of data.templates){
+    let catalog=[],catalogError=null,selectedCategory='all',catalogRequest=null,observer=null,renderGeneration=0,runningThumbnails=0,thumbnailQueue=[];
+    const thumbnailTasks=new Set(),thumbnailCache=new Map(),receipts=new Map(),latestResults=new Map(),cardViews=new Map(),categoryButtons=new Map();
+    function cancelThumbnails(){renderGeneration++;observer?.disconnect();observer=null;thumbnailQueue=[];for(const task of thumbnailTasks){task.visible=false;task.controller?.abort()}thumbnailTasks.clear()}
+    function pumpThumbnails(){
+      while(runningThumbnails<4&&thumbnailQueue.length){
+        const task=thumbnailQueue.shift();task.queued=false;
+        if(!task.visible||task.generation!==renderGeneration||!isCurrent())continue;
+        const controller=new AbortController();task.controller=controller;runningThumbnails++;
+        request('/'+encodeURIComponent(task.item.id),{signal:controller.signal}).then(result=>{
+          if(controller.signal.aborted||!isCurrent()||task.generation!==renderGeneration)return;
+          global.KGTemplatePreview.mount(task.thumbnail,result.preview);thumbnailCache.set(task.key,result);task.retry.hidden=true;
+        }).catch(error=>{if(!controller.signal.aborted&&isCurrent()&&task.generation===renderGeneration){task.thumbnail.textContent='预览暂不可用';task.retry.hidden=false}}).finally(()=>{task.controller=null;runningThumbnails--;if(controller.signal.aborted&&task.visible&&task.generation===renderGeneration)queueThumbnail(task);pumpThumbnails()});
+      }
+    }
+    function queueThumbnail(task){if(!task.visible||task.queued||task.controller||thumbnailCache.has(task.key))return;task.queued=true;thumbnailQueue.push(task);pumpThumbnails()}
+    for(const [id,label] of categories){const button=el('button',label);button.type='button';button.dataset.templateCategory=id;button.onclick=()=>{selectedCategory=id;renderCatalog()};categoryButtons.set(id,button);tabs.append(button)}
+    search.oninput=()=>renderCatalog();reset.onclick=()=>{search.value='';renderCatalog();search.focus()};
+    retry.onclick=()=>refresh().catch(showCatalogError);
+    function showCatalogError(error,success=''){if(!isCurrent())return;catalogError=success?new Error(success+'模板列表刷新失败，请点击重试加载。'+error.message):error;status.textContent=catalogError.message;retry.hidden=false}
+    async function refresh(){
+      if(!isCurrent())return;cancelThumbnails();catalogRequest?.abort();const controller=new AbortController();catalogRequest=controller;retry.hidden=true;status.textContent='正在加载模板…';
+      try{const data=await request('',{signal:controller.signal});if(!isCurrent()||controller.signal.aborted)return;catalog=data.templates;catalogError=null;renderCatalog()}
+      catch(error){if(!controller.signal.aborted)throw error}
+    }
+    function updateReceiptView(item){
+      const view=cardViews.get(item.id),receipt=latestResults.get(item.id);if(!view||!receipt?.fileId)return;
+      const link=el('a','打开新图谱');link.href='index.html?fileId='+encodeURIComponent(receipt.fileId);link.dataset.templateResult=receipt.fileId;
+      link.onclick=async e=>{if(busy||!isCurrent()){e.preventDefault();return}if(global.KGGraphFileTabs?.openFile){e.preventDefault();finish();await global.KGGraphFileTabs.openFile(receipt.fileId)}};
+      view.details.hidden=false;view.details.replaceChildren(link);view.load.textContent='再次查看已创建副本';
+    }
+    function loadCopy(item,version){return execute(async()=>{
+      if(!isCurrent())return;requireOnlineFiles();
+      if(!receipts.has(item.id))receipts.set(item.id,new Map());const versions=receipts.get(item.id);
+      if(!versions.has(version))versions.set(version,{requestId:global.crypto?.randomUUID?.()||'template-'+Date.now()+'-'+Math.random(),version});
+      const receipt=versions.get(version);status.textContent='正在创建独立图谱…';
+      const result=await request('/'+encodeURIComponent(item.id)+'/loads',{method:'POST',body:{requestId:receipt.requestId,version:receipt.version},signal:lifetime.signal});if(!isCurrent())return;
+      receipt.fileId=result.fileId;latestResults.set(item.id,receipt);updateReceiptView(item);
+      const store=global.KGGraphFileRemoteStore||global.KGGraphFileStore;await store?.refresh?.();if(!isCurrent())return;await global.KGGraphFileTabs?.refresh?.();if(!isCurrent())return;
+      status.textContent='已创建独立副本';
+    })}
+    function renderCatalog(){
+      cancelThumbnails();cardViews.clear();list.replaceChildren();retry.hidden=!catalogError;
+      const query=(search.value||'').trim().toLocaleLowerCase();
+      const visible=catalog.filter(item=>(selectedCategory==='all'||categoryOf(item)===selectedCategory)&&(!query||(item.name+' '+(item.description||'')).toLocaleLowerCase().includes(query)));
+      for(const [id,label] of categories){const button=categoryButtons.get(id);button.textContent=label+' · '+catalog.filter(item=>id==='all'||categoryOf(item)===id).length;button.setAttribute('aria-pressed',String(selectedCategory===id))}
+      section.textContent=categories.find(([id])=>id===selectedCategory)[1]+' · '+visible.length+' 个模板';reset.hidden=!query;
+      status.textContent=catalogError?catalogError.message:!catalog.length?'暂无模板，教师可发布当前图谱。':!visible.length?'没有符合条件的模板，请切换分类或清除搜索。':'点击预览查看图谱，使用模板后可打开独立副本。';
+      if(global.KGGraphFileEditorStoreBridge?.isRemote?.()!==true)status.textContent=onlineFilesRequired;
+      if(global.IntersectionObserver)observer=new global.IntersectionObserver(entries=>{for(const entry of entries){const task=entry.target.templateThumbnailTask;if(!task)continue;task.visible=entry.isIntersecting;if(task.visible)queueThumbnail(task);else task.controller?.abort()}},{root:dialog,threshold:0.01});
+      for(const item of visible){
         const card=el('article');card.dataset.templateId=item.id;
-        // 头部：标题 + 免费/会员徽章（下架状态并入徽章文案，保持“已下架”可读）。
-        const head=el('div');head.className='template-card-head';
-        head.append(el('h3',item.name));
-        const badge=el('span',`${item.memberOnly?'会员':'免费'} · v${item.version}${item.listed?'':' · 已下架'}`);
-        badge.className='template-badge '+(item.memberOnly?'template-badge-member':'template-badge-free')+(item.listed?'':' template-badge-off');
-        head.append(badge);card.append(head);
-        const thumbnail=el('button','正在生成预览…');thumbnail.type='button';thumbnail.className='template-thumbnail';thumbnail.setAttribute('aria-label','预览 '+item.name);card.append(thumbnail);
-        const body=el('div');body.className='template-card-body';const details=el('div');details.hidden=true;body.append(details);card.append(body);
-        const actions=el('div');actions.className='template-card-actions';card.append(actions);
-        const preview=el('button','预览');actions.append(preview);
-        let snapshot=null;
-        function fetchPreview(signal){if(signal)return request('/'+encodeURIComponent(item.id),{signal});if(!snapshot)snapshot=request('/'+encodeURIComponent(item.id),{signal:lifetime.signal}).catch(error=>{snapshot=null;throw error});return snapshot}
-        preview.onclick=thumbnail.onclick=()=>showPreview(item,fetchPreview,version=>loadCopy(version));
-        fetchPreview().then(result=>{if(!disposed)global.KGTemplatePreview.mount(thumbnail,result.preview)}).catch(()=>{if(!disposed)thumbnail.textContent='预览暂不可用 · 点击重试'});
-        const load=el('button','加载为新图谱');load.disabled=!item.listed;load.dataset.templateLoad='';load.classList.add('template-load-primary');actions.append(load);
-        const receipts=new Map();
-        load.onclick=()=>loadCopy(item.version);
-        function loadCopy(version){return execute(async()=>{
-          if(!isCurrent())return;
-          requireOnlineFiles();
-          if(!receipts.has(version))receipts.set(version,{requestId:global.crypto?.randomUUID?.()||'template-'+Date.now()+'-'+Math.random(),version});
-          const receipt=receipts.get(version);
-          status.textContent='正在创建独立图谱…';
-          const result=await request('/'+encodeURIComponent(item.id)+'/loads',{method:'POST',body:receipt,signal:lifetime.signal});if(!isCurrent())return;
-          const store=global.KGGraphFileRemoteStore||global.KGGraphFileStore;await store?.refresh?.();if(!isCurrent())return;await global.KGGraphFileTabs?.refresh?.();if(!isCurrent())return;
-          status.textContent='已创建独立副本';const link=el('a','打开新图谱');link.href='index.html?fileId='+encodeURIComponent(result.fileId);link.dataset.templateResult=result.fileId;
-          link.onclick=async e=>{if(!isCurrent()){e.preventDefault();return}if(global.KGGraphFileTabs?.openFile){e.preventDefault();finish();await global.KGGraphFileTabs.openFile(result.fileId)}};details.hidden=false;details.replaceChildren(link);load.textContent='再次查看已创建副本';
+        const frame=el('div');frame.className='template-thumbnail-frame';const thumbnail=el('button','正在生成预览…');thumbnail.type='button';thumbnail.className='template-thumbnail';thumbnail.setAttribute('aria-label','预览 '+item.name);
+        const thumbRetry=el('button','重试缩略图');thumbRetry.type='button';thumbRetry.hidden=true;thumbRetry.className='template-thumbnail-retry';thumbRetry.dataset.templateThumbnailRetry='';frame.append(thumbnail,thumbRetry);card.append(frame);
+        const body=el('div');body.className='template-card-body';const head=el('div');head.className='template-card-head';head.append(el('h3',item.name));body.append(head);
+        const meta=el('div');meta.className='template-card-meta';meta.append(el('span',(item.isBuiltin?'内置模板':item.publisherName||'教师发布')+' · '+(item.categoryLabel||categories.find(([id])=>id===categoryOf(item))[1])));
+        const badge=el('span',`${item.memberOnly?'会员':'免费'} · v${item.version}${item.listed?'':' · 已下架'}`);badge.className='template-badge '+(item.memberOnly?'template-badge-member':'template-badge-free')+(item.listed?'':' template-badge-off');meta.append(badge);body.append(meta);
+        const details=el('div');details.hidden=true;body.append(details);const cardActions=el('div');cardActions.className='template-card-actions';const preview=el('button','预览'),load=el('button','使用模板');preview.type=load.type='button';load.disabled=!item.listed;load.dataset.templateLoad='';load.classList.add('template-load-primary');cardActions.append(preview,load);body.append(cardActions);card.append(body);list.append(card);
+        cardViews.set(item.id,{details,load});updateReceiptView(item);
+        const key=item.id+':'+item.version;
+        const fetchPreview=signal=>request('/'+encodeURIComponent(item.id),{signal:signal||lifetime.signal});
+        preview.onclick=thumbnail.onclick=()=>showPreview(item,fetchPreview,version=>loadCopy(item,version));load.onclick=()=>loadCopy(item,item.version);
+        const task={item,key,thumbnail,retry:thumbRetry,generation:renderGeneration,visible:!observer,controller:null,queued:false};thumbnailTasks.add(task);thumbnail.templateThumbnailTask=task;
+        thumbRetry.onclick=()=>{thumbRetry.hidden=true;thumbnail.textContent='正在生成预览…';queueThumbnail(task)};
+        if(thumbnailCache.has(key))global.KGTemplatePreview.mount(thumbnail,thumbnailCache.get(key).preview);else if(observer)observer.observe(thumbnail);else queueThumbnail(task);
+        if(item.canMaintain){const management=el('details');management.className='template-card-management';const summary=el('summary','管理模板'),update=el('button','更新为新版本'),toggle=el('button',item.listed?'下架':'重新上架');update.type=toggle.type='button';management.append(summary,update,toggle);body.append(management);update.onclick=()=>form(item);toggle.onclick=()=>execute(async()=>{await request('/'+encodeURIComponent(item.id),{method:'PATCH',body:{listed:!item.listed},signal:lifetime.signal});if(!isCurrent())return;
+          const success=item.listed?'模板已下架。':'模板已重新上架。';
+          try{await refresh();if(isCurrent())status.textContent=success}catch(error){showCatalogError(error,success)}
         })}
-        if(item.canMaintain){const update=el('button','更新为新版本'),toggle=el('button',item.listed?'下架':'重新上架');actions.append(update,toggle);update.onclick=()=>form(item);toggle.onclick=()=>execute(async()=>{await request('/'+encodeURIComponent(item.id),{method:'PATCH',body:{listed:!item.listed}});await refresh()})}
-        list.append(card);
       }
     }
     async function showPreview(item,fetchPreview,load){
@@ -110,10 +153,11 @@
       const name=el('input');name.name='name';name.required=true;name.maxLength=200;name.value=item?.name||'知识图谱模板';name.placeholder='给模板起个名字';name.setAttribute('aria-label','模板名称');nameField.append(name);
       const descField=el('label');descField.className='template-field';descField.append(el('span','模板描述'));
       const description=el('textarea');description.name='description';description.maxLength=3000;description.value=item?.description||'';description.placeholder='描述模板内容与适用场景';description.setAttribute('aria-label','模板描述');descField.append(description);
+      const categoryField=el('label');categoryField.className='template-field';categoryField.append(el('span','模板分类'));const category=el('select');category.name='category';category.setAttribute('aria-label','模板分类');for(const [id,label] of categories){if(id==='all')continue;const option=el('option',label);option.value=id;category.append(option)}category.value=item?categoryOf(item):'general';categoryField.append(category);
       const member=el('input');member.type='checkbox';member.checked=!!item?.memberOnly;member.name='memberOnly';const label=el('label','会员模板（加载需要有效会员） ');label.className='template-member-toggle';label.append(member);
       const submit=el('button',item?'发布新版本':'直接发布');submit.type='submit';submit.classList.add('template-submit-primary');const cancel=el('button','取消编辑');cancel.type='button';cancel.className='template-cancel';cancel.onclick=()=>{editor.remove();publicationForm=null};
       const row=el('div');row.className='template-form-actions';row.append(cancel,submit);
-      editor.append(nameField,descField,label,row);dialog.insertBefore(editor,list);publicationForm={editor,name};name.focus();
+      editor.append(nameField,categoryField,descField,label,row);dialog.insertBefore(editor,list);publicationForm={editor,name};name.focus();
       editor.onsubmit=e=>{e.preventDefault();const cleanName=name.value.trim();if(!cleanName){status.textContent='请输入模板名称。';name.focus();return}execute(async()=>{
         requireOnlineFiles();
         submit.disabled=true;cancel.disabled=true;status.textContent='正在保存当前图谱并发布模板…';
@@ -127,12 +171,12 @@
         await global.KGGraphFileRemoteAdapter?.flush?.();
         if(!isCurrent())throw new Error('当前图谱或账号已变化，请重新发布。');
         const latest=context();
-        await request(item?'/'+encodeURIComponent(item.id)+'/versions':'',{method:'POST',body:{sourceFileId:latest.fileId,expectedFileRevision:latest.revision,name:cleanName,description:description.value,memberOnly:member.checked}});
+        await request(item?'/'+encodeURIComponent(item.id)+'/versions':'',{method:'POST',body:{sourceFileId:latest.fileId,expectedFileRevision:latest.revision,name:cleanName,description:description.value,memberOnly:member.checked,category:category.value},signal:lifetime.signal});
         editor.remove();publicationForm=null;const success=item?'新版本已发布，旧副本保留。':'模板已直接发布。';
-        try{await refresh();status.textContent=success}catch(error){status.textContent=success+'模板列表刷新失败，请关闭后重新打开查看。'}
+        try{await refresh();status.textContent=success}catch(error){showCatalogError(error,success)}
       }).finally(()=>{submit.disabled=false;cancel.disabled=false})};
     }
-    refresh().catch(error=>{if(!disposed)status.textContent=error.message});
+    refresh().catch(showCatalogError);
   }
   global.KGGraphTemplateCenter={open,canPublish};
   if(typeof module==='object'&&module.exports)module.exports={canPublish,previewWindowPosition};

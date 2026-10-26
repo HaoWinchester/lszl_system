@@ -4,6 +4,12 @@ from pathlib import Path
 from helpers.graph_detail_actions import open_retained_practice
 from playwright.sync_api import sync_playwright,expect
 ROOT=Path(__file__).resolve().parents[2];OUT=ROOT/'artifacts/canvas-m2-m5/t15';BASE='http://127.0.0.1:5195'
+def maintenance(row, name):
+    """Use the visible manager entry before interacting with its controls."""
+    menu=row.locator('.template-card-management')
+    if menu.get_attribute('open') is None:menu.locator('summary').click()
+    return row.get_by_role('button',name=name,exact=True)
+
 def main():
     fixture=json.loads((OUT/'fixture.json').read_text());users=fixture['users'];files=fixture['files'];password=fixture['password'];errors=[]
     with sync_playwright() as pw:
@@ -33,7 +39,7 @@ def main():
             visible_click(p,'#templateBtn');expect(p.locator('#graphTemplateCenter')).to_be_visible();expect(p.locator('#graphTemplateCenter [role=status]')).not_to_have_text('正在加载模板…')
         def close(p):visible_click(p,'#graphTemplateCenter .template-center-actions button:last-child')
         def publication(p,name,member=False,item=None):
-            if item:p.locator(f'[data-template-id="{item}"]').get_by_role('button',name='更新为新版本').click()
+            if item:maintenance(p.locator(f'[data-template-id="{item}"]'),'更新为新版本').click()
             else:p.locator('[data-template-publish]').click()
             form=p.locator('.template-publication-form');form.locator('[name=name]').fill(name);form.locator('[name=description]').fill('描述预览，不含完整图谱或答案');form.locator('[name=memberOnly]').set_checked(member);form.get_by_role('button',name='发布新版本' if item else '直接发布',exact=True).click();expect(form).to_have_count(0)
             row=p.locator('#graphTemplateCenter article').filter(has=p.get_by_role('heading',name=name,exact=True));expect(row).to_have_count(1);return row.get_attribute('data-template-id')
@@ -43,9 +49,9 @@ def main():
         source=teacher.request.get(BASE+'/api/v1/files/'+files['teacher']).json()['graphData']
         publication(p,'免费完整模板 v2',item=free)
         assert teacher.request.get(BASE+'/api/v1/graph-templates/'+free).json()['template']['version']==2
-        p.locator(f'[data-template-id="{free}"]').get_by_role('button',name='下架',exact=True).click();expect(p.locator(f'[data-template-id="{free}"]')).to_contain_text('已下架');p.locator(f'[data-template-id="{free}"]').get_by_role('button',name='重新上架',exact=True).click()
+        maintenance(p.locator(f'[data-template-id="{free}"]'),'下架').click();expect(p.locator(f'[data-template-id="{free}"]')).to_contain_text('已下架');maintenance(p.locator(f'[data-template-id="{free}"]'),'重新上架').click()
         close(p);p.evaluate("document.querySelector('#stage').requestFullscreen()");center(p);assert p.evaluate("document.fullscreenElement.contains(document.querySelector('#graphTemplateCenter'))");p.screenshot(path=str(OUT/'teacher-fullscreen.png'));close(p);p.evaluate('document.exitFullscreen()')
-        admin,a=session('admin');center(a);admin_template=publication(a,'管理员模板',True);assert a.locator(f'[data-template-id="{paid}"]').get_by_role('button',name='下架',exact=True).is_visible();close(a);admin.close()
+        admin,a=session('admin');center(a);admin_template=publication(a,'管理员模板',True);assert maintenance(a.locator(f'[data-template-id="{paid}"]'),'下架').is_visible();close(a);admin.close()
         student,s=session('student');center(s);expect(s.locator('[data-template-publish]')).to_have_count(0)
         s.locator(f'[data-template-id="{paid}"] [data-template-load]').click();expect(s.locator('[role=status]')).to_contain_text('需要有效会员')
         before=student.request.get(BASE+'/api/v1/files/'+files['student']).json()['graphData']
@@ -60,7 +66,7 @@ def main():
         assert teacher.request.get(BASE+'/api/v1/files/'+files['teacher']).json()['graphData']==source
         center(s);s.set_viewport_size({'width':390,'height':844});s.screenshot(path=str(OUT/'student-narrow.png'));visible_click(s,'#graphTemplateCenter .template-center-actions button:last-child');expect(s.locator('#graphTemplateCenter')).to_have_count(0)
         member,m=session('member');center(m);row=m.locator(f'[data-template-id="{paid}"]');row.locator('[data-template-load]').click();expect(row.locator('[data-template-result]')).to_be_visible();memberfile=row.locator('[data-template-result]').get_attribute('data-template-result');m.screenshot(path=str(OUT/'member-load.png'));close(m)
-        p.locator('#templateBtn').click();expect(p.locator('#graphTemplateCenter')).to_be_visible();p.locator(f'[data-template-id="{paid}"]').get_by_role('button',name='下架',exact=True).click()
+        p.locator('#templateBtn').click();expect(p.locator('#graphTemplateCenter')).to_be_visible();maintenance(p.locator(f'[data-template-id="{paid}"]'),'下架').click()
         assert member.request.get(BASE+'/api/v1/files/'+memberfile).ok
         assert member.request.post(BASE+f'/api/v1/graph-templates/{paid}/loads',data={'version':1,'requestId':'after-downlist'}).status==404
         viewer,v=session('viewer');assert viewer.request.get(BASE+'/api/v1/graph-templates').status==403;viewer.close()
@@ -102,7 +108,7 @@ def role_matrix(base, output):
         expect(page.locator('#graphTemplateCenter [role=status]')).not_to_have_text('正在加载模板…')
     def close(page):page.locator('#graphTemplateCenter .template-center-actions button:last-child').click()
     def publication(page,name,member=False,template=None):
-        if template:page.locator('[data-template-id="'+template+'"]').get_by_role('button',name='更新为新版本',exact=True).click()
+        if template:maintenance(page.locator('[data-template-id="'+template+'"]'),'更新为新版本').click()
         else:page.locator('[data-template-publish]').click()
         form=page.locator('.template-publication-form');form.locator('[name=name]').fill(name);form.locator('[name=description]').fill('角色实测模板');form.locator('[name=memberOnly]').set_checked(member)
         path='/api/v1/graph-templates'+('/'+template+'/versions' if template else '')
@@ -202,11 +208,11 @@ def role_matrix(base, output):
         free=checked(response.value,201)['template'];expect(form).to_have_count(0)
         assert next(node for node in checked(teacher_ctx.request.get(base+'/api/v1/files/'+source))['graphData']['nodes'] if node['id']=='b')['geometry']==latest
         paid=publication(teacher,'教师会员模板-'+run,True);free=publication(teacher,'教师免费更新-'+run,False,free['id']);assert free['version']==2
-        row=teacher.locator('[data-template-id="'+free['id']+'"]');row.get_by_role('button',name='下架',exact=True).click();expect(row).to_contain_text('已下架');row.get_by_role('button',name='重新上架',exact=True).click();expect(row).not_to_contain_text('已下架')
+        row=teacher.locator('[data-template-id="'+free['id']+'"]');maintenance(row,'下架').click();expect(row).to_contain_text('已下架');maintenance(row,'重新上架').click();expect(row).not_to_contain_text('已下架')
         preview(teacher,paid['id'],'teacher');load_copy('teacher',paid);record('teacher','UI publish/save failure zero POST/retry/update/downlist/relist; rich preview private fields excluded; paid copy membership bypass opens and refreshes')
         source_snapshot=checked(teacher_ctx.request.get(base+'/api/v1/files/'+source))['graphData']
         admin=pages['admin'];center(admin);own=publication(admin,'管理员模板-'+run,True);own=publication(admin,'管理员模板更新-'+run,True,own['id']);assert own['version']==2
-        row=admin.locator('[data-template-id="'+paid['id']+'"]');row.get_by_role('button',name='下架',exact=True).click();expect(row).to_contain_text('已下架');row.get_by_role('button',name='重新上架',exact=True).click();expect(row).not_to_contain_text('已下架')
+        row=admin.locator('[data-template-id="'+paid['id']+'"]');maintenance(row,'下架').click();expect(row).to_contain_text('已下架');maintenance(row,'重新上架').click();expect(row).not_to_contain_text('已下架')
         preview(admin,paid['id'],'admin');load_copy('admin',paid);record('admin','UI publish/update; maintains another teacher listing; rich preview; paid copy membership bypass opens and refreshes')
         other=pages['other_teacher'];center(other);foreign=other.locator('[data-template-id="'+free['id']+'"]');expect(foreign.get_by_role('button',name='更新为新版本',exact=True)).to_have_count(0);expect(foreign.get_by_role('button',name='下架',exact=True)).to_have_count(0)
         other_ctx=contexts['other_teacher'];rev=checked(other_ctx.request.get(base+'/api/v1/files/'+files['other_teacher']))['meta']['revision']
@@ -263,7 +269,7 @@ def publication_flow(base,output,source=False,tag='candidate'):
      w.locator('#templateBtn').click();expect(w.locator('#graphTemplateCenter')).to_be_visible();expect(w.locator('#graphTemplateCenter [role=status]')).not_to_have_text('正在加载模板…')
     def close(w):w.locator('#graphTemplateCenter .template-center-actions').get_by_role('button',name='关闭',exact=True).click()
     def form(w,name,member=False,tid=None):
-     if tid:w.locator('[data-template-id="'+tid+'"]').get_by_role('button',name='更新为新版本',exact=True).click()
+     if tid:maintenance(w.locator('[data-template-id="'+tid+'"]'),'更新为新版本').click()
      else:w.locator('[data-template-publish]').click()
      f=w.locator('.template-publication-form');f.locator('[name=name]').fill(name);f.locator('[name=description]').fill('完整流程 '+uid);f.locator('[name=memberOnly]').set_checked(member);return f
     def publish(w,f,tid=None):
@@ -310,7 +316,7 @@ def publication_flow(base,output,source=False,tag='candidate'):
       edit_title(w,'b','第二版知识关联 '+uid);center(w);f=form(w,'免费模板新版 '+uid,tid=tid);updated=publish(w,f,tid);check('teacher_updates_immutable_version',updated['version']==2);assert teacher.request.get(B+'/api/v1/graph-templates/'+tid).json()['preview']['version']==2
       check('new_version_leaves_existing_copy_unchanged',next(n for n in student.request.get(B+'/api/v1/files/'+copyid).json()['graphData']['nodes'] if n['id']==copied['idMap']['b'])['title']=='学生副本改动 '+uid)
       w.locator('[data-template-id=\"'+tid+'\"]').get_by_role('button',name='预览',exact=True).click();expect(w.locator('.template-preview-window .knowledge-card[data-node-id=b] .node-title')).to_have_text('第二版知识关联 '+uid);w.locator('.template-preview-window').get_by_role('button',name='关闭模板预览',exact=True).click();check('preview_shows_updated_version_content')
-      row=w.locator('[data-template-id="'+tid+'"]');row.get_by_role('button',name='下架',exact=True).click();expect(row).to_contain_text('已下架');check('downlist_keeps_loaded_copy',student.request.get(B+'/api/v1/files/'+copyid).ok);row.get_by_role('button',name='重新上架',exact=True).click();expect(row).not_to_contain_text('已下架');check('relist_template')
+      row=w.locator('[data-template-id="'+tid+'"]');maintenance(row,'下架').click();expect(row).to_contain_text('已下架');check('downlist_keeps_loaded_copy',student.request.get(B+'/api/v1/files/'+copyid).ok);maintenance(row,'重新上架').click();expect(row).not_to_contain_text('已下架');check('relist_template')
       admin,a=session('ink-admin');a.goto(B+'/graph',wait_until='networkidle');ready(a);center(a);expect(a.locator('[data-template-id="'+tid+'"]')).to_be_visible();expect(a.locator('[data-template-id="'+tid+'"]')).to_contain_text('下架');check('admin_can_maintain_teacher_template')
       response=admin.request.put(B+'/api/v1/subscriptions/admin/ink-student',data={'planId':'lifetime','status':'active','note':'isolated browser template fixture'});assert response.ok,response.text();s.reload(wait_until='networkidle');ready(s);center(s);membercopy=load(s,paid['id']);check('active_member_loads_paid_template',membercopy['fileId']!=copyid)
       viewer,v=session('ink-viewer');v.goto(B+'/graph',wait_until='networkidle');ready(v);check('viewer_template_entry_hidden',not v.locator('#templateBtn').is_visible());check('viewer_catalog_denied',viewer.request.get(B+'/api/v1/graph-templates').status==403)
