@@ -1,6 +1,6 @@
 # 模板中心分类与个人图谱隔离验证
 
-日期：2026-10-26。设计已由用户确认。本记录覆盖本地开发自检和 UAT 部署自检；用户业务验收仍待完成。功能已合入并推送 uat，main 与正式环境保持原状。
+日期：2026-10-26。设计已由用户确认。本记录覆盖本地开发自检和 UAT 部署自检；UAT 交付后用户明确授权正式发布，396 已合入 main 并上线，详见 [正式发布记录](production.md)。
 
 ## 本地实际运行版本与回滚来源
 
@@ -81,7 +81,7 @@
 - [396 登录后空白画布](/Users/menghao/Documents/幻谱/佩奇老师/测试环境/lszl_system/artifacts/template-gallery/empty-current-396/login.png)
 - [396 切换账户后空白画布](/Users/menghao/Documents/幻谱/佩奇老师/测试环境/lszl_system/artifacts/template-gallery/empty-current-396/account-switch.png)
 
-## UAT 已交付，等待用户业务验收
+## UAT 交付历史（后续已授权正式发布）
 
 - 地址：[https://uat.aihuanpu.com/graph](https://uat.aihuanpu.com/graph)，版本 `v9.0-p4.1.396`，previous 为 accepted 394。
 - 独立最终复审通过，两项 P2 均已解决，无新增修复范围问题。应用与生成产物提交为 `a92f240e`、`bc3ff54c`。
@@ -101,6 +101,6 @@ UAT 证据位于 `artifacts/template-gallery/deploy/` 的 `uat-deploy.log`、`ua
 - [UAT 高项桌面](/Users/menghao/Documents/幻谱/佩奇老师/测试环境/lszl_system/artifacts/template-gallery/uat/gaoxiang-desktop.png)
 - [UAT 手机](/Users/menghao/Documents/幻谱/佩奇老师/测试环境/lszl_system/artifacts/template-gallery/uat/prince2-narrow.png)
 
-自动化自检不等于用户 UAT 业务验收。当前停止在 UAT，等待用户明确确认后才可合入 main；保留功能分支及 main/uat 两个永久分支。
+上述为 UAT 交付时的状态。之后用户明确要求“部署到正式环境”，已完成 main 合入及正式发布，详见 [正式发布记录](production.md)。main/uat 两个永久分支保留。
 
 开发过程的 SDD 审查、回归脚本及本地来源审计已整体保存在忽略目录 `artifacts/template-gallery/sdd-archive/`；上文历史命令保留执行时的原始路径。临时 Git exclude 将恢复原始字节，既有 `docs/local-preview/`、`docs/promo/` 不纳入本轮提交且原样保留。

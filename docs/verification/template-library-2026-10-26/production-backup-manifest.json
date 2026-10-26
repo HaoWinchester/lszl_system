@@ -1,0 +1,21 @@
+{
+  "environment": "prod",
+  "database": "kg_graph",
+  "backupDirectory": "/home/ubuntu/lszl-backups/20261026_150902",
+  "backupTimestamp": "20261026_150902",
+  "createdAtUTC": "2026-10-26T07:10:33.379659+00:00",
+  "rollbackImage": "lszl-kg-backend:rollback-20261026_150902",
+  "files": [
+    {
+      "path": "/home/ubuntu/lszl-backups/20261026_150902/repo_20261026_150902.tar.gz",
+      "bytes": 41854572,
+      "sha256": "520c62fc2b29d30c5f1b9f249c265ba01aae14b68a8c4219d6a05580d9c13cf9"
+    },
+    {
+      "path": "/home/ubuntu/lszl-backups/20261026_150902/db_20261026_150902.dump",
+      "bytes": 208642682,
+      "sha256": "5941e92659073d9b097c1af14fb6d8dee8cd86a9e6e6b4803dcf9a7c961e3d39"
+    }
+  ],
+  "archiveAndDumpReadable": true
+}
