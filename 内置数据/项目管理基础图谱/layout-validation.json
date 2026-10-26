@@ -1,0 +1,315 @@
+{
+  "graphs": [
+    {
+      "id": "prince2-01",
+      "name": "PRINCE2 · 方法框架与五个整合要素",
+      "nodes": 11,
+      "links": 11,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "prince2-02",
+      "name": "PRINCE2 · 七项原则",
+      "nodes": 11,
+      "links": 11,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "prince2-03",
+      "name": "PRINCE2 · 七项实践",
+      "nodes": 11,
+      "links": 11,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "prince2-04",
+      "name": "PRINCE2 · 七个过程",
+      "nodes": 11,
+      "links": 11,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "prince2-05",
+      "name": "PRINCE2 · 角色与治理职责",
+      "nodes": 11,
+      "links": 11,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "prince2-06",
+      "name": "PRINCE2 · 阶段管理与例外升级",
+      "nodes": 11,
+      "links": 11,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "cspm-01",
+      "name": "CSPM · 能力评价框架与等级",
+      "nodes": 11,
+      "links": 11,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "cspm-02",
+      "name": "CSPM · 目标范围与工作分解",
+      "nodes": 11,
+      "links": 11,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "cspm-03",
+      "name": "CSPM · 进度资源与执行控制",
+      "nodes": 11,
+      "links": 11,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "cspm-04",
+      "name": "CSPM · 风险问题与变更",
+      "nodes": 11,
+      "links": 11,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "cspm-05",
+      "name": "CSPM · 沟通协作与职业行为",
+      "nodes": 11,
+      "links": 11,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "cspm-06",
+      "name": "CSPM · 经验教训与能力证据",
+      "nodes": 11,
+      "links": 11,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "gaoxiang-01",
+      "name": "高项 · 信息系统项目知识导航",
+      "nodes": 11,
+      "links": 11,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "gaoxiang-02",
+      "name": "高项 · 立项论证与整体管理",
+      "nodes": 11,
+      "links": 11,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "gaoxiang-03",
+      "name": "高项 · 需求范围与验收",
+      "nodes": 11,
+      "links": 11,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "gaoxiang-04",
+      "name": "高项 · 进度成本与挣值",
+      "nodes": 11,
+      "links": 11,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "gaoxiang-05",
+      "name": "高项 · 风险质量与采购协同",
+      "nodes": 11,
+      "links": 11,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    },
+    {
+      "id": "gaoxiang-06",
+      "name": "高项 · 案例分析与论文结构",
+      "nodes": 11,
+      "links": 11,
+      "cardObstructions": [],
+      "edgeCrossings": [],
+      "grayIcons": 0,
+      "palette": [
+        "#2563eb",
+        "#7c3aed",
+        "#0f766e",
+        "#ea580c",
+        "#d97706",
+        "#be185d"
+      ]
+    }
+  ],
+  "totalGraphs": 18,
+  "totalNodes": 198,
+  "totalLinks": 198,
+  "cardObstructions": 0,
+  "edgeCrossings": 0
+}
