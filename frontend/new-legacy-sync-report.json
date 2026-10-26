@@ -1,10 +1,19 @@
 {
   "schemaVersion": 1,
   "fromVersion": "v9.0-p4.1.395",
-  "toVersion": "v9.0-p4.1.395",
+  "toVersion": "v9.0-p4.1.396",
   "changes": {
-    "added": [],
-    "changed": [],
+    "added": [
+      "tests/graph-empty-current-browser.py"
+    ],
+    "changed": [
+      "VERSION",
+      "content-prep-studio/dist/content-prep.html",
+      "src/00-config-state.js",
+      "src/23-graph-file-remote-adapter.js",
+      "src/30-auth-guards.js",
+      "src/90-bootstrap.js"
+    ],
     "removed": []
   },
   "incompatible": []

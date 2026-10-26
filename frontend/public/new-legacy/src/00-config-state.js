@@ -266,6 +266,13 @@ function load(){
     if(remote&&remote.active&&remote.active()){
       const remoteGraph=remote.getLoadedGraph&&remote.getLoadedGraph();
       if(remoteGraph){state=sanitizeState(remoteGraph);lastSavedSnapshot=JSON.stringify(saveableState());return true}
+      // Only a successfully resolved empty account replaces the canvas. A failed
+      // request must not be treated as an empty response.
+      if(remote.isInitialized&&remote.isInitialized()){
+        state=sanitizeState(baseState());
+        lastSavedSnapshot=JSON.stringify(saveableState());
+        window.KGGraphFileAutosave?.clearDirty?.('loaded-empty');
+      }
       previewContentSnapshot=graphContentSnapshot(saveableState());
       return false;
     }

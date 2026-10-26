@@ -134,7 +134,8 @@ function authLoadCurrentSpace(copyCurrentIfEmpty=false){
   if(copyCurrentIfEmpty&&!(AppStorage.exists?AppStorage.exists(key):localStorage.getItem(key)!=null)){
     try{if(AppStorage.writeJSON)AppStorage.writeJSON(key,currentSnapshot);else localStorage.setItem(key,JSON.stringify(currentSnapshot))}catch(e){console.warn(e)}
   }
-  state=templateState('pmp');
+  // Remote completion owns restoration, including a successfully empty account.
+  if(!window.KGGraphFileRemoteAdapter?.active())state=templateState('pmp');
   state.selectedNodeId=null;state.selectedLinkId=null;state.linkSourceId=null;
   lastSavedSnapshot='';
   const had=load();

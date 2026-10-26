@@ -47,6 +47,7 @@
     return pending;
   }
   function initialize(){return initializeCurrent()}
+  function isInitialized(){return active()&&initializedEpoch===sessionEpoch}
   function getLoadedGraph(){return clone(loadedGraph)}
   function getCurrentFileMeta(){return clone(current)}
   function queueSave(graphData,options={}){
@@ -107,5 +108,5 @@
     if(!event?.detail?.authenticated||!active())return null;
     return initializeCurrent();
   }
-  global.KGGraphFileRemoteAdapter={active,initialize,initializeCurrent,adoptFile,getLoadedGraph,getCurrentFileMeta,queueSave,save,flush,acceptRevision,clearSession,handleSessionChange};
+  global.KGGraphFileRemoteAdapter={active,initialize,initializeCurrent,isInitialized,adoptFile,getLoadedGraph,getCurrentFileMeta,queueSave,save,flush,acceptRevision,clearSession,handleSessionChange};
 })(window);
