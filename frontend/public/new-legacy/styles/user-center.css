@@ -275,3 +275,10 @@
 
 /* Keep the old-password field absent for accounts that have never set one. */
 .uc-dialog .uc-password-grid .uc-field[hidden]{display:none}
+
+/* Referral uses the shared account card sizing, with independently copyable fields. */
+.uc-dialog .uc-referral-card{align-items:flex-start}
+.uc-dialog .uc-referral-fields{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:end;margin-top:12px}
+.uc-dialog .uc-referral-fields input{width:100%;min-width:0;text-overflow:ellipsis}
+.uc-dialog .uc-referral-fields .uc-button{margin-left:0}
+@media(max-width:610px){.uc-dialog .uc-referral-card .uc-card-content{flex-basis:calc(100% - 70px)}.uc-dialog .uc-referral-fields{grid-template-columns:minmax(0,1fr)}.uc-dialog .uc-referral-fields .uc-button{justify-self:start;margin-left:0}}

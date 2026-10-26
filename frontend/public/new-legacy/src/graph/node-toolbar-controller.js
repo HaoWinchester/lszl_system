@@ -46,6 +46,8 @@
         ${button('align','节点对齐',ICONS.align,'data-node-toolbar-panel="align" aria-haspopup="true" aria-expanded="false"')}
         ${button('lock','完全锁定节点',ICONS.unlock,'aria-pressed="false"')}
         ${button('related-canvas','打开相关画布',ICONS.relatedCanvas)}
+        ${button('group','组合卡片（Ctrl/⌘ G）',ICONS.nodeSize,'hidden')}
+        ${button('ungroup','取消组合（Ctrl/⌘ Shift G）',ICONS.layers||ICONS.nodeSize,'hidden')}
         ${button('more','更多设置',ICONS.more,'data-node-toolbar-panel="more" aria-haspopup="true" aria-expanded="false"')}
       </div><div class="node-style-toolbar-panels uc-toolbar-panels"></div>`;
       root.addEventListener('pointerdown',event=>event.stopPropagation());

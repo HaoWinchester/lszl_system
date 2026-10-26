@@ -107,3 +107,9 @@ test('dragging a simplified single segment keeps both fixed endpoints and create
  const g=require('../src/graph/edge-geometry.js');
  assert.deepEqual(g.moveElbowSegment({x:0,y:0},{x:200,y:0},[],0,{x:0,y:-45}),[{x:0,y:-45},{x:200,y:-45}]);
 });
+
+test('redundant collinear backtracks collapse instead of leaving overlapping control points',()=>{
+ const g=require('../src/graph/edge-geometry.js');
+ assert.deepEqual(g.simplifyOrthogonal([{x:0,y:0},{x:180,y:0},{x:90,y:0},{x:240,y:0},{x:240,y:80}]),[{x:0,y:0},{x:240,y:0},{x:240,y:80}]);
+ assert.deepEqual(g.simplifyOrthogonal([{x:0,y:0},{x:100,y:0},{x:0,y:0},{x:0,y:80}]),[{x:0,y:0},{x:0,y:80}]);
+});

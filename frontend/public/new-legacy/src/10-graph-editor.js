@@ -250,6 +250,7 @@ function linkRenderPoints(link,nodeMap=null,options={}){
   return{...points,mainGraph:true,a:override?.from||points.a,b:override?.to||points.b};
 }
 let edgeBundleMemo={time:0,plan:null};
+function linkBundleKey(link){return JSON.stringify([pathStyleForLink(link),link.lineStyle||'solid',link.color||state.defaults.linkColor,Number(link.strokeWidth)||4,link.arrowStyle||'none'])}
 function mainGraphNodeMap(){if(typeof getGraphIndex!=='function')return null;try{return getGraphIndex().nodeMap}catch(_){return null}}
 function currentEdgeBundlePlan(){
   if(typeof window==='undefined'||!window.KGGraphEdgeBundle?.plan)return null;
@@ -265,6 +266,7 @@ function currentEdgeBundlePlan(){
     const points=rawLinkRenderPoints(candidate);if(!points)continue;
     items.push({id:String(candidate.id),fromId:candidate.from,toId:candidate.to,a:points.a,b:points.b,ca:points.ca,cb:points.cb,
       hasFromPort:hasExplicitPort(candidate.fromPort),hasToPort:hasExplicitPort(candidate.toPort),pathStyle:pathStyleForLink(candidate),
+      bundleKey:linkBundleKey(candidate),
       fromPort:candidate.fromPort,toPort:candidate.toPort,waypoints:normalizedEdgePoints(candidate.waypoints),hasStoredWaypoints:normalizedEdgePoints(candidate.waypoints).length>0});
   }
   edgeBundleMemo={time:now,plan:window.KGGraphEdgeBundle.plan(items)};
@@ -604,7 +606,7 @@ function isLargeGraphPreferenceEnabled(){
   return !prefs||prefs.largeGraphMode!==false;
 }
 function isGraphOverLargeThreshold(){return state.nodes.length>=LARGE_GRAPH_NODE_THRESHOLD||state.links.length>=LARGE_GRAPH_LINK_THRESHOLD}
-function isLargeGraphMode(){return isLargeGraphPreferenceEnabled()&&isGraphOverLargeThreshold()}
+function isLargeGraphMode(){return false}
 function shouldShowLargeGraphOverview(){return !!(isLargeGraphMode()&&largeGraphOverviewEnabled)}
 function normalizeRelatedScopeAnchor(){
   if(relatedScopeAnchorNodeId&&!nodeById(relatedScopeAnchorNodeId))relatedScopeAnchorNodeId=null;
@@ -1743,7 +1745,8 @@ function isHomeSelectionLockControlTarget(target){return !!target?.closest?.('[d
 function canStartHomeReboxFromTarget(target){return !target?.closest?.('.knowledge-card,.graph-text-element,[data-link-id],.edge-hit,.edge-visible,button,a,input,textarea,select,[contenteditable="true"]')}
 function dismissLockedHomeSelection(reason='selection-dismiss'){window.KGHomeCanvasRuntime?.selectionFilter?.clear?.({reason,apply:false});clearSelection({reason,preserveFilter:true});syncHomeSelectionInteractionLock();return true}
 function selectedHomeMovableIds(){
-  return {nodes:[...selectedNodeIds].filter(id=>nodeById(id)),texts:[...selectedTextElementIds].filter(id=>textElementById(id))};
+  const ids=[...selectedNodeIds].filter(id=>nodeById(id));
+  return {nodes:window.KGGraphGroups?.expand(state.nodes,ids)||ids,texts:[...selectedTextElementIds].filter(id=>textElementById(id))};
 }
 function beginHomeSelectionBoundsDrag(event){
   if(event.button!==0||isCanvasPanMode()||!pointerInsideHomeSelectionBounds(event))return false;
@@ -2030,7 +2033,7 @@ function readonlyGraphPresentation(projection,{svg,markerId}={}){
   const graph=sanitizeState({nodes:rawNodes,links:projection.links||[],elements:projection.elements||[]});
   const nodes=graph.nodes,nodeMap=new Map(nodes.map(node=>[node.id,node])),links=graph.links;
   const routes=links.map(link=>({link,points:rawLinkRenderPoints(link,nodeMap,{ignoreGather:true})})).filter(item=>item.points);
-  const bundlePlan=links.length<=600?window.KGGraphEdgeBundle?.plan(routes.map(({link,points})=>({id:String(link.id),fromId:link.from,toId:link.to,...points,hasFromPort:!!link.fromPort&&link.fromPort!=='auto',hasToPort:!!link.toPort&&link.toPort!=='auto',pathStyle:pathStyleForLink(link),fromPort:link.fromPort,toPort:link.toPort,waypoints:normalizedEdgePoints(link.waypoints),hasStoredWaypoints:normalizedEdgePoints(link.waypoints).length>0}))):null;
+  const bundlePlan=links.length<=600?window.KGGraphEdgeBundle?.plan(routes.map(({link,points})=>({id:String(link.id),fromId:link.from,toId:link.to,...points,hasFromPort:!!link.fromPort&&link.fromPort!=='auto',hasToPort:!!link.toPort&&link.toPort!=='auto',pathStyle:pathStyleForLink(link),bundleKey:linkBundleKey(link),fromPort:link.fromPort,toPort:link.toPort,waypoints:normalizedEdgePoints(link.waypoints),hasStoredWaypoints:normalizedEdgePoints(link.waypoints).length>0}))):null;
   ensureGraphEdgeMarkers(svg,markerId);
   const edges=routes.map(({link,points})=>{
     const override=bundlePlan?.endpoints?.get(String(link.id)),resolved={...points,a:override?.from||points.a,b:override?.to||points.b,mainGraph:!!bundlePlan,bundlePlan};
@@ -2163,6 +2166,20 @@ function applyNodeLayerAction(action){
   const labels={raise:'上移一层',lower:'下移一层',front:'置于顶层',back:'置于底层'};
   pushGraphUndoSnapshot(`${labels[action]||'调整层级'}（${ids.length} 个节点）`);state.nodes=result.items;render({persist:true});showStatus(`已将 ${ids.length} 个节点${labels[action]||'调整层级'}。`);return true;
 }
+function changeGraphCardGroup(ungroup=false){
+  const groups=window.KGGraphGroups;if(!groups||!canWriteGraph())return false;
+  const ids=selectedNodeIdsForClipboard(),expanded=groups.expand(state.nodes,ids);
+  if(!expanded.length||rejectLockedNodeAction(ungroup?'取消组合':'组合卡片',expanded))return false;
+  if(!ungroup&&expanded.length<2){showStatus('请先多选至少两张卡片，再组合。');return false}
+  if(ungroup&&!state.nodes.some(node=>expanded.includes(node.id)&&node.groupId)){showStatus('当前卡片没有组合。');return false}
+  pushGraphUndoSnapshot(ungroup?'取消卡片组合':'组合卡片');
+  const changed=ungroup?groups.ungroup(state.nodes,ids):groups.combine(state.nodes,ids,()=>uid('g'));
+  if(!changed)return false;
+  selectedNodeIds=new Set(expanded);state.selectedNodeId=expanded[0];
+  refreshSelectionUI({persist:true});
+  showStatus(ungroup?'已取消组合，卡片可以独立移动。':`已组合 ${expanded.length} 张卡片，拖动任意成员即可整体移动。`);return true;
+}
+window.KGGraphCardGroups=Object.freeze({combine:()=>changeGraphCardGroup(false),ungroup:()=>changeGraphCardGroup(true)});
 function ensureNodeContextMenu(){
   if(nodeContextMenuController)return nodeContextMenuController;
   const factory=window.KGGraphContextMenuController;if(!factory||typeof factory.create!=='function')return null;
@@ -2171,6 +2188,8 @@ function ensureNodeContextMenu(){
     if(context.nodeId)selectNodeForContextMenu(context.nodeId,{showToolbar:false});
     if(action==='copy')copySelectedGraphCards();
     else if(action==='paste')pasteGraphClipboardCards();
+    else if(action==='group')changeGraphCardGroup(false);
+    else if(action==='ungroup')changeGraphCardGroup(true);
     else if(action.startsWith('layer:'))applyNodeLayerAction(action.slice(6));
     else if(action==='refresh'){resetGraphPointerInteractions({hideMenus:true});save();location.reload()}
   }});return nodeContextMenuController;
@@ -2186,7 +2205,8 @@ function showNodeContextMenu(id,clientX,clientY){
   if(!graphModeAllows('contextMenuAdvanced'))return showCanvasContextMenu(clientX,clientY);
   exitNodeFreeResizeMode({refresh:false});if(!selectNodeForContextMenu(id,{showToolbar:false}))return false;
   lastGraphPointerWorldPosition=screenToWorld(clientX,clientY);const menu=ensureNodeContextMenu();if(!menu)return false;
-  menu.show({clientX,clientY,context:{type:'node',nodeId:id,locked:isNodeFullyLocked(id),canPaste:graphClipboardHasData(),actions:graphContextMenuActions()}});return true;
+  const ids=selectedNodeIdsForClipboard();
+  menu.show({clientX,clientY,context:{type:'node',nodeId:id,locked:isNodeFullyLocked(id),canPaste:graphClipboardHasData(),canGroup:ids.length>1,canUngroup:ids.some(key=>nodeById(key)?.groupId),actions:graphContextMenuActions()}});return true;
 }
 function showCanvasContextMenu(clientX,clientY){
   if(!graphModeAllows('contextMenu'))return false;
@@ -2743,7 +2763,8 @@ cardsLayer.addEventListener('pointerdown',e=>{
   e.stopPropagation();e.preventDefault();
   const toggleMulti=e.ctrlKey||e.metaKey;
   const editOnRelease=false;
-  const groupIds=toggleMulti?[id]:(selectedNodeIds.has(id)&&selectedNodeIds.size>1?[...selectedNodeIds]:[id]);
+  const dragIds=toggleMulti?[id]:(selectedNodeIds.has(id)&&selectedNodeIds.size>1?[...selectedNodeIds]:[id]);
+  const groupIds=toggleMulti?dragIds:(window.KGGraphGroups?.expand(state.nodes,dragIds)||dragIds);
   const lockedGroup=groupIds.filter(gid=>window.KGGraphModel?.interactionOf?.(nodeById(gid)).locked);if(lockedGroup.length){showStatus(`选择中有 ${lockedGroup.length} 个锁定节点，已取消整体移动。`);return}
   if(groupIds.length===1&&!e.shiftKey&&!e.ctrlKey&&!e.metaKey)clearMultiSelection();
   const historyLabel=groupIds.length>1?`移动 ${groupIds.length} 个知识点`:`移动“${n.title}”`,historyController=beginGraphGestureHistory(historyLabel);if(!historyController)return;
@@ -2771,6 +2792,7 @@ cardsLayer.addEventListener('pointermove',e=>{
   const px=e.clientX-cardDrag.startClient.x,py=e.clientY-cardDrag.startClient.y,wasMoved=!!cardDrag.moved;
   const dragController=ensureGraphDragController();if(dragController)dragController.update(e);
   if(Math.hypot(px,py)>5){if(!wasMoved){if(!dragController)cardDrag.historyController.checkpoint(cardDrag.historyLabel);stage.classList.add('graph-card-dragging');nodeStyleToolbarController?.hide()}cardDrag.moved=true;clearTimeout(cardDrag.longTimer)}
+  if(!cardDrag.moved)return;
   if(isRelatedGatherActive()&&cardDrag.moved){
     if(!cardDrag.gatherDragBlocked)showStatus('当前是临时聚拢布局，仅用于讲解查看；请先退出聚拢后再调整原图谱位置。');
     cardDrag.gatherDragBlocked=true;
@@ -3327,6 +3349,7 @@ function handleNodeToolbarAction(action,button,event=null){
   if(lockedIds.length&&group!=='lock'&&group!=='related-canvas'){
     rejectLockedNodeAction('使用此功能',ids);nodeStyleToolbarController?.closePanels();updateNodeStyleToolbarControls();return;
   }
+  if((group==='group'||group==='ungroup')&&!textItem){changeGraphCardGroup(group==='ungroup');return}
   if(group==='color-region'&&!textItem){nodeFillColorRegion=value||'body-fill';updateNodeStyleToolbarControls();return}
   if(group==='lock'&&!textItem){
     const nodes=ids.map(id=>nodeById(id)).filter(Boolean),allLocked=nodes.length&&nodes.every(node=>window.KGGraphModel?.interactionOf?.(node).locked),history=ensureGraphHistoryController();
@@ -3410,6 +3433,7 @@ function updateNodeStyleToolbarControls(){
   if(!cardQuickActionsEl||cardQuickActionsEl.hidden)return;const textItem=nodeToolbarTextElement(),primary=nodeToolbarPrimaryNode(),ids=nodeToolbarSelectedIds(),root=cardQuickActionsEl;if(!textItem&&!primary)return;
   // 阅读模式：工具栏仅保留 grip 与「打开相关画布」（末尾统一应用 .readonly-context 隐藏）。
   const readonlyContext=!graphModeAllows('nodeToolbar');
+  for(const action of ['group','ungroup']){const btn=root.querySelector(`[data-node-toolbar-action="${action}"]`);if(btn)btn.hidden=!!textItem||readonlyContext||(action==='group'?ids.length<2:!ids.some(id=>nodeById(id)?.groupId))}
   root.classList.toggle('readonly-context',readonlyContext);
   const appearance=textItem?window.KGGraphModel.textElementAppearanceOf(textItem):window.KGGraphModel.appearanceOf(primary);root.classList.toggle('text-element-context',!!textItem);
   const fillTrigger=root.querySelector('[data-node-toolbar-panel="fill"]');
@@ -3596,6 +3620,8 @@ function handleNodeTap(id){
     }
   }else{
     state.selectedNodeId=id;
+    const group=window.KGGraphGroups?.expand(state.nodes,[id])||[id];
+    if(group.length>1)selectedNodeIds=new Set(group);
     if(largeGraphRelatedFocusEnabled&&!currentRelatedScopeAnchorId())relatedScopeAnchorNodeId=id;
     const relation=largeGraphRelationState();
     showStatus(relation&&relationLayerEnabled()?`已查看“${clicked.title}”：${relation.relatedCount} 个相关知识点，${relation.linkCount} 条关系。`:`已查看“${clicked.title}”。需要连线时请使用工具栏“连线”或卡牌连接手柄。`);
@@ -3945,6 +3971,7 @@ function handleGraphClipboardShortcut(e){
   const combo=e.ctrlKey||e.metaKey;
   if(!combo)return;
   const key=String(e.key||'').toLowerCase();
+  if(key==='g'){e.preventDefault();e.stopPropagation();changeGraphCardGroup(!!e.shiftKey);return}
   if(key==='a'){
     if(selectAllGraphNodesFromShortcut()){e.preventDefault();e.stopPropagation()}
     return;

@@ -347,6 +347,7 @@ function saveNow(options={}){
   return persistCurrentGraphNow(options);
 }
 function save(delay=260){
+  window.KGGraphGroups?.normalize(state.nodes||[]);
   const autosave=window.KGGraphFileAutosave;
   if(autosave&&typeof autosave.markDirty==='function')return autosave.markDirty('graph-change');
   clearTimeout(saveTimer);saveTimer=setTimeout(()=>saveNow(),delay);

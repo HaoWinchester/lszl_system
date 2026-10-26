@@ -24,8 +24,7 @@
     animations: true,
     relationLabels: true,
     gradients: true,
-    deferEdgesDuringDrag: true,
-    largeGraphMode: true
+    deferEdgesDuringDrag: true
   });
   const PRESET_PREFS = Object.freeze({
     quality: {
@@ -35,8 +34,7 @@
       animations: true,
       relationLabels: true,
       gradients: true,
-      deferEdgesDuringDrag: true,
-      largeGraphMode: true
+      deferEdgesDuringDrag: true
     },
     balanced: {
       performancePreset: "balanced",
@@ -45,8 +43,7 @@
       animations: true,
       relationLabels: true,
       gradients: true,
-      deferEdgesDuringDrag: true,
-      largeGraphMode: true
+      deferEdgesDuringDrag: true
     },
     performance: {
       performancePreset: "performance",
@@ -55,8 +52,7 @@
       animations: false,
       relationLabels: false,
       gradients: false,
-      deferEdgesDuringDrag: true,
-      largeGraphMode: true
+      deferEdgesDuringDrag: true
     }
   });
 
@@ -75,7 +71,7 @@
     const src = input && typeof input === "object" ? input : {};
     const preset = String(src.performancePreset || base.performancePreset);
     base.performancePreset = Object.prototype.hasOwnProperty.call(PRESET_LABELS, preset) ? preset : "custom";
-    ["shadows","blur","animations","relationLabels","gradients","deferEdgesDuringDrag","largeGraphMode"].forEach(key=>{
+    ["shadows","blur","animations","relationLabels","gradients","deferEdgesDuringDrag"].forEach(key=>{
       if(Object.prototype.hasOwnProperty.call(src, key)) base[key] = !!src[key];
     });
     return base;
@@ -128,7 +124,7 @@
     r.classList.toggle("kg-perf-hide-relation-labels", !prefs.relationLabels);
     r.classList.toggle("kg-perf-no-gradients", !prefs.gradients);
     r.classList.toggle("kg-perf-defer-drag-edges", !!prefs.deferEdgesDuringDrag);
-    r.classList.toggle("kg-large-graph-mode-disabled", prefs.largeGraphMode === false);
+    r.classList.remove("kg-large-graph-mode-disabled");
     r.dataset.kgGraphPerformancePreset = prefs.performancePreset || "custom";
 
     const btn = $("graphPrefsBtn");
@@ -170,7 +166,6 @@
       </div>
       <div class="graph-prefs-section">
         <div class="graph-prefs-section-title">性能与视觉效果</div>
-        <label class="graph-prefs-toggle graph-prefs-toggle-important"><input type="checkbox" data-pref="largeGraphMode"><span>大图模式</span></label>
         <label class="graph-prefs-toggle graph-prefs-toggle-important"><input type="checkbox" data-pref="deferEdgesDuringDrag"><span>拖动时延迟刷新连接线</span></label>
         <label class="graph-prefs-toggle"><input type="checkbox" data-pref="shadows"><span>卡牌与面板阴影</span></label>
         <label class="graph-prefs-toggle"><input type="checkbox" data-pref="blur"><span>玻璃模糊效果</span></label>
@@ -178,7 +173,7 @@
         <label class="graph-prefs-toggle"><input type="checkbox" data-pref="relationLabels"><span>关系线标签</span></label>
         <label class="graph-prefs-toggle"><input type="checkbox" data-pref="gradients"><span>卡牌渐变背景</span></label>
       </div>
-      <div class="graph-prefs-note">建议：卡牌较多或多选拖动卡顿时，优先切换到“高性能”，并保持“大图模式”和“拖动时延迟刷新连接线”开启。开启大图模式后，任何数量的卡牌都会使用大图渲染策略；关闭后按普通图谱模式显示，关系线较多时可能变卡。偏好仅保存在当前浏览器，不会写入图谱文件。</div>
+      <div class="graph-prefs-note">卡牌较多或多选拖动卡顿时，可切换到“高性能”，或开启“拖动时延迟刷新连接线”。性能设置不改变关系线的可见范围。偏好仅保存在当前浏览器，不会写入图谱文件。</div>
     `;
     document.body.appendChild(menuEl);
 

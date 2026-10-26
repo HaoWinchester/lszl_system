@@ -5108,6 +5108,13 @@ g.is-batch-selected .edge-visible{
 
 /* Keep the old-password field absent for accounts that have never set one. */
 .uc-dialog .uc-password-grid .uc-field[hidden]{display:none}
+
+/* Referral uses the shared account card sizing, with independently copyable fields. */
+.uc-dialog .uc-referral-card{align-items:flex-start}
+.uc-dialog .uc-referral-fields{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:end;margin-top:12px}
+.uc-dialog .uc-referral-fields input{width:100%;min-width:0;text-overflow:ellipsis}
+.uc-dialog .uc-referral-fields .uc-button{margin-left:0}
+@media(max-width:610px){.uc-dialog .uc-referral-card .uc-card-content{flex-basis:calc(100% - 70px)}.uc-dialog .uc-referral-fields{grid-template-columns:minmax(0,1fr)}.uc-dialog .uc-referral-fields .uc-button{justify-self:start;margin-left:0}}
 /* style: styles/membership-ui.css */
 /* 会员中心成品稿：所有规则限定在会员弹窗内，避免影响图谱工作区。 */
 .membership-ui-backdrop{z-index:2147483300;background:rgba(29,42,58,.42);backdrop-filter:blur(8px)}
@@ -9404,6 +9411,9 @@ body.qw-selection-toolbar-motion .uc-selection-bounds,.stage.graph-card-dragging
 /* Invisible zoom sliders must not intercept the scrollable rail above the dock. */
 #stage .canvas-zoom-dock:not(.slider-open) .canvas-zoom-slider-popover,
 #stage .canvas-zoom-dock:not(.slider-open) .canvas-zoom-slider-popover *{pointer-events:none!important;visibility:hidden}
+
+/* Hidden contextual actions must override the toolbar button display grid. */
+.node-style-toolbar .node-toolbar-btn[hidden]{display:none!important}
 /* style: styles/home-canvas-performance.css */
 /* V9.0-P4.3.6 · 首页画布独立关系线、轮廓悬浮与稳定便签阴影 */
 .stage .edge-visible{

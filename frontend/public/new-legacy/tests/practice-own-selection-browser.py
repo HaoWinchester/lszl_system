@@ -3,7 +3,7 @@ from pathlib import Path
 import json
 from helpers.practice_tools import click_tool
 ROOT=Path(__file__).resolve().parents[1]
-OUT=ROOT.parent/'artifacts/ui-polish-20261020/answers';OUT.mkdir(parents=True,exist_ok=True)
+OUT=ROOT.parent/'.superpowers/sdd/2026-10-26-practice-graph-referral/evidence/answers';OUT.mkdir(parents=True,exist_ok=True)
 fixture=ROOT/'tests/practice-mark-show-answers-browser.py'
 setup=fixture.read_text().split('    # ---------- 场景 1：')[0]
 setup=setup.replace('    attrs, body = body_html()', '    page.clock.install()\n    attrs, body = body_html()')
@@ -29,16 +29,17 @@ for kind in questions:
     page.wait_for_timeout(200)
     page.clock.pause_at(page.evaluate('Date.now()')+10)
     page.locator('#practiceInstantFeedback').uncheck()
+    option_top=page.locator('#practiceOptions').bounding_box()['y']
 '''+actions+f'''
     expected={expected!r};compact={compact!r}
     def neutral():
-        assert page.locator('.practice-own-selection').is_visible()
-        assert page.locator('.practice-own-selection').inner_text()=='我的选择：'+expected
+        assert not page.locator('.practice-own-selection').is_visible()
         assert page.locator('.practice-option.is-correct,.practice-option.is-wrong,.qm-pair-feedback').count()==0
         assert not page.locator('#practiceFeedback').is_visible()
         assert not page.locator('#practiceExplanationPanel').is_visible()
         assert page.locator('#practiceExplanationHead').inner_text()==''
     neutral()
+    assert abs(page.locator('#practiceOptions').bounding_box()['y']-option_top)<1
     if {kind!r}!='matching':
         selected=page.locator('.practice-option.is-selected').first
         other=page.locator('.practice-option:not(.is-selected)').first

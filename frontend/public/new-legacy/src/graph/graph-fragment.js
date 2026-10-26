@@ -42,6 +42,7 @@
       if(key!=='links'){move(item);move(item.geometry)}
     }
     for(const link of fragment.links){link.from=idMap[link.from];link.to=idMap[link.to];for(const key of ['curveControls','waypoints'])for(const p of link[key]||[])move(p);move(link.fromPoint);move(link.toPoint)}
+    global.KGGraphGroups?.remap(fragment.nodes,idFactory);
     return{fragment,idMap};
   }
   function parse(text){try{if(typeof text!=='string'||text.length>8*1024*1024)return null;return validate(JSON.parse(text))}catch(error){return null}}

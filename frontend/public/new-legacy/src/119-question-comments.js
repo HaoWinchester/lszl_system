@@ -151,6 +151,7 @@
   function canManage(user) { return !!user && MANAGER_ROLES.has(text(user.role)) }
 
   function request(path, options = {}) {
+    const owner=currentUser()?.username
     // 按段编码：questionId/commentId 安全转义，保留路径分隔符。
     const [pathname, query] = path.split('?')
     const url = (pathname.startsWith('@favorites') ? '/api/v1/question-comments/favorites'
@@ -165,8 +166,10 @@
         document.dispatchEvent(new CustomEvent('kg:auth-required'))
         throw new Error('UNAUTHENTICATED')
       }
+      if(owner!==currentUser()?.username)throw new Error('UNAUTHENTICATED')
       if (response.status === 204) return null
       const payload = await response.json().catch(() => ({}))
+      if(owner!==currentUser()?.username)throw new Error('UNAUTHENTICATED')
       if (!response.ok) throw new Error(text(payload.detail) || 'REQUEST_FAILED')
       return payload
     })
@@ -542,7 +545,7 @@
       instance.drawer.focus()
       wireEvents({...instance, root:instance.drawer, owner:instance})
       instance.drawer.addEventListener('keydown', event => {
-        if (event.key === 'Escape') {if(instance.state.emojiExpanded){event.stopPropagation();closeEmojiPicker(instance,true)}else closeDrawer(instance)}
+        if (event.key === 'Escape') {if(instance.state.emojiExpanded){event.stopPropagation();closeEmojiPicker(instance,true)}else {event.stopPropagation();closeDrawer(instance)}}
         if(event.key.startsWith('Arrow')&&event.target.matches('[data-qc-emoji]')){const buttons=[...instance.drawer.querySelectorAll('[data-qc-emoji]:not([hidden])')],index=buttons.indexOf(event.target),columns=Math.max(1,Math.round(instance.drawer.querySelector('.q-emoji-grid').clientWidth/40)),step=event.key==='ArrowLeft'?-1:event.key==='ArrowRight'?1:event.key==='ArrowUp'?-columns:columns;event.preventDefault();buttons[Math.max(0,Math.min(buttons.length-1,index+step))]?.focus()}
       })
       // 点击评论区以外的任意位置：收起评论区。
@@ -1014,22 +1017,45 @@
     } catch(error) { showToast(instance,text(error.message)) }
     finally { instance.pending.delete(commentId) }
   }
+  function listFavorites(cursor) { return request('@favorites'+(cursor?'?cursor='+encodeURIComponent(cursor):'')) }
+  function removeFavorite(comment) { return request(`${comment.questionId}/comments/${comment.id}/favorite`,{method:'DELETE'}) }
+  async function openFavorite(comment) {
+    if(!comment)throw new Error('评论不存在，请重新读取收藏')
+    // Revalidate permission/deletion and follow cursors so old comments can be located.
+    const owner=currentUser()?.username, comments=[]
+    let cursor=null
+    do {
+      const page=await request(`${comment.questionId}/comments`+(cursor?'?cursor='+encodeURIComponent(cursor):''))
+      comments.push(...(page.comments||[]));cursor=page.nextCursor
+    } while(cursor && !comments.some(row=>row.id===comment.id))
+    if(owner!==currentUser()?.username)throw new Error('UNAUTHENTICATED')
+    if(!comments.some(row=>row.id===comment.id))throw new Error('原评论已删除或不可访问，请重新读取收藏')
+    let focused=[...instances].find(row=>row.questionId===comment.questionId && !row.disposed)
+    if(!focused){
+      const question=comment.question || {},article=document.createElement('article')
+      article.className='q-favorite-question'
+      article.innerHTML=`<button type="button" data-qc-close-question>关闭题目</button><h2>${escapeHTML(comment.questionTitle)}</h2><p>${escapeHTML(question.stem || (question.stemParts||[]).map(part=>part.text||'').join('') || question.title || '')}</p>${global.KGQuestionMaterials?.render?.(question,{readOnly:true,reveal:true}) || ''}<ol>${(question.options || []).map(option=>`<li>${escapeHTML(option.text || option.content || option)}</li>`).join('')}</ol><p>答案：${escapeHTML((question.correctOptionIds||[]).join('、') || question.correctAnswer || question.answer || '')}</p><p>${escapeHTML(question.analysis || question.explanation || '')}</p>`
+      document.body.appendChild(article)
+      focused=mountCard({card:article,questionId:comment.questionId})
+      article.querySelector('[data-qc-close-question]').onclick=()=>{teardown(focused);article.remove()}
+    }
+    activate(focused)
+    Object.assign(focused.state,{expanded:true,favoritesMode:false,comments,commentsCursor:cursor,nextCursor:cursor,loaded:true,error:false})
+    const byId=new Map(comments.map(row=>[row.id,row])),ancestors=new Set()
+    let parent=byId.get(comment.id)?.parentId
+    while(parent&&!ancestors.has(parent)){
+      ancestors.add(parent);focused.state.expandedReplies.add(parent);parent=byId.get(parent)?.parentId
+    }
+    renderInto(focused)
+    const target=focused.drawer?.querySelector(`[data-comment-id="${CSS.escape(comment.id)}"]`)
+    if(target){target.tabIndex=-1;target.scrollIntoView({block:'center'});target.focus()}
+    return focused
+  }
   function returnToQuestion(instance, commentId) {
     const comment=instance.state.favorites.find(c=>c.id===commentId)
     if(!comment)return
-    const target=[...instances].find(row=>row.questionId===comment.questionId)
-    if(target) { closeDrawer(instance); target.anchor.scrollIntoView({block:'center'}); activate(target); target.state.expanded=true; target.state.favoritesMode=false; reload(target); return }
-    const question=comment.question || {}
     closeDrawer(instance)
-    const article=document.createElement('article')
-    article.className='q-favorite-question'
-    article.innerHTML=`<button type="button" data-qc-close-question>关闭题目</button><h2>${escapeHTML(comment.questionTitle)}</h2><p>${escapeHTML(question.stem || (question.stemParts||[]).map(part=>part.text||'').join('') || question.title || '')}</p>${global.KGQuestionMaterials?.render?.(question,{readOnly:true,reveal:true}) || ''}<ol>${(question.options || []).map(option=>`<li>${escapeHTML(option.text || option.content || option)}</li>`).join('')}</ol><p>答案：${escapeHTML((question.correctOptionIds||[]).join('、') || question.correctAnswer || question.answer || '')}</p><p>${escapeHTML(question.analysis || question.explanation || '')}</p>`
-    document.body.appendChild(article)
-    const focused=mountCard({card:article,questionId:comment.questionId})
-    article.querySelector('[data-qc-close-question]').onclick=()=>{teardown(focused);article.remove();activate(instance);instance.root.querySelector('[data-qc-action="favorites"]')?.focus()}
-    activate(focused)
-    focused.state.expanded=true
-    reload(focused)
+    openFavorite(comment).catch(error=>showToast(instance,error.message || '原题评论暂不可访问，请重试'))
   }
   function teardown(target) {
     const selected=target ? [target.__kgQuestionComments || target] : [...instances]
@@ -1059,6 +1085,6 @@
   function closeSettings(){if(settingsDialog){settingsDialog.close();settingsDialog.remove();settingsDialog=null}}
   global.addEventListener('kg-auth-session-change',()=>{closeSettings();countCache.clear();teardown()})
   global.addEventListener('pagehide',()=>{closeSettings();teardown()})
-  global.KGQuestionComments = Object.freeze({ mountPanel, mountCard, mountCards, openPanel, mountDanmaku, teardownSource, pickDanmaku, danmakuEnabled, setDanmakuEnabled, getDanmakuSettings, setDanmakuSettings, openDanmakuSettings, teardown, commentCounts, commentCount })
+  global.KGQuestionComments = Object.freeze({ mountPanel, mountCard, mountCards, openPanel, mountDanmaku, teardownSource, pickDanmaku, danmakuEnabled, setDanmakuEnabled, getDanmakuSettings, setDanmakuSettings, openDanmakuSettings, listFavorites, removeFavorite, openFavorite, teardown, commentCounts, commentCount })
 })(window)
 

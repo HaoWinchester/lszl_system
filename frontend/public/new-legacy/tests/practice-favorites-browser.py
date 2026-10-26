@@ -77,7 +77,7 @@ def harness(page):
         "**/harness",
         lambda r: r.fulfill(
             content_type="text/html",
-            body=f'<!doctype html><html><head><base href="http://localhost/"></head><body{attrs}>{body}</body></html>',
+            body=f'<!doctype html><html><head><meta charset="utf-8"><base href="http://localhost/"></head><body{attrs}>{body}</body></html>',
         ),
     )
     page.goto("http://localhost/harness")
@@ -183,6 +183,64 @@ with sync_playwright() as playwright:
     page.wait_for_function("document.getElementById('practiceFavoritesEmpty').hidden===false")
     assert '收藏' in page.locator('#practiceFavoritesEmpty').inner_text()
     page.keyboard.press('Escape')
+
+    # Unified comment collection, paginated original-comment location and recovery.
+    comment = dict(id='c-old', questionId='q1', content='收藏的深入讨论', questionTitle='以下哪个是正确选项？',
+                   question=dict(title='原题', stemParts=[dict(text='原题题干')], options=[], analysis='原题解析'),
+                   author='同学', createdAt='2026-10-26T01:00:00Z', myFavorite=True, parentId='c-reply')
+    mode = {'state': 'ready', 'removed': False}
+    def comment_favorites(route):
+        if mode['state'] == 'error':
+            route.fulfill(status=503, content_type='application/json', body='{"detail":"网络暂不可用"}')
+        else:
+            route.fulfill(content_type='application/json', body=json.dumps({'comments': [] if mode['removed'] else [comment], 'nextCursor': None}))
+    page.route('**/api/v1/question-comments/favorites*', comment_favorites)
+    def original_comments(route):
+        if mode['state'] == 'denied':
+            route.fulfill(status=403, content_type='application/json', body='{"detail":"原题不可访问"}')
+        elif mode['state'] == 'deleted':
+            route.fulfill(content_type='application/json', body='{"comments":[],"nextCursor":null}')
+        else:
+            page_two='cursor=' in route.request.url
+            ancestors=[dict(id='c-root',questionId='q1',content='主评论'),dict(id='c-reply',questionId='q1',parentId='c-root',content='一级回复')]
+            route.fulfill(content_type='application/json', body=json.dumps({'comments':[comment] if page_two else ancestors, 'nextCursor':None if page_two else 'page-two'}))
+    page.route('**/api/v1/questions/q1/comments*', original_comments)
+    def remove_comment(route):
+        mode['removed'] = True
+        route.fulfill(status=204)
+    page.route('**/api/v1/questions/q1/comments/c-old/favorite', remove_comment)
+    page.locator('#practiceFavoritesOpenBtn').click()
+    page.locator('[data-favorites-kind="comments"]').click()
+    page.get_by_role('button', name='查看原题评论').wait_for()
+    assert '收藏的深入讨论' in page.locator('#practiceFavoritesList').inner_text()
+    assert page.locator('#practiceFavoritesSearch').is_disabled()
+    for state in ['deleted', 'denied']:
+        mode['state'] = state
+        page.get_by_role('button', name='查看原题评论').click()
+        page.wait_for_function("!document.querySelector('[data-comment-favorite-open]').disabled")
+        assert page.locator('.q-favorite-question').count() == 0
+        assert ('删除' if state == 'deleted' else '不可访问') in page.locator('#practiceToast').inner_text()
+    mode['state'] = 'ready'
+    page.get_by_role('button', name='查看原题评论').click()
+    page.locator('.q-comments-drawer [data-comment-id="c-old"]').wait_for()
+    assert page.locator('.q-comments-drawer [data-comment-id="c-old"]').evaluate('(node)=>node===document.activeElement')
+    page.keyboard.press('Escape')
+    page.locator('[data-qc-close-question]').click()
+    mode['state'] = 'error'
+    page.locator('#practiceFavoritesRetry').click()
+    page.wait_for_function("document.querySelector('#practiceFavoritesSummary').textContent==='收藏读取失败'")
+    mode['state'] = 'ready'
+    page.locator('#practiceFavoritesRetry').click()
+    page.get_by_role('button', name='查看原题评论').wait_for()
+    evidence=ROOT.parent / '.superpowers/sdd/2026-10-26-practice-graph-referral/evidence'
+    evidence.mkdir(parents=True, exist_ok=True)
+    for width in [1440,390]:
+        page.set_viewport_size({'width':width,'height':900})
+        page.screenshot(path=str(evidence / f'practice-comment-favorites-{width}.png'))
+        assert page.locator('#practiceFavoritesList').evaluate('(node)=>node.scrollWidth<=node.clientWidth+1')
+    page.locator('[data-comment-favorite-remove]').click()
+    page.wait_for_function("document.getElementById('practiceFavoritesEmpty').hidden===false")
+    assert '还没有收藏的评论' in page.locator('#practiceFavoritesEmpty').inner_text()
 
     assert not errors, errors
     page.close()

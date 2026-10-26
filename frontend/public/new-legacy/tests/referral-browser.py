@@ -53,7 +53,7 @@ with sync_playwright() as playwright:
         assert referral.is_visible(),target+': optional referral input must be visible'
         bounds=referral.bounding_box();assert bounds['x']>=0 and bounds['x']+bounds['width']<=page.viewport_size['width']
         assert referral.input_value()=='0123456789ABCDEF',target+': link must prefill'
-        assert '推荐人与新用户各赠 7 天会员' in page.locator('#authReferralRewardNote').inner_text()
+        assert '好友首次付费后，双方各得 7 天会员' in page.locator('#authReferralRewardNote').inner_text()
         name='browser_'+uuid4().hex[:16]
         page.locator('#authUsername').fill(name);page.locator('#authPassword').fill('test-only-password')
         page.locator('#authLegalConsent').check()
@@ -98,7 +98,7 @@ with sync_playwright() as playwright:
         link=page.locator('#ucReferralLink').input_value()
         assert link==args.base_url+'/practice-mode.html?referralCode='+code
         assert '已注册 0 人' in page.locator('#ucReferralBox').inner_text()
-        assert '双方各赠 7 天会员' in page.locator('#ucReferralBox').inner_text()
+        assert '双方各得 7 天会员' in page.locator('#ucReferralBox').inner_text()
         page.wait_for_function("KGSubscription.subscriptionSummary(KGAuthCore.currentUser().username).subscription.planId==='free'")
         # A real visitor follows the generated link and registers, then the
         # inviter sees only an aggregate from the actual binding table.
@@ -110,15 +110,15 @@ with sync_playwright() as playwright:
         visitor.locator('#authUsername').fill(child);visitor.locator('#authPassword').fill('test-only-password')
         visitor.locator('#authLegalConsent').check();visitor.locator('#authRegisterBtn').click()
         visitor.wait_for_function('!!KGAuthCore.currentUser()')
-        visitor.wait_for_function('KGServerEntitlements.allExamPapers===true')
-        assert page.evaluate('KGServerEntitlements.allExamPapers') is False, 'inviter cache begins as free until refreshed'
+        visitor.wait_for_function('KGServerEntitlements.allExamPapers===false')
         page.evaluate('KGUserCenter.open()')
         page.wait_for_function("document.getElementById('ucReferralBox').textContent.includes('已注册 1 人')")
-        page.wait_for_function('KGServerEntitlements.allExamPapers===true')
-        page.wait_for_function("document.getElementById('ucSubscriptionBox').textContent.includes('来源：推荐奖励')")
-        assert 'referral' not in page.locator('#ucSubscriptionBox').inner_text()
-        assert page.evaluate("KGSubscription.subscriptionSummary(KGAuthCore.currentUser().username).subscription.source")=='referral'
-        assert page.evaluate("KGSubscription.subscriptionSummary(KGAuthCore.currentUser().username).subscription.planId")=='monthly'
+        assert '已完成奖励 0 人' in page.locator('#ucReferralBox').inner_text()
+        assert page.evaluate('KGServerEntitlements.allExamPapers') is False
+        assert page.evaluate("KGSubscription.subscriptionSummary(KGAuthCore.currentUser().username).subscription.planId")=='free'
+        assert page.locator('#ucReferralBox .uc-card-icon').count()==1
+        card=page.locator('#ucReferralBox').bounding_box()
+        assert card['width'] <= page.viewport_size['width']
         assert child not in page.locator('#ucReferralBox').inner_text()
         visitor_context.close()
         page.locator('#userCenterCloseBtn').click()

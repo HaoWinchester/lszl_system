@@ -79,3 +79,10 @@ test('a single manual relation never bundles its own parallel backtrack segments
  const result=plan([item('alone',{hasStoredWaypoints:true,waypoints:[{x:100,y:0},{x:100,y:200},{x:112,y:200},{x:112,y:0}]})]);
  assert.equal(result.segmentChannels.size,0);
 });
+
+test('opposite directions and incompatible styles never share a trunk channel',()=>{
+ const a=item('forward',{hasStoredWaypoints:true,bundleKey:'blue',waypoints:[{x:100,y:0},{x:100,y:200}]}),
+ b=item('reverse',{hasStoredWaypoints:true,bundleKey:'blue',waypoints:[{x:112,y:200},{x:112,y:0}]}),
+ c=item('other-style',{hasStoredWaypoints:true,bundleKey:'red',waypoints:[{x:115,y:0},{x:115,y:200}]});
+ const result=plan([a,b,c]);assert.equal(result.segmentChannels.size,0);assert.equal(result.endpoints.size,2,'only matching style endpoints may be bundled');
+});
