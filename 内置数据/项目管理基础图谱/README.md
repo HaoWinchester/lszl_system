@@ -33,4 +33,8 @@ python3 -m unittest discover -s 内置数据/shared -p 'test_*.py' -v
 
 `catalog.json` 保留既有发布器所需的 `graphs/id/name/file/nodeCount/linkCount/description` 字段；新增稳定 `packageId`、每行 `category`、`sourceKey`、图文件 `sha256`、`packageFile` 与 ZIP `packageSha256`。sourceKey 为 packageId + ':' + topicId。新内容包不借用旧 PMP ID。学习包沿用现有导出器的实际导出时间，因此重新生成 ZIP 后应一并保存更新的目录 ZIP 哈希；图文件哈希稳定。不要为验证而重建旧 PMP ZIP。
 
-当前目录不执行数据库导入或远端发布。分类、库源文件创建与安全旧源修复由独立服务层发布工具负责。严禁通过客户端 API 绕过保留的 builtin-template source 限制。
+## 服务层导入与发布
+
+`publish-uat.py`（默认只读 UAT）与 `import-local.py`（显式 ENV=dev / kg_graph_dev）共同使用 `../shared/publication.py`。新源为隐藏库源，分类持久化为 prince2/cspm/gaoxiang；不创建个人导入原件或选择当前文件。明确 `--apply` 才写入，重跑零新增；同名、来源、owner、当前源或不可变快照冲突整批中止。
+
+完整本地/远端命令、运行目录与 Python、复制所需 helper/包目录布局、旧 PMP receipt 精确修复及 fresh backup-evidence 格式见 [共享发布说明](../shared/README-publication.md)。严禁通过客户端 API 绕过保留的 builtin-template source 限制。

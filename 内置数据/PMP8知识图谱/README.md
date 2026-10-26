@@ -6,7 +6,7 @@
 
 ## 查看与导入
 
-- 本地服务：<http://127.0.0.1:5173/graph>。管理员登录后，在文件管理中打开 **PMP8 · 30套知识图谱** 文件夹，或点击左侧“模板”查看、加载副本。
+- 本地服务：<http://127.0.0.1:5173/graph>。登录后点击“模板”查看、加载个人副本；库内部源文件不进入个人文件管理。
 - `graphs/`：每套图谱一个原生 JSON，可用现有“导入学习包”导入。
 - `packages/`：使用现有 `KGHomePackageService` 导出的 30 个 ZIP 学习包，每次选一个导入。
 - `catalog.json`：主题目录、分类、布局和节点数量。
@@ -14,9 +14,7 @@
 
 重新生成并校验：`node 内置数据/PMP8知识图谱/build.mjs && node 内置数据/PMP8知识图谱/validate-layout.mjs`。
 
-本地导入：`python3 内置数据/PMP8知识图谱/import-local.py --username admin`，按提示输入本地密码。脚本只接受回环地址，经现有 API 创建个人文件与免费模板；遇到同名但已改变的图谱会停止，避免覆盖个人修改。它不会部署代码或连接 UAT/正式服务器。
-
-对本轮已生成的本地图谱更新视觉：追加 `--refresh-visuals`。该模式先进行几何校验，再备份当前内容，只更新本轮文件的样式、位置与关系路径，保留卡片正文与个人学习状态，通过正式版本 API 发布模板新版本；已加载的个人副本保持独立。
+本地导入改为受保护的服务层入口，不再创建个人 imported 原件；必须使用后端虚拟环境并显式 `ENV=dev`，默认只读。旧 `--username` 保留，`--refresh-visuals` 已废止并明确报错。完整命令、旧 receipt 精确修复与新备份证据格式见 [共享发布说明](../shared/README-publication.md)。
 
 ## 内容组织
 
@@ -50,22 +48,6 @@
 
 ## UAT 基础模板发布
 
-`publish-uat.py` 通过现有文件与模板服务创建免费、已上架的基础模板，维护来源为管理员 `admin`。默认目标为 `ENV=uat` / `kg_graph_uat`，执行只读计划，明确传入 `--apply` 才会写入。只有显式指定 `--environment prod` 才接受 `ENV=prod` / `kg_graph`，交叉环境或开发库一律拒绝。
+`publish-uat.py` 是共享发布器的薄入口，默认只读 UAT，`--apply` 写入；正式环境必须显式 `--environment prod`。准确 ENV、配置与实际数据库均需匹配，远端入口拒绝 dev。已有同来源、owner、快照和当前源内容的出版物仅补 `pmp` 分类，不增加版本、不覆盖正文。原 catalog 的中文子主题保持原字节，由准确 packageId 映射到公共分类。
 
-发布前先备份 UAT 当前代码、运行资产与数据库，校验备份非空且可读取，再将 `catalog.json`、`graphs/` 与该脚本传到 UAT 后端的临时包目录。该操作不需要重建镜像或重启服务。
-
-```text
-python /tmp/pmp8-foundation/publish-uat.py --report /tmp/pmp8-foundation/plan.json
-python /tmp/pmp8-foundation/publish-uat.py --apply --report /tmp/pmp8-foundation/published.json
-```
-
-已有同一批次且内容相同的模板会复用；名称、归属或内容冲突会中止，不覆盖已有模板。模板更新不会修改学员已加载的副本。
-
-正式发布必须先取得用户 UAT 验收与正式发布授权，并备份正式代码、运行资产与 `kg_graph` 数据库，确认非空、归档可读并生成 manifest；之后使用同一内容包：
-
-```text
-python /tmp/pmp8-foundation/publish-uat.py --environment prod --report /tmp/pmp8-foundation/plan.json
-python /tmp/pmp8-foundation/publish-uat.py --environment prod --apply --report /tmp/pmp8-foundation/published.json
-```
-
-这是内容数据发布；不替换 active release、不运行站点构建或数据库迁移、不重启应用。
+复制远端时必须同时复制兄弟 `shared/publication.py`；完整包目录布局、容器工作目录、备份纪律与可复制命令见 [共享发布说明](../shared/README-publication.md)。
