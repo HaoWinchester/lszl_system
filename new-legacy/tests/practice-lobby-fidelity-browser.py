@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Chrome checks the approved lobby control skin using the real page and CSS cascade.
 
-Business responses are explicit DOM fixtures; the API-backed workflow companion is
+Business responses are explicit drawer fixtures; the API-backed workflow companion is
 practice-lobby-design-browser.py. No production or UAT data is read or written.
 """
 import argparse
@@ -18,7 +18,7 @@ parser.add_argument('--capture', choices=['before', 'after'], default='after')
 args = parser.parse_args()
 fixture = Path(__file__).with_name('practice-mark-show-answers-browser.py')
 setup = fixture.read_text().split('    # ---------- 场景 1：')[0]
-setup = setup.replace('    "src/100-practice-mode.js",', '    "src/practice/lobby-dashboard.js",\n    "src/100-practice-mode.js",')
+setup = setup.replace('    "src/100-practice-mode.js",', '    "src/119-question-comments.js",\n    "src/120-question-favorites.js",\n    "src/100-practice-mode.js",')
 setup = setup.replace('viewport={"width": 1440, "height": 960}', 'viewport={"width": 1505, "height": 1045}')
 # Read every linked stylesheet in its actual order, including the global skin.
 start = setup.index('    for stylesheet in [')
@@ -28,62 +28,63 @@ setup = setup[:start] + '''    for stylesheet in re.findall(r'<link[^>]+href="([
 ''' + setup[end:]
 scenario = '''
     page.emulate_media(reduced_motion='reduce')
-    # Preserve the real rendered DOM, isolate dashboard events for callback checks.
-    page.evaluate("""()=>{
-      const root=document.querySelector('.practice-main');const copy=root.cloneNode(true);root.replaceWith(copy);
-      window.__actions=[];window.__fail=false;
-      window.__rows=[{sessionId:'resume-1',paperName:'PMP 敏捷精讲题20题',createdAt:'2024-12-28T11:40:00Z',status:'paused',total:20,answered:8,correct:6,durationMs:1680000},
-        {sessionId:'report-1',paperName:'PMP 预测精讲综合练习10题',createdAt:'2024-12-26T06:12:00Z',status:'completed',reportAvailable:true,total:10,answered:10,correct:8,durationMs:360000}];
-      const api=window.KGPracticeLobbyDashboard.create({root:copy,getUser:()=> 'fixture-user',getHistory:async()=>{if(window.__fail)throw Error('offline');return window.__rows},getFavorites:async()=>({favorites:[{questionId:'favorite-1',stemText:'如何处理已识别风险？',favoritedAt:'2024-12-26T06:12:00Z'}]}),
-        onResume:id=>__actions.push(['resume',id]),onReport:id=>__actions.push(['report',id]),onFavorite:id=>__actions.push(['favorite',id]),onHistory:()=>__actions.push(['history']),onFavorites:()=>__actions.push(['favorites']),onSettings:()=>{}});
-      window.__dashboard=api;api.refresh();
-    }""")
-    expect(page.locator('#practiceRecentBody tr')).to_have_count(2)
+    assert page.locator('#practiceRecentPanel').count() == 0
+    assert page.locator('.practice-recent').count() == 0
     assert page.locator('[data-lobby-open="reports"]').count() == 0
-    assert page.locator('#practiceHistoryOpenBtn').count() == 1
-    page.wait_for_timeout(800)
+    for selector in ['#practiceHistoryOpenBtn', '#practiceFavoritesOpenBtn']:
+        expect(page.locator(selector)).to_have_count(1)
+        expect(page.locator(selector)).to_be_visible()
+        expect(page.locator(selector)).to_be_enabled()
+    page.evaluate("""()=>{
+      KGPracticeLearningApi.listSessions=async()=>[
+        {sessionId:'resume-1',paperId:'paper-1',paperName:'PMP 模拟卷',mode:'practice',createdAt:'2024-12-28T11:40:00Z',status:'paused',total:20,answered:8,correct:6},
+        {sessionId:'report-1',paperId:'paper-1',paperName:'PMP 模拟卷',mode:'challenge',createdAt:'2024-12-26T06:12:00Z',status:'completed',reportAvailable:true,total:10,answered:10,correct:8}];
+    }""")
+    page.locator('#practiceHistoryOpenBtn').click()
+    expect(page.locator('#practiceHistoryDrawer')).to_be_visible()
+    expect(page.locator('.practice-history-group')).to_have_count(1)
+    page.locator('.practice-history-group summary').click()
+    expect(page.locator('[data-history-resume="resume-1"]')).to_be_visible()
+    expect(page.locator('[data-history-session="report-1"]')).to_be_visible()
+    page.keyboard.press('Escape')
+    expect(page.locator('#practiceHistoryDrawer')).to_be_hidden()
+    favorites={'failed':False,'rows':[{'questionId':'favorite-1','stemText':'如何处理已识别风险？','favoritedAt':'2024-12-26T06:12:00Z'}]}
+    def favorite_response(route):
+        route.fulfill(status=503,json={'detail':'offline'}) if favorites['failed'] else route.fulfill(json={'favorites':favorites['rows'],'nextCursor':None})
+    page.route('**/api/v1/question-favorites?*',favorite_response)
+    page.route('**/api/v1/question-comments/favorites*',lambda route:route.fulfill(json={'comments':[],'nextCursor':None}))
+    page.locator('#practiceFavoritesOpenBtn').click()
+    expect(page.locator('#practiceFavoritesDrawer')).to_be_visible()
+    expect(page.locator('#practiceFavoritesList [data-favorite-item]')).to_have_count(1)
+    favorites['failed']=True
+    page.locator('#practiceFavoritesRetry').click()
+    expect(page.locator('#practiceFavoritesList [data-favorite-item]')).to_have_count(0)
+    expect(page.locator('#practiceFavoritesEmpty')).to_be_visible()
+    favorites['failed']=False
+    page.locator('#practiceFavoritesRetry').click()
+    expect(page.locator('#practiceFavoritesList [data-favorite-item]')).to_have_count(1)
+    page.locator('[data-favorites-kind="comments"]').click()
+    expect(page.locator('[data-favorites-kind="comments"]')).to_have_attribute('aria-pressed','true')
+    expect(page.locator('#practiceFavoritesEmpty')).to_be_visible()
+    expect(page.locator('#practiceFavoritesSummary')).not_to_contain_text('失败')
+    page.keyboard.press('Escape')
+    expect(page.locator('#practiceFavoritesDrawer')).to_be_hidden()
     page.mouse.move(0,0)
     page.evaluate('scrollTo(0,0)')
     page.screenshot(path=str(OUT / ('ui-'+args.capture+'-desktop.png')), full_page=True)
-    page.locator('.practice-recent').screenshot(path=str(OUT / ('ui-'+args.capture+'-recent.png')))
     def styles(selector):
-        return page.locator(selector).evaluate("""e=>{const s=getComputedStyle(e);return Object.fromEntries(['borderTopWidth','borderRightWidth','borderBottomWidth','borderBottomColor','borderLeftWidth','borderRadius','boxShadow','backgroundColor','fontSize','fontFamily','fontWeight','paddingTop','paddingRight','paddingBottom','paddingLeft','transform'].map(k=>[k,s[k]]))}""")
-    observed={selector:styles(selector) for selector in ['#practiceRecentHistoryTab','#practiceRecentFavoritesTab','.practice-recent-more','[data-recent-resume]','[data-recent-report]']}
+        return page.locator(selector).evaluate("""e=>{const s=getComputedStyle(e);return Object.fromEntries(['borderRadius','boxShadow','backgroundColor','color','opacity','pointerEvents','transform'].map(k=>[k,s[k]]))}""")
+    observed={selector:styles(selector) for selector in ['#practiceHistoryOpenBtn','#practiceFavoritesOpenBtn']}
     cards=page.locator('.practice-mode-card').evaluate_all('(es)=>es.map(e=>({class:e.className,height:e.getBoundingClientRect().height,y:e.getBoundingClientRect().y}))')
     (OUT / ('ui-'+args.capture+'-computed.json')).write_text(json.dumps({'controls':observed,'cards':cards},ensure_ascii=False,indent=2))
     for selector,s in observed.items():
-        assert s['borderRadius']=='0px',(selector,'rounded control',s)
-        assert s['boxShadow']=='none',(selector,'global button outline/shadow',s)
-        assert s['borderTopWidth']==s['borderRightWidth']==s['borderLeftWidth']=='0px',(selector,s)
-        assert s['backgroundColor']=='rgba(0, 0, 0, 0)',(selector,s)
-        assert s['transform']=='none',(selector,s)
-        assert s['fontSize']==('14px' if 'Tab' in selector else '11px'),(selector,s)
-        assert s['paddingLeft']==s['paddingRight']=='0px',(selector,s)
-        if 'Tab' in selector:
-            assert s['borderBottomWidth']=='2px' and s['paddingTop']=='0px' and s['paddingBottom']=='10px',(selector,s)
-        elif selector!='.practice-recent-more':
-            assert s['borderBottomWidth']=='0px' and s['paddingTop']==s['paddingBottom']=='4px',(selector,s)
+        assert s['opacity']=='1' and s['pointerEvents']!='none',(selector,'available navigation must not appear disabled',s)
+        before=page.locator(selector).bounding_box()
         page.locator(selector).hover()
-        hover=styles(selector)
-        assert hover['boxShadow']=='none' and hover['transform']=='none',(selector,'hover regression',hover)
-    assert len(set(round(c['height'],2) for c in cards))==1,('mode card heights',cards)
-    page.locator('#practiceRecentHistoryTab').focus()
-    page.keyboard.press('ArrowRight')
-    expect(page.locator('#practiceRecentFavoritesTab')).to_have_attribute('aria-selected','true')
-    expect(page.locator('#practiceRecentFavoritesTab')).to_be_focused()
-    expect(page.locator('#practiceRecentFavoritesTab')).to_have_css('border-bottom-color','rgb(118, 81, 238)')
-    expect(page.locator('[data-recent-favorite]')).to_have_count(1)
-    page.locator('[data-recent-favorite]').click()
-    page.keyboard.press('Home')
-    page.locator('#practiceRecentFavoritesTab').focus();page.keyboard.press('Home')
-    expect(page.locator('#practiceRecentHistoryTab')).to_have_attribute('aria-selected','true')
-    page.locator('[data-recent-resume]').click();page.locator('[data-recent-report]').click()
-    assert page.evaluate('__actions')==[['favorite','favorite-1'],['resume','resume-1'],['report','report-1']]
-    page.evaluate('__fail=true');page.locator('#practiceRecentFavoritesTab').click();page.locator('#practiceRecentHistoryTab').click()
-    expect(page.locator('[data-recent-retry]')).to_be_visible();expect(page.locator('#practiceRecentBody tr')).to_have_count(0)
-    page.evaluate('__fail=false');page.locator('[data-recent-retry]').click();expect(page.locator('#practiceRecentBody tr')).to_have_count(2)
-    page.evaluate('__rows=[]');page.evaluate('__dashboard.refresh()');expect(page.locator('.practice-recent-table')).to_be_hidden()
-    expect(page.locator('#practiceRecentStatus')).to_contain_text('完成或保存')
+        after=page.locator(selector).bounding_box()
+        assert abs(before['width']-after['width'])<.1 and abs(before['height']-after['height'])<.1,(selector,'hover must preserve control size')
+        page.locator(selector).focus();expect(page.locator(selector)).to_be_focused()
+    assert len(cards)==4 and len(set(round(c['height'],2) for c in cards))==1,('mode card heights',cards)
     page.set_viewport_size({'width':390,'height':844})
     # Let Chrome complete responsive layout before checking header geometry.
     page.evaluate('() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))')
@@ -109,6 +110,6 @@ scenario = '''
     expect(page.locator('#accountMenu')).to_be_hidden()
     assert not errors,errors
     browser.close()
-print('practice lobby fidelity: 5 control computed/hover skins, 4 equal mode cards, keyboard tabs, 3 action callbacks, error/retry/empty and mobile passed')
+print('practice lobby fidelity: no duplicate panel, sidebar history/favorites/comment category, error/retry/empty, 4 equal mode cards and mobile navigation passed')
 '''
 exec(compile(setup + scenario, str(Path(__file__)), 'exec'))
