@@ -1,14 +1,10 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.401",
+  "fromVersion": "v9.0-p4.1.402",
   "toVersion": "v9.0-p4.1.402",
   "changes": {
     "added": [],
-    "changed": [
-      "VERSION",
-      "content-prep-studio/dist/content-prep.html",
-      "src/10-graph-editor.js"
-    ],
+    "changed": [],
     "removed": []
   },
   "incompatible": []
