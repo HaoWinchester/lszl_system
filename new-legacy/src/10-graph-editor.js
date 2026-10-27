@@ -250,7 +250,8 @@ function linkRenderPoints(link,nodeMap=null,options={}){
   return{...points,mainGraph:true,a:override?.from||points.a,b:override?.to||points.b};
 }
 let edgeBundleMemo={time:0,plan:null};
-function linkBundleKey(link){return JSON.stringify([pathStyleForLink(link),link.lineStyle||'solid',link.color||state.defaults.linkColor,Number(link.strokeWidth)||4,link.arrowStyle||'none'])}
+// Arrowheads stay independent at each endpoint; only the trunk's stroke must match.
+function linkBundleKey(link){return JSON.stringify([pathStyleForLink(link),link.lineStyle||'solid',link.color||state.defaults.linkColor,Number(link.strokeWidth)||4])}
 function mainGraphNodeMap(){if(typeof getGraphIndex!=='function')return null;try{return getGraphIndex().nodeMap}catch(_){return null}}
 function currentEdgeBundlePlan(){
   if(typeof window==='undefined'||!window.KGGraphEdgeBundle?.plan)return null;
