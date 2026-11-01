@@ -267,9 +267,9 @@ with sync_playwright() as playwright:
         assert {private_question_id, public_question_id, internal_question_id} <= managed_ids
         learning_catalog = assert_ok(
             student.request.get(
-                BASE + "/api/v1/question-catalog/bootstrap?mode=learning&include_questions=true"
+                BASE + f"/api/v1/question-catalog/learning/questions?bank_id={published_bank['id']}&page_size=20"
             ),
-            "learning catalog",
+            "paginated learning catalog",
         )
         learning_ids = {item["id"] for item in learning_catalog["questions"]}
         assert public_question_id in learning_ids

@@ -1,10 +1,14 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.402",
-  "toVersion": "v9.0-p4.1.402",
+  "fromVersion": "v9.0-p4.1.403",
+  "toVersion": "v9.0-p4.1.404",
   "changes": {
     "added": [],
-    "changed": [],
+    "changed": [
+      "VERSION",
+      "content-prep-studio/dist/content-prep.html",
+      "tests/knowledge-dashboard-browser.py"
+    ],
     "removed": []
   },
   "incompatible": []
