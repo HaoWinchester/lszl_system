@@ -192,7 +192,13 @@ with sync_playwright() as pw:
         if width>850:
             cb=child.bounding_box();lb=page.locator('[data-knowledge-list]').bounding_box()
             assert lb['y']+lb['height']<=cb['y']+cb['height']-10, (cb,lb)
-        assert child.evaluate('e=>[...e.querySelectorAll("button")].filter(b=>b.getClientRects().length).every(b=>b.getBoundingClientRect().height>=44)')
+        # Hover translation can report 43.999938px for a 44px layout box.
+        # Keep the layout requirement and allow only sub-pixel measurement error.
+        undersized = child.evaluate('''e=>[...e.querySelectorAll("button")]
+            .filter(b=>b.getClientRects().length)
+            .filter(b=>b.offsetHeight<44 || b.getBoundingClientRect().height<43.99)
+            .map(b=>({text:b.textContent,height:b.getBoundingClientRect().height,layoutHeight:b.offsetHeight}))''')
+        assert not undersized, {'viewport': (width,height), 'undersized': undersized}
         listing=page.locator('[data-knowledge-list]');listing.scroll_into_view_if_needed()
         listing.evaluate('e=>e.scrollTop=0');r=listing.bounding_box()
         page.mouse.move(r['x']+r['width']/2,r['y']+min(r['height']/2,150));page.mouse.wheel(0,260);page.wait_for_timeout(180)
