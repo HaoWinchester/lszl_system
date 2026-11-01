@@ -27,7 +27,7 @@
 - [x] Wire bootstrap guard before rate limiting, global IP enforcement and administrator listing/unlock APIs; reuse `paused` and audit logging.
 - [x] Configure trusted UAT/production Docker gateway forwarding using the verified deployment network, and have the existing rate limiter share the same resolver.
 - [x] Update the old graph-access test to use summary bootstrap, keeping public visibility and answer assertions in paginated normal learning tests.
-- [ ] Run the focused regression tests, then full backend and frontend checks; fix only related regressions.
+- [x] Run the focused regression tests, then full backend and frontend checks; fix only related regressions.
 
 ### Task 3: Integrate and deploy to UAT
 
