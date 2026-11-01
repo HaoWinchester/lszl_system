@@ -18,15 +18,15 @@
 
 ### Task 1: Reproduce and define the boundary
 
-- [ ] Add `backend/tests/test_bootstrap_security.py` with real HTTP and database checks for forbidden bulk requests, persisted locks, account suspension, safe normal callers, spoofed forwarding and admin recovery.
-- [ ] Run `.venv/bin/python -m pytest tests/test_bootstrap_security.py -q` and confirm current code returns 200 where 403 is required.
+- [x] Add `backend/tests/test_bootstrap_security.py` with real HTTP and database checks for forbidden bulk requests, persisted locks, account suspension, safe normal callers, spoofed forwarding and admin recovery.
+- [x] Run `.venv/bin/python -m pytest tests/test_bootstrap_security.py -q` and confirm current code returns 200 where 403 is required.
 
 ### Task 2: Implement and retain normal behavior
 
-- [ ] Add `backend/app/core/client_ip.py`, `backend/app/models/security.py`, the Alembic migration and `backend/app/services/content_security_service.py` for trusted IP resolution and persistent enforcement.
-- [ ] Wire bootstrap guard before rate limiting, global IP enforcement and administrator listing/unlock APIs; reuse `paused` and audit logging.
-- [ ] Configure trusted UAT/production Docker gateway forwarding using the verified deployment network, and have the existing rate limiter share the same resolver.
-- [ ] Update the old graph-access test to use summary bootstrap, keeping public visibility and answer assertions in paginated normal learning tests.
+- [x] Add `backend/app/core/client_ip.py`, `backend/app/models/security.py`, the Alembic migration and `backend/app/services/content_security_service.py` for trusted IP resolution and persistent enforcement.
+- [x] Wire bootstrap guard before rate limiting, global IP enforcement and administrator listing/unlock APIs; reuse `paused` and audit logging.
+- [x] Configure trusted UAT/production Docker gateway forwarding using the verified deployment network, and have the existing rate limiter share the same resolver.
+- [x] Update the old graph-access test to use summary bootstrap, keeping public visibility and answer assertions in paginated normal learning tests.
 - [ ] Run the focused regression tests, then full backend and frontend checks; fix only related regressions.
 
 ### Task 3: Integrate and deploy to UAT

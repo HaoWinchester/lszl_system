@@ -151,7 +151,7 @@ def test_nonmember_grant_asset_context_and_public_catalog_semantics(data):
                     public=next(q for q in response.json()['questions'] if q['id']==d.both)
                     assert public['correctAnswer']=='A' and public['analysis']=='SECRET ANALYSIS'
                 if 'paper_id' in params:assert d.both in ids
-            boot=c.get('/api/v1/question-catalog/bootstrap',params={'include_questions':'true','subject':'PMP'})
+            boot=c.get('/api/v1/question-catalog/bootstrap',params={'subject':'PMP'})
             assert boot.status_code==200,boot.text
             assert d.q not in {q['id'] for q in boot.json().get('questions',[])}
 

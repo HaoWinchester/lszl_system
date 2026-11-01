@@ -35,6 +35,7 @@ from app.models.shared_runtime_state import SharedRuntimeState
 from app.models.subscription import RedeemCode, Subscription, SubscriptionOrder
 from app.models.subject_facet import SubjectFacetSchema
 from app.models.system import RoleTheme, SystemSetting
+from app.models.security import SecurityIPBlock
 from app.models.teaching_content import (
     ActivityCollection,
     ActivityOverride,
@@ -71,6 +72,7 @@ __all__ = [
     "WechatMiniSession",
     "RoleTheme",
     "SystemSetting",
+    "SecurityIPBlock",
     "Folder",
     "GraphFile",
     "FileContent",

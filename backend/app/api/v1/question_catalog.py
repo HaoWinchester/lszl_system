@@ -19,11 +19,15 @@ from app.schemas.question_catalog import (
     CatalogQuestionResponse,
     TeachingContentRevisionResponse,
 )
-from app.services import question_catalog_service, teaching_content_revision_service
+from app.services import content_security_service, question_catalog_service, teaching_content_revision_service
 
 router = APIRouter(prefix="/question-catalog", tags=["question-catalog"])
 DB = Annotated[AsyncSession, Depends(get_db)]
 CatalogManager = Annotated[User, Depends(require_permissions("accessQuestionBank"))]
+
+
+async def bootstrap_bulk_guard(request: Request, db: DB, include_questions: bool = Query(False)):
+    await content_security_service.guard_bootstrap_bulk_read(db, request, include_questions)
 
 
 @router.get("/revision", response_model=TeachingContentRevisionResponse)
@@ -123,6 +127,7 @@ async def list_learning_questions(
 async def bootstrap(
     request: Request,
     db: DB,
+    _bulk: Annotated[None, Depends(bootstrap_bulk_guard)] = None,
     _: QuestionRateLimited = None,
     mode: Literal["managed", "learning"] = Query("learning"),
     subject: str | None = Query(None),

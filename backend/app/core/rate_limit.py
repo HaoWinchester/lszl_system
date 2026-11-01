@@ -11,6 +11,7 @@ from fastapi import Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import optional_current_user
+from app.core.client_ip import client_ip
 from app.core.config import settings
 from app.db.session import get_db
 from app.models.user import User
@@ -20,16 +21,6 @@ logger = logging.getLogger(__name__)
 _BUCKET_TTL_SECONDS = 3600.0
 _WINDOW_SECONDS = 60.0
 _hits: dict[str, deque[float]] = {}
-
-
-def client_ip(request: Request) -> str:
-    real_ip = request.headers.get("x-real-ip")
-    if real_ip:
-        return real_ip.strip()
-    forwarded_for = request.headers.get("x-forwarded-for")
-    if forwarded_for:
-        return forwarded_for.split(",")[0].strip()
-    return request.client.host if request.client else "unknown"
 
 
 def reset_all() -> None:

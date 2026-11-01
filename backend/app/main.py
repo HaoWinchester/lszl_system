@@ -15,8 +15,10 @@ from app.core.session import SessionMiddleware
 
 from app.api.v1.router import api_router
 from app.core.config import settings
+from app.core.client_ip import client_ip
 from app.db.session import AsyncSessionLocal, engine
 from app.services.builtin_teaching_content_seed_service import BuiltinSeedSummary
+from app.services.content_security_service import is_ip_blocked
 from app.web.routes import router as web_router
 
 logging.basicConfig(level=logging.INFO)
@@ -163,6 +165,15 @@ def _normalize_localhost_request(request: Request):
 
 @app.middleware("http")
 async def ensure_shared_local_session(request: Request, call_next):
+    ip = client_ip(request)
+    if ip is not None and request.url.path != f"{settings.API_V1_PREFIX}/health":
+        async with AsyncSessionLocal() as db:
+            if await is_ip_blocked(db, ip):
+                return JSONResponse(
+                    status_code=403,
+                    content={"detail": {"code": "IP_LOCKED", "message": "当前 IP 已锁定，请联系管理员"}},
+                    headers={"Cache-Control": "no-store"},
+                )
     redirect_response = _normalize_localhost_request(request)
     if redirect_response is not None:
         return redirect_response

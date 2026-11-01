@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     RATE_LIMIT_ENABLED: bool = True
     RATE_LIMIT_QUESTIONS_PER_MINUTE: int = 60
     RATE_LIMIT_QUESTIONS_IP_PER_MINUTE: int = 120
+    # Only these direct peers may supply X-Real-IP; never trust arbitrary XFF.
+    TRUSTED_PROXY_CIDRS: list[str] = ["127.0.0.1/32", "::1/128"]
 
     # itsdangerous 签名密钥（生产必改）
     SECRET_KEY: str = "change-me-in-prod"

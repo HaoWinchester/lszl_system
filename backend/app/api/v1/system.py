@@ -6,7 +6,7 @@ GET 类登录即可（前端需读主题），写操作仅管理员。
 from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import CurrentUser, require_role
@@ -15,11 +15,25 @@ from app.models.user import User
 from app.schemas.analytics import FeatureAnalyticsQuery
 from app.schemas.feature_usage import UsageQuery
 from app.services import feature_usage_service
-from app.services import analytics_service, system_service, user_service
+from app.services import analytics_service, content_security_service, system_service, user_service
 
 router = APIRouter(prefix="/system", tags=["system"])
 DB = Annotated[AsyncSession, Depends(get_db)]
 AdminUser = Annotated[User, Depends(require_role("admin"))]
+
+
+@router.get("/security/ip-blocks")
+async def security_ip_blocks(db: DB, _: AdminUser, limit: int = Query(100, ge=1, le=200), offset: int = Query(0, ge=0)):
+    return {"blocks": await content_security_service.list_ip_blocks(db, limit=limit, offset=offset)}
+
+
+@router.delete("/security/ip-blocks/{ip}")
+async def release_security_ip_block(ip: str, db: DB, admin: AdminUser):
+    try:
+        await content_security_service.release_ip_block(db, ip, admin.username)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail="IP 地址格式无效") from error
+    return {"ok": True}
 
 
 # ---------- 权限矩阵 ----------
