@@ -32,9 +32,9 @@
 ### Task 3: Integrate and deploy to UAT
 
 - [x] Review diff and verify main/uat still exist. Commit feature, merge into uat and push using the required proxy; verify remote branch hash.
-- [ ] Run existing `deploy/update-uat.sh` and complete release validation, browser checks and public version checks; commit/push generated tracked release artifacts.
-- [ ] Verify first-hit enforcement with isolated UAT fixtures, clean up test blocks/accounts, write verification evidence and report the UAT URL to the user.
+- [x] Run existing `deploy/update-uat.sh` and complete release validation, browser checks and public version checks; commit/push generated tracked release artifacts.
+- [x] Verify first-hit enforcement with isolated UAT fixtures, clean up test blocks/accounts, write verification evidence and report the UAT URL to the user.
 
-## 当前阻塞
+## UAT 交付状态
 
-完整校验通过并已合入、推送 uat。部署脚本在服务替换前因服务器仅余 2.9GB、低于 5GB 门槛而中止；构建缓存/悬空镜像清理未释放空间。等待用户扩容或指定允许清理的目录。UAT 仍为 402，线上封禁验收脚本尚未运行；main 未更新。
+用户清理服务器空间后已完成 UAT 404 部署、首次封禁/解锁及四页登录退出在线检查、实际 3 题练习和刷新后进度持久化检查。所有临时账号/测试数据及测试 IP 锁定已清理；回退镜像已保留。等待用户本人业务验收，main 与正式环境未更新。
