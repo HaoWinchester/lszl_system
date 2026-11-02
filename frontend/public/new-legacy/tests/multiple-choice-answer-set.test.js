@@ -55,3 +55,28 @@ test('multiple-choice release validation requires 3-8 options, 2 correct, a dist
   assert.ok(Answers.validate({ ...base, analysis: '' }, { release: true }).length);
   assert.deepEqual(plain(Answers.validate({ ...base, analysis: '' })), []);
 });
+
+test('formats complete correct answers using canonical option order and legacy flags', () => {
+  const options = [...'ABCDEF'].map(id => ({ id }));
+  assert.equal(Answers.correctAnswerText({
+    type: 'multiple_choice', options, correctOptionIds: ['D', 'A', 'C', 'A'],
+  }), 'A、C、D');
+  assert.equal(Answers.correctAnswerText({
+    type: 'multiple_choice',
+    options: [...'ABCDE'].map(id => ({ id, correct: ['B', 'E'].includes(id) })),
+  }), 'B、E');
+  assert.equal(Answers.correctAnswerText({ type: 'single_choice', options, correctAnswer: 'B' }), 'B');
+  assert.equal(Answers.correctAnswerText({ type: 'multiple_choice', options }), '');
+});
+
+test('formats matching pairs rather than falling back to stale choice answers', () => {
+  const question = {
+    type: 'matching', correctAnswer: 'A', options: [{ id: 'A', correct: true }, { id: 'B' }],
+    matching: {
+      left: [{ id: 'l1', text: '一' }, { id: 'l2', text: '二' }],
+      right: [{ id: 'r1', text: '甲' }, { id: 'r2', text: '乙' }],
+      correctPairs: { l1: 'r2', l2: 'r1' },
+    },
+  };
+  assert.equal(Answers.correctAnswerText(question), '1 → 乙；2 → 甲');
+});

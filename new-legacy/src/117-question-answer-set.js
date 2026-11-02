@@ -79,6 +79,10 @@
     }).join('；');
   }
 
+  function correctAnswerText(question) {
+    return answerText(question, question?.type === 'matching' ? question.matching?.correctPairs : correctIds(question));
+  }
+
   function validate(question, options = {}) {
     if (question?.type === 'matching') {
       const errors = [], matching = question.matching || {}, left = matching.left || [], right = matching.right || [];
@@ -100,5 +104,5 @@
     return errors;
   }
 
-  global.KGQuestionAnswerSet = Object.freeze({ optionIds, normalizeIds, correctIds, grade, validate, supported, pairs, assignPair, gradePairs, answerText, contentExtension });
+  global.KGQuestionAnswerSet = Object.freeze({ optionIds, normalizeIds, correctIds, grade, validate, supported, pairs, assignPair, gradePairs, answerText, correctAnswerText, contentExtension });
 })(typeof window !== 'undefined' ? window : globalThis);
