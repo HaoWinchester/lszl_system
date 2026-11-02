@@ -70,9 +70,9 @@ with sync_playwright() as playwright:
         expect(group.locator('[data-history-resume="active-3"]')).to_be_visible()
         page.locator('[data-history-practice="short-paper"]').click()
         request = page.evaluate('window.__entryRequests[0]')
-        assert request == {"paperId":"short-paper", "releaseId":"short-paper-v1", "mode":"practice", "count":3, "order":"paper"}, request
+        assert request == {"paperId":"short-paper", "releaseId":"short-paper-v1", "mode":"practice", "count":"all", "order":"paper"}, request
         assert page.evaluate('window.KGPracticeMode.snapshot().active') is True
-        assert page.locator('[name="practiceCount"]:checked').input_value() == '3'
+        assert page.locator('[name="practiceCount"]:checked').input_value() == 'all'
         assert page.locator('#practiceSelectedPaperName').inner_text() == 'short-paper'
         page.close()
     browser.close()

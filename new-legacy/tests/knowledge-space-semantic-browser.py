@@ -1,5 +1,6 @@
 """Source modules, real canvas and controls at desktop/mobile sizes."""
 from pathlib import Path
+import os
 from playwright.sync_api import sync_playwright, expect
 ROOT=Path(__file__).resolve().parents[2]
 OUT=ROOT/'artifacts/learning-feedback-three-groups/task-3'
@@ -10,12 +11,16 @@ with sync_playwright() as p:
   page=browser.new_page(viewport={'width':width,'height':854 if width==559 else 900},reduced_motion='reduce')
   errors=[];page.on('pageerror',lambda e: errors.append(str(e)))
   page.set_content('<button id="open" data-knowledge-dashboard-open>知识星空</button>')
+  # Exercise the real first paint arriving after the model is already settled.
+  first_paint_delay = int(os.environ.get('KG_KNOWLEDGE_PAINT_DELAY_MS', '0'))
+  if first_paint_delay:
+   page.evaluate('''delay=>{const raf=window.requestAnimationFrame.bind(window);let first=true;window.requestAnimationFrame=callback=>raf(time=>{if(first){first=false;setTimeout(()=>callback(time),delay)}else callback(time)})}''', first_paint_delay)
   page.add_style_tag(path=str(ROOT/'new-legacy/styles/knowledge-dashboard.css'))
   page.evaluate('''()=>{window.drawnLabels=[];const text=CanvasRenderingContext2D.prototype.fillText;CanvasRenderingContext2D.prototype.fillText=function(value,...args){drawnLabels.push(String(value));return text.call(this,value,...args)};window.starArcs=0;const clear=CanvasRenderingContext2D.prototype.clearRect;CanvasRenderingContext2D.prototype.clearRect=function(...args){starArcs=0;return clear.apply(this,args)};const arc=CanvasRenderingContext2D.prototype.arc;CanvasRenderingContext2D.prototype.arc=function(...args){starArcs++;return arc.apply(this,args)}}''')
   page.add_script_tag(path=str(ROOT/'new-legacy/src/practice/knowledge-space-scene.js'))
   page.evaluate('''()=>{const real=KGKnowledgeSpaceScene;window.scenes=[];window.KGKnowledgeSpaceScene={...real,mount:o=>{window.overlay=o.nodes;const s=real.mount(o);scenes.push(s);return s}};window.owner='a';window.calls=0;window.fail=false;KGAuthCore={currentUser:()=>owner?{username:owner}:null};KGDomainApi={request:async()=>{calls++;if(fail)throw Error('offline');return {topicCount:81,attemptCount:9,recentAttemptCount:2,nodes:Array.from({length:81},(_,i)=>({id:String(i),title:'考点'+i,subject:i<12?'数学':'英语',taxonomyId:i<12?'a':'b',path:i<12?['代数','方程','考点'+i]:['阅读','理解','考点'+i],brightness:.6}))}}}}''')
   page.add_script_tag(path=str(ROOT/'new-legacy/src/practice/knowledge-dashboard.js'))
-  page.locator('#open').click();page.wait_for_function('scenes.at(-1).snapshot().settled')
+  page.locator('#open').click();page.wait_for_function('scenes.at(-1).snapshot().settled && starArcs>=81')
   assert page.evaluate('scenes.at(-1).snapshot().mode')=='clusters'
   assert page.evaluate('starArcs')>=81, 'overview must draw real catalog stars beneath clusters'
   assert page.evaluate('overlay.length===81 && overlay.every(n=>n.brightness===.12 && n.relatedAttemptCount===0)')

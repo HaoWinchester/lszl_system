@@ -30,6 +30,100 @@ from app.services import wechat_mini_service
 PASSWORD = "practice-session-pass"
 
 
+@pytest.mark.parametrize("total,mode", [(93, "practice"), (99, "practice"), (185, "practice"), (93, "challenge"), (99, "scholar"), (3, "practice")])
+def test_all_count_uses_entire_frozen_inventory_and_preserves_cases(total, mode):
+    ids = _practice_fixture_ids()
+    asyncio.run(_seed_released_pmp_paper(ids, domains=["people"] * total))
+
+    async def prepare_case():
+        async with AsyncSessionLocal() as db:
+            release = await db.get(PaperRelease, ids["release"])
+            release.paper_type = "standard" if total == 185 else "mixed"
+            # The actual frozen inventory is authoritative even if its summary is stale.
+            release.question_count = 1
+            rows = list((await db.scalars(select(PaperReleaseQuestion).where(PaperReleaseQuestion.release_id == ids["release"]).order_by(PaperReleaseQuestion.order_index))).all())
+            for index, row in enumerate(rows[:3], 1):
+                row.snapshot = {**row.snapshot, "material": {"id": "case-all", "revision": 1, "title": "共享案例", "text": "完整案例背景", "images": []}, "caseGroup": {"id": "case-all", "order": index, "total": 3}}
+            await db.commit()
+
+    try:
+        asyncio.run(prepare_case())
+        with TestClient(app) as client:
+            assert client.post("/api/v1/auth/login", json={"username": ids["student"], "password": PASSWORD}).status_code == 200
+            response = client.post("/api/v1/learning/practice/sessions/enter", json={"paperId": ids["paper"], "releaseId": ids["release"], "mode": mode, "count": "all", "order": "paper"})
+            assert response.status_code == 200, response.text
+            body = response.json()
+            assert body["resumed"] is False
+            assert body["session"]["stats"]["total"] == total
+            assert len(body["questions"]) == total
+            assert len({q["questionId"] for q in body["questions"]}) == total
+            assert [q["question"]["caseGroup"]["order"] for q in body["questions"][:3]] == [1, 2, 3]
+            restored = client.get(f"/api/v1/learning/practice/sessions/{body['session']['id']}")
+            assert restored.status_code == 200, restored.text
+            assert restored.json()["session"]["stats"]["total"] == total
+    finally:
+        asyncio.run(_cleanup_released_pmp_paper(ids))
+
+
+@pytest.mark.parametrize("requested,mode", [(181, "practice"), ("All", "practice"), ("all", "revenge"), (0, "practice")])
+def test_all_count_keeps_numeric_and_revenge_validation(requested, mode):
+    ids = _practice_fixture_ids()
+    asyncio.run(_seed_released_pmp_paper(ids))
+    try:
+        with TestClient(app) as client:
+            client.post("/api/v1/auth/login", json={"username": ids["student"], "password": PASSWORD})
+            response = client.post("/api/v1/learning/practice/sessions/start", json={"paperId": ids["paper"], "releaseId": ids["release"], "mode": mode, "count": requested, "order": "paper"})
+            assert response.status_code == 422, response.text
+            assert response.json()["detail"]["code"] == "INVALID_PRACTICE_COUNT"
+    finally:
+        asyncio.run(_cleanup_released_pmp_paper(ids))
+
+
+def test_all_count_checks_access_and_resumes_original_short_session():
+    ids = _practice_fixture_ids()
+    asyncio.run(_seed_released_pmp_paper(ids))
+    try:
+        with TestClient(app) as client:
+            client.post("/api/v1/auth/login", json={"username": ids["student"], "password": PASSWORD})
+            request = {"paperId": ids["paper"], "releaseId": ids["release"], "mode": "practice", "count": "all", "order": "paper"}
+            denied = client.post("/api/v1/learning/practice/sessions/start", json={**request, "releaseId": "missing-release"})
+            assert denied.status_code == 404, denied.text
+            started = client.post("/api/v1/learning/practice/sessions/start", json={**request, "count": 10}).json()["session"]
+            resumed = client.post("/api/v1/learning/practice/sessions/enter", json=request)
+            assert resumed.status_code == 200, resumed.text
+            assert resumed.json()["resumed"] is True
+            assert resumed.json()["session"]["id"] == started["id"]
+            assert resumed.json()["session"]["stats"]["total"] == 10
+    finally:
+        asyncio.run(_cleanup_released_pmp_paper(ids))
+
+
+@pytest.mark.parametrize("unavailable", ["member", "withdrawn", "empty"])
+def test_all_count_rejects_inaccessible_or_empty_release(unavailable):
+    ids = _practice_fixture_ids()
+    asyncio.run(_seed_released_pmp_paper(ids))
+
+    async def restrict_release():
+        async with AsyncSessionLocal() as db:
+            release = await db.get(PaperRelease, ids["release"])
+            if unavailable == "member":
+                release.access_level = "member"
+            elif unavailable == "withdrawn":
+                release.status = "withdrawn"
+            else:
+                await db.execute(delete(PaperReleaseQuestion).where(PaperReleaseQuestion.release_id == ids["release"]))
+            await db.commit()
+
+    try:
+        asyncio.run(restrict_release())
+        with TestClient(app) as client:
+            client.post("/api/v1/auth/login", json={"username": ids["student"], "password": PASSWORD})
+            response = client.post("/api/v1/learning/practice/sessions/start", json={"paperId": ids["paper"], "releaseId": ids["release"], "mode": "practice", "count": "all", "order": "paper"})
+            assert response.status_code == (422 if unavailable == "empty" else 404), response.text
+    finally:
+        asyncio.run(_cleanup_released_pmp_paper(ids))
+
+
 def _practice_fixture_ids() -> dict[str, str]:
     token = uuid4().hex[:10]
     return {
