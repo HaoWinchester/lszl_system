@@ -72,3 +72,7 @@
 - 本次数据操作前备份：`/home/ubuntu/lszl-uat-backups/pmp-documents-20261102T060123Z`，代码与UAT数据库均非空，并完成归档目录、pg_restore TOC及SHA256校验，[manifest](../samples/pmp-documents-20261102/before-paper-publication-backup.json)已保存。
 
 本次只验证已发布试卷可进入做题，未代替用户业务验收，未合入main或修改正式环境。
+
+## 试卷展示命名调整
+
+用户指出发布试卷不应沿用题库文档名称。已通过现有试卷更新服务将文字卷改为“PMP 12月考纲新题专题卷（一）”，截图卷改为“PMP 12月考纲新题专题卷（二）”。UAT线上发布目录已回读确认新名称；分类、备注、题数、发布版本和练习权限一致，192条冻结题目快照调整前后SHA256一致。未重新发布版本，也未重建试卷。
