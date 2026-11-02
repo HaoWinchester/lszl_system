@@ -1,0 +1,16 @@
+{
+  "observed_at": "2026-11-02",
+  "identity_url": "https://creator.xiaohongshu.com/new/home",
+  "identity": "text=/小红书账号:\\s*\\d+/",
+  "publish_url": "https://creator.xiaohongshu.com/publish/publish?from=homepage&target=image",
+  "images": "input[type=file]",
+  "title": "input[placeholder='填写标题会有更多赞哦']",
+  "body": ".tiptap.ProseMirror[contenteditable=true]",
+  "submit": "button:has-text('发布')",
+  "notes_url": "https://creator.xiaohongshu.com/new/note-manager",
+  "note_row": ".note-card",
+  "note_title": ".note-card__title",
+  "note_id_attribute": "data-impression",
+  "required_declaration": null,
+  "evidence": "Creator home account ID, publish title/body accessible names and DevTools DOM, note-card data-impression.noteTarget.value.noteId inspected via CUA. Final submit and six-image upload must still pass live test."
+}
