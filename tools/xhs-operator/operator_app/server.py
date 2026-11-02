@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from .store import Store
 from .content import Pipeline, Model
-from .sources import SOURCES, TOPICS, verify_sources
+from .sources import catalog, verify_sources, refresh_library
 from .browser import BrowserAdapter
 from .worker import Worker, next_slots
 
@@ -60,12 +60,13 @@ def create_app(root=None):
         finally:
             worker.task.cancel()
             with suppress(asyncio.CancelledError):await worker.task
+            await worker.close()
             for t in tasks:t.cancel()
             await asyncio.gather(*tasks,return_exceptions=True)
             await adapter.close();lock.close()
 
     app=FastAPI(title='知习 · 内容工作台',lifespan=lifespan,docs_url=None,redoc_url=None)
-    app.state.db=db;app.state.pipeline=pipeline;app.state.adapter=adapter
+    app.state.db=db;app.state.pipeline=pipeline;app.state.adapter=adapter;app.state.worker=worker
 
     @app.middleware('http')
     async def local_only(request:Request,call_next):
@@ -104,6 +105,7 @@ def create_app(root=None):
         if not adapter.status.get('identity_verified'):blockers.append('工具专用浏览器的登录与账号 ID 尚未核对')
         source=db.root/'source-check.json'
         return dict(model=model,browser=adapter.status,blockers=blockers,
+                    community=adapter.community_status,
                     source_check=json.loads(source.read_text()) if source.exists() else None)
 
     @app.get('/')
@@ -112,9 +114,13 @@ def create_app(root=None):
     @app.get('/api/state')
     async def state():
         cfg=db.settings()
+        sources,topics=catalog(db.root)
+        library_report=db.root/'knowledge-refresh.json'
         return {'csrf':token,'settings':{k:v for k,v in cfg.items() if k!='claude_config'},
                 'diagnostics':diagnostics(),'drafts':db.drafts(),'jobs':db.jobs(),'events':db.events(),
-                'sources':SOURCES,'topics':TOPICS,'busy':pipeline.busy,'usage':db.usage(),
+                'sources':sources,'topics':topics,'busy':pipeline.busy,'usage':db.usage(),
+                'research':worker.research.state(),
+                'knowledge':json.loads(library_report.read_text()) if library_report.exists() else None,
                 'messages':worker.replies.list(),'next_slots':next_slots(cfg['times'])}
 
     @app.post('/api/pause')
@@ -124,9 +130,15 @@ def create_app(root=None):
     async def enable():
         blockers=diagnostics()['blockers']
         if blockers:raise ValueError('；'.join(blockers))
-        await verify_sources(db.root)
+        report=await refresh_library(db)
+        if not report['available_source_ids']:raise ValueError('没有可用的已核验知识来源')
         await adapter.probe()
-        db.set_enabled(True);return {'enabled':True}
+        batch=await worker.scan_inbox()
+        if set(batch.get('complete_channels',[]))!={'comment','dm'}:raise ValueError('评论和私信尚未全部读通，不能开启完整自动运营')
+        try:worker.research.context()
+        except ValueError:
+            async with adapter.lock:await worker.research.refresh(adapter)
+        db.configure(enabled=True,auto_reply=True);return {'enabled':True}
 
     @app.put('/api/settings')
     async def settings(body:SettingsPatch):
@@ -136,7 +148,7 @@ def create_app(root=None):
     @app.post('/api/generate',status_code=202)
     async def generate(body:GenerateBody):
         if pipeline.busy:raise ValueError('已有生成任务在执行')
-        if body.topic_id and body.topic_id not in {t['id'] for t in TOPICS}:raise ValueError('选题不存在')
+        if body.topic_id and body.topic_id not in {t['id'] for t in catalog(db.root)[1]}:raise ValueError('选题不存在')
         launch(pipeline.generate(body.topic_id),'生成内容')
         return {'accepted':True}
 
@@ -210,6 +222,31 @@ def create_app(root=None):
 
     @app.post('/api/browser/check')
     async def check():return await adapter.probe()
+
+    @app.post('/api/browser/community',status_code=202)
+    async def community():launch(adapter.open_community(),'打开主站登录');return {'accepted':True}
+
+    @app.post('/api/inbox/scan',status_code=202)
+    async def scan():launch(worker.scan_inbox(),'扫描互动');return {'accepted':True}
+
+    @app.post('/api/inbox/pause')
+    async def pause_replies():db.configure(auto_reply=False);return {'auto_reply':False}
+
+    @app.post('/api/research/refresh',status_code=202)
+    async def research():
+        async def run():
+            async with adapter.lock:await worker.research.refresh(adapter)
+        launch(run(),'竞品分析');return {'accepted':True}
+
+    @app.post('/api/knowledge/refresh',status_code=202)
+    async def knowledge():
+        if pipeline.busy:raise ValueError('已有内容任务在执行')
+        async def run():
+            async with pipeline.lock:
+                pipeline.busy=True
+                try:await refresh_library(db,Model(db))
+                finally:pipeline.busy=False
+        launch(run(),'知识库更新');return {'accepted':True}
 
     @app.post('/api/sources/check')
     async def source_check():return await verify_sources(db.root)

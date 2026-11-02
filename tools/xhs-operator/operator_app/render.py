@@ -14,14 +14,18 @@ footer{border-top:1px solid #a6b2a9;padding-top:23px;margin-top:30px;font-size:2
 .cover{background:#173c32;color:#f8f1dc}.cover .kicker{color:#bbd5a1}.cover .title{font-size:88px}.cover footer{color:#b5c9ba}.cover .brand{border-color:#d4e3bc}
 '''
 
-def document(card, index, count, product):
+def document(card, index, count, product, sources=None):
     esc=html.escape
+    sources=sources or []
+    overview=not sources or all(s.get("kind")=="overview" for s in sources)
+    kicker="PMBOK® GUIDE / 第八版" if overview else "PMP / 通用学习补充"
+    attribution="PMI 官方公开简介" if overview else " / ".join(dict.fromkeys(s["edition"] for s in sources))
     return f'''<!doctype html><html lang="zh-CN"><meta charset="utf-8"><style>{CSS}</style>
     <article class="{'cover' if index==0 else ''}"><div class="brand"><span>{esc(product)}</span><span>PMP · 学习手记</span></div>
-    <div class="body"><div class="kicker">PMBOK® GUIDE / 第八版</div><h1 class="title">{esc(card['title'])}</h1><div class="text">{esc(card['text'])}</div></div>
-    <div class="number">{index+1:02}</div><footer>依据：PMI 官方公开简介 · 原创整理与自测<br>学习意译，不替代教材和考试大纲　 {index+1:02} / {count:02}</footer></article></html>'''
+    <div class="body"><div class="kicker">{esc(kicker)}</div><h1 class="title">{esc(card['title'])}</h1><div class="text">{esc(card['text'])}</div></div>
+    <div class="number">{index+1:02}</div><footer>依据：{esc(attribution)} · 原创整理与自测<br>学习意译，不替代教材和考试大纲　 {index+1:02} / {count:02}</footer></article></html>'''
 
-async def render(draft, root, product):
+async def render(draft, root, product, sources=None):
     content=draft['content']
     q=content['question']
     cards=content['cards']+[{'title':'做一道知识自测','text':q['stem']+'\n\n'+'\n'.join(f'{k}. {v}' for k,v in q['options'].items())},
@@ -34,7 +38,7 @@ async def render(draft, root, product):
         try:
             page=await browser.new_page(viewport={'width':1080,'height':1440},device_scale_factor=1)
             for i,card in enumerate(cards):
-                source=document(card,i,len(cards),product)
+                source=document(card,i,len(cards),product,sources)
                 await page.set_content(source)
                 await page.evaluate('document.fonts.ready')
                 fits=await page.locator('.body').evaluate('(e)=>e.scrollHeight<=e.clientHeight && e.scrollWidth<=e.clientWidth')

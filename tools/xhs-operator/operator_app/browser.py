@@ -55,6 +55,18 @@ class BrowserAdapter:
     def __init__(self, db):
         self.db=db;self.lock=asyncio.Lock();self.pw=None;self.context=None;self.page=None
         self.status={'connected':False,'identity_verified':False,'reason':'尚未打开工具专用浏览器'}
+        self.community_status={'identity_verified':False,'reason':'主站尚未核验','channels':[]}
+
+    async def open_community(self):
+        async with self.lock:
+            await self.open()
+            page=next((p for p in self.context.pages if urlparse(p.url).netloc=='www.xiaohongshu.com'),None)
+            if page is None:
+                page=await self.context.new_page()
+                await page.goto('https://www.xiaohongshu.com',wait_until='domcontentloaded')
+            await page.bring_to_front()
+            self.community_status={'identity_verified':False,'reason':'请在主站登录同一官方账号，随后扫描互动','channels':[]}
+            return self.community_status
 
     def contract(self):
         p=self.db.root/'browser-contract.json'
@@ -154,10 +166,14 @@ class BrowserAdapter:
 
     async def prepare(self, draft, preview=False):
         c=self.contract();page=await self.open()
-        from .sources import verify_sources, SOURCES
-        if not draft['review'] or draft['review'].get('source_hash')!=digest(SOURCES) or draft['review'].get('product_hash')!=digest({k:self.db.settings()[k] for k in ('product_name','product_fact','product_url')}):
+        from .sources import verify_sources, selected_sources
+        sources=selected_sources(self.db.root,draft['topic'])
+        if not draft['review'] or draft['review'].get('source_hash')!=digest(sources) or draft['review'].get('product_hash')!=digest({k:self.db.settings()[k] for k in ('product_name','product_fact','product_url')}):
             raise ValueError('资料或产品事实已更新，需要重新审核')
-        await verify_sources(self.db.root)
+        await verify_sources(self.db.root,[s['id'] for s in sources])
+        if not preview:
+            from .research import Research
+            Research(self.db).context()
         check_assets(self.db.root,draft['assets'])
         before=await self.rows(page,c)
         await page.goto(c['publish_url'],wait_until='domcontentloaded')
@@ -211,6 +227,9 @@ class BrowserAdapter:
         # Creator Center currently exposes no verified inbox in this integration.
         # Fail closed rather than scan unrelated private conversations.
         raise ValueError('评论和私信通道尚未完成当前账号的页面适配')
+
+    async def search_competitors(self,query,limit=12):
+        raise ValueError('需要先登录小红书主站并核验搜索结果页面，尚未采集竞品样本')
 
     async def reply(self,message):
         raise ValueError('互动发送适配尚未通过真实会话核验，未发送')

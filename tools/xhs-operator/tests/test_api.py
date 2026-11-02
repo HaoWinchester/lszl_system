@@ -27,3 +27,23 @@ async def test_settings_validate_schedule_and_hide_secret(tmp_path):
         assert (await c.get('/api/state')).json()['settings']['times']==['08:30','19:30']
         assert (await c.put('/api/settings',headers=h,json={'adapter_verified':True})).status_code==422
         assert 'AUTH_TOKEN' not in str(state)
+
+@pytest.mark.asyncio
+async def test_full_operation_cannot_enable_with_only_comment_channel(tmp_path,monkeypatch):
+    from operator_app import server
+    class Configured:
+        def __init__(self,*args):pass
+        def info(self):return {'configured':True,'model':'test'}
+    async def sources(db):return {'available_source_ids':['pmi-pmbok8']}
+    monkeypatch.setattr(server,'Model',Configured);monkeypatch.setattr(server,'refresh_library',sources)
+    app=create_app(tmp_path);db=app.state.db;db.configure(adapter_verified=True)
+    adapter=app.state.adapter;adapter.status={'identity_verified':True}
+    async def probe():return adapter.status
+    async def partial():return {'messages':[],'complete_channels':['comment']}
+    monkeypatch.setattr(adapter,'probe',probe);monkeypatch.setattr(adapter,'read_messages',partial)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://localhost:8877') as c:
+        token=(await c.get('/api/state')).json()['csrf']
+        response=await c.post('/api/enable',headers={'X-Operator-Token':token})
+        assert response.status_code==409
+        assert '私信' in response.json()['detail']
+        assert not db.settings()['enabled'] and not db.settings()['auto_reply']
