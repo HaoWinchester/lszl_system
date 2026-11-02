@@ -21,8 +21,8 @@ function queue(){return heading('发布队列','每个账号、每个时段只�
 function inbox(){
   const connected=state.diagnostics.community?.identity_verified;
   return heading('评论与私信','常规咨询自动回复，发送结果不明时只核验、不重发。',`<button data-action="community">打开主站登录</button><button data-action="scan">扫描互动</button>${state.settings.auto_reply?'<button data-action="pause-replies">暂停回复</button>':''}`)+
-    `<div class="notice"><strong>${connected?'主站账号已核对':'主站连接尚未完成'}</strong><p>${esc(state.diagnostics.community?.reason||'请先在工具专用浏览器登录同一官方账号。')}</p><p>首次完整扫描建立历史基线，之后只处理新咨询。扫描按钮只读取；完整自动运营开启后才发送。08:00–22:00 巡查，每小时最多 5 条。</p></div>`+
-    `<div class="table-wrap"><table class="data-table"><thead><tr><th>咨询</th><th>渠道 / 时间</th><th>回复与状态</th></tr></thead><tbody>${state.messages.map(m=>`<tr><td class="title-cell">${esc(m.text)}<div class="meta">${esc(m.context?.author_name||m.context?.author_id||'')}</div></td><td>${m.channel==='dm'?'私信':'评论'}<br>${fmt(m.created)}</td><td>${badge(m.status)}<p>${esc(m.reply||'没有足够依据自动回答')}</p>${m.reason?`<small>${esc(m.reason)}</small>`:''}</td></tr>`).join('')}</tbody></table>${!state.messages.length?empty('尚无已读取的相关咨询','不会读取和回复无关私人会话。'):''}</div>`;
+    `<div class="notice"><strong>${connected?'主站账号已核对':'主站连接尚未完成'}</strong><p>${esc(state.diagnostics.community?.reason||'请先在工具专用浏览器登录同一官方账号。')}</p><p>${esc(state.diagnostics.community?.scope||'扫描范围将在首次读取后显示。')}</p><p>首次完整扫描建立历史基线，之后只处理新咨询。扫描按钮只读取；完整自动运营开启后才发送。08:00–22:00 巡查，每小时最多 5 条。</p></div>`+
+    `<div class="table-wrap"><table class="data-table"><thead><tr><th>咨询</th><th>渠道 / 时间</th><th>回复与状态</th></tr></thead><tbody>${state.messages.map(m=>`<tr><td class="title-cell">${esc(m.text)}<div class="meta">${esc(m.context?.author_name||m.context?.author_id||'')}</div></td><td>${m.channel==='dm'?'私信':'评论'}<br>${m.context?.event_at?fmt(m.context.event_at):'时间未核验'}</td><td>${badge(m.status)}<p>${esc(m.reply||'没有足够依据自动回答')}</p>${m.reason?`<small>${esc(m.reason)}</small>`:''}</td></tr>`).join('')}</tbody></table>${!state.messages.length?empty('尚无已读取的相关咨询','不会读取和回复无关私人会话。'):''}</div>`;
 }
 function research(){
   const r=state.research||{samples:[]};

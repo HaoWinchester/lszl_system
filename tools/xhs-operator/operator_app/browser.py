@@ -56,6 +56,8 @@ class BrowserAdapter:
         self.db=db;self.lock=asyncio.Lock();self.pw=None;self.context=None;self.page=None
         self.status={'connected':False,'identity_verified':False,'reason':'尚未打开工具专用浏览器'}
         self.community_status={'identity_verified':False,'reason':'主站尚未核验','channels':[]}
+        from .community import Community
+        self.community=Community(self)
 
     async def open_community(self):
         async with self.lock:
@@ -224,15 +226,19 @@ class BrowserAdapter:
         return {'status':'unknown','reason':'未找到唯一的新笔记及可靠的发布状态；不会自动重发','baseline':baseline}
 
     async def read_messages(self):
-        # Creator Center currently exposes no verified inbox in this integration.
-        # Fail closed rather than scan unrelated private conversations.
-        raise ValueError('评论和私信通道尚未完成当前账号的页面适配')
+        return await self.community.scan()
 
     async def search_competitors(self,query,limit=12):
-        raise ValueError('需要先登录小红书主站并核验搜索结果页面，尚未采集竞品样本')
+        return await self.community.search(query,limit)
 
-    async def reply(self,message):
-        raise ValueError('互动发送适配尚未通过真实会话核验，未发送')
+    async def prepare_reply(self,message):
+        return await self.community.prepare(message)
+
+    async def submit_reply(self,message,prepared):
+        return await self.community.submit(message,prepared)
+
+    async def verify_reply(self,message):
+        return await self.community.verify(message)
 
     async def close(self):
         if self.context: await self.context.close()

@@ -267,3 +267,41 @@ def test_link_request_negated_in_related_dm_must_not_send_url():
 def test_dm_url_requires_actual_entry_request(text):
     answer = reply_for(text, 'dm', URL, related=True)
     assert answer is None or URL not in answer
+
+
+def test_late_discovered_historical_event_stays_seen(tmp_path, daytime):
+    _, q = ready(tmp_path)
+    old = event('older', event_at='2026-11-02T00:59:59+00:00')
+    equal = event('equal', event_at='2026-11-02T01:00:00Z')
+    new = event('newer', event_at='2026-11-02T01:00:01+00:00')
+    q.scan({'messages': [old, equal, new], 'complete_channels': ['comment']})
+    assert {m['id']: m['status'] for m in q.list()} == {'older': 'seen', 'equal': 'seen', 'newer': 'pending'}
+    assert next(m for m in q.list() if m['id'] == 'newer')['context']['event_at'] == '2026-11-02T01:00:01+00:00'
+
+
+def test_answered_event_and_previously_pending_message_are_suppressed(tmp_path, daytime):
+    _, q = ready(tmp_path)
+    q.scan({'messages': [event('pending')], 'complete_channels': ['comment']})
+    q.scan({'messages': [event('pending', answered=True), event('answered', answered=True)], 'complete_channels': ['comment']})
+    assert {m['id']: m['status'] for m in q.list()} == {'pending': 'seen', 'answered': 'seen'}
+    assert all(m['context']['answered'] is True for m in q.list())
+    assert q.claim(NOW) is None
+
+
+@pytest.mark.parametrize('event_at', ['not-a-date', '2026-11-02T02:00:00', None])
+def test_explicit_unparseable_message_timestamp_is_never_reply_eligible(tmp_path, daytime, event_at):
+    _, q = ready(tmp_path)
+    q.scan({'messages': [event(event_at=event_at)], 'complete_channels': ['comment']})
+    assert q.list()[0]['status'] == 'seen'
+
+
+def test_answered_rescan_preserves_unknown_receipt_state_and_original_target(tmp_path, daytime):
+    _, q = ready(tmp_path)
+    q.scan({'messages': [event()], 'complete_channels': ['comment']})
+    m = q.claim(NOW); assert q.begin_send(m['id'], NOW)
+    q.finish(m['id'])
+    incoming = event(answered=True); incoming['context']['target'] = 'https://wrong.example/'
+    q.scan({'messages': [incoming], 'complete_channels': ['comment']})
+    stored = q.list()[0]
+    assert stored['status'] == 'unknown' and stored['submitted'] == NOW
+    assert stored['context']['target'].endswith('/owned-pmp-note')

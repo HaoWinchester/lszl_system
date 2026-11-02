@@ -12,5 +12,5 @@
   "note_title": ".note-card__title",
   "note_id_attribute": "data-impression",
   "required_declaration": null,
-  "evidence": "Creator home account ID, publish title/body accessible names and DevTools DOM, note-card data-impression.noteTarget.value.noteId inspected via CUA. Final submit and six-image upload must still pass live test."
+  "evidence": "Observed via CUA: creator account ID, six-image upload, title/body editors, accessible publish button and note-card ID. One real submission verified in published channel on 2026-11-02; no resubmission after initial unknown result."
 }

@@ -16,7 +16,8 @@ CHANNELS = {'comment', 'dm'}
 RELATED = re.compile(r'PMP|刷题|做题|题库|幻谱|知习|练习平台', re.I)
 SENSITIVE = re.compile(r'退款|投诉|侵权|价格|多少钱|收费|免费|付费|优惠|商务|合作|答案|密钥|密码|验证码|忽略|指令', re.I)
 CONTEXT_FIELDS = {'account', 'owned', 'related', 'note_id', 'thread_id', 'author_id',
-                  'fingerprint', 'target', 'comment_id', 'message_id', 'author_name', 'received_at'}
+                  'fingerprint', 'target', 'comment_id', 'message_id', 'author_name', 'received_at',
+                  'event_at', 'answered'}
 
 
 def reply_for(text, channel, url, *, related=False):
@@ -93,7 +94,7 @@ class ReplyQueue:
         notices = []
         with self.db.connect() as c:
             cfg = json.loads(c.execute('SELECT data FROM settings WHERE id=1').fetchone()[0])
-            baselines = {r['channel'] for r in c.execute('SELECT channel FROM reply_baselines WHERE account=?', (cfg['account'],))}
+            baselines = {r['channel']: r['completed'] for r in c.execute('SELECT channel,completed FROM reply_baselines WHERE account=?', (cfg['account'],))}
             for event in batch.get('messages', []):
                 ident, channel, text = event['id'], event['channel'], event['text']
                 context = event.get('context') or {}
@@ -112,11 +113,30 @@ class ReplyQueue:
                 context = {k: v for k, v in context.items() if k in CONTEXT_FIELDS}
                 context['fingerprint'] = context.get('fingerprint') or digest(text)
                 reply = reply_for(text, channel, cfg['product_url'], related=True)
-                status = 'seen' if channel not in baselines else ('pending' if reply else 'needs-attention')
+                historical = channel not in baselines
+                if 'event_at' in context:
+                    try:
+                        event_at = datetime.fromisoformat(context['event_at'])
+                        if event_at.tzinfo is None:
+                            raise ValueError('消息发生时间缺少时区')
+                        historical = historical or event_at <= datetime.fromisoformat(baselines[channel])
+                    except (ValueError, TypeError):
+                        historical = True
+                suppressed = historical or context.get('answered') is True
+                status = 'seen' if suppressed else ('pending' if reply else 'needs-attention')
                 inserted = c.execute('INSERT OR IGNORE INTO messages(id,channel,text,reply,status,created,context,config_hash) VALUES(?,?,?,?,?,?,?,?)',
                                      (ident, channel, text[:600], reply, status, utcnow(), json.dumps(context, ensure_ascii=False), config_fingerprint(cfg))).rowcount
-                # A repeat can never replace the original exact target or revive a
-                # sent/unknown/historical event. Re-reading is intentionally inert.
+                # A rescan may revoke send eligibility, but must never replace the
+                # exact target or revive a sent/unknown/historical event.
+                if not inserted and suppressed:
+                    existing = c.execute("SELECT context FROM messages WHERE id=? AND status IN ('pending','claimed','needs-attention') AND submitted IS NULL", (ident,)).fetchone()
+                    if existing:
+                        original = json.loads(existing['context'])
+                        for key in ('event_at', 'answered'):
+                            if key in context:
+                                original[key] = context[key]
+                        c.execute("UPDATE messages SET status='seen',context=?,reason=? WHERE id=?",
+                                  (json.dumps(original, ensure_ascii=False), '已人工回复或消息早于基线；未发送', ident))
                 if inserted and status == 'needs-attention':
                     notices.append(ident)
             for channel in complete:
