@@ -1,0 +1,5429 @@
+{
+  "bank": {
+    "id": "pmp-cn-reviewed-20261102",
+    "name": "PMP新版中文题库（原96题版·实收93题）",
+    "subject": "PMP",
+    "description": "用户提供优化解析、删除超纲版。保留原题号，原文缺Q16/Q49/Q72。共享案例15小题；三道特殊交互改为单选。原资料声明并非PMI真实考试题。",
+    "visibility": "private",
+    "version": "2026.11.02",
+    "questions": [
+      {
+        "id": "pmp-cn-20261102-Q24",
+        "sourceId": "pmp-cn-20261102-Q24",
+        "title": "Q24 第1小题  可持续发展与监测",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q24",
+        "stemParts": [
+          {
+            "text": "社区追问河口监测及异常处置，发起人反对增项。怎么办？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "将可持续指标与报告纳入计划",
+            "correct": true
+          },
+          {
+            "id": "B",
+            "text": "仅按许可证条件监测",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "只在干系人会议中非正式更新",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "另建不纳入基准的可持续计划",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "A",
+        "correctOptionIds": [],
+        "analysis": "社区提出河口监测、异常处置的诉求，不能只简单按原有许可证、非正式口头处理或者单独搞一份不入基准的计划。应当把可持续相关指标、监测与报告要求正式纳入项目计划，做到可执行、可追踪，合规且回应干系人诉求。 B 局限于原有许可证，忽略当前社区诉求与环境担忧；C 非正式更新不可控；D 单独建计划不进基准，无法受控。\n易错点：只作口头更新。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q24",
+            "sourceParagraph": 29,
+            "source": "PM Illustrated 专题互动练习  Sustainability Quest 海洋区题",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：A。将可持续指标和报告纳入计划。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": [],
+        "_caseKey": "pmp-case-1",
+        "caseGroup": {
+          "id": "pmp-case-1",
+          "order": 1,
+          "total": 3
+        }
+      },
+      {
+        "id": "pmp-cn-20261102-Q25",
+        "sourceId": "pmp-cn-20261102-Q25",
+        "title": "Q25 第2小题  可持续采购与质量成本",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q25",
+        "stemParts": [
+          {
+            "text": "快方案减少船期，却增加化学品与泄漏应对风险。怎样比较？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "综合比较质量成本与可持续影响",
+            "correct": true
+          },
+          {
+            "id": "B",
+            "text": "选快方案，减少海上作业时间",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "选熟悉的方法，避免外界担忧",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "施工方法由承包商自行决定",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "A",
+        "correctOptionIds": [],
+        "analysis": "快方案虽然节省船期，但带来化学品、泄漏的环境与可持续方面风险，不能单纯只看工期。需要综合评估质量成本以及可持续影响，权衡之后再决策；不能直接选快方案、单纯选熟悉方案或者交由承包商自行决定。\n易错点：让承包商自行决定。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q25",
+            "sourceParagraph": 40,
+            "source": "PM Illustrated 专题互动练习  Sustainability Quest 海洋区题2",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：A。综合比较质量成本和可持续影响。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": [],
+        "_caseKey": "pmp-case-1",
+        "caseGroup": {
+          "id": "pmp-case-1",
+          "order": 2,
+          "total": 3
+        }
+      },
+      {
+        "id": "pmp-cn-20261102-Q26",
+        "sourceId": "pmp-cn-20261102-Q26",
+        "title": "Q26 第3小题  生态风险与责任人",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q26",
+        "stemParts": [
+          {
+            "text": "鲸迁徙、珊瑚及风暴季带来环境风险。下一步是什么？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "登记风险及其触发条件、责任人与应对",
+            "correct": true
+          },
+          {
+            "id": "B",
+            "text": "等事故被报告后再处理",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "通过合同转移给承包商",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "暂停海上工作直到迁徙期结束",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "A",
+        "correctOptionIds": [],
+        "analysis": "鲸迁徙、珊瑚、风暴季属于识别出来的环境风险，按照风险管理流程，下一步登记风险，记录触发条件、责任人以及对应的应对方案。 B 是被动事后处理；C 不能简单直接转移；D 直接停工属于过激，不是标准第一步。\n易错点：以已有许可代替评估。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q26",
+            "sourceParagraph": 51,
+            "source": "PM Illustrated 专题互动练习  Sustainability Quest 海洋区题4",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：A。登记风险、触发条件、责任人与应对。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": [],
+        "_caseKey": "pmp-case-1",
+        "caseGroup": {
+          "id": "pmp-case-1",
+          "order": 3,
+          "total": 3
+        }
+      },
+      {
+        "id": "pmp-cn-20261102-Q32",
+        "sourceId": "pmp-cn-20261102-Q32",
+        "title": "Q32 第1小题  案例与工作日依赖",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q32",
+        "stemParts": [
+          {
+            "text": "安全审查何时完成？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "3月31日，星期三",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "4月2日，星期五",
+            "correct": true
+          },
+          {
+            "id": "C",
+            "text": "4月5日，星期一",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "3月29日，星期一",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "B",
+        "correctOptionIds": [],
+        "analysis": "3月29日起数5个工作日。脱敏测试数据于 3 月 26 日（周五）就绪，安全审查从数据到位后的次一工作日启动，工期共 5 个工作日，周末不计入工作日，3 月 26 日（周五）之后的周六、周日休息，审查起始日为 3 月 29 日（周一），依次计数 5 个工作日，分别为 3 月 29 日、3 月 30 日、3 月 31 日、4 月 1 日、4 月 2 日，因此安全审查在 4 月 2 日（星期五）完成，题干中签字审查报告截止时间 3 月 31 日为干扰信息，本题答案选 B。\n易错点：按日历日计算。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q32",
+            "sourceParagraph": 67,
+            "source": "Passy 案例与图表示例  案例题1",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：B。4月2日星期五。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": [],
+        "_caseKey": "pmp-case-2",
+        "caseGroup": {
+          "id": "pmp-case-2",
+          "order": 1,
+          "total": 3
+        }
+      },
+      {
+        "id": "pmp-cn-20261102-Q33",
+        "sourceId": "pmp-cn-20261102-Q33",
+        "title": "Q33 第2小题  案例与关键约束",
+        "type": "multiple_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q33",
+        "stemParts": [
+          {
+            "text": "哪两项事实威胁3月31日的签批截止？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "脱敏测试数据的就绪日期",
+            "correct": true
+          },
+          {
+            "id": "B",
+            "text": "团队平均每迭代16故事点",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "安全审查需要5个工作日",
+            "correct": true
+          },
+          {
+            "id": "D",
+            "text": "后续发布安排的64故事点",
+            "correct": false
+          }
+        ],
+        "correctAnswer": null,
+        "correctOptionIds": [
+          "A",
+          "C"
+        ],
+        "analysis": "本题需要选出威胁 3 月 31 日签批截止的两项因素，安全审查需要等待脱敏测试数据就绪才能启动，脱敏测试数据就绪日期（A）决定审查最早开始时间，加上安全审查本身需要 5 个工作日（C），两者共同造成审查完成时间超出 3 月 31 日；团队迭代速度、安排在后续版本的 64 个故事点和本次版本的安全审查签批无关，属于干扰信息，因此答案选 A、C。\n易错点：混入后续功能点。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q33",
+            "sourceParagraph": 78,
+            "source": "Passy 案例与图表示例  案例题2，选2项",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：A、C。测试数据到位日、审查工期。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": [],
+        "_caseKey": "pmp-case-2",
+        "caseGroup": {
+          "id": "pmp-case-2",
+          "order": 2,
+          "total": 3
+        }
+      },
+      {
+        "id": "pmp-cn-20261102-Q34",
+        "sourceId": "pmp-cn-20261102-Q34",
+        "title": "Q34 第3小题  案例／混合交付",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q34",
+        "stemParts": [
+          {
+            "text": "本案例采用哪种交付方式？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "预测型",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "适应型（敏捷）",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "混合型",
+            "correct": true
+          },
+          {
+            "id": "D",
+            "text": "案例未说明",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "C",
+        "correctOptionIds": [],
+        "analysis": "软件按迭代构建，迁移与合规审查按固定顺序执行。本题考查项目生命周期类型判断，案例中软件开发采用两周迭代的敏捷方式构建，属于适应型特点，但数据迁移和上线前安全审查采用固定、顺序执行的计划模式，带有预测型特征，两种方式结合，因此属于混合型交付方式，容易误选适应型，原因是只关注迭代开发而忽略合规审查等顺序化的预测型环节，本题答案选 C。\n易错点：只看到软件迭代，漏掉固定计划部分。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q34",
+            "sourceParagraph": 89,
+            "source": "Passy 案例与图表示例  Lakeside案例第3题",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：C。混合型。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": [],
+        "_caseKey": "pmp-case-2",
+        "caseGroup": {
+          "id": "pmp-case-2",
+          "order": 3,
+          "total": 3
+        }
+      },
+      {
+        "id": "pmp-cn-20261102-Q39",
+        "sourceId": "pmp-cn-20261102-Q39",
+        "title": "Q39 第1小题  案例与项目挽救",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q39",
+        "stemParts": [
+          {
+            "text": "接手失败项目，第一周重点是什么？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "用2—3周全面访谈、审阅架构与建立基线",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "迅速访谈用户和开发者，核实可用成果、前五项能力及团队容量",
+            "correct": true
+          },
+          {
+            "id": "C",
+            "text": "先重建治理、风险登记与里程碑计划",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "先集中修复缺陷并分析根因",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "B",
+        "correctOptionIds": [],
+        "analysis": "本题考查接手失败项目初期的工作重点，接手失败项目的第一周首要任务是快速摸清项目真实现状，迅速访谈用户和开发者，核实已有的可用成果、核心能力以及团队容量；A 选项耗时 2-3 周周期太长，不属于第一周重点，C 选项重建治理、计划和 D 选项修复缺陷都属于后续动作，不能在还不清楚现状时优先开展，容易误选先重建文档或直接修复缺陷，因此答案选 B。\n易错点：先全面重建文档。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q39",
+            "sourceParagraph": 105,
+            "source": "PM Mastery 免费25题  原题21",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：B。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": [],
+        "_caseKey": "pmp-case-3",
+        "caseGroup": {
+          "id": "pmp-case-3",
+          "order": 1,
+          "total": 3
+        }
+      },
+      {
+        "id": "pmp-cn-20261102-Q40",
+        "sourceId": "pmp-cn-20261102-Q40",
+        "title": "Q40 第2小题  案例与保留可用成果",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q40",
+        "stemParts": [
+          {
+            "text": "已建成果仅15%可用，需求与用户不符。建议什么？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "强化需求签字与追踪后继续完成剩余建设",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "先请外部专家做敏捷转型评估",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "全部推倒，重做需求与架构",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "保留可用15%，与用户定重点，两周迭代、10个月分4次发布",
+            "correct": true
+          }
+        ],
+        "correctAnswer": "D",
+        "correctOptionIds": [],
+        "analysis": "用用户反馈和分批交付纠偏。本题考查失败项目挽救的策略选择，项目仅剩 10 个月和 170 万美元，已建成果还有 15% 可以利用，不适合全部推倒重来；应当保留这部分可用成果，和用户共同确定优先级，采用两周迭代、分批次发布的方式交付，利用用户持续反馈纠正需求偏差，A 选项继续按原有模式建设会延续需求不符的问题，B 选项先做评估会耽误有限工期，C 全部推倒重来成本与时间都无法承受，容易误选全部推倒重做，因此答案选 D。\n易错点：全部推倒重来。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q40",
+            "sourceParagraph": 116,
+            "source": "PM Mastery 免费25题  原题22",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：D。保留可用基础，转为混合式迭代交付。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": [],
+        "_caseKey": "pmp-case-3",
+        "caseGroup": {
+          "id": "pmp-case-3",
+          "order": 2,
+          "total": 3
+        }
+      },
+      {
+        "id": "pmp-cn-20261102-Q41",
+        "sourceId": "pmp-cn-20261102-Q41",
+        "title": "Q41 第3小题  案例与恢复后的范围",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q41",
+        "stemParts": [
+          {
+            "text": "3次迭代交付2模块后，CIO要求加回删去的功能。怎么办？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "按已有速度增加功能，维持原承诺",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "每次迭代预留功能缓冲",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "严格拒绝当前计划外的范围",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "展示排序后的待办，仅在用户优先级更高时替换纳入",
+            "correct": true
+          }
+        ],
+        "correctAnswer": "D",
+        "correctOptionIds": [],
+        "analysis": "本题考查敏捷项目的范围变更管理，敏捷模式下团队速率、容量是固定的，不能直接新增功能，需要向相关方展示排好优先级的待办列表，只有当该功能优先级高于现有待办项时，才用它替换原有条目纳入迭代；A 选项直接加功能会造成范围蔓延、超出团队容量，B 预留缓冲不是处理该需求的正确方式，C 直接拒绝不利于相关方协作，容易误选直接同意增加功能，因此答案选 D。\n易错点：成功后无条件加项。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q41",
+            "sourceParagraph": 127,
+            "source": "PM Mastery 免费25题  原题25",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：D。由用户重新排序，高价值项替换现有项。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": [],
+        "_caseKey": "pmp-case-3",
+        "caseGroup": {
+          "id": "pmp-case-3",
+          "order": 3,
+          "total": 3
+        }
+      },
+      {
+        "id": "pmp-cn-20261102-Q45",
+        "sourceId": "pmp-cn-20261102-Q45",
+        "title": "Q45 第1小题  案例／范围与期望",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q45",
+        "stemParts": [
+          {
+            "text": "16周只能完成愿望清单70%，如何回应全量上线要求？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "承诺全量上线，立即增加资深开发者",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "推迟到全部功能完成再上线",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "确认固定日期，约定优先MVP，余项后续发布",
+            "correct": true
+          },
+          {
+            "id": "D",
+            "text": "转预测型并锁定全部功能",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "C",
+        "correctOptionIds": [],
+        "analysis": "本题考查混合交付项目中时间与范围的平衡，项目存在固定的上线节点，在 16 周的时间约束下无法交付全部功能，应当守住这个上线日期，和发起人协商确定最小可行产品 MVP 优先上线，剩余功能安排在后续迭代发布；A 盲目加人容易引发效率下降，B 推迟上线会错过业务窗口期，D 转为预测型锁定全部功能不符合实际产能，容易误选承诺交付全部功能，因此答案选 C。\n易错点：承诺全部交付。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q45",
+            "sourceParagraph": 142,
+            "source": "TestPrepGuides 新版练习  pmp-p-13，Harbor Health案例第1问",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：C。协商优先级与最小可行范围，余项后续发布。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": [],
+        "_caseKey": "pmp-case-4",
+        "caseGroup": {
+          "id": "pmp-case-4",
+          "order": 1,
+          "total": 3
+        }
+      },
+      {
+        "id": "pmp-cn-20261102-Q46",
+        "sourceId": "pmp-cn-20261102-Q46",
+        "title": "Q46 第2小题  案例／收益交接",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q46",
+        "stemParts": [
+          {
+            "text": "收益需上线半年后测量，如何交接？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "明确运营收益负责人及测量方法，转型时移交",
+            "correct": true
+          },
+          {
+            "id": "B",
+            "text": "项目持续开放六个月由原团队测量",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "客户验收即报告收益实现",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "从商业论证删除该收益",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "A",
+        "correctOptionIds": [],
+        "analysis": "本题考查项目收益管理与交接，项目收益要在上线半年之后才能测量，项目结束交付时收益还无法验证，不能在验收时就宣告收益达成，应当明确后续运营阶段的收益负责人、收益测量方式，在项目移交时一并把收益追踪工作转移给运营方；B 选项让项目团队继续留守半年测量会造成项目无法正常收尾，C 在验收时直接报告收益实现不符合实际，D 删除收益指标属于逃避管理，容易误选验收即认定收益实现，因此答案选 A。\n易错点：验收即宣告收益。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q46",
+            "sourceParagraph": 153,
+            "source": "TestPrepGuides 新版练习  pmp-r-08，案例第2问",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：A。明确运营收益负责人、测量方法并移交追踪。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": [],
+        "_caseKey": "pmp-case-4",
+        "caseGroup": {
+          "id": "pmp-case-4",
+          "order": 2,
+          "total": 3
+        }
+      },
+      {
+        "id": "pmp-cn-20261102-Q47",
+        "sourceId": "pmp-cn-20261102-Q47",
+        "title": "Q47 第3小题  案例／组织变革",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q47",
+        "stemParts": [
+          {
+            "text": "呼叫中心员工担心新系统拖慢工作，怎么办？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "请发起人发邮件强制使用",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "等每个员工都表示适应才上线",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "上线后再安排深入培训",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "让员工参与测试，培养变革骨干并在上线前后培训",
+            "correct": true
+          }
+        ],
+        "correctAnswer": "D",
+        "correctOptionIds": [],
+        "analysis": "本题考查组织变革管理，面对员工对新系统的顾虑，单纯强制推行、一味等待所有人适应或是上线后再培训都不是最优方案；让呼叫中心员工提前参与测试，培养变革骨干，同时在上线前后配套培训，通过参与感缓解抵触、提前发现问题，消除员工担忧，A 强制推行会加剧抵触情绪，B 等待全员适应会错过上线窗口期，C 上线后再培训风险偏高，容易误选直接强制推行，因此答案选 D。\n易错点：仅发强制使用邮件。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q47",
+            "sourceParagraph": 164,
+            "source": "TestPrepGuides 新版练习  pmp-b-13，案例第3问",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：D。让员工参与测试，培养变革骨干并安排培训。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": [],
+        "_caseKey": "pmp-case-4",
+        "caseGroup": {
+          "id": "pmp-case-4",
+          "order": 3,
+          "total": 3
+        }
+      },
+      {
+        "id": "pmp-cn-20261102-Q15",
+        "sourceId": "pmp-cn-20261102-Q15",
+        "title": "Q15 挣值与绩效判断",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q15",
+        "stemParts": [
+          {
+            "text": "PV=80,000，EV=72,000，AC=90,000。判断进度和成本状态。\n\nPV | EV | AC\n80,000 | 72,000 | 90,000\n\n金额单位为美元。"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "进度领先、成本超支",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "进度落后、成本节约",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "进度落后、成本超支",
+            "correct": true
+          },
+          {
+            "id": "D",
+            "text": "进度正常、成本超支",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "C",
+        "correctOptionIds": [],
+        "analysis": "SPI = EV/PV = 72000/80000 = 0.9＜1 → 进度落后 CPI = EV/AC = 72000/90000 = 0.8＜1 → 成本超支。\n易错点：混淆PV与AC的用途。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q15",
+            "sourceParagraph": 176,
+            "source": "CISNET 免费练习  Process部分第14题",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：C。进度落后，成本超支。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q30",
+        "sourceId": "pmp-cn-20261102-Q30",
+        "title": "Q30 图表与风险矩阵",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q30",
+        "stemParts": [
+          {
+            "text": "概率80%、影响很高的风险，应放入哪个区域？\n\n影响与概率 | 低概率 | 高概率\n高影响 | 区域2 | 区域4\n低影响 | 区域1 | 区域3\n\n区域定义沿用来源，分界为定性示意。"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "区域1．低概率、低影响",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "区域2．低概率、高影响",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "区域3．高概率、低影响",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "区域4．高概率、高影响",
+            "correct": true
+          }
+        ],
+        "correctAnswer": "D",
+        "correctOptionIds": [],
+        "analysis": "本题考查概率影响矩阵（风险矩阵），该风险概率 80% 属于高概率、影响很高属于高影响，两个维度均为高，对应区域 4；区域 1 是低概率低影响，区域2是低概率高影响，区域3是高概率低影响，易错点是只看概率或者只看影响单一维度判断，因此答案是区域 4。\n易错点：只看概率。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q30",
+            "sourceParagraph": 189,
+            "source": "PMA 新版题型示例  Enhanced Matching示例",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：区域4：高概率、高影响。",
+            "interactionAdaptation": "风险区域选择转换为单选"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q31",
+        "sourceId": "pmp-cn-20261102-Q31",
+        "title": "Q31 图表与缺陷趋势",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q31",
+        "stemParts": [
+          {
+            "text": "周末未关闭缺陷数能支持什么结论？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "质量肯定已符合验收标准",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "五周缺陷数持续增加",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "第3周达峰值，随后两周下降",
+            "correct": true
+          },
+          {
+            "id": "D",
+            "text": "需要恰好增加两名测试人员",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "C",
+        "correctOptionIds": [],
+        "analysis": "本题考查趋势图解读，从折线图可以看到，未关闭缺陷数量在 W3 达到最高点，W4、W5 连续下降；A 错误，缺陷数量下降不等于质量一定满足验收标准；B 错误，并不是持续增加，中间有起伏；D 错误，图表无法直接得出需要增加两名测试人员的结论，不能主观推断资源需求，因此答案选 C。\n易错点：据此认定质量合格。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q31",
+            "sourceParagraph": 202,
+            "source": "PMA 新版题型示例  Graphic-Based示例",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：C。第3周达峰值，随后两周下降。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": [
+          "assets/pmp-image1.png"
+        ]
+      },
+      {
+        "id": "pmp-cn-20261102-Q35",
+        "sourceId": "pmp-cn-20261102-Q35",
+        "title": "Q35 图表与完工预测",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q35",
+        "stemParts": [
+          {
+            "text": "按此前平均速度，剩余工作在哪次迭代完成？\n\n来源设定此后总范围维持150点。图只绘迭代1至5已知完成量。"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "第6次迭代",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "第7次迭代",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "第8次迭代",
+            "correct": true
+          },
+          {
+            "id": "D",
+            "text": "第9次迭代",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "C",
+        "correctOptionIds": [],
+        "analysis": "本题考查燃起图（Burn-up）与团队速率计算。从图中可知团队平均速率为 20 故事点/迭代，总范围 150 点，到第 5 迭代结束已完成 100 点，还剩余 50 点；50÷20=2.5 个迭代，不能向下取整，第 6 迭代做完还剩 30 点、第 7 迭代做完还剩 10 点，剩下的 10 点要在第 8 迭代完成，易错点是直接把 2.5 取整为 2，误以为第 7 迭代就能做完，所以答案是第 8 次迭代内。\n易错点：把2.5次向下取整。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q35",
+            "sourceParagraph": 215,
+            "source": "Passy 案例与图表示例  Burn-up下拉示例",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：第8次迭代内。",
+            "interactionAdaptation": "下拉选择转换为单选"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": [
+          "assets/pmp-image2.png"
+        ]
+      },
+      {
+        "id": "pmp-cn-20261102-Q36",
+        "sourceId": "pmp-cn-20261102-Q36",
+        "title": "Q36 图表与计划实际对比",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q36",
+        "stemParts": [
+          {
+            "text": "哪个任务按时开始，却延迟结束？\n\n横条起止刻度仅用于重现来源关系，无真实日期或工期含义。"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "任务A",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "任务B",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "任务C",
+            "correct": true
+          },
+          {
+            "id": "D",
+            "text": "任务D",
+            "correct": false
+          },
+          {
+            "id": "E",
+            "text": "任务E",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "C",
+        "correctOptionIds": [],
+        "analysis": "本题考查甘特图计划与实际横道对比，需要同时对比起点和终点。任务 C 的实际横道起点和计划起点对齐，代表按时开始；但实际横道的终点在计划终点右侧，代表结束延迟。 A：开始就晚了；B：起止都和计划一致；D：开始提前；E：无实际横道。易错点是只看开始时间，忽略完工节点，因此答案选 C。\n易错点：只看开始时间。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q36",
+            "sourceParagraph": 229,
+            "source": "Passy 案例与图表示例  Hotspot示例",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：C。任务C。",
+            "interactionAdaptation": "图上点击任务转换为看图单选"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": [
+          "assets/pmp-image3.png"
+        ]
+      },
+      {
+        "id": "pmp-cn-20261102-Q48",
+        "sourceId": "pmp-cn-20261102-Q48",
+        "title": "Q48 图表／燃尽图",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q48",
+        "stemParts": [
+          {
+            "text": "第5天的迭代目标有何风险？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "进度领先，可拉入更多工作",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "迭代中途增加了范围",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "按计划可完成",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "剩余工作远高于理想线，迭代目标有风险",
+            "correct": true
+          }
+        ],
+        "correctAnswer": "D",
+        "correctOptionIds": [],
+        "analysis": "本题考查迭代燃尽图解读，虚线是理想剩余工作量线，实线是实际剩余工作量线。第 5 天时，实际剩余工作量（35 点）明显高于理想剩余工作量（20 点），代表当前产出速度跟不上计划，迭代目标存在完不成的风险。 A 错误，不是进度领先；B 错误，燃尽图本身不能直接证明中途加了范围；C 错误，无法按计划完成；易错点误判实线在上方是进度好，实际上燃尽图纵坐标代表剩余工作量，线条越高代表剩下的活越多，因此答案选 D。\n易错点：仅凭缓降断言加范围。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q48",
+            "sourceParagraph": 244,
+            "source": "TestPrepGuides 新版练习  pmp-r-20，燃尽图",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：D。剩余工作远高于理想线，目标有风险。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": [
+          "assets/pmp-image4.png"
+        ]
+      },
+      {
+        "id": "pmp-cn-20261102-Q50",
+        "sourceId": "pmp-cn-20261102-Q50",
+        "title": "Q50 风险／EMV",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q50",
+        "stemParts": [
+          {
+            "text": "威胁30%损失5万，机会20%收益2万，净期望影响？\n\n风险 | 概率 | 金额影响\n威胁 | 30% | 损失50,000\n机会 | 20% | 节省20,000\n\n金额单位为美元。"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "−19,000美元",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "−11,000美元",
+            "correct": true
+          },
+          {
+            "id": "C",
+            "text": "−15,000美元",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "＋11,000美元",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "B",
+        "correctOptionIds": [],
+        "analysis": "EMV 公式：威胁取负数，机会取正数 = 0.3 × (-50000) + 0.2 × (+20000) = -15000 + 4000 = -11000 美元。\n易错点：机会也计损失。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q50",
+            "sourceParagraph": 257,
+            "source": "TestPrepGuides 新版练习  pmp-b-10，风险期望货币值",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：B。净损失1.1万。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q57",
+        "sourceId": "pmp-cn-20261102-Q57",
+        "title": "Q57 图表／进度压缩",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q57",
+        "stemParts": [
+          {
+            "text": "以下哪项14天完工预测有依据？\n\n图示条件：默认零时滞FS依赖、资源独立。Build最多压2天，每天1200美元；Config最多压2天，每天800美元；设计、集成不可压缩。备选方案允许集成与Build最多重叠2天，但Config必须先完成。目标14天。"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "Config压2天：14天、1,600美元，保留FS依赖",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "Build压2天：14天、2,400美元，保留FS依赖",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "Build与集成重叠2天：14天、零成本但有返工风险",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "Build压2天且Config压1天：14天、3,200美元，保留FS依赖",
+            "correct": true
+          }
+        ],
+        "correctAnswer": "D",
+        "correctOptionIds": [],
+        "analysis": "本题考查关键路径、赶工与活动依赖（FS 完成到开始）。\n原始工期：设计 4 天之后两条并行分支：\n分支 1：Build 8 天；分支 2：Config 7 天；两条都完成之后才能开始集成 4 天。\n原工期：4 + max (8,7) + 4 = 4+8+4 = 16 天，目标需要压缩到 14 天，一共要压缩 2 天。\n约束：Config 必须完成，集成才能开始；Build 最多压 2 天，Config 最多压 2 天；设计、集成不可压缩。\n- A：Config 压 2 天 → Config 变成 5 天，Build 依旧 8 天，max (8,5)=8，总工期 4+8+4=16 天，达不到 14 天。\n- B：Build 压 2 天 → Build 变成 6 天，Config7 天，max (6,7)=7，总工期 4+7+4=15 天，不是 14 天。\n- C：Build 和集成重叠 2 天，但 Config 需要 7 天完工，集成最早只能等 Config 结束才能启动，受 Config 约束，最多只能提前 1 天，无法做到 14 天。\n- D：Build 压 2 天（8→6 天，增加费用 2×1200=2400 美元），Config 压 1 天（7→6 天，增加费用 1×800=800 美元）；此时两条并行分支都为 6 天，max (6,6)=6；总工期 = 4+6+4=14 天，总赶工费用 2400+800=3200 美元，符合条件。\n易错点：只看单条分支压缩，忽略集成必须等 Build、Config 两条分支全部完成才能启动这个约束。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q57",
+            "sourceParagraph": 270,
+            "source": "Mastery Exam Prep 公开样题  原题16",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：D。Build压2天，Config压1天，3200美元。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": [
+          "assets/pmp-image5.png"
+        ]
+      },
+      {
+        "id": "pmp-cn-20261102-Q58",
+        "sourceId": "pmp-cn-20261102-Q58",
+        "title": "Q58 图表／指标可比性",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q58",
+        "stemParts": [
+          {
+            "text": "哪组指标及判断能得到数据支持？\n\n数据说明：估算量尺与参照故事改变，历史点数未重估；其他口径可比。\n\n指标 | 前 | 后\n故事点 | 120 | 240\n验收生产变更 | 24 | 24\n人工修正率 | 12% | 5%\n培训完成率 | 60% | 90%"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "已验收生产变更＋培训率：吞吐稳定、就绪度提升",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "已验收生产变更＋人工修正率：吞吐稳定、返工减少",
+            "correct": true
+          },
+          {
+            "id": "C",
+            "text": "故事点＋人工修正率：吞吐上升、返工减少",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "新点数减半＋人工修正率：吞吐稳定、返工减少",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "B",
+        "correctOptionIds": [],
+        "analysis": "本题核心前提是题干注明估算量尺与参照故事发生改变，因此前后两阶段的故事点口径不一致，故事点数值不具备可比性，不能依靠故事点去判断吞吐是否上升。已验收生产变更数量前后都是 24，代表交付吞吐保持稳定；人工修正率从 12% 下降到 5%，人工修正率用来体现返工情况，数值降低说明返工变少。A 选项中培训完成率提升只能体现培训就绪度，组合判断不符合题意；C 选项误用不可比的故事点判定吞吐上升，属于典型易错陷阱；D 选项 “新点数减半” 在表格中没有对应数据，没有支撑依据；只有 B 选项选用的两个指标口径可比，“吞吐稳定、返工减少” 的判断能够被表格数据支持，易错点就是忽略量尺变更，直接把故事点翻倍理解为产能翻倍。\n易错点：将点数翻倍视为产能翻倍。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q58",
+            "sourceParagraph": 292,
+            "source": "Mastery Exam Prep 公开样题  原题17",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：B。人工修正率、已验收生产变更数。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q59",
+        "sourceId": "pmp-cn-20261102-Q59",
+        "title": "Q59 图表／风险区间",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q59",
+        "stemParts": [
+          {
+            "text": "需求与服务容量风险怎样变化？\n\n条件：最低需求700/周；满量容量未验证，增员第9周才到位，判断前8周。\n\n每周数量 | 原区间 | 新区间\n需求 | 400–1200 | 900–1100\n容量 | 1300–1500 | 850–1050"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "需求不足风险下降；容量风险上升",
+            "correct": true
+          },
+          {
+            "id": "B",
+            "text": "需求不足风险下降；容量风险下降",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "需求不足风险下降；容量不足已确定发生",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "需求不足风险下降；容量风险不变",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "A",
+        "correctOptionIds": [],
+        "analysis": "本题需要对比新旧区间、结合最低需求 700 / 周来判断风险变化，需求原区间 4001200，新区间 9001100，需求整体抬高、远离最低需求阈值，所以需求不足风险下降；容量原区间 13001500，新区间下移至 8501050，和需求区间高度靠近，容量不够的可能性变大，容量风险上升；同时题目说明满量容量未验证，不能判定容量不足已经确定发生，易错点就是直接把区间重叠当成故障已经发生，因此答案选 A。\n易错点：把重叠区间当已发生故障。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q59",
+            "sourceParagraph": 305,
+            "source": "Mastery Exam Prep 公开样题  原题22",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：A。需求不足风险降低，近期容量不足风险升高。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q60",
+        "sourceId": "pmp-cn-20261102-Q60",
+        "title": "Q60 图表／可持续经济性",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q60",
+        "stemParts": [
+          {
+            "text": "新电价下应如何建议？\n\n条件：原电价0.30美元/kWh，新电价0.10美元/kWh适用全部5年；不折现。年排放上限45吨，选达标的最低成本方案。授标前改选需发起人批准，其余条件相同且无切换罚款。\n\n设计 | 购价 美元 | 年用电 kWh | 年排放 吨\nA | 200000 | 200000 | 40\nB | 320000 | 100000 | 20"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "A五年便宜12万美元、排放达标，授标前报批",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "A五年便宜7万美元，但须放宽排放上限，保留B",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "A五年便宜7万美元、排放达标，授标前报批",
+            "correct": true
+          },
+          {
+            "id": "D",
+            "text": "B仍便宜3万美元且达标，保留B",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "C",
+        "correctOptionIds": [],
+        "analysis": "本题要求选择排放达标前提下总成本最低的方案，新电价 0.10 美元 /kWh，周期 5 年，不折现，年排放上限 45 吨，A 年排放 40 吨、B 年排放 20 吨，二者均达标；计算总成本 = 购价 + 5 年电费：A 总成本 = 200000+(200000×0.10×5)=300000 美元，B 总成本 = 320000+(100000×0.10×5)=370000 美元，A 比 B 便宜 7 万美元，更换方案需要在授标前报发起人批准，易错点是误以为要优先选择排放量最低的 B 方案，因此答案选 C。。\n易错点：默认必须选最低排放。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q60",
+            "sourceParagraph": 318,
+            "source": "Mastery Exam Prep 公开样题  原题24",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：C。报批改选A：五年便宜7万美元且达排放上限。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q69",
+        "sourceId": "pmp-cn-20261102-Q69",
+        "title": "Q69 数据计算／成本偏差",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q69",
+        "stemParts": [
+          {
+            "text": "根据表中数据，成本偏差CV是多少？\n\nBAC | 已完成工作 | AC\n2,000,000美元 | 60% | 1,500,000美元\n\n来源中的预测型船舶改装项目。"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "−800,000美元",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "＋300,000美元，有利",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "−500,000美元",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "−300,000美元",
+            "correct": true
+          }
+        ],
+        "correctAnswer": "D",
+        "correctOptionIds": [],
+        "analysis": "EV＝60%×200万＝120万；CV＝EV−AC＝−30万。\n易错点：把预算总额与实际成本直接相减。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q69",
+            "sourceParagraph": 331,
+            "source": "SASERÁ Academy 新版10题  原题6",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：D。−300,000美元。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q20",
+        "sourceId": "pmp-cn-20261102-Q20",
+        "title": "Q20 第1小题  AI／检索增强生成",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q20",
+        "stemParts": [
+          {
+            "text": "AI要基于官方公告回答问题，且不改变模型本身，哪种方式最适合？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "查询时用RAG检索可信记录",
+            "correct": true
+          },
+          {
+            "id": "B",
+            "text": "微调模型，永久学会镇上记录",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "只用通用提示，不接入本地资料",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "生成可能的收容所地图",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "A",
+        "correctOptionIds": [],
+        "analysis": "本题核心要求是 AI 依托官方公告作答、不改动模型本身，RAG 即检索增强生成，在提问的时候实时调取外部可信资料作为回答依据，不需要对模型做微调训练；B 选项微调会改变模型本身，C 不接入本地官方资料、D 生成地图都无法满足基于官方公告回答的要求，因此选 A。\n易错点：把实时检索与微调混为一谈。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q20",
+            "sourceParagraph": 349,
+            "source": "PM Illustrated AI学习路径  K Town 寻人情境第1题",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：A。RAG在查询时检索可信记录。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": [],
+        "_caseKey": "pmp-case-5",
+        "caseGroup": {
+          "id": "pmp-case-5",
+          "order": 1,
+          "total": 3
+        }
+      },
+      {
+        "id": "pmp-cn-20261102-Q21",
+        "sourceId": "pmp-cn-20261102-Q21",
+        "title": "Q21 第2小题  AI／辅助与责任",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q21",
+        "stemParts": [
+          {
+            "text": "协调志愿者时，哪种使用方式最符合AI辅助？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "草拟搜寻计划和风险清单，供人审核完善",
+            "correct": true
+          },
+          {
+            "id": "B",
+            "text": "AI直接发布最终志愿者排班",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "代理端到端运行搜寻并分派任务",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "每次简报后自动生成纪要和更新",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "A",
+        "correctOptionIds": [],
+        "analysis": "本题考查 AI 辅助的边界，题干要求保留人的审核和责任，AI 只做辅助工作，AI 草拟搜寻计划和风险清单，由人来审核完善，决策权和最终责任留在人身上；B、C 让 AI 直接输出、下发最终安排，D 自动生成纪要更新不属于该场景下符合题意的核心辅助模式，易错点是误以为 AI 自动产出并直接落地就是辅助，因此选 A。\n易错点：把自动发布最终安排当作辅助。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q21",
+            "sourceParagraph": 360,
+            "source": "PM Illustrated AI学习路径  K Town 寻人情境第2题",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：A。先草拟计划与风险清单，交人审核。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": [],
+        "_caseKey": "pmp-case-5",
+        "caseGroup": {
+          "id": "pmp-case-5",
+          "order": 2,
+          "total": 3
+        }
+      },
+      {
+        "id": "pmp-cn-20261102-Q22",
+        "sourceId": "pmp-cn-20261102-Q22",
+        "title": "Q22 第3小题  AI／幻觉核验",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q22",
+        "stemParts": [
+          {
+            "text": "AI列出带正式名称和编号的收容所信息，采取行动前应如何处理？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "用可信来源核验，采用核实后的信息",
+            "correct": true
+          },
+          {
+            "id": "B",
+            "text": "时间紧，直接发给志愿者",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "让AI改写得更清楚",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "用另一AI确认清单正确",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "A",
+        "correctOptionIds": [],
+        "analysis": "本题考查 AI 幻觉风险的校验，AI 输出的信息即便格式规范、带有正式名称编号，也存在幻觉出错的可能，不能直接采信，需要依托可信的原始来源核验信息，确认无误后再使用；B 直接下发、C 仅优化表述、D 换另一个 AI 复核都无法完成真实性校验，易错点是认为其他 AI 的确认就等同于事实核验，因此选 A。\n易错点：让另一个AI赞同便当作核实。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q22",
+            "sourceParagraph": 371,
+            "source": "PM Illustrated AI学习路径  K Town 寻人情境第3题",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：A。用可信来源核验，再更新计划。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": [],
+        "_caseKey": "pmp-case-5",
+        "caseGroup": {
+          "id": "pmp-case-5",
+          "order": 3,
+          "total": 3
+        }
+      },
+      {
+        "id": "pmp-cn-20261102-Q01",
+        "sourceId": "pmp-cn-20261102-Q01",
+        "title": "Q01 AI 与人工判断",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q01",
+        "stemParts": [
+          {
+            "text": "AI汇总反馈时可能遗漏关键干系人意见。缩减范围前，项目经理应先做什么？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "接受摘要，已获批准的AI处理能力更强",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "重新核对原始反馈，验证摘要并记录决策依据",
+            "correct": true
+          },
+          {
+            "id": "C",
+            "text": "拒绝一切AI分析，干系人决策全部手工处理",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "多数意见已明确，立即请发起人批准缩减范围",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "B",
+        "correctOptionIds": [],
+        "analysis": "本题的核心是 AI 属于辅助工具，即便已经获批使用，输出的汇总摘要依然存在遗漏关键干系人意见的风险，不能直接采信，项目经理需要核对原始反馈来验证摘要内容，同时留存好决策依据；A 直接接受摘要、C 全盘禁用 AI、D 直接提交审批都不合适，易错点就是要么无条件信任 AI 输出，要么走向极端完全拒绝 AI 工具，因此选 B。\n易错点：直接接受AI摘要或全面禁用AI。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q01",
+            "sourceParagraph": 382,
+            "source": "PM Exams 新版专题题  原题1",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：B。核对原始反馈，验证摘要并记录依据。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q17",
+        "sourceId": "pmp-cn-20261102-Q17",
+        "title": "Q17 AI 与情境适用性",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q17",
+        "stemParts": [
+          {
+            "text": "AI建议缩短测试两周，但本次首次集成工作很多。应先做什么？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "历史数据客观，采纳AI建议",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "为稳妥起见直接延长测试",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "核对模型假设是否适用于首次集成",
+            "correct": true
+          },
+          {
+            "id": "D",
+            "text": "请发起人在AI与负责人意见间选一个",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "C",
+        "correctOptionIds": [],
+        "analysis": "AI 给出的建议依托它自身的模型假设与历史数据，本次项目有大量首次集成，场景和过往不一样，不能直接采信或者直接反着改，首先需要核验 AI 背后的模型假设是否适配本次首次集成的场景；A 直接采纳、B 直接延长、D 交给发起人二选一都不是正确的优先动作，因此选 C。\n易错点：照搬预测。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q17",
+            "sourceParagraph": 393,
+            "source": "Master of Project Academy AI情境  情境1",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：C。核验模型假设是否适用于本次发布。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q18",
+        "sourceId": "pmp-cn-20261102-Q18",
+        "title": "Q18 AI 与数据代表性",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q18",
+        "stemParts": [
+          {
+            "text": "AI判供应商延期概率低，但历史数据几乎无该类供应商。怎么办？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "按AI结果登记为低风险",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "评估数据局限，补充专家与供应商专项分析",
+            "correct": true
+          },
+          {
+            "id": "C",
+            "text": "数据不全，停止使用AI",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "用罚款条款转移延期风险",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "B",
+        "correctOptionIds": [],
+        "analysis": "AI 的预测依赖训练数据，本题缺少该类供应商的历史数据，样本代表性不足，AI 结论可信度有限，不能直接采信，应当先识别这份数据局限，再通过专家判断、和供应商专项沟通做补充分析；A 直接采信 AI 结果、C 直接停用 AI、D 直接靠罚款转移风险都不是优先做法，因此选 B。\n易错点：直接按低概率登记。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q18",
+            "sourceParagraph": 404,
+            "source": "Master of Project Academy AI情境  情境2",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：B。补充专家及供应商专项分析。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q19",
+        "sourceId": "pmp-cn-20261102-Q19",
+        "title": "Q19 AI 与组织采纳",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q19",
+        "stemParts": [
+          {
+            "text": "AI排程与资深成员的技能认知冲突，双轨计划造成延期。首先怎么办？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "强制执行AI排程",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "与团队了解顾虑并核正技能数据",
+            "correct": true
+          },
+          {
+            "id": "C",
+            "text": "请PMO撤回工具直到团队准备好",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "把不接受的成员调往其他项目",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "B",
+        "correctOptionIds": [],
+        "analysis": "AI 排班的结果是依托录入的技能数据生成的，现在和资深成员的实际认知冲突，首先要倾听团队的顾虑，核查、修正 AI 用到的技能基础数据，找到冲突根源；A 强制推行 AI 方案、C 直接撤走工具、D 调离成员都是比较粗暴的处理方式，不是优先动作，因此选 B。\n易错点：强制使用工具。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q19",
+            "sourceParagraph": 415,
+            "source": "Master of Project Academy AI情境  情境3",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：B。听取成员意见，检查技能数据。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q23",
+        "sourceId": "pmp-cn-20261102-Q23",
+        "title": "Q23 AI 与受控试点",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q23",
+        "stemParts": [
+          {
+            "text": "成员担忧AI状态报告的准确性与隐私。应如何推动采用？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "下周起强制全员使用",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "禁止工具，直到担忧消失",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "说明目的、听取顾虑，约定复核与数据规则后试点",
+            "correct": true
+          },
+          {
+            "id": "D",
+            "text": "完全交给IT部门推动",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "C",
+        "correctOptionIds": [],
+        "analysis": "团队对准确性、隐私有顾虑时，不能强行推行，也不能直接禁用。正确做法是沟通说明工具用途，认真听取大家的顾虑，明确数据使用、复核的规则，先用试点小范围验证，平衡落地推广和信息、隐私风险。A 强推、B 直接禁止都属于极端做法。\n易错点：强推或全面禁止。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q23",
+            "sourceParagraph": 426,
+            "source": "TechNet 新版免费题  原题10",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：C。听取担忧，约定复核与数据规则后试点。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q42",
+        "sourceId": "pmp-cn-20261102-Q42",
+        "title": "Q42 AI 与测试复核",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q42",
+        "stemParts": [
+          {
+            "text": "新人照抄AI测试用例，漏掉业务规则。如何纠正？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "全面禁用AI",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "约定AI输出复核规则并辅导新人",
+            "correct": true
+          },
+          {
+            "id": "C",
+            "text": "让新人停止测试",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "工具通常有效，忽略这次错误",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "B",
+        "correctOptionIds": [],
+        "analysis": "AI 只是辅助工具，最终责任还是人。不能全盘禁用 AI，也不能无视错误。要制定 AI 产出内容的复核规则，同时辅导新人，教会他核验 AI 输出、对照业务规则检查，避免直接照搬 AI 结果。\n易错点：全面禁用AI。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q42",
+            "sourceParagraph": 437,
+            "source": "Brolly Academy 新版60题  原题8",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：B。制定复核规则并辅导验证。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q44",
+        "sourceId": "pmp-cn-20261102-Q44",
+        "title": "Q44 AI 与保密边界",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q44",
+        "stemParts": [
+          {
+            "text": "成员拟把客户机密资料贴入免费公共AI。首先怎么办？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "允许上传，以节省时间",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "先停止，核对AI政策与客户合同，仅用获批工具妥善处理数据",
+            "correct": true
+          },
+          {
+            "id": "C",
+            "text": "上传后删除即可",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "事后再问客户",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "B",
+        "correctOptionIds": [],
+        "analysis": "客户机密属于敏感数据，公共免费 AI 往往存在数据泄露风险，不能上传。首先制止该操作，核对公司 AI 使用政策、客户合同里的数据保密条款，只能使用经过审批的合规 AI 工具处理涉密数据。A、C、D 都存在泄密风险，是错误做法。\n易错点：上传后删除即可。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q44",
+            "sourceParagraph": 448,
+            "source": "Brolly Academy 新版60题  原题52",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：B。先停止上传，核对政策、合同及批准工具。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q53",
+        "sourceId": "pmp-cn-20261102-Q53",
+        "title": "Q53 AI／资源计划",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q53",
+        "stemParts": [
+          {
+            "text": "拟以AI生成测试用例，减少测试人力前怎么办？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "先试点、验证输出并核对政策",
+            "correct": true
+          },
+          {
+            "id": "B",
+            "text": "按厂商承诺的节约量削减估算",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "等PMO出台政策才考虑",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "让测试人员各自决定用法",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "A",
+        "correctOptionIds": [],
+        "analysis": "不能直接按照厂商宣传的节省人力数字去削减资源。正确做法是先做受控试点，验证 AI 产出质量，同时确认符合公司相关政策，拿到真实效果证据之后，再评估人力调整。B 轻信厂商承诺、C 被动等政策、D 放任员工自行决定都不合适。\n易错点：照搬供应商节省比例。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q53",
+            "sourceParagraph": 459,
+            "source": "SASERÁ Academy 新版10题  原题4",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：A。受控试点，验证输出及政策符合性。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q67",
+        "sourceId": "pmp-cn-20261102-Q67",
+        "title": "Q67 AI／自动化与价值取舍",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q67",
+        "stemParts": [
+          {
+            "text": "AI自动生成成果可省时，却会删去部分干系人重视的功能，应如何回应？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "批准自动化并通知删除功能",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "直接否决，完全保留原成果",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "先实施，有人投诉再补功能",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "共同评估价值影响，再权衡省时与功能损失",
+            "correct": true
+          }
+        ],
+        "correctAnswer": "D",
+        "correctOptionIds": [],
+        "analysis": "不能直接同意自动化删掉功能，也不能直接全盘否决 AI 方案。效率提升只是一方面，要和干系人一起评估被移除功能的业务价值，权衡节省时间带来的收益和功能缺失带来的负面影响之后再做决策。A、C 属于擅自取舍，B 是直接拒绝，都不对。\n易错点：未评估就删功能或全面拒绝自动化。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q67",
+            "sourceParagraph": 470,
+            "source": "PM Mastery 免费25题  原题14",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：D。先与干系人评估价值，再权衡省时与功能损失。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q77",
+        "sourceId": "pmp-cn-20261102-Q77",
+        "title": "Q77 AI／技术环境",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q77",
+        "stemParts": [
+          {
+            "text": "生成式AI快速变化，项目经理应持何态度？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "回避所有AI",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "跟踪变化，验证后调整",
+            "correct": true
+          },
+          {
+            "id": "C",
+            "text": "新工具一律采用",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "假定技术不变",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "B",
+        "correctOptionIds": [],
+        "analysis": "AI 技术迭代很快，既不能全部回避不用，也不能新工具上来就直接使用。正确做法是持续跟踪技术变化，验证工具对项目的实际影响，评估合适之后再调整使用策略。A 全盘回避、C 全部采用、D 假设技术不变都属于极端、静态的思路。\n易错点：每款新工具都采用。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q77",
+            "sourceParagraph": 481,
+            "source": "Oliver Lehmann 2026公开PDF  原题121，PDF第40页",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：B。监测相关变化，验证影响后调整。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q94",
+        "sourceId": "pmp-cn-20261102-Q94",
+        "title": "Q94 AI／交付方法对比",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q94",
+        "stemParts": [
+          {
+            "text": "项目A在300站点替换成熟打印机；项目B是5人的需求未明AI试点。各选何种交付方法？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "A分批短迭代；B前期详细计划",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "A前期详细计划；B短迭代与用户反馈",
+            "correct": true
+          },
+          {
+            "id": "C",
+            "text": "两者均详细计划，B增加储备",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "两者均短迭代与用户反馈",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "B",
+        "correctOptionIds": [],
+        "analysis": "项目 A：替换成熟打印机，需求明确、流程稳定、确定性高，适合预测型（前期详细计划），提前做好完整规划，按计划批量落地。 项目 B：AI 试点，需求不明确、不确定性很高，适合敏捷短迭代，持续收集用户反馈，逐步探索验证，不适合一开始就做详细计划。 核心思路：确定性高→预测型；需求模糊不确定→敏捷迭代，不要被团队人数干扰判断。\n易错点：按团队人数选方法。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q94",
+            "sourceParagraph": 492,
+            "source": "SaveMyCert 公开示例  公开示例5",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：B。前者预测型，后者短迭代反馈。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q02",
+        "sourceId": "pmp-cn-20261102-Q02",
+        "title": "Q02 可持续发展",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q02",
+        "stemParts": [
+          {
+            "text": "供应商能追回两周工期，但方案与组织环保承诺冲突，合同又未禁止。怎么办？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "合同允许且工期紧，采用快方案",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "可持续性始终优先，立即否决",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "综合分析工期、成本、干系人与环保影响后提交治理决策",
+            "correct": true
+          },
+          {
+            "id": "D",
+            "text": "交由运营部门在收尾时决定",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "C",
+        "correctOptionIds": [],
+        "analysis": "虽然合同没有禁止这个方案，但是它违背了组织对外的环保承诺，不能直接选用（A 错），也不能不经评估直接一刀切否决（B 错）。项目经理需要全面评估工期、成本、干系人诉求以及环保方面带来的负面影响，整理信息之后上报给对应的治理层做决策。D 的问题是不能拖到收尾阶段才处理这种重大决策。 核心：合同允许≠符合组织战略、价值观和承诺，重大冲突要评估后上报治理决策。\n易错点：仅因合同允许就立即实施。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q02",
+            "sourceParagraph": 504,
+            "source": "PM Exams 新版专题题  原题2",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：C。分析综合影响，提交适当治理决策。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q27",
+        "sourceId": "pmp-cn-20261102-Q27",
+        "title": "Q27 材料选择与全生命周期",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q27",
+        "stemParts": [
+          {
+            "text": "便宜材料废弃物多，可回收材料贵4%，组织有环保承诺。怎么办？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "呈报生命周期成本、处置、合规及环保承诺影响",
+            "correct": true
+          },
+          {
+            "id": "B",
+            "text": "商业论证重成本，直接选便宜材料",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "环保承诺优先，用应急储备选可回收材料",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "请供应商决定",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "A",
+        "correctOptionIds": [],
+        "analysis": "不能只看采购价（B 错），也不能自己直接判定环保优先、擅自动用应急储备（C 错），更不能把决策权交给供应商（D 错）。 项目经理要完整分析全生命周期成本、废料处置成本、合规风险、对组织环保承诺的影响，整理信息上报给对应的决策人，由决策方权衡取舍。 核心考点：项目经理负责调研、提供评估依据，而不是自己单方面拍板。\n易错点：擅用应急储备。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q27",
+            "sourceParagraph": 515,
+            "source": "CertRidge 免费题  原题12",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：A。呈报生命周期成本、处置与合规影响。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q37",
+        "sourceId": "pmp-cn-20261102-Q37",
+        "title": "Q37 可持续与无障碍需求",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q37",
+        "stemParts": [
+          {
+            "text": "项目预计打印15,000页，一人确实难读屏幕。怎样兼顾？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "为尊重偏好，全部打印",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "为有需要者供纸，其余数字优先，并改善可读性",
+            "correct": true
+          },
+          {
+            "id": "C",
+            "text": "为环保强制全面无纸化",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "全部改用再生纸打印",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "B",
+        "correctOptionIds": [],
+        "analysis": "不要走极端，既不能全部打印（A），也不能一刀切强制全部无纸化（C）。正确做法是兼顾环保和人员需求：有纸质阅读需求的人提供打印版本，其余场景优先数字化，同时优化电子文档的可读性，减少打印总量，同时保障成员正常参与工作。D 全部换成再生纸依然会产生大量纸张消耗，不是最优方案。 核心思路：可持续题目偏好折中方案，兼顾人的需求和环保目标，拒绝非黑即白。\n易错点：全员只用纸或全禁纸。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q37",
+            "sourceParagraph": 526,
+            "source": "PM Mastery 免费25题  原题1",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：B。对个人提供便利，其余优先数字化。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q38",
+        "sourceId": "pmp-cn-20261102-Q38",
+        "title": "Q38 软件项目的环境影响",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q38",
+        "stemParts": [
+          {
+            "text": "敏捷软件项目应如何纳入可持续性？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "软件环境影响小，只管传统约束",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "决策考虑云能效、机房位置与资源优化",
+            "correct": true
+          },
+          {
+            "id": "C",
+            "text": "等重要里程碑后专门评估",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "全部交给企业环保部门",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "B",
+        "correctOptionIds": [],
+        "analysis": "软件系统同样存在环境能耗（云服务器、机房算力耗电等），不能认为软件没有环境影响（A 错）。 敏捷需要在迭代决策中持续考虑可持续性：选型时考虑云平台能效、机房选址、算力资源优化，降低能耗。 C 错误：不能等到里程碑才一次性评估；D 错误：项目经理不能把这件事全部甩给环保部门。 核心考点：软件项目也有碳足迹，可持续性要融入日常迭代决策。\n易错点：认为软件没有影响。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q38",
+            "sourceParagraph": 537,
+            "source": "PM Mastery 免费25题  原题3",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：B。将云能效、机房位置、资源优化纳入决策。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q43",
+        "sourceId": "pmp-cn-20261102-Q43",
+        "title": "Q43 可持续目标与需求",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q43",
+        "stemParts": [
+          {
+            "text": "客户要求新仓库降低碳足迹，应怎样落实？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "视为可有可无，成本涨就忽略",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "需求、设计和采购纳入可测量的可持续标准",
+            "correct": true
+          },
+          {
+            "id": "C",
+            "text": "完全交给施工承包商",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "仅在项目结束时报告",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "B",
+        "correctOptionIds": [],
+        "analysis": "降碳是客户明确提出的需求，不能当成可有可无（A 错）；也不能全部甩给承包商（C 错），更不能等到收尾才只做一份报告（D 错）。 正确做法：在需求、设计、采购阶段就提前定义可测量、可量化的可持续指标，从早期决策就把低碳要求嵌入进去，而不是后期补救。 核心：可持续目标要前置、量化，融入项目全过程。\n易错点：只在收尾报告。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q43",
+            "sourceParagraph": 548,
+            "source": "Brolly Academy 新版60题  原题47",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：B。把可量化目标纳入需求、设计和采购。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q55",
+        "sourceId": "pmp-cn-20261102-Q55",
+        "title": "Q55 可持续／隐含碳",
+        "type": "multiple_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q55",
+        "stemParts": [
+          {
+            "text": "合同要求减少材料隐含碳，列两项方法。"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "不改材料，结尾购买全部碳抵消",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "采购文件明确低碳材料",
+            "correct": true
+          },
+          {
+            "id": "C",
+            "text": "只在最终报告记录碳量",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "每个里程碑按目标追踪隐含碳",
+            "correct": true
+          },
+          {
+            "id": "E",
+            "text": "完全由承包商自行减碳",
+            "correct": false
+          }
+        ],
+        "correctAnswer": null,
+        "correctOptionIds": [
+          "B",
+          "D"
+        ],
+        "analysis": "- B：采购文件明确低碳材料 ✅，在源头就对材料的隐含碳提出要求；\n- D：每个里程碑按目标追踪隐含碳 ✅，过程持续监控，保证朝着目标履约；\n- A 错误：单纯靠收尾买碳抵消，没有从根源减少隐含碳；\n- C 错误：只记录不管控，无法实现减碳；\n- E 错误：不能完全交给承包商自主处理，甲方需要管控。\n核心考点：隐含碳管控要源头定义 + 过程追踪，优先源头减量，而不是事后碳抵消。\n易错点：只在末期购买抵消。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q55",
+            "sourceParagraph": 559,
+            "source": "SASERÁ Academy 新版10题  原题8，选二",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：B、D。采购明确低碳材料；各里程碑按目标追踪。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q68",
+        "sourceId": "pmp-cn-20261102-Q68",
+        "title": "Q68 可持续发展／质量指标",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q68",
+        "stemParts": [
+          {
+            "text": "制造产线改造如何把可持续性纳入质量管理？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "仅在最终报告和经验总结写声明",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "定义能耗、废料率等可持续质量指标",
+            "correct": true
+          },
+          {
+            "id": "C",
+            "text": "全部交企业ESG团队",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "改用再生纸和数字签批",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "B",
+        "correctOptionIds": [],
+        "analysis": "解析：把可持续性纳入质量管理不能只在收尾报告做文字说明（A 错）、也不能全部移交 ESG 团队（C 错），再生纸和数字签批只是次要的办公优化，不是产线改造质量管理层面的做法（D 错），正确做法是定义能耗、废料率这类可量化的可持续指标，纳入质量指标体系，融入日常质量管控和决策当中。\n易错点：只在最终报告写环保声明。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q68",
+            "sourceParagraph": 576,
+            "source": "TestPrepGuides 新版练习  pmp-r-17",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：B。制定能耗、废料率等可测量要求，作为质量指标管理。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q83",
+        "sourceId": "pmp-cn-20261102-Q83",
+        "title": "Q83 可持续／合规类别",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q83",
+        "stemParts": [
+          {
+            "text": "项目合规分类除法律外还应覆盖哪些？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "只管技术要求",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "只管低成本要求",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "法律、监管、安全健康、可持续与合同",
+            "correct": true
+          },
+          {
+            "id": "D",
+            "text": "仅法律监管",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "C",
+        "correctOptionIds": [],
+        "analysis": "解析：项目合规不只是法律、监管条文，A 只局限技术、B 只看低成本都不对，D 只包含法律监管范围不足，合规还应当覆盖安全健康、可持续、合同约定等要求，需要结合项目实际场景完整识别。\n易错点：只查法规。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q83",
+            "sourceParagraph": 587,
+            "source": "Oliver Lehmann 2026公开PDF  原题177，PDF第57页",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：C。适用的安全、健康、可持续及合同要求。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q85",
+        "sourceId": "pmp-cn-20261102-Q85",
+        "title": "Q85 可持续／社区参与",
+        "type": "multiple_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q85",
+        "stemParts": [
+          {
+            "text": "环保团体公开反对引发舆情，采取哪两项？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "更新影响力与参与策略",
+            "correct": true
+          },
+          {
+            "id": "B",
+            "text": "请发起人公开反驳",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "召开干系人圆桌会",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "将其移出关键沟通",
+            "correct": false
+          },
+          {
+            "id": "E",
+            "text": "直接了解诉求并找共识",
+            "correct": true
+          }
+        ],
+        "correctAnswer": null,
+        "correctOptionIds": [
+          "A",
+          "E"
+        ],
+        "analysis": "环保团体提出反对、舆情出现时，干系人的影响力发生变化，不能选择公开反驳、排斥对方等对立方式（B、D 错误），圆桌会不是优先措施（C 错），应当更新影响力与干系人参与策略，同时直接沟通、了解诉求、寻求共识。\n易错点：只保护里程碑。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q85",
+            "sourceParagraph": 598,
+            "source": "PMAspirant 新版多选100题  原题16，选二",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：A、E。更新影响力与参与策略；直接沟通找共识。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q87",
+        "sourceId": "pmp-cn-20261102-Q87",
+        "title": "Q87 可持续／违规整改",
+        "type": "multiple_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q87",
+        "stemParts": [
+          {
+            "text": "分包绕过沉积控制，检查将至，列两项行动。"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "立即向监管机构报告",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "只登记风险，等回顾会处理",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "审查合同并协同法务合规",
+            "correct": true
+          },
+          {
+            "id": "D",
+            "text": "立即移除分包商",
+            "correct": false
+          },
+          {
+            "id": "E",
+            "text": "评估严重性并在检查前协同整改",
+            "correct": true
+          }
+        ],
+        "correctAnswer": null,
+        "correctOptionIds": [
+          "C",
+          "E"
+        ],
+        "analysis": "分包商违规绕过沉积控制、检查临近，不能直接上报监管、单纯登记等待或者直接移除分包商（A、B、D 错），应当先审查合同、协同法务合规，同时评估违规严重程度，在检查前组织整改。\n易错点：等检查发现。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q87",
+            "sourceParagraph": 610,
+            "source": "PMAspirant 新版多选100题  原题77，选二",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：C、E。协同法务合规审查合同；评估严重性并整改。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q88",
+        "sourceId": "pmp-cn-20261102-Q88",
+        "title": "Q88 情境／智能楼宇",
+        "type": "multiple_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q88",
+        "stemParts": [
+          {
+            "text": "传感器漏洞修补会延迟节能试点，列三项行动。"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "综合安全、运营及可持续影响重评风险",
+            "correct": true
+          },
+          {
+            "id": "B",
+            "text": "无客户数据，先试点后打补丁",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "协同厂商、网安与运营比较时点及应对",
+            "correct": true
+          },
+          {
+            "id": "D",
+            "text": "更新风险、责任、时点与残余风险",
+            "correct": true
+          },
+          {
+            "id": "E",
+            "text": "固件归厂商，全部转移",
+            "correct": false
+          }
+        ],
+        "correctAnswer": null,
+        "correctOptionIds": [
+          "A",
+          "C",
+          "D"
+        ],
+        "analysis": "传感器漏洞修补会耽误节能试点，不能因为没有客户数据就先试点再补漏洞，也不能把固件风险全部甩给厂商（B、E 错），需要结合安全、运营、可持续维度重新评估风险，联合厂商、网安、运营一起讨论时间方案，并且更新风险台账、责任人、时间节点以及残余风险。\n易错点：无客户数据就忽略。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q88",
+            "sourceParagraph": 622,
+            "source": "PMAspirant 新版多选100题  原题94，选三",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：A、C、D。重评综合风险；协同厂商安全及运营；更新应对责任与时点。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q03",
+        "sourceId": "pmp-cn-20261102-Q03",
+        "title": "Q03 价值与收益实现",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q03",
+        "stemParts": [
+          {
+            "text": "功能按时交付，但采用率低、业务痛点仍在。应优先检查什么？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "增加仪表板报告频率，证明已交付成果",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "先重评价值实现与干系人目标，再决定是否增加报告",
+            "correct": true
+          },
+          {
+            "id": "C",
+            "text": "工期表现良好，继续原计划",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "混合方式导致问题，全面转为预测型",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "B",
+        "correctOptionIds": [],
+        "analysis": "虽然功能按时交付，但低采用率、业务痛点依旧存在，说明单纯按时交付不等于实现预期价值，增加报表只是展示交付成果，无法解决价值不达标问题，继续按原计划推进也不能改善现状，直接切换开发模式也不是首要动作，因此要优先重新评估价值实现情况以及和干系人目标是否匹配，在此基础上再决定后续措施。\n易错点：只增加进度报表。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q03",
+            "sourceParagraph": 635,
+            "source": "PM Exams 新版专题题  原题4",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：B。价值实现与干系人目标的一致性。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q29",
+        "sourceId": "pmp-cn-20261102-Q29",
+        "title": "Q29 情境与综合影响分析",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q29",
+        "stemParts": [
+          {
+            "text": "项目已延期，API又变更，新增高价值报表。首先怎么办？\n\n情境背景：混合项目已晚2周；API技术变化可能再晚1周。产品负责人提出高价值报表，发起人仍要求原发布日期。"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "保护范围基准，拒绝新功能",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "要求加班追回全部延期",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "先分析范围、进度、风险与价值的累积影响",
+            "correct": true
+          },
+          {
+            "id": "D",
+            "text": "立即更换集成供应商",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "C",
+        "correctOptionIds": [],
+        "analysis": "项目已经延期，叠加 API 变更、新增报表需求，同时发起人坚持原定发布日期，直接拒绝新增功能、要求加班赶工或者更换供应商都属于过于激进的处置方式，没有先评估全貌，正确做法是先分析范围、进度、风险和新增价值带来的累积综合影响，评估各个可选方案的可行性之后再做决策。\n易错点：立即加班或拒绝新增。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q29",
+            "sourceParagraph": 646,
+            "source": "PMA 新版题型示例  Case or Scenario示例",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：C。分析范围、进度、风险与价值的综合影响。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q66",
+        "sourceId": "pmp-cn-20261102-Q66",
+        "title": "Q66 情境／商业论证",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q66",
+        "stemParts": [
+          {
+            "text": "竞品上市可能削弱项目收益，应怎么办？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "商业论证已批，照原计划做",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "评估商业论证和收益，与发起人讨论",
+            "correct": true
+          },
+          {
+            "id": "C",
+            "text": "立即自行取消",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "不告知干系人以免担忧",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "B",
+        "correctOptionIds": [],
+        "analysis": "竞品上市属于外部环境变化，有可能改变项目原本的投资价值，商业论证虽然已经获批，但不代表不能重新审视，不能直接一成不变按原计划推进，也不能由项目经理擅自取消项目，更不能隐瞒消息不告知干系人，正确做法是评估该事件对商业论证和预期收益带来的影响，并和发起人沟通、商讨备选方案。\n易错点：直接取消项目。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q66",
+            "sourceParagraph": 658,
+            "source": "CoverLettersAndResume 100题  原题99",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：B。评估商业论证与收益影响，与发起人讨论选项。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q80",
+        "sourceId": "pmp-cn-20261102-Q80",
+        "title": "Q80 情境／增量反馈",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q80",
+        "stemParts": [
+          {
+            "text": "客户看过两次增量后大改需求，怎么办？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "用反馈重排待办",
+            "correct": true
+          },
+          {
+            "id": "B",
+            "text": "正式需求已定，拒改",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "全部暂停，重设基准",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "要求书面承诺不再改",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "A",
+        "correctOptionIds": [],
+        "analysis": "增量交付的目的就是通过迭代成果获取客户反馈、挖掘真实需求，客户看完增量之后提出较大需求变更属于敏捷场景下正常的反馈输入，不可以直接拒绝修改、强制要求客户承诺不再变更，也不需要直接全部停工重置基准，应当利用这份反馈，协助产品负责人重新梳理、调整待办列表。\n易错点：强求不再变更。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q80",
+            "sourceParagraph": 669,
+            "source": "Oliver Lehmann 2026公开PDF  原题125，PDF第41页",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：A。把反馈用于帮助产品负责人调整待办。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q04",
+        "sourceId": "pmp-cn-20261102-Q04",
+        "title": "Q04 治理与变更控制",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q04",
+        "stemParts": [
+          {
+            "text": "发布前，干系人提出可能提高满意度、也可能导致延期的重大变更。首先怎么办？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "可能延期，立即拒绝变更",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "为提高客户满意度，立即实施",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "评估影响并遵循变更控制流程",
+            "correct": true
+          },
+          {
+            "id": "D",
+            "text": "问团队是否能接受延期",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "C",
+        "correctOptionIds": [],
+        "analysis": "面对这个存在利弊的重大变更，不管直接拒绝或是直接实施都属于没有经过评估的草率行为，询问团队能否接受延期也不是规范的变更管理流程，正确做法是先全面评估变更带来的各类影响，再按照既定的变更控制流程走审批决策，为后续的选择建立可靠的决策依据。\n易错点：立即拒绝或直接实施。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q04",
+            "sourceParagraph": 681,
+            "source": "PMI 官方公开样题  官方样题1",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：C。评估影响，遵循变更控制流程。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q05",
+        "sourceId": "pmp-cn-20261102-Q05",
+        "title": "Q05 治理与变更控制",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q05",
+        "stemParts": [
+          {
+            "text": "变更已获批准，变更日志和基准已更新。下一步如何确保落地？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "重新评估商业论证",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "在指导与管理项目工作中安排团队执行",
+            "correct": true
+          },
+          {
+            "id": "C",
+            "text": "分析财务偏差",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "在PMIS中关闭变更请求",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "B",
+        "correctOptionIds": [],
+        "analysis": "变更已经获批、变更日志和基准更新完成后，不需要再次重新评估商业论证或者分析财务偏差，也不能提前在 PMIS 里关闭变更请求，变更要等到执行完成、验证通过后才可以关闭，此时下一步应当在指导与管理项目工作过程中安排团队落实执行这项获批的变更。\n易错点：重复评估或提前关闭变更。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q05",
+            "sourceParagraph": 692,
+            "source": "CertSafari 免费样题  原题32",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：B。安排团队执行已批准的变更。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q06",
+        "sourceId": "pmp-cn-20261102-Q06",
+        "title": "Q06 合规与外部环境",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q06",
+        "stemParts": [
+          {
+            "text": "执行中发现遗漏强制法规要求，落实将增加约三周。首先怎么办？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "直接补入进度并通知发起人延期",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "要求加班以抵消三周增量",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "编制含影响与备选方案的变更请求",
+            "correct": true
+          },
+          {
+            "id": "D",
+            "text": "请求监管方给予延期以维持上线日",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "C",
+        "correctOptionIds": [],
+        "analysis": "强制性法规是必须遵守的，项目经理不能自行直接修改进度通知延期，也不能强行安排加班去赶工期，直接向监管申请延期也不是首要步骤，合规带来的调整属于变更，需要先做好影响分析、梳理备选方案，提交变更请求交由治理层来做决策。\n易错点：自行宣布延期或直接安排加班。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q06",
+            "sourceParagraph": 703,
+            "source": "PMP Exam Lab 免费题集  原题16",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：C。准备含影响分析及选项的变更请求。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q07",
+        "sourceId": "pmp-cn-20261102-Q07",
+        "title": "Q07 安全与紧急处置",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q07",
+        "stemParts": [
+          {
+            "text": "工作现场出现直接危及人员安全的风险。首先怎么办？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "先完成常规影响分析",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "等下次治理会议决定",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "执行安全程序并升级报告",
+            "correct": true
+          },
+          {
+            "id": "D",
+            "text": "要求先做完当前任务再报告",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "C",
+        "correctOptionIds": [],
+        "analysis": "人员安全属于最高优先级，面对直接危及人身安全的紧急风险，不能先做常规影响分析、等待治理会议或者继续完成手头任务，应当第一时间执行既定安全保护程序保障人员安全，同时向上升级上报情况。\n易错点：先完成任务或照常分析再保护。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q07",
+            "sourceParagraph": 714,
+            "source": "PMP Exam Lab 免费题集  原题126",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：C。执行安全程序并升级报告。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q08",
+        "sourceId": "pmp-cn-20261102-Q08",
+        "title": "Q08 干系人与权限",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q08",
+        "stemParts": [
+          {
+            "text": "有影响力的干系人反复下达与批准计划冲突的指令，团队优先级混乱。怎么办？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "按其最新指令更新优先级",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "记录问题，继续工作而不沟通",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "要求团队执行较小的指令",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "与其明确角色、权限及对项目的影响",
+            "correct": true
+          }
+        ],
+        "correctAnswer": "D",
+        "correctOptionIds": [],
+        "analysis": "有影响力的干系人不断下达和已批准计划冲突的指令，造成团队优先级混乱，不能一味顺从对方指令、随意更新优先级，也不能只记录问题而不去沟通协调，更不能随意挑选部分指令执行，正确做法是和这位干系人沟通，明确其角色、权限以及对项目的影响，厘清指挥边界，恢复项目执行的一致性。\n易错点：因其影响力而默认服从。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q08",
+            "sourceParagraph": 725,
+            "source": "PMI 官方公开样题  官方样题2",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：D。与其沟通角色、权限及影响。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q28",
+        "sourceId": "pmp-cn-20261102-Q28",
+        "title": "Q28 合规与需求追踪",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q28",
+        "stemParts": [
+          {
+            "text": "医疗器械尚未设计，如何处理强制安全标准？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "把适用条款转为需求，追踪到设计、测试与验收",
+            "correct": true
+          },
+          {
+            "id": "B",
+            "text": "成果完成后再做合规审计",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "对增加成本或工期的条款申请豁免",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "加应急储备应对后续返工",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "A",
+        "correctOptionIds": [],
+        "analysis": "医疗器械属于强合规领域，强制安全标准必须在项目早期纳入进来，不能等到成果做完之后才做合规审计，也不能轻易申请豁免标准条款，或者预留储备用来应对后期返工，应当把适用的强制安全条款转化为项目需求，全程追踪落实到设计、测试以及验收环节当中。\n易错点：只安排末期审计。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q28",
+            "sourceParagraph": 736,
+            "source": "CertRidge 免费题  原题13",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：A。转化为需求，贯穿设计、测试和验收。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q52",
+        "sourceId": "pmp-cn-20261102-Q52",
+        "title": "Q52 情境／安全审查",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q52",
+        "stemParts": [
+          {
+            "text": "外部安全审查慢，团队开始跳过检查。怎么办？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "向发起人报告安全部门导致延期",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "延长为四周迭代",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "等回顾会再提出跳过检查的问题",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "恢复检查，协同安全部门把审查融入工作流",
+            "correct": true
+          }
+        ],
+        "correctAnswer": "D",
+        "correctOptionIds": [],
+        "analysis": "安全审查属于合规检查，团队跳过检查属于违规行为，不能放任不管，直接上报甩锅、延长迭代周期或者等到回顾会才讨论都无法解决当下合规风险，首要做法是恢复安全检查，同时协同安全部门优化流程，把安全审查整合进日常工作流，从根源消除卡点，保证持续合规。\n易错点：等回顾会再处理。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q52",
+            "sourceParagraph": 747,
+            "source": "SASERÁ Academy 新版10题  原题2",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：D。恢复检查，协同安全部门优化审查流。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q89",
+        "sourceId": "pmp-cn-20261102-Q89",
+        "title": "Q89 情境／合规交接",
+        "type": "multiple_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q89",
+        "stemParts": [
+          {
+            "text": "平台验收但无人接管持续合规，列两项措施。"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "关闭前明确持续合规运营责任人",
+            "correct": true
+          },
+          {
+            "id": "B",
+            "text": "验收即自动移交合规，可关闭",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "交接计划写明控制、证据及报告频率",
+            "correct": true
+          },
+          {
+            "id": "D",
+            "text": "项目团队监控到下次监管审计",
+            "correct": false
+          },
+          {
+            "id": "E",
+            "text": "文档归档PMO即完成",
+            "correct": false
+          }
+        ],
+        "correctAnswer": null,
+        "correctOptionIds": [
+          "A",
+          "C"
+        ],
+        "analysis": "平台完成验收不等于合规责任就此结束，不能验收后就默认自动移交合规并关闭项目，也不能让项目团队长期负责监控直到审计，或是只把文档归档给 PMO 就收尾，需要在关闭项目前明确持续合规运营的责任人，并且在交接计划里写清楚管控方式、证据留存要求以及报告频率，保障合规责任能够延续下去。\n易错点：仅技术验收即关闭。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q89",
+            "sourceParagraph": 758,
+            "source": "PMAspirant 新版多选100题  原题79，选二",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：A、C。明确运营责任人；交接控制、证据及报告安排。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q90",
+        "sourceId": "pmp-cn-20261102-Q90",
+        "title": "Q90 情境／外部冲击",
+        "type": "multiple_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q90",
+        "stemParts": [
+          {
+            "text": "地缘事件、关税和网安规则同时变化，列三项措施。"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "持续扫描外部环境",
+            "correct": true
+          },
+          {
+            "id": "B",
+            "text": "调应急预算填供应链超支",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "咨询各地区法务合规",
+            "correct": true
+          },
+          {
+            "id": "D",
+            "text": "重评交付方案与受影响工作优先级",
+            "correct": true
+          },
+          {
+            "id": "E",
+            "text": "等全部外部问题解决再恢复",
+            "correct": false
+          },
+          {
+            "id": "F",
+            "text": "维持原范围与计划",
+            "correct": false
+          }
+        ],
+        "correctAnswer": null,
+        "correctOptionIds": [
+          "A",
+          "C",
+          "D"
+        ],
+        "analysis": "地缘、关税、网安规则同步变动属于复杂多变的外部跨境约束，不能维持原有计划不变，也不能暂停项目等所有外部问题全部解决再开工，直接动用应急预算填补超支也不是优先动作；应当持续扫描外部环境动态掌握新规变化，咨询各地法务合规专家确保符合当地法规，并且重新评估交付方案以及受影响工作的优先级，灵活应对变化。\n易错点：保持原计划不变。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q90",
+            "sourceParagraph": 770,
+            "source": "PMAspirant 新版多选100题  原题100，选三",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：A、C、D。持续扫描；咨询地区合规专家；重评方案和优先级。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q93",
+        "sourceId": "pmp-cn-20261102-Q93",
+        "title": "Q93 治理／决策权限",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q93",
+        "stemParts": [
+          {
+            "text": "规定预算审批权、审议频率和经理权限的文件属于什么？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "项目管理计划",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "项目治理框架",
+            "correct": true
+          },
+          {
+            "id": "C",
+            "text": "沟通管理计划",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "项目范围说明书",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "B",
+        "correctOptionIds": [],
+        "analysis": "项目治理框架就是用来定义项目的监督机制、决策权限、审批规则、审议频次、权责边界的文件；项目管理计划侧重项目如何执行管控，沟通管理计划聚焦沟通相关安排，范围说明书主要说明项目要交付什么内容，所以规定预算审批权、审议频率和经理权限的文件属于项目治理框架。\n易错点：误当沟通计划。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q93",
+            "sourceParagraph": 783,
+            "source": "SaveMyCert 公开示例  公开示例3",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：B。项目治理框架。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q10",
+        "sourceId": "pmp-cn-20261102-Q10",
+        "title": "Q10 知识转移与团队能力",
+        "type": "multiple_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q10",
+        "stemParts": [
+          {
+            "text": "敏捷团队仅一人懂数据库，形成瓶颈。为培养团队技能，应采取哪两项措施？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "让数据库专家与其他成员结对",
+            "correct": true
+          },
+          {
+            "id": "B",
+            "text": "另聘一名数据库专家",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "开展数据库技能交叉培训",
+            "correct": true
+          },
+          {
+            "id": "D",
+            "text": "从范围中删除数据库工作",
+            "correct": false
+          },
+          {
+            "id": "E",
+            "text": "数据库任务全部由项目经理承担",
+            "correct": false
+          }
+        ],
+        "correctAnswer": null,
+        "correctOptionIds": [
+          "A",
+          "C"
+        ],
+        "analysis": "团队只有一人掌握数据库技能，存在单点依赖瓶颈，目标是培养团队整体技能、消除单点风险，外聘专家只是增加人员而不是培养现有团队，删除相关工作属于缩减范围，让项目经理承担数据库任务也不合理；结对工作和交叉培训是敏捷里典型的知识共享手段，能够帮助其他成员学习技能，减少单点依赖，提升团队流动性。\n易错点：删减范围或把技术工作交给项目经理。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q10",
+            "sourceParagraph": 795,
+            "source": "CertSafari 免费样题  原题2，原题选2项",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：A、C。结对工作与交叉培训。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q11",
+        "sourceId": "pmp-cn-20261102-Q11",
+        "title": "Q11 混合交付与裁剪",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q11",
+        "stemParts": [
+          {
+            "text": "法规里程碑固定，用户体验需求却不确定。应怎样选择开发方式？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "法规要求排除了自适应方式，全部预测型",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "体验需求不确定，全部敏捷型",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "控制法规证据与节点，迭代细化体验",
+            "correct": true
+          },
+          {
+            "id": "D",
+            "text": "等体验需求全部确定后再开展工作",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "C",
+        "correctOptionIds": [],
+        "analysis": "这是典型混合生命周期场景，法规里程碑属于硬性固定约束，需要按要求管控节点、留存合规证据，而用户体验需求不确定性高，适合用敏捷迭代方式逐步探索细化，不适合一刀切全部用预测型或者全部敏捷型，也不能等到需求全部确定才开工，要根据不同工作的约束特点裁剪生命周期。\n易错点：要求全项目统一用敏捷或预测。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q11",
+            "sourceParagraph": 807,
+            "source": "PM Exams 新版专题题  原题11",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：C。控制法规节点，迭代细化体验需求。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q12",
+        "sourceId": "pmp-cn-20261102-Q12",
+        "title": "Q12 质量与完成标准",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q12",
+        "stemParts": [
+          {
+            "text": "故事反复被拒收，原因是未做测试环境验证。项目经理应推动什么？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "促成团队与产品负责人共同认可完成定义",
+            "correct": true
+          },
+          {
+            "id": "B",
+            "text": "单元测试通过就要求验收",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "每次发布末尾另设测试迭代",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "由开发人员单独决定何谓完成",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "A",
+        "correctOptionIds": [],
+        "analysis": "用户故事反复被拒收，根源在于大家对于 “什么时候算完成” 没有统一标准，缺少明确的完成定义 DoD，没有把测试环境验证纳入完成条件；只靠单元测试通过就验收、额外增加专门的测试迭代都只是治标，开发人员单方面定义完成标准也不合适，项目经理应该推动团队和产品负责人一起协商、认可统一的完成定义，明确交付前必须包含的验证要求，从源头消除验收标准不一致的问题。\n易错点：另设测试迭代而不解决标准分歧。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q12",
+            "sourceParagraph": 818,
+            "source": "CISNET 免费练习  Process部分第2题",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：A。团队与产品负责人统一完成定义。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q13",
+        "sourceId": "pmp-cn-20261102-Q13",
+        "title": "Q13 看板与工作流",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q13",
+        "stemParts": [
+          {
+            "text": "在制品翻倍，周期时间从4天增至9天，吞吐量不变。应如何改善？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "增加一名开发者",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "把每项工作都拆成更小任务",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "降低在制品限制，先完成再拉取",
+            "correct": true
+          },
+          {
+            "id": "D",
+            "text": "改为两周迭代并固定承诺量",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "C",
+        "correctOptionIds": [],
+        "analysis": "看板场景下，吞吐量不变但在制品翻倍、周期时间拉长，典型问题是并行开启太多任务、任务互相挤占、等待变多，流动受阻；单纯增加开发者、拆分任务并不能解决同时开启太多工作的问题，切换迭代周期固定承诺量也不是对应的解法，看板的核心对策是设置并降低在制品限制，遵循先完成已启动任务，再拉取新工作的原则，减少并行任务，恢复工作流动。\n易错点：只增加人员或拆卡片数量。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q13",
+            "sourceParagraph": 829,
+            "source": "PMP Exam Lab 免费题集  原题3",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：C。降低在制品限制，优先完成已开始项。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q14",
+        "sourceId": "pmp-cn-20261102-Q14",
+        "title": "Q14 质量与过程能力",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q14",
+        "stemParts": [
+          {
+            "text": "控制图显示过程受控，客户仍频繁收到缺陷品。最可能的原因是什么？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "控制界限比容差界限宽",
+            "correct": true
+          },
+          {
+            "id": "B",
+            "text": "容差界限比控制界限宽",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "团队未进行统计抽样",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "客户混淆了普通与特殊原因变异",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "A",
+        "correctOptionIds": [],
+        "analysis": "控制图显示过程受控，只代表过程的波动是稳定的、只有普通原因变异，不代表产出结果一定满足客户规格要求；当控制界限比规格公差（容差界限）更宽的时候，虽然过程本身稳定受控，但产出品很容易跑出客户要求的公差范围，带来缺陷。容差界限比控制界限宽是不会出现这个问题的，没抽样、客户混淆变异类型也不是这个情境的核心原因。\n易错点：把受控误当作必然合格。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q14",
+            "sourceParagraph": 840,
+            "source": "CertSafari 免费样题  原题23",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：A。过程控制界限宽于客户规格容差。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q70",
+        "sourceId": "pmp-cn-20261102-Q70",
+        "title": "Q70 情境／技术冲突",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q70",
+        "stemParts": [
+          {
+            "text": "两专家方案争执拖延设计，应怎么办？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "按共同标准组织技术论证",
+            "correct": true
+          },
+          {
+            "id": "B",
+            "text": "选更有经验者的方案",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "升级请发起人决定",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "拆成两部分各做各的",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "A",
+        "correctOptionIds": [],
+        "analysis": "两名专家因为技术方案争执、拖累设计进度，不能直接凭借资历选择经验多一方的方案，也不要直接上交发起人拍板，或者把工作拆分分头实施；正确做法是建立统一、公认的评价标准，组织技术论证，让双方基于相同标准分析对比，通过协作得出有依据的决策。\n易错点：凭资历选方案。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q70",
+            "sourceParagraph": 851,
+            "source": "PMCLEAR 公开41题  原题2",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：A。按共同评价标准组织分析讨论。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q71",
+        "sourceId": "pmp-cn-20261102-Q71",
+        "title": "Q71 情境／同理心",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q71",
+        "stemParts": [
+          {
+            "text": "成员因家庭患病连续误期，先怎么办？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "私下了解并约定可行方案",
+            "correct": true
+          },
+          {
+            "id": "B",
+            "text": "立即重分其剩余工作",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "向团队解释其个人境遇",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "直接转介员工援助项目",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "A",
+        "correctOptionIds": [],
+        "analysis": "团队成员因为家人患病持续缺岗，这件事属于员工个人隐私，项目经理不能直接向全体团队透露他的私人处境，也不要立刻直接重新分配他手上的工作，更不能不经沟通直接转接员工援助项目；合适的做法是私下单独沟通，表达关心，和成员一起商量、约定可行的工作安排方案，兼顾人文关怀、项目责任和员工隐私。\n易错点：向全员解释私事。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q71",
+            "sourceParagraph": 862,
+            "source": "PMCLEAR 公开41题  原题5",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：A。私下了解并共同约定可行工作方案。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q73",
+        "sourceId": "pmp-cn-20261102-Q73",
+        "title": "Q73 质量／控制图判读规则",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q73",
+        "stemParts": [
+          {
+            "text": "点均未越界，但连续8点在均值上方，应如何判断？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "未越界，过程受控",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "已超规格，隔离并报废",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "用近期数据重算控制界限",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "虽未越界，仍应判断失控并查因",
+            "correct": true
+          }
+        ],
+        "correctAnswer": "D",
+        "correctOptionIds": [],
+        "analysis": "控制图里虽然所有点都没有超出上下控制界限，但是存在连续 8 个点都落在均值同一侧的情况，这属于控制图的非随机模式判定规则，代表过程存在特殊原因失控，不能单纯因为没有越界就判定过程受控，需要判定为失控并调查背后的原因；它不属于超出规格的问题，也不需要直接重新计算控制界限。\n易错点：以未越界认定稳定。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q73",
+            "sourceParagraph": 873,
+            "source": "PMCLEAR 公开41题  原题13",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：D。识别非随机信号并调查原因。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q74",
+        "sourceId": "pmp-cn-20261102-Q74",
+        "title": "Q74 质量／帕累托分析",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q74",
+        "stemParts": [
+          {
+            "text": "11类共340缺陷，先确定改进重点，用何工具？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "帕累托分析，找主要缺陷类别",
+            "correct": true
+          },
+          {
+            "id": "B",
+            "text": "控制图，看缺陷率稳定性",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "因果图，集体探讨根因",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "散点图，检验变量关联",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "A",
+        "correctOptionIds": [],
+        "analysis": "帕累托分析基于二八定律，用来统计各类缺陷数量、排序，识别出造成大部分问题的少数主要缺陷类别，帮助我们优先锁定改进重点。控制图用来判断过程是否受控稳定，因果图用来挖掘问题根本原因，散点图用来查看两个变量之间的相关性，这几个工具都不适合用来筛选优先改进项。\n易错点：直接研究所有根因。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q74",
+            "sourceParagraph": 884,
+            "source": "PMCLEAR 公开41题  原题14",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：A。帕累托分析。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q76",
+        "sourceId": "pmp-cn-20261102-Q76",
+        "title": "Q76 敏捷／验收条件",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q76",
+        "stemParts": [
+          {
+            "text": "完成的定义与验收标准有什么区别？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "两者相同",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "DoD通用，验收标准针对故事",
+            "correct": true
+          },
+          {
+            "id": "C",
+            "text": "验收标准通用，DoD针对故事",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "DoD仅由客户编写",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "B",
+        "correctOptionIds": [],
+        "analysis": "DoD（完成的定义）是团队统一的、通用的交付准则，适用于所有用户故事；验收标准是针对单个具体用户故事，描述这个故事满足需求、可以被产品负责人验收的条件，交付时需要同时满足 DoD 和对应故事的验收标准。二者不是同一个东西，DoD 也不是只由客户编写。\n易错点：认为完全相同。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q76",
+            "sourceParagraph": 895,
+            "source": "PMCLEAR 公开41题  原题41",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：B。前者为通用完成准则，后者针对具体故事。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q79",
+        "sourceId": "pmp-cn-20261102-Q79",
+        "title": "Q79 敏捷／待办维护",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q79",
+        "stemParts": [
+          {
+            "text": "待办超过800项且多已失效，怎么办？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "清空待办重建",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "清理、排序并细化近期项",
+            "correct": true
+          },
+          {
+            "id": "C",
+            "text": "800项全部保留",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "产品负责人独自细化",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "B",
+        "correctOptionIds": [],
+        "analysis": "产品待办列表堆积大量条目、很多已经失效过时，不能直接全部清空重建，也不能原样全部保留；产品负责人需要持续维护待办，清理、关闭过时失效条目，对剩下的条目重新排序，并且只对近期要做的项做细化梳理，保障待办列表保持有效、精简。不能由产品负责人独自完成全部细化，细化需要和团队协作。\n易错点：全部保留。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q79",
+            "sourceParagraph": 906,
+            "source": "Oliver Lehmann 2026公开PDF  原题124，PDF第40–41页",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：B。关闭过时项，重排并细化近期项。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q81",
+        "sourceId": "pmp-cn-20261102-Q81",
+        "title": "Q81 质量／QA与QC",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q81",
+        "stemParts": [
+          {
+            "text": "质量保证与质量控制主要区别？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "QA等同QC",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "QA自动、QC手工",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "QC总在QA前",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "QA看过程，QC查成果",
+            "correct": true
+          }
+        ],
+        "correctAnswer": "D",
+        "correctOptionIds": [],
+        "analysis": "QA（质量保证）聚焦过程，关注流程本身是否合理、有没有按流程执行，偏向预防；QC（质量控制）聚焦成果，检查产出的可交付物有没有缺陷、是否符合标准。QA 和 QC 不是一回事，也不存在 QA 自动化、QC 手工，或者 QC 一定在 QA 前面这种说法。\n易错点：认为同义。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q81",
+            "sourceParagraph": 917,
+            "source": "Oliver Lehmann 2026公开PDF  原题126，PDF第41页",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：D。前者关注过程，后者检查成果。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q82",
+        "sourceId": "pmp-cn-20261102-Q82",
+        "title": "Q82 敏捷／障碍管理",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q82",
+        "stemParts": [
+          {
+            "text": "障碍日志长期未更新且无负责人，怎么办？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "停止记录",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "仅Scrum Master私用",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "旧项直接关闭",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "排序、定责、限时并升级",
+            "correct": true
+          }
+        ],
+        "correctAnswer": "D",
+        "correctOptionIds": [],
+        "analysis": "障碍日志的目的是推动障碍解决，只记录却长期不更新、没有责任人就失去了意义。不能停止记录、只留给 Scrum Master 自用，也不能直接把旧条目关掉；需要对障碍排序、分配责任人、设定解决时限，无法解决时及时升级上报，把日志里的条目转化为实际行动。\n易错点：只保留日志。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q82",
+            "sourceParagraph": 928,
+            "source": "Oliver Lehmann 2026公开PDF  原题129，PDF第42页",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：D。排序、定责任人与时限，必要时升级。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q84",
+        "sourceId": "pmp-cn-20261102-Q84",
+        "title": "Q84 敏捷／信息辐射源",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q84",
+        "stemParts": [
+          {
+            "text": "怎样让干系人低成本、近实时查看敏捷进展？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "开放任务板、燃尽／燃起图与发布计划",
+            "correct": true
+          },
+          {
+            "id": "B",
+            "text": "月度指导委员会幻灯片",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "威胁与机会的风险登记册",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "项目结束的经验总结",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "A",
+        "correctOptionIds": [],
+        "analysis": "任务板、燃尽图 / 燃起图、发布计划属于信息辐射源，公开之后干系人可以自主按需查看，低成本、接近实时地掌握敏捷进展。月度幻灯片属于定期汇报，时效性差；风险登记册用来管理风险，经验总结是收尾阶段工作，都不适合用来实时展示迭代进展。\n易错点：每次另做月报。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q84",
+            "sourceParagraph": 939,
+            "source": "Oliver Lehmann 2026公开PDF  原题60，PDF第20页",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：A。开放任务板、燃尽或燃起图等信息辐射源。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q91",
+        "sourceId": "pmp-cn-20261102-Q91",
+        "title": "Q91 团队／共同愿景",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q91",
+        "stemParts": [
+          {
+            "text": "与发起人和用户约定的共同愿景有何用途？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "替代首发产品待办",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "锁定范围基准",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "汇总各方个人需求",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "让取舍指向共同结果",
+            "correct": true
+          }
+        ],
+        "correctAnswer": "D",
+        "correctOptionIds": [],
+        "analysis": "共同愿景说明项目 “为什么要做”，当后续需求冲突、需要做取舍时，用来统一方向，让所有取舍决策都朝着共同预期结果；愿景不是功能清单，不能替代产品待办，也不是用来锁定范围基准、汇总零散个人需求的。\n易错点：把愿景当功能清单。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q91",
+            "sourceParagraph": 950,
+            "source": "SaveMyCert 公开示例  公开示例1",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：D。让取舍指向共同的预期结果。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q92",
+        "sourceId": "pmp-cn-20261102-Q92",
+        "title": "Q92 情境／方法裁剪",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q92",
+        "stemParts": [
+          {
+            "text": "需求分歧且技术陌生，选交付方法前先做什么？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "先细分详细WBS",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "直接采用组织标准Scrum",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "先问发起人偏好",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "先评估需求与技术不确定性",
+            "correct": true
+          }
+        ],
+        "correctAnswer": "D",
+        "correctOptionIds": [],
+        "analysis": "需求有分歧、技术陌生，不确定性很高，在选择交付方式之前，应当先评估需求和技术层面的不确定性，再根据不确定性高低去裁剪、匹配适合的生命周期和方法；不能直接套用标准 Scrum，也不是先做详细 WBS 或者直接询问发起人的偏好。\n易错点：直接套用Scrum。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q92",
+            "sourceParagraph": 961,
+            "source": "SaveMyCert 公开示例  公开示例2",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：D。评估需求和技术的不确定性。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q95",
+        "sourceId": "pmp-cn-20261102-Q95",
+        "title": "Q95 情境／外部阻碍",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q95",
+        "stemParts": [
+          {
+            "text": "采购队列使测试环境连续阻塞两迭代，怎么办？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "搭临时模拟环境",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "协同采购疏通请求并向团队报告进展",
+            "correct": true
+          },
+          {
+            "id": "C",
+            "text": "提醒自组织团队自行清除障碍",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "请发起人缩减迭代目标",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "B",
+        "correctOptionIds": [],
+        "analysis": "这是外部障碍（采购队列卡住测试环境），Scrum Master 的职责就是主动帮团队清除外部阻碍，协同采购疏通采购请求，同时把进展同步给团队。 A 搭模拟环境属于绕开问题，不是优先做法；C 这个障碍属于外部采购问题，团队自己无法清除；D 直接缩减迭代目标不是首选对策。\n易错点：只等回顾会。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q95",
+            "sourceParagraph": 972,
+            "source": "Training Camp 公开样题  公开示例1",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：B。直接与采购协调，并向团队报告进展。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q09",
+        "sourceId": "pmp-cn-20261102-Q09",
+        "title": "Q09 供应商与进度风险",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q09",
+        "stemParts": [
+          {
+            "text": "关键部件可能迟到两周，已无进度储备，发起人追问能否按期上线。首先怎么办？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "先告诉发起人目前仍能按期完成",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "立即压缩进度",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "与团队评估影响及应对选项",
+            "correct": true
+          },
+          {
+            "id": "D",
+            "text": "直接升级，请发起人指示",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "C",
+        "correctOptionIds": [],
+        "analysis": "关键部件存在延期风险，发起人询问能否按期上线时，不能随便承诺可以按时交付，也不要立刻盲目赶工压缩进度；首先要和团队一起评估延期带来的影响以及可行的应对方案，拿到分析结果之后，再给发起人提供客观的预测和备选方案。\n易错点：直接保证交期或立即压缩工期。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q09",
+            "sourceParagraph": 984,
+            "source": "PMI 官方公开样题  官方样题3",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：C。与团队评估影响和应对选项。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q51",
+        "sourceId": "pmp-cn-20261102-Q51",
+        "title": "Q51 情境／合同争议",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q51",
+        "stemParts": [
+          {
+            "text": "合同约定谈判30天不成转调解，现已35天。下一步？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "按合同启动调解",
+            "correct": true
+          },
+          {
+            "id": "B",
+            "text": "继续谈判直到达成一致",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "先做独立成本审查",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "谈判失败，直接进入仲裁",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "A",
+        "correctOptionIds": [],
+        "analysis": "合同明确约定谈判 30 天没谈成就转入调解，现在已经超过时限，应当严格遵照合同里约定的争议处理流程，启动调解环节，不能继续无限期谈判，也不能跳过调解直接进入仲裁。\n易错点：继续无限谈判。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q51",
+            "sourceParagraph": 995,
+            "source": "SASERÁ Academy 新版10题  原题1",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：A。启动约定调解。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q54",
+        "sourceId": "pmp-cn-20261102-Q54",
+        "title": "Q54 情境／财务分类",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q54",
+        "stemParts": [
+          {
+            "text": "Scrum开发费需区分资本化与费用化，怎么办？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "团队记工时，全部由财务事后分类",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "交给外部审计师",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "与财务约定按会计政策标记迭代工作",
+            "correct": true
+          },
+          {
+            "id": "D",
+            "text": "项目经理仅凭描述自行分类",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "C",
+        "correctOptionIds": [],
+        "analysis": "资本化、费用化属于财务会计政策，项目经理不能自己判断划分。需要和财务达成一致，按照会计政策在迭代工作上做好标记，方便后续核算；不能全部交给财务事后归类、项目经理自行分类或者直接交给外部审计师。\n易错点：经理自行判定。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q54",
+            "sourceParagraph": 1006,
+            "source": "SASERÁ Academy 新版10题  原题7",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：C。与财务约定按会计政策标记工作。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q56",
+        "sourceId": "pmp-cn-20261102-Q56",
+        "title": "Q56 风险沟通与报告",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q56",
+        "stemParts": [
+          {
+            "text": "指导委员会每月仅30分钟，应提供怎样的风险图表？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "一页列前10项风险及分数",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "重点风险热图，附趋势和待决策事项",
+            "correct": true
+          },
+          {
+            "id": "C",
+            "text": "提供含全部列与评论的140项完整登记册",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "仅报告已变为问题的风险",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "B",
+        "correctOptionIds": [],
+        "analysis": "指导委员会开会时间很短（仅 30 分钟），需要可视化、高浓缩、方便快速决策的材料。风险热图直观展示风险等级，搭配趋势和待决策事项最适合高层快速研判；只罗列前 10 项风险分数太单薄，完整登记册信息太多，只汇报已经变成问题的风险会漏掉潜在风险。\n易错点：只列静态分值。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q56",
+            "sourceParagraph": 1017,
+            "source": "SASERÁ Academy 新版10题  原题9",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：B。重点风险热图，附趋势和待决策事项。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q61",
+        "sourceId": "pmp-cn-20261102-Q61",
+        "title": "Q61 采购／合同选择",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q61",
+        "stemParts": [
+          {
+            "text": "急需外援但范围尚不明确，适合什么合同？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "工料合同",
+            "correct": true
+          },
+          {
+            "id": "B",
+            "text": "固定总价合同",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "总价加经济价格调整合同",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "明确品项的采购订单",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "A",
+        "correctOptionIds": [],
+        "analysis": "工料合同（T&M）适合工作范围、工作量还不清楚、需要紧急找人支援的场景，一般同时设置成本上限来控预算。固定总价类合同适合范围明确的情况，范围不清时不适合。\n易错点：强行固定总价。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q61",
+            "sourceParagraph": 1028,
+            "source": "CoverLettersAndResume 100题  原题64",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：A。工料合同，并设置费用控制。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q62",
+        "sourceId": "pmp-cn-20261102-Q62",
+        "title": "Q62 采购／招标文件",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q62",
+        "stemParts": [
+          {
+            "text": "买方比较解决方案、技能和经验，应发何种文件？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "报价邀请书RFQ",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "投标邀请书IFB",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "采购订单PO",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "建议书邀请书RFP",
+            "correct": true
+          }
+        ],
+        "correctAnswer": "D",
+        "correctOptionIds": [],
+        "analysis": "RFP 建议书邀请书，用来让卖方提交方案，买方对比解决方案、能力、经验，评估维度不只是价格。\n- RFQ（报价邀请书）主要只比价；\n- IFB 投标邀请书多用于标准商品、低价竞标；\n- PO 采购订单用于简单、现成商品。\n易错点：只发询价单。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q62",
+            "sourceParagraph": 1039,
+            "source": "CoverLettersAndResume 100题  原题65",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：D。建议书邀请书RFP。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q63",
+        "sourceId": "pmp-cn-20261102-Q63",
+        "title": "Q63 风险／机会增强",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q63",
+        "stemParts": [
+          {
+            "text": "增加资深开发者以提高机会发生概率，属什么应对？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "开拓",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "分享",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "接受",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "增强",
+            "correct": true
+          }
+        ],
+        "correctAnswer": "D",
+        "correctOptionIds": [],
+        "analysis": "增强（提升）是针对机会的策略，用来提高机会发生概率或者提升机会带来的收益；开拓是确保机会一定发生；分享是和别的组织一起把握机会；接受就是顺其自然不主动干预。\n易错点：与确保实现的开拓混淆。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q63",
+            "sourceParagraph": 1053,
+            "source": "CoverLettersAndResume 100题  原题91",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：D。增强。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q64",
+        "sourceId": "pmp-cn-20261102-Q64",
+        "title": "Q64 风险／次生风险",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q64",
+        "stemParts": [
+          {
+            "text": "应对原风险的措施又引出新风险，称什么？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "残余风险",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "触发条件",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "问题",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "次生风险",
+            "correct": true
+          }
+        ],
+        "correctAnswer": "D",
+        "correctOptionIds": [],
+        "analysis": "次生风险：为处理原有风险而采取应对措施，新产生出来的风险。 残余风险（剩余风险）：采取应对措施之后，仍然留下来、还存在的原风险。\n易错点：误作剩余风险。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q64",
+            "sourceParagraph": 1064,
+            "source": "CoverLettersAndResume 100题  原题92",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：D。次生风险。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q65",
+        "sourceId": "pmp-cn-20261102-Q65",
+        "title": "Q65 外部环境／PESTLE",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q65",
+        "stemParts": [
+          {
+            "text": "政治、经济、社会、技术、法律及环境用何工具扫描？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "帕累托分析",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "鱼骨图",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "PESTLE分析",
+            "correct": true
+          },
+          {
+            "id": "D",
+            "text": "甘特图",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "C",
+        "correctOptionIds": [],
+        "analysis": "PESTLE 就是用来扫描外部宏观环境：政治 P、经济 E、社会 S、技术 T、法律 L、环境 E。帕累托用来找主要缺陷，鱼骨图找根因，甘特图展示进度。\n易错点：用帕累托代替。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q65",
+            "sourceParagraph": 1075,
+            "source": "CoverLettersAndResume 100题  原题98",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：C。PESTLE分析。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q75",
+        "sourceId": "pmp-cn-20261102-Q75",
+        "title": "Q75 风险／规避",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q75",
+        "stemParts": [
+          {
+            "text": "改用成熟夹具，完全消除新设计威胁，属何应对？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "减轻",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "转移",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "规避",
+            "correct": true
+          },
+          {
+            "id": "D",
+            "text": "接受",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "C",
+        "correctOptionIds": [],
+        "analysis": "规避（回避）是修改计划，彻底消除这个威胁本身；减轻只是降低风险发生概率或影响，并没有消除风险源。这里改用成熟夹具，把新设计带来的威胁完全消除，属于规避。易错点：误当仅降低概率。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q75",
+            "sourceParagraph": 1086,
+            "source": "PMCLEAR 公开41题  原题35",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：C。规避。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q78",
+        "sourceId": "pmp-cn-20261102-Q78",
+        "title": "Q78 采购／谈判准备",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q78",
+        "stemParts": [
+          {
+            "text": "供应商谈判前应准备什么？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "准备利益、BATNA及决策标准",
+            "correct": true
+          },
+          {
+            "id": "B",
+            "text": "签约前不留记录",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "极端开价，缓慢让步",
+            "correct": false
+          },
+          {
+            "id": "D",
+            "text": "拒谈对方利益",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "A",
+        "correctOptionIds": [],
+        "analysis": "谈判之前要准备各方诉求利益、BATNA（最佳备选方案）以及谈判的决策标准。极端报价只是谈判策略，不是谈判前必须准备的基础；谈判需要做好记录，也不能无视对方利益。\n易错点：只设极端开价。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q78",
+            "sourceParagraph": 1096,
+            "source": "Oliver Lehmann 2026公开PDF  原题123，PDF第40页",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：A。了解利益、最佳替代方案BATNA及决策标准。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q86",
+        "sourceId": "pmp-cn-20261102-Q86",
+        "title": "Q86 情境／风险储备",
+        "type": "multiple_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q86",
+        "stemParts": [
+          {
+            "text": "财务质疑两类储备，应说明哪两点？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "量化已识别风险以估算应急储备",
+            "correct": true
+          },
+          {
+            "id": "B",
+            "text": "删除应急储备，发生后申请变更",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "区分已知风险应急储备与未知风险管理储备",
+            "correct": true
+          },
+          {
+            "id": "D",
+            "text": "各工作包统一比例",
+            "correct": false
+          },
+          {
+            "id": "E",
+            "text": "仅列假设，发生后再要钱",
+            "correct": false
+          }
+        ],
+        "correctAnswer": null,
+        "correctOptionIds": [
+          "A",
+          "C"
+        ],
+        "analysis": "应急储备用来应对已知 - 未知风险（已识别出来的风险），要量化估算；管理储备用来应对未知 - 未知风险。需要向财务说明二者的区别：量化已识别风险来估算应急储备，并且区分应急储备和管理储备。\n易错点：为好看删除储备。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q86",
+            "sourceParagraph": 1107,
+            "source": "PMAspirant 新版多选100题  原题55，选二",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：A、C。量化已识别风险估算应急储备；区分管理储备。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      },
+      {
+        "id": "pmp-cn-20261102-Q96",
+        "sourceId": "pmp-cn-20261102-Q96",
+        "title": "Q96 情境／风险触发",
+        "type": "single_choice",
+        "subject": "PMP",
+        "difficulty": "中等",
+        "scope": "internal",
+        "teacherNumber": "Q96",
+        "stemParts": [
+          {
+            "text": "四站点ERP迁移距上线10周；供应商确认旧接口6周后停用，已有中间件应急预案。下一步怎么办？"
+          }
+        ],
+        "options": [
+          {
+            "id": "A",
+            "text": "提高风险概率并监控",
+            "correct": false
+          },
+          {
+            "id": "B",
+            "text": "请COO推迟站点1",
+            "correct": false
+          },
+          {
+            "id": "C",
+            "text": "登记问题、执行预案并更新风险登记册和进度",
+            "correct": true
+          },
+          {
+            "id": "D",
+            "text": "要求供应商保留接口直到上线后",
+            "correct": false
+          }
+        ],
+        "correctAnswer": "C",
+        "correctOptionIds": [],
+        "analysis": "供应商已经确认旧接口 6 周后停用，属于已经发生，不再是潜在风险，变成问题。已有应急预案，下一步登记问题、执行预案，同时更新风险登记册和进度计划。 A 错误：它已经不是待监控的风险；B 没必要直接推迟站点；D 不能单方面要求供应商延期保留接口。\n易错点：仍只当潜在风险。",
+        "metadata": {
+          "documentImport": {
+            "batch": "pmp-documents-20261102",
+            "sourceDocument": "PMP新版中文题库_96题（优化解析和删除超纲版）.docx",
+            "originalNumber": "Q96",
+            "sourceParagraph": 1119,
+            "source": "Training Camp 公开样题  公开HarborPoint案例",
+            "extraction": "原文结构化提取",
+            "answerSource": "参考答案：C。登记问题，启动预案并更新计划。"
+          }
+        },
+        "tags": [],
+        "lifecycle": {
+          "status": "active"
+        },
+        "_assetFiles": []
+      }
+    ]
+  },
+  "materials": {
+    "pmp-case-1": {
+      "title": "海岸与海上设施升级",
+      "text": "共享背景：Northpoint Energy升级海上平台的关键阀门和监测设备、河口附近的管线登陆点与泵站，并修订承包船舶作业程序。发起人看重减少停机、改善安全及风暴季前完工。\n\n附近有鲸迁徙通道和珊瑚礁；河口经过工业区，近期变色和岸边垃圾引发累积环境影响担忧。项目已有许可，但许可所依据的基线假设受到质疑。社区要求明确施工与早期运营的监测、报告及事故处理，发起人担心新增范围拖延交付。\n\n海上承包商正在投标：快方案减少船舶作业日，却增加化学品处理并改变泄漏应对；慢方案为当地监管和应急团队熟悉。海洋生物学家建议避开鲸迁徙高峰并保护珊瑚；团队以已有许可及范围未列明为由反对，沟通负责人担心声誉受损。",
+      "images": []
+    },
+    "pmp-case-2": {
+      "title": "银行应用发布与安全审查",
+      "text": "共享背景：Lakeside Credit Union更换移动银行应用，软件团队按两周迭代开发；数据迁移与上线前安全审查采用固定、顺序执行的计划。监管方要求上线前取得签字确认的安全审查报告。\n\n供审查的候选版本已在第6迭代完成，另64故事点的低优先功能安排在后续版本。请结合下表回答三道小题；按周一至周五工作，不另计假日。\n\n事项 | 案例数据\n团队平均速度 | 16故事点／迭代\n脱敏测试数据就绪 | 3月26日，星期五\n安全审查工期 | 数据到位后的次一工作日起，5个工作日\n签字审查报告截止 | 3月31日，星期三",
+      "images": []
+    },
+    "pmp-case-3": {
+      "title": "理赔系统项目挽救",
+      "text": "共享背景：Patriot Insurance的ClaimsNow理赔现代化项目原用瀑布式交付，计划24个月、预算480万美元。14个月已花310万美元，仅交付30%功能；原项目经理因连续错过3个里程碑被撤换。\n\n第4个月完成的400页需求文档被业务用户认为偏离真实需求。11人的开发团队士气低落，觉得自己在替错误需求受责；业务发起人4个月未参会。已发现847个缺陷，其中142个严重。\n\n你接手时只剩10个月和170万美元。CIO表示董事会不会再批准另一轮现代化，要求交付可用成果；业务用户说，之前反映需求错误却没有改变，因此不再参会。各小题按所述的新情况继续判断。",
+      "images": []
+    },
+    "pmp-case-4": {
+      "title": "诊所预约系统上线",
+      "text": "共享背景：Harbor Health诊所网络更换患者预约系统，目标是上线半年后爽约率下降15%。项目采用混合交付：供应商以固定总价、预测型计划配置核心平台；内部团队以两周迭代开发患者移动应用。\n\n发起人要求在16周后的冬季呼吸道疾病高峰前上线，并认为初始愿望清单中的功能都会交付。按团队速度预测，16周只能完成约70%。每天使用平台的呼叫中心员工担心新系统拖慢工作；上线后由运营部门负责系统。",
+      "images": []
+    },
+    "pmp-case-5": {
+      "title": "志愿者搜寻中的AI辅助",
+      "text": "共享背景：Max在K镇寻找Bob，先到信息亭，再到搜寻支持办公室。项目经理正在协调志愿者，团队希望借助AI使用镇上的官方失物招领公告及收容所更新，同时保留人的审核和责任。三个小题分别考查资料检索、辅助工作的边界及信息核验。",
+      "images": []
+    }
+  }
+}

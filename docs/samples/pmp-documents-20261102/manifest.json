@@ -1,0 +1,113 @@
+{
+  "batch": "pmp-documents-20261102",
+  "textQuestionCount": 93,
+  "textMissingNumbers": [
+    "Q16",
+    "Q49",
+    "Q72"
+  ],
+  "textMaterialCount": 5,
+  "miniQuestionCount": 99,
+  "sourceTextSha256": "f4cff366485c6e9523c2125282c30cf5e7a7406497b1d5873a1c3933cd84a9dd",
+  "sourceScreenshotSha256": "322f31102ade9b12387cbde849a9e11301d5fceb0de2f1200092629e9cfa0ab9",
+  "packages": [
+    {
+      "file": "text-package.json",
+      "sha256": "afcc237595a65a55ac1a484fa9f8166bebd55dac0c9bdb2ea5f3aca44e12b1d3"
+    },
+    {
+      "file": "mini-package.json",
+      "sha256": "7e7eaaefbc3197fd20f83046d82a23f9a7587ef47c70d175f6a86a3945b74933"
+    }
+  ],
+  "assets": [
+    {
+      "file": "assets/mini-021-diagram.png",
+      "sha256": "81f815cfdcc1e24d91f8425ab93a0c294e6334c7910ab66e716550d3fe520017"
+    },
+    {
+      "file": "assets/mini-024-diagram.png",
+      "sha256": "ca43233f885f7cf51ffa8b19dab5e6c20fdc5e561e15e1b3da885501403ce670"
+    },
+    {
+      "file": "assets/mini-025-diagram.png",
+      "sha256": "8c6d862140b87ca1bdfe58f70af336e1380b159175870bc5509e177a82f015eb"
+    },
+    {
+      "file": "assets/mini-026-diagram.png",
+      "sha256": "0325b676d261f5199378a55dae058d37351bf407f0e5bc586c8d8f61f3779855"
+    },
+    {
+      "file": "assets/mini-027-diagram.png",
+      "sha256": "10f6bec4c858aef6702d6837fd6537cb0037be366d31341f8369b55ead53738b"
+    },
+    {
+      "file": "assets/mini-029-diagram.png",
+      "sha256": "07b7e8e23b865308e79b63834c71b0f292cb5e76fa9f5262f7010f29195edc3e"
+    },
+    {
+      "file": "assets/mini-032-diagram.png",
+      "sha256": "3e03644890a52b6f3887f8528e3d6377b328f681c1ee9b143ab715a1cb0600ee"
+    },
+    {
+      "file": "assets/mini-033-diagram.png",
+      "sha256": "c735f535e046b9ea7d725f6c79813eed32ee7da6945a69fb8a4b1a1e07edfe0a"
+    },
+    {
+      "file": "assets/mini-034-diagram.png",
+      "sha256": "20cd546c551aea47f7b8f6caf45d7396e72665c8d0c091228183f93f97c60468"
+    },
+    {
+      "file": "assets/mini-035-diagram.png",
+      "sha256": "961e4f1ef98db438cf6a0c758b2d76d7ea78b1b629a8f2bb5389c2515e24ecd3"
+    },
+    {
+      "file": "assets/mini-036-diagram.png",
+      "sha256": "a0522229d09a0dee4e8593ab817b919933b85c99bae79408220435bcfeea40ba"
+    },
+    {
+      "file": "assets/mini-037-diagram.png",
+      "sha256": "eda2d7c1fec5ddb56100a34d6d5cbde7edb9415b623a9efe9fe6a5a5b6337cb2"
+    },
+    {
+      "file": "assets/mini-058-diagram.png",
+      "sha256": "26c6c85d036cc92e9c5c8b8fa04b90407ed9db5cf3574f22d93e886ea5859033"
+    },
+    {
+      "file": "assets/mini-060-diagram.png",
+      "sha256": "26c6c85d036cc92e9c5c8b8fa04b90407ed9db5cf3574f22d93e886ea5859033"
+    },
+    {
+      "file": "assets/mini-062-diagram.png",
+      "sha256": "26c6c85d036cc92e9c5c8b8fa04b90407ed9db5cf3574f22d93e886ea5859033"
+    },
+    {
+      "file": "assets/mini-064-diagram.png",
+      "sha256": "26c6c85d036cc92e9c5c8b8fa04b90407ed9db5cf3574f22d93e886ea5859033"
+    },
+    {
+      "file": "assets/mini-066-diagram.png",
+      "sha256": "26c6c85d036cc92e9c5c8b8fa04b90407ed9db5cf3574f22d93e886ea5859033"
+    },
+    {
+      "file": "assets/pmp-image1.png",
+      "sha256": "db56ef0eae3572213970d4529041f43845fca27773498738fa61758bd27f595c"
+    },
+    {
+      "file": "assets/pmp-image2.png",
+      "sha256": "0414fdf0b3bf4e83cb0d9d92f3c77e61bd04ebf60985a1875cde82a7231e8a34"
+    },
+    {
+      "file": "assets/pmp-image3.png",
+      "sha256": "b1f17e8d4266ccc1c269ce4a7f7995bd97e2ecd63e110cfddfd912533aa32010"
+    },
+    {
+      "file": "assets/pmp-image4.png",
+      "sha256": "c2308e5dd0391043ef116986a3a70a4b2ba8ffb3cc407435a142c053d3dff3df"
+    },
+    {
+      "file": "assets/pmp-image5.png",
+      "sha256": "47e765077f7b726013f06feed79592abb1479776e298756ce9cef71831f65287"
+    }
+  ]
+}

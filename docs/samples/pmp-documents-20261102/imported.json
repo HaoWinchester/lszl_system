@@ -1,0 +1,37 @@
+{
+  "environment": "uat",
+  "batch": "pmp-documents-20261102",
+  "importPlan": {
+    "add": 2,
+    "replace": 0,
+    "skip": 0,
+    "conflict": 0,
+    "hasChanges": true,
+    "hasConflicts": false,
+    "summaries": [],
+    "duplicateQuestions": [],
+    "duplicateQuestionCount": 0,
+    "duplicateExistingCount": 0,
+    "duplicateBatchCount": 0
+  },
+  "banks": [
+    {
+      "bankId": "b_2af33e165efc4055aae0065410ed9fa6",
+      "sourceId": "pmp-cn-reviewed-20261102",
+      "name": "PMP新版中文题库（原96题版·实收93题）",
+      "questionCount": 93,
+      "caseChildCount": 15,
+      "imageReferences": 5,
+      "verified": true
+    },
+    {
+      "bankId": "b_c8887ec55418460c8c77b74d52d6b85f",
+      "sourceId": "pmp-mini-screenshots-20261102",
+      "name": "PMP小程序新题型合集（截图整理版）",
+      "questionCount": 99,
+      "caseChildCount": 67,
+      "imageReferences": 17,
+      "verified": true
+    }
+  ]
+}

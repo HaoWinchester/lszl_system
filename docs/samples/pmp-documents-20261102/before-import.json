@@ -1,0 +1,20 @@
+{
+  "environment": "uat",
+  "batch": "pmp-documents-20261102",
+  "apply": true,
+  "existing": [],
+  "incoming": [
+    {
+      "sourceId": "pmp-cn-reviewed-20261102",
+      "name": "PMP新版中文题库（原96题版·实收93题）",
+      "questions": 93,
+      "materials": 5
+    },
+    {
+      "sourceId": "pmp-mini-screenshots-20261102",
+      "name": "PMP小程序新题型合集（截图整理版）",
+      "questions": 99,
+      "materials": 15
+    }
+  ]
+}
