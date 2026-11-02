@@ -9,7 +9,7 @@
 | PMP新版中文题库（原96题版·实收93题） | 93 | 84 / 9 | 5 | 15 | 5 |
 | PMP小程序新题型合集（截图整理版） | 99 | 95 / 4 | 15 | 67 | 17 |
 
-- UAT管理入口：<https://uat.aihuanpu.com/question-bank.html>。两库由现有UAT管理员`admin`持有，均仅教师可见，未创建或发布学员试卷。
+- UAT管理入口：<https://uat.aihuanpu.com/question-bank.html>。两库由现有UAT管理员`admin`持有，题库本身均仅教师可见。首次导入时未发布学员试卷；随后按用户明确要求发布两份专题卷，见下方追加记录。
 - 文字题库ID：`b_2af33e165efc4055aae0065410ed9fa6`；截图库ID：`b_c8887ec55418460c8c77b74d52d6b85f`。
 - 文字版正文实为93题，保留Q01–Q96原题号中的93个，缺Q16/Q49/Q72，不补造。Q30/Q35/Q36按已确认方案转为单选；Q90完整保留A–F六项，答案A/C/D。
 - 截图版136个图片资源、137次引用全部逐项对照，102道候选中收录99题。截图30重复残片去重；截图23多解、28预算口径及活动歧义、117/118源站答案冲突三题隔离。完整原文和原因保存在[校订清单](../samples/pmp-documents-20261102/mini-review.json)的`excluded`。
@@ -57,3 +57,18 @@
 完整发布校验在当前工作区内的隔离副本运行，根目录已有`docs/local-preview/`和`docs/promo/`均保留。本地证据目录为`docs/local-preview/pmp-import-assessment-20261102/`；其中`full-validation-summary.json`为完整门禁摘要、`deploy405.log`为发布日志、`runtime405-verification.json`为线上全文件校验、`live-uat-405/report.json`及同目录截图为六题实页复验、`uat-after-deploy-verified.json`为部署后数据回读。原始DOCX另在忽略的`artifacts/pmp-document-import-20261102/originals/`保留。
 
 开发自检不替代用户本人UAT业务验收。验收完成后才可按项目纪律进入main。
+
+## 用户要求的专题卷发布（2026-11-02 14:02）
+
+用户明确要求将两套题按“专题卷”分类，备注为“12 月考纲 新题”，发布到UAT供做题验收。本次仅操作UAT业务数据，未修改应用代码或部署版本。
+
+- 原分类只有“模考卷”“原则专题卷”“测试卷”，因此通过现有分类服务新建“专题卷”（`pc_cd5645b684364f038e0408df6d76817e`），没有重命名既有分类。
+- 文字卷93题，试卷`p_f82421140d55463ebdde314b5d34406d`，发布版本`pr_f5a05ea4096745b2a004dfe37b1c85b0`；截图卷99题，试卷`p_cd1fe26e65c343cba40b01a0e87de91b`，发布版本`pr_0bcbb7a7e18542748c058ce56816c857`。均为v1、混合试卷、已发布。
+- 两卷发布说明均精确设为“12 月考纲 新题”，以免费试卷开放给UAT学生、教师及管理员，开启做题模式。仍保留之前隔离的三道问题题目，不将其加入试卷。
+- 按生成包中的顺序引用全部题目，使用现有组卷、发布预检和冻结资源服务，未直接写业务表。发布前所有题目通过中文题干、选项、答案和解析检查；英文未填写提示不影响本次中文发布。
+- 发布后逐题核对192条冻结快照的题干、选项、多选完整答案、解析、图表和案例分组；重复执行核验仍返回同一试卷及发布版本，没有重复建卷或发布。
+- 实际浏览器在试卷管理中点击“专题卷”，显示两卷已组99/99与93/93，均“已发布v1”；做题页两张卡片显示正确备注与题数。分别点击两卷的“开始10题短练”，两套题干和选项均可进入；文字卷案例材料同步显示。未选择答案、未交卷，两次检查均为0/10已答。
+- 做题入口：<https://uat.aihuanpu.com/practice-mode.html>；管理入口：<https://uat.aihuanpu.com/paper-management.html>。本地浏览器截图在`artifacts/pmp-paper-publication-20261102/`，发布回执为[published-papers.json](../samples/pmp-documents-20261102/published-papers.json)。
+- 本次数据操作前备份：`/home/ubuntu/lszl-uat-backups/pmp-documents-20261102T060123Z`，代码与UAT数据库均非空，并完成归档目录、pg_restore TOC及SHA256校验，[manifest](../samples/pmp-documents-20261102/before-paper-publication-backup.json)已保存。
+
+本次只验证已发布试卷可进入做题，未代替用户业务验收，未合入main或修改正式环境。

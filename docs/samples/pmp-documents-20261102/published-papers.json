@@ -1,0 +1,36 @@
+{
+  "environment": "uat",
+  "apply": true,
+  "papers": [
+    {
+      "paperId": "p_f82421140d55463ebdde314b5d34406d",
+      "releaseId": "pr_f5a05ea4096745b2a004dfe37b1c85b0",
+      "name": "PMP新版中文题库（原96题版·实收93题）",
+      "questionCount": 93,
+      "categoryId": "pc_cd5645b684364f038e0408df6d76817e",
+      "categoryName": "专题卷",
+      "description": "12 月考纲 新题",
+      "status": "published",
+      "enabledModes": [
+        "practice_mode"
+      ],
+      "accessLevel": "free",
+      "verified": true
+    },
+    {
+      "paperId": "p_cd1fe26e65c343cba40b01a0e87de91b",
+      "releaseId": "pr_0bcbb7a7e18542748c058ce56816c857",
+      "name": "PMP小程序新题型合集（截图整理版）",
+      "questionCount": 99,
+      "categoryId": "pc_cd5645b684364f038e0408df6d76817e",
+      "categoryName": "专题卷",
+      "description": "12 月考纲 新题",
+      "status": "published",
+      "enabledModes": [
+        "practice_mode"
+      ],
+      "accessLevel": "free",
+      "verified": true
+    }
+  ]
+}
