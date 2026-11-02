@@ -132,6 +132,9 @@
     return state.releases;
   }
   function selectedRelease(){return state.releases.find(row=>row.id===state.selectedPaperId)||state.releases[0]||null}
+  function selectedQuestionCount(release=selectedRelease()){
+    return state.selectedCount==='all'?Number(release?.questionCount||release?.totalCount||release?.questions?.length||0):Number(state.selectedCount);
+  }
   function practiceApi(){return global.KGPracticeLearningApi||null}
   function saveCoordinator(){
     if(!state.saves)state.saves=global.KGPracticeSessionSave.create({api:practiceApi()});
@@ -1222,7 +1225,7 @@
     // 挑战/学霸恢复时血量可能与满血差距很大；顶栏虽然按剩余血量渲染，
     // 但"开始挑战"按钮静默恢复会让人误以为是满血新开局，必须明确告知剩余血量。
     if((state.mode==='challenge'||state.mode==='scholar')&&state.health<state.maxHealth)showToast('已恢复上次进度 · 剩余血量 '+state.health+' / '+state.maxHealth);
-    state.lastSettings={paperId:catalog?.id||state.session.paperId,count:state.questions.length,order:text(state.order||'paper'),mode:state.mode};document.body.dataset.practiceMode=state.mode;
+    state.lastSettings={paperId:catalog?.id||state.session.paperId,count:state.questions.length,countChoice:state.selectedCount==='all'||state.questions.length>COUNTS[COUNTS.length-1]?'all':state.questions.length,order:text(state.order||'paper'),mode:state.mode};document.body.dataset.practiceMode=state.mode;
     if(state.mode==='scholar')state.deadline=Date.now()+Math.max(0,Number(runtime.remainingMs??SCHOLAR_MAX_SECONDS*1000));
     dom.timer.hidden=true;dom.timeRow.hidden=state.mode!=='scholar';dom.health.hidden=!modePolicy().showHealth;
     setView('game');renderQuestion();if(state.mode==='scholar')startTimer({resume:true});
@@ -1231,7 +1234,7 @@
   function practiceEntryInput(mode,catalog,count){
     const order=mode==='revenge'?'paper':(dom.orderInputs.find(input=>input.checked)?.value||'paper');
     if(mode==='revenge')return {mode,count:revengePolicy().requestCount,order};
-    return {paperId:text(catalog?.paperId||catalog?.id),releaseId:text(catalog?.releaseId),mode,count,order};
+    return {paperId:text(catalog?.paperId||catalog?.id),releaseId:text(catalog?.releaseId),mode,count:state.selectedCount==='all'?'all':count,order};
   }
   async function createFreshSession(input){
     const api=practiceApi();
@@ -1247,7 +1250,7 @@
     const challenge=mode==='challenge';
     if(state.entryStartingMode)return false;
     if(!hasAuthenticatedUser()){global.KGSharedAuthDialog?.open?.('登录后即可开始做题，并保存你的学习进度。');return false}
-    const catalog=selectedRelease(),count=Number(state.selectedCount);
+    const catalog=selectedRelease(),count=selectedQuestionCount(catalog);
     if(mode!=='revenge'&&!catalog){showToast('请先选择一份试卷，再开始练习。');syncLobby();return false}
     const access=catalog?paperAccess(catalog):{allowed:true,accessLevel:'free'};
     if(mode!=='revenge'&&!access.allowed)return openMembership(access);
@@ -1290,7 +1293,7 @@
         state.index=0;state.maxHealth=state.mode==='challenge'?challengeInitialHealth(state.questions.length):state.mode==='scholar'?scholarInitialHealth(state.questions.length):MAX_HEALTH;state.health=state.maxHealth;state.challengeFailedShown=false;state.streak=0;state.maxStreak=0;state.experience=0;state.correct=0;state.answered=0;state.startedAt=Date.now();state.endedAt=0;state.locked=false;state.active=true;state.completed=false;state.abandonedRecorded=false;
         createDraft(null);
         if(state.mode==='challenge'||state.mode==='scholar')showToast('答完全部题目将自动交卷；做错的题（含中途退出时已答的）都会记入复仇模式。');
-        state.lastSettings={paperId:catalog.id,count,order:state.order,mode:state.mode};
+        state.lastSettings={paperId:catalog.id,count,countChoice:state.selectedCount,order:state.order,mode:state.mode};
         dom.timer.hidden=true;dom.timeRow.hidden=state.mode!=='scholar';dom.health.hidden=state.mode==='practice';
         setView('game');renderQuestion();if(state.mode==='scholar')startTimer();return true;
       }catch(error){
@@ -1303,9 +1306,9 @@
   }
   function startAgain(){
     const settings=state.lastSettings;if(!settings){showLobby();return}
-    state.selectedPaperId=settings.paperId;state.selectedCount=settings.count;state.order=settings.order;
+    state.selectedPaperId=settings.paperId;state.selectedCount=settings.countChoice??(settings.count>COUNTS[COUNTS.length-1]||settings.count===Number(selectedRelease()?.questionCount)?'all':settings.count);state.order=settings.order;
     if(settings.mode==='revenge'){state.revengeSelectedCount=settings.count;startPractice('revenge');return}
-    if(dom.paperSelect)dom.paperSelect.value=settings.paperId;dom.countInputs.forEach(input=>input.checked=Number(input.value)===settings.count);dom.orderInputs.forEach(input=>input.checked=input.value===settings.order);
+    if(dom.paperSelect)dom.paperSelect.value=settings.paperId;dom.countInputs.forEach(input=>input.checked=(input.value==='all'?'all':Number(input.value))===state.selectedCount);dom.orderInputs.forEach(input=>input.checked=input.value===settings.order);
     startPractice(settings.mode);
   }
   function openExitConfirm(){if(!state.active)return;if(state.mode==='practice')clearFeedbackTimer();dom.exitConfirm.hidden=false;dom.exitConfirm.setAttribute('aria-hidden','false')}
@@ -1369,11 +1372,11 @@
   function syncCountOptions(){
     const release=selectedRelease(),available=Number(release?.questionCount||release?.totalCount||release?.questions?.length||0),access=release?paperAccess(release):{allowed:false};
     let firstEnabled=0,currentEnabled=false;
-    const minimum=dom.countInputs[0];
-    if(minimum){minimum.value=String(available>0&&available<COUNTS[0]?available:COUNTS[0]);const label=minimum.closest('label')?.querySelector('span');if(label)label.textContent=available>0&&available<COUNTS[0]?'全部 '+available:String(COUNTS[0])}
-    dom.countInputs.forEach(input=>{const count=Number(input.value),enabled=available>=count;input.disabled=!enabled;if(enabled&&!firstEnabled)firstEnabled=count;if(enabled&&count===state.selectedCount)currentEnabled=true});
-    if(!currentEnabled)state.selectedCount=firstEnabled||10;
-    dom.countInputs.forEach(input=>input.checked=Number(input.value)===state.selectedCount);
+    const all=dom.countInputs.find(input=>input.value==='all'),allLabel=all?.closest('label')?.querySelector('span');
+    if(allLabel)allLabel.textContent=available>0?`全部（${available}题）`:'全部';
+    dom.countInputs.forEach(input=>{const choice=input.value==='all'?'all':Number(input.value),enabled=available>0&&(choice==='all'||available>=choice);input.disabled=!enabled;if(enabled&&!firstEnabled)firstEnabled=choice;if(enabled&&choice===state.selectedCount)currentEnabled=true});
+    if(!currentEnabled&&state.selectedCount!=='all')state.selectedCount=firstEnabled||10;
+    dom.countInputs.forEach(input=>input.checked=(input.value==='all'?'all':Number(input.value))===state.selectedCount);
     const revengeEntry=revengePolicy();
     dom.startButtons.forEach(button=>{
       const revenge=button.dataset.practiceStart==='revenge',revengeStats=getMistakeStats(),revengeAvailable=revengeStats.active>0,revengeUnavailable=Number(revengeStats.unavailable||0)>0;
@@ -1383,7 +1386,7 @@
       button.textContent=revenge?(revengeAvailable?`开始复仇（${revengeEntry.automatic?'全部 ':''}${revengeEntry.requestCount} 题）`:revengeUnavailable?'检查错题内容':'暂无错题'):( !release?(button.dataset.defaultLabel||button.textContent):(!access.allowed?'开通会员':button.dataset.defaultLabel||button.textContent));
     });
     const ordinary=dom.startButtons.find(button=>button.dataset.practiceStart==='practice');
-    if(ordinary&&hasAuthenticatedUser()&&access.allowed)ordinary.textContent=`开始 ${state.selectedCount} 题${state.selectedCount<=20?'短练':'练习'}`;
+    if(ordinary&&hasAuthenticatedUser()&&access.allowed){const count=selectedQuestionCount(release);ordinary.textContent=`开始 ${count} 题${count<=20?'短练':'练习'}`}
     renderResumeActions();
     dom.setupCard?.classList.toggle('is-vip-locked',!!release&&!access.allowed);
   }
@@ -1594,7 +1597,7 @@
     global.addEventListener('resize',()=>{if(document.body.dataset.practiceView==='lobby'){positionExperiencePanel();const panel=$('practiceExpPanel');if(panel)panel.hidden=!experienceReady|| (global.matchMedia?.('(max-width:900px)').matches?!document.body.classList.contains('is-exp-panel-open'):false)}});
     dom.paperDrawer?.addEventListener('click',event=>{if(event.target===dom.paperDrawer)closePaperDrawer()});
     dom.historyDrawer?.addEventListener('click',event=>{if(event.target===dom.historyDrawer)closeHistoryDrawer()});
-    dom.countInputs.forEach(input=>input.addEventListener('change',()=>{if(input.checked){state.selectedCount=Number(input.value);syncCountOptions();syncResumableButtons()}}));
+    dom.countInputs.forEach(input=>input.addEventListener('change',()=>{if(input.checked){state.selectedCount=input.value==='all'?'all':Number(input.value);syncCountOptions();syncResumableButtons()}}));
     dom.revengeCountOptions?.addEventListener('change',event=>{const input=event.target.closest?.('[name="practiceRevengeCount"]');if(!input?.checked||input.disabled)return;state.revengeSelectedCount=Number(input.value);syncRevengeStats();syncCountOptions();syncResumableButtons()});
     dom.revengeRuleShell?.addEventListener('mouseenter',()=>setRevengeRuleOpen(true));
     dom.revengeRuleShell?.addEventListener('mouseleave',()=>{if(!state.revengeRulePinned&&document.activeElement!==dom.revengeRuleTrigger)setRevengeRuleOpen(false)});

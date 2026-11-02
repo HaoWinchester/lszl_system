@@ -8,7 +8,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import select, text as sql_text
+from sqlalchemy import func, select, text as sql_text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -629,13 +629,14 @@ async def start_session(
     release_id = str(data.get("releaseId") or "").strip()
     mode = str(data.get("mode") or "").strip().lower()
     order = str(data.get("order") or "paper").strip().lower()
+    all_questions = data.get("count") == "all" and mode != "revenge"
     try:
-        count = int(data.get("count") or 0)
+        count = 0 if all_questions else int(data.get("count") or 0)
     except (TypeError, ValueError) as error:
         raise _error(422, "INVALID_PRACTICE_COUNT", "题目数量无效") from error
     if mode not in PRACTICE_SESSION_MODES:
         raise _error(422, "INVALID_PRACTICE_MODE", "练习模式无效")
-    if not PRACTICE_QUESTION_COUNT_MIN <= count <= PRACTICE_QUESTION_COUNT_MAX:
+    if not all_questions and not PRACTICE_QUESTION_COUNT_MIN <= count <= PRACTICE_QUESTION_COUNT_MAX:
         raise _error(422, "INVALID_PRACTICE_COUNT", "题目数量必须在 1 到 180 之间")
     if order not in PRACTICE_ORDERS:
         raise _error(422, "INVALID_PRACTICE_ORDER", "答题顺序无效")
@@ -653,6 +654,10 @@ async def start_session(
             or not await paper_release_service.can_access(db, user, release)
         ):
             raise _error(404, "PRACTICE_RELEASE_NOT_FOUND", "试卷不存在或当前不可练习")
+        if all_questions:
+            count = int(await db.scalar(select(func.count()).select_from(PaperReleaseQuestion).where(PaperReleaseQuestion.release_id == release_id)) or 0)
+            if not count:
+                raise _error(422, "PRACTICE_QUESTION_SHORTAGE", "试卷没有可练习题目", available=0)
 
     await db.execute(
         sql_text("SELECT pg_advisory_xact_lock(hashtext(:owner), hashtext(:scope))"),

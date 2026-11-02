@@ -1,19 +1,13 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.404",
-  "toVersion": "v9.0-p4.1.405",
+  "fromVersion": "v9.0-p4.1.407",
+  "toVersion": "v9.0-p4.1.408",
   "changes": {
-    "added": [
-      "tests/question-preview-answer-set-browser.py",
-      "tests/question-preview-answer-set.test.js"
-    ],
+    "added": [],
     "changed": [
       "VERSION",
       "content-prep-studio/dist/content-prep.html",
-      "src/117-question-answer-set.js",
-      "src/65-question-bank-admin.js",
-      "src/teacher/question-bank/question-preview.js",
-      "tests/multiple-choice-answer-set.test.js"
+      "tests/knowledge-space-semantic-browser.py"
     ],
     "removed": []
   },
