@@ -15,5 +15,5 @@
 - [x] 在真实前端DOM补充选择全部、切换试卷、小卷、空卷、请求载荷与窄屏可达性测试，先观察缺功能失败。
 - [x] 局部修改`new-legacy/practice-mode.html`和`src/100-practice-mode.js`，扩展现有`practice_session_service.start_session`。
 - [x] 定向测试通过后运行前后端现有检查与官方发布门禁，核对源/同步产物/active release文件数量与关键页面。
-- [ ] 提交功能分支，合入并推送uat，数据与代码备份后部署UAT，实页确认93/99题可选择全部并创建整卷会话。
-- [ ] 停在UAT等待用户验收，保留main。
+- [x] 提交功能分支，合入并推送uat，数据与代码备份后部署UAT，实页确认93/99题可选择全部并创建整卷会话。
+- [x] 停在UAT等待用户验收，保留main。
