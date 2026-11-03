@@ -10,13 +10,19 @@
     return raw;
   }
   function extension(question){return {...(question?.metadata||{}),...(question?.metadata?._mixedContent||{}),...(question?.raw?._mixedContent||{}),...(question?.raw||{}),...question};}
+  function languageMode(requested){if(['zh','en','bilingual'].includes(requested))return requested;return global.KGFreeModeLanguage?.mode?.()||global.KGActivitySchemaV1?.getLanguageMode?.()||'zh';}
+  function languageText(zh,en,mode){return languageMode(mode)==='en'&&String(en||'').trim()?String(en):String(zh||'');}
+  function languageMarkup(zh,en,mode){
+    const current=languageMode(mode),text=languageText(zh,en,current),english=String(en||'').trim();
+    return esc(text)+(current==='bilingual'&&english&&english!==String(zh||'').trim()?`<span class="qm-language-en" lang="en">${esc(english)}</span>`:'');
+  }
   function images(rows){return (Array.isArray(rows)?rows:[]).map(image=>{
     const url=safeUrl(image?.url);if(!url)return '';
     return `<figure class="qm-image"><button type="button" class="qm-zoom" data-qm-zoom="${esc(url)}" aria-label="放大图表：${esc(image.alt||'题目图表')}"><img src="${esc(url)}" alt="${esc(image.alt||'题目图表')}" loading="lazy"/></button><figcaption>${esc(image.alt||'点击图表放大')}</figcaption><button type="button" data-qm-retry hidden>图表加载失败，点击重试</button></figure>`;
   }).join('');}
-  function renderMaterials(question){
-    const q=extension(question),m=q.material;
-    return (m?`<details class="qm-case" data-case-id="${esc(m.id)}" open><summary>${esc(m.title||'案例材料')}${q.caseGroup?` · 第 ${Number(q.caseGroup.order)||1} / ${Number(q.caseGroup.total)||1} 小题`:''}</summary><div class="qm-case-body"><div class="qm-text">${esc(m.text||'')}</div>${images(m.images)}</div></details>`:'')+images(q.images);
+  function renderMaterials(question,{languageMode:requestedMode}={}){
+    const q=extension(question),m=q.material,en=q.translations?.en?.material||{},mode=languageMode(requestedMode);
+    return (m?`<details class="qm-case" data-case-id="${esc(m.id)}" open><summary>${languageMarkup(m.title||'案例材料',en.title,mode)}${q.caseGroup?` · 第 ${Number(q.caseGroup.order)||1} / ${Number(q.caseGroup.total)||1} 小题`:''}</summary><div class="qm-case-body"><div class="qm-text">${languageMarkup(m.text||'',en.text,mode)}</div>${images(m.images)}</div></details>`:'')+images(q.images);
   }
   // Both learning canvases keep question content and its media inside the same card.
   function renderCardContent(question,content){
@@ -30,12 +36,13 @@
     const w=Math.max(380,Math.min(1400,Number(width)||preferred));
     return {width:w,height:w>=760?Math.ceil(w*9/16):Math.max(320,vh-160)};
   }
-  function renderMatching(question,{selectedPairs={},readOnly=false,reveal=false}={}){
+  function renderMatching(question,{selectedPairs={},readOnly=false,reveal=false,languageMode:requestedMode}={}){
     const q=extension(question),m=q.matching||{},selected=answer()?.pairs(q,selectedPairs)||{},right=m.right||[];
+    const mode=languageMode(requestedMode),translated=q.translations?.en?.matching||{},peer=(item,side)=>(translated[side]||[]).find(row=>String(row.id)===String(item?.id))?.text,copy=(item,side)=>languageMarkup(item?.text,peer(item,side),mode);
     return `<section class="qm-matching" aria-label="匹配作答"><p class="qm-help">${readOnly?'配对结果':'先选择左侧条目，再点击候选答案；也可把候选拖入条目。'}</p><div class="qm-pairs">${(m.left||[]).map((item,index)=>{
       const match=right.find(r=>r.id===selected[item.id]),correct=right.find(r=>r.id===m.correctPairs?.[item.id]);
-      return `<div class="qm-pair${reveal?(match?.id===correct?.id?' is-correct':' is-wrong'):''}"><button type="button" class="qm-target" data-qm-left="${esc(item.id)}" ${readOnly?'disabled':''} aria-pressed="false"><b>${index+1}. ${esc(item.text)}</b><span>${esc(match?.text||'选择或拖入答案')}</span></button>${match&&!readOnly?`<button type="button" class="qm-clear" data-qm-clear="${esc(item.id)}" aria-label="取消第 ${index+1} 项配对">取消</button>`:''}${reveal?`<p class="qm-pair-feedback">${match?.id===correct?.id?'✓ 配对正确':'正确配对：'+esc(correct?.text||'未设置')}</p>`:''}</div>`;
-    }).join('')}</div>${readOnly?'':`<div class="qm-candidates" aria-label="候选答案">${right.map(item=>`<button type="button" class="qm-candidate" draggable="true" data-qm-right="${esc(item.id)}" aria-label="候选：${esc(item.text)}">${esc(item.text)}${Object.values(selected).includes(item.id)?'<small>已配对，可重新分配</small>':''}</button>`).join('')}</div>`}<p class="qm-status" role="status" aria-live="polite"></p></section>`;
+      return `<div class="qm-pair${reveal?(match?.id===correct?.id?' is-correct':' is-wrong'):''}"><button type="button" class="qm-target" data-qm-left="${esc(item.id)}" ${readOnly?'disabled':''} aria-pressed="false"><b>${index+1}. ${copy(item,'left')}</b><span>${match?copy(match,'right'):'选择或拖入答案'}</span></button>${match&&!readOnly?`<button type="button" class="qm-clear" data-qm-clear="${esc(item.id)}" aria-label="取消第 ${index+1} 项配对">取消</button>`:''}${reveal?`<p class="qm-pair-feedback">${match?.id===correct?.id?'✓ 配对正确':'正确配对：'+(correct?copy(correct,'right'):'未设置')}</p>`:''}</div>`;
+    }).join('')}</div>${readOnly?'':`<div class="qm-candidates" aria-label="候选答案">${right.map(item=>`<button type="button" class="qm-candidate" draggable="true" data-qm-right="${esc(item.id)}" aria-label="候选：${esc(languageText(item.text,peer(item,'right'),mode))}">${copy(item,'right')}${Object.values(selected).includes(item.id)?'<small>已配对，可重新分配</small>':''}</button>`).join('')}</div>`}<p class="qm-status" role="status" aria-live="polite"></p></section>`;
   }
   function bindMedia(container){
     if(!container||container.dataset.qmMediaBound)return;
@@ -53,11 +60,11 @@
       dialog.querySelector('button').onclick=()=>dialog.close();dialog.addEventListener('close',()=>{dialog.remove();zoom.focus();});(global.KGCanvasDomInteraction?.overlayHost?.(document.body)||document.body).append(dialog);dialog.showModal();
     });
   }
-  function bind(container,{question,selectedPairs={},readOnly=false,reveal=false,onChange=()=>{}}={}){
+  function bind(container,{question,selectedPairs={},readOnly=false,reveal=false,languageMode:requestedMode,onChange=()=>{}}={}){
     bindMedia(container);
     const q=extension(question);let selected=answer()?.pairs(q,selectedPairs)||{},active='';
     function status(message){const node=container.querySelector('.qm-status');if(node)node.textContent=message;}
-    function draw(){container.innerHTML=renderMatching(q,{selectedPairs:selected,readOnly,reveal});}
+    function draw(){container.innerHTML=renderMatching(q,{selectedPairs:selected,readOnly,reveal,languageMode:requestedMode});}
     function assign(left,right){if(readOnly)return;selected=answer().assignPair(q,selected,left,right);active='';draw();onChange({...selected});const next=q.matching.left.find(item=>!selected[item.id])?.id||left;Array.from(container.querySelectorAll('[data-qm-left]')).find(el=>el.dataset.qmLeft===next)?.focus();status(`已配对 ${Object.keys(selected).length} / ${q.matching.left.length} 项`);}
     draw();
     container.onclick=event=>{
