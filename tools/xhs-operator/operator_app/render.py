@@ -29,7 +29,7 @@ async def render(draft, root, product, sources=None):
     content=draft['content']
     q=content['question']
     cards=content['cards']+[{'title':'做一道知识自测','text':q['stem']+'\n\n'+'\n'.join(f'{k}. {v}' for k,v in q['options'].items())},
-                            {'title':'核对思路，再去练习','text':f"答案：{q['answer']}\n{q['explanation']}\n\n{product}提供 PMP 题目练习。需要入口可私信咨询。"}]
+                            {'title':'核对思路，再去练习','text':f"答案：{q['answer']}\n{q['explanation']}\n\n{product}提供 PMP 题目练习。按自己的复习安排练习并复盘。"}]
     folder=Path(root)/'assets'/draft['id']/str(draft['version'])
     folder.mkdir(parents=True,exist_ok=True)
     assets=[]

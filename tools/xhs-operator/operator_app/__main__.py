@@ -16,8 +16,9 @@ def main():
         uvicorn.run(create_app(args.data),host='127.0.0.1',port=args.port,access_log=False)
     else:
         db=Store(args.data)
-        if args.command=='pause':db.set_enabled(False)
-        print('自动运营：'+('运行中' if db.settings()['enabled'] else '已暂停'))
+        if args.command=='pause':db.configure(enabled=False,auto_reply=False,preparation_enabled=False)
+        print('模式：本地备稿；平台自动化已停用')
+        print('定时备稿：'+('运行中' if db.settings().get('preparation_enabled') else '已暂停'))
         print('稿件：'+str(len(db.drafts()))+'；队列：'+str(len(db.jobs())))
 
 if __name__=='__main__':main()

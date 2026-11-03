@@ -7,19 +7,21 @@ from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from urllib.parse import urlparse
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from .store import Store
 from .content import Pipeline, Model
 from .sources import catalog, verify_sources, refresh_library
-from .browser import BrowserAdapter
-from .worker import Worker, next_slots
+from .drafting import DraftWorker, export_draft
+from .research import Research
+from .replies import ReplyQueue
 
 STATIC=Path(__file__).parent/'static'
 
 class SettingsPatch(BaseModel):
     model_config=ConfigDict(extra='forbid')
+    preparation_enabled:bool|None=None
     times:list[str]|None=None
     daily_calls:int|None=Field(None,ge=1,le=40)
     daily_tokens:int|None=Field(None,ge=6500,le=300000)
@@ -34,9 +36,6 @@ class SettingsPatch(BaseModel):
 class GenerateBody(BaseModel):
     topic_id:str|None=None
 
-class QueueBody(BaseModel):
-    due:str
-
 class EditBody(BaseModel):
     title:str=Field(min_length=1,max_length=20)
     body:str=Field(min_length=1,max_length=600)
@@ -44,7 +43,11 @@ class EditBody(BaseModel):
 
 def create_app(root=None):
     db=Store(root or Path(__file__).parent.parent/'.runtime')
-    pipeline=Pipeline(db);adapter=BrowserAdapter(db);worker=Worker(db,pipeline,adapter)
+    db.configure(enabled=False,auto_reply=False)
+    with db.connect() as c:
+        c.execute("UPDATE jobs SET status='canceled',reason='已切换本地备稿；由用户在官方客户端发布' WHERE status IN ('queued','claimed') AND submitted IS NULL")
+    pipeline=Pipeline(db);worker=DraftWorker(db,pipeline)
+    replies=ReplyQueue(db);research=Research(db)
     token=secrets.token_urlsafe(32); tasks=set()
 
     @asynccontextmanager
@@ -54,19 +57,18 @@ def create_app(root=None):
             fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
         except OSError:
             lock.close();raise RuntimeError('该运行目录已有服务在执行')
-        worker.replies.recover()
-        worker.task=asyncio.create_task(worker.loop())
+        loop_task=asyncio.create_task(worker.loop())
         try: yield
         finally:
-            worker.task.cancel()
-            with suppress(asyncio.CancelledError):await worker.task
+            loop_task.cancel()
+            with suppress(asyncio.CancelledError):await loop_task
             await worker.close()
             for t in tasks:t.cancel()
             await asyncio.gather(*tasks,return_exceptions=True)
-            await adapter.close();lock.close()
+            lock.close()
 
     app=FastAPI(title='知习 · 内容工作台',lifespan=lifespan,docs_url=None,redoc_url=None)
-    app.state.db=db;app.state.pipeline=pipeline;app.state.adapter=adapter;app.state.worker=worker
+    app.state.db=db;app.state.pipeline=pipeline;app.state.worker=worker
 
     @app.middleware('http')
     async def local_only(request:Request,call_next):
@@ -101,11 +103,8 @@ def create_app(root=None):
         blockers=[]
         try: model=Model(db).info()
         except ValueError as e: model={'configured':False};blockers.append(str(e))
-        if not db.settings()['adapter_verified']:blockers.append('发布适配器尚未完成真实账号联调')
-        if not adapter.status.get('identity_verified'):blockers.append('工具专用浏览器的登录与账号 ID 尚未核对')
         source=db.root/'source-check.json'
-        return dict(model=model,browser=adapter.status,blockers=blockers,
-                    community=adapter.community_status,
+        return dict(model=model,blockers=blockers,
                     source_check=json.loads(source.read_text()) if source.exists() else None)
 
     @app.get('/')
@@ -116,29 +115,15 @@ def create_app(root=None):
         cfg=db.settings()
         sources,topics=catalog(db.root)
         library_report=db.root/'knowledge-refresh.json'
-        return {'csrf':token,'settings':{k:v for k,v in cfg.items() if k!='claude_config'},
+        return {'mode':'draft-only','csrf':token,'settings':{k:v for k,v in cfg.items() if k!='claude_config'},
                 'diagnostics':diagnostics(),'drafts':db.drafts(),'jobs':db.jobs(),'events':db.events(),
                 'sources':sources,'topics':topics,'busy':pipeline.busy,'usage':db.usage(),
-                'research':worker.research.state(),
+                'research':research.state(),
                 'knowledge':json.loads(library_report.read_text()) if library_report.exists() else None,
-                'messages':worker.replies.list(),'next_slots':next_slots(cfg['times'])}
+                'messages':replies.list()}
 
     @app.post('/api/pause')
-    async def pause():db.set_enabled(False);return {'enabled':False}
-
-    @app.post('/api/enable')
-    async def enable():
-        blockers=diagnostics()['blockers']
-        if blockers:raise ValueError('；'.join(blockers))
-        report=await refresh_library(db)
-        if not report['available_source_ids']:raise ValueError('没有可用的已核验知识来源')
-        await adapter.probe()
-        batch=await worker.scan_inbox()
-        if set(batch.get('complete_channels',[]))!={'comment','dm'}:raise ValueError('评论和私信尚未全部读通，不能开启完整自动运营')
-        try:worker.research.context()
-        except ValueError:
-            async with adapter.lock:await worker.research.refresh(adapter)
-        db.configure(enabled=True,auto_reply=True);return {'enabled':True}
+    async def pause():db.configure(enabled=False,auto_reply=False,preparation_enabled=False);return {'enabled':False,'preparation_enabled':False}
 
     @app.put('/api/settings')
     async def settings(body:SettingsPatch):
@@ -162,81 +147,26 @@ def create_app(root=None):
         if pipeline.busy:raise ValueError('生成任务正在执行')
         launch(pipeline.audit(db.get_draft(ident)),'审核内容');return {'accepted':True}
 
-    @app.post('/api/drafts/{ident}/queue')
-    async def queue(ident:str,body:QueueBody):
-        from datetime import datetime,timezone
-        try:due=datetime.fromisoformat(body.due)
-        except ValueError:raise ValueError('排期格式无效')
-        if due.tzinfo is None or due<=datetime.now(timezone.utc):raise ValueError('请选择未来时间，并包含时区')
-        db.enqueue(ident,body.due);return {'queued':True}
+    @app.get('/api/drafts/{ident}/export')
+    async def export(ident:str):
+        data=export_draft(db,ident)
+        return Response(data,media_type='application/zip',headers={'Content-Disposition':f'attachment; filename="draft-{ident}.zip"'})
 
-    @app.post('/api/drafts/{ident}/preview',status_code=202)
-    async def preview(ident:str):
-        d=db.get_draft(ident)
-        if d['status']!='ready': raise ValueError('请先完成审核')
-        async def run():
-            async with adapter.lock:
-                await adapter.prepare(d,preview=True)
-                db.notify('preview-'+ident,'六张图片和正文已在创作中心填写并核对，尚未发布。')
-        launch(run(),'发布预检');return {'accepted':True}
-
-    @app.post('/api/drafts/{ident}/publish-once',status_code=202)
-    async def publish_once(ident:str):
-        from .store import utcnow
-        if not db.settings().get('adapter_calibrated'):raise ValueError('请先通过真实页面预检')
-        d=db.get_draft(ident)
-        if d['status']!='ready':raise ValueError('稿件未审核')
-        if db.settings()['enabled']:raise ValueError('自动运营中，请使用排期')
-        async def run():
-            async with adapter.lock:
-                previous=db.settings()['adapter_verified']
-                try:
-                    db.enqueue(ident,utcnow())
-                    db.configure(enabled=True,adapter_verified=True)
-                    await worker.process(draft_id=ident)
-                    job=next(j for j in db.jobs() if j['draft_id']==ident and j['version']==d['version'])
-                    if job['status'] in {'published','platform-review'}:
-                        db.configure(adapter_verified=True)
-                        db.notify('live-publish-'+ident,'真实发布流程已通过，已记录平台笔记 ID。自动运营仍保持暂停。')
-                    else:db.configure(adapter_verified=previous)
-                finally:db.set_enabled(False)
-        launch(run(),'单篇发布联调');return {'accepted':True}
-
-    @app.post('/api/jobs/{ident}/cancel')
-    async def cancel(ident:str):
-        with db.connect() as c:
-            n=c.execute("UPDATE jobs SET status='canceled',reason='用户取消' WHERE id=? AND status='queued'",(ident,)).rowcount
-            if n!=1:raise ValueError('仅尚未执行的任务可取消')
-        return {'canceled':True}
-
-    @app.post('/api/jobs/{ident}/verify',status_code=202)
-    async def verify(ident:str):
-        job=next((j for j in db.jobs() if j['id']==ident),None)
-        if not job:raise ValueError('任务不存在')
-        async def run():
-            async with adapter.lock:await worker.reconcile(job)
-        launch(run(),'核验发布');return {'accepted':True}
-
-    @app.post('/api/browser/open',status_code=202)
-    async def login():launch(adapter.login(),'打开登录浏览器');return {'accepted':True}
-
+    @app.post('/api/enable')
+    @app.post('/api/browser/open')
     @app.post('/api/browser/check')
-    async def check():return await adapter.probe()
-
-    @app.post('/api/browser/community',status_code=202)
-    async def community():launch(adapter.open_community(),'打开主站登录');return {'accepted':True}
-
-    @app.post('/api/inbox/scan',status_code=202)
-    async def scan():launch(worker.scan_inbox(),'扫描互动');return {'accepted':True}
+    @app.post('/api/browser/community')
+    @app.post('/api/inbox/scan')
+    @app.post('/api/research/refresh')
+    @app.post('/api/drafts/{ident}/queue')
+    @app.post('/api/drafts/{ident}/preview')
+    @app.post('/api/drafts/{ident}/publish-once')
+    @app.post('/api/jobs/{ident}/verify')
+    async def retired(ident:str=''):
+        return JSONResponse({'detail':'已停用平台自动化。请下载发布包，在官方客户端人工发布与互动。'},status_code=410)
 
     @app.post('/api/inbox/pause')
     async def pause_replies():db.configure(auto_reply=False);return {'auto_reply':False}
-
-    @app.post('/api/research/refresh',status_code=202)
-    async def research():
-        async def run():
-            async with adapter.lock:await worker.research.refresh(adapter)
-        launch(run(),'竞品分析');return {'accepted':True}
 
     @app.post('/api/knowledge/refresh',status_code=202)
     async def knowledge():
