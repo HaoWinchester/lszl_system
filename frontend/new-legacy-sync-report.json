@@ -1,18 +1,12 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.408",
+  "fromVersion": "v9.0-p4.1.412",
   "toVersion": "v9.0-p4.1.411",
   "changes": {
-    "added": [
-      "tests/practice-materials-language-browser.py",
-      "tests/question-materials-language.test.js"
-    ],
+    "added": [],
     "changed": [
       "VERSION",
-      "content-prep-studio/dist/content-prep.html",
-      "src/100-practice-mode.js",
-      "src/118-question-materials.js",
-      "styles/question-materials.css"
+      "content-prep-studio/dist/content-prep.html"
     ],
     "removed": []
   },
