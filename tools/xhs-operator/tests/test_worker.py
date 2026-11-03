@@ -66,7 +66,7 @@ async def test_slow_generation_does_not_block_inbox_or_pause(tmp_path):
     Research(db).save([{'note_id':'a'*24,'url':'https://www.xiaohongshu.com/explore/'+'a'*24,'title':'PMP怎么刷题','likes':'3'}], 'PMP',datetime.now(timezone.utc).isoformat())
     try:
         await w.tick();await asyncio.wait_for(started.wait(),1)
-        w.last_inbox=None
+        db.configure(last_inbox_check=None)
         await asyncio.wait_for(w.tick(),1)
         assert a.reads==2
         db.set_enabled(False)
@@ -87,3 +87,40 @@ async def test_readonly_inbox_scan_can_establish_baseline_while_paused(tmp_path)
     assert result['complete_channels']==['comment','dm']
     assert db.settings()['enabled'] is False
     with db.connect() as c:assert c.execute('SELECT COUNT(*) FROM reply_baselines').fetchone()[0]==2
+
+@pytest.mark.asyncio
+async def test_six_hour_inbox_interval_survives_restart_without_delaying_posts(tmp_path,monkeypatch):
+    import asyncio
+    from operator_app import worker
+    now=['2026-11-03T03:25:00+00:00']
+    monkeypatch.setattr(worker,'utcnow',lambda:now[0])
+    db=Store(tmp_path);db.configure(enabled=True,auto_reply=True,last_inbox_check=now[0])
+    class Inbox:
+        lock=asyncio.Lock()
+    counts={'scans':0,'posts':0}
+    def make_worker():
+        w=Worker(db,Pipeline(),Inbox())
+        async def scan(adapter):counts['scans']+=1
+        async def post():counts['posts']+=1
+        async def no_produce():pass
+        w.replies.run=scan;w.process=post;w.produce=no_produce
+        w.research.context=lambda:{}
+        return w
+    w=make_worker()
+    try:
+        now[0]='2026-11-03T09:24:59+00:00'
+        await w.tick()
+        assert counts=={'scans':0,'posts':1}
+        now[0]='2026-11-03T09:25:00+00:00'
+        await w.tick()
+        assert counts=={'scans':1,'posts':2}
+    finally:await w.close()
+    restarted=make_worker()
+    try:
+        now[0]='2026-11-03T09:30:00+00:00'
+        await restarted.tick()
+        assert counts=={'scans':1,'posts':3}
+        now[0]='2026-11-03T15:25:00+00:00' # 23:25 Shanghai, outside reply window
+        await restarted.tick()
+        assert counts=={'scans':1,'posts':4}
+    finally:await restarted.close()

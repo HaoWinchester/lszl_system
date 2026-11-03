@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from .store import utcnow
-from .replies import ReplyQueue
+from .replies import ReplyQueue, in_hours
 from .research import Research
 
 
@@ -22,14 +22,22 @@ class Worker:
     def __init__(self,db,pipeline,adapter):
         self.db=db;self.pipeline=pipeline;self.adapter=adapter
         self.owner=uuid.uuid4().hex;self.task=None;self.last_generation=None
-        self.replies=ReplyQueue(db);self.last_reconcile=None;self.last_inbox=None
+        self.replies=ReplyQueue(db);self.last_reconcile=None
         self.research=Research(db);self.background=None;self.last_research_attempt=None;self.last_knowledge=None
 
     async def scan_inbox(self):
         async with self.adapter.lock:
             batch=await self.adapter.read_messages()
             self.replies.scan(batch)
+            self.db.configure(last_inbox_check=utcnow())
             return batch
+
+    def inbox_due(self):
+        now=utcnow();cfg=self.db.settings()
+        if not cfg['auto_reply'] or not in_hours(now):return False
+        last=cfg.get('last_inbox_check')
+        if not last:return True
+        return datetime.fromisoformat(now)-datetime.fromisoformat(last)>=timedelta(hours=6)
 
     async def refresh_knowledge(self):
         from .sources import refresh_library
@@ -127,12 +135,15 @@ class Worker:
             async with self.adapter.lock:await self.replies.reconcile(self.adapter)
         if not self.db.settings()['enabled']:return
         async with self.adapter.lock:await self.process()
-        if self.db.settings()['auto_reply'] and self.last_inbox!=minute:
-            self.last_inbox=minute
+        if self.inbox_due():
+            # Persist before starting too, so interrupted scans do not immediately
+            # repeat after restart. The interval counts from completion normally.
+            self.db.configure(last_inbox_check=utcnow())
             try:
                 async with self.adapter.lock:await self.replies.run(self.adapter)
             except Exception as e:
                 self.db.notify('inbox-'+utcnow()[:10],str(e) if isinstance(e,ValueError) else '互动页面读取失败；未发送新的回复。')
+            finally:self.db.configure(last_inbox_check=utcnow())
         if not self.db.settings()['enabled']:return
         try:self.research.context()
         except ValueError:
