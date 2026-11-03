@@ -856,7 +856,7 @@
     if(materialHost){
       const prior=materialHost.querySelector('[data-case-id]');
       if(prior)state.casePositions[prior.dataset.caseId]={scroll:prior.querySelector('.qm-case-body')?.scrollTop||0,open:prior.open};
-      materialHost.innerHTML=global.KGQuestionMaterials?.renderMaterials(question)||'';
+      materialHost.innerHTML=global.KGQuestionMaterials?.renderMaterials(question,{languageMode:languageMode()})||'';
       materialPanel.hidden=!materialHost.innerHTML;
       global.KGQuestionMaterials?.bindMedia(materialHost);
       const current=materialHost.querySelector('[data-case-id]'),position=current&&state.casePositions[current.dataset.caseId];
@@ -895,7 +895,7 @@
     if(state.mode==='revenge'&&!state.verification?.active&&state.revengeState?.phase==='remediation'&&state.revengeState?.questionId===question.id)showRemediation(question);
   }
   function renderMatchingAnswer(question,savedAnswer,readOnly){
-    global.KGQuestionMaterials?.bind(dom.options,{question,selectedPairs:savedAnswer?.selectedPairs||state.pendingMatches[question.id]||{},readOnly,
+    global.KGQuestionMaterials?.bind(dom.options,{question,languageMode:languageMode(),selectedPairs:savedAnswer?.selectedPairs||state.pendingMatches[question.id]||{},readOnly,
       reveal:readOnly&&shouldShowExplanation(),onChange:pairs=>{state.pendingMatches[question.id]=pairs;state.draft?.markDirty?.();renderSaveStatus();if(dom.confirmAnswerBtn)dom.confirmAnswerBtn.disabled=!AnswerSet.pairs(question,pairs,true);}});
   }
   function updateQuestionNav(){
