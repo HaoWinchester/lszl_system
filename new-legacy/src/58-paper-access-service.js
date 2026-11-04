@@ -28,7 +28,7 @@
     if(accessLevel===FREE)return {allowed:true,accessLevel,state:'free',code:'FREE_PAPER',message:'免费试卷'};
     if(role==='admin'||role==='teacher')return {allowed:true,accessLevel,state:'role_bypass',code:'ROLE_BYPASS',message:'教学角色可预览 VIP 试卷'};
     if(!user||role==='guest'||role==='viewer')return {allowed:false,accessLevel,state:'login_required',code:'LOGIN_REQUIRED',message:'登录学员账号并开通会员后即可练习。'};
-    if(hasExamEntitlement())return {allowed:true,accessLevel,state:'member',code:'MEMBER_ACCESS',message:'VIP 会员可使用'};
+    if((role==='student'&&paper?.contentRestricted===false)||hasExamEntitlement())return {allowed:true,accessLevel,state:'member',code:'MEMBER_ACCESS',message:'VIP 会员可使用'};
     return {allowed:false,accessLevel,state:'membership_required',code:'MEMBERSHIP_REQUIRED',message:'此试卷为 VIP 会员专属，开通会员即可解锁全部试卷。'};
   }
   function canUse(paper){return inspect(paper).allowed}

@@ -53,6 +53,7 @@ function harness() {
   }
   window.window = window
   const context = vm.createContext({ window, document, CustomEvent: window.CustomEvent, requestAnimationFrame: window.requestAnimationFrame, setTimeout, clearTimeout, console })
+  vm.runInContext(readFileSync(resolve('../new-legacy/src/feature-assets.js'), 'utf8'), context)
   vm.runInContext(readFileSync(sourcePath, 'utf8'), context, { filename: sourcePath })
   return { api: window.KGHomepageLoader, appended, events, raf, status, document }
 }

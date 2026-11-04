@@ -217,6 +217,7 @@ python3 new-legacy/tests/practice-materials-language-browser.py
 python3 new-legacy/tests/practice-comment-language-browser.py
 python3 new-legacy/tests/practice-danmaku-recovery-browser.py
 python3 new-legacy/tests/comment-composer-popover-browser.py
+CANVAS_TEST_RELEASE_ROOT="$VALIDATION_ROOT/releases" python3 new-legacy/tests/run-practice-demand-browser.py
 python3 new-legacy/tests/practice-answer-sheet-browser.py
 python3 new-legacy/tests/practice-result-report-browser.py
 python3 new-legacy/tests/practice-report-feedback-browser.py

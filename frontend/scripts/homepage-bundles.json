@@ -11,7 +11,8 @@
         "auth-session-bootstrap.js",
         "domain-api-client.js",
         "src/28-device-preferences.js",
-        "src/00-import-guard.js"
+        "src/00-import-guard.js",
+        "src/feature-assets.js"
       ],
       "styles": []
     },
