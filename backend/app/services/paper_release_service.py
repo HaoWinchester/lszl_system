@@ -8,6 +8,7 @@ from typing import Any
 from fastapi import HTTPException
 from sqlalchemy import String, cast, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import load_only
 
 from app.core.security import now_utc, uid
 from app.models.paper_release import PaperRelease, PaperReleaseQuestion
@@ -561,19 +562,40 @@ async def history(
 
 
 def catalog_summary(release: PaperRelease, *, user: User | None, entitled: bool) -> dict:
-    payload = release_to_dict(
-        release, content_restricted=user is None or not can_access_with_entitlement(user, release, entitled)
-    )
-    if user is None:
-        for key in ("publishedBy", "allowedRoles", "metadata"):
-            payload.pop(key, None)
-    return payload
+    """Learner directory fields only; full frozen metadata belongs to detail."""
+    return {
+        "id": release.id,
+        "releaseId": release.id,
+        "paperId": release.paper_id,
+        "version": release.version,
+        "status": release.status,
+        "availability": release.status,
+        "name": release.name,
+        "title": release.name,
+        "subject": release.subject,
+        "description": release.description or "",
+        "paperType": release.paper_type,
+        "purpose": "learning",
+        "accessLevel": release.access_level,
+        "accessPolicy": {"accessLevel": release.access_level},
+        "enabledModes": release.enabled_modes or [],
+        "modeConfigVersion": 2,
+        "questionCount": release.question_count,
+        "configuredCount": release.question_count,
+        "totalCount": release.question_count,
+        "publishedAt": _timestamp(release.published_at),
+        "publishedAtIso": release.published_at.isoformat() if release.published_at else None,
+        "updatedAt": _timestamp(release.published_at),
+        "contentRestricted": user is None or not can_access_with_entitlement(user, release, entitled),
+    }
 
 
 async def catalog(
     db: AsyncSession, user: User | None, *, page: int, page_size: int,
-    search: str = "", subject: str = "", access: str = "all",
+    search: str = "", subject: str = "", access: str = "all", mode: str | None = None,
 ) -> dict:
+    if mode is not None and mode not in VALID_MODES:
+        raise _error(422, "INVALID_RELEASE_MODE", "未知学习模式")
     entitled = await entitlement_for_request(db, user) if user else False
     # allowed_roles 为空数组表示不限制角色（与 can_access_with_entitlement 语义一致）
     role_filter = or_(
@@ -584,7 +606,9 @@ async def catalog(
     # 发布受众约束学员可见范围，管理员仍须能检查发布内容。
     if user is None or user.role != "admin":
         base = base.where(role_filter)
-    # Facets come from the whole permitted catalog, never the current page or search.
+    if mode is not None:
+        base = base.where(PaperRelease.enabled_modes.contains([mode]))
+    # Facets obey role/mode, independent of search/subject/access and pagination.
     subjects = list((await db.execute(
         base.with_only_columns(PaperRelease.subject).distinct().order_by(PaperRelease.subject)
     )).scalars().all())
@@ -601,9 +625,19 @@ async def catalog(
         base = base.where(PaperRelease.access_level.in_(MEMBER_ACCESS_LEVELS))
     elif access == "free":
         base = base.where(PaperRelease.access_level.not_in(MEMBER_ACCESS_LEVELS))
-    total = int(await db.scalar(select(func.count()).select_from(base.subquery())) or 0)
+    total = int(await db.scalar(select(func.count()).select_from(
+        base.with_only_columns(PaperRelease.id).subquery()
+    )) or 0)
     releases = (await db.execute(
-        base.order_by(PaperRelease.published_at.desc(), PaperRelease.id)
+        base.options(load_only(
+            PaperRelease.id, PaperRelease.paper_id, PaperRelease.version,
+            PaperRelease.status, PaperRelease.name, PaperRelease.subject,
+            PaperRelease.description, PaperRelease.paper_type,
+            PaperRelease.access_level, PaperRelease.enabled_modes,
+            PaperRelease.allowed_roles, PaperRelease.question_count,
+            PaperRelease.published_at,
+            raiseload=True,
+        )).order_by(PaperRelease.published_at.desc(), PaperRelease.id)
         .limit(page_size).offset((page - 1) * page_size)
     )).scalars().all()
     coverage = await practice_coverage_service.coverage_summaries(db, user.username, [item.id for item in releases]) if user else {}
