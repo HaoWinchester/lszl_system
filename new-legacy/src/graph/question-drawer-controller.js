@@ -38,7 +38,7 @@
     fsDocument().addEventListener('fullscreenchange',onFullscreenChange);
     fsDocument().addEventListener('webkitfullscreenchange',onFullscreenChange);
     function shell(){
-      panel.innerHTML=`<header><strong>${esc(context.title)} · 做题</strong><span class="gqd-header-actions"><button type="button" data-fullscreen aria-pressed="false" aria-label="全屏做题">全屏</button><button type="button" data-close aria-label="关闭做题抽屉">关闭</button></span></header><div class="gqd-scroll"><p data-status role="status" aria-live="polite"></p><div data-content></div></div>`;
+      panel.innerHTML=`<header><strong>${esc(context.title)} · 做题</strong><span class="gqd-header-actions"><button type="button" data-fullscreen aria-pressed="false" aria-label="全屏做题">全屏</button><button type="button" data-close aria-label="关闭做题抽屉">关闭</button></span></header><div class="gqd-scroll"><p data-status role="status" aria-live="polite"></p><div data-content></div></div><footer class="gqd-footer"><a class="gqd-more" href="practice-mode.html" aria-label="进入做题大厅" title="进入做题大厅">more</a></footer>`;
       panel.querySelector('[data-close]').onclick=close;
       panel.querySelector('[data-fullscreen]').onclick=toggleFullscreen;
       panel.onkeydown=e=>{e.stopPropagation();if(e.key==='Escape'){if(fsActive()){exitFullscreen();fsEntered=false;return}if(exitFullscreen())return;close();}};

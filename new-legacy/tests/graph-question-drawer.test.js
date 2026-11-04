@@ -1,5 +1,12 @@
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
 const root=path.resolve(__dirname,'..');
+test('card practice is a visible accessible icon and drawer keeps a lobby link outside scrolling content',()=>{
+  const editor=fs.readFileSync(path.join(root,'src/10-graph-editor.js'),'utf8');
+  const button=editor.match(/<button id="graphPracticeBtn"[^>]*>[\s\S]*?<\/button>/)?.[0];
+  assert.ok(button);assert.doesNotMatch(button.split('>')[0],/\bhidden\b/);assert.match(button,/aria-label="做题"/);assert.match(button,/<svg[^>]*aria-hidden="true"/);assert.doesNotMatch(button,/>做题</);
+  const drawer=fs.readFileSync(path.join(root,'src/graph/question-drawer-controller.js'),'utf8');
+  assert.match(drawer,/<\/div><footer class="gqd-footer"><a[^>]*href="practice-mode.html"[^>]*aria-label="进入做题大厅"[^>]*>more<\/a><\/footer>/);
+});
 function load(){const context=vm.createContext({URL});context.globalThis=context;vm.runInContext(fs.readFileSync(path.join(root,'src/118-question-materials.js'),'utf8'),context);return context.KGQuestionMaterials;}
 test('graph media requires complete exact context and forbids arbitrary query or external URLs',()=>{const media=load(),base='/api/v1/question-assets/a';assert.equal(media.safeUrl(base),base);const tuple=base+'?fileId=f&nodeId=n&bindingId=b&sourceVersion=v';assert.equal(media.safeUrl(tuple),tuple);assert.equal(media.safeUrl(tuple+'&attemptId=h'),tuple+'&attemptId=h');for(const value of [base+'?fileId=f',tuple+'&fileId=other',tuple+'&questionId=q','https://evil.test'+tuple,tuple+'#x',base+'?attemptId=h'])assert.equal(media.safeUrl(value),'');assert.match(media.renderMaterials({images:[{url:tuple,alt:'授权图片'}]}),/sourceVersion=v/);});
 test('drawer scripts register once in source and bundle in dependency order',()=>{const source=fs.readFileSync(path.join(root,'index.html'),'utf8'),bundle=JSON.parse(fs.readFileSync(path.join(root,'../frontend/scripts/homepage-bundles.json'),'utf8')).groups.find(g=>g.name==='home-graph').scripts;for(const name of ['src/117-question-answer-set.js','src/118-question-materials.js','src/119-question-analysis.js','src/graph/question-drawer-controller.js']){assert.equal(bundle.filter(x=>x===name).length,1);assert.equal(source.split('src="'+name+'"').length,2);assert.ok(bundle.indexOf(name)<bundle.indexOf('src/10-graph-editor.js'));}});
