@@ -143,7 +143,6 @@
                 </div>
               </fieldset>
               <details class="practice-lobby-help practice-coverage-help"><summary aria-label="查看普通练习和进度规则">?</summary><div class="practice-help-content"><strong>普通练习规则</strong><p class="practice-selection-notice" id="practiceCoverageSummary" role="status"></p><p>优先练未做题，不足所选题量时用已做题补足；案例题保留完整。全部做过后进入复习。已练不代表掌握，只统计已保存的有效作答。</p></div></details>
-              <button type="button" class="practice-secondary-btn practice-coverage-retry" id="practiceCoverageRetry" hidden>重试加载进度</button>
               <fieldset class="practice-choice-group">
                 <legend>试卷顺序</legend>
                 <div class="practice-order-options">
@@ -151,10 +150,12 @@
                   <label><input type="radio" name="practiceOrder" value="random"/><span>随机顺序</span></label>
                 </div>
               </fieldset>
-              <div class="practice-entry-actions">
+              <fieldset class="practice-entry-actions practice-choice-group" aria-label="普通练习操作">
+                <legend class="practice-entry-legend" aria-hidden="true">开始练习</legend>
                 <button type="button" class="practice-start-btn" data-practice-start="practice">开始 10 题短练</button>
                 <button type="button" class="practice-secondary-btn" data-practice-new="practice" hidden>新开一轮</button>
-              </div>
+              </fieldset>
+              <button type="button" class="practice-secondary-btn practice-coverage-retry" id="practiceCoverageRetry" hidden>重试加载进度</button>
             </section>
             <section class="practice-mode-grid practice-standard-modes" aria-label="挑战和学霸模式">
               <article class="practice-mode-card challenge">

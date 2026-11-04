@@ -1,11 +1,11 @@
 <!doctype html>
-<html data-release="v9.0-p4.1.417" lang="zh-CN">
+<html data-release="v9.0-p4.1.418" lang="zh-CN">
 <head>
-<link rel="icon" type="image/jpeg" href="/assets/logo.jpg?v=v9.0-p4.1.417">
-<meta name="kg-practice-bundle-version" content="v9.0-p4.1.417">
-<script type="application/json" id="kg-page-features">{"auth":{"depends":[],"scripts":["bundles/practice-auth.js?v=v9.0-p4.1.417"],"styles":[]},"account":{"depends":["auth"],"scripts":["bundles/practice-account.js?v=v9.0-p4.1.417"],"styles":[]},"question":{"depends":[],"scripts":["bundles/practice-question.js?v=v9.0-p4.1.417"],"styles":[]},"community":{"depends":["question"],"scripts":["bundles/practice-community.js?v=v9.0-p4.1.417"],"styles":[]},"answer":{"depends":["community"],"scripts":["bundles/practice-answer.js?v=v9.0-p4.1.417"],"styles":[]},"report":{"depends":[],"scripts":["bundles/practice-report.js?v=v9.0-p4.1.417"],"styles":[]},"knowledge":{"depends":[],"scripts":["bundles/practice-knowledge.js?v=v9.0-p4.1.417"],"styles":[]}}</script>
-<script src="bundles/practice-prelude.js?v=v9.0-p4.1.417"></script>
-<script defer src="bundles/practice-lobby.js?v=v9.0-p4.1.417"></script><!-- kg-teaching-content-sync:generated -->
+<link rel="icon" type="image/jpeg" href="/assets/logo.jpg?v=v9.0-p4.1.418">
+<meta name="kg-practice-bundle-version" content="v9.0-p4.1.418">
+<script type="application/json" id="kg-page-features">{"auth":{"depends":[],"scripts":["bundles/practice-auth.js?v=v9.0-p4.1.418"],"styles":[]},"account":{"depends":["auth"],"scripts":["bundles/practice-account.js?v=v9.0-p4.1.418"],"styles":[]},"question":{"depends":[],"scripts":["bundles/practice-question.js?v=v9.0-p4.1.418"],"styles":[]},"community":{"depends":["question"],"scripts":["bundles/practice-community.js?v=v9.0-p4.1.418"],"styles":[]},"answer":{"depends":["community"],"scripts":["bundles/practice-answer.js?v=v9.0-p4.1.418"],"styles":[]},"report":{"depends":[],"scripts":["bundles/practice-report.js?v=v9.0-p4.1.418"],"styles":[]},"knowledge":{"depends":[],"scripts":["bundles/practice-knowledge.js?v=v9.0-p4.1.418"],"styles":[]}}</script>
+<script src="bundles/practice-prelude.js?v=v9.0-p4.1.418"></script>
+<script defer src="bundles/practice-lobby.js?v=v9.0-p4.1.418"></script><!-- kg-teaching-content-sync:generated -->
 <!-- kg-direct-bootstrap-anchor -->
 <!-- kg-runtime:generated -->
 <!-- kg-auth-session:generated -->
@@ -14,7 +14,7 @@
 <!-- kg-direct-entry:generated -->
 <!-- kg-feature-usage-clock:generated -->
 <!-- kg-feature-analytics:generated -->
-<link rel="stylesheet" href="bundles/practice-lobby.css?v=v9.0-p4.1.417">
+<link rel="stylesheet" href="bundles/practice-lobby.css?v=v9.0-p4.1.418">
 
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
@@ -157,7 +157,6 @@
                 </div>
               </fieldset>
               <details class="practice-lobby-help practice-coverage-help"><summary aria-label="查看普通练习和进度规则">?</summary><div class="practice-help-content"><strong>普通练习规则</strong><p class="practice-selection-notice" id="practiceCoverageSummary" role="status"></p><p>优先练未做题，不足所选题量时用已做题补足；案例题保留完整。全部做过后进入复习。已练不代表掌握，只统计已保存的有效作答。</p></div></details>
-              <button type="button" class="practice-secondary-btn practice-coverage-retry" id="practiceCoverageRetry" hidden>重试加载进度</button>
               <fieldset class="practice-choice-group">
                 <legend>试卷顺序</legend>
                 <div class="practice-order-options">
@@ -165,10 +164,12 @@
                   <label><input type="radio" name="practiceOrder" value="random"/><span>随机顺序</span></label>
                 </div>
               </fieldset>
-              <div class="practice-entry-actions">
+              <fieldset class="practice-entry-actions practice-choice-group" aria-label="普通练习操作">
+                <legend class="practice-entry-legend" aria-hidden="true">开始练习</legend>
                 <button type="button" class="practice-start-btn" data-practice-start="practice">开始 10 题短练</button>
                 <button type="button" class="practice-secondary-btn" data-practice-new="practice" hidden>新开一轮</button>
-              </div>
+              </fieldset>
+              <button type="button" class="practice-secondary-btn practice-coverage-retry" id="practiceCoverageRetry" hidden>重试加载进度</button>
             </section>
             <section class="practice-mode-grid practice-standard-modes" aria-label="挑战和学霸模式">
               <article class="practice-mode-card challenge">
