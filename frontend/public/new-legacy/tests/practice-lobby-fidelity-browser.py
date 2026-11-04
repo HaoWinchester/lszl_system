@@ -93,7 +93,34 @@ scenario = '''
         assert abs(geometry['height']-geometry['lineHeight'])<1, (selector,'short text must retain one natural line',geometry)
         element.evaluate('(e,html)=>e.innerHTML=html',original)
     assert len(cards)==4 and len(set(round(c['height'],2) for c in cards))==1,('mode card heights',cards)
+    expect(page.locator('#practiceLibrarySubject')).to_have_count(0)
+    for width in [1440, 768, 390, 320]:
+        page.set_viewport_size({'width':width,'height':900 if width==1440 else 844})
+        page.evaluate('()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))')
+        geometry=page.evaluate("""()=>{const rect=s=>document.querySelector(s).getBoundingClientRect();const search=rect('#practiceLibrarySearch'),toolbar=rect('.practice-library-toolbar'),actions=rect('.practice-library-actions');return {searchRight:search.right,toolbarRight:toolbar.right,actionsLeft:actions.left,heights:['.practice-count-options','.practice-order-options','[data-practice-start="practice"]'].map(s=>rect(s).height)}}""")
+        assert max(geometry['heights'])-min(geometry['heights'])<1,('matching practice control heights',width,geometry)
+        target=geometry['actionsLeft']-16 if width==1440 else geometry['toolbarRight']
+        assert abs(geometry['searchRight']-target)<1,('right aligned search',width,geometry)
+        offsets=page.evaluate("""()=>[['.challenge','.practice-lobby-help>summary'],['.revenge','#practiceRevengeRuleTrigger']].map(([card,button])=>{const root=document.querySelector('.practice-mode-card'+card),c=root.getBoundingClientRect(),b=root.querySelector(button).getBoundingClientRect();return {top:b.top-c.top,right:c.right-b.right}})""")
+        assert abs(offsets[0]['top']-offsets[1]['top'])<1 and abs(offsets[0]['right']-offsets[1]['right'])<1,('aligned rule icons',width,offsets)
+        trigger=page.locator('#practiceRevengeRuleTrigger');trigger.scroll_into_view_if_needed()
+        before=page.evaluate('({height:document.documentElement.scrollHeight,y:scrollY})')
+        trigger.click();tooltip=page.locator('#practiceRevengeRuleTooltip');expect(tooltip).to_be_visible()
+        popup=tooltip.bounding_box();anchor=trigger.bounding_box()
+        assert popup['y']>=8 and popup['y']+popup['height']<=anchor['y']-7,('rule opens upward in viewport',width,popup,anchor)
+        assert popup['x']>=8 and popup['x']+popup['width']<=width-8,('rule stays horizontally in viewport',width,popup)
+        assert page.evaluate('({height:document.documentElement.scrollHeight,y:scrollY})')==before,('rule must not move page',width,before)
+        page.keyboard.press('Escape');expect(tooltip).to_be_hidden()
+    page.set_viewport_size({'width':390,'height':480})
+    page.locator('#practiceLibrarySearch').focus();trigger.scroll_into_view_if_needed();trigger.focus()
+    expect(tooltip).to_be_visible();page.keyboard.press('Tab');expect(tooltip).to_be_focused()
+    assert tooltip.evaluate('e=>e.scrollHeight>e.clientHeight'), 'short viewport must retain scrollable rules'
+    before_scroll=page.evaluate('scrollY');tooltip.press('End')
+    page.wait_for_function('document.querySelector("#practiceRevengeRuleTooltip").scrollTop>0')
+    assert page.evaluate('scrollY')==before_scroll, 'keyboard rule reading must not scroll the page'
+    page.keyboard.press('Escape');expect(tooltip).to_be_hidden();expect(trigger).to_be_focused()
     page.set_viewport_size({'width':390,'height':844})
+    page.evaluate('scrollTo(0,0)')
     # Let Chrome complete responsive layout before checking header geometry.
     page.evaluate('() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))')
     # Compare both rectangles in one rendered frame; separate protocol reads can straddle a resize.

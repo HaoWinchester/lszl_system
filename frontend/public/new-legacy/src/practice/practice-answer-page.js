@@ -1,6 +1,33 @@
 /* 答题页展示控件：复用答题、答题卡和标记的公共业务入口。 */
 (function () {
   'use strict';
+  function positionHelp(trigger, content, {preferAbove = false} = {}) {
+    if (!trigger.getClientRects().length || !content.getClientRects().length) return;
+    content.style.removeProperty('top');
+    if (preferAbove) {
+      content.style.position = 'fixed';
+      content.style.right = 'auto';
+      content.style.bottom = 'auto';
+      content.style.width = Math.min(window.innerWidth - 28, window.innerWidth <= 480 ? window.innerWidth : 280) + 'px';
+      content.style.maxHeight = (window.innerHeight - 16) + 'px';
+      content.style.overflowY = 'auto';
+    }
+    const anchor = trigger.getBoundingClientRect();
+    let height = content.getBoundingClientRect().height;
+    const above = Math.max(0, anchor.top - 16), below = Math.max(0, window.innerHeight - anchor.bottom - 16);
+    const useAbove = preferAbove ? above >= Math.min(height, 80) || above >= below : anchor.bottom + height + 8 > window.innerHeight - 8;
+    if (preferAbove) {
+      content.style.maxHeight = (useAbove ? above : below) + 'px';
+      height = content.getBoundingClientRect().height;
+      const width = content.getBoundingClientRect().width;
+      content.style.left = Math.max(14, Math.min(window.innerWidth - width - 14, anchor.right - width)) + 'px';
+    }
+    const top = useAbove ? anchor.top - height - 8 : anchor.bottom + 8;
+    const viewportTop = Math.max(8, Math.min(window.innerHeight - height - 8, top));
+    const fixed = getComputedStyle(content).position === 'fixed';
+    content.style.top = (fixed ? viewportTop : viewportTop - content.offsetParent.getBoundingClientRect().top) + 'px';
+  }
+  window.KGPracticeHelpPopovers = Object.freeze({position: positionHelp});
   function bindHelpPopovers() {
     const helps = [...document.querySelectorAll('.practice-standard-modes .practice-lobby-help')].map(detail => {
       const summary = detail.querySelector('summary');
@@ -10,14 +37,7 @@
       const position = () => {
         content.style.removeProperty('top');
         if (!detail.open) return;
-        // Keep the popup next to its trigger and inside the viewport, including
-        // desktop cards near the bottom after returning from a practice session.
-        const trigger = summary.getBoundingClientRect(), height = content.getBoundingClientRect().height;
-        const below = trigger.bottom + 8;
-        const top = below + height <= window.innerHeight - 8 ? below : trigger.top - height - 8;
-        const viewportTop = Math.max(8, Math.min(window.innerHeight - height - 8, top));
-        const fixed = window.matchMedia('(max-width:480px)').matches;
-        content.style.top = (fixed ? viewportTop : viewportTop - detail.getBoundingClientRect().top) + 'px';
+        positionHelp(summary, content);
       };
       const open = () => { if (!detail.open) { detail.open = true; position(); } };
       const cancelClose = () => window.clearTimeout(closeTimer);
@@ -46,7 +66,15 @@
       });
       return {detail, close, position};
     });
-    window.addEventListener('resize', () => helps.forEach(help => help.position()));
+    const repositionRevenge = () => {
+      const trigger = document.getElementById('practiceRevengeRuleTrigger');
+      const content = document.getElementById('practiceRevengeRuleTooltip');
+      if (trigger && content && !content.hidden) positionHelp(trigger, content, {preferAbove: true});
+    };
+    window.addEventListener('resize', () => { helps.forEach(help => help.position()); repositionRevenge(); });
+    window.addEventListener('scroll', event => {
+      if (!event.target.closest?.('.practice-help-content,.practice-revenge-rule-tooltip')) repositionRevenge();
+    }, true);
     document.addEventListener('click', event => {
       helps.forEach(help => { if (!help.detail.contains(event.target)) help.close(); });
     });

@@ -1,10 +1,14 @@
 {
   "schemaVersion": 1,
   "fromVersion": "v9.0-p4.1.416",
-  "toVersion": "v9.0-p4.1.416",
+  "toVersion": "v9.0-p4.1.417",
   "changes": {
     "added": [],
-    "changed": [],
+    "changed": [
+      "VERSION",
+      "content-prep-studio/dist/content-prep.html",
+      "tests/graph-question-drawer-browser.py"
+    ],
     "removed": []
   },
   "incompatible": []
