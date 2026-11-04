@@ -33,8 +33,7 @@ with sync_playwright() as pw:
         p.locator('#practicePaperLoadMore').click();expect(p.locator('#practicePaperDrawerLibrary [data-paper-id]')).to_have_count(16);expect(p.locator('#practicePaperLoadMore')).to_be_hidden();p.locator('#practicePaperDrawerClose').click()
         p.locator('#practiceLibrarySearch').fill('分页试卷 01');expect(p.locator('#practicePaperLibrary [data-paper-id]')).to_have_count(1);expect(p.locator('#practicePaperLibrary [data-paper-id] h2')).to_contain_text('01')
         p.locator('#practiceLibraryClear').click();expect(p.locator('#practicePaperLibrary [data-paper-id]')).to_have_count(12)
-        p.locator('#practiceLibrarySubject').select_option('PMI-ACP');expect(p.locator('#practicePaperLibrary [data-paper-id]')).to_have_count(7)
-        p.locator('#practiceLibraryClear').click();expect(p.locator('#practicePaperLibrary [data-paper-id]')).to_have_count(12)
+        expect(p.locator('#practiceLibrarySubject')).to_have_count(0)
         # Lazy login must still mount password, consent and WeChat controls after DOMContentLoaded.
         p.locator('#authStatus').click();p.locator('#accountMenuSessionBtn').click();expect(p.locator('#authModal')).to_have_class(__import__('re').compile('show'));expect(p.locator('.wechat-login-entry')).to_have_count(1)
         p.locator('#authUsername').fill('ink-browser');p.locator('#authPassword').fill('ink-browser-test');p.locator('#authLegalConsent').check();p.locator('#authDoLoginBtn').click();expect(p.locator('#authModal')).not_to_have_class(__import__('re').compile('show'))

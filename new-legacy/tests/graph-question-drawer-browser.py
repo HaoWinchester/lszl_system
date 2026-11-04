@@ -24,7 +24,13 @@ def main():
             page.mouse.click(x,y)
         def open_card(page,id='n'):
             visible_click(page,'.knowledge-card[data-node-id="'+id+'"]');open_card_practice(page);page.locator('.graph-question-drawer').wait_for(state='visible');expect(page.locator('.graph-question-drawer [data-status]')).to_have_text('');expect(page.get_by_role('link',name='进入做题大厅')).to_be_visible()
+        def choice_style(card,option):
+            return card.locator('.gqd-option:has(input[value="'+option+'"])').evaluate("e=>({background:getComputedStyle(e).backgroundColor,key:getComputedStyle(e.querySelector('.gqd-option-key')).backgroundColor})")
         teacher,p=session('teacher');open_card(p);expect(p.locator('.gqd-question')).to_have_count(3);expect(p.locator('.gqd-analysis')).to_have_count(0)
+        first_choice=p.locator('.gqd-question').first.locator('input[value=A]');first_choice.check()
+        p.locator('[data-fullscreen]').click();p.wait_for_function('!!document.fullscreenElement')
+        expect(p.locator('.graph-question-drawer')).to_have_class(__import__('re').compile('is-fullscreen'));expect(first_choice).to_be_checked()
+        p.locator('[data-fullscreen]').click();p.wait_for_function('!document.fullscreenElement');expect(first_choice).to_be_checked()
         p.wait_for_function("[...document.querySelectorAll('.gqd-question img')].every(i=>i.complete&&i.naturalWidth===240)");p.screenshot(path=str(OUT/'teacher-1440.png'));(OUT/'native-bounds.json').write_text(json.dumps(p.evaluate("({scroll:[scrollX,scrollY],stage:document.querySelector('#stage').getBoundingClientRect().toJSON(),stageScroll:[document.querySelector('#stage').scrollLeft,document.querySelector('#stage').scrollTop]})")))
         bindings=teacher.request.get(base+f'/api/v1/graph-questions/files/{files["teacher"]}/nodes/n/bindings').json()['bindings'];assert 'analysis' not in bindings[0]['question'];asset=bindings[0]['question']['images'][0]['url'];assert teacher.request.get(base+asset).ok;assert teacher.request.get(base+asset.replace('nodeId=n','nodeId=empty')).status==404
         p.locator('[data-add]').click();p.locator('[data-search] input[name=q]').fill('card');p.locator('[data-search] form button').click();expect(p.locator('[data-results] label')).to_have_count(20)
@@ -55,7 +61,9 @@ def main():
             open_card(page);expect(page.locator('.gqd-question')).to_have_count(3);expect(page.locator('[data-add]')).to_have_count(0 if role in ('student','member') else 1)
             if role=='admin':
                 page.locator('[data-add]').click();page.locator('[data-search] input[name=q]').fill('card');page.locator('[data-search] input[name=subject]').fill('PMP');page.locator('[data-search] form button').click();expect(page.locator('[data-results] label')).to_have_count(20);page.locator('[data-results] input:not(:disabled)').first.check();page.locator('[data-confirm]').click();expect(page.locator('.gqd-question')).to_have_count(4)
-                card=page.locator('.gqd-question').first;card.locator('input[value=B]').check();card.locator('[data-submit]').click();expect(card.locator('.gqd-analysis')).to_be_visible();expect(card.locator('[data-feedback]')).to_contain_text('回答错误')
+                card=page.locator('.gqd-question').first;card.locator('input[value=B]').check();selected_style=choice_style(card,'B');card.locator('[data-submit]').click();expect(card.locator('.gqd-analysis')).to_be_visible();expect(card.locator('[data-feedback]')).to_contain_text('回答错误')
+                expect(card.locator('.gqd-option.is-incorrect input[value=B]')).to_be_checked()
+                result_style=choice_style(card,'B');assert result_style['background']!=selected_style['background'] and result_style['key']!=selected_style['key'],'incorrect result must replace selected-state styling'
             if role in ('student','member'):
                 assert ctx.request.get(base+'/api/v1/graph-questions/search?fileId='+files[role]+'&nodeId=n').status==403
                 assert ctx.request.put(base+f'/api/v1/graph-questions/files/{files[role]}/nodes/n/bindings',data={'expectedFileRevision':1,'questionIds':[users['q']]}).status==403
@@ -68,7 +76,11 @@ def main():
                     else:
                         card.locator('input[value=A]').check()
                         if index==1:card.locator('input[value=B]').check()
+                        selected_style=choice_style(card,'A')
                     card.locator('[data-submit]').click();expect(card.locator('.gqd-analysis')).to_be_visible();expect(card.locator('[data-feedback]')).to_contain_text('回答正确')
+                    if index!=2:
+                        expect(card.locator('.gqd-option.is-correct input[value=A]')).to_be_checked()
+                        result_style=choice_style(card,'A');assert result_style['background']!=selected_style['background'] and result_style['key']!=selected_style['key'],'correct result must replace selected-state styling'
                     if index==2:
                         expect(card.locator('[data-qm-left=l1] span')).to_have_text('一');expect(card.locator('[data-qm-left=l2] span')).to_have_text('二')
                 page.screenshot(path=str(OUT/(role+'-analysis.png')));page.set_viewport_size({'width':390,'height':844});page.screenshot(path=str(OUT/(role+'-mobile.png')));assert page.locator('[data-close]').bounding_box()['x']<390

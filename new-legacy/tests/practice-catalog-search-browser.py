@@ -35,7 +35,7 @@ with sync_playwright() as pw:
         page.locator('#practiceLibrarySearch').fill('agile')
         expect(page.locator('#practicePaperLibrary [data-paper-id]')).to_have_count(1)
         expect(page.locator('#practicePaperLibrary [data-paper-id="p21"]')).to_be_visible()
-        page.locator('#practiceLibrarySubject').select_option('ACP')
+        expect(page.locator('#practiceLibrarySubject')).to_have_count(0)
         page.locator('[data-paper-filter="member"]').first.click()
         expect(page.locator('#practicePaperLibrary [data-paper-id]')).to_have_count(1)
         expect(page.locator('#practiceSelectedPaperName')).to_have_text(selected)
@@ -45,7 +45,7 @@ with sync_playwright() as pw:
         expect(page.locator('#practicePaperLibrary [data-paper-id]')).to_have_count(0)
         page.locator('#practiceLibraryClear').click()
         expect(page.locator('#practicePaperLibrary [data-paper-id]')).to_have_count(25)
-        expect(page.locator('#practiceLibrarySubject')).to_have_value('')
+        expect(page.locator('#practiceLibrarySearch')).to_have_value('')
         expect(page.locator('#practiceSelectedPaperName')).to_have_text(selected)
         assert not errors, errors
         page.close()

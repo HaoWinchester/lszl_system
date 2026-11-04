@@ -15,7 +15,7 @@
   const $=id=>document.getElementById(id);
   const dom={};
   const state={
-    releases:[],selectedPaperId:'',libraryFilter:'all',librarySearch:'',librarySubject:'',selectedCount:10,revengeSelectedCount:0,order:'paper',mode:'',questions:[],index:0,
+    releases:[],selectedPaperId:'',libraryFilter:'all',librarySearch:'',selectedCount:10,revengeSelectedCount:0,order:'paper',mode:'',questions:[],index:0,
     health:MAX_HEALTH,streak:0,experience:0,correct:0,answered:0,startedAt:0,endedAt:0,
     locked:false,active:false,completed:false,lastSettings:null,timerId:0,deadline:0,
     feedbackTimer:0,popTimer:0,toastTimer:0,abandonedRecorded:false,catalogAvailable:false,retiredNavigation:null,retiredNoticeShown:false,
@@ -388,8 +388,10 @@
   }
   function setRevengeRuleOpen(open){
     if(!dom.revengeRuleTrigger||!dom.revengeRuleTooltip)return;
+    if(!open&&dom.revengeRuleTooltip.contains(document.activeElement))dom.revengeRuleTrigger.focus({preventScroll:true});
     dom.revengeRuleTrigger.setAttribute('aria-expanded',String(!!open));
     dom.revengeRuleTooltip.hidden=!open;
+    if(open)global.KGPracticeHelpPopovers?.position(dom.revengeRuleTrigger,dom.revengeRuleTooltip,{preferAbove:true});
   }
   function activeMistakeRecords(){try{return practiceApi()?.active?.()||[]}catch(error){return []}}
   function questionFromMistake(record,index){
@@ -1514,18 +1516,13 @@
     global.clearTimeout(catalogSearchTimer);
     const api=global.KGPaperReleaseApi;if(!api?.queryCatalog){renderPaperLibrary();return}
     const page=api.catalogPage();
-    try{await api.queryCatalog({page:append?page.page+1:1,pageSize:12,search:state.librarySearch,subject:state.librarySubject,access:state.libraryFilter,append})}
+    try{await api.queryCatalog({page:append?page.page+1:1,pageSize:12,search:state.librarySearch,access:state.libraryFilter,append})}
     catch(error){showToast('试卷读取失败，请重试。');}
   }
   function renderPaperLibrary(){
     const page=global.KGPaperReleaseApi?.catalogPage?.();
-    const rows=page?state.releases:filterCatalog(state.releases,{search:state.librarySearch,subject:state.librarySubject,access:state.libraryFilter});
-    if(dom.librarySubject){
-      const subjects=global.KGPaperReleaseApi?.catalogPage?.()?.subjects||[...new Set(state.releases.map(row=>row.subject).filter(Boolean))].sort();
-      dom.librarySubject.innerHTML='<option value="">全部科目</option>'+subjects.map(subject=>'<option value="'+escapeHTML(subject)+'">'+escapeHTML(subject)+'</option>').join('');
-      dom.librarySubject.value=state.librarySubject;
-    }
-    if(dom.libraryClear)dom.libraryClear.hidden=!state.librarySearch&&!state.librarySubject&&state.libraryFilter==='all';
+    const rows=page?state.releases:filterCatalog(state.releases,{search:state.librarySearch,access:state.libraryFilter});
+    if(dom.libraryClear)dom.libraryClear.hidden=!state.librarySearch&&state.libraryFilter==='all';
     dom.filterButtons.forEach(button=>button.classList.toggle('is-active',button.dataset.paperFilter===state.libraryFilter));
     const status=catalogStatus();
     dom.paperLibrary?.setAttribute('aria-busy',String(status==='loading'));
@@ -1639,8 +1636,7 @@
     dom.paperSelect?.addEventListener('change',()=>selectPaper(dom.paperSelect.value));
     dom.filterButtons.forEach(button=>button.addEventListener('click',()=>{state.libraryFilter=button.dataset.paperFilter||'all';void queryPaperCatalog()}));
     dom.librarySearch?.addEventListener('input',()=>{state.librarySearch=dom.librarySearch.value;global.clearTimeout(catalogSearchTimer);catalogSearchTimer=global.setTimeout(()=>queryPaperCatalog(),180)});
-    dom.librarySubject?.addEventListener('change',()=>{state.librarySubject=dom.librarySubject.value;void queryPaperCatalog()});
-    dom.libraryClear?.addEventListener('click',()=>{state.librarySearch='';state.librarySubject='';state.libraryFilter='all';if(dom.librarySearch)dom.librarySearch.value='';void queryPaperCatalog()});
+    dom.libraryClear?.addEventListener('click',()=>{state.librarySearch='';state.libraryFilter='all';if(dom.librarySearch)dom.librarySearch.value='';void queryPaperCatalog()});
     $('practicePaperLoadMore')?.addEventListener('click',()=>queryPaperCatalog({append:true}));
     dom.libraryMoreBtn?.addEventListener('click',openPaperDrawer);dom.paperDrawerClose?.addEventListener('click',closePaperDrawer);
     dom.historyOpenBtn?.addEventListener('click',openHistoryDrawer);dom.historyCloseBtn?.addEventListener('click',closeHistoryDrawer);dom.clearHistoryBtn?.addEventListener('click',clearHistory);
@@ -1671,9 +1667,9 @@
     dom.countInputs.forEach(input=>input.addEventListener('change',()=>{if(input.checked){state.selectedCount=input.value==='all'?'all':Number(input.value);syncCountOptions();syncResumableButtons()}}));
     dom.revengeCountOptions?.addEventListener('change',event=>{const input=event.target.closest?.('[name="practiceRevengeCount"]');if(!input?.checked||input.disabled)return;state.revengeSelectedCount=Number(input.value);syncRevengeStats();syncCountOptions();syncResumableButtons()});
     dom.revengeRuleShell?.addEventListener('mouseenter',()=>setRevengeRuleOpen(true));
-    dom.revengeRuleShell?.addEventListener('mouseleave',()=>{if(!state.revengeRulePinned&&document.activeElement!==dom.revengeRuleTrigger)setRevengeRuleOpen(false)});
+    dom.revengeRuleShell?.addEventListener('mouseleave',()=>{if(!state.revengeRulePinned&&!dom.revengeRuleShell.contains(document.activeElement))setRevengeRuleOpen(false)});
     dom.revengeRuleTrigger?.addEventListener('focus',()=>setRevengeRuleOpen(true));
-    dom.revengeRuleTrigger?.addEventListener('blur',()=>global.setTimeout(()=>{if(!state.revengeRulePinned&&!dom.revengeRuleShell?.contains(document.activeElement))setRevengeRuleOpen(false)},0));
+    [dom.revengeRuleTrigger,dom.revengeRuleTooltip].forEach(element=>element?.addEventListener('blur',()=>global.setTimeout(()=>{if(!state.revengeRulePinned&&!dom.revengeRuleShell?.contains(document.activeElement))setRevengeRuleOpen(false)},0)));
     dom.revengeRuleTrigger?.addEventListener('click',event=>{event.stopPropagation();state.revengeRulePinned=!state.revengeRulePinned;setRevengeRuleOpen(state.revengeRulePinned)});
     document.addEventListener('click',event=>{if(!dom.revengeRuleShell?.contains(event.target)){state.revengeRulePinned=false;setRevengeRuleOpen(false)}});
     dom.startButtons.forEach(button=>button.addEventListener('click',()=>startPractice(button.dataset.practiceStart)));
@@ -1821,7 +1817,7 @@
   }
   function cacheDom(){
     Object.assign(dom,{
-      lobby:$('practiceLobby'),game:$('practiceGame'),checkpoint:$('practiceCheckpoint'),result:$('practiceResult'),paperSelect:$('practicePaperSelect'),librarySearch:$('practiceLibrarySearch'),librarySubject:$('practiceLibrarySubject'),libraryClear:$('practiceLibraryClear'),paperMeta:$('practicePaperMeta'),retiredNotice:$('practiceRetiredModeNotice'),selectedPaperName:$('practiceSelectedPaperName'),paperLibrary:$('practicePaperLibrary'),paperDrawerLibrary:$('practicePaperDrawerLibrary'),filterButtons:[...document.querySelectorAll('[data-paper-filter]')],librarySummary:$('practiceLibrarySummary'),paperDrawerSummary:$('practicePaperDrawerSummary'),libraryMoreBtn:$('practiceLibraryMoreBtn'),paperDrawer:$('practicePaperDrawer'),paperDrawerClose:$('practicePaperDrawerClose'),toast:$('practiceToast'),
+      lobby:$('practiceLobby'),game:$('practiceGame'),checkpoint:$('practiceCheckpoint'),result:$('practiceResult'),paperSelect:$('practicePaperSelect'),librarySearch:$('practiceLibrarySearch'),libraryClear:$('practiceLibraryClear'),paperMeta:$('practicePaperMeta'),retiredNotice:$('practiceRetiredModeNotice'),selectedPaperName:$('practiceSelectedPaperName'),paperLibrary:$('practicePaperLibrary'),paperDrawerLibrary:$('practicePaperDrawerLibrary'),filterButtons:[...document.querySelectorAll('[data-paper-filter]')],librarySummary:$('practiceLibrarySummary'),paperDrawerSummary:$('practicePaperDrawerSummary'),libraryMoreBtn:$('practiceLibraryMoreBtn'),paperDrawer:$('practicePaperDrawer'),paperDrawerClose:$('practicePaperDrawerClose'),toast:$('practiceToast'),
       setupCard:document.querySelector('.practice-setup-card'),modeGrid:document.querySelector('.practice-mode-grid'),empty:$('practiceEmpty'),countInputs:[...document.querySelectorAll('[name="practiceCount"]')],orderInputs:[...document.querySelectorAll('[name="practiceOrder"]')],startButtons:[...document.querySelectorAll('[data-practice-start]')],revengeActiveCount:$('practiceRevengeActiveCount'),revengePendingCount:$('practiceRevengePendingCount'),revengeRemediationCount:$('practiceRevengeRemediationCount'),revengeVerificationCount:$('practiceRevengeVerificationCount'),revengeMasteredCount:$('practiceRevengeMasteredCount'),revengeCountSummary:$('practiceRevengeCountSummary'),revengeCountOptions:$('practiceRevengeCountOptions'),revengeCountOptionList:$('practiceRevengeCountOptionList'),revengeRuleShell:$('practiceRevengeRuleShell'),revengeRuleTrigger:$('practiceRevengeRuleTrigger'),revengeRuleTooltip:$('practiceRevengeRuleTooltip'),
       progressShell:$('practiceProgressShell'),progressBar:$('practiceProgressBar'),questionProgress:$('practiceQuestionProgress'),health:$('practiceHealth'),timer:$('practiceTimer'),timeRow:$('practiceTimeRow'),timeRail:$('practiceTimeRail'),timeBar:$('practiceTimeBar'),timerMs:$('practiceTimerMs'),dangerVignette:$('practiceDangerVignette'),streakPop:$('practiceStreakPop'),feedback:$('practiceFeedback'),sessionConflict:$('practiceSessionConflict'),sessionConflictReload:$('practiceSessionConflictReload'),verificationBanner:$('practiceVerificationBanner'),verificationKnowledge:$('practiceVerificationKnowledge'),verificationMessage:$('practiceVerificationMessage'),questionCard:$('practiceQuestionCard'),questionStem:$('practiceQuestionStem'),previousWrongAnswer:$('practicePreviousWrongAnswer'),previousWrongToggle:$('practicePreviousWrongToggle'),showPreviousWrong:$('practiceShowPreviousWrong'),options:$('practiceOptions'),confirmAnswerBtn:$('practiceConfirmAnswerBtn'),questionNav:$('practiceQuestionNav'),prevBtn:$('practicePrevBtn'),nextBtn:$('practiceNextBtn'),questionPos:$('practiceQuestionPos'),remediationPanel:$('practiceRemediationPanel'),remediationKnowledge:$('practiceRemediationKnowledge'),remediationMessage:$('practiceRemediationMessage'),remediationReviewBtn:$('practiceRemediationReviewBtn'),remediationContinueBtn:$('practiceRemediationContinueBtn'),remediationExplanation:$('practiceRemediationExplanation'),
       exitBtn:$('practiceExitBtn'),reviewBackBtn:$('practiceReviewBackBtn'),exitConfirm:$('practiceExitConfirm'),exitCancel:$('practiceExitCancel'),exitConfirmBtn:$('practiceExitConfirmBtn'),saveExitBtn:$('practiceSaveExitBtn'),abandonBtn:$('practiceAbandonBtn'),answerSheetRoot:$('practiceAnswerSheet'),answerSheetMobileBtn:$('practiceAnswerSheetMobileBtn'),answerSheetMobileCount:document.querySelector('#practiceAnswerSheetMobileBtn span'),answerSheetDrawer:$('practiceAnswerSheetDrawer'),answerSheetDrawerClose:$('practiceAnswerSheetDrawerClose'),submitConfirm:$('practiceSubmitConfirm'),submitMessage:$('practiceSubmitMessage'),submitReturnBtn:$('practiceSubmitReturnBtn'),submitAnywayBtn:$('practiceSubmitAnywayBtn'),checkpointStreak:$('practiceCheckpointStreak'),checkpointExperience:$('practiceCheckpointExperience'),checkpointDuration:$('practiceCheckpointDuration'),checkpointContinue:$('practiceCheckpointContinue'),resultAccuracy:$('practiceResultAccuracy'),resultDuration:$('practiceResultDuration'),resultExperience:$('practiceResultExperience'),challengeOutcome:$('practiceChallengeOutcome'),challengeResult:$('practiceChallengeResult'),challengeDetail:$('practiceChallengeDetail'),failBackdrop:$('practiceFailBackdrop'),failLobbyBtn:$('practiceFailLobbyBtn'),failContinueBtn:$('practiceFailContinueBtn'),againBtn:$('practiceAgainBtn'),lobbyBtn:$('practiceLobbyBtn'),historyOpenBtn:$('practiceHistoryOpenBtn'),historyCount:$('practiceHistoryCount'),historyDrawer:$('practiceHistoryDrawer'),historyCloseBtn:$('practiceHistoryCloseBtn'),historySummary:$('practiceHistorySummary'),historyList:$('practiceHistoryList'),historyEmpty:$('practiceHistoryEmpty'),clearHistoryBtn:$('practiceClearHistoryBtn'),favoritesOpenBtn:$('practiceFavoritesOpenBtn'),favoritesDrawer:$('practiceFavoritesDrawer'),favoritesCloseBtn:$('practiceFavoritesCloseBtn'),favoritesSummary:$('practiceFavoritesSummary'),favoritesList:$('practiceFavoritesList'),favoritesEmpty:$('practiceFavoritesEmpty'),favoriteBtn:$('practiceFavoriteBtn')

@@ -50,7 +50,7 @@ with sync_playwright() as pw:
     assert page.locator('.practice-mode-card').count()==4
     for label in ['普通练习','挑战模式','学霸模式','复仇模式']:assert page.get_by_role('heading',name=label,exact=True).count()==1,label
     page.locator('#practiceLibrarySearch').fill('找不到的试卷');expect(page.locator('#practicePaperLibrary .practice-paper-empty')).to_contain_text('没有找到');page.locator('#practiceLibraryClear').click();expect(page.locator('#practicePaperLibrary [data-paper-id]')).to_have_count(4)
-    page.locator('#practiceLibraryFilters [data-paper-filter="member"]').click();expect(page.locator('#practicePaperLibrary [data-paper-id]')).to_have_count(1);page.locator('#practiceLibraryClear').click();page.locator('#practiceLibrarySubject').select_option('PMP');page.locator('#practiceLibraryClear').click();checks.append('search, free/member, subject and clear')
+    page.locator('#practiceLibraryFilters [data-paper-filter="member"]').click();expect(page.locator('#practicePaperLibrary [data-paper-id]')).to_have_count(1);page.locator('#practiceLibraryClear').click();expect(page.locator('#practiceLibrarySubject')).to_have_count(0);checks.append('search, free/member and clear without subject selector')
     page.locator('#practiceLibraryMoreBtn').click();expect(page.locator('#practicePaperDrawer')).to_be_visible();page.keyboard.press('Escape');expect(page.locator('#practicePaperDrawer')).to_be_hidden()
     for mode in ['challenge','scholar']:
         help=page.locator('.'+mode+' .practice-lobby-help');help.locator('summary').click();expect(help).to_have_attribute('open','');page.keyboard.press('Escape');assert not help.evaluate('e=>e.open')

@@ -1,11 +1,11 @@
 <!doctype html>
-<html data-release="v9.0-p4.1.416" lang="zh-CN">
+<html data-release="v9.0-p4.1.417" lang="zh-CN">
 <head>
-<link rel="icon" type="image/jpeg" href="/assets/logo.jpg?v=v9.0-p4.1.416">
-<meta name="kg-practice-bundle-version" content="v9.0-p4.1.416">
-<script type="application/json" id="kg-page-features">{"auth":{"depends":[],"scripts":["bundles/practice-auth.js?v=v9.0-p4.1.416"],"styles":[]},"account":{"depends":["auth"],"scripts":["bundles/practice-account.js?v=v9.0-p4.1.416"],"styles":[]},"question":{"depends":[],"scripts":["bundles/practice-question.js?v=v9.0-p4.1.416"],"styles":[]},"community":{"depends":["question"],"scripts":["bundles/practice-community.js?v=v9.0-p4.1.416"],"styles":[]},"answer":{"depends":["community"],"scripts":["bundles/practice-answer.js?v=v9.0-p4.1.416"],"styles":[]},"report":{"depends":[],"scripts":["bundles/practice-report.js?v=v9.0-p4.1.416"],"styles":[]},"knowledge":{"depends":[],"scripts":["bundles/practice-knowledge.js?v=v9.0-p4.1.416"],"styles":[]}}</script>
-<script src="bundles/practice-prelude.js?v=v9.0-p4.1.416"></script>
-<script defer src="bundles/practice-lobby.js?v=v9.0-p4.1.416"></script><!-- kg-teaching-content-sync:generated -->
+<link rel="icon" type="image/jpeg" href="/assets/logo.jpg?v=v9.0-p4.1.417">
+<meta name="kg-practice-bundle-version" content="v9.0-p4.1.417">
+<script type="application/json" id="kg-page-features">{"auth":{"depends":[],"scripts":["bundles/practice-auth.js?v=v9.0-p4.1.417"],"styles":[]},"account":{"depends":["auth"],"scripts":["bundles/practice-account.js?v=v9.0-p4.1.417"],"styles":[]},"question":{"depends":[],"scripts":["bundles/practice-question.js?v=v9.0-p4.1.417"],"styles":[]},"community":{"depends":["question"],"scripts":["bundles/practice-community.js?v=v9.0-p4.1.417"],"styles":[]},"answer":{"depends":["community"],"scripts":["bundles/practice-answer.js?v=v9.0-p4.1.417"],"styles":[]},"report":{"depends":[],"scripts":["bundles/practice-report.js?v=v9.0-p4.1.417"],"styles":[]},"knowledge":{"depends":[],"scripts":["bundles/practice-knowledge.js?v=v9.0-p4.1.417"],"styles":[]}}</script>
+<script src="bundles/practice-prelude.js?v=v9.0-p4.1.417"></script>
+<script defer src="bundles/practice-lobby.js?v=v9.0-p4.1.417"></script><!-- kg-teaching-content-sync:generated -->
 <!-- kg-direct-bootstrap-anchor -->
 <!-- kg-runtime:generated -->
 <!-- kg-auth-session:generated -->
@@ -14,7 +14,7 @@
 <!-- kg-direct-entry:generated -->
 <!-- kg-feature-usage-clock:generated -->
 <!-- kg-feature-analytics:generated -->
-<link rel="stylesheet" href="bundles/practice-lobby.css?v=v9.0-p4.1.416">
+<link rel="stylesheet" href="bundles/practice-lobby.css?v=v9.0-p4.1.417">
 
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
@@ -120,7 +120,6 @@
             <div class="practice-library-title"><strong>试卷库</strong><span id="practiceLibrarySummary" aria-live="polite">选择最近发布的试卷</span></div>
           <div class="practice-catalog-search">
             <label for="practiceLibrarySearch"><span class="practice-visually-hidden">搜索试卷</span><input id="practiceLibrarySearch" type="search" placeholder="搜索试卷名称或关键词" autocomplete="off"/></label>
-            <label for="practiceLibrarySubject"><span class="practice-visually-hidden">科目</span><select id="practiceLibrarySubject"><option value="">全部科目</option></select></label>
             <button type="button" class="practice-secondary-btn" id="practiceLibraryClear" hidden>清除筛选</button>
           </div>
             <div class="practice-library-actions">
@@ -189,7 +188,7 @@
           <aside class="practice-revenge-column" role="region" aria-label="错题复习">
             <article class="practice-mode-card revenge">
               <span class="practice-mode-icon" data-kg-icon="rotate-ccw" data-kg-icon-size="20" aria-hidden="true"></span>
-              <div><div class="practice-revenge-title" id="practiceRevengeRuleShell"><h2>复仇模式</h2><button type="button" class="practice-revenge-rule-trigger" id="practiceRevengeRuleTrigger" aria-label="查看复仇模式规则" aria-controls="practiceRevengeRuleTooltip" aria-expanded="false"><span data-kg-icon="circle-help" data-kg-icon-size="16" aria-hidden="true"></span></button><div class="practice-revenge-rule-tooltip" id="practiceRevengeRuleTooltip" role="tooltip" hidden><strong>复仇模式规则</strong><ul><li><b>第一次在复仇模式答对，并且完成交卷</b><br>题目会进入“待验证”，暂时移出复仇题池。</li><li><b>等待约 24 小时</b><br>题目会重新进入复仇模式，作为延迟验证题。</li><li><b>再次答对并完成交卷</b><br>题目会变成“已掌握”，不再进入复仇题池。</li><li>只“保存退出”不算，必须交卷结算。</li><li>如果再次答错，需要先看解析、完成补救和验证，然后重新等待验证。</li><li>“已掌握”仍会保留在统计里，并非删除历史记录；以后若又答错，会重新进入错题池。</li></ul></div></div><p class="practice-mode-purpose">重做错题，巩固薄弱知识点</p></div>
+              <div><div class="practice-revenge-title" id="practiceRevengeRuleShell"><h2>复仇模式</h2><button type="button" class="practice-revenge-rule-trigger" id="practiceRevengeRuleTrigger" aria-label="查看复仇模式规则" aria-controls="practiceRevengeRuleTooltip" aria-expanded="false">?</button><div class="practice-revenge-rule-tooltip" id="practiceRevengeRuleTooltip" role="tooltip" tabindex="0" aria-label="复仇模式规则" hidden><strong>复仇模式规则</strong><ul><li><b>第一次在复仇模式答对，并且完成交卷</b><br>题目会进入“待验证”，暂时移出复仇题池。</li><li><b>等待约 24 小时</b><br>题目会重新进入复仇模式，作为延迟验证题。</li><li><b>再次答对并完成交卷</b><br>题目会变成“已掌握”，不再进入复仇题池。</li><li>只“保存退出”不算，必须交卷结算。</li><li>如果再次答错，需要先看解析、完成补救和验证，然后重新等待验证。</li><li>“已掌握”仍会保留在统计里，并非删除历史记录；以后若又答错，会重新进入错题池。</li></ul></div></div><p class="practice-mode-purpose">重做错题，巩固薄弱知识点</p></div>
               <div class="practice-revenge-total">可复仇 <strong id="practiceRevengeActiveCount">0</strong> 题</div>
               <details class="practice-revenge-options"><summary>复习进度与题量</summary>
               <div class="practice-revenge-stats" aria-label="复仇错题统计"><span>新错题 <strong id="practiceRevengePendingCount">0</strong></span><span>需补救 <strong id="practiceRevengeRemediationCount">0</strong></span><span>待验证 <strong id="practiceRevengeVerificationCount">0</strong></span><span>已掌握 <strong id="practiceRevengeMasteredCount">0</strong></span></div>
