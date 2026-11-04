@@ -487,3 +487,173 @@ test('published catalog reads beyond page 50 instead of silently truncating sear
   assert.equal(context.KGPaperReleaseApi.catalog().length,51);
   assert.equal(context.KGPaperReleaseApi.catalog().at(-1).releaseId,'r51');
 });
+
+function practiceAdapter(request) {
+  const listeners = new Map()
+  const requests = []
+  const context = {
+    console, Promise, URLSearchParams,
+    location: { pathname: '/practice-mode.html' },
+    CustomEvent: class { constructor(type, init = {}) { this.type = type; this.detail = init.detail } },
+    addEventListener(type, listener) { listeners.set(type, listener) },
+    dispatchEvent(event) { listeners.get(event.type)?.(event) },
+    KGDomainApi: { request(args) { requests.push(args.path); return request(args) } },
+  }
+  context.window = context
+  vm.runInNewContext(adapter, context)
+  return { api: context.KGPaperReleaseApi, requests, context }
+}
+
+function catalogPayload(ids, total = ids.length) {
+  return { releases: ids.map(id => ({ paperId: `p-${id}`, releaseId: id, questionCount: 4, contentRestricted: false })), total, subjects: ['PMP', 'ACP'] }
+}
+
+function deferred() {
+  let resolve, reject
+  const promise = new Promise((success, failure) => { resolve = success; reject = failure })
+  return { promise, resolve, reject }
+}
+
+test('practice lobby initially requests only twelve summaries with practice mode and global subject facets', async () => {
+  const { api, requests } = practiceAdapter(async () => catalogPayload(['r1'], 500))
+  await api.ready()
+  assert.deepEqual(requests, ['/api/v1/paper-releases/catalog?page=1&pageSize=12&mode=practice_mode'])
+  assert.deepEqual(JSON.parse(JSON.stringify(api.catalogPage())), {
+    page: 1, pageSize: 12, total: 500, subjects: ['PMP', 'ACP'], hasMore: true, search: '', subject: '', access: 'all',
+  })
+  assert.equal(api.catalog()[0].contentRestricted, false)
+})
+
+test('practice catalog loads a requested page, deduplicates append, and sends server filters', async () => {
+  const { api, requests } = practiceAdapter(async ({ path }) => {
+    const query = new URL(path, 'https://local.test').searchParams
+    return catalogPayload(query.get('page') === '2' ? ['r1', 'r2'] : ['r1'], 30)
+  })
+  await api.ready()
+  await api.queryCatalog({ page: 1, pageSize: 12, search: '网络 & 安全', subject: 'ACP', access: 'member' })
+  await api.queryCatalog({ page: 2, pageSize: 12, search: '网络 & 安全', subject: 'ACP', access: 'member', append: true })
+  assert.equal(requests.length, 3)
+  const query = new URL(requests.at(-1), 'https://local.test').searchParams
+  assert.equal(query.get('mode'), 'practice_mode')
+  assert.equal(query.get('page'), '2')
+  assert.equal(query.get('pageSize'), '12')
+  assert.equal(query.get('search'), '网络 & 安全')
+  assert.equal(query.get('subject'), 'ACP')
+  assert.equal(query.get('access'), 'member')
+  assert.deepEqual(Array.from(api.catalog(), row => row.releaseId), ['r1', 'r2'])
+  await api.reload()
+  assert.equal(requests.at(-1), requests.at(-2))
+  assert.deepEqual(Array.from(api.catalog(), row => row.releaseId), ['r1', 'r2'])
+})
+
+test('repeated practice queries coalesce and late filters cannot overwrite the latest catalog', async () => {
+  const old = deferred(), fresh = deferred()
+  const { api, requests } = practiceAdapter(async ({ path }) => {
+    const search = new URL(path, 'https://local.test').searchParams.get('search')
+    return search === 'old' ? old.promise : search === 'new' ? fresh.promise : catalogPayload([])
+  })
+  await api.ready()
+  const first = api.queryCatalog({ search: 'old' })
+  const repeated = api.queryCatalog({ search: 'old' })
+  const latest = api.queryCatalog({ search: 'new' })
+  assert.equal(first, repeated)
+  assert.equal(requests.length, 3)
+  fresh.resolve(catalogPayload(['new']))
+  await latest
+  old.resolve(catalogPayload(['old']))
+  await first
+  assert.deepEqual(Array.from(api.catalog(), row => row.releaseId), ['new'])
+  assert.equal(api.catalogPage().search, 'new')
+  assert.equal(api.catalogStatus(), 'ready')
+})
+
+test('failed practice append retains rows and criteria for an explicit retry', async () => {
+  let fail = true
+  const { api, requests } = practiceAdapter(async ({ path }) => {
+    const page = new URL(path, 'https://local.test').searchParams.get('page')
+    if (page === '2' && fail) throw new Error('offline')
+    return catalogPayload([page === '2' ? 'r2' : 'r1'], 20)
+  })
+  await api.ready()
+  await api.queryCatalog({ search: 'PMP' })
+  await assert.rejects(api.queryCatalog({ page: 2, search: 'PMP', append: true }), /offline/)
+  assert.equal(api.catalogStatus(), 'error')
+  assert.match(api.error().message, /offline/)
+  assert.deepEqual(Array.from(api.catalog(), row => row.releaseId), ['r1'])
+  fail = false
+  await api.reload()
+  assert.equal(requests.at(-1), requests.at(-2))
+  assert.deepEqual(Array.from(api.catalog(), row => row.releaseId), ['r1', 'r2'])
+  assert.equal(api.catalogStatus(), 'ready')
+  assert.equal(api.error(), null)
+})
+
+test('practice initial failure is distinguishable from empty success and retryable', async () => {
+  let fail = true
+  const { api } = practiceAdapter(async () => { if (fail) throw new Error('unavailable'); return catalogPayload([]) })
+  await api.ready()
+  assert.equal(api.catalogStatus(), 'error')
+  assert.equal(api.catalog().length, 0)
+  fail = false
+  await api.ready({ force: true })
+  assert.equal(api.catalogStatus(), 'ready')
+  assert.equal(api.catalogPage().total, 0)
+  assert.equal(api.catalogPage().hasMore, false)
+})
+
+test('practice auth change resets pagination and prevents stale catalog, detail and question cache leaks', async () => {
+  const oldCatalog = deferred(), oldDetail = deferred(), oldQuestions = deferred()
+  let owner = 'old'
+  const { api, context, requests } = practiceAdapter(async ({ path }) => {
+    if (path.includes('/questions?')) return owner === 'old' ? oldQuestions.promise : { total: 0, questions: [] }
+    if (path.endsWith('/historical')) return owner === 'old' ? oldDetail.promise : { release: { releaseId: 'historical', name: 'new owner' } }
+    const query = new URL(path, 'https://local.test').searchParams
+    if (owner === 'old' && query.get('page') === '2') return oldCatalog.promise
+    return catalogPayload([owner])
+  })
+  await api.ready()
+  const pendingCatalog = api.queryCatalog({ page: 2, search: 'retained', subject: 'ACP', access: 'free', append: true })
+  const pendingDetail = api.detail('historical')
+  const pendingQuestions = api.fetchQuestions('historical')
+  owner = 'new'
+  context.dispatchEvent(new context.CustomEvent('kg:auth-session-changed'))
+  assert.equal(api.catalog().length, 0)
+  await api.ready()
+  const refreshed = new URL(requests.findLast(path => path.includes('/catalog?')), 'https://local.test').searchParams
+  assert.equal(refreshed.get('page'), '1')
+  assert.equal(refreshed.get('search'), 'retained')
+  assert.equal(refreshed.get('subject'), 'ACP')
+  oldCatalog.resolve(catalogPayload(['old']))
+  oldDetail.resolve({ release: { releaseId: 'historical', name: 'old owner' } })
+  oldQuestions.resolve({ release: { releaseId: 'historical' }, total: 1, questions: [{ questionId: 'secret', question: { id: 'secret' } }] })
+  await Promise.all([pendingCatalog, pendingDetail, pendingQuestions])
+  assert.deepEqual(Array.from(api.catalog(), row => row.releaseId), ['new'])
+  assert.equal((await api.detail('historical')).name, 'new owner')
+  assert.equal((await api.fetchQuestions('historical')).items.length, 0)
+})
+
+test('catalog restriction absence remains distinct from explicit false', async () => {
+  const { api } = practiceAdapter(async () => ({ releases: [
+    { releaseId: 'missing' }, { releaseId: 'false', contentRestricted: false }, { releaseId: 'true', contentRestricted: true },
+  ], total: 3 }))
+  await api.ready()
+  const rows = api.catalog()
+  assert.equal(Object.hasOwn(rows[0], 'contentRestricted'), false)
+  assert.equal(rows[1].contentRestricted, false)
+  assert.equal(rows[2].contentRestricted, true)
+})
+
+test('practice detail resolves an out-of-page current release without misclassifying it as historical', async () => {
+  const { api, requests } = practiceAdapter(async ({ path }) => path.includes('/catalog?')
+    ? catalogPayload(['visible'], 60)
+    : { release: { paperId: 'selected', releaseId: path.split('/').at(-1), status: path.endsWith('history') ? 'superseded' : 'published' } })
+  await api.ready()
+  const selected = await api.detail('outside')
+  assert.equal(selected.current, true)
+  assert.equal(selected.availability, 'published')
+  const historical = await api.detail('history')
+  assert.equal(historical.current, false)
+  assert.equal(historical.availability, 'superseded')
+  assert.equal(api.catalog().length, 1)
+  assert.equal(requests.length, 3)
+})

@@ -7,7 +7,7 @@
  * 题目按 release 走 GET /api/v1/paper-releases/{id}/questions 分页冻结快照，
  * 单响应受服务端 1MB 上限约束。
  *
- * - 目录在注入后立即预取，载入完成后广播 kg:published-papers-changed。
+ * - 大厅只预取第一页摘要，其他页面保持既有目录行为；完成后广播 kg:published-papers-changed。
  * - 题目按需拉取：同一 release 的题目分页串行（保序），不同 release 由调用方并发。
  * - 所有数据只进内存缓存，不写回 localStorage。
  */
@@ -15,6 +15,8 @@
   const API_ROOT = '/api/v1/paper-releases';
   const DomainApi = global.KGDomainApi;
   const CATALOG_PAGE_SIZE = 100;
+  const PRACTICE_CATALOG_PAGE_SIZE = 12;
+  const practiceCatalog = /(?:^|\/)practice-mode\.html$/.test(text(global.location?.pathname));
   const QUESTIONS_PAGE_SIZE = 50;
   const MODES = Object.freeze(['practice_mode', 'deep_recall', 'multi_question_canvas', 'single_deep_study']);
 
@@ -30,6 +32,11 @@
   };
   let readyPromise = null;
   let catalogEpoch = 0;
+  let catalogQueryVersion = 0;
+  let pendingCatalogQuery = null;
+  let catalogQuery = { page: 1, pageSize: practiceCatalog ? PRACTICE_CATALOG_PAGE_SIZE : CATALOG_PAGE_SIZE,
+    search: '', subject: '', access: 'all', append: false };
+  let catalogPaging = { ...catalogQuery, total: 0, subjects: [], hasMore: false };
 
   function text(value) { return String(value == null ? '' : value); }
   function number(value, fallback) {
@@ -106,7 +113,7 @@
       totalCount: questionCount,
       configuredCount: questionCount,
       coverage: row.coverage ? clone(row.coverage) : null,
-      contentRestricted: row.contentRestricted === true,
+      ...(typeof row.contentRestricted === 'boolean' ? { contentRestricted: row.contentRestricted } : {}),
       updatedAt: number(row.updatedAt || row.publishedAt, 0),
       allowedRoles: Array.isArray(row.allowedRoles) ? row.allowedRoles.map(text).filter(Boolean) : [],
       accessPolicy: { accessLevel: accessLevelOf(row) },
@@ -158,6 +165,70 @@
 
   function catalog() {
     return state.catalog.map(clone);
+  }
+
+  function catalogPage() {
+    const { append, ...page } = catalogPaging;
+    return clone(page);
+  }
+
+  // 大厅只读取请求的这一页；搜索、科目与权限过滤由服务端统一执行。
+  function queryCatalog({ page = 1, pageSize = 12, search = '', subject = '', access = 'all', append = false } = {}) {
+    const query = {
+      page: Math.max(1, Math.floor(number(page, 1))),
+      pageSize: Math.min(100, Math.max(1, Math.floor(number(pageSize, 12)))),
+      search: text(search).trim(), subject: text(subject).trim(),
+      access: ['free', 'member'].includes(access) ? access : 'all', append: append === true,
+    };
+    const key = JSON.stringify(query);
+    if (pendingCatalogQuery?.key === key) return pendingCatalogQuery.promise;
+    const sameCriteria = ['search', 'subject', 'access', 'pageSize'].every(field => query[field] === catalogQuery[field]);
+    // Never combine pages from different filters, even if a caller passes append.
+    query.append = query.append && sameCriteria;
+    catalogQuery = query;
+    const epoch = catalogEpoch;
+    const version = ++catalogQueryVersion;
+    if (!sameCriteria) {
+      replaceCatalog([]);
+      catalogPaging = { ...query, total: 0, subjects: catalogPaging.subjects, hasMore: false };
+    }
+    catalogPaging = { ...catalogPaging, ...query };
+    state.catalogStatus = 'loading';
+    state.error = null;
+    announceChange();
+    const params = new URLSearchParams({ page: String(query.page), pageSize: String(query.pageSize) });
+    if (practiceCatalog) params.set('mode', 'practice_mode');
+    if (query.search) params.set('search', query.search);
+    if (query.subject) params.set('subject', query.subject);
+    if (query.access !== 'all') params.set('access', query.access);
+    const current = () => epoch === catalogEpoch && version === catalogQueryVersion;
+    const operation = (async () => {
+      try {
+        const payload = await request(`/catalog?${params.toString()}`);
+        if (!current()) return catalog();
+        const batch = Array.isArray(payload.releases) ? payload.releases : [];
+        const rows = query.append ? [...state.catalog, ...batch] : batch;
+        const byId = new Map(rows.map(row => [text(row.releaseId || row.id), row]));
+        replaceCatalog([...byId.values()]);
+        const total = Math.max(0, number(payload.total, state.catalog.length));
+        catalogPaging = { ...query, total,
+          subjects: Array.isArray(payload.subjects) ? payload.subjects.map(text).filter(Boolean) : [],
+          hasMore: batch.length > 0 && query.page * query.pageSize < total };
+        state.error = null;
+        state.catalogStatus = 'ready';
+        return catalog();
+      } catch (error) {
+        if (current()) { state.error = error; state.catalogStatus = 'error'; }
+        throw error;
+      } finally {
+        if (current()) { pendingCatalogQuery = null; announceChange(); }
+      }
+    })();
+    pendingCatalogQuery = { key, promise: operation };
+    // ready() always follows the most recently requested criteria, with its
+    // historical non-throwing initialization contract.
+    readyPromise = operation.catch(() => catalog());
+    return operation;
   }
 
   function normalizeManagementRow(row) {
@@ -232,11 +303,13 @@
     const id = text(releaseId);
     if (!id) return null;
     if (state.details.has(id)) return state.details.get(id);
+    const epoch = catalogEpoch;
     const payload = await request(`/${encodeURIComponent(id)}`);
+    if (epoch !== catalogEpoch) return null;
     const row = payload && payload.release ? normalizeCatalogRow(payload.release) : null;
     if (!row) return null;
-    // 详情可能来自 superseded 历史 release
-    row.current = state.catalogById.has(id);
+    // 分页目录中未出现并不代表已被替换；详情状态由服务端确定。
+    row.current = practiceCatalog ? row.status === 'published' : state.catalogById.has(id);
     row.availability = row.status === 'withdrawn' ? 'withdrawn' : (row.current ? 'published' : 'superseded');
     state.details.set(id, row);
     return row;
@@ -253,6 +326,7 @@
     const loadKey = JSON.stringify([id, text(seed), Math.max(0, number(maxCount, 0))]);
     const pending = state.questionLoads.get(loadKey);
     if (pending) return pending;
+    const epoch = catalogEpoch;
     const operation = (async () => {
       const items = [];
       let offset = 0;
@@ -266,6 +340,7 @@
         const query = new URLSearchParams({ limit: String(QUESTIONS_PAGE_SIZE), offset: String(offset) });
         if (seed) query.set('seed', seed);
         const payload = await request(`/${encodeURIComponent(id)}/questions?${query.toString()}`);
+        if (epoch !== catalogEpoch) return { items: [], release: null, total: 0 };
         releaseRow = payload.release ? normalizeCatalogRow(payload.release) : releaseRow;
         total = number(payload.total, total);
         const batch = Array.isArray(payload.questions) ? payload.questions : [];
@@ -299,12 +374,17 @@
 
   function invalidate({ keepCatalog = true } = {}) {
     catalogEpoch += 1;
+    catalogQueryVersion += 1;
+    pendingCatalogQuery = null;
+    readyPromise = null;
     state.details.clear();
     state.questions.clear();
     state.questionLoads.clear();
     if (!keepCatalog) {
       state.catalog = [];
       state.catalogById = new Map();
+      catalogQuery = { ...catalogQuery, page: 1, append: false };
+      catalogPaging = { ...catalogQuery, total: 0, subjects: [], hasMore: false };
     }
   }
 
@@ -314,6 +394,10 @@
 
   async function ready({ force = false } = {}) {
     if (!force && readyPromise) return readyPromise;
+    if (practiceCatalog) {
+      const operation = queryCatalog(catalogQuery);
+      return force ? operation : readyPromise;
+    }
     const epoch = catalogEpoch;
     state.catalogStatus = 'loading';
     announceChange();
@@ -346,6 +430,8 @@
     ready,
     reload,
     catalog,
+    queryCatalog,
+    catalogPage,
     managementCatalog,
     mergeManagementPapers,
     publish,
