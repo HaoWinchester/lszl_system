@@ -4,6 +4,7 @@ import { dirname, resolve } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import vm from 'node:vm'
+import { readGeneratedPage } from './test-helpers/generated-page.mjs'
 
 // P4.6 第 1 轮性能门禁：已发布试卷走 /api/v1/paper-releases 细粒度 API，
 // 不再经 /api/v1/runtime/state 整包拉取 7.65MB 快照。
@@ -382,7 +383,12 @@ test('sync injects the paper release adapter ahead of the repository', () => {
 
 test('generated learner pages carry the adapter exactly once', () => {
   for (const page of ['practice-mode.html', 'question-workspace.html', 'knowledge-recall.html', 'index.html']) {
-    if (page === 'index.html') {
+    if (page === 'practice-mode.html') {
+      const generated = readGeneratedPage(resolve(frontendRoot, 'public/new-legacy'), page, { features: 'all' })
+      assert.equal(generated.initial.filter(entry => entry.asset === 'paper-release-adapter.js').length, 1, page)
+      assert.equal(generated.entries.filter(entry => entry.asset === 'paper-release-adapter.js').length, 1, page)
+      assert.ok(generated.initial.some(entry => entry.asset === 'src/59-published-paper-repository.js'), page)
+    } else if (page === 'index.html') {
       const plan = JSON.parse(read(resolve(frontendRoot, 'scripts/homepage-bundles.json')))
       assert.equal(plan.groups.flatMap(group => group.scripts).filter(asset => asset === 'paper-release-adapter.js').length, 1, page)
       assert.match(read(resolve(frontendRoot, 'public/new-legacy/bundles/home-question.js')), /paper-release-adapter\.js/)

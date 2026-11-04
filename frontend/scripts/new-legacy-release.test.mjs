@@ -6,6 +6,7 @@ import { dirname, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import test, { after } from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { readGeneratedPage } from './test-helpers/generated-page.mjs'
 
 const scriptsDir = dirname(fileURLToPath(import.meta.url))
 const frontendDir = resolve(scriptsDir, '..')
@@ -175,11 +176,21 @@ test('update builds an isolated release and atomically selects it', () => {
   assert.match(landingPage, new RegExp(`src/landing\\.js\\?v=${sourceVersion}`))
   assert.doesNotMatch(landingPage, /server-state-bootstrap|direct-entry|feature-analytics/, 'public landing must not load business runtime adapters')
   const practicePage = readFileSync(resolve(root, sourceVersion, 'site', 'practice-mode.html'), 'utf8')
-  assert.match(
-    practicePage,
-    new RegExp(`src/41-account-menu\\.js\\?v=${sourceVersion}`),
-    'release pages must cache-bust local business scripts',
-  )
+  const practice = readGeneratedPage(resolve(root, sourceVersion, 'site'), 'practice-mode.html', { features: 'all' })
+  const practiceScripts = Array.from(practicePage.matchAll(/<script\b[^>]*\bsrc="([^"]+)"/g), match => match[1])
+  assert.deepEqual(practiceScripts, [
+    `bundles/practice-prelude.js?v=${sourceVersion}`,
+    `bundles/practice-lobby.js?v=${sourceVersion}`,
+  ], 'practice release loads only versioned initial bundles')
+  assert.ok(practice.initial.some(entry => entry.asset === 'src/41-account-menu.js'))
+  assert.equal(practice.initial.some(entry => entry.asset === 'src/33-user-center.js'), false)
+  assert.equal(practice.entries.filter(entry => entry.asset === 'src/33-user-center.js').length, 1)
+  for (const feature of Object.values(practice.manifest)) {
+    for (const asset of [...feature.scripts, ...feature.styles]) {
+      assert.equal(new URL(asset, 'https://release.test').searchParams.get('v'), sourceVersion,
+        'feature bundles must use the same immutable release version')
+    }
+  }
   const workspacePage = readFileSync(resolve(root, sourceVersion, 'site', 'question-workspace.html'), 'utf8')
   assert.match(workspacePage, /practice-learning-adapter\.js/)
   assert.match(workspacePage, /personal-card-adapter\.js/)
@@ -442,20 +453,25 @@ test('failed automatic validation never changes the active release', () => {
 
 test('candidate with fewer site files is rejected before promotion', () => {
   const root = makeRoot()
-  assert.equal(run(root, 'update', source).status, 0)
+  const baseline = resolve(root, 'no-regression-source')
+  const fixtureFile = 'unregistered-release-content.txt'
+  cpSync(source, baseline, { recursive: true })
+  writeFileSync(resolve(baseline, fixtureFile), 'protected release content\n')
+  assert.equal(run(root, 'update', baseline).status, 0)
+  assert.ok(existsSync(resolve(root, sourceVersion, 'site', fixtureFile)), 'fixture must exist in the active site')
   const before = readFileSync(resolve(root, 'current.json'), 'utf8')
   const next = resolve(root, 'smaller-source')
   const nextVersion = `${sourceVersion}-smaller-site`
-  cpSync(source, next, { recursive: true })
+  cpSync(baseline, next, { recursive: true })
   writeFileSync(resolve(next, 'VERSION'), `${nextVersion}\n`)
-  rmSync(resolve(next, 'README.md'))
+  rmSync(resolve(next, fixtureFile))
 
   const result = run(root, 'update', next)
 
   assert.notEqual(result.status, 0)
-  // v9.0 起未登记的文件消失需指向 new-legacy-removals.json，README.md 未登记仍拒绝
+  // 以同一份源快照只删除一个明确存在的产物，避免新增 bundle 抵消文件减少。
   assert.match(result.stderr, /缺少未登记删除的文件/)
-  assert.match(result.stderr, /README\.md/)
+  assert.ok(result.stderr.includes(fixtureFile))
   assert.equal(readFileSync(resolve(root, 'current.json'), 'utf8'), before)
   const report = readJson(resolve(root, nextVersion, 'validation.json'))
   assert.equal(report.passed, false)

@@ -6,6 +6,7 @@ import { spawnSync } from 'node:child_process'
 import test from 'node:test'
 import vm from 'node:vm'
 import { fileURLToPath } from 'node:url'
+import { readGeneratedPage } from './test-helpers/generated-page.mjs'
 
 const scriptsDir = dirname(fileURLToPath(import.meta.url))
 const frontendDir = resolve(scriptsDir, '..')
@@ -302,7 +303,7 @@ test('question-bank imports forward explicit replacement confirmation and preser
   assert.match(calls.at(-2).options.body, /"confirmReplace":true/)
 })
 
-test('sync injects the adapter before each page question repository and marks its mode', () => {
+test('sync injects question bootstrap for its consumers and excludes the snapshot-based practice lobby', () => {
   const root = mkdtempSync(resolve(tmpdir(), 'kg-catalog-adapter-'))
   const output = resolve(root, 'site')
   try {
@@ -318,7 +319,6 @@ test('sync injects the adapter before each page question repository and marks it
       ['paper-management.html', ['managed', 'src/65-question-bank-admin.js']],
       ['question-workspace.html', ['learning', 'src/59-published-paper-repository.js']],
       ['knowledge-recall.html', ['learning', 'src/59-published-paper-repository.js']],
-      ['practice-mode.html', ['learning', 'src/59-published-paper-repository.js']],
       ['index.html', ['learning', 'src/60-question-bank.js']],
     ])
     for (const [page, [mode, marker]] of pages) {
@@ -329,6 +329,11 @@ test('sync injects the adapter before each page question repository and marks it
         : html
       assert.ok(executable.indexOf('question-catalog-adapter.js') < executable.indexOf(marker), `${page} adapter order`)
     }
+    const practice = readGeneratedPage(output, 'practice-mode.html', { features: 'all' })
+    assert.doesNotMatch(practice.html, /data-question-catalog-mode|question-catalog-adapter\.js/)
+    assert.equal(practice.entries.some(entry => entry.asset === 'question-catalog-adapter.js'), false)
+    assert.ok(practice.initial.some(entry => entry.asset === 'paper-release-adapter.js'))
+    assert.ok(practice.initial.some(entry => entry.asset === 'src/59-published-paper-repository.js'))
   } finally {
     rmSync(root, { recursive: true, force: true })
   }

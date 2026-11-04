@@ -3,6 +3,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { readGeneratedPage } from './test-helpers/generated-page.mjs'
 
 const scriptsDir = dirname(fileURLToPath(import.meta.url))
 const frontendDir = resolve(scriptsDir, '..')
@@ -35,11 +36,20 @@ test('member purchase uses the server Native order flow and polls its status', (
   assert.ok(homeSecondary.indexOf('direct-system-adapter.js') < homeSecondary.indexOf('src/33-user-center.js'))
 })
 
-test('practice mode loads the system adapter between wechat login and user center scripts', () => {
-  const practicePage = readFileSync(resolve(frontendDir, 'public/new-legacy/practice-mode.html'), 'utf8')
-
-  assert.ok(practicePage.indexOf('src/32-wechat-login.js') < practicePage.indexOf('direct-system-adapter.js'))
-  assert.ok(practicePage.indexOf('direct-system-adapter.js') < practicePage.indexOf('src/33-user-center.js'))
+test('practice account feature waits for WeChat auth and subscription core before system adapter and user center', () => {
+  const practice = readGeneratedPage(resolve(frontendDir, 'public/new-legacy'), 'practice-mode.html', { features: ['account'] })
+  assert.deepEqual(practice.manifest.account.depends, ['auth'])
+  assert.equal(practice.initial.some(entry => /32-wechat-login|33-user-center|direct-system-adapter|37-subscription/.test(entry.asset)), false,
+    'auth, account and payment modules must remain demand-loaded')
+  const scripts = practice.entries.map(entry => entry.asset)
+  for (const asset of ['src/32-wechat-login.js', 'src/37-subscription-core.js', 'direct-system-adapter.js', 'src/33-user-center.js']) {
+    assert.equal(scripts.filter(script => script === asset).length, 1, asset)
+  }
+  assert.ok(scripts.indexOf('src/32-wechat-login.js') < scripts.indexOf('direct-system-adapter.js'))
+  assert.ok(scripts.indexOf('src/37-subscription-core.js') < scripts.indexOf('direct-system-adapter.js'))
+  assert.ok(scripts.indexOf('direct-system-adapter.js') < scripts.indexOf('src/33-user-center.js'))
+  assert.ok(practice.entries.find(entry => entry.asset === 'direct-system-adapter.js').source.includes('/api/v1/subscriptions/orders'))
+  assert.match(practice.entries.find(entry => entry.asset === 'src/33-user-center.js').source, /await\s+pay\.createNativeOrder\(/)
 })
 
 test('every page loading user center gets the system adapter before it', () => {
@@ -47,10 +57,10 @@ test('every page loading user center gets the system adapter before it', () => {
   const pages = readdirSync(siteDir).filter(name => name.endsWith('.html'))
   const offenders = []
   for (const name of pages) {
-    const html = readFileSync(resolve(siteDir, name), 'utf8')
-    const userCenterAt = html.indexOf('src/33-user-center.js')
+    const scripts = readGeneratedPage(siteDir, name, { features: 'all' }).entries.map(entry => entry.asset)
+    const userCenterAt = scripts.indexOf('src/33-user-center.js')
     if (userCenterAt < 0) continue
-    const adapterAt = html.indexOf('direct-system-adapter.js')
+    const adapterAt = scripts.indexOf('direct-system-adapter.js')
     if (adapterAt < 0 || adapterAt > userCenterAt) offenders.push(name)
   }
   assert.deepEqual(offenders, [], `以下页面缺少 direct-system-adapter 或顺序错误：${offenders.join(', ')}`)
