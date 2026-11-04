@@ -98,10 +98,13 @@ async def release_catalog(
     search: str = Query(default="", max_length=200),
     subject: str = Query(default="", max_length=32),
     access: str = Query(default="all", pattern="^(all|free|member)$"),
+    mode: str | None = Query(
+        default=None, pattern="^(" + "|".join(sorted(paper_release_service.VALID_MODES)) + ")$",
+    ),
 ):
     user = await optional_current_user(request, db)
     return await paper_release_service.catalog(
-        db, user, page=page, page_size=page_size, search=search, subject=subject, access=access
+        db, user, page=page, page_size=page_size, search=search, subject=subject, access=access, mode=mode
     )
 
 

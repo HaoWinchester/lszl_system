@@ -9,16 +9,16 @@ from uuid import uuid4
 import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, event, func, select
 
-from app.core.security import now_utc
-from app.db.session import AsyncSessionLocal
+from app.core.security import hash_password, now_utc
+from app.db.session import AsyncSessionLocal, engine
 from app.main import app
 from app.models.paper_release import PaperRelease, PaperReleaseQuestion
 from app.models.question import ExamPaper, PaperQuestion, Question, QuestionBank
 from app.models.subscription import Subscription
 from app.models.training import LearningEvent, PracticeMistake, RecallProgress, RecallQuestionSnapshot, TrainingProgress
-from app.models.user import User
+from app.models.user import User, UserAdminLog
 from app.services import (
     deep_recall_service,
     learning_service,
@@ -1074,4 +1074,201 @@ def test_manual_selected_paper_publishes_current_mix_even_after_generated_edit(g
     try:
         asyncio.run(scenario())
     finally:
+        asyncio.run(_cleanup(ids))
+
+
+@pytest.mark.parametrize("audience", ["guest", "student", "member", "admin"])
+def test_catalog_whitelists_learner_fields_without_selecting_bulk_columns(audience):
+    ids = _ids()
+    asyncio.run(_seed(ids))
+
+    async def scenario():
+        async with AsyncSessionLocal() as db:
+            teacher = await db.get(User, ids["teacher"])
+            release = await paper_release_service.publish(
+                db, teacher, ids["paper"], expected_revision=1,
+                access_level="member", enabled_modes=["practice_mode"],
+                allowed_roles=["student"], metadata={"internalNote": "publish-detail"},
+            )
+            assert paper_release_service.release_to_dict(release)["metadata"]["internalNote"] == "publish-detail"
+            release_id = release.id
+            release.release_metadata = {"internalNote": "x" * 80_000}
+            release.source_payload = {"questions": [{"answer": "y" * 200_000}]}
+            password_hash = hash_password("catalog-test-password")
+            student = await db.get(User, ids["student"])
+            actor = await db.get(User, ids["other_teacher"])
+            student.password_hash = actor.password_hash = password_hash
+            if audience == "member":
+                db.add(Subscription(
+                    username=ids["student"], plan_id="monthly", status="active",
+                    started_at=now_utc(), expires_at=now_utc() + timedelta(days=1),
+                ))
+            if audience == "admin":
+                actor = await db.get(User, ids["other_teacher"])
+                actor.role = "admin"
+            await db.commit()
+
+        async with AsyncSessionLocal() as db:
+            user = None if audience == "guest" else await db.get(
+                User, ids["other_teacher"] if audience == "admin" else ids["student"]
+            )
+            statements = []
+
+            def record_sql(connection, cursor, statement, parameters, context, executemany):
+                statements.append(statement)
+
+            event.listen(engine.sync_engine, "before_cursor_execute", record_sql)
+            try:
+                result = await paper_release_service.catalog(
+                    db, user, page=1, page_size=200, search="冻结试卷",
+                )
+            finally:
+                event.remove(engine.sync_engine, "before_cursor_execute", record_sql)
+            row = next(item for item in result["releases"] if item["releaseId"] == release_id)
+            assert set(row) == {
+                "id", "releaseId", "paperId", "version", "status", "availability",
+                "name", "title", "subject", "description", "paperType", "purpose",
+                "accessLevel", "accessPolicy", "enabledModes", "modeConfigVersion",
+                "questionCount", "configuredCount", "totalCount", "publishedAt",
+                "publishedAtIso", "updatedAt", "contentRestricted", "coverage",
+            }
+            assert row["name"] == "冻结试卷"
+            assert row["questionCount"] == row["configuredCount"] == row["totalCount"] == 6
+            assert row["enabledModes"] == ["practice_mode"]
+            assert row["contentRestricted"] is (audience in {"guest", "student"})
+            assert len(json.dumps(row)) < 3_000
+            assert row["coverage"] == (None if user is None else {
+                "releaseId": release_id, "totalCount": 6, "completedCount": 0, "remainingUnseen": 6,
+            })
+            release_queries = [sql.lower() for sql in statements if "paper_releases" in sql.lower()]
+            assert release_queries
+            assert not any("paper_releases.metadata" in sql or "paper_releases.source_payload" in sql for sql in release_queries)
+            assert not any("paper_release_questions.snapshot" in sql for sql in statements)
+
+            # Full detail and history still expose their frozen metadata on demand.
+            actor = await db.get(User, ids["other_teacher"])
+            actor.role = "admin"
+            detail = await paper_release_service.detail(db, actor, release_id)
+            assert detail["metadata"] == {"internalNote": "x" * 80_000}
+            assert detail["publishedBy"] == ids["teacher"]
+            assert detail["allowedRoles"] == ["student"]
+            history = await paper_release_service.history(db, actor, ids["paper"], page=1, page_size=10)
+            assert paper_release_service.release_to_dict(history["releases"][0])["metadata"] == detail["metadata"]
+            return release_id
+    try:
+        release_id = asyncio.run(scenario())
+        with TestClient(app) as client:
+            if audience != "guest":
+                username = ids["other_teacher"] if audience == "admin" else ids["student"]
+                login = client.post("/api/v1/auth/login", json={
+                    "username": username, "password": "catalog-test-password",
+                })
+                assert login.status_code == 200
+            response = client.get("/api/v1/paper-releases/catalog", params={"search": "冻结试卷"})
+            assert response.status_code == 200
+            row = next(item for item in response.json()["releases"] if item["releaseId"] == release_id)
+            assert not {"metadata", "sourcePayload", "publishedBy", "allowedRoles"} & row.keys()
+            assert row["contentRestricted"] is (audience in {"guest", "student"})
+    finally:
+        async def cleanup_logs():
+            async with AsyncSessionLocal() as db:
+                await db.execute(delete(UserAdminLog).where(UserAdminLog.target_username.in_([
+                    ids["student"], ids["other_teacher"],
+                ])))
+                await db.commit()
+        asyncio.run(cleanup_logs())
+        asyncio.run(_cleanup(ids))
+
+
+def test_catalog_mode_filters_totals_pages_and_role_scoped_subject_facets():
+    ids = _ids()
+    asyncio.run(_seed(ids))
+    token = ids["paper"]
+
+    async def scenario():
+        async with AsyncSessionLocal() as db:
+            for index, (subject, modes, roles, access, status) in enumerate([
+                ("DemandA", ["practice_mode"], ["student"], "free", "published"),
+                ("DemandB", ["practice_mode", "deep_recall"], ["student"], "member", "published"),
+                ("DemandC", ["practice_mode"], ["student"], "free", "published"),
+                ("Hidden", ["practice_mode"], ["teacher"], "free", "published"),
+                ("Recall", ["deep_recall"], ["student"], "free", "published"),
+                ("Retired", ["practice_mode"], ["student"], "free", "withdrawn"),
+            ]):
+                db.add(PaperRelease(
+                    id=f"{token}-mode-{index}", paper_id=f"{token}-mode-paper-{index}",
+                    version=1, status=status, name=f"{token} title {index}", subject=subject,
+                    publisher_id=ids["teacher"], access_level=access, enabled_modes=modes,
+                    allowed_roles=roles, question_count=0, published_at=now_utc() + timedelta(seconds=index),
+                ))
+            await db.commit()
+            student = await db.get(User, ids["student"])
+            coverage_release_ids = []
+
+            def record_coverage(connection, cursor, statement, parameters, context, executemany):
+                if "WITH answered" in statement:
+                    coverage_release_ids.append(context.compiled_parameters[0]["release_ids"])
+
+            event.listen(engine.sync_engine, "before_cursor_execute", record_coverage)
+            try:
+                page = await paper_release_service.catalog(
+                    db, student, page=1, page_size=1, search=token, mode="practice_mode",
+                )
+            finally:
+                event.remove(engine.sync_engine, "before_cursor_execute", record_coverage)
+            assert page["total"] == 3
+            assert [row["releaseId"] for row in page["releases"]] == [f"{token}-mode-2"]
+            assert coverage_release_ids == [[f"{token}-mode-2"]]
+            second = await paper_release_service.catalog(
+                db, student, page=2, page_size=1, search=token, mode="practice_mode",
+            )
+            assert [row["releaseId"] for row in second["releases"]] == [f"{token}-mode-1"]
+            assert second["releases"][0]["contentRestricted"] is True
+            assert second["subjects"] == page["subjects"]
+            assert {"DemandA", "DemandB", "DemandC"} <= set(page["subjects"])
+            assert not {"Hidden", "Recall", "Retired"} & set(page["subjects"])
+            filtered = await paper_release_service.catalog(
+                db, student, page=2, page_size=1, search="nothing-matches", subject="DemandA",
+                access="free", mode="practice_mode",
+            )
+            assert filtered["total"] == 0
+            assert filtered["releases"] == []
+            assert filtered["subjects"] == page["subjects"]
+            member_only = await paper_release_service.catalog(
+                db, student, page=1, page_size=10, search=token, access="member", mode="practice_mode",
+            )
+            assert member_only["total"] == 1
+            assert member_only["subjects"] == page["subjects"]
+            unfiltered = await paper_release_service.catalog(db, student, page=1, page_size=10, search=token)
+            assert unfiltered["total"] == 4
+            guest = await paper_release_service.catalog(db, None, page=1, page_size=10, search=token, mode="practice_mode")
+            assert guest["total"] == 3
+            teacher = await db.get(User, ids["teacher"])
+            teacher_page = await paper_release_service.catalog(db, teacher, page=1, page_size=10, search=token, mode="practice_mode")
+            assert teacher_page["total"] == 1
+            actor = await db.get(User, ids["other_teacher"])
+            actor.role = "admin"
+            admin_page = await paper_release_service.catalog(db, actor, page=1, page_size=10, search=token, mode="practice_mode")
+            assert admin_page["total"] == 4
+    try:
+        asyncio.run(scenario())
+        with TestClient(app) as client:
+            response = client.get("/api/v1/paper-releases/catalog", params={"mode": "practice_mode", "search": token, "pageSize": 1})
+            assert response.status_code == 200
+            assert response.json()["total"] == 3
+            assert len(response.json()["releases"]) == 1
+            for mode, expected_total in [
+                ("deep_recall", 2), ("multi_question_canvas", 0), ("single_deep_study", 0),
+            ]:
+                response = client.get("/api/v1/paper-releases/catalog", params={"mode": mode, "search": token})
+                assert response.status_code == 200
+                assert response.json()["total"] == expected_total
+            for mode in ("unknown", "practice", " "):
+                assert client.get("/api/v1/paper-releases/catalog", params={"mode": mode}).status_code == 422
+    finally:
+        async def cleanup_modes():
+            async with AsyncSessionLocal() as db:
+                await db.execute(delete(PaperRelease).where(PaperRelease.publisher_id == ids["teacher"]))
+                await db.commit()
+        asyncio.run(cleanup_modes())
         asyncio.run(_cleanup(ids))
