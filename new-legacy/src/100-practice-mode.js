@@ -129,6 +129,7 @@
       if(id&&!unique.has(id))unique.set(id,{...row,id,paperId:id,questionCount:Number(row.questionCount||row.totalCount||0),access:paperAccess(row)});
     });
     state.releases=[...unique.values()];
+    if(!global.KGPaperReleaseApi?.catalogPage?.()&&!state.releases.some(row=>row.id===state.selectedCatalogEntry?.id))state.selectedCatalogEntry=null;
     return state.releases;
   }
   function selectedRelease(){if(state.retiredSelectionUnavailable||state.retiredSelectionPending)return null;return state.releases.find(row=>row.id===state.selectedPaperId)||(state.selectedCatalogEntry?.id===state.selectedPaperId?state.selectedCatalogEntry:null)||(state.selectedPaperId?null:state.releases[0]||null)}

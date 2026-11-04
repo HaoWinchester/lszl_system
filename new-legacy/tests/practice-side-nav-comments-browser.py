@@ -216,6 +216,7 @@ with sync_playwright() as playwright:
             summary.hover()
             assert help.evaluate('el=>el.open'), f'{mode} help must open on hover'
             content_box = help.locator('.practice-help-content').bounding_box()
+            assert content_box['y'] >= 8 and content_box['y'] + content_box['height'] <= viewport['height'] - 8, (mode, content_box, viewport)
             if viewport['width'] <= 480:
                 trigger_box = summary.bounding_box()
                 gap = max(content_box['y'] - trigger_box['y'] - trigger_box['height'],
