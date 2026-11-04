@@ -9,13 +9,15 @@
       let closeTimer;
       const position = () => {
         content.style.removeProperty('top');
-        if (!detail.open || !window.matchMedia('(max-width:480px)').matches) return;
-        // Narrow screens use a fixed popup. Keep it beside the trigger rather
-        // than requiring the pointer to cross most of the screen to reach it.
+        if (!detail.open) return;
+        // Keep the popup next to its trigger and inside the viewport, including
+        // desktop cards near the bottom after returning from a practice session.
         const trigger = summary.getBoundingClientRect(), height = content.getBoundingClientRect().height;
         const below = trigger.bottom + 8;
         const top = below + height <= window.innerHeight - 8 ? below : trigger.top - height - 8;
-        content.style.top = Math.max(8, Math.min(window.innerHeight - height - 8, top)) + 'px';
+        const viewportTop = Math.max(8, Math.min(window.innerHeight - height - 8, top));
+        const fixed = window.matchMedia('(max-width:480px)').matches;
+        content.style.top = (fixed ? viewportTop : viewportTop - detail.getBoundingClientRect().top) + 'px';
       };
       const open = () => { if (!detail.open) { detail.open = true; position(); } };
       const cancelClose = () => window.clearTimeout(closeTimer);
