@@ -23,6 +23,8 @@
   const state = {
     catalog: [],          // 轻量目录（normalize 后）
     catalogById: new Map(),
+    selectedPapers: new Map(), // paperId -> exact lightweight published summary (or null)
+    selectedPaperLoads: new Map(),
     details: new Map(),   // releaseId -> release（normalize 后，含 questions refs）
     questions: new Map(), // releaseId -> { items, fetchedAt, seed }
     questionLoads: new Map(), // releaseId + seed + maxCount -> in-flight Promise
@@ -170,6 +172,31 @@
   function catalogPage() {
     const { append, ...page } = catalogPaging;
     return clone(page);
+  }
+
+  // 历史记录仅有 paperId 时，精确查询当前发布摘要，不扫描目录或读取冻结正文。
+  function findPublishedPaper(paperId) {
+    const id = text(paperId).trim();
+    if (!id) return Promise.resolve(null);
+    if (state.selectedPapers.has(id)) return Promise.resolve(clone(state.selectedPapers.get(id)));
+    if (state.selectedPaperLoads.has(id)) return state.selectedPaperLoads.get(id);
+    const epoch = catalogEpoch;
+    const params = new URLSearchParams({ page: '1', pageSize: '1', mode: 'practice_mode', paperId: id });
+    const operation = (async () => {
+      try {
+        const payload = await request(`/catalog?${params.toString()}`);
+        if (epoch !== catalogEpoch) return null;
+        const exact = (Array.isArray(payload.releases) ? payload.releases : [])
+          .find(row => text(row?.paperId) === id && text(row?.releaseId || row?.id));
+        const row = exact ? normalizeCatalogRow(exact) : null;
+        state.selectedPapers.set(id, row);
+        return clone(row);
+      } finally {
+        if (state.selectedPaperLoads.get(id) === operation) state.selectedPaperLoads.delete(id);
+      }
+    })();
+    state.selectedPaperLoads.set(id, operation);
+    return operation;
   }
 
   // 大厅只读取请求的这一页；搜索、科目与权限过滤由服务端统一执行。
@@ -378,6 +405,8 @@
     pendingCatalogQuery = null;
     readyPromise = null;
     state.details.clear();
+    state.selectedPapers.clear();
+    state.selectedPaperLoads.clear();
     state.questions.clear();
     state.questionLoads.clear();
     if (!keepCatalog) {
@@ -432,6 +461,7 @@
     catalog,
     queryCatalog,
     catalogPage,
+    findPublishedPaper,
     managementCatalog,
     mergeManagementPapers,
     publish,
