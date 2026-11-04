@@ -657,3 +657,72 @@ test('practice detail resolves an out-of-page current release without misclassif
   assert.equal(api.catalog().length, 1)
   assert.equal(requests.length, 3)
 })
+
+test('selected paper lookup requests one exact summary on demand without changing catalog criteria', async () => {
+  const lookup = deferred()
+  const { api, requests } = practiceAdapter(async ({ path }) => path.includes('paperId=')
+    ? lookup.promise : catalogPayload(['visible'], 50))
+  await api.ready()
+  assert.equal(requests.length, 1)
+  await api.queryCatalog({ search: 'filtered', subject: 'ACP', access: 'member' })
+  const before = JSON.stringify(api.catalogPage())
+  const first = api.findPublishedPaper('paper & 1')
+  const repeated = api.findPublishedPaper('paper & 1')
+  assert.equal(requests.length, 3)
+  assert.equal(requests.at(-1), '/api/v1/paper-releases/catalog?page=1&pageSize=1&mode=practice_mode&paperId=paper+%26+1')
+  lookup.resolve({ releases: [{ paperId: 'paper & 1', releaseId: 'selected', contentRestricted: false, questionCount: 7 }], total: 1 })
+  const [selected, same] = await Promise.all([first, repeated])
+  assert.equal(selected.releaseId, 'selected')
+  assert.equal(same.releaseId, 'selected')
+  assert.equal(selected.totalCount, 7)
+  assert.equal(selected.contentRestricted, false)
+  selected.title = 'local mutation'
+  assert.notEqual((await api.findPublishedPaper('paper & 1')).title, 'local mutation')
+  assert.equal(requests.length, 3)
+  assert.deepEqual(Array.from(api.catalog(), row => row.releaseId), ['visible'])
+  assert.equal(JSON.stringify(api.catalogPage()), before)
+  assert.equal(api.catalogStatus(), 'ready')
+})
+
+test('selected paper lookup does not accept unrelated rows and failed lookups can retry', async () => {
+  let fail = true
+  const { api, requests } = practiceAdapter(async ({ path }) => {
+    if (!path.includes('paperId=')) return catalogPayload([])
+    if (fail) throw new Error('lookup offline')
+    return catalogPayload(['unrelated'])
+  })
+  await api.ready()
+  assert.equal(await api.findPublishedPaper(''), null)
+  assert.equal(requests.length, 1)
+  await assert.rejects(api.findPublishedPaper('missing'), /lookup offline/)
+  assert.equal(api.catalogStatus(), 'ready')
+  fail = false
+  assert.equal(await api.findPublishedPaper('missing'), null)
+  assert.equal(await api.findPublishedPaper('missing'), null)
+  assert.equal(requests.length, 3)
+})
+
+test('selected paper lookup clears owner-specific cached summaries and rejects late owner responses', async () => {
+  const old = deferred()
+  let owner = 'old'
+  const { api, context, requests } = practiceAdapter(async ({ path }) => {
+    if (!path.includes('paperId=')) return catalogPayload([owner])
+    if (owner === 'old') return old.promise
+    return { releases: [{ paperId: 'selected', releaseId: owner, coverage: { completedCount: 0 } }], total: 1 }
+  })
+  await api.ready()
+  const first = api.findPublishedPaper('selected')
+  owner = 'new'
+  context.dispatchEvent(new context.CustomEvent('kg:auth-session-changed'))
+  await api.ready()
+  const newer = await api.findPublishedPaper('selected')
+  assert.equal(newer.releaseId, 'new')
+  old.resolve({ releases: [{ paperId: 'selected', releaseId: 'old', coverage: { completedCount: 9 } }], total: 1 })
+  assert.equal(await first, null)
+  assert.equal((await api.findPublishedPaper('selected')).coverage.completedCount, 0)
+  owner = 'third'
+  context.dispatchEvent(new context.CustomEvent('kg:auth-session-changed'))
+  await api.ready()
+  assert.equal((await api.findPublishedPaper('selected')).releaseId, 'third')
+  assert.equal(requests.filter(path => path.includes('paperId=')).length, 3)
+})
