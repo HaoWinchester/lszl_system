@@ -219,7 +219,8 @@
       replaceCatalog([]);
       catalogPaging = { ...query, total: 0, subjects: catalogPaging.subjects, hasMore: false };
     }
-    catalogPaging = { ...catalogPaging, ...query };
+    // 分页游标只在响应成功后提交；失败时“加载更多”仍应重试同一页。
+    // catalogQuery 单独保留待请求条件，供 reload() 显式重试。
     state.catalogStatus = 'loading';
     state.error = null;
     announceChange();

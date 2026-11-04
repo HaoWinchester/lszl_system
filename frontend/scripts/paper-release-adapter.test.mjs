@@ -732,3 +732,29 @@ test('selected paper lookup clears owner-specific cached summaries and rejects l
   assert.equal((await api.findPublishedPaper('selected')).releaseId, 'third')
   assert.equal(requests.filter(path => path.includes('paperId=')).length, 3)
 })
+
+test('load-more retries a failed next page using the last successfully committed catalog page', async () => {
+  let failNextPage = true
+  const { api, requests } = practiceAdapter(async ({ path }) => {
+    const page = Number(new URL(path, 'https://local.test').searchParams.get('page'))
+    if (page === 2 && failNextPage) {
+      failNextPage = false
+      throw new Error('temporary page failure')
+    }
+    return catalogPayload([`r${page}`], 36)
+  })
+  await api.ready()
+  const loadMore = () => {
+    const { page, pageSize, search, subject, access } = api.catalogPage()
+    return api.queryCatalog({ page: page + 1, pageSize, search, subject, access, append: true })
+  }
+  await assert.rejects(loadMore(), /temporary page failure/)
+  assert.equal(api.catalogPage().page, 1)
+  assert.equal(api.catalogStatus(), 'error')
+  assert.deepEqual(Array.from(api.catalog(), row => row.releaseId), ['r1'])
+  await loadMore()
+  assert.deepEqual(requests.map(path => new URL(path, 'https://local.test').searchParams.get('page')), ['1', '2', '2'])
+  assert.equal(api.catalogPage().page, 2)
+  assert.equal(api.catalogStatus(), 'ready')
+  assert.deepEqual(Array.from(api.catalog(), row => row.releaseId), ['r1', 'r2'])
+})
