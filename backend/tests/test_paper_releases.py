@@ -1274,34 +1274,41 @@ def test_catalog_mode_filters_totals_pages_and_role_scoped_subject_facets():
         asyncio.run(_cleanup(ids))
 
 
-def test_catalog_exact_paper_filter_preserves_global_subject_facets():
+@pytest.mark.parametrize("lookup", ["paperId", "releaseId"])
+def test_catalog_exact_lookup_preserves_global_subject_facets(lookup):
     ids = _ids()
     asyncio.run(_seed(ids))
 
     async def scenario():
+        release_ids = {}
         async with AsyncSessionLocal() as db:
             teacher = await db.get(User, ids["teacher"])
             for paper_id, subject in [(ids["paper"], "DemandExactA"), (ids["other_paper"], "DemandExactB")]:
                 paper = await db.get(ExamPaper, paper_id)
                 paper.subject = subject
-                await paper_release_service.publish(
+                release = await paper_release_service.publish(
                     db, teacher, paper_id, expected_revision=1, access_level="free",
                     enabled_modes=["practice_mode"], allowed_roles=["student"], metadata={},
                 )
+                release_ids[paper_id] = release.id
         async with AsyncSessionLocal() as db:
+            value = ids["paper"] if lookup == "paperId" else release_ids[ids["paper"]]
+            service_key = "paper_id" if lookup == "paperId" else "release_id"
             result = await paper_release_service.catalog(
-                db, None, page=1, page_size=1, mode="practice_mode", paper_id=ids["paper"],
+                db, None, page=1, page_size=1, mode="practice_mode", **{service_key: value},
             )
             assert result["total"] == 1
             assert [row["paperId"] for row in result["releases"]] == [ids["paper"]]
             assert {"DemandExactA", "DemandExactB"} <= set(result["subjects"])
-            prefix = await paper_release_service.catalog(db, None, page=1, page_size=1, paper_id=ids["paper"][:-1])
+            prefix = await paper_release_service.catalog(db, None, page=1, page_size=1, **{service_key: value[:-1]})
             assert prefix["total"] == 0
+            return release_ids
     try:
-        asyncio.run(scenario())
+        release_ids = asyncio.run(scenario())
         with TestClient(app) as client:
             response = client.get("/api/v1/paper-releases/catalog", params={
-                "paperId": ids["other_paper"], "mode": "practice_mode", "pageSize": 1,
+                lookup: ids["other_paper"] if lookup == "paperId" else release_ids[ids["other_paper"]],
+                "mode": "practice_mode", "pageSize": 1,
             })
             assert response.status_code == 200
             assert response.json()["total"] == 1
