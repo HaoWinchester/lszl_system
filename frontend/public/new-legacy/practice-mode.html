@@ -1,11 +1,11 @@
 <!doctype html>
-<html data-release="v9.0-p4.1.415" lang="zh-CN">
+<html data-release="v9.0-p4.1.416" lang="zh-CN">
 <head>
-<link rel="icon" type="image/jpeg" href="/assets/logo.jpg?v=v9.0-p4.1.415">
-<meta name="kg-practice-bundle-version" content="v9.0-p4.1.415">
-<script type="application/json" id="kg-page-features">{"auth":{"depends":[],"scripts":["bundles/practice-auth.js?v=v9.0-p4.1.415"],"styles":[]},"account":{"depends":["auth"],"scripts":["bundles/practice-account.js?v=v9.0-p4.1.415"],"styles":["bundles/practice-account.css?v=v9.0-p4.1.415"]},"question":{"depends":[],"scripts":["bundles/practice-question.js?v=v9.0-p4.1.415"],"styles":["bundles/practice-question.css?v=v9.0-p4.1.415"]},"community":{"depends":["question"],"scripts":["bundles/practice-community.js?v=v9.0-p4.1.415"],"styles":["bundles/practice-community.css?v=v9.0-p4.1.415"]},"answer":{"depends":["community"],"scripts":["bundles/practice-answer.js?v=v9.0-p4.1.415"],"styles":[]},"report":{"depends":[],"scripts":["bundles/practice-report.js?v=v9.0-p4.1.415"],"styles":[]},"knowledge":{"depends":[],"scripts":["bundles/practice-knowledge.js?v=v9.0-p4.1.415"],"styles":["bundles/practice-knowledge.css?v=v9.0-p4.1.415"]}}</script>
-<script src="bundles/practice-prelude.js?v=v9.0-p4.1.415"></script>
-<script defer src="bundles/practice-lobby.js?v=v9.0-p4.1.415"></script><!-- kg-teaching-content-sync:generated -->
+<link rel="icon" type="image/jpeg" href="/assets/logo.jpg?v=v9.0-p4.1.416">
+<meta name="kg-practice-bundle-version" content="v9.0-p4.1.416">
+<script type="application/json" id="kg-page-features">{"auth":{"depends":[],"scripts":["bundles/practice-auth.js?v=v9.0-p4.1.416"],"styles":[]},"account":{"depends":["auth"],"scripts":["bundles/practice-account.js?v=v9.0-p4.1.416"],"styles":[]},"question":{"depends":[],"scripts":["bundles/practice-question.js?v=v9.0-p4.1.416"],"styles":[]},"community":{"depends":["question"],"scripts":["bundles/practice-community.js?v=v9.0-p4.1.416"],"styles":[]},"answer":{"depends":["community"],"scripts":["bundles/practice-answer.js?v=v9.0-p4.1.416"],"styles":[]},"report":{"depends":[],"scripts":["bundles/practice-report.js?v=v9.0-p4.1.416"],"styles":[]},"knowledge":{"depends":[],"scripts":["bundles/practice-knowledge.js?v=v9.0-p4.1.416"],"styles":[]}}</script>
+<script src="bundles/practice-prelude.js?v=v9.0-p4.1.416"></script>
+<script defer src="bundles/practice-lobby.js?v=v9.0-p4.1.416"></script><!-- kg-teaching-content-sync:generated -->
 <!-- kg-direct-bootstrap-anchor -->
 <!-- kg-runtime:generated -->
 <!-- kg-auth-session:generated -->
@@ -14,7 +14,7 @@
 <!-- kg-direct-entry:generated -->
 <!-- kg-feature-usage-clock:generated -->
 <!-- kg-feature-analytics:generated -->
-<link rel="stylesheet" href="bundles/practice-lobby.css?v=v9.0-p4.1.415">
+<link rel="stylesheet" href="bundles/practice-lobby.css?v=v9.0-p4.1.416">
 
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
@@ -28,6 +28,7 @@
   <meta property="og:url" content="https://lszl.aihuanpu.com/practice-mode.html"/>
   <title>个人学习工具｜知识图谱与主动回忆</title>
   <link rel="canonical" href="https://lszl.aihuanpu.com/practice-mode.html"/>
+
 
 
 
@@ -104,7 +105,7 @@
           </nav>
       </aside>
       <button type="button" class="practice-exp-fab" id="practiceExpFab" hidden aria-expanded="false" aria-controls="practiceExpPanel" aria-label="展开做题经验面板">XP</button>
-      <section class="practice-lobby" id="practiceLobby" aria-labelledby="practiceLobbyTitle">
+      <section class="practice-lobby" id="practiceLobby" data-catalog-pending aria-labelledby="practiceLobbyTitle">
         <header class="practice-lobby-head">
           <div class="practice-lobby-head-title">
             <h1 id="practiceLobbyTitle">开始练习</h1>
@@ -132,7 +133,7 @@
             </div>
           </div>
 
-          <div class="practice-paper-scroll-shell"><div class="practice-paper-scroll" id="practicePaperLibrary" aria-busy="true"><div class="practice-paper-empty" role="status">正在读取已发布试卷…</div></div></div>
+          <div class="practice-paper-scroll-shell"><div class="practice-paper-scroll" id="practicePaperLibrary" aria-busy="true"><div class="practice-paper-card practice-paper-empty" role="status">正在读取已发布试卷…</div></div></div>
           <select id="practicePaperSelect" hidden aria-hidden="true"></select>
         </section>
 

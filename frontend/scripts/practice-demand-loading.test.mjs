@@ -12,3 +12,11 @@ test('practice initial page contains only two scripts and declarative optional f
  assert.match(html,/data-practice-view="lobby"/);const config=JSON.parse(html.match(/id="kg-page-features">([^<]+)<\/script>/)[1]);for(const name of ['auth','account','answer','community','report','knowledge'])assert.ok(config[name]);assert.ok(config.account.depends.includes('auth'));assert.ok(config.answer.depends.includes('community'))
  const plan=JSON.parse(read('./practice-bundles.json'));const initial=plan.groups.filter(g=>g.initial).flatMap(g=>g.scripts);for(const name of ['src/113-practice-result-report.js','src/119-question-comments.js','src/33-user-center.js','src/32-wechat-login.js','src/practice/knowledge-space-scene.js'])assert.ok(!initial.includes(name),name);assert.ok(!plan.groups.flatMap(g=>g.scripts).includes('question-catalog-adapter.js'))
 })
+test('practice keeps the approved stylesheet cascade while deferring scripts',()=>{
+ const approved=['dialogs','main','user-center','membership-ui','subscription','account-menu','support-center','practice-mode','question-comments','knowledge-dashboard','focus-vega-typography','learning-skin','learning-loading','learning-weekly-open-gate','close-button','answer-page','question-materials'].map(name=>`styles/${name}.css`)
+ const plan=JSON.parse(read('./practice-bundles.json'))
+ assert.deepEqual(plan.groups.filter(g=>g.initial).flatMap(g=>g.styles),approved)
+ assert.ok(plan.groups.filter(g=>g.feature).every(g=>g.styles.length===0),'optional scripts must not reorder the approved CSS cascade')
+ const css=read('../public/new-legacy/bundles/practice-lobby.css')
+ assert.deepEqual([...css.matchAll(/\/\* style: ([^ ]+) \*\//g)].map(match=>match[1]),approved)
+})

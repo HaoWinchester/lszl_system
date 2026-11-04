@@ -1529,7 +1529,8 @@
     dom.filterButtons.forEach(button=>button.classList.toggle('is-active',button.dataset.paperFilter===state.libraryFilter));
     const status=catalogStatus();
     dom.paperLibrary?.setAttribute('aria-busy',String(status==='loading'));
-    const empty='<div class="practice-paper-empty" role="status">'+(status==='loading'?'正在读取已发布试卷…':status==='error'?'试卷读取失败，请检查网络。<button type="button" data-retry-paper-catalog>重新读取试卷</button>':state.releases.length?'没有找到匹配的试卷，试试其他关键词或清除筛选。':'暂无已发布试卷。教师发布试卷后即可在这里开始练习。')+'</div>';
+    if(status!=='loading')dom.lobby?.removeAttribute('data-catalog-pending');
+    const empty='<div class="'+(status==='loading'?'practice-paper-card practice-paper-empty':'practice-paper-empty')+'" role="status">'+(status==='loading'?'正在读取已发布试卷…':status==='error'?'试卷读取失败，请检查网络。<button type="button" data-retry-paper-catalog>重新读取试卷</button>':state.releases.length?'没有找到匹配的试卷，试试其他关键词或清除筛选。':'暂无已发布试卷。教师发布试卷后即可在这里开始练习。')+'</div>';
     if(dom.paperLibrary){dom.paperLibrary.innerHTML=rows.length?rows.map(paperCardMarkup).join(''):empty;bindPaperCards(dom.paperLibrary)}
     if(dom.paperDrawerLibrary&&!dom.paperDrawer?.hidden){dom.paperDrawerLibrary.innerHTML=rows.length?rows.map(paperCardMarkup).join(''):empty;bindPaperCards(dom.paperDrawerLibrary,{closeDrawer:true})}
     const more=$('practicePaperLoadMore');if(more){more.hidden=!page?.hasMore;more.disabled=status==='loading';more.textContent=status==='loading'?'正在读取…':'加载更多试卷'}

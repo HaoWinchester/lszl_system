@@ -48,15 +48,21 @@
       "styles": [
         "styles/dialogs.css",
         "styles/main.css",
+        "styles/user-center.css",
+        "styles/membership-ui.css",
+        "styles/subscription.css",
         "styles/account-menu.css",
         "styles/support-center.css",
         "styles/practice-mode.css",
+        "styles/question-comments.css",
+        "styles/knowledge-dashboard.css",
         "styles/focus-vega-typography.css",
         "styles/learning-skin.css",
         "styles/learning-loading.css",
         "styles/learning-weekly-open-gate.css",
         "styles/close-button.css",
-        "styles/answer-page.css"
+        "styles/answer-page.css",
+        "styles/question-materials.css"
       ]
     },
     {
@@ -87,10 +93,8 @@
         "direct-system-adapter.js",
         "src/33-user-center.js"
       ],
-      "styles": [
-        "styles/user-center.css",
-        "styles/subscription.css"
-      ]
+      "styles": [],
+      "retainStyleArtifact": true
     },
     {
       "name": "practice-question",
@@ -105,9 +109,8 @@
         "src/117-question-answer-set.js",
         "src/118-question-materials.js"
       ],
-      "styles": [
-        "styles/question-materials.css"
-      ]
+      "styles": [],
+      "retainStyleArtifact": true
     },
     {
       "name": "practice-community",
@@ -121,9 +124,8 @@
         "src/119-question-comments.js",
         "src/120-question-favorites.js"
       ],
-      "styles": [
-        "styles/question-comments.css"
-      ]
+      "styles": [],
+      "retainStyleArtifact": true
     },
     {
       "name": "practice-answer",
@@ -164,9 +166,8 @@
         "src/practice/knowledge-space-scene.js",
         "src/practice/knowledge-dashboard.js"
       ],
-      "styles": [
-        "styles/knowledge-dashboard.css"
-      ]
+      "styles": [],
+      "retainStyleArtifact": true
     }
   ]
 }
