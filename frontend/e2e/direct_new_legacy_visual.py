@@ -23,6 +23,9 @@ CUSTOMIZATION_STYLESHEETS = {"membership-ui.css"}
 HOMEPAGE_BUNDLE_GROUPS = json.loads(
     (Path(__file__).parents[1] / "scripts" / "homepage-bundles.json").read_text()
 )["groups"]
+PRACTICE_BUNDLE_GROUPS = json.loads(
+    (Path(__file__).parents[1] / "scripts" / "practice-bundles.json").read_text()
+)["groups"]
 
 
 def difference_ratio(left_path: Path, right_path: Path, threshold: int = 20) -> float:
@@ -96,6 +99,22 @@ with sync_playwright() as playwright:
                     expected_raw = [
                         Path(asset).name
                         for group in HOMEPAGE_BUNDLE_GROUPS
+                        for asset in group["styles"]
+                        if Path(asset).name not in CUSTOMIZATION_STYLESHEETS
+                    ]
+                    assert integrated_styles == expected_initial, (case_name, viewport_name, stylesheets)
+                    assert len(raw_styles) == len(set(raw_styles)), (case_name, viewport_name, stylesheets)
+                    assert set(raw_styles) == set(expected_raw), (case_name, viewport_name, stylesheets)
+                elif case_name == "practice":
+                    expected_initial = [
+                        f"{group['name']}.css"
+                        for group in PRACTICE_BUNDLE_GROUPS
+                        if group["initial"] and group["styles"]
+                    ]
+                    expected_raw = [
+                        Path(asset).name
+                        for group in PRACTICE_BUNDLE_GROUPS
+                        if group["initial"]
                         for asset in group["styles"]
                         if Path(asset).name not in CUSTOMIZATION_STYLESHEETS
                     ]
