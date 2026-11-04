@@ -1,15 +1,11 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.413",
-  "toVersion": "v9.0-p4.1.414",
+  "fromVersion": "v9.0-p4.1.415",
+  "toVersion": "v9.0-p4.1.415",
   "changes": {
     "added": [],
     "changed": [
-      "VERSION",
-      "content-prep-studio/dist/content-prep.html",
-      "src/100-practice-mode.js",
-      "src/practice/practice-answer-page.js",
-      "tests/practice-side-nav-comments-browser.py"
+      "content-prep-studio/dist/content-prep.html"
     ],
     "removed": []
   },
