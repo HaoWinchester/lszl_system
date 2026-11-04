@@ -84,6 +84,14 @@ scenario = '''
         after=page.locator(selector).bounding_box()
         assert abs(before['width']-after['width'])<.1 and abs(before['height']-after['height'])<.1,(selector,'hover must preserve control size')
         page.locator(selector).focus();expect(page.locator(selector)).to_be_focused()
+    # Speed work must preserve the approved content-driven title/meta geometry.
+    for selector in ['#practiceSelectedPaperName', '#practicePaperMeta']:
+        element=page.locator(selector)
+        original=element.inner_html()
+        element.evaluate("e=>e.textContent='PMP'")
+        geometry=element.evaluate("e=>({height:e.getBoundingClientRect().height,lineHeight:parseFloat(getComputedStyle(e).lineHeight)})")
+        assert abs(geometry['height']-geometry['lineHeight'])<1, (selector,'short text must retain one natural line',geometry)
+        element.evaluate('(e,html)=>e.innerHTML=html',original)
     assert len(cards)==4 and len(set(round(c['height'],2) for c in cards))==1,('mode card heights',cards)
     page.set_viewport_size({'width':390,'height':844})
     # Let Chrome complete responsive layout before checking header geometry.

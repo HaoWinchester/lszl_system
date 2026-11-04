@@ -30,6 +30,7 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 - `new-legacy/` 是当前前端权威源；不要把 `frontend/public/new-legacy/` 或 active release site 当作手工编辑源。
 - 正式发布必须走 `node frontend/scripts/manage-new-legacy.js update new-legacy --skip-browser`，由脚本同步、构建、验证并 promote；禁止手工复制覆盖 release site。
 - 页面已有 DOM、class、画布结构和业务行为默认保持兼容；涉及视觉或交互调整时，以当前设计规格和契约测试为准。
+- 性能优化不得擅自修改既有布局、尺寸、字号、颜色或 CSS 覆盖顺序。外观保真必须与改动前的运行版本对照；修改后的源码与构建产物一致，不能替代原外观验证。
 - 跨页面公共行为必须落入 `new-legacy/src/` 下职责明确的共享模块或 `frontend/scripts/new-legacy-assets/` 适配层，禁止在多个页面复制变体实现。
 - `frontend/public/new-legacy/`、manifest、sync report 和 seed 版本等生成产物在正式发布时必须与源修改一起提交。
 

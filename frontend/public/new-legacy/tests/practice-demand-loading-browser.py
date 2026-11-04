@@ -14,14 +14,16 @@ with sync_playwright() as pw:
         scripts=[];catalog=[]
         p.route('**/bundles/practice-lobby.js?*',lambda r:scripts.append(r))
         p.route('**/paper-releases/catalog?*',lambda r:catalog.append(r))
-        p.goto(base+'/practice-mode.html',wait_until='commit');p.locator('#practiceSetupCard').wait_for(state='visible')
+        p.goto(base+'/practice-mode.html',wait_until='commit');p.locator('#practicePaperLibrary').wait_for(state='visible')
         bounds=lambda:p.locator('.practice-mode-layout').evaluate('(e)=>({y:e.getBoundingClientRect().y,height:e.getBoundingClientRect().height})')
+        expect(p.locator('.practice-mode-layout')).to_be_hidden()
         first=bounds();assert len(scripts)==1;scripts[0].continue_();p.wait_for_load_state('domcontentloaded');p.wait_for_timeout(80);pending=bounds()
+        expect(p.locator('.practice-mode-layout')).to_be_hidden()
         assert len(catalog)==1,requests
         assert 'pageSize=12' in catalog[0].request.url and 'mode=practice_mode' in catalog[0].request.url
         catalog[0].continue_();p.unroute('**/paper-releases/catalog?*');p.wait_for_function('KGPaperReleaseApi.catalogStatus()==="ready"');expect(p.locator('#practicePaperLibrary [data-paper-id]')).to_have_count(12);p.wait_for_timeout(150)
-        ready=bounds();assert max(abs(first['y']-x['y']) for x in (pending,ready))<=1,(width,first,pending,ready)
-        assert max(abs(first['height']-x['height']) for x in (pending,ready))<=1,(width,first,pending,ready)
+        ready=bounds();expect(p.locator('.practice-mode-layout')).to_be_visible()
+        assert p.locator('#practiceLobby').get_attribute('data-catalog-pending') is None
         initial=[u for u in requests if '/bundles/' in u and '.js?' in u];assert len(initial)==2,initial
         forbidden=['question-catalog/bootstrap','/questions?','/learning/practice/sessions','/subscriptions/plans','practice-answer.js','practice-account.js','practice-report.js','practice-community.js','practice-knowledge.js','practice-auth.js']
         assert not [u for u in requests if any(x in u for x in forbidden)],requests
@@ -43,6 +45,15 @@ with sync_playwright() as pw:
         p.route('**/bundles/practice-answer.js?*',lambda r:r.abort());p.locator('[data-practice-start="practice"]').click();expect(p.locator('#practiceToast')).to_be_visible();p.unroute('**/bundles/practice-answer.js?*');p.locator('[data-practice-start="practice"]').click();expect(p.locator('#practiceGame')).to_be_visible();assert p.evaluate('KGPracticeFeatures.state("report")')=='idle'
         p.locator('[data-option-id="A"]').click();p.locator('#practiceAnswerSheetMobileBtn').click();expect(p.locator('#practiceAnswerSheetDrawer .practice-answer-number')).to_have_count(2);p.locator('#practiceAnswerSheetDrawerClose').click();p.locator('#practiceNextBtn').click();p.locator('[data-option-id="A"]').click();expect(p.locator('#practiceResult')).to_be_visible();assert p.evaluate('KGPracticeFeatures.state("report")')=='ready'
         ctx.close()
+    failure_ctx=browser.new_context();failure_page=failure_ctx.new_page()
+    failure_page.route('**/paper-releases/catalog?*',lambda r:r.fulfill(status=503,json={'detail':'initial catalog unavailable'}),times=1)
+    failure_page.goto(base+'/practice-mode.html',wait_until='networkidle')
+    expect(failure_page.locator('[data-retry-paper-catalog]')).to_be_visible()
+    expect(failure_page.locator('.practice-mode-layout')).to_be_visible()
+    assert failure_page.locator('#practiceLobby').get_attribute('data-catalog-pending') is None
+    failure_page.locator('[data-retry-paper-catalog]').click()
+    expect(failure_page.locator('#practicePaperLibrary [data-paper-id]')).to_have_count(12)
+    failure_ctx.close()
     ctx=browser.new_context(viewport={'width':1440,'height':900})
     assert ctx.request.post(base+'/api/v1/auth/login',data={'username':'ink-student','password':'ink-browser-test'}).ok
     started=ctx.request.post(base+'/api/v1/learning/practice/sessions/enter',data={'paperId':'lobby-paper-01','releaseId':'lobby-release-01','mode':'practice','count':2,'order':'paper'});assert started.ok,started.text()
