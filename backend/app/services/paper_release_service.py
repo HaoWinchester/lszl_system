@@ -593,7 +593,7 @@ def catalog_summary(release: PaperRelease, *, user: User | None, entitled: bool)
 async def catalog(
     db: AsyncSession, user: User | None, *, page: int, page_size: int,
     search: str = "", subject: str = "", access: str = "all", mode: str | None = None,
-    paper_id: str = "",
+    paper_id: str = "", release_id: str = "",
 ) -> dict:
     if mode is not None and mode not in VALID_MODES:
         raise _error(422, "INVALID_RELEASE_MODE", "未知学习模式")
@@ -624,6 +624,8 @@ async def catalog(
         base = base.where(PaperRelease.subject == subject.strip())
     if paper_id:
         base = base.where(PaperRelease.paper_id == paper_id)
+    if release_id:
+        base = base.where(PaperRelease.id == release_id)
     if access == "member":
         base = base.where(PaperRelease.access_level.in_(MEMBER_ACCESS_LEVELS))
     elif access == "free":
