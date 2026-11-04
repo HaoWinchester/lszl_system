@@ -23,8 +23,8 @@
   const state = {
     catalog: [],          // 轻量目录（normalize 后）
     catalogById: new Map(),
-    selectedPapers: new Map(), // paperId -> exact lightweight published summary (or null)
-    selectedPaperLoads: new Map(),
+    selectedSummaries: new Map(), // [identifier field, id] -> exact published summary (or null)
+    selectedSummaryLoads: new Map(),
     details: new Map(),   // releaseId -> release（normalize 后，含 questions refs）
     questions: new Map(), // releaseId -> { items, fetchedAt, seed }
     questionLoads: new Map(), // releaseId + seed + maxCount -> in-flight Promise
@@ -174,30 +174,35 @@
     return clone(page);
   }
 
-  // 历史记录仅有 paperId 时，精确查询当前发布摘要，不扫描目录或读取冻结正文。
-  function findPublishedPaper(paperId) {
-    const id = text(paperId).trim();
+  // 兼容旧记录与跳转参数：精确查询当前发布摘要，不扫描目录或读取冻结正文。
+  function findPublishedSummary(field, value) {
+    const id = text(value).trim();
     if (!id) return Promise.resolve(null);
-    if (state.selectedPapers.has(id)) return Promise.resolve(clone(state.selectedPapers.get(id)));
-    if (state.selectedPaperLoads.has(id)) return state.selectedPaperLoads.get(id);
+    const key = JSON.stringify([field, id]);
+    if (state.selectedSummaries.has(key)) return Promise.resolve(clone(state.selectedSummaries.get(key)));
+    if (state.selectedSummaryLoads.has(key)) return state.selectedSummaryLoads.get(key);
     const epoch = catalogEpoch;
-    const params = new URLSearchParams({ page: '1', pageSize: '1', mode: 'practice_mode', paperId: id });
+    const params = new URLSearchParams({ page: '1', pageSize: '1', mode: 'practice_mode', [field]: id });
     const operation = (async () => {
       try {
         const payload = await request(`/catalog?${params.toString()}`);
         if (epoch !== catalogEpoch) return null;
         const exact = (Array.isArray(payload.releases) ? payload.releases : [])
-          .find(row => text(row?.paperId) === id && text(row?.releaseId || row?.id));
+          .find(row => text(field === 'releaseId' ? row?.releaseId || row?.id : row?.paperId) === id
+            && text(row?.releaseId || row?.id));
         const row = exact ? normalizeCatalogRow(exact) : null;
-        state.selectedPapers.set(id, row);
+        state.selectedSummaries.set(key, row);
         return clone(row);
       } finally {
-        if (state.selectedPaperLoads.get(id) === operation) state.selectedPaperLoads.delete(id);
+        if (state.selectedSummaryLoads.get(key) === operation) state.selectedSummaryLoads.delete(key);
       }
     })();
-    state.selectedPaperLoads.set(id, operation);
+    state.selectedSummaryLoads.set(key, operation);
     return operation;
   }
+
+  function findPublishedPaper(paperId) { return findPublishedSummary('paperId', paperId); }
+  function findPublishedRelease(releaseId) { return findPublishedSummary('releaseId', releaseId); }
 
   // 大厅只读取请求的这一页；搜索、科目与权限过滤由服务端统一执行。
   function queryCatalog({ page = 1, pageSize = 12, search = '', subject = '', access = 'all', append = false } = {}) {
@@ -406,8 +411,8 @@
     pendingCatalogQuery = null;
     readyPromise = null;
     state.details.clear();
-    state.selectedPapers.clear();
-    state.selectedPaperLoads.clear();
+    state.selectedSummaries.clear();
+    state.selectedSummaryLoads.clear();
     state.questions.clear();
     state.questionLoads.clear();
     if (!keepCatalog) {
@@ -463,6 +468,7 @@
     queryCatalog,
     catalogPage,
     findPublishedPaper,
+    findPublishedRelease,
     managementCatalog,
     mergeManagementPapers,
     publish,

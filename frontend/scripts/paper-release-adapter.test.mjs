@@ -758,3 +758,68 @@ test('load-more retries a failed next page using the last successfully committed
   assert.equal(api.catalogStatus(), 'ready')
   assert.deepEqual(Array.from(api.catalog(), row => row.releaseId), ['r1', 'r2'])
 })
+
+test('release-only navigation looks up one exact current summary without changing the catalog page', async () => {
+  const lookup = deferred()
+  const { api, requests } = practiceAdapter(async ({ path }) => path.includes('releaseId=')
+    ? lookup.promise : catalogPayload(['visible'], 50))
+  await api.ready()
+  await api.queryCatalog({ page: 2, search: 'filtered', subject: 'ACP', access: 'member' })
+  const before = JSON.stringify(api.catalogPage())
+  const first = api.findPublishedRelease('release & 1')
+  const repeated = api.findPublishedRelease('release & 1')
+  assert.equal(requests.length, 3)
+  assert.equal(requests.at(-1), '/api/v1/paper-releases/catalog?page=1&pageSize=1&mode=practice_mode&releaseId=release+%26+1')
+  lookup.resolve({ releases: [{ paperId: 'selected', releaseId: 'release & 1', contentRestricted: false, questionCount: 7 }], total: 1 })
+  const [selected, same] = await Promise.all([first, repeated])
+  assert.equal(selected.paperId, 'selected')
+  assert.equal(same.releaseId, 'release & 1')
+  assert.equal(selected.totalCount, 7)
+  assert.equal(selected.contentRestricted, false)
+  selected.title = 'mutation'
+  assert.notEqual((await api.findPublishedRelease('release & 1')).title, 'mutation')
+  assert.deepEqual(Array.from(api.catalog(), row => row.releaseId), ['visible'])
+  assert.equal(JSON.stringify(api.catalogPage()), before)
+  assert.equal(api.catalogStatus(), 'ready')
+  assert.equal(requests.length, 3)
+})
+
+test('release summary lookup validates exact IDs and does not reuse a paper lookup cache entry', async () => {
+  const { api, requests } = practiceAdapter(async ({ path }) => {
+    const query = new URL(path, 'https://local.test').searchParams
+    if (query.has('paperId')) return { releases: [{ paperId: 'shared', releaseId: 'paper-result' }], total: 1 }
+    if (query.get('releaseId') === 'shared') return { releases: [{ paperId: 'release-result', releaseId: 'shared' }], total: 1 }
+    return catalogPayload(['unrelated'])
+  })
+  await api.ready()
+  assert.equal(await api.findPublishedRelease(''), null)
+  assert.equal((await api.findPublishedPaper('shared')).releaseId, 'paper-result')
+  assert.equal((await api.findPublishedRelease('shared')).paperId, 'release-result')
+  assert.equal(await api.findPublishedRelease('missing'), null)
+  assert.equal(await api.findPublishedRelease('missing'), null)
+  assert.equal(requests.length, 4)
+})
+
+test('release summary lookup clears cached owner coverage and rejects stale owner responses', async () => {
+  const old = deferred()
+  let owner = 'old'
+  const { api, context, requests } = practiceAdapter(async ({ path }) => {
+    if (!path.includes('releaseId=')) return catalogPayload([owner])
+    if (owner === 'old') return old.promise
+    return { releases: [{ paperId: owner, releaseId: 'selected', coverage: { completedCount: 0 } }], total: 1 }
+  })
+  await api.ready()
+  const first = api.findPublishedRelease('selected')
+  owner = 'new'
+  context.dispatchEvent(new context.CustomEvent('kg:auth-session-changed'))
+  await api.ready()
+  assert.equal((await api.findPublishedRelease('selected')).paperId, 'new')
+  old.resolve({ releases: [{ paperId: 'old', releaseId: 'selected', coverage: { completedCount: 9 } }], total: 1 })
+  assert.equal(await first, null)
+  assert.equal((await api.findPublishedRelease('selected')).coverage.completedCount, 0)
+  owner = 'third'
+  context.dispatchEvent(new context.CustomEvent('kg:auth-session-changed'))
+  await api.ready()
+  assert.equal((await api.findPublishedRelease('selected')).paperId, 'third')
+  assert.equal(requests.filter(path => path.includes('releaseId=')).length, 3)
+})
