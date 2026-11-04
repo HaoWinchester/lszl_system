@@ -16,22 +16,22 @@
   <title>个人学习工具｜知识图谱与主动回忆</title>
   <link rel="canonical" href="https://lszl.aihuanpu.com/practice-mode.html"/>
   <link rel="stylesheet" href="styles/main.css"/>
-  <link rel="stylesheet" href="styles/user-center.css"/>
-  <link rel="stylesheet" href="styles/subscription.css"/>
+  <link rel="kg-feature-style" data-practice-feature="account" href="styles/user-center.css"/>
+  <link rel="kg-feature-style" data-practice-feature="account" href="styles/subscription.css"/>
   <link rel="stylesheet" href="styles/account-menu.css"/>
   <link rel="stylesheet" href="styles/support-center.css"/>
   <link rel="stylesheet" href="styles/practice-mode.css"/>
-  <link rel="stylesheet" href="styles/question-comments.css"/>
-  <link rel="stylesheet" href="styles/knowledge-dashboard.css"/>
+  <link rel="kg-feature-style" data-practice-feature="community" href="styles/question-comments.css"/>
+  <link rel="kg-feature-style" data-practice-feature="knowledge" href="styles/knowledge-dashboard.css"/>
   <link rel="stylesheet" href="styles/focus-vega-typography.css"/>
   <link rel="stylesheet" href="styles/learning-skin.css"/>
   <link rel="stylesheet" href="styles/learning-loading.css"/>
   <link rel="stylesheet" href="styles/learning-weekly-open-gate.css"/>
   <link rel="stylesheet" href="styles/close-button.css"/>
   <link rel="stylesheet" href="styles/answer-page.css"/>
-<link rel="stylesheet" href="styles/question-materials.css"/>
+<link rel="kg-feature-style" data-practice-feature="question" href="styles/question-materials.css"/>
 </head>
-<body class="practice-mode-page" data-learning-skin="focus-vega">
+<body class="practice-mode-page" data-learning-skin="focus-vega" data-practice-view="lobby">
   <div class="practice-app">
     <header class="practice-header">
       <a class="practice-brand" href="practice-mode.html" aria-label="返回做题模式大厅">
@@ -119,7 +119,7 @@
             </div>
           </div>
 
-          <div class="practice-paper-scroll-shell"><div class="practice-paper-scroll" id="practicePaperLibrary"></div></div>
+          <div class="practice-paper-scroll-shell"><div class="practice-paper-scroll" id="practicePaperLibrary" aria-busy="true"><div class="practice-paper-empty" role="status">正在读取已发布试卷…</div></div></div>
           <select id="practicePaperSelect" hidden aria-hidden="true"></select>
         </section>
 
@@ -336,7 +336,7 @@
           <button type="button" data-paper-filter="member">会员</button>
         </div>
       </div>
-      <div class="practice-drawer-body"><div class="practice-paper-drawer-grid" id="practicePaperDrawerLibrary"></div></div>
+      <div class="practice-drawer-body"><div class="practice-paper-drawer-grid" id="practicePaperDrawerLibrary"></div><button type="button" class="practice-secondary-btn" id="practicePaperLoadMore" hidden>加载更多试卷</button></div>
     </aside>
   </div>
 
@@ -411,42 +411,44 @@
   <script defer src="src/01-runtime-config.js"></script>
   <script defer src="src/28-app-storage.js"></script>
   <script defer src="src/29-auth-core.js"></script>
-  <script defer src="src/30-shared-auth-dialog.js"></script>
-  <script defer src="src/32-wechat-login.js"></script>
+  <script defer src="src/feature-assets.js"></script>
+  <script defer src="src/practice/feature-loader.js"></script>
+  <script type="application/x-kg-feature" data-practice-feature="auth" src="src/30-shared-auth-dialog.js"></script>
+  <script type="application/x-kg-feature" data-practice-feature="auth" src="src/32-wechat-login.js"></script>
   <script defer src="src/34-role-permissions.js"></script>
   <script defer src="src/31a-learning-weekly-open-schedule.js"></script>
-  <script defer src="src/37-subscription-plans.js"></script>
-  <script defer src="src/37-subscription-orders.js"></script>
-  <script defer src="src/37-subscription-redeem-codes.js"></script>
-  <script defer src="src/37-subscription-core.js"></script>
-  <script defer src="src/33-user-center.js"></script>
+  <script type="application/x-kg-feature" data-practice-feature="account" src="src/37-subscription-plans.js"></script>
+  <script type="application/x-kg-feature" data-practice-feature="account" src="src/37-subscription-orders.js"></script>
+  <script type="application/x-kg-feature" data-practice-feature="account" src="src/37-subscription-redeem-codes.js"></script>
+  <script type="application/x-kg-feature" data-practice-feature="account" src="src/37-subscription-core.js"></script>
+  <script type="application/x-kg-feature" data-practice-feature="account" src="src/33-user-center.js"></script>
   <script defer src="src/107-learning-ui-icons.js"></script>
   <script defer src="src/41-account-menu.js"></script>
   <script defer src="src/101-engagement-repository.js"></script>
   <script defer src="src/103-support-center.js"></script>
   <script defer src="src/59c-active-learning-mode-policy.js"></script>
   <script defer src="src/58-paper-access-service.js"></script>
-  <script defer src="src/86-activity-schema-v1.js"></script>
-  <script defer src="src/86-free-mode-language.js"></script>
-  <script defer src="src/86-question-language-ui.js"></script>
+  <script type="application/x-kg-feature" data-practice-feature="question" src="src/86-activity-schema-v1.js"></script>
+  <script type="application/x-kg-feature" data-practice-feature="question" src="src/86-free-mode-language.js"></script>
+  <script type="application/x-kg-feature" data-practice-feature="question" src="src/86-question-language-ui.js"></script>
   <script defer src="src/59-published-paper-repository.js"></script>
   <script defer src="src/110-learning-loading.js"></script>
-  <script defer src="src/111-practice-session-core.js"></script>
-  <script defer src="src/115-practice-mode-policy.js"></script>
-  <script defer src="src/112-practice-answer-sheet.js"></script>
-  <script defer src="src/113-practice-result-report.js"></script>
-  <script defer src="src/119-question-comments.js"></script>
-  <script defer src="src/120-question-favorites.js"></script>
-  <script defer src="src/117-question-answer-set.js"></script>
-<script defer src="src/118-question-materials.js"></script>
-  <script defer src="src/114-practice-draft-state.js"></script>
-  <script defer src="src/116-practice-session-save.js"></script>
+  <script type="application/x-kg-feature" data-practice-feature="answer" src="src/111-practice-session-core.js"></script>
+  <script type="application/x-kg-feature" data-practice-feature="answer" src="src/115-practice-mode-policy.js"></script>
+  <script type="application/x-kg-feature" data-practice-feature="answer" src="src/112-practice-answer-sheet.js"></script>
+  <script type="application/x-kg-feature" data-practice-feature="report" src="src/113-practice-result-report.js"></script>
+  <script type="application/x-kg-feature" data-practice-feature="community" src="src/119-question-comments.js"></script>
+  <script type="application/x-kg-feature" data-practice-feature="community" src="src/120-question-favorites.js"></script>
+  <script type="application/x-kg-feature" data-practice-feature="question" src="src/117-question-answer-set.js"></script>
+<script type="application/x-kg-feature" data-practice-feature="question" src="src/118-question-materials.js"></script>
+  <script type="application/x-kg-feature" data-practice-feature="answer" src="src/114-practice-draft-state.js"></script>
+  <script type="application/x-kg-feature" data-practice-feature="answer" src="src/116-practice-session-save.js"></script>
   <script defer src="src/118-revenge-entry-policy.js"></script>
   <script defer src="src/paper-presentation.js"></script>
   <script defer src="src/practice/lobby-dashboard.js"></script>
-  <script defer src="src/practice/practice-sound.js"></script>
-  <script defer src="src/practice/knowledge-space-scene.js"></script>
-  <script defer src="src/practice/knowledge-dashboard.js"></script>
+  <script type="application/x-kg-feature" data-practice-feature="answer" src="src/practice/practice-sound.js"></script>
+  <script type="application/x-kg-feature" data-practice-feature="knowledge" src="src/practice/knowledge-space-scene.js"></script>
+  <script type="application/x-kg-feature" data-practice-feature="knowledge" src="src/practice/knowledge-dashboard.js"></script>
   <script defer src="src/100-practice-mode.js"></script>
   <script defer src="src/practice/practice-answer-page.js"></script>
 </body>

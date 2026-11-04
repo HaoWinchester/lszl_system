@@ -1,0 +1,172 @@
+{
+  "groups": [
+    {
+      "name": "practice-prelude",
+      "initial": true,
+      "defer": false,
+      "scripts": [
+        "teaching-content-sync.js",
+        "runtime-config.override.js",
+        "auth-session-bootstrap.js",
+        "domain-api-client.js",
+        "src/28-device-preferences.js",
+        "src/feature-assets.js"
+      ],
+      "styles": []
+    },
+    {
+      "name": "practice-lobby",
+      "initial": true,
+      "defer": true,
+      "scripts": [
+        "direct-entry.js",
+        "src/feature-usage-clock.js",
+        "feature-analytics.js",
+        "src/00-dialogs.js",
+        "src/01-runtime-config.js",
+        "src/28-app-storage.js",
+        "src/29-auth-core.js",
+        "src/34-role-permissions.js",
+        "src/31a-learning-weekly-open-schedule.js",
+        "src/107-learning-ui-icons.js",
+        "src/41-account-menu.js",
+        "src/101-engagement-repository.js",
+        "src/103-support-center.js",
+        "src/58-paper-access-service.js",
+        "paper-release-adapter.js",
+        "src/59-published-paper-repository.js",
+        "src/110-learning-loading.js",
+        "src/118-revenge-entry-policy.js",
+        "src/paper-presentation.js",
+        "src/practice/lobby-dashboard.js",
+        "practice-learning-adapter.js",
+        "src/59c-active-learning-mode-policy.js",
+        "src/practice/feature-loader.js",
+        "src/100-practice-mode.js",
+        "src/practice/practice-answer-page.js"
+      ],
+      "styles": [
+        "styles/dialogs.css",
+        "styles/main.css",
+        "styles/account-menu.css",
+        "styles/support-center.css",
+        "styles/practice-mode.css",
+        "styles/focus-vega-typography.css",
+        "styles/learning-skin.css",
+        "styles/learning-loading.css",
+        "styles/learning-weekly-open-gate.css",
+        "styles/close-button.css",
+        "styles/answer-page.css"
+      ]
+    },
+    {
+      "name": "practice-auth",
+      "feature": "auth",
+      "initial": false,
+      "defer": true,
+      "depends": [],
+      "scripts": [
+        "src/30-shared-auth-dialog.js",
+        "src/32-wechat-login.js"
+      ],
+      "styles": []
+    },
+    {
+      "name": "practice-account",
+      "feature": "account",
+      "initial": false,
+      "defer": true,
+      "depends": [
+        "auth"
+      ],
+      "scripts": [
+        "src/37-subscription-plans.js",
+        "src/37-subscription-orders.js",
+        "src/37-subscription-redeem-codes.js",
+        "src/37-subscription-core.js",
+        "direct-system-adapter.js",
+        "src/33-user-center.js"
+      ],
+      "styles": [
+        "styles/user-center.css",
+        "styles/subscription.css"
+      ]
+    },
+    {
+      "name": "practice-question",
+      "feature": "question",
+      "initial": false,
+      "defer": true,
+      "depends": [],
+      "scripts": [
+        "src/86-activity-schema-v1.js",
+        "src/86-free-mode-language.js",
+        "src/86-question-language-ui.js",
+        "src/117-question-answer-set.js",
+        "src/118-question-materials.js"
+      ],
+      "styles": [
+        "styles/question-materials.css"
+      ]
+    },
+    {
+      "name": "practice-community",
+      "feature": "community",
+      "initial": false,
+      "defer": true,
+      "depends": [
+        "question"
+      ],
+      "scripts": [
+        "src/119-question-comments.js",
+        "src/120-question-favorites.js"
+      ],
+      "styles": [
+        "styles/question-comments.css"
+      ]
+    },
+    {
+      "name": "practice-answer",
+      "feature": "answer",
+      "initial": false,
+      "defer": true,
+      "depends": [
+        "community"
+      ],
+      "scripts": [
+        "src/111-practice-session-core.js",
+        "src/115-practice-mode-policy.js",
+        "src/112-practice-answer-sheet.js",
+        "src/114-practice-draft-state.js",
+        "src/116-practice-session-save.js",
+        "src/practice/practice-sound.js"
+      ],
+      "styles": []
+    },
+    {
+      "name": "practice-report",
+      "feature": "report",
+      "initial": false,
+      "defer": true,
+      "depends": [],
+      "scripts": [
+        "src/113-practice-result-report.js"
+      ],
+      "styles": []
+    },
+    {
+      "name": "practice-knowledge",
+      "feature": "knowledge",
+      "initial": false,
+      "defer": true,
+      "depends": [],
+      "scripts": [
+        "src/practice/knowledge-space-scene.js",
+        "src/practice/knowledge-dashboard.js"
+      ],
+      "styles": [
+        "styles/knowledge-dashboard.css"
+      ]
+    }
+  ]
+}

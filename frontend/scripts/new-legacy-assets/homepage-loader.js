@@ -40,19 +40,7 @@
     }
   }
   function appendAsset(kind,bundle){
-    return new Promise((resolve,reject)=>{
-      const node=document.createElement(kind==='style'?'link':'script');
-      if(kind==='style'){
-        node.rel='stylesheet';
-        node.href=url(bundle,'css');
-      }else{
-        node.async=false;
-        node.src=url(bundle,'js');
-      }
-      node.onload=()=>resolve(node);
-      node.onerror=()=>reject(new Error(`homepage ${bundle} ${kind} load failed`));
-      document.head.appendChild(node);
-    });
+    return kind==='style'?global.KGFeatureAssets.loadStyle(url(bundle,'css')):global.KGFeatureAssets.loadScript(url(bundle,'js'));
   }
   async function initialize(name){
     if(name==='graph'&&global.KGHomepageGraphBootstrap&&typeof global.KGHomepageGraphBootstrap.then==='function'){
@@ -92,6 +80,8 @@
       })
       .catch(error=>{
         for(const node of record.nodes)node.remove?.();
+        global.KGFeatureAssets.forget('script',url(config.bundle,'js'));
+        if(config.style)global.KGFeatureAssets.forget('style',url(config.bundle,'css'));
         for(const item of pending)item.catch(()=>{});
         document.querySelectorAll?.(`link[href*="${config.bundle}.css"],script[src*="${config.bundle}.js"]`)?.forEach?.(node=>node.remove?.());
         record.nodes=[];

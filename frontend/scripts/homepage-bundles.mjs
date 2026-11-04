@@ -11,7 +11,7 @@ function normalizeAsset(value) {
 function assetMatches(html, kind) {
   const pattern = kind === 'script'
     ? /<script\b[^>]*\bsrc=["']([^"']+)["'][^>]*>\s*<\/script>/gi
-    : /<link\b(?=[^>]*\brel=["']stylesheet["'])(?=[^>]*\bhref=["']([^"']+)["'])[^>]*>/gi
+    : /<link\b(?=[^>]*\brel=["'](?:stylesheet|kg-feature-style)["'])(?=[^>]*\bhref=["']([^"']+)["'])[^>]*>/gi
   return Array.from(html.matchAll(pattern), (match) => ({
     tag: match[0],
     asset: normalizeAsset(match[1]),
@@ -84,7 +84,7 @@ function replaceTags(html, matches, replacement) {
   if (!matches.length) return html
   const remove = new Set(matches.map((match) => match.tag))
   let inserted = false
-  return html.replace(/<script\b[^>]*\bsrc=["'][^"']+["'][^>]*>\s*<\/script>|<link\b(?=[^>]*\brel=["']stylesheet["'])(?=[^>]*\bhref=["'][^"']+["'])[^>]*>/gi, (tag) => {
+  return html.replace(/<script\b[^>]*\bsrc=["'][^"']+["'][^>]*>\s*<\/script>|<link\b(?=[^>]*\brel=["'](?:stylesheet|kg-feature-style)["'])(?=[^>]*\bhref=["'][^"']+["'])[^>]*>/gi, (tag) => {
     if (!remove.has(tag)) return tag
     if (!inserted) {
       inserted = true
@@ -94,21 +94,21 @@ function replaceTags(html, matches, replacement) {
   })
 }
 
-function alreadyBuilt(html, plan, outputRoot) {
+function alreadyBuilt(html, plan, outputRoot, metaName) {
   const outputs = plan.groups.flatMap((group) => [
     ...(group.scripts.length ? [`bundles/${group.name}.js`] : []),
     ...(group.styles.length || group.retainStyleArtifact ? [`bundles/${group.name}.css`] : []),
   ])
-  return html.includes('<meta name="kg-homepage-bundle-version"')
+  return html.includes(`<meta name="${metaName}"`)
     && outputs.length > 0
     && outputs.every((asset) => existsSync(resolve(outputRoot, asset)))
 }
 
-export function buildHomepageBundles({ outputRoot, version, plan }) {
+export function buildHomepageBundles({ outputRoot, version, plan, page = 'index.html', metaName = 'kg-homepage-bundle-version' }) {
   validatePlan(plan)
-  const indexPath = resolve(outputRoot, 'index.html')
+  const indexPath = resolve(outputRoot, page)
   let html = readFileSync(indexPath, 'utf8')
-  if (alreadyBuilt(html, plan, outputRoot)) return { indexPath, groups: plan.groups.map((group) => group.name) }
+  if (alreadyBuilt(html, plan, outputRoot, metaName)) return { indexPath, groups: plan.groups.map((group) => group.name) }
 
   const scriptMatches = assetMatches(html, 'script')
   const styleMatches = assetMatches(html, 'style')
@@ -131,7 +131,8 @@ export function buildHomepageBundles({ outputRoot, version, plan }) {
 
   const safeVersion = String(version).replace(/[&"<>]/g, (character) => ({ '&': '&amp;', '"': '&quot;', '<': '&lt;', '>': '&gt;' })[character])
   const scriptTags = [
-    `<meta name="kg-homepage-bundle-version" content="${safeVersion}">`,
+    `<meta name="${metaName}" content="${safeVersion}">`,
+    ...(plan.groups.some(group => group.feature) ? [`<script type="application/json" id="kg-page-features">${JSON.stringify(Object.fromEntries(plan.groups.filter(group => group.feature).map(group => [group.feature, { depends: group.depends || [], scripts: group.scripts.length ? [`bundles/${group.name}.js?v=${version}`] : [], styles: group.styles.length ? [`bundles/${group.name}.css?v=${version}`] : [] }]))).replace(/</g, '\\u003c')}</script>`] : []),
     ...plan.groups
     .filter((group) => group.initial && group.scripts.length)
     .map((group) => `<script${group.defer ? ' defer' : ''} src="bundles/${group.name}.js?v=${version}"></script>`)

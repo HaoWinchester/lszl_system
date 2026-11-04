@@ -301,3 +301,11 @@ test('practice adapter exposes the server-deduplicated global revenge pool', asy
     overview.revengeCandidates,
   )
 })
+
+test('late practice session and report responses are discarded after owner changes',async()=>{
+ const {runInNewContext}=await import('node:vm');let username='owner-a',resolve;const held=new Promise(r=>resolve=r);
+ const window={location:{pathname:'/practice-mode.html'},addEventListener(){},dispatchEvent(){},KGAuthCore:{currentUser:()=>username?{username}:null},fetch:async()=>{await held;return {ok:true,json:async()=>({session:{id:'private-a',questions:[{stem:'private'}]},report:{private:true}})}}};
+ runInNewContext(source('frontend/scripts/new-legacy-assets/practice-learning-adapter.js'),{window,URLSearchParams,CustomEvent:class{}});
+ const session=window.KGPracticeLearningApi.getSession('private-a');const report=window.KGPracticeLearningApi.getReport('private-a');username='owner-b';resolve();
+ await assert.rejects(session,/账号已改变/);await assert.rejects(report,/账号已改变/);
+});

@@ -26,6 +26,7 @@
     try { (global.document || global).dispatchEvent(new CustomEvent(type, { detail: clone(detail), bubbles: true })) } catch (error) {}
   }
   async function request(path, options = {}) {
+    const requestOwner = text(currentUser()?.username)
     const response = await global.fetch(`${API_ROOT}${path}`, {
       ...options,
       credentials: 'include',
@@ -33,6 +34,9 @@
     })
     let payload = {}
     try { payload = await response.json() } catch (error) {}
+    if (/^\/sessions(?:\/|$)/.test(path) && requestOwner !== text(currentUser()?.username)) {
+      throw new Error('账号已改变，已丢弃上一账号的练习响应。')
+    }
     if (!response.ok) {
       const detail = payload?.detail || payload
       const message = typeof detail === 'object' ? detail?.message : detail

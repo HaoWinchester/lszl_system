@@ -335,12 +335,13 @@
     escapeHTML
   };
 
-  document.addEventListener('DOMContentLoaded',()=>{
+  function initializePage(){
     ensureAuthPanel();
     handleOfficialCallback();
     loadPublicConfig().then(config=>{
       const entry=document.querySelector('.wechat-login-entry');
       if(entry)entry.hidden=config.enableOfficial!==true;
     });
-  });
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initializePage,{once:true});else initializePage();
 })();

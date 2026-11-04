@@ -10,6 +10,7 @@ const frontendDir = resolve(scriptsDir, '..')
 const repoDir = resolve(frontendDir, '..')
 const contract = JSON.parse(readFileSync(resolve(scriptsDir, 'new-legacy-contract.json'), 'utf8'))
 const homepageBundlePlan = JSON.parse(readFileSync(resolve(scriptsDir, 'homepage-bundles.json'), 'utf8'))
+const practiceBundlePlan = JSON.parse(readFileSync(resolve(scriptsDir, 'practice-bundles.json'), 'utf8'))
 const p45PersistenceContract = JSON.parse(readFileSync(resolve(scriptsDir, 'p45-persistence-contract.json'), 'utf8'))
 const learningEntryChooserAssets = ['src/31-learning-entry-chooser.js']
 const learningEntryChooserStorageKeys = ['kg_learning_entry_chooser_claim_v1', 'kg_learning_entry_chooser_consumed_v1']
@@ -682,7 +683,7 @@ function injectPage(html, page, version) {
     'practice-mode.html': { mode: 'learning', marker: generated.includes('<script defer src="src/59-published-paper-repository.js"></script>') ? '<script defer src="src/59-published-paper-repository.js"></script>' : '<script defer src="src/100-practice-mode.js"></script>' },
     'index.html': { mode: 'learning', marker: '<script defer src="src/60-question-bank.js"></script>' },
   }
-  const catalogPage = questionCatalogPages[page]
+  const catalogPage = page === 'practice-mode.html' ? null : questionCatalogPages[page]
   if (catalogPage && !generated.includes('kg-question-catalog:generated')) {
     if (!generated.includes(catalogPage.marker)) {
       throw new Error(`new-legacy ${page} 题目目录脚本顺序已变化，请复核目录适配器`)
@@ -830,7 +831,7 @@ function injectPage(html, page, version) {
     if (userCenterTag) {
       generated = removeLocalScriptTags(generated, 'direct-system-adapter.js')
       generated = generated.replace(/^[ \t]*<!--\s*kg-system:generated\s*-->[ \t]*(?:\r?\n)?/gim, '')
-      const adapterTag = '<script defer src="./direct-system-adapter.js"></script>'
+      const adapterTag = page === 'practice-mode.html' ? '<script type="application/x-kg-feature" data-practice-feature="account" src="./direct-system-adapter.js"></script>' : '<script defer src="./direct-system-adapter.js"></script>'
       generated = generated.replace(
         userCenterTag,
         `${adapterTag}<!-- kg-system:generated -->\n${userCenterTag}`,
@@ -1174,6 +1175,7 @@ function sync({ source, out }) {
 
   if (existsSync(resolve(source, 'styles/main.css'))) {
     buildHomepageBundles({ outputRoot: out, version, plan: homepageBundlePlan })
+    if (existsSync(resolve(out, 'src/practice/feature-loader.js'))) buildHomepageBundles({ outputRoot: out, version, plan: practiceBundlePlan, page: 'practice-mode.html', metaName: 'kg-practice-bundle-version' })
   }
 
   const indexPath = resolve(out, 'index.html')
