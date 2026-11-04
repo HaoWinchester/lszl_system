@@ -30,4 +30,15 @@
 
 - artifacts/practice-ui-polish/graph-practice-mobile.png与graph-practice-desktop.png使用真实弹窗组件和用户截图转录的中文视觉样例；这些仅用于外观预览，未假装成真实API成功用例。
 - 真实业务回归日志graph-browser-final.log、answer-sheet-browser.log、lobby-controls-keyboard.log等位于artifacts/practice-ui-polish/。
-- 候选v9.0-p4.1.417，待完整发布、健康及公网复测后记录成功。用户本人UAT验收尚未执行；main禁止提前合入，功能分支保留。
+- v9.0-p4.1.417已完成完整发布、健康及公网复测。用户本人UAT验收尚未执行；main禁止提前合入，功能分支保留。
+
+## UAT最终结果
+
+- UAT版本v9.0-p4.1.417，实现提交67a9b97a。完整release校验通过1953秒，部署2004秒；脚本退出0，后端/worker/HTTPS健康与公网版本检查通过。
+- 正式流程内后端1300项（3条既有弃用警告）、前端404项、全部要求的浏览器/视觉检查通过。source/build视觉对照用于生成链路一致性，本次用户授权的局部新设计另以真实交互和截图复核。
+- 公网1440/768/390/320宽度均通过：没有科目select；搜索框右边与筛选区间隔16px（桌面）或工具栏右侧（窄屏）一致；题量、顺序、开始按钮均37px；挑战/复仇规则按钮的top/right边距完全相同。
+- 规则浮层在4种宽度均向上且不越界，document.scrollHeight与window.scrollY前后完全不变。无页面JS错误；CLS分别0.00084/0.00259/0.00401/0.00435，均低于0.02。
+- 原按需优化保持：初始2脚本、12条摘要；图谱线上home-shell.css/home-graph.js与候选文件SHA256逐字节一致，确认实际服务的是本次弹窗实现。
+- 额外使用真实隔离API复现并验证结果色：仅将CSS选择器改回旧优先级时，已选正确/错误项均仍为紫色；修复后错误项稳定为rgb(255,244,245)/字母块rgb(194,71,97)，正确项为rgb(240,250,244)/字母块rgb(37,137,80)。每次均等待选中态稳定后再提交，成功API未mock。证据result-color-probe.json。
+- 公网证据为artifacts/practice-ui-polish/uat-verification.json及uat-lobby-1440/768/390/320.png；全部本地fixture服务器已正常退出并清理独立数据库。
+- main保持6941af5c。等待用户本人UAT验收；功能分支保留，本次不合入main。
