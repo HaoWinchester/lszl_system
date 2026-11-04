@@ -23,4 +23,15 @@
 
 ## 发布状态
 
-目标版本v9.0-p4.1.418。完整发布与公网复核结果待实际执行后补充。用户尚未验收，main保持原提交，功能分支保留。
+已部署v9.0-p4.1.418，用户尚未验收。main保持6941af5c，功能分支保留。
+
+## 实际发布与公网复核
+
+- 实现07ed3c7b，版本化种子同步61a9b33a。正式update-uat.sh退出0；完整release验证1955秒、总部署2006秒。validation.json确认passed=true、profile=full，active pointer已指向418。
+- 后端1300项、前端404项及全部要求的浏览器/视觉检查通过；新增viewport契约也在正式验证中通过。生成链路视觉检查通过；本次局部布局效果另以真实公网截图核对。
+- 417的site共1273文件，418为1274，只新增tests/practice-lobby-viewport-browser.py，没有删除原文件；关键页面均在。
+- 公网7种视口逐一验证：1504×801、1366×768、1280×768、1024×768、768×844、390×844、320×568。document高度均等于视口高度、宽度不溢出、scrollY保持0。前三种桌面尺寸大厅内容也不溢出；窄屏末端按钮通过区域内滚动可达。
+- 三个控件高度均37px；桌面上下边界一致；双列视口的顺序与开始按钮对齐。继续练习状态由独立浏览器fixture覆盖，不将访客公网页面误称为登录续做验证。
+- 所有公网视口的搜索右对齐、向上复仇提示、打开关闭不改整页高度/scrollY通过，无JS错误。首屏2脚本/12摘要，CLS范围0–0.00961，低于0.02。
+- HTTPS健康检查status=ok、db=ok；发布脚本确认PUBLIC_RELEASE_OK=v9.0-p4.1.418。公网记录为artifacts/practice-lobby-viewport/uat-verification.json、uat-verification.log及uat-lobby-*.png。
+- 这些属于开发自检与部署复核，不代表用户业务验收；尚未合入或推送main。
