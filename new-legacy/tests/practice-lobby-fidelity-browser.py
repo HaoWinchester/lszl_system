@@ -97,8 +97,12 @@ scenario = '''
     for width in [1440, 768, 390, 320]:
         page.set_viewport_size({'width':width,'height':900 if width==1440 else 844})
         page.evaluate('()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))')
-        geometry=page.evaluate("""()=>{const rect=s=>document.querySelector(s).getBoundingClientRect();const search=rect('#practiceLibrarySearch'),toolbar=rect('.practice-library-toolbar'),actions=rect('.practice-library-actions');return {searchRight:search.right,toolbarRight:toolbar.right,actionsLeft:actions.left,heights:['.practice-count-options','.practice-order-options','[data-practice-start="practice"]'].map(s=>rect(s).height)}}""")
+        geometry=page.evaluate("""()=>{const rect=s=>document.querySelector(s).getBoundingClientRect();const search=rect('#practiceLibrarySearch'),toolbar=rect('.practice-library-toolbar'),actions=rect('.practice-library-actions'),controls=['.practice-count-options','.practice-order-options','[data-practice-start="practice"]'].map(rect);return {searchRight:search.right,toolbarRight:toolbar.right,actionsLeft:actions.left,heights:controls.map(r=>r.height),tops:controls.map(r=>r.top),bottoms:controls.map(r=>r.bottom)}}""")
         assert max(geometry['heights'])-min(geometry['heights'])<1,('matching practice control heights',width,geometry)
+        if width==1440:
+            assert max(geometry['tops'])-min(geometry['tops'])<1 and max(geometry['bottoms'])-min(geometry['bottoms'])<1,('practice controls share the same baseline',width,geometry)
+        elif width==768:
+            assert abs(geometry['tops'][1]-geometry['tops'][2])<1,('order and action align in two-column setup',width,geometry)
         target=geometry['actionsLeft']-16 if width==1440 else geometry['toolbarRight']
         assert abs(geometry['searchRight']-target)<1,('right aligned search',width,geometry)
         offsets=page.evaluate("""()=>[['.challenge','.practice-lobby-help>summary'],['.revenge','#practiceRevengeRuleTrigger']].map(([card,button])=>{const root=document.querySelector('.practice-mode-card'+card),c=root.getBoundingClientRect(),b=root.querySelector(button).getBoundingClientRect();return {top:b.top-c.top,right:c.right-b.right}})""")

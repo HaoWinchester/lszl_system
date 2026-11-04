@@ -685,12 +685,12 @@ body.practice-mode-page:not([data-practice-view="lobby"]) .practice-lobby-sideba
 #practiceLobby .practice-setup-card{position:relative;grid-column:1/-1;order:0;display:grid;grid-template-columns:minmax(160px,1fr) minmax(180px,1fr) minmax(150px,.85fr) minmax(160px,.8fr);gap:18px;align-items:center;padding:24px 20px;margin:0 0 8px;border-radius:10px;background:#fafbfe;box-shadow:none;border-color:#e0e5ef;scroll-margin-top:90px}
 #practiceLobby .practice-selected-paper{border:0;padding:0;gap:8px}#practiceLobby .practice-selected-paper strong{font-size:20px;white-space:normal;line-height:1.3}
 #practiceLobby .practice-selected-paper>span,#practiceLobby .practice-choice-group legend{font-size:11px;color:#77829a;font-weight:500}#practiceLobby .practice-selected-paper small{font-size:11px;line-height:1.5}
-#practiceLobby .practice-choice-group{border-left:1px solid #e4e8f0;padding-left:18px;margin:0;min-width:0}#practiceLobby .practice-choice-group legend{padding:0;margin-bottom:9px}
+#practiceLobby .practice-choice-group{align-self:start;border-left:1px solid #e4e8f0;padding-left:18px;margin:0;min-width:0}#practiceLobby .practice-choice-group legend{padding:0;margin-bottom:9px}
 #practiceLobby .practice-count-options,#practiceLobby .practice-order-options{gap:0;display:flex;background:#fff;border:1px solid #dbe1ec;border-radius:7px;overflow:hidden}
 #practiceLobby .practice-choice-group label{flex:1;min-width:0}#practiceLobby .practice-choice-group label span{height:35px;min-width:0;margin:0;padding:0 7px;border:0;border-radius:5px;font-size:12px;background:transparent;color:#636e84;box-shadow:none}
 #practiceLobby .practice-choice-group label input:checked+span{background:#7952ed;color:#fff}
 #practiceLobby .practice-count-options .practice-count-all{flex:0 0 auto}#practiceLobby .practice-count-all span{white-space:nowrap;padding:0 10px}
-#practiceLobby .practice-entry-actions{gap:6px}#practiceLobby .practice-entry-actions .practice-start-btn{height:37px;min-height:37px;border-radius:7px;background:#7651ee;color:#fff;font-size:14px;box-shadow:none}
+#practiceLobby .practice-entry-actions{gap:6px;border:0;padding:0;min-width:0}#practiceLobby .practice-entry-legend{visibility:hidden}#practiceLobby .practice-entry-actions .practice-start-btn{height:37px;min-height:37px;border-radius:7px;background:#7651ee;color:#fff;font-size:14px;box-shadow:none}
 #practiceLobby .practice-entry-actions .practice-secondary-btn{height:30px;font-size:11px;padding:0 10px}#practiceLobby .practice-coverage-retry{grid-column:1/-1;height:30px;width:max-content;font-size:11px}
 #practiceLobby .practice-modes-title{grid-column:1/-1;order:1;margin:5px 0 0;font-size:16px;line-height:1.4;font-weight:650}
 #practiceLobby .practice-mode-card{position:relative;display:grid;grid-template-columns:30px minmax(0,1fr);gap:10px;padding:18px 14px;min-height:164px;border:1px solid #e0e4ef;border-radius:8px;background:#fff;box-shadow:none;overflow:visible;align-content:start}
@@ -745,6 +745,34 @@ body.practice-mode-page[data-practice-view="lobby"] .practice-exp-fab{display:no
 .practice-favorites-toolbar [aria-pressed="true"]{background:#f4f2fb!important;color:var(--practice-accent,#6d5dfc)!important;border-color:currentColor!important}
 .practice-favorite-card [data-comment-favorite-remove]{background:#f4f4f5;color:#52525b}
 @media(max-width:600px){.practice-summary-fab{right:max(10px,env(safe-area-inset-right));bottom:calc(150px + env(safe-area-inset-bottom))}}
+
+/* The lobby owns a fixed shell; long answers and reports retain document scrolling. */
+html:has(body.practice-mode-page[data-practice-view="lobby"]){height:100%;min-height:0;overflow:hidden}
+body.practice-mode-page[data-practice-view="lobby"]{height:100dvh;min-height:0;overflow:hidden}
+body.practice-mode-page[data-practice-view="lobby"] .practice-app{height:100dvh;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+body.practice-mode-page[data-practice-view="lobby"] .practice-header{flex-shrink:0}
+body.practice-mode-page[data-practice-view="lobby"] .practice-main{flex:1;min-height:0;grid-template-rows:minmax(0,1fr);align-items:stretch;padding-top:16px;padding-bottom:12px;overflow:hidden}
+body.practice-mode-page[data-practice-view="lobby"] .practice-lobby-sidebar{position:static;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin}
+body.practice-mode-page[data-practice-view="lobby"] #practiceLobby{min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin}
+@media(min-width:1181px) and (max-height:850px){
+  body.practice-mode-page[data-practice-view="lobby"] .practice-main{padding-top:8px;padding-bottom:8px}
+  #practiceLobby .practice-modes-title{margin-top:0}
+  #practiceLobby .practice-lobby-head{margin-bottom:10px}
+  #practiceLobby .practice-library-shelf{padding:12px 16px;margin-bottom:12px}
+  #practiceLobby .practice-library-toolbar{margin-bottom:10px}
+  #practiceLobby .practice-paper-scroll .practice-paper-card{min-height:130px;padding:12px}
+  #practiceLobby .practice-paper-scroll .practice-paper-card h2{margin-bottom:6px}
+  #practiceLobby .practice-paper-scroll .practice-paper-card-head{margin-bottom:8px}
+  #practiceLobby .practice-setup-card{padding:16px 20px;margin-bottom:6px}
+  #practiceLobby .practice-mode-layout{gap:10px}
+  #practiceLobby .practice-mode-card{min-height:160px;padding:12px 14px;gap:6px}
+}
+@media(max-width:900px){
+  body.practice-mode-page[data-practice-view="lobby"] .practice-main{display:flex;flex-direction:column;gap:0}
+  body.practice-mode-page[data-practice-view="lobby"] .practice-lobby-sidebar{flex-shrink:0;overflow:visible}
+  body.practice-mode-page[data-practice-view="lobby"] #practiceLobby{flex:1;min-height:0}
+}
+@media(max-width:480px){#practiceLobby .practice-entry-legend{display:none}}
 
 /* Reveal configuration once the first summary is ready; keep the original final geometry. */
 #practiceLobby[data-catalog-pending] .practice-mode-layout{visibility:hidden}

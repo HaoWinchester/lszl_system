@@ -223,6 +223,7 @@ python3 new-legacy/tests/practice-result-report-browser.py
 python3 new-legacy/tests/practice-report-feedback-browser.py
 python3 new-legacy/tests/practice-instant-feedback-browser.py
 python3 new-legacy/tests/practice-lobby-fidelity-browser.py
+python3 new-legacy/tests/practice-lobby-viewport-browser.py
 python3 new-legacy/tests/practice-side-nav-comments-browser.py
 python3 new-legacy/tests/practice-floating-menu-browser.py
 python3 new-legacy/tests/danmaku-design-browser.py
