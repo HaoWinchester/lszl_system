@@ -209,10 +209,11 @@ with sync_playwright() as pw:
         page.wait_for_function("document.body.dataset.practiceView==='lobby'")
         # A full page reload must preserve device toggle + hidden IDs; server has no hide mutation.
         page.reload(wait_until='networkidle')
-        assert page.evaluate('KGQuestionComments.danmakuEnabled()') is False
+        assert page.evaluate("typeof KGQuestionComments === 'undefined'"), 'Lobby must defer the comments runtime'
         assert target['id'] in page.evaluate("KGDevicePreferences.getString('kg_question_danmaku_hidden_v1__ink-browser')")
         page.locator('[data-practice-start="practice"]').click()
         page.wait_for_function('KGPracticeMode.snapshot().active&&KGPracticeMode.snapshot().index===0')
+        assert page.evaluate('KGQuestionComments.danmakuEnabled()') is False
         expect(page.locator('#practiceExplanationPanel')).to_be_visible()
         expect(page.locator('.q-danmaku')).to_have_count(0)
         click_tool(page, '#practiceDanmakuToggle')
