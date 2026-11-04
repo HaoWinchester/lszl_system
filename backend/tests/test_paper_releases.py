@@ -1272,3 +1272,40 @@ def test_catalog_mode_filters_totals_pages_and_role_scoped_subject_facets():
                 await db.commit()
         asyncio.run(cleanup_modes())
         asyncio.run(_cleanup(ids))
+
+
+def test_catalog_exact_paper_filter_preserves_global_subject_facets():
+    ids = _ids()
+    asyncio.run(_seed(ids))
+
+    async def scenario():
+        async with AsyncSessionLocal() as db:
+            teacher = await db.get(User, ids["teacher"])
+            for paper_id, subject in [(ids["paper"], "DemandExactA"), (ids["other_paper"], "DemandExactB")]:
+                paper = await db.get(ExamPaper, paper_id)
+                paper.subject = subject
+                await paper_release_service.publish(
+                    db, teacher, paper_id, expected_revision=1, access_level="free",
+                    enabled_modes=["practice_mode"], allowed_roles=["student"], metadata={},
+                )
+        async with AsyncSessionLocal() as db:
+            result = await paper_release_service.catalog(
+                db, None, page=1, page_size=1, mode="practice_mode", paper_id=ids["paper"],
+            )
+            assert result["total"] == 1
+            assert [row["paperId"] for row in result["releases"]] == [ids["paper"]]
+            assert {"DemandExactA", "DemandExactB"} <= set(result["subjects"])
+            prefix = await paper_release_service.catalog(db, None, page=1, page_size=1, paper_id=ids["paper"][:-1])
+            assert prefix["total"] == 0
+    try:
+        asyncio.run(scenario())
+        with TestClient(app) as client:
+            response = client.get("/api/v1/paper-releases/catalog", params={
+                "paperId": ids["other_paper"], "mode": "practice_mode", "pageSize": 1,
+            })
+            assert response.status_code == 200
+            assert response.json()["total"] == 1
+            assert response.json()["releases"][0]["paperId"] == ids["other_paper"]
+            assert {"DemandExactA", "DemandExactB"} <= set(response.json()["subjects"])
+    finally:
+        asyncio.run(_cleanup(ids))
