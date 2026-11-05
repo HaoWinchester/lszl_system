@@ -279,3 +279,68 @@ test('session refresh cannot adopt another cookie owner while the old classroom 
   assert.equal(result.ok,false);assert.equal(c.KGAuthCore.currentUsername(),'teacher');assert.equal(c.KGAuthRecovery.isPaused(),true);
   assert.equal(events.filter(e=>e.type==='kg-auth-session-change').length,0);
 });
+
+for(const action of ['login','register']){
+  test(`clean ${action} to another account flushes the old classroom once before authentication`,async()=>{
+    let cookieOwner='teacher',prepares=0;
+    const calls=[];
+    const {context:c}=authHarness(async(url,init={})=>{
+      calls.push({url,method:init.method});
+      if(url==='/api/v1/workspaces/original')return response(cookieOwner==='teacher'?200:401);
+      cookieOwner='student';return response(200,{user:{username:'student'},loginSessionId:'student-login'});
+    });
+    c.KGAuthRecovery.register('workspace',{
+      hasUnsavedChanges:()=>false,
+      prepareLeave:async()=>{prepares++;return (await c.KGAuthRecovery.fetch('/api/v1/workspaces/original',{method:'PUT'})).ok},
+    });
+    const result=await c.KGAuthCore[action]('student','password');
+    assert.equal(result.ok,true,result.message);
+    assert.equal(prepares,1,'No second save is safe once the server cookie has changed owner');
+    assert.equal(calls.filter(call=>call.url==='/api/v1/workspaces/original').length,1);
+    assert.equal(calls[0].url,'/api/v1/workspaces/original');
+    assert.equal(c.KGAuthCore.currentUsername(),'student');
+    assert.equal(c.KGAuthRecovery.isPaused(),false);
+  });
+
+  test(`new old-owner edits during pending ${action} are retained without a post-authentication save`,async()=>{
+    let finish,dirty=false,prepares=0;
+    const pending=new Promise(resolve=>{finish=resolve});
+    const calls=[];
+    const {context:c}=authHarness(async(url,init={})=>{
+      calls.push({url,method:init.method});
+      if(url==='/api/v1/workspaces/original')return response(200);
+      return pending;
+    });
+    c.KGAuthRecovery.register('workspace',{
+      hasUnsavedChanges:()=>dirty,
+      prepareLeave:async()=>{prepares++;dirty=false;return (await c.KGAuthRecovery.fetch('/api/v1/workspaces/original',{method:'PUT'})).ok},
+    });
+    const authentication=c.KGAuthCore[action]('student','password');
+    await new Promise(resolve=>setImmediate(resolve));
+    dirty=true;finish(response(200,{user:{username:'student'},loginSessionId:'student-login'}));
+    assert.equal((await authentication).ok,false);
+    assert.equal(dirty,true,'Only the original owner may submit edits typed while authentication was pending');
+    assert.equal(prepares,1);
+    assert.equal(calls.filter(call=>call.url==='/api/v1/workspaces/original').length,1);
+    assert.equal(c.KGAuthCore.currentUsername(),'teacher');
+    assert.equal(c.KGAuthRecovery.isPaused(),true);
+  });
+}
+
+test('clean cookie-owner refresh adopts the authenticated owner without writing the old classroom',async()=>{
+  let prepares=0;const calls=[];
+  const {context:c}=authHarness(async(url,init={})=>{
+    calls.push({url,method:init.method});
+    return url.endsWith('/me')?response(200,{user:{username:'student'},loginSessionId:'student-login'}):response(401);
+  });
+  c.KGAuthRecovery.register('workspace',{
+    hasUnsavedChanges:()=>false,
+    prepareLeave:async()=>{prepares++;return (await c.KGAuthRecovery.fetch('/api/v1/workspaces/original',{method:'PUT'})).ok},
+  });
+  const result=await c.KGAuthCore.refreshSession();
+  assert.equal(result.ok,true,result.message);
+  assert.equal(prepares,0);
+  assert.equal(calls.filter(call=>call.method==='PUT').length,0);
+  assert.equal(c.KGAuthCore.currentUsername(),'student');
+  assert.equal(c.KGAuthRecovery.isPaused(),false);
+});

@@ -98,11 +98,16 @@
     })();
     try{return await logoutCheck}finally{logoutCheck=null}
   }
-  async function beforeLogin(username){
+  async function beforeLogin(username,{phase='before-auth'}={}){
     if(retained&&!paused&&!hasUnsavedChanges())retained=null;
     if(retained&&username!==retained.username){show('请使用原账号 '+retained.username+' 重新登录，当前课堂尚未保存。');return false}
     const current=capture();
-    if(current&&current.username!==username)return prepareLogout();
+    if(current&&current.username!==username){
+      // The response means the server cookie may already belong to this new
+      // owner. Inspect retained edits here; only the pre-auth phase may save.
+      if(phase==='post-auth')return !paused&&!hasUnsavedChanges();
+      return prepareLogout();
+    }
     if(current&&hasUnsavedChanges())retained=retained||current;
     return true;
   }

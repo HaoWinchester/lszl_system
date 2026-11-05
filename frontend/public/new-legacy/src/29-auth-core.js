@@ -313,7 +313,7 @@
       try{
         const payload=await remoteRequest(providerConfig().endpoints.login,{body:{username,password,acceptedTermsVersion:context.acceptedTermsVersion||undefined,context}});
         const user=normalizeUser(payload.user?.username||payload.username||username,{...(payload.user||{}),username:payload.user?.username||payload.username||username,source:"remote"});
-        if(window.KGAuthRecovery&&await window.KGAuthRecovery.beforeLogin(user.username)===false){
+        if(window.KGAuthRecovery&&await window.KGAuthRecovery.beforeLogin(user.username,{phase:'post-auth'})===false){
           window.KGAuthRecovery.observe({status:401},window.KGAuthRecovery.capture(),{source:'login-new-draft'});
           window.KGAuthRecovery.publishSession({username:user.username,loginSessionId:serverLoginSessionId(payload)});
           return {ok:false,message:'登录期间产生了未保存修改，当前课堂已保留，请重新登录原账号后保存。'};
@@ -372,7 +372,7 @@
       try{
         const payload=await remoteRequest(config.endpoints.register,{body:{username,password,acceptedTermsVersion:context.acceptedTermsVersion||undefined,referralCode:context.referralCode??readReferralCode(),context}});
         const user=normalizeUser(payload.user?.username||payload.username||username,{...(payload.user||{}),username:payload.user?.username||payload.username||username,source:"remote"});
-        if(window.KGAuthRecovery&&await window.KGAuthRecovery.beforeLogin(user.username)===false){
+        if(window.KGAuthRecovery&&await window.KGAuthRecovery.beforeLogin(user.username,{phase:'post-auth'})===false){
           window.KGAuthRecovery.observe({status:401},window.KGAuthRecovery.capture(),{source:'register-new-draft'});
           window.KGAuthRecovery.publishSession({username:user.username,loginSessionId:serverLoginSessionId(payload)});
           return {ok:false,message:'注册期间产生了未保存修改，当前课堂已保留，请重新登录原账号后保存。'};
@@ -432,7 +432,7 @@
       if(!username)throw new Error('会话响应缺少用户信息');
       if(identityChanged())return {ok:false,stale:true,user:remoteUser(),provider:'remote'};
       const user=normalizeUser(username,{...(payload.user||{}),username,source:"remote"});
-      if(window.KGAuthRecovery&&await window.KGAuthRecovery.beforeLogin(user.username)===false){
+      if(window.KGAuthRecovery&&await window.KGAuthRecovery.beforeLogin(user.username,{phase:'post-auth'})===false){
         window.KGAuthRecovery.observe({status:401},identity,{source:'session-owner-changed'});
         return {ok:false,user:remoteUser(),provider:'remote',preservedSession:true,message:'登录账号已变化，当前课堂已保留，请重新登录原账号。'};
       }
