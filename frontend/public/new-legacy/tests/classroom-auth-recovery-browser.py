@@ -67,7 +67,7 @@ def graph_identity(page, mode):
         return page.evaluate('({nodes:state.nodes,links:state.links})')
     if mode == 'workspace':
         return page.evaluate('''()=>{const w=KGMultiQuestionWorkspace.activeWorkspace();
-          return {id:w.id,nodes:w.nodes,edges:w.edges,groups:w.groups}}''')
+          return {id:KGMultiQuestionWorkspace.activeWorkspaceId(),nodes:w.nodes,edges:w.edges,groups:w.groups}}''')
     return page.locator('#krQuestionCard').inner_text()
 
 
@@ -154,6 +154,17 @@ def check_classroom(browser, base, mode, checks):
         pen_ids = [s['id'] for s in canvas_dom(page) if s['tag'].lower() != 'text']
         assert pen_ids, 'The real pen gesture must create a stroke'
         original_pen = {s['id']: s for s in wait_persisted(page, context, base, mode, file_id, ids=pen_ids) if s['id'] in pen_ids}
+        if mode == 'workspace':
+            # A newly-created default row acquires its relational server ID on
+            # first hydration. Resolve that fixture alias before taking the
+            # classroom snapshot; no unsaved text exists during this warm load.
+            page.reload(wait_until='networkidle')
+            dismiss_overlays(page)
+            page.wait_for_function('window.KGWorkspaceInk && KGCanvasWorkspaceAdapter.isReady()')
+            page.locator(MODES[mode][1]).click()
+            expect(toolbar).to_be_visible()
+            original_url = page.url
+            navigation_count = len(navigations)
         original_graph = graph_identity(page, mode)
 
         # A temporary 503 must retain the editor without declaring logout.

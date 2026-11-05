@@ -1,16 +1,13 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.420",
-  "toVersion": "v9.0-p4.1.421",
+  "fromVersion": "v9.0-p4.1.421",
+  "toVersion": "v9.0-p4.1.422",
   "changes": {
     "added": [],
     "changed": [
       "VERSION",
       "content-prep-studio/dist/content-prep.html",
-      "src/29-auth-core.js",
-      "tests/auth-recovery.test.js",
-      "tests/canvas-ink-navigation.test.js",
-      "tests/run-practice-demand-browser.py"
+      "tests/classroom-auth-recovery-browser.py"
     ],
     "removed": []
   },
