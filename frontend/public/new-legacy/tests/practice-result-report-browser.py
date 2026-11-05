@@ -143,6 +143,27 @@ with sync_playwright() as playwright:
     assert "KGPracticeResultReport.render" in source
     assert 'id="practiceReviewBackBtn"' in html
     assert "src/113-practice-result-report.js" in html
+
+    # A frozen pretest list must include correct, wrong and unanswered questions.
+    pretest = {**report, "reportKind":"simulation", "counts":{"total":180,"correct":103,"wrong":23,"unanswered":54},
+               "maxScore":170,"rawScore":100,"scorePercent":58.82,"accuracyPercent":57.22,
+               "unscoredQuestions":[{"questionId":f"q{i}","number":i} for i in range(1,11)]}
+    page.evaluate('''report=>KGPracticeResultReport.render(document.querySelector('#report'),report,{
+      questions:Array.from({length:10},(_,i)=>({id:'q'+(i+1),stem:'题目 '+(i+1),options:[],correctAnswerIds:['A']})),
+      answers:{q1:{correct:true,selectedAnswer:'A'},q2:{correct:false,selectedAnswer:'B'}}
+    })''',pretest)
+    assert '170 道计分题' in page.locator('.practice-report-unscored').inner_text()
+    assert '全卷正确率' in page.locator('.practice-report-counts').inner_text()
+    assert page.locator('[data-report-unscored]').count() == 10
+    for qid,outcome in [('q1','答对'),('q2','答错'),('q10','未作答')]:
+        page.locator(f'[data-report-unscored="{qid}"]').click()
+        assert page.locator(f'[data-review-card="{qid}"]').evaluate('(e)=>e===document.activeElement')
+        assert outcome+' · 不计分' in page.locator(f'[data-review-card="{qid}"]').inner_text()
+    page.evaluate('''report=>KGPracticeResultReport.render(document.querySelector('#report'),report,{
+      onReviewQuestion:id=>window.reviewed=id})''',pretest)
+    for qid in ('q1','q10'):
+        page.locator(f'[data-report-unscored="{qid}"]').click()
+        assert page.evaluate('window.reviewed') == qid
     page.evaluate("""report=>KGPracticeResultReport.render(document.querySelector('#report'),report,{
       nextPractice:{count:10,remainingUnseen:3},onNextPractice:()=>window.nextClicked=true,
       onReviewWrong:id=>window.reviewed=id

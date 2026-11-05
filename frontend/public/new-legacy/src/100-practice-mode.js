@@ -359,7 +359,7 @@
       answers:state.session?.answers||{},
       onReviewAll:state.mode==='practice'?()=>openQuestionReview(state.questions[state.index]?.id||state.questions[0]?.id):null,
       nextPractice:state.reportNextPractice,onNextPractice:startNextPractice,
-      onReviewWrong:reviewWrongQuestion,onAgain:startAgain,onLobby:showLobby});
+      onReviewWrong:reviewWrongQuestion,onReviewQuestion:openQuestionReview,onAgain:startAgain,onLobby:showLobby});
     if(rendered){
       const copy=selectionNotice(state.session);
       if(copy){const notice=document.createElement('p');notice.className='practice-selection-notice';notice.textContent=copy;dom.result.querySelector('.practice-report-overall')?.after(notice)}
@@ -919,7 +919,7 @@
     retriggerViewAnimation(dom.questionCard,'is-switching');
     const typeLabel=$('practiceQuestionType');
     if(typeLabel)typeLabel.textContent=question.type==='matching'?'配对题':question.type==='multiple_choice'?'多选题':'单选题';
-    if(question.type==='matching')renderMatchingAnswer(question,savedAnswer,!!savedAnswer||(state.mode==='practice'&&showAnswersEnabled()));
+    if(question.type==='matching')renderMatchingAnswer(question,savedAnswer,state.reviewing||!!savedAnswer||(state.mode==='practice'&&showAnswersEnabled()));
     if(AnswerSet.supported&&!AnswerSet.supported(question)){dom.options.innerHTML='<p role="alert">当前客户端不支持此题型，请更新后重试。</p>';state.locked=true;}
     renderPreviousWrongAnswer(question);
     renderOwnSelection(question,savedAnswer);
@@ -928,14 +928,14 @@
       const id=text(button.dataset.optionId);button.classList.toggle('is-pending',multi&&pending.has(id));button.setAttribute('aria-pressed',multi&&pending.has(id)?'true':'false');
       button.addEventListener('click',()=>multi?togglePendingAnswer(question,id,button):answer(id,button));
     });
-    if(dom.confirmAnswerBtn){dom.confirmAnswerBtn.hidden=!(multi||question.type==='matching')||!!practiceAnswered||showAnswersEnabled();dom.confirmAnswerBtn.disabled=question.type==='matching'?!AnswerSet.pairs(question,state.pendingMatches[question.id]||{},true):!pending.size;dom.confirmAnswerBtn.dataset.questionId=multi||question.type==='matching'?question.id:''}
+    if(dom.confirmAnswerBtn){dom.confirmAnswerBtn.hidden=state.reviewing||!(multi||question.type==='matching')||!!practiceAnswered||showAnswersEnabled();dom.confirmAnswerBtn.disabled=question.type==='matching'?!AnswerSet.pairs(question,state.pendingMatches[question.id]||{},true):!pending.size;dom.confirmAnswerBtn.dataset.questionId=multi||question.type==='matching'?question.id:''}
     if(practiceAnswered){
       state.locked=true;lockOptions();
       revealOptionResult(practiceAnswered.selected,questionCorrectIds(question));
       // 已答题按模式策略与普通练习开关展示；未答题不提前显示解析。
       if(shouldShowExplanation())renderPracticeExplanation(question,practiceAnswered.correct);
-    }else if(state.mode==='practice'&&!state.reviewing&&!state.verification?.active&&showAnswersEnabled()){
-      // 显示答案开关：未答题直接回放正确答案与解析（中性文案），锁定作答；关闭开关恢复可答。
+    }else if(state.reviewing||(state.mode==='practice'&&!state.verification?.active&&showAnswersEnabled())){
+      // 未答题的成绩回看及显示答案开关共用中性回放，锁定所有题型并揭示解析。
       state.locked=true;lockOptions();
       revealOptionResult([],questionCorrectIds(question));
       renderPracticeExplanation(question,null,true);

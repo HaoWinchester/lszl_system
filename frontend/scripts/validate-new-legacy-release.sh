@@ -220,10 +220,12 @@ python3 new-legacy/tests/comment-composer-popover-browser.py
 CANVAS_TEST_RELEASE_ROOT="$VALIDATION_ROOT/releases" python3 new-legacy/tests/run-practice-demand-browser.py
 python3 new-legacy/tests/practice-answer-sheet-browser.py
 python3 new-legacy/tests/practice-result-report-browser.py
+node --test new-legacy/tests/practice-result-report.test.js
 python3 new-legacy/tests/practice-report-feedback-browser.py
 python3 new-legacy/tests/practice-instant-feedback-browser.py
 python3 new-legacy/tests/practice-lobby-fidelity-browser.py
 python3 new-legacy/tests/practice-lobby-viewport-browser.py
+CANVAS_TEST_RELEASE_ROOT="$VALIDATION_ROOT/releases" python3 new-legacy/tests/run-practice-demand-browser.py --server practice_pretest_server.py --browser practice-pretest-report-browser.py --artifacts pmp-unscored
 python3 new-legacy/tests/practice-side-nav-comments-browser.py
 python3 new-legacy/tests/practice-floating-menu-browser.py
 python3 new-legacy/tests/danmaku-design-browser.py
