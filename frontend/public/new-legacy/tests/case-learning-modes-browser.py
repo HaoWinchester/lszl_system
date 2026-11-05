@@ -74,6 +74,12 @@ with sync_playwright() as p:
                 page.evaluate("""()=>{const card=document.querySelector('.qw-question-card:has(.qm-card-case-layout)'),api=KGMultiQuestionWorkspace;window.caseNodeId=card.dataset.nodeId;}""")
                 node=card.get_attribute('data-node-id')
                 page.evaluate("id=>{const s=KGCanvasWorkspaceStore,w=s.ensure();const node=w.nodes[id];if(node.caseLayoutVersion!==1)throw Error('case migration marker missing');s.updateNodeLayout(id,{x:node.x,y:node.y,width:900,height:507});}",node)
+                # This checks reopening a saved custom width, not best-effort pagehide writes.
+                page.evaluate('KGCanvasWorkspaceAdapter.flush({throwOnError:true})')
+                saved=student.request.get(base+'/api/v1/workspaces')
+                assert saved.ok,saved.text()
+                persisted=[workspace.get('payload',{}).get('nodes',{}).get(node) for workspace in saved.json()['workspaces']]
+                assert any(item and item.get('width')==900 and item.get('caseLayoutVersion')==1 for item in persisted),'custom width must be committed before reopen'
                 page.reload(wait_until='networkidle')
                 expect(card).to_contain_text(stem(order),timeout=30000)
                 assert abs(card.evaluate('e=>e.offsetWidth')-900)<1,'custom width must survive reopen'
