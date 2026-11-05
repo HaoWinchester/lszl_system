@@ -25,4 +25,23 @@
 
 - 已核对420及已通过的418的冻结source/site指纹，并确认工作源与420候选一致。首轮本地419失败记录保留，不手工改报告。完整420成功后通过原生promote 418、promote 420得到current420/previous418，runtime打包再次确认两个受保护版本有效；UAT远端419验证记录未改。
 - 最新只读正式清单仍为411/1253文件，候选420/1276文件，无删除。生产真实411的恢复将由正式脚本独立生成备份和回滚镜像，不以本地previous418替代。
-- 当前尚未正式同步代码、重建镜像或重启。备份目录、上线及公网复核结果在实际完成后补充。
+- 完整候选通过后从发布分支快进main并经指定代理推送，远端引用核验一致；正式部署源码提交e3930b28。
+
+## 正式备份与上线结果
+
+- `PYTHONDONTWRITEBYTECODE=1 GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=status.showUntrackedFiles GIT_CONFIG_VALUE_0=no bash deploy/update.sh`退出0，耗时145秒。备份阶段62秒，发生在任何正式代码同步、镜像构建、容器重启及迁移之前。
+- **正式备份目录：`/home/ubuntu/lszl-backups/20261105_130747`**。原生脚本完成代码归档、数据库custom dump、非空、tar目录和pg_restore TOC校验，并生成manifest、保留当前运行镜像标签。
+- `repo_20261105_130747.tar.gz`：42047427字节，SHA256 `92366bc44e944313e7f406cbc4c1d850b7b3043f74e3de5a3fd95c9cb6128cf0`。
+- `db_20261105_130747.dump`：223427047字节，SHA256 `2a68d496ad377c86c620bb37320cf519530e29a024052e6df0d594fc14521339`。
+- 备份目录仅属主可访问，两文件权限600；独立核对manifest、非空、摘要与回滚镜像`lszl-kg-backend:rollback-20261105_130747`仍存在。没有下载或输出数据库内容、密码或密钥，也未删除既有备份。
+- 正式管理器按相同source/site/context复用刚通过的420完整验证，frontend-build阶段3秒；未使用跳过检查标志。runtime打包420和418，实际生产411另由上述独立备份及镜像支持恢复。
+- 服务健康检查通过，小程序29路由/13表就绪检查及教学助手检查均返回ok；正式磁盘剩余8.1GB。新版本上线不包含UAT数据库、测试账号、练习记录或试卷数据。
+
+## 正式公网复核
+
+- 正式入口：<https://lszl.aihuanpu.com/practice-mode.html>；页面meta与容器实际active release均为v9.0-p4.1.420，HTTPS健康status=ok、db=ok。
+- 全部1276个线上site文件SHA256逐一与完整验证候选一致；变更涉及的6个后端模块（路由、目录、历史、计分、会话与HTML）指纹也一致。旧正式1253个文件全部保留。
+- 公网1504×801、1366×768、1280×768、1024×768、768×844、390×844、320×568七种视口通过：无科目框、搜索右对齐、按钮37px且对齐、桌面一屏、整页不滚动、窄屏内容操作可达、向上规则说明无页面晃动、无JS错误。CLS最高0.00402。
+- 首屏仍为2个脚本、12条目录摘要；真实公开目录响应8813字节，递归检查无题目正文、答案、metadata或大快照字段。图谱与做题关键5个业务包的公开HTTP指纹也与候选一致。
+- 上线后浏览器仅进行公开页面、资源、提示与布局的只读检查，没有创建正式练习、代答、交卷或支付。PMP业务已在完整候选的隔离真实API流程中验证；180题适用范围保持用户确认值，185题卷不触发。
+- 证据：artifacts/production-420/中的deploy.log、backup-verification.json、release-integrity.json、all-live-hashes.json、production-verification.json、health.json、catalog.json及production-lobby-*.png。
