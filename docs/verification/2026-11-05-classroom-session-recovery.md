@@ -30,4 +30,15 @@
 
 `v9.0-p4.1.425` 完整发布门禁已通过：`passed=true`、`profile=full`，总耗时 2174 秒，未跳过验证。后端 1327 项、前端 421 项、恢复专项 82 项及全部要求的浏览器/跨域/视觉检查均通过。桌面/手机练习视觉差异 0%，自由图谱桌面 0.001%、手机 0%。原 1276 个 site 文件全部保留，新包 1287 个，关键 admin-console 页面存在。
 
-候选实现提交 `f09ea435`；UAT 部署与公网复核尚未完成，用户业务验收待执行。main 与正式环境不变。
+候选实现提交 `f09ea435`；部署提交 `e5fa0171`。已合入并推送 uat，`bash deploy/update-uat.sh` 退出 0，总耗时 59 秒；完整发布验证记录按内容指纹复用（2 秒），没有跳过或降级门禁。UAT：https://uat.aihuanpu.com 。
+
+## 实际部署与公网复核
+
+- UAT 容器 `/app/frontend/new-legacy-releases/current.json` 和公网页面均为 `v9.0-p4.1.425`；运行时包含本次候选及原 420 回滚包。
+- `/api/v1/health` 为 `status=ok`、`db=ok`；小程序与教师助手就绪检查通过。新会话续期路由出现在实际 OpenAPI 中，未登录请求返回 401。
+- 公网 11 个关键前端资源（公共恢复、认证核心、三类画布、工作区/个人卡适配器及构建 bundle 等）的 SHA256 与 425 不可变 site 逐字节相同；6 个相关页面版本一致。
+- UAT 容器内认证路由、认证依赖、SessionMiddleware、公用撤销服务、撤销模型和 Alembic 文件共 6 个 SHA256 与已测后端源码一致；实际 `alembic current` 为 `1b6f9a2d4c80 (head)`。
+- 本地证据：`uat-deploy-425.log`、`uat-verification.json`、`uat-runtime.json`、`uat-migration.log`（均位于 `artifacts/classroom-auth-recovery/`）。公网 HTTPS 校验使用系统 CA，没有关闭证书验证。
+- 公网复核为只读版本/资源/API 检查；课堂业务故障注入、文字/画布数据库重载及账号切换在隔离真实 API/候选浏览器完成，没有对 UAT 现有课堂数据做测试修改。
+
+用户业务验收待执行，重点检查三类画布掉登录后文字和笔迹保留、画笔切换立即响应、原账号重登后保存恢复，以及未提交表单需显式保存/生成。未合入或推送 main，正式环境保持不变；保留功能分支与工作树，等待用户明确验收通过后再处理 main。
