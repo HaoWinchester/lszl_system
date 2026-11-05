@@ -22,3 +22,20 @@ test('unlabelled questions are included and absent domains have no slice',()=>{
 test('zero questions render an empty state without fabricated slices',()=>{
   const html=render(0,{});assert.match(html,/暂无题目领域分布/);assert.doesNotMatch(html,/practice-report-pie/);
 });
+
+test('PMP simulation lists frozen unscored question numbers and distinguishes full accuracy',()=>{
+  const window={};vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'../src/113-practice-result-report.js'),'utf8'),{window});
+  const root={classList:{add(){}},querySelector(){return null},querySelectorAll(){return []}};
+  window.KGPracticeResultReport.render(root,{official:false,reportKind:'simulation',counts:{total:180},scorePercent:60,accuracyPercent:56.67,maxScore:170,
+    unscoredQuestions:Array.from({length:10},(_,i)=>({questionId:`q${i}`,number:i+1}))},{onReviewQuestion(){}});
+  assert.match(root.innerHTML,/不计分题说明/);
+  assert.match(root.innerHTML,/170 道计分题/);
+  assert.match(root.innerHTML,/全卷正确率/);
+  assert.match(root.innerHTML,/data-report-unscored="q0"/);
+  assert.match(root.innerHTML,/data-report-unscored="q9"/);
+  assert.match(root.innerHTML,/第 10 题/);
+});
+
+test('legacy and short reports do not invent unscored questions',()=>{
+  const html=render(10,{});assert.doesNotMatch(html,/不计分题说明|data-report-unscored/);
+});

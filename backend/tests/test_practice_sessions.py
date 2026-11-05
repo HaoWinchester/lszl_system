@@ -30,6 +30,96 @@ from app.services import wechat_mini_service
 PASSWORD = "practice-session-pass"
 
 
+def test_full_pmp_pretest_is_private_persistent_and_frozen_after_idempotent_complete():
+    ids = _practice_fixture_ids()
+    asyncio.run(_seed_released_pmp_paper(ids, domains=["people"]*60+["process"]*60+["business-environment"]*60))
+
+    async def read_policy(session_id):
+        async with AsyncSessionLocal() as db:
+            session = await db.get(PracticeSession, session_id)
+            return session.scoring_snapshot.get("pmpPretest")
+
+    try:
+        with TestClient(app) as client:
+            assert client.post('/api/v1/auth/login', json={'username': ids['student'], 'password': PASSWORD}).status_code == 200
+            entry = {'paperId': ids['paper'], 'releaseId': ids['release'], 'mode': 'challenge', 'count': 'all', 'order': 'random'}
+            started = client.post('/api/v1/learning/practice/sessions/enter', json={**entry, 'pmpPretest': {'questionIds': ['forged']}})
+            assert started.status_code == 200, started.text
+            session = started.json()['session'];base=f"/api/v1/learning/practice/sessions/{session['id']}"
+            assert 'pmpPretest' not in started.text and 'unscoredQuestions' not in started.text
+            frozen = asyncio.run(read_policy(session['id']))
+            excluded = frozen['questionIds'];assert len(set(excluded)) == 10
+            order = [q['questionId'] for q in session['questionOrder']]
+            assert set(excluded) <= set(order)
+            paused = client.post(base+'/pause', json={'revision': session['revision'], 'answers': {}, 'runtimeState': {'currentIndex':17}})
+            assert paused.status_code == 200, paused.text
+            resumed = client.post('/api/v1/learning/practice/sessions/enter', json=entry)
+            assert resumed.status_code == 200 and resumed.json()['resumed'] is True
+            session = resumed.json()['session'];assert session['runtimeState']['currentIndex'] == 17
+            assert asyncio.run(read_policy(session['id'])) == frozen
+            assert 'pmpPretest' not in resumed.text
+            # Three excluded correct, three excluded wrong, four excluded unanswered.
+            included = [qid for qid in order if qid not in excluded]
+            correct = included[:100] + excluded[:3];wrong = included[100:120] + excluded[3:6]
+            answers = {qid: {'selectedAnswer': 'A' if qid in correct else 'B', 'selectionIndex': index}
+                       for index,qid in enumerate(correct+wrong,1)}
+            payload = {'revision':session['revision'], 'answers':answers}
+            completed = client.post(base+'/complete', json=payload)
+            assert completed.status_code == 200, completed.text
+            report = completed.json()['report']
+            scores = {q['questionId']:q['score'] for q in session['questionOrder']}
+            expected_max = sum(scores[qid] for qid in included)
+            expected_raw = sum(scores[qid] for qid in included[:100])
+            assert report['maxScore'] == expected_max and report['rawScore'] == expected_raw
+            assert report['scorePercent'] == round(expected_raw / expected_max * 100, 2)
+            assert report['counts'] == {'total':180, 'answered':126, 'correct':103, 'wrong':23, 'unanswered':54}
+            assert set(report['wrongQuestionIds']) == set(wrong)
+            assert sum(d['total'] for d in report['domains'].values()) == 170
+            assert report['unscoredQuestions'] == [{'questionId':qid,'number':order.index(qid)+1} for qid in order if qid in excluded]
+            assert all(set(row) == {'questionId','number'} for row in report['unscoredQuestions'])
+            duplicate = client.post(base+'/complete', json=payload)
+            assert duplicate.status_code == 200 and duplicate.json()['report'] == report
+            assert client.get(base+'/report').json()['report'] == report
+            assert asyncio.run(read_policy(session['id'])) == frozen
+            assert 'pmpPretest' not in completed.json()['session']['scoringSnapshot']
+            client.post('/api/v1/auth/logout')
+            client.post('/api/v1/auth/login',json={'username':ids['other_student'],'password':PASSWORD})
+            assert client.get(base+'/report').status_code == 404
+    finally:
+        asyncio.run(_cleanup_released_pmp_paper(ids))
+
+
+def test_legacy_active_full_pmp_session_does_not_gain_a_new_random_policy():
+    ids = _practice_fixture_ids()
+    asyncio.run(_seed_released_pmp_paper(ids,domains=['people']*180))
+
+    async def make_legacy(session_id):
+        async with AsyncSessionLocal() as db:
+            session=await db.get(PracticeSession,session_id)
+            session.scoring_snapshot={k:v for k,v in session.scoring_snapshot.items() if k!='pmpPretest'}
+            session.status='paused'
+            await db.commit()
+
+    try:
+        with TestClient(app) as client:
+            client.post('/api/v1/auth/login',json={'username':ids['student'],'password':PASSWORD})
+            entry={'paperId':ids['paper'],'releaseId':ids['release'],'mode':'practice','count':'all','order':'paper'}
+            created=client.post('/api/v1/learning/practice/sessions/enter',json=entry).json()['session']
+            asyncio.run(make_legacy(created['id']))
+            resumed=client.post('/api/v1/learning/practice/sessions/enter',json=entry)
+            assert resumed.status_code==200 and resumed.json()['resumed'] is True
+            session=resumed.json()['session']
+            assert session['id']==created['id']
+            detail=client.get(f"/api/v1/learning/practice/sessions/{session['id']}").json()['session']
+            assert 'pmpPretest' not in detail['scoringSnapshot']
+            completed=client.post(f"/api/v1/learning/practice/sessions/{session['id']}/complete",json={'revision':session['revision'],'answers':{}})
+            assert completed.status_code==200,completed.text
+            assert 'unscoredQuestions' not in completed.json()['report']
+            assert completed.json()['report']['maxScore']==184  # fixture keeps its original weighted first question
+    finally:
+        asyncio.run(_cleanup_released_pmp_paper(ids))
+
+
 @pytest.mark.parametrize("total,mode", [(93, "practice"), (99, "practice"), (185, "practice"), (93, "challenge"), (99, "scholar"), (3, "practice")])
 def test_all_count_uses_entire_frozen_inventory_and_preserves_cases(total, mode):
     ids = _practice_fixture_ids()

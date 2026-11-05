@@ -47,8 +47,9 @@
     const weights = report?.domainWeights || {}
     const domains = report?.domains || {}
     const hasUnsampled = Object.keys(DOMAIN_LABELS).some(domain => number(domains[domain]?.total) === 0)
+    const scoredTotal = report.unscoredQuestions?.length ? Object.values(domains).reduce((sum,row)=>sum+number(row.total),0) : number(report?.counts?.total)
     const entries = Object.keys(DOMAIN_LABELS).filter(domain => number(domains[domain]?.total) > 0).map(domain => ({
-      domain, weight: hasUnsampled ? Math.round(number(domains[domain].total) / number(report?.counts?.total) * 100) : Math.max(0, number(weights[domain])),
+      domain, weight: hasUnsampled ? Math.round(number(domains[domain].total) / scoredTotal * 100) : Math.max(0, number(weights[domain])),
     }))
     const total = entries.reduce((sum, entry) => sum + entry.weight, 0) || 100
     let angle = 0
@@ -118,6 +119,7 @@
     const questions = options.questions || []
     const answers = options.answers || {}
     const wrongIds = new Set((report.wrongQuestionIds || []).map(text))
+    const unscoredIds = new Set((report.unscoredQuestions || []).map(item=>text(item.questionId)))
     const status = question => answers[question.id]?.correct === true ? 'correct'
       : wrongIds.has(text(question.id)) || answers[question.id]?.correct === false ? 'wrong' : 'unanswered'
     const counts = { all: questions.length, correct: 0, wrong: 0 }
@@ -133,7 +135,7 @@
         const selected = Array.isArray(answer.selectedAnswerIds) ? answer.selectedAnswerIds.map(text) : [text(answer.selectedAnswer)].filter(Boolean)
         const correct = (question.correctAnswerIds || []).map(text)
         const outcome = status(question)
-        return `<article class="practice-review-card" data-review-card="${escapeHTML(question.id)}"><header><h3>第 ${index + 1} 题</h3><span class="practice-review-status is-${outcome}">${outcome === 'correct' ? '答对' : outcome === 'wrong' ? '答错' : '未作答'}</span></header><p class="practice-review-stem">${escapeHTML(question.stem)}</p>${global.KGQuestionMaterials?.render(question,{selectedPairs:answer.selectedPairs||{},readOnly:true,reveal:true})||''}<ol class="practice-review-options">${(question.options || []).map(option => `<li class="${correct.includes(text(option.id)) ? 'is-correct' : selected.includes(text(option.id)) ? 'is-wrong' : ''}"><strong>${escapeHTML(option.id)}</strong><span>${escapeHTML(option.text)}</span></li>`).join('')}</ol><div class="practice-review-answers"><span>你的答案：${escapeHTML(question.type==='matching'?global.KGQuestionAnswerSet?.answerText(question,answer.selectedPairs):selected.join('、') || '未作答')}</span><span>正确答案：${escapeHTML(question.type==='matching'?global.KGQuestionAnswerSet?.answerText(question,question.matching?.correctPairs):correct.join('、') || '暂无')}</span></div><div class="practice-review-explanation"><strong>题目解析</strong><p>${escapeHTML(text(question.explanation).trim() || '暂无解析')}</p><button type="button" class="practice-secondary-btn" data-question-feedback="${escapeHTML(question.id)}">解析有误或缺失？反馈此题</button></div></article>`
+        return `<article class="practice-review-card" data-review-card="${escapeHTML(question.id)}"><header><h3>第 ${index + 1} 题</h3><span class="practice-review-status is-${outcome}">${outcome === 'correct' ? '答对' : outcome === 'wrong' ? '答错' : '未作答'}${unscoredIds.has(text(question.id)) ? ' · 不计分' : ''}</span></header><p class="practice-review-stem">${escapeHTML(question.stem)}</p>${global.KGQuestionMaterials?.render(question,{selectedPairs:answer.selectedPairs||{},readOnly:true,reveal:true})||''}<ol class="practice-review-options">${(question.options || []).map(option => `<li class="${correct.includes(text(option.id)) ? 'is-correct' : selected.includes(text(option.id)) ? 'is-wrong' : ''}"><strong>${escapeHTML(option.id)}</strong><span>${escapeHTML(option.text)}</span></li>`).join('')}</ol><div class="practice-review-answers"><span>你的答案：${escapeHTML(question.type==='matching'?global.KGQuestionAnswerSet?.answerText(question,answer.selectedPairs):selected.join('、') || '未作答')}</span><span>正确答案：${escapeHTML(question.type==='matching'?global.KGQuestionAnswerSet?.answerText(question,question.matching?.correctPairs):correct.join('、') || '暂无')}</span></div><div class="practice-review-explanation"><strong>题目解析</strong><p>${escapeHTML(text(question.explanation).trim() || '暂无解析')}</p><button type="button" class="practice-secondary-btn" data-question-feedback="${escapeHTML(question.id)}">解析有误或缺失？反馈此题</button></div></article>`
       }).join('') : `<p class="practice-review-empty">${filter === 'wrong' ? '本次没有答错的题目。' : filter === 'correct' ? '本次没有答对的题目。' : '暂无可回顾的题目。'}</p>`
     }
     const mountComments = () => {
@@ -157,6 +159,11 @@
       selectWithComments('all')
       section.scrollIntoView({ behavior: 'smooth', block: 'start' })
     })
+    if (!options.onReviewQuestion) root.querySelectorAll('[data-report-unscored]').forEach(button=>button.addEventListener('click',()=>{
+      selectWithComments('all')
+      const card=Array.from(section.querySelectorAll('[data-review-card]')).find(item=>item.dataset.reviewCard===button.dataset.reportUnscored)
+      if(card){card.tabIndex=-1;card.scrollIntoView({behavior:'smooth',block:'start'});card.focus({preventScroll:true})}
+    }))
   }
 
   function render(root, report, options = {}) {
@@ -165,6 +172,8 @@
     const counts = report.counts || {}
     const score = number(report.scorePercent)
     const isSimulation = report.reportKind === 'simulation' || (!report.reportKind && number(counts.total) >= 60 && !['revenge', 'scholar'].includes(report.mode))
+    const unscored = isSimulation && Array.isArray(report.unscoredQuestions) ? report.unscoredQuestions : []
+    const pretestNote = unscored.length ? `<section class="practice-report-domain-unavailable practice-report-unscored" aria-label="不计分题说明"><h2>不计分题说明</h2><p>本卷共 ${number(counts.total)} 题，其中 ${number(counts.total)-unscored.length} 道计分题、${unscored.length} 道不计分题。模拟分、通过判定及领域成绩仅按计分题计算；上方答对、答错、未答及全卷正确率仍统计全部题目，错题复盘与经验不受影响。</p><p>以下题目由系统在本次练习开始时随机选定，名单已固定，仅用于模拟，不代表 PMI 真实考试中的预试题。</p><div class="practice-review-filters">${unscored.map(item=>{const label=`第 ${number(item.number)} 题`;return Array.isArray(options.questions)||options.onReviewQuestion?`<button type="button" data-report-unscored="${escapeHTML(item.questionId)}" aria-label="回看${label}（不计分）">${label}</button>`:`<span>${label}</span>`}).join('')}</div></section>` : ''
     const resultClass = report.passed ? 'is-pass' : 'is-fail'
     const questionNumbers = options.questionNumbers || {}
     const wrongIds = Array.isArray(report.wrongQuestionIds) ? report.wrongQuestionIds : []
@@ -182,12 +191,13 @@
       <section class="practice-report-meta"><div><span>学员</span><strong>${escapeHTML(report.learner || '当前学员')}</strong></div><div><span>试卷</span><strong>${escapeHTML(report.paperName || 'PMP 模拟练习')}</strong></div><div><span>日期</span><strong>${escapeHTML(report.examDate || report.completedAt || '')}</strong></div><div><span>报告编号</span><strong>${escapeHTML(report.reportNumber || report.sessionId || '')}</strong></div></section>
       <section class="practice-report-overall ${isSimulation ? resultClass : ''}"><div><span>${isSimulation ? 'OVERALL PERFORMANCE' : 'PRACTICE COVERAGE'}</span><h2>${isSimulation ? escapeHTML(report.resultLabel || `模拟考试结果：${report.passed ? 'PASS' : 'FAIL'}`) : '本次练习摘要'}</h2><p>${isSimulation ? '本结果按本次会话的冻结规则生成。' : '仅反映本次抽取题目的表现。'}</p></div><div class="practice-report-score"><strong>${isSimulation ? score.toFixed(2).replace(/\.00$/, '') : number(report.accuracyPercent).toFixed(2).replace(/\.00$/, '')}</strong><span>${isSimulation ? `模拟分 / 100${report.maxScore ? ` · ${number(report.rawScore)} / ${number(report.maxScore)} 原始分` : ''}` : '本次正确率 / 100'}</span></div></section>
       ${isSimulation ? `<section class="practice-report-band-scale" aria-label="总体表现区间"><div class="practice-report-band-track">${bandScaleMarkup(report)}<i style="left:${Math.max(0, Math.min(100, score))}%" aria-label="你的模拟分 ${score}"></i></div></section>` : ''}
-      <section class="practice-report-counts"><div><span>总题数</span><strong>${number(counts.total)}</strong></div><div><span>答对</span><strong>${number(counts.correct)}</strong></div><div><span>答错</span><strong>${number(counts.wrong)}</strong></div><div><span>未答</span><strong>${number(counts.unanswered)}</strong></div><div><span>正确率</span><strong>${number(report.accuracyPercent ?? score).toFixed(2).replace(/\.00$/, '')}%</strong></div><div><span>累计用时</span><strong>${durationLabel(report.durationMs)}</strong></div>${options.experience == null ? '' : `<div><span>本次经验</span><strong>${number(options.experience)}</strong></div>`}</section>
+      <section class="practice-report-counts"><div><span>总题数</span><strong>${number(counts.total)}</strong></div><div><span>答对</span><strong>${number(counts.correct)}</strong></div><div><span>答错</span><strong>${number(counts.wrong)}</strong></div><div><span>未答</span><strong>${number(counts.unanswered)}</strong></div><div><span>${unscored.length?'全卷正确率':'正确率'}</span><strong>${number(report.accuracyPercent ?? score).toFixed(2).replace(/\.00$/, '')}%</strong></div><div><span>累计用时</span><strong>${durationLabel(report.durationMs)}</strong></div>${options.experience == null ? '' : `<div><span>本次经验</span><strong>${number(options.experience)}</strong></div>`}</section>
+      ${pretestNote}
       <section class="practice-report-next"><h2>下一步建议</h2>${nextCount?`<p>${escapeHTML(nextDetail)}</p><button type="button" class="practice-primary-btn" data-report-next>${escapeHTML(nextLabel)}</button>`:''}${wrongIds.length?'<button type="button" class="practice-secondary-btn" data-report-review-wrong>回看本次错题</button>':''}<ul>${(isSimulation ? (Array.isArray(report.recommendations) ? report.recommendations.filter(item=>wrongIds.length||!String(item).includes('本次错题')) : []) : [wrongIds.length?'优先复盘本次错题及对应知识点':number(counts.unanswered)>0?'先回看本次未答题目和解析，再练习未做过的题目':report.mode==='revenge'?'返回错题区查看待验证或已掌握状态，按到期提示继续巩固':'继续练习未做过的题目，扩大知识覆盖', '扩大题目覆盖后再判断各领域的整体表现']).map(item => `<li>${escapeHTML(item)}</li>`).join('')}</ul></section>
       ${domainDataComplete && isSimulation
         ? `<section class="practice-report-breakdown"><header><span>EXAM BREAKDOWN</span><h2>考试领域分析</h2><p>扇区大小代表领域占比，颜色代表本领域的模拟表现等级。</p>${legendMarkup()}</header>${pieMarkup(report)}</section>
       <section class="practice-report-domains"><h2>各领域成绩</h2><div class="practice-report-table-scroll"><table class="practice-report-domain-table"><thead><tr><th>领域</th><th>占比</th><th>答对 / 总数</th><th>得分率</th><th>表现</th></tr></thead><tbody>${domainRows(report, true)}</tbody></table></div></section>`
-        : isSimulation ? '<section class="practice-report-domain-unavailable" role="status"><h2>领域分析暂不可用</h2><p>本试卷包含未标注 PMP 领域的历史题目；总体成绩仍按全部题目计算，为避免误导，本次不展示领域饼图与领域等级。</p></section>'
+        : isSimulation ? `<section class="practice-report-domain-unavailable" role="status"><h2>领域分析暂不可用</h2><p>本试卷包含未标注 PMP 领域的历史题目；总体成绩仍按${unscored.length?'本次计分题':'全部题目'}计算，为避免误导，本次不展示领域饼图与领域等级。</p></section>`
         : `<section class="practice-report-breakdown"><header><h2>本次题目领域分布</h2><p>按实际题数统计，颜色仅用于区分领域。</p></header>${coverageMarkup(report)}</section><section class="practice-report-domains"><h2>本次领域覆盖</h2><div class="practice-report-table-scroll"><table class="practice-report-domain-table"><thead><tr><th>领域</th><th>覆盖</th><th>答对 / 总数</th><th>本次正确率</th><th>状态</th></tr></thead><tbody>${domainRows(report, false)}</tbody></table></div>${domainDataComplete ? '' : '<p>部分历史题目缺少领域标注，已计入上方“未标注”题量。</p>'}</section>`}
       <nav aria-label="报告操作" class="practice-report-actions">${options.onReviewAll || Array.isArray(options.questions) ? '<button type="button" class="practice-secondary-btn" data-report-review-all="true">回看全部题目与解析</button>' : ''}<button type="button" class="practice-primary-btn" data-report-again="true">再练一次</button><button type="button" class="practice-secondary-btn" data-report-lobby="true">返回大厅</button></nav>
       <section class="practice-report-wrong"><div><h2>本次错题</h2><p>${wrongIds.length ? `共 ${wrongIds.length} 道，${Array.isArray(options.questions) ? '下方已统一展开错题与解析，也可筛选全部或答对的题目。' : '点击题号只读回看答案与解析。'}` : '本次作答没有错题。'}</p></div><div class="practice-report-wrong-list">${wrongButtons}</div></section>
@@ -201,6 +211,7 @@
     if (!Array.isArray(options.questions)) root.querySelector('[data-report-review-wrong]')?.addEventListener('click',()=>options.onReviewWrong?.(wrongIds[0]))
     root.querySelector('[data-report-next]')?.addEventListener('click',()=>options.onNextPractice?.())
     renderQuestionReview(root, report, options)
+    if(options.onReviewQuestion)root.querySelectorAll('[data-report-unscored]').forEach(button=>button.addEventListener('click',()=>options.onReviewQuestion(button.dataset.reportUnscored)))
     global.KGQuestionMaterials?.bindMedia(root)
     root.querySelector('[data-report-again]')?.addEventListener('click', () => options.onAgain?.())
     root.querySelector('[data-report-lobby]')?.addEventListener('click', () => options.onLobby?.())
