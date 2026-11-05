@@ -1,15 +1,13 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.423",
-  "toVersion": "v9.0-p4.1.424",
+  "fromVersion": "v9.0-p4.1.424",
+  "toVersion": "v9.0-p4.1.425",
   "changes": {
     "added": [],
     "changed": [
       "VERSION",
       "content-prep-studio/dist/content-prep.html",
-      "src/29-auth-core.js",
-      "src/shared/auth-recovery.js",
-      "tests/auth-recovery.test.js"
+      "tests/canvas-form-drafts-browser.py"
     ],
     "removed": []
   },

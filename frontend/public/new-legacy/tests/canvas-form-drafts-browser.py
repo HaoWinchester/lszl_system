@@ -133,6 +133,9 @@ def home(page, context, base, events):
     page.locator('#detailActionsToggle').click()
     page.locator('#editFromDetailBtn').click()
     expect(page.locator('#nodeModal')).to_be_visible()
+    # openNodeModal schedules its initial title focus. Let that real focus
+    # arrive before filling another field, so it cannot steal a fill mid-input.
+    expect(page.locator('#nTitle')).to_be_focused()
     title = '原账号节点草稿 ' + uuid.uuid4().hex[:8]
     summary = '未按保存的详细内容\n第二行 mixed 中文'
     fields = {'#nTitle': title, '#nSummary': summary}
@@ -211,10 +214,16 @@ def recall(page, context, base, events):
     expect(page.locator('.kr-node button').first).to_be_visible()
     page.locator('.kr-node button').first.click()
     expect(page.locator('#krCustomInput')).to_be_visible()
+    # Root activation is a real asynchronous mutation. A fresh fixture may
+    # still have zero saved nodes when its new root is already visible; await
+    # that root's acknowledgement before measuring an unsubmitted child.
+    root_id = page.locator('.kr-node').first.get_attribute('data-instance-id')
+    before = wait_api(page, lambda: context.request.get(base + '/api/v1/recall/session/ink-question-1?releaseId=ink-release'),
+                      lambda value: any(node.get('instanceId') == root_id for node in value['progress'].get('nodes', [])),
+                      'Root preparation must be acknowledged before the draft baseline')['progress']
     title = '保留未生成' + uuid.uuid4().hex[:8]
     fields = {'#krCustomInput': title}
     mark_fields(page, fields)
-    before = context.request.get(base + '/api/v1/recall/session/ink-question-1?releaseId=ink-release').json()['progress']
     def paused_pen_switch():
         page.locator('#krInkBtn').click()
         page.locator('.canvas-ink-toolbar').get_by_role('button', name='画笔', exact=True).click()
