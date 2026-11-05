@@ -101,8 +101,8 @@
     const listeners=[];
     let selectedId=null,textDrag=null,textResize=null,erasing=null,colorSession=null;
     const selected=()=>getStrokes().find(item=>item.id===selectedId);
-    const styleTool=()=>textSession?'text':tool==='select'?selected()?.tool:tool;
-    const currentStyle=()=>{const name=styleTool(),selection=selected();return textSession?{...TOOLS.text,...textSession.style}:selection&&(tool==='select'||tool==='text')?{...TOOLS[name],...selection}:prefs[name]};
+    const styleTool=()=>textSession&&!textSession.suspended?'text':tool==='select'?selected()?.tool:tool;
+    const currentStyle=()=>{const name=styleTool(),selection=selected();return textSession&&!textSession.suspended?{...TOOLS.text,...textSession.style}:selection&&(tool==='select'||tool==='text')?{...TOOLS[name],...selection}:prefs[name]};
     const measure=doc.createElement('canvas').getContext('2d');
     const textLines=stroke=>textLayout(stroke,measure).lines;
     const textBox=stroke=>textLayout(stroke,measure);
@@ -119,6 +119,7 @@
       layer.append(group);
     }
     const readonly=()=>!!options.isReadonly?.();
+    const allowToolSelection=()=>!readonly()||!!options.allowReadonlyToolSelection?.();
     const report=error=>options.onError?.(error?.message||String(error));
     const history=options.history||global.KGCanvasHistoryController?.create({onChange:refreshControls});
     const ownHistory=!options.history;
@@ -185,7 +186,7 @@
       // 只读（切题过渡/访客）不再把工具强制降回 select：工具选择保留，绘制入口由
       // pointerdown 的 readonly 拦截兜底，按钮 disabled + 光标还原表达锁定；
       // 只读解除后工具与自定义光标自动恢复（切题保持画笔状态的前提）。
-      toolbar.querySelectorAll('[data-ink-tool]').forEach(btn=>{btn.setAttribute('aria-pressed',String(btn.dataset.inkTool===tool));btn.disabled=locked&&btn.dataset.inkTool!=='select'});
+      toolbar.querySelectorAll('[data-ink-tool]').forEach(btn=>{btn.setAttribute('aria-pressed',String(btn.dataset.inkTool===tool));btn.disabled=locked&&!allowToolSelection()&&btn.dataset.inkTool!=='select'});
       for(const action of ['undo','redo']){const btn=toolbar.querySelector('[data-ink-action='+action+']');btn.hidden=!(ownHistory||options.showHistory);btn.disabled=locked||!state[action==='undo'?'canUndo':'canRedo']}
       toolbar.hidden=!opened;
       const launch=trigger();if(launch){if(!launch.querySelector('svg'))launch.innerHTML=penIcon;launch.classList.add('canvas-ink-entry');launch.setAttribute('aria-expanded',String(opened));launch.disabled=locked;const tip=locked?'当前画布只读，无法使用画笔':opened?'收起画笔工具并退出绘画':'展开画笔工具，在画布上书写或标注';if(launch.hasAttribute('data-tooltip')){launch.dataset.tooltip=tip;launch.removeAttribute('title')}else launch.title=tip;launch.querySelector('svg')?.style.setProperty('color',prefs[TOOLS[tool]?tool:'pen'].color)}
@@ -253,9 +254,20 @@
     }
     function setTool(value){
       closeColorPicker();cancel();
-      // Keep the latest tool request on the draft until IME and persistence finish.
-      if(textSession){textSession.onSaved=value!==tool?()=>setTool(value):null;if(value!==tool){closeTextEditor(true);return;}}
-      if(value!=='select'&&(value!=='text'||selected()?.tool!=='text'))selectedId=null;if(!TOOLS[value])settingsOpen=false;tool=(TOOLS[value]||value==='eraser')&&!readonly()?value:'select';
+      // Persistence must never hold the drawing tool hostage. Keep the same
+      // editor as an in-memory draft until the acknowledgement succeeds.
+      if(textSession){
+        const session=textSession,leaving=value!=='text';session.onSaved=null;
+        const shouldCommit=leaving&&!session.suspended;
+        session.suspended=leaving;
+        session.frame.style.pointerEvents=leaving?'none':'';
+        session.border.style.pointerEvents=leaving?'none':'';
+        session.editor.readOnly=leaving;
+        if(leaving){session.status.textContent='文字尚未保存 · 点击文字工具继续编辑';if(doc.activeElement===session.editor)session.editor.blur()}
+        else if(!session.stale){session.editor.focus({preventScroll:true})}
+        if(shouldCommit)closeTextEditor(true);
+      }
+      if(value!=='select'&&(value!=='text'||selected()?.tool!=='text'))selectedId=null;if(!TOOLS[value])settingsOpen=false;tool=(TOOLS[value]||value==='eraser')&&allowToolSelection()?value:'select';
       viewport.classList.toggle('canvas-ink-drawing',tool!=='select');viewport.dataset.inkTool=tool;
       if(tool!=='select')options.onDrawMode?.();
       render();
@@ -268,7 +280,7 @@
       Object.assign(prefs[current],patch);
       const selection=selected();
       if(selection&&(tool==='text'||tool==='select')&&!textSession){try{change(getStrokes().map(item=>item.id===selection.id?{...item,...patch}:item),'笔迹格式')}catch(error){report(error)}}
-      if(textSession){Object.assign(textSession.style,patch);textSession.editor.style.color=textSession.style.color;textSession.editor.style.fontWeight=textSession.style.bold?'700':'400';textSession.editor.style.fontSize=textSession.style.width*(options.getViewport().scale||options.getViewport().zoom||1)+'px';textSession.editor.dispatchEvent(new global.Event('input'))}
+      if(textSession&&!textSession.suspended){Object.assign(textSession.style,patch);textSession.editor.style.color=textSession.style.color;textSession.editor.style.fontWeight=textSession.style.bold?'700':'400';textSession.editor.style.fontSize=textSession.style.width*(options.getViewport().scale||options.getViewport().zoom||1)+'px';textSession.editor.dispatchEvent(new global.Event('input'))}
       refreshControls();
     }
     bold.addEventListener('click',()=>updateTextStyle({bold:!currentStyle()?.bold}));
@@ -333,6 +345,8 @@
     listen(toolbar,'wheel',event=>event.stopPropagation());
     // 文字工具：单击选择，拖动移动，双击编辑；Enter 换行，Ctrl/⌘+Enter 保存。
     let textSession=null;
+    const textContext=()=>options.getTextContext?.();
+    const textContextMatches=session=>!session.stale&&session.context===textContext();
     async function closeTextEditor(commit){
       const session=textSession;if(!session)return true;
       if(commit&&session.closing)return session.closing;
@@ -344,9 +358,16 @@
           session.editor.dataset.saveState='committing';
           const success=await session.edit.commit();
           if(textSession!==session)return false;
+          if(!textContextMatches(session)){session.stale=true;session.editor.dataset.saveState='failed';session.status.textContent='画布已切换，草稿仍保留，请复制输入或按 Esc 关闭';return false}
           session.editor.dataset.saveState=session.edit.state().status;
-          if(!success){session.onSaved=null;if(session.edit.state().status==='failed'){session.status.textContent='文字未保存，请点击外部重试';report(session.edit.state().error)}return false}
-        }else{session.edit.cancel();if(session.applied&&!session.stale){options.setStrokes?options.setStrokes(session.before):options.change(session.before,'取消文字修改');render()}}
+          if(!success){session.onSaved=null;if(session.edit.state().status==='failed'){session.status.textContent=session.suspended?'文字未保存 · 点击文字工具继续编辑或重试':'文字未保存，请点击外部重试';report(session.edit.state().error)}return false}
+        }else{session.edit.cancel();if(session.applied&&textContextMatches(session)){
+          // Discard this text edit only; pen strokes drawn while it was suspended
+          // belong to the current canvas and must survive cancellation.
+          const original=session.before.find(item=>item.id===session.id),current=getStrokes().filter(item=>item.id!==session.id);
+          if(original)current.splice(Math.min(session.before.findIndex(item=>item.id===session.id),current.length),0,original);
+          options.setStrokes?options.setStrokes(current):options.change(current,'取消文字修改');render()
+        }}
         const onSaved=commit?session.onSaved:null;
         textSession=null;session.unmount.forEach(dispose=>dispose());session.frame.remove();session.status.remove();session.border.remove();refreshControls();onSaved?.();return true;
       };
@@ -371,13 +392,15 @@
       for(const side of ['nw','n','ne','e','se','s','sw','w']){const dot=doc.createElement('span');dot.className='canvas-ink-text-edit-point';dot.dataset.inkEditPoint=side;dot.dataset.inkEditDrag='point';border.append(dot)}
       const overlayHost=options.overlayHost||doc.body;overlayHost.append(editorFrame,status,border);
       const before=normalize(getStrokes()),id=existing?.id||'ink-'+Date.now().toString(36)+'-'+(++sequence)+'-'+Math.random().toString(36).slice(2,8);
-      const session={editor,frame:editorFrame,status,border,existing,world,style,before,unmount:[],applied:false,composing:false};textSession=session;
+      const session={id,context:textContext(),editor,frame:editorFrame,status,border,existing,world,style,before,unmount:[],applied:false,composing:false,suspended:false};textSession=session;
       session.edit=global.KGTextEditSession.create({original:{text:editor.value,...style,points:[[...world]]},persist:async draft=>{
-        if(session.stale)throw new Error('画布已切换，文字草稿仍保留，请复制输入或按 Esc 关闭');
+        if(!textContextMatches(session))throw new Error('画布已切换，文字草稿仍保留，请复制输入或按 Esc 关闭');
         if(!existing&&!draft.text.trim())return true;
+        if(readonly())throw new Error('当前画布只读，文字草稿仍保留');
         const stroke={id,tool:'text',...draft};stroke.boxHeight=Math.min(4000,Math.max(draft.boxHeight||24,textLines(stroke).length*stroke.width*1.35));
-        const signature=JSON.stringify(stroke);
-        if(signature!==session.appliedSignature){change(existing||session.applied?getStrokes().map(item=>item.id===id?stroke:item):[...getStrokes(),stroke],existing?'编辑文字':'添加文字');session.applied=true;session.appliedSignature=signature}
+        const signature=JSON.stringify(normalize([stroke])[0]);
+        const current=getStrokes(),applied=current.find(item=>item.id===id);
+        if(signature!==(applied?JSON.stringify(normalize([applied])[0]):undefined)){change(applied?current.map(item=>item.id===id?stroke:item):[...current,stroke],existing?'编辑文字':'添加文字');session.applied=true}
         return options.persistText?await options.persistText():true;
       }});
       function revealCaret(){
@@ -429,10 +452,10 @@
       editor.addEventListener('keydown',event=>{event.stopPropagation();if(event.isComposing||event.keyCode===229)return;if(event.key==='Enter'&&(event.ctrlKey||event.metaKey)){event.preventDefault();closeTextEditor(true)}else if(event.key==='Escape'){event.preventDefault();closeTextEditor(false)}});
       editor.addEventListener('input',updateDraft);
       editor.addEventListener('keyup',revealCaret);editor.addEventListener('select',revealCaret);
-      editor.addEventListener('blur',event=>{if(toolbar.contains(event.relatedTarget)||colorPickerTarget(event.relatedTarget))return;global.setTimeout(()=>{if(textSession===session&&!toolbar.contains(doc.activeElement)&&!colorPickerTarget(doc.activeElement))closeTextEditor(true)},160)});
+      editor.addEventListener('blur',event=>{if(toolbar.contains(event.relatedTarget)||colorPickerTarget(event.relatedTarget))return;global.setTimeout(()=>{if(textSession===session&&!session.suspended&&doc.activeElement!==editor&&!toolbar.contains(doc.activeElement)&&!colorPickerTarget(doc.activeElement))closeTextEditor(true)},160)});
       editor.focus();resize();refreshControls();
     }
-    listen(global,'pointerdown',event=>{if(!textSession||textSession.frame.contains(event.target)||textSession.border.contains(event.target)||toolbar.contains(event.target)||colorPickerTarget(event.target))return;closeTextEditor(true);},true);
+    listen(global,'pointerdown',event=>{if(!textSession||textSession.suspended||textSession.frame.contains(event.target)||textSession.border.contains(event.target)||toolbar.contains(event.target)||colorPickerTarget(event.target))return;closeTextEditor(true);},true);
     function hitStroke(location,padding,textOnly=false){
       const target=new global.DOMPoint(...location),byId=new Map(getStrokes().map(stroke=>[stroke.id,stroke]));
       for(const el of [...layer.querySelectorAll('[data-stroke-id]')].reverse()){
@@ -460,7 +483,7 @@
       points.push(next);
     }
     listen(global,'pointerdown',event=>{
-      if(textSession||destroyed||space||event.button!==0||event.isPrimary===false)return;
+      if((textSession&&!textSession.suspended)||destroyed||space||event.button!==0||event.isPrimary===false)return;
       const handle=event.target.closest?.('[data-ink-resize-handle]');if(handle&&layer.contains(handle)&&!readonly()){stop(event);const stroke=getStrokes().find(item=>item.id===handle.dataset.textId);textResize={beforeSignature:strokeStateSignature(),pointerId:event.pointerId,handle:handle.dataset.inkResizeHandle,start:point(event,viewport.getBoundingClientRect(),options.getViewport()),original:normalize([stroke])[0],box:textBox(stroke)};viewport.setPointerCapture(event.pointerId);return}
       if(destroyed||active||erasing||textDrag||textResize||space||readonly()||event.button!==0||event.isPrimary===false||!inside(event.target))return;
       const view=options.getViewport(),location=point(event,viewport.getBoundingClientRect(),view);

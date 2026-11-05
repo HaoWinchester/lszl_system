@@ -52,7 +52,18 @@
   // current graph is clean, and never after its file/session has been replaced.
   async function saveAcknowledged(options={},isCurrent=()=>true){
     const context=()=>global.KGGraphFileEditorStoreBridge?.fragmentSource?.()?.fileId||'';
-    const fileId=context(),current=()=>isCurrent()&&context()===fileId;
+    const fileId=context();let createdFileId='';
+    const current=()=>{
+      if(!isCurrent())return false;
+      const next=context();
+      if(next===fileId)return !createdFileId;
+      // A caller with a stable logical-session guard may acknowledge the one
+      // server ID assigned to its previously unsaved preview. Existing files
+      // always retain the strict selected-file identity check.
+      if(fileId||!options.allowFileCreation||!next)return false;
+      if(!createdFileId)createdFileId=next;
+      return next===createdFileId;
+    };
     do{
       if(!current())return false;
       if(await saveNow(options)===false||!current())return false;

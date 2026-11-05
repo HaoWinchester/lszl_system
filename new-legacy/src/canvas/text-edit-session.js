@@ -7,7 +7,7 @@
     async function commit(){
       if(composing)return false;if(pending)return pending;
       const current=version,value=draft;status='committing';
-      pending=Promise.resolve().then(async()=>{try{const result=await persist(value);if(current!==version)return false;if(result===false)throw Error('文字未保存，请重试');status='committed';return true}catch(e){if(current===version){status='failed';error=e}return false}finally{pending=null}});
+      pending=Promise.resolve().then(async()=>{try{if(current!==version)return false;const result=await persist(value);if(current!==version)return false;if(result===false)throw Error('文字未保存，请重试');status='committed';return true}catch(e){if(current===version){status='failed';error=e}return false}finally{pending=null}});
       return pending;
     }
     return Object.freeze({update,cancel,commit,setComposing:value=>{composing=!!value},state:()=>({original,draft,status,error,composing})});

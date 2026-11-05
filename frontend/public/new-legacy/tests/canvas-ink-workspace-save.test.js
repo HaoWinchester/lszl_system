@@ -28,7 +28,7 @@ test('failed older request cannot replace a newer queued drawing',async()=>{
 function navigationAdapter({readonly=false,draft=false,commit=true,saveState='saved',answers=0,answerFlushing=false,flush=async()=>{}}={}){
  const writes=[],calls=[],state={readonly,optionClickTimers:new Map(),answerQueue:Array(answers).fill({}),answerFlushing,workspace:{id:'navigation-canvas'},ink:{hasTextDraft:()=>draft,commitText:async()=>{calls.push('commit');return commit}}};
  const source=fs.readFileSync(path.join(__dirname,'../src/77-multi-question-workspace.js'),'utf8');
- const registration=source.match(/global\.KGLearningProgress\?\.registerAdapter\?\.\('multi_question_canvas',\{([\s\S]*?)\n    \}\);/);
+ const registration=source.match(/const workspaceParticipant=\{([\s\S]*?)\n    \};/);
  assert.ok(registration,'workspace learning adapter registration must exist');
  const adapter=vm.runInNewContext('({'+registration[1]+'})',{state,store:()=>({write:(workspace,options)=>writes.push({workspace,options})}),global:{KGCanvasWorkspaceAdapter:{getState:()=>({status:saveState}),flush:async options=>{calls.push('flush');assert.equal(options.throwOnError,true);return flush()}}},flushPendingOptionChoices:async()=>calls.push('choices'),flushAnswerQueue:async options=>{assert.equal(options.throwOnError,true);calls.push('answers')},clearPaperTransientState(){}});
  return {adapter,writes,calls};
@@ -71,6 +71,16 @@ test('workspace navigation waits for an answer already in flight before leaving'
  let finish;const response=new Promise(resolve=>{finish=resolve}),s=answerQueueHarness(()=>response);s.enqueueAnswer({requestId:'in-flight'},'n1');
  const autosave=s.flushAnswerQueue();let left=false;const leave=s.flushAnswerQueue({throwOnError:true}).then(()=>{left=true});
  await new Promise(resolve=>setImmediate(resolve));assert.equal(left,false);finish();await Promise.all([autosave,leave]);assert.equal(left,true);
+});
+
+test('expired workspace keeps queued answers without sending or rescheduling until recovery',async()=>{
+ let paused=true,sends=0,timers=0;
+ const s=answerQueueHarness(async()=>{sends++});
+ s.global.KGAuthRecovery={isPaused:()=>paused};s.global.setTimeout=()=>{timers++};
+ s.enqueueAnswer({requestId:'retained-answer'},'n1');
+ await assert.rejects(s.flushAnswerQueue({throwOnError:true}),/作答尚未保存/);
+ assert.equal(sends,0);assert.equal(timers,0);assert.equal(s.state.answerQueue.length,1);
+ paused=false;await s.flushAnswerQueue({throwOnError:true});assert.equal(sends,1);assert.equal(s.state.answerQueue.length,0);
 });
 
 test('workspace refresh protection tracks live drafts answer queues and remote save state',()=>{

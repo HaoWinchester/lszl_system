@@ -27,14 +27,14 @@
   }
   async function request(path, options = {}) {
     const requestOwner = text(currentUser()?.username)
-    const response = await global.fetch(`${API_ROOT}${path}`, {
+    const response = await (global.KGAuthRecovery?.fetch || global.fetch)(`${API_ROOT}${path}`, {
       ...options,
       credentials: 'include',
       headers: { ...(options.body ? { 'content-type': 'application/json' } : {}), ...(options.headers || {}) },
     })
     let payload = {}
     try { payload = await response.json() } catch (error) {}
-    if (/^\/sessions(?:\/|$)/.test(path) && requestOwner !== text(currentUser()?.username)) {
+    if (requestOwner !== text(currentUser()?.username)) {
       throw new Error('账号已改变，已丢弃上一账号的练习响应。')
     }
     if (!response.ok) {

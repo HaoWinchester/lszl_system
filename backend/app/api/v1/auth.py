@@ -3,6 +3,8 @@
 登录成功/失败/登出/微信登录均写审计日志。
 """
 
+import json
+import re
 from typing import Annotated, Literal
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
@@ -12,15 +14,14 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
-from app.core.auth import CurrentUser, establish_authenticated_session, get_login_session_id, has_recent_wechat_password_proof, record_wechat_password_proof
+from app.core.auth import CurrentUser, optional_cookie_user, establish_authenticated_session, get_login_session_id, has_recent_wechat_password_proof, record_wechat_password_proof
 from app.core.config import settings
 from app.core.security import now_utc
 from app.core.legal import LEGAL_CONSENT_VERSION, accepted_legal_consent
 from app.db.session import get_db
 from app.schemas.auth import AuthenticatedResponse, LoginRequest, RegisterRequest, SelfProfileUpdate, WechatAccountChoice
 from app.schemas.user import UserCreate
-from app.models.user import ACTIVE
-from app.services import system_service, user_service, wechat_service, wechat_account_service, referral_service
+from app.services import browser_session_service, system_service, user_service, wechat_service, wechat_account_service, referral_service
 from app.api.v1 import referrals
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -117,7 +118,8 @@ async def register(req: RegisterRequest, request: Request, db: DB):
     except IntegrityError as exc:
         await db.rollback()
         raise HTTPException(status_code=409, detail="注册信息已变化，请检查用户名后重试") from exc
-    login_session_id = establish_authenticated_session(request, user.username)
+    login_session_id = await establish_authenticated_session(request, user.username, db)
+    await db.refresh(user)
     return {"user": user_service.to_dict(user), "loginSessionId": login_session_id}
 
 
@@ -143,20 +145,47 @@ async def login(req: LoginRequest, request: Request, db: DB):
     await user_service.log_action(db, "login_success", user.username, user.username, "登录成功", ip, ua)
     await db.commit()
     await db.refresh(user)
-    login_session_id = establish_authenticated_session(request, user.username)
+    login_session_id = await establish_authenticated_session(request, user.username, db)
+    await db.refresh(user)
     return {"user": user_service.to_dict(user), "loginSessionId": login_session_id}
+
+
+def _logout_detail(request: Request) -> str:
+    """Only keep documented context; ignore URL queries and arbitrary values."""
+    page = request.headers.get("x-kg-page", "").split("?", 1)[0].split("#", 1)[0]
+    if page not in SAFE_WECHAT_RETURN_PATHS:
+        page = "unknown"
+    entry = request.headers.get("x-kg-entry", "")
+    if entry not in {"account-menu", "logout-button", "user-action", "cross-tab", "system-settings"}:
+        entry = "unknown"
+    request_id = request.headers.get("x-request-id", "")
+    if not re.fullmatch(r"[0-9a-fA-F-]{32,36}", request_id):
+        request_id = "unknown"
+    return "退出登录 " + json.dumps({"page": page, "entry": entry, "requestId": request_id}, ensure_ascii=False)
+
+
+@router.post("/refresh")
+async def refresh_session(request: Request, user: CurrentUser):
+    if request.state.auth_transport != "cookie":
+        raise HTTPException(status_code=400, detail="仅浏览器会话可续期")
+    login_session_id = get_login_session_id(request)
+    request.scope["_kg_refresh_session"] = True
+    return JSONResponse({"ok": True, "loginSessionId": login_session_id,
+                         "expiresIn": settings.SESSION_MAX_AGE_SECONDS},
+                        headers={"Cache-Control": "no-store"})
 
 
 @router.post("/logout")
 async def logout(request: Request, db: DB):
     un = request.session.get("username")
+    await browser_session_service.revoke(db, request)
     pending = request.session.get("wechat_account") or {}
     if pending.get("ticket"):
         await wechat_account_service.cancel(db, str(pending["ticket"]))
     if un:
         ip, ua = _client_info(request)
-        await user_service.log_action(db, "logout", un, un, "退出登录", ip, ua)
-        await db.commit()
+        await user_service.log_action(db, "logout", un, un, _logout_detail(request), ip, ua)
+    await db.commit()
     request.session.clear()
     response = JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -217,7 +246,8 @@ async def wechat_auth_url(
     cfg = await system_service.get_wechat_config(db)
     if wechat_service.compute_mode(cfg) != "official":
         raise HTTPException(status_code=400, detail="未配置正式微信登录（缺 AppID/AppSecret 或未启用）")
-    username = str(request.session.get("username") or "")
+    current = await optional_cookie_user(request, db)
+    username = current.username if current else ""
     if intent in {"bind", "recover"} and not username:
         raise HTTPException(status_code=401, detail="请先登录后再绑定微信")
     url, state = wechat_service.build_auth_url(cfg)
@@ -254,8 +284,8 @@ async def wechat_callback(code: str, state: str, request: Request, db: DB):
             username = str(pending.get("username") or "")
             if not username or request.session.get("username") != username:
                 return _wechat_redirect(return_path, "bind-failed")
-            user = await user_service.get_by_username(db, username)
-            if not user or user.status != ACTIVE:
+            user = await optional_cookie_user(request, db)
+            if not user or user.username != username:
                 return _wechat_redirect(return_path, "bind-failed")
             if pending.get("intent") == "recover":
                 owner = await wechat_service.find_by_wechat_identity(db, profile["openid"], profile["unionid"])
@@ -270,6 +300,7 @@ async def wechat_callback(code: str, state: str, request: Request, db: DB):
             accepted_terms_version = _accepted_legal_consent(pending.get("acceptedTermsVersion"))
             user = await wechat_service.find_or_create_user(db, profile, {**cfg, "autoCreateUser": False}, "wechat")
             if not user:
+                await browser_session_service.revoke(db, request)
                 raw = await wechat_account_service.issue(db, profile)
                 request.session.clear()
                 request.session["wechat_account"] = {
@@ -278,7 +309,8 @@ async def wechat_callback(code: str, state: str, request: Request, db: DB):
                 }
                 return _wechat_redirect(return_path, "account-required")
             user_service.record_legal_consent(user, accepted_terms_version)
-            establish_authenticated_session(request, user.username)
+            await establish_authenticated_session(request, user.username, db)
+            await db.refresh(user)
             record_wechat_password_proof(request, user.username)
             action, detail, result = "wechat_login", "微信扫码登录", "login-success"
     except (PermissionError, ValueError) as exc:
@@ -322,12 +354,14 @@ async def wechat_demo_login(
     )
     await db.commit()
     await db.refresh(user)
-    login_session_id = establish_authenticated_session(request, user.username)
+    login_session_id = await establish_authenticated_session(request, user.username, db)
+    await db.refresh(user)
     return {"user": user_service.to_dict(user), "loginSessionId": login_session_id}
 
 
 @router.get('/wechat/account')
 async def pending_wechat_account(request: Request, db: DB):
+    await optional_cookie_user(request, db)
     pending = request.session.get('wechat_account') or {}
     try:
         ticket = await wechat_account_service.pending(db, str(pending.get('ticket') or ''), request.session.get('username'))
@@ -347,6 +381,7 @@ async def cancel_wechat_account(request: Request, db: DB):
 
 @router.post('/wechat/account', response_model=AuthenticatedResponse)
 async def complete_wechat_account(req: WechatAccountChoice, request: Request, db: DB):
+    await optional_cookie_user(request, db)
     pending = request.session.get('wechat_account') or {}
     try:
         ticket = await wechat_account_service.pending(db, str(pending.get('ticket') or ''), request.session.get('username'))
@@ -371,7 +406,8 @@ async def complete_wechat_account(req: WechatAccountChoice, request: Request, db
         await db.rollback()
         raise HTTPException(status_code=403, detail=str(exc)) from exc
     authenticated_at = pending.get("authenticatedAt")
-    session_id = establish_authenticated_session(request, user.username)
+    session_id = await establish_authenticated_session(request, user.username, db)
+    await db.refresh(user)
     if isinstance(authenticated_at, (int, float)):
         record_wechat_password_proof(request, user.username, authenticated_at)
     return {'user': user_service.to_dict(user), 'loginSessionId': session_id}

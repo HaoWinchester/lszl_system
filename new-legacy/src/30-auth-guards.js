@@ -67,6 +67,7 @@ function authLoadSession(){
 }
 let authCurrentUser=authLoadSession();
 function authIsLoggedIn(){
+  if(window.KGAuthRecovery?.isPaused())return false;
   // 远程模式下 authCurrentUser 闭包可能在登录 reload 后未同步，优先读权威源 KGAuthCore。
   const core=window.KGAuthCore;
   if(core&&typeof core.currentUser==='function'){try{if(core.currentUser())return true}catch(e){}}

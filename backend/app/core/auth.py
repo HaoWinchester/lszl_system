@@ -14,7 +14,7 @@ from app.db.session import get_db
 from app.core.permissions import can
 from app.core.security import now_utc
 from app.models.user import ACTIVE, User
-from app.services import user_service
+from app.services import browser_session_service, user_service
 from app.services import wechat_mini_service
 
 
@@ -27,9 +27,11 @@ def _authorization_header(request: Request) -> str:
     return ""
 
 
-def establish_authenticated_session(request: Request, username: str) -> str:
+async def establish_authenticated_session(request: Request, username: str, db: AsyncSession) -> str:
     """Replace the signed browser session after a successful authentication."""
 
+    await browser_session_service.revoke(db, request)
+    await db.commit()
     login_session_id = secrets.token_urlsafe(24)
     request.session.clear()
     request.session["username"] = username
@@ -68,7 +70,7 @@ def get_login_session_id(request: Request) -> str:
     login_session_id = request.session.get("login_session_id")
     if isinstance(login_session_id, str) and login_session_id:
         return login_session_id
-    login_session_id = secrets.token_urlsafe(24)
+    login_session_id = browser_session_service.identity(request) or secrets.token_urlsafe(24)
     request.session["login_session_id"] = login_session_id
     return login_session_id
 
@@ -87,16 +89,40 @@ async def get_current_user(
         request.state.login_session_id = resolved.login_session_id
         return resolved.user
 
+    had_session = bool(request.session.get("username"))
+    user = await optional_cookie_user(request, db)
+    if user is None:
+        detail = "会话已失效，请重新登录" if had_session else "未登录"
+        raise HTTPException(status_code=401, detail=detail)
+    expected_identity = next((value.decode("latin-1") for name, value in request.scope.get("headers", ())
+                              if name.lower() == b"x-kg-login-session-id"), None)
+    if expected_identity is not None and expected_identity != browser_session_service.identity(request):
+        # A stale classroom must never save under another tab's new account.
+        # Leave the actual cookie untouched so that account remains signed in.
+        raise HTTPException(status_code=401, detail={
+            "code": "LOGIN_SESSION_CHANGED", "message": "登录账号已变化，请重新登录",
+        })
+    return user
+
+
+async def optional_cookie_user(request: Request, db: AsyncSession) -> User | None:
+    """Resolve only the browser cookie, sharing revocation with page bootstrap."""
     request.state.auth_transport = "cookie"
     username = request.session.get("username")
     if not username:
-        raise HTTPException(status_code=401, detail="未登录")
-    user = await user_service.get_by_username(db, username)
+        return None
+    user = await user_service.get_by_username(db, str(username))
     if not user or user.status != ACTIVE:
-        request.session.clear()
-        raise HTTPException(status_code=401, detail="会话已失效，请重新登录")
-    return user
-
+        # Retaining a rejected cookie must not revive it after reactivation.
+        await browser_session_service.revoke(db, request)
+        await db.commit()
+    elif not await browser_session_service.is_revoked(db, request):
+        return user
+    request.session.clear()
+    # A late rejected read cannot delete a newer successful login's cookie.
+    # Explicit route cookies, particularly /logout deletion, are preserved.
+    request.scope["_kg_rejected_session"] = True
+    return None
 
 async def optional_current_user(request: Request, db: AsyncSession) -> User | None:
     """Resolve an active session when present without requiring authentication."""
@@ -111,16 +137,7 @@ async def optional_current_user(request: Request, db: AsyncSession) -> User | No
         request.state.login_session_id = resolved.login_session_id
         return resolved.user
 
-    request.state.auth_transport = "cookie"
-
-    username = request.session.get("username")
-    if not username:
-        return None
-    user = await user_service.get_by_username(db, str(username))
-    if not user or user.status != ACTIVE:
-        request.session.clear()
-        return None
-    return user
+    return await optional_cookie_user(request, db)
 
 
 def require_role(*roles: str) -> Callable:

@@ -26,6 +26,7 @@
         "src/01-runtime-config.js",
         "src/28-app-storage.js",
         "src/29-auth-core.js",
+        "src/shared/auth-recovery.js",
         "src/34-role-permissions.js",
         "src/31a-learning-weekly-open-schedule.js",
         "src/107-learning-ui-icons.js",

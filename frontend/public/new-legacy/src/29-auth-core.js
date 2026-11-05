@@ -157,6 +157,7 @@
         bootstrap.authenticated=!!user;
         bootstrap.username=user?.username||null;
         bootstrap.authUser=user;
+        bootstrap.loginSessionId=String(session?.loginSessionId||'');
       }
       return true;
     }catch(e){return false}
@@ -165,7 +166,9 @@
     const value=payload?.loginSessionId||payload?.login_session_id||payload?.user?.loginSessionId||payload?.user?.login_session_id||"";
     return typeof value==="string"&&value.trim()?value.trim():"";
   }
-  function notifyRemoteSession(username,loginSessionId,previousLoginSessionId,authenticationAction=''){
+  async function notifyRemoteSession(username,loginSessionId,previousLoginSessionId,authenticationAction=''){
+    if(loginSessionId!==previousLoginSessionId){window.KGAuthSessionBootstrap?.invalidate?.();window.KGAuthRecovery?.publishSession?.({username,loginSessionId})}
+    if(username&&await window.KGAuthRecovery?.acceptSession?.({username,loginSessionId}))return;
     if(loginSessionId!==previousLoginSessionId){
       window.dispatchEvent(new CustomEvent("kg:auth-session-changed",{detail:{authenticated:!!username,username,loginSessionId,authenticationAction}}));
     }
@@ -193,7 +196,7 @@
     const session=readRemoteSession();
     const headers={"Content-Type":"application/json",...(options.headers||{})};
     if(session?.token)headers.Authorization="Bearer "+session.token;
-    const response=await fetch(endpointUrl(endpoint),{
+    const response=await (window.KGAuthRecovery?.fetch||fetch)(endpointUrl(endpoint),{
       method:options.method||"POST",
       credentials:config.credentials,
       headers,
@@ -305,6 +308,7 @@
     username=cleanUsername(username);
     password=String(password||"");
     if(!username||!password)return {ok:false,message:"请输入用户名和密码。"};
+    if(window.KGAuthRecovery&&await window.KGAuthRecovery.beforeLogin(username)===false)return {ok:false,message:'当前课堂尚未保存，请先使用原账号重新登录并保存。'};
     if(providerConfig().mode==="remote"){
       try{
         const payload=await remoteRequest(providerConfig().endpoints.login,{body:{username,password,acceptedTermsVersion:context.acceptedTermsVersion||undefined,context}});
@@ -312,7 +316,7 @@
         const previousLoginSessionId=serverLoginSessionId(readRemoteSession()||{}),loginSessionId=serverLoginSessionId(payload);
         writeRemoteSession({user,token:payload.token||"",loginSessionId,issuedAt:Date.now()});
         try{if(Store.remove)Store.remove(AUTH_SESSION_KEY);else localStorage.removeItem(AUTH_SESSION_KEY)}catch(e){}
-        notifyRemoteSession(user.username,loginSessionId,previousLoginSessionId);
+        await notifyRemoteSession(user.username,loginSessionId,previousLoginSessionId);
         return {ok:true,user,message:String(payload.message||"登录成功")};
       }catch(error){return {ok:false,message:String(error?.message||error)}}
     }
@@ -357,6 +361,7 @@
     username=cleanUsername(username);password=String(password||"");
     if(username.length<2)return {ok:false,message:"用户名至少需要 2 个字符。"};
     if(password.length<4)return {ok:false,message:"密码至少需要 4 个字符。"};
+    if(window.KGAuthRecovery&&await window.KGAuthRecovery.beforeLogin(username)===false)return {ok:false,message:'当前课堂尚未保存，请先使用原账号重新登录并保存。'};
     const config=providerConfig();
     if(config.mode==="remote"){
       try{
@@ -365,7 +370,7 @@
         const previousLoginSessionId=serverLoginSessionId(readRemoteSession()||{}),loginSessionId=serverLoginSessionId(payload);
         writeRemoteSession({user,token:payload.token||"",loginSessionId,issuedAt:Date.now()});
         try{if(Store.remove)Store.remove(AUTH_SESSION_KEY);else localStorage.removeItem(AUTH_SESSION_KEY)}catch(e){}
-        notifyRemoteSession(user.username,loginSessionId,previousLoginSessionId,'register');
+        await notifyRemoteSession(user.username,loginSessionId,previousLoginSessionId,'register');
         return {ok:true,user,message:String(payload.message||"注册成功")};
       }catch(error){return {ok:false,message:String(error?.message||error)}}
     }
@@ -380,12 +385,16 @@
   async function logout(context={}){
     const config=providerConfig();
     const username=currentUsername();
+    if(window.KGAuthRecovery&&await window.KGAuthRecovery.prepareLogout()===false)return {ok:false,username,message:'当前课堂尚未保存，已取消退出。'};
     if(config.mode==="remote"){
-      try{await remoteRequest(config.endpoints.logout,{body:{context}})}catch(error){console.warn("[KGAuthCore] remote logout failed",error)}
+      const requestId=globalThis.crypto?.randomUUID?.()||uid('logout');
+      const page=String(globalThis.location?.pathname||'').split('?')[0].split('#')[0];
+      try{await remoteRequest(config.endpoints.logout,{body:{context},headers:{'X-KG-Page':page,'X-KG-Entry':'account-menu','X-Request-ID':requestId}})}
+      catch(error){return {ok:false,username,message:String(error?.message||'退出失败，当前课堂已保留，请重试。')}}
       const previousLoginSessionId=serverLoginSessionId(readRemoteSession()||{});
       writeRemoteSession(null);
       try{if(Store.remove)Store.remove(AUTH_SESSION_KEY);else localStorage.removeItem(AUTH_SESSION_KEY)}catch(e){}
-      notifyRemoteSession("","",previousLoginSessionId);
+      await notifyRemoteSession("","",previousLoginSessionId);
       return {ok:true,username};
     }
     if(username)logAction("用户退出",username,String(context.source||"本地退出"));
@@ -395,23 +404,31 @@
   async function refreshSession(){
     const config=providerConfig();
     if(config.mode!=="remote")return {ok:true,user:currentUser(),provider:"local-demo"};
+    const identity=window.KGAuthRecovery?.capture?.();
+    const identityChanged=()=>{
+      const now=window.KGAuthRecovery?.capture?.();
+      return (now?.username||'')!==(identity?.username||'')||(now?.loginSessionId||'')!==(identity?.loginSessionId||'');
+    };
     try{
       const payload=await remoteRequest(config.endpoints.session,{method:"GET"});
       const username=payload.user?.username||payload.username||"";
-      if(!username){const previousLoginSessionId=serverLoginSessionId(readRemoteSession()||{});writeRemoteSession(null);notifyRemoteSession("","",previousLoginSessionId);return {ok:false,user:null,provider:"remote"}}
+      if(!username)throw new Error('会话响应缺少用户信息');
+      if(identityChanged())return {ok:false,stale:true,user:remoteUser(),provider:'remote'};
       const user=normalizeUser(username,{...(payload.user||{}),username,source:"remote"});
       const previousLoginSessionId=serverLoginSessionId(readRemoteSession()||{}),loginSessionId=serverLoginSessionId(payload);
       writeRemoteSession({user,token:payload.token||readRemoteSession()?.token||"",loginSessionId,issuedAt:Date.now()});
-      notifyRemoteSession(user.username,loginSessionId,previousLoginSessionId);
+      await notifyRemoteSession(user.username,loginSessionId,previousLoginSessionId);
       return {ok:true,user,provider:"remote"};
     }catch(error){
       const status=Number(error?.status||0);
-      // 仅在服务器明确判定未认证（401/403）时才清除登录态；
-      // 网络抖动、部署重启等瞬时故障保留本地会话，下次成功刷新自动恢复，
-      // 避免用户被莫名登出（微信注册账号没有密码，登出后难以重新登录）。
-      if(status===401||status===403){
+      if(identityChanged())return {ok:false,stale:true,user:remoteUser(),provider:'remote'};
+      if(status===401&&identity&&window.KGAuthRecovery){
+        window.KGAuthRecovery.observe({status},identity,{source:'auth-refresh'});
+        return {ok:false,user:remoteUser(),provider:'remote',preservedSession:true,message:String(error?.message||error)};
+      }
+      if(status===401){
         const previousLoginSessionId=serverLoginSessionId(readRemoteSession()||{});
-        writeRemoteSession(null);notifyRemoteSession("","",previousLoginSessionId);
+        writeRemoteSession(null);await notifyRemoteSession("","",previousLoginSessionId);
         return {ok:false,user:null,provider:"remote",message:String(error?.message||error)};
       }
       const stale=readRemoteSession();

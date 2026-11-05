@@ -9,7 +9,9 @@
   }
   let snapshot=null, generation=0, queue=[], busy=false, inFlight=null, hidden=false
   const uuid=()=>global.crypto.randomUUID()
-  const identity=()=>snapshot?.authenticated ? String(snapshot.loginSessionId||'') : ''
+  const paused=()=>Boolean(global.KGAuthRecovery?.isPaused?.())
+  const identity=()=>!paused() && snapshot?.authenticated ? String(snapshot.loginSessionId||'') : ''
+  const apiFetch=(url,options)=>(global.KGAuthRecovery?.fetch||global.fetch).call(global,url,options)
   function pageFeature(){
     const name=String(global.location?.pathname||'').split('/').pop()
     if(name==='practice-mode.html'){
@@ -21,14 +23,15 @@
     }
     return FEATURE_BY_PAGE[name]||''
   }
-  function foreground(){return !hidden && global.document.visibilityState==='visible' && global.document.hasFocus()}
+  function foreground(){return !paused() && !hidden && global.document.visibilityState==='visible' && global.document.hasFocus()}
   function sync(){clock.select(pageFeature(),identity());clock.visibility(foreground())}
   function sendInterval(entry){
     const {identity:loginSessionId,...body}=entry;
-    return global.fetch(ENDPOINT,{method:'POST',credentials:'include',keepalive:true,
+    return apiFetch(ENDPOINT,{method:'POST',credentials:'include',keepalive:true,
       headers:{'content-type':'application/json'},body:JSON.stringify({...body,loginSessionId})});
   }
   function flushOnExit(){
+    if(paused())return
     // The browser may terminate this document before an in-flight promise settles.
     // Send each queued tail now; any later retry keeps its eventId (server deduplicates).
     for(const entry of queue){
@@ -37,10 +40,10 @@
     }
   }
   async function drain(){
-    if(busy)return
+    if(busy||paused())return
     busy=true
     try{
-      while(queue.length){
+      while(queue.length&&!paused()){
         const entry=queue[0]
         if(entry.identity!==identity() || Date.now()-Date.parse(entry.endedAt)>600000){queue.shift();continue}
         let response
@@ -58,6 +61,7 @@
     }finally{inFlight=null;busy=false}
   }
   const clock=global.KGUsageClock?.create({now:()=>Date.now(),uuid,emit:entry=>{
+    if(paused())return
     queue.push(entry);if(queue.length>64)queue.shift();void drain()
   }})
   if(!clock)return
@@ -74,8 +78,8 @@
   function track(featureKey,eventType,actionKey){
     activity()
     // Retain legacy outcome instrumentation only in the explicitly legacy view.
-    if(!identity() || !['key_action','outcome'].includes(eventType) || !actionKey)return
-    global.fetch('/api/v1/analytics/feature-events',{method:'POST',credentials:'include',keepalive:true,
+    if(paused() || !identity() || !['key_action','outcome'].includes(eventType) || !actionKey)return
+    apiFetch('/api/v1/analytics/feature-events',{method:'POST',credentials:'include',keepalive:true,
       headers:{'content-type':'application/json'},body:JSON.stringify({featureKey,eventType,actionKey})}).catch(()=>{})
   }
   global.KGFeatureAnalytics=Object.freeze({track})
@@ -87,6 +91,8 @@
     global.addEventListener('pagehide',()=>{hidden=true;clock.visibility(false);flushOnExit();void drain()})
     global.addEventListener('pageshow',()=>{hidden=false;sync();void drain()})
     global.addEventListener('kg-auth-session-change',()=>{void loadSession()})
+    global.addEventListener('kg:auth-expired',()=>{queue=[];sync()})
+    global.addEventListener('kg:auth-recovered',()=>{void loadSession(true)})
     global.addEventListener('online',()=>{void drain()})
     for(const name of ['pointerdown','keydown','input','scroll','touchstart'])
       global.document.addEventListener(name,activity,{capture:true,passive:true})

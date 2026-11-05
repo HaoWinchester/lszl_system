@@ -7,7 +7,7 @@
   function baseUrl(){const config=authConfig(),base=String(config.baseUrl||'').replace(/\/$/,'');return /\/api\/v1$/.test(base)?base:base+'/api/v1'}
   function headers(){return {'Content-Type':'application/json',...(global.KGAuthCore?.authHeaders?.()||{})}}
   async function request(path,options={}){
-    const response=await global.fetch(baseUrl()+path,{credentials:authConfig().credentials||'include',headers:{...headers(),...(options.headers||{})},method:options.method||'GET',body:options.body===undefined?undefined:JSON.stringify(options.body)});
+    const response=await (global.KGAuthRecovery?.fetch||global.fetch)(baseUrl()+path,{credentials:authConfig().credentials||'include',headers:{...headers(),...(options.headers||{})},method:options.method||'GET',body:options.body===undefined?undefined:JSON.stringify(options.body)});
     let payload={};try{payload=await response.json()}catch(error){}
     if(!response.ok){
       const detail=payload&&payload.detail;

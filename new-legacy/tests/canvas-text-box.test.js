@@ -32,3 +32,10 @@ test('graph acknowledgement drains older pending writes and refuses current fail
  const auto=window.KGGraphFileAutosave;assert.equal(typeof auto.saveAcknowledged,'function');auto.markDirty();const older=auto.saveNow({force:true});auto.markDirty();const latest=auto.saveAcknowledged({force:true});resolve(true);await older;assert.equal(await latest,false);assert.equal(requests,2);assert.equal(auto.isDirty(),true);
  window.persistCurrentGraphNow=()=>new Promise(r=>resolve=r);const moved=auto.saveAcknowledged({force:true});context='two';resolve(true);assert.equal(await moved,false);
 });
+
+
+test('cancelling before queued persistence starts never writes a discarded draft',async()=>{
+ let writes=0;const session=S.create({original:'old',persist:()=>{writes++;return true}});
+ session.update('discard');const pending=session.commit();session.cancel();
+ assert.equal(await pending,false);assert.equal(writes,0);assert.equal(session.state().draft,'old');
+});

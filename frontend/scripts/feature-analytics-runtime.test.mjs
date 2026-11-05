@@ -1,15 +1,16 @@
 import test from 'node:test';import assert from 'node:assert/strict';import vm from 'node:vm';import {readFileSync} from 'node:fs';
 const read=p=>readFileSync(new URL(p,import.meta.url),'utf8');
 async function setup(path='practice-mode.html'){
- let now=Date.UTC(2026,8,28),sid='A',focus=true,timer,mutation,fail=false,hold=false,status=201,refreshes=0;const sent=[],listeners={};let id=0;
+ let now=Date.UTC(2026,8,28),sid='A',focus=true,timer,mutation,fail=false,hold=false,status=201,refreshes=0,paused=false;const sent=[],listeners={};let id=0;
  const listen=(n,fn)=>(listeners[n]??=[]).push(fn);
  const w={Date:class extends Date{static now(){return now}},crypto:{randomUUID:()=>`id-${++id}`},location:{pathname:'/'+path},
  document:{readyState:'complete',visibilityState:'visible',hasFocus:()=>focus,body:{dataset:{practiceView:'active'}},getElementById:()=>null,addEventListener:listen},
+ KGAuthRecovery:{isPaused:()=>paused},
  KGAuthSessionBootstrap:{load:async()=>({authenticated:!!sid,loginSessionId:sid}),refresh:async()=>{refreshes++;return {authenticated:!!sid,loginSessionId:sid}}},fetch:async(url,o)=>{sent.push({url,body:JSON.parse(o.body)});if(fail)throw Error('offline');if(hold)return new Promise(()=>{});return {ok:status===201,status}},
  addEventListener:listen,setInterval:fn=>{timer=fn},MutationObserver:class{constructor(fn){mutation=fn}observe(){}}};
  w.window=w;w.globalThis=w;vm.createContext(w);vm.runInContext(read('../../new-legacy/src/feature-usage-clock.js'),w);vm.runInContext(read('./new-legacy-assets/feature-analytics.js'),w);
  await new Promise(setImmediate);
- return {w,sent,step:n=>now+=n*1000,tick:async()=>{timer();await new Promise(setImmediate)},fire:async n=>{(listeners[n]||[]).forEach(fn=>fn());await new Promise(setImmediate)},focus:v=>focus=v,sid:v=>sid=v,fail:v=>fail=v,hold:v=>hold=v,status:v=>status=v,refreshes:()=>refreshes,mutation:()=>mutation()};
+ return {w,sent,step:n=>now+=n*1000,tick:async()=>{timer();await new Promise(setImmediate)},fire:async n=>{(listeners[n]||[]).forEach(fn=>fn());await new Promise(setImmediate)},focus:v=>focus=v,sid:v=>sid=v,fail:v=>fail=v,hold:v=>hold=v,status:v=>status=v,refreshes:()=>refreshes,mutation:()=>mutation(),pause:value=>paused=value};
 }
 test('practice and induction both report intervals, background focus pauses counters',async()=>{
  for(const page of ['practice-mode.html','question-workspace.html']){const x=await setup(page);x.step(15);await x.tick();assert.equal(x.sent[0].body.foregroundSeconds,15);x.focus(false);await x.fire('blur');x.step(60);await x.tick();assert.equal(x.sent.length,1);}
@@ -36,4 +37,34 @@ test('pagehide immediately transmits the final interval while a periodic upload 
  x.step(5);await x.fire('pagehide');
  assert.equal(x.sent.length,2);assert.deepEqual(x.sent.map(e=>e.body.foregroundSeconds),[15,5]);
  assert.equal(x.sent[1].body.loginSessionId,'A');
+});
+
+
+test('paused classroom drops pending clocks and suppresses interval and event uploads until recovery',async()=>{
+ const x=await setup();
+ x.step(5);x.pause(true);await x.fire('kg:auth-expired');
+ x.step(60);await x.tick();await x.fire('pointerdown');
+ x.w.KGFeatureAnalytics.track('practice','key_action','explain');
+ await x.fire('pagehide');await x.fire('online');
+ assert.equal(x.sent.length,0,'Paused timers, actions, exit and retry must not upload');
+ x.pause(false);x.sid('recovered');await x.fire('kg:auth-recovered');
+ assert.equal(x.refreshes(),1);
+ await x.fire('pageshow');x.step(15);await x.tick();
+ assert.equal(x.sent.length,1);
+ assert.equal(x.sent[0].body.loginSessionId,'recovered');
+ assert.equal(x.sent[0].body.foregroundSeconds,15,'Recovery must not upload time spent paused');
+ x.w.KGFeatureAnalytics.track('practice','key_action','explain');
+ assert.equal(x.sent.at(-1).url,'/api/v1/analytics/feature-events');
+});
+
+test('paused classroom never retries a previously failed unauthorized interval',async()=>{
+ const x=await setup();x.fail(true);x.step(15);await x.tick();
+ const old=x.sent[0].body.eventId;
+ x.pause(true);await x.fire('kg:auth-expired');x.fail(false);
+ await x.fire('online');await x.fire('pagehide');x.step(30);await x.tick();
+ assert.equal(x.sent.length,1);
+ x.pause(false);x.sid('recovered');await x.fire('kg:auth-recovered');
+ await x.fire('pageshow');x.step(15);await x.tick();
+ assert.equal(x.sent.length,2);assert.notEqual(x.sent.at(-1).body.eventId,old);
+ assert.equal(x.sent.at(-1).body.loginSessionId,'recovered');
 });

@@ -1,5 +1,6 @@
 """ORM 模型汇总。新增模型在此 import，供 Alembic autogenerate 检测。"""
 
+from app.models.browser_session import RevokedBrowserSession
 from app.models.wechat_account import WechatAccountTicket
 from app.models.analytics import FeatureUsageEvent
 from app.models.content_prep import (
@@ -62,6 +63,7 @@ from app.models.user import User, UserAdminLog
 from app.models.wechat_mini import WechatMiniAuthTicket, WechatMiniSession
 
 __all__ = [
+    "RevokedBrowserSession",
     "ReferralBinding",
     "ReferralCode",
     "WechatAccountTicket",

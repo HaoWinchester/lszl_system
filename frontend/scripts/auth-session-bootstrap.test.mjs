@@ -24,9 +24,10 @@ function response(status, payload = {}) {
   }
 }
 
-function loadAdapter(fetchImpl) {
+function loadAdapter(fetchImpl, extras = {}) {
   const events = []
   const window = {
+    ...extras,
     fetch: fetchImpl,
     dispatchEvent(event) { events.push(event) },
   }
@@ -114,4 +115,83 @@ test('an unauthenticated response resolves to one stable anonymous snapshot', as
   assert.equal(first.user, null)
   assert.equal(first.loginSessionId, '')
   assert.deepEqual(second, first)
+})
+
+
+for (const failure of ['network', '503', 'bad JSON']) {
+  for (const knownIdentity of [false, true]) {
+    test(`${failure} keeps ${knownIdentity ? 'known identity' : 'initial identity uncertain'} and retries on next load`, async () => {
+      let attempt = 0
+      let fail = false
+      const { api } = loadAdapter(async () => {
+        attempt += 1
+        if (fail) {
+          if (failure === 'network') throw new Error('offline')
+          if (failure === '503') return response(503)
+          return { ok: true, status: 200, async json() { throw new SyntaxError('invalid JSON') } }
+        }
+        return response(200, { user: { username: 'alice', role: 'teacher' }, loginSessionId: 'session-alice' })
+      })
+      if (knownIdentity) await api.load()
+      fail = true
+      const failed = await (knownIdentity ? api.refresh() : api.load())
+      assert.equal(failed.uncertain, true)
+      assert.equal(failed.user?.username || null, knownIdentity ? 'alice' : null)
+      assert.notEqual(failed.authenticated, false, 'temporary failure is not confirmed anonymous')
+      fail = false
+      const restored = await api.load()
+      assert.equal(restored.user.username, 'alice')
+      assert.equal(restored.loginSessionId, 'session-alice')
+      assert.equal(restored.uncertain, undefined)
+      assert.equal(attempt, knownIdentity ? 3 : 2)
+    })
+  }
+}
+
+test('all consumers of an invalidated valid response receive the latest session', async () => {
+  const requests = []
+  const { api } = loadAdapter(() => {
+    const pending = deferred()
+    requests.push(pending)
+    return pending.promise
+  })
+  const old = api.load()
+  api.invalidate()
+  const current = api.load()
+  requests[1].resolve(response(200, { user: { username: 'bob', role: 'teacher' }, loginSessionId: 'new' }))
+  await current
+  requests[0].resolve(response(200, { user: { username: 'alice', role: 'student' }, loginSessionId: 'old' }))
+  assert.equal((await old).user.username, 'bob')
+  assert.equal(api.peek().user.username, 'bob')
+})
+
+test('late 401 consumers get the current session and do not trigger recovery for a newer login', async () => {
+  const requests = []
+  const observations = []
+  const identity = { username: 'alice', loginSessionId: 'old' }
+  const { api } = loadAdapter(() => {
+    const pending = deferred()
+    requests.push(pending)
+    return pending.promise
+  }, { KGAuthRecovery: { capture: () => identity, observe: (...args) => observations.push(args) } })
+  const old = api.load()
+  api.invalidate()
+  const current = api.refresh()
+  requests[1].resolve(response(200, { user: { username: 'alice', role: 'teacher' }, loginSessionId: 'new' }))
+  await current
+  requests[0].resolve(response(401))
+  assert.equal((await old).loginSessionId, 'new')
+  assert.equal(observations.length, 0)
+})
+
+test('current genuine 401 is anonymous and informs the optional recovery coordinator', async () => {
+  const observations = []
+  const identity = { username: 'alice', loginSessionId: 'active' }
+  const { api } = loadAdapter(async () => response(401), {
+    KGAuthRecovery: { capture: () => identity, observe: (...args) => observations.push(args) },
+  })
+  assert.equal((await api.load()).authenticated, false)
+  assert.equal(observations.length, 1)
+  assert.equal(observations[0][1], identity)
+  assert.equal(observations[0][2].source, 'session-bootstrap')
 })

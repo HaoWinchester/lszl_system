@@ -18,6 +18,7 @@
   autosave.markDirty = function (reason) {
     const result = originalMarkDirty(reason)
     global.clearTimeout(timer)
+    if(global.KGAuthRecovery?.isPaused())return result
     timer = global.setTimeout(() => {
       persistToServer().catch((error) => {
         autosave.reportError?.(error, 'server-error')
@@ -26,6 +27,7 @@
     }, 400)
     return result
   }
+  global.addEventListener('kg:auth-expired',()=>{global.clearTimeout(timer)})
 
   Object.defineProperty(autosave, '__serverDebounceInstalled', {
     configurable: false,

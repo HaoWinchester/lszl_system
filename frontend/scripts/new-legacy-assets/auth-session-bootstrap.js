@@ -11,7 +11,7 @@
 
   function normalize(payload) {
     const user = payload?.user && typeof payload.user === 'object' ? payload.user : null
-    if (!user?.username) return anonymousSnapshot()
+    if (!user?.username) throw new Error('会话响应不完整')
     return {
       authenticated: true,
       user,
@@ -19,19 +19,34 @@
     }
   }
 
+  function uncertainSnapshot() {
+    return { ...(snapshot || { authenticated: null, user: null, loginSessionId: '' }), uncertain: true }
+  }
+
   function request(requestGeneration) {
-    const operation = global.fetch('/api/v1/auth/me', {
-      method: 'GET',
-      credentials: 'include',
-    })
+    const identity = global.KGAuthRecovery?.capture?.() || null
+    let responsePromise
+    try {
+      responsePromise = global.fetch('/api/v1/auth/me', { method: 'GET', credentials: 'include' })
+    } catch (error) {
+      responsePromise = Promise.reject(error)
+    }
+    const operation = Promise.resolve(responsePromise)
       .then(async (response) => {
-        if (response.status === 401) return anonymousSnapshot()
+        if (response.status === 401) {
+          if (requestGeneration === generation) {
+            global.KGAuthRecovery?.observe?.(response, identity, { source: 'session-bootstrap', path: '/api/v1/auth/me' })
+          }
+          return anonymousSnapshot()
+        }
         if (!response.ok) throw new Error('会话查询失败')
-        return normalize(await response.json().catch(() => ({})))
+        return normalize(await response.json())
       })
-      .catch(() => anonymousSnapshot())
+      .catch(() => uncertainSnapshot())
       .then((next) => {
-        if (requestGeneration === generation) snapshot = next
+        // Every consumer must receive the current generation, not only peek().
+        if (requestGeneration !== generation) return load()
+        snapshot = next
         return next
       })
       .finally(() => {
@@ -42,8 +57,8 @@
   }
 
   function load() {
-    if (snapshot) return Promise.resolve(snapshot)
     if (inFlight?.generation === generation) return inFlight.promise
+    if (snapshot && !snapshot.uncertain) return Promise.resolve(snapshot)
     return request(generation)
   }
 
@@ -55,7 +70,7 @@
 
   function refresh() {
     if (inFlight?.generation === generation) return inFlight.promise
-    if (snapshot) invalidate()
+    generation += 1
     return request(generation)
   }
 

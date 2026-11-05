@@ -25,7 +25,7 @@
   let owner = store.currentUserId?.() || 'guest'
   function canWrite() {
     const role = global.KGRolePermissions?.currentRole?.() || global.KGAuthCore?.currentUser?.()?.role
-    return owner !== 'guest' && ['admin', 'teacher', 'student'].includes(role)
+    return !global.KGAuthRecovery?.isPaused() && owner !== 'guest' && ['admin', 'teacher', 'student'].includes(role)
   }
   const controllers = new Set()
   function assertOwner(expectedOwner, expectedGeneration) {
@@ -42,7 +42,7 @@
     const controller = global.AbortController ? new global.AbortController() : null
     if (controller) controllers.add(controller)
     try {
-      const response = await fetch(endpoint + path, {
+      const response = await (global.KGAuthRecovery?.fetch || fetch)(endpoint + path, {
         method,
         credentials: 'include',
         headers: body === undefined ? { Accept: 'application/json' } : {
@@ -277,6 +277,10 @@
   }
   global.addEventListener?.('kg-auth-session-change', ownerChanged)
   global.addEventListener?.('kg:auth-session-changed', ownerChanged)
+  global.addEventListener?.('kg:auth-expired', () => {
+    for (const timer of timers.values()) clearTimeout(timer)
+    timers.clear()
+  })
   async function flush(options = {}) {
     const queuedWrites = [...pending.keys()].map(id => flushOne(id, options))
     await Promise.all(queuedWrites)

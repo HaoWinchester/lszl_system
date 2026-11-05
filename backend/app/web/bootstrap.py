@@ -10,14 +10,9 @@ from app.services import user_service
 
 
 async def optional_user(request: Request, db: AsyncSession):
-    username = request.session.get("username")
-    if not username:
-        return None
-    user = await user_service.get_by_username(db, str(username))
-    if not user or user.status != "active":
-        request.session.clear()
-        return None
-    return user
+    from app.core.auth import optional_cookie_user
+
+    return await optional_cookie_user(request, db)
 
 
 async def build_bootstrap(

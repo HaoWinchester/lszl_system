@@ -327,6 +327,7 @@ function loadRecallDraftLifecycle(overrides = {}) {
     saveProgress: () => calls.push('pending'),
     writeProgressNow: async () => { calls.push('save'); return true; },
     notifyRecallLimit: message => calls.push(message),
+    progressChangeVersion:0,progressSavedVersion:0,
     ...overrides,
   };
   vm.createContext(context);
@@ -384,6 +385,22 @@ test('unload protection reports only editable unsaved drafts, pending saves, or 
   }
   context.isRecallSessionReadonly = () => true;
   assert.equal(context.hasRecallDraft(), false);
+});
+
+test('canceling a queued recall save on expiry preserves the unsaved stroke warning',()=>{
+  const {context,inputs}=loadRecallDraftLifecycle({
+    isRecallSessionReadonly:()=>false,isRecallReadonly:()=>false,inkController:{hasTextDraft:()=>false},
+    progressSaveTimer:0,recallAdapter:{getState:()=>({saveState:'saved'})},
+    setTimeout:()=>1,clearTimeout(){},renderSaveState(){},
+  });
+  inputs.krPersonalTitle.value='旧标题';inputs.krPersonalContent.value='旧正文';
+  const controller=fs.readFileSync(path.join(root,'src/86-knowledge-recall.js'),'utf8');
+  const start=controller.indexOf('  function saveProgress(){');
+  vm.runInContext(controller.slice(start,controller.indexOf('  function loadProgress(',start)),context);
+  assert.equal(context.hasRecallDraft(),false);
+  context.saveProgress();context.cancelProgressSave();
+  assert.equal(context.progressSaveTimer,0);
+  assert.equal(context.hasRecallDraft(),true,'canceled timers must not mark pending ink/node changes saved');
 });
 
 

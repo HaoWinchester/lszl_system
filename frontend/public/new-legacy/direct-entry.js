@@ -10,6 +10,8 @@
   }
 
   let role = cachedRoleFromAuth()
+  let requestSequence = 0
+  let authUncertain = false
 
   function publishDirectAuth(user) {
     const current = global.__KG_DIRECT_BOOTSTRAP__
@@ -28,17 +30,22 @@
   function requestCurrentUser({ force = false } = {}) {
     const session = global.KGAuthSessionBootstrap
     if (!session) return Promise.resolve({})
+    const sequence = ++requestSequence
     const request = force ? session.refresh() : session.load()
     return request
       .then((snapshot) => {
+        if (sequence !== requestSequence) return {}
         const user = snapshot?.user || null
+        authUncertain = Boolean(snapshot?.uncertain || (!user && global.KGAuthRecovery?.isPaused?.()))
+        if (!user && authUncertain) return {}
         role = String(user?.role || 'guest')
         publishDirectAuth(user)
         decorateMemberEntry()
         return user || {}
       })
       .catch(() => {
-        role = cachedRoleFromAuth()
+        if (sequence !== requestSequence) return {}
+        authUncertain = true
         return {}
       })
   }
@@ -77,6 +84,10 @@
     }
   })
 
+  global.addEventListener('kg:auth-recovered', () => {
+    requestCurrentUser({ force: true }).catch(() => {})
+  })
+
   global.addEventListener('kg-auth-session-change', (event) => {
     if (event?.detail?.provider !== 'remote') return
     requestCurrentUser({ force: true }).catch(() => {
@@ -108,7 +119,7 @@
     await initialUser;
     consumeLoginRequest();
     const params = new URLSearchParams(global.location.search || '')
-    if (params.get('auth') === 'login' && currentRole() === 'guest' && typeof global.authOpen === 'function') {
+    if (!authUncertain && params.get('auth') === 'login' && currentRole() === 'guest' && typeof global.authOpen === 'function') {
       global.authOpen('请登录后继续使用。')
     }
     if (params.get('member') === '1') {

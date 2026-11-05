@@ -17,6 +17,7 @@
   let isDragging=false,dragStart=null,worldStart=null,panPointerId=null,panButton=0,rightPanStart=null,contextMenuSuppressUntil=0,contextMenu=null,customOpen=false,lastViewportSize=null;
   let canvasRuntime=null,inkController=null,tableController=null,recallViewportRestored=false,recallTransitionBusy=false;
   let progressSaveTimer=0,questionSessionToken=0,cardClickTimer=0,searchTimer=0,nodeSearchTimer=0;
+  let progressChangeVersion=0,progressSavedVersion=0;
   let associationRuntime={subject:'',library:null,nodeCache:new Map(),resolveCache:new Map()};
   let nodeDrag=null,suppressNodeClickUntil=0;
   let recallAdapter=null,recallSession=null,keywordsRevealed=false;
@@ -65,7 +66,7 @@
   ];
 
   function recallQuestionBankId(){return String(question?.sourceCollectionId||question?.sourceReleaseId||question?.sourceBankId||question?.bankId||'')}
-  function isRecallSessionReadonly(){return document.body.classList.contains('kr-readonly')||recallSession?.permissions?.canWrite===false}
+  function isRecallSessionReadonly(){return !!globalThis.KGAuthRecovery?.isPaused()||document.body.classList.contains('kr-readonly')||recallSession?.permissions?.canWrite===false}
   function isRecallReadonly(){return recallTransitionBusy||isRecallSessionReadonly()}
   function setRecallTransitionBusy(enabled){
     recallTransitionBusy=enabled;
@@ -379,13 +380,14 @@
     return true;
   }
   async function prepareRecallLeave(){
+    if(globalThis.KGAuthRecovery?.isPaused())return false;
     if(isRecallReadonly()||isTeacherDraftPreview())return true;
     if(!await commitRecallDrafts())return false;
     return writeProgressNow();
   }
   function hasRecallDraft(){
-    if(isRecallSessionReadonly()||isTeacherDraftPreview())return false;
-    if(progressSaveTimer||inkController?.hasTextDraft?.())return true;
+    if((isRecallSessionReadonly()&&!globalThis.KGAuthRecovery?.isPaused())||isTeacherDraftPreview())return false;
+    if(progressChangeVersion!==progressSavedVersion||progressSaveTimer||inkController?.hasTextDraft?.())return true;
     if(['saving','failed','conflict'].includes(recallAdapter?.getState?.().saveState))return true;
     const node=state.nodes.find(item=>item.instanceId===state.activeNodeId);
     const titleInput=$('krPersonalTitle'),contentInput=$('krPersonalContent');
@@ -396,7 +398,8 @@
   async function writeProgressNow({allowTransition=false}={}){
     if(isRecallSessionReadonly()||(recallTransitionBusy&&!allowTransition)||isTeacherDraftPreview()||!recallAdapter)return false;
     if(progressSaveTimer){clearTimeout(progressSaveTimer);progressSaveTimer=0}
-    try{await recallAdapter.saveGraph(progressPayload());return true}
+    const version=progressChangeVersion;
+    try{await recallAdapter.saveGraph(progressPayload());progressSavedVersion=version;return true}
     catch(error){
       notifyRecallLimit(Number(error?.status)===409?'进度已在其他页面更新，请重新载入后继续。':'进度尚未保存，请检查网络后重试。');
       return false;
@@ -404,6 +407,7 @@
   }
   function saveProgress(){
     if(isRecallReadonly()||isTeacherDraftPreview())return;
+    progressChangeVersion+=1;
     if(progressSaveTimer)clearTimeout(progressSaveTimer);
     // P4.5.37：防抖 420→1200ms，降低高频写库；pagehide/visibilitychange 仍即时 flush。
     progressSaveTimer=setTimeout(()=>{progressSaveTimer=0;void writeProgressNow()},1200);
@@ -427,6 +431,7 @@
         // 体验差；改为每次进入都以题目卡片(world 0,0)重新居中，会话内仍可自由拖动并保存。
         if(raw.transform&&Number.isFinite(Number(raw.transform.scale))){state.transform.scale=Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,Number(raw.transform.scale)))}
         normalizeGraph();
+        progressSavedVersion=progressChangeVersion;
         return true;
       }
     }catch(e){}
@@ -1678,6 +1683,8 @@
     inkController=window.KGCanvasInk?.create?.({
       trigger:$('krInkBtn'),viewport,world,getViewport:()=>state.transform,getStrokes:()=>state.strokes,
       getColorContext:()=>JSON.stringify([window.KGAuthCore?.currentUser?.()?.username||'',question.id,questionSessionToken,recallTransitionBusy]),
+      getTextContext:()=>JSON.stringify([window.KGAuthCore?.currentUsername?.()||'',recallSession?.releaseId||'',question.id]),
+      allowReadonlyToolSelection:()=>!!globalThis.KGAuthRecovery?.isPaused(),
       openColorPicker:request=>window.KGColorPickerV2?.openInk({...request,kind:'deep-recall-ink',documentColors:(state.strokes||[]).map(stroke=>stroke.color),documentLabel:'当前画布'})||null,
       setStrokes:strokes=>{state.strokes=strokes;saveProgress()},
       persistText:flushProgress,
@@ -1690,6 +1697,11 @@
       }
     });
     window.KGRecallInk=inkController;
+    globalThis.KGAuthRecovery?.register('deep-recall',{
+      hasUnsavedChanges:hasRecallDraft,prepareLeave:prepareRecallLeave,
+      onExpired:()=>{cancelProgressSave();setRecallTransitionBusy(true);inkController?.refreshControls()},
+      onRecovered:async()=>{setRecallTransitionBusy(false);inkController?.refreshControls();return prepareRecallLeave()}
+    });
     const ui=window.KGCanvasToolbar,tools=$('krInkBtn')?.parentElement;
     if(ui&&tools){
       ui.group(tools,'绘制',[[ $('krInkBtn'),'pen','画笔']],{iconOnly:true});

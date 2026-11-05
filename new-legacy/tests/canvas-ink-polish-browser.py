@@ -176,6 +176,7 @@ def deferred_tool_exit(browser):
         editor.evaluate("el=>el.dispatchEvent(new CompositionEvent('compositionstart',{bubbles:true}))")
         page.get_by_role('button',name='画笔' if action=='pen' else '关闭画笔工具',exact=True).click()
         expect(editor).to_have_value('输入法草稿');assert page.evaluate('writes')==0
+        if action=='pen':assert page.evaluate('ink.tool')=='pen','Tool selection must not wait for composition'
         editor.evaluate("el=>el.dispatchEvent(new CompositionEvent('compositionend',{bubbles:true}))")
         expect(editor).to_have_count(0)
         assert page.evaluate('ink.tool')==('pen' if action=='pen' else 'select'),('Composition completion must finish the requested tool/close action',action,page.evaluate('ink.tool'))
@@ -210,11 +211,11 @@ def eraser_hold_exit(browser):
         page.close()
 def asynchronous_tool_exit(browser):
     page=setup(browser);page.evaluate('ink.destroy();window.failSave=true;window.ink=KGCanvasInk.create({viewport:document.querySelector("#view"),world:document.querySelector("#world"),getViewport:()=>({x:0,y:0,scale:1}),getStrokes:()=>strokes,setStrokes:s=>{strokes=s;writes++},persistText:()=>!failSave})');page.evaluate('ink.openTextAt(300,200)')
-    editor=page.locator('.canvas-ink-text-editor');editor.fill('失败保留');page.get_by_role('button',name='画笔',exact=True).click();expect(editor).to_have_attribute('data-save-state','failed');assert page.evaluate('ink.tool')=='text'
-    page.evaluate('failSave=false');page.get_by_role('button',name='画笔',exact=True).click();expect(editor).to_have_count(0);assert page.evaluate('ink.tool')=='pen' and page.evaluate('strokes.length')==1
+    editor=page.locator('.canvas-ink-text-editor');editor.fill('失败保留');page.get_by_role('button',name='画笔',exact=True).click();expect(editor).to_have_attribute('data-save-state','failed');assert page.evaluate('ink.tool')=='pen';assert page.evaluate('ink.hasTextDraft()')
+    page.evaluate('failSave=false');page.get_by_role('button',name='画笔',exact=True).click();expect(editor).to_have_value('失败保留');page.get_by_role('button',name='文字',exact=True).click();expect(editor).to_be_focused();page.evaluate('ink.commitText()');expect(editor).to_have_count(0);page.get_by_role('button',name='画笔',exact=True).click();assert page.evaluate('ink.tool')=='pen' and page.evaluate('strokes.length')==1
     page.close()
     page=setup(browser);page.evaluate('ink.destroy();window.ink=KGCanvasInk.create({viewport:document.querySelector("#view"),world:document.querySelector("#world"),getViewport:()=>({x:0,y:0,scale:1}),getStrokes:()=>strokes,setStrokes:s=>{strokes=s;writes++},persistText:()=>new Promise(resolve=>window.finishSave=resolve)})');page.evaluate('ink.openTextAt(300,200)');editor=page.locator('.canvas-ink-text-editor');editor.fill('最后选择')
-    page.get_by_role('button',name='画笔',exact=True).click();page.get_by_role('button',name='荧光笔',exact=True).click();page.evaluate('finishSave(true)');expect(editor).to_have_count(0)
+    page.get_by_role('button',name='画笔',exact=True).click();assert page.evaluate('ink.tool')=='pen';page.get_by_role('button',name='荧光笔',exact=True).click();assert page.evaluate('ink.tool')=='highlighter';expect(editor).to_have_value('最后选择');page.evaluate('finishSave(true)');expect(editor).to_have_count(0)
     assert page.evaluate('ink.tool')=='highlighter','The last requested tool wins after one delayed save';assert page.evaluate('strokes.length')==1;page.close()
 def live_pages(base):
     base=base.rstrip('/')

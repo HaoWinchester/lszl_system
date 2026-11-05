@@ -51,7 +51,7 @@ test('recall failed save keeps original session and restores editing',async()=>{
 });
 test('recall transition flush bypasses only temporary lock, never session permission',async()=>{
   let sessionReadonly=false,writes=0;
-  const context={recallTransitionBusy:true,progressSaveTimer:0,
+  const context={recallTransitionBusy:true,progressSaveTimer:0,progressChangeVersion:0,progressSavedVersion:0,
     isRecallSessionReadonly:()=>sessionReadonly,isTeacherDraftPreview:()=>false,
     recallAdapter:{saveGraph:async()=>{writes++}},progressPayload:()=>({strokes:[]}),notifyRecallLimit(){}
   };

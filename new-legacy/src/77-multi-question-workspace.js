@@ -264,6 +264,7 @@
     }catch(e){return false}
   }
   function hasWorkspaceWriteAccess(){
+    if(global.KGAuthRecovery?.isPaused())return false;
     const role=global.KGRolePermissions?.currentRole?.()||global.KGAuthCore?.currentUser?.()?.role;
     return loggedIn()&&role!=='viewer'&&global.KGCanvasWorkspaceAdapter?.isReady?.()!==false;
   }
@@ -1774,6 +1775,7 @@
   }
   function scheduleAnswerFlush(){
     global.clearTimeout(state.answerFlushTimer);
+    if(global.KGAuthRecovery?.isPaused())return;
     state.answerFlushTimer=global.setTimeout(flushAnswerQueue,ANSWER_FLUSH_DELAY);
   }
   async function flushAnswerQueue(options={}){
@@ -1784,6 +1786,7 @@
     if(options.throwOnError&&state.answerQueue.length)throw new Error('作答尚未保存，请重试后再离开。');
   }
   async function sendAnswerQueue(){
+    if(global.KGAuthRecovery?.isPaused())return;
     if(state.answerFlushing)return;
     const queue=state.answerQueue.splice(0);
     if(!queue.length)return;
@@ -5700,6 +5703,7 @@
       setTemporaryPanMode(false);
     });
     global.addEventListener('kg-auth-session-change',async()=>{
+      if(String(state.workspace?.userId||'')===String(store()?.currentUserId?.()||''))return;
       const session=++state.workspaceSession,userId=store()?.currentUserId?.();
       state.workspaceTransition=true;
       updateReadonly();
@@ -5815,14 +5819,15 @@
     const route=global.KGLearningRouteContext?.parse?.({mode:'multi_question_canvas'})||{};
     if(route.paperId)state.paperId=String(route.paperId);
     if(route.releaseId)state.releaseId=String(route.releaseId);
-    global.KGLearningProgress?.registerAdapter?.('multi_question_canvas',{
+    const workspaceParticipant={
       flush:()=>{if(state.workspace)store()?.write?.(state.workspace,{reason:'learning-context-flush'});void flushAnswerQueue();return true},
       hasUnsavedChanges:()=>{
-        if(state.readonly)return false;
+        if(state.readonly&&!global.KGAuthRecovery?.isPaused())return false;
         const remote=global.KGCanvasWorkspaceAdapter?.getState?.(state.workspaceId||state.workspace?.id);
         return Boolean(state.ink?.hasTextDraft?.()||state.optionClickTimers.size||state.answerQueue.length||state.answerFlushing||['pending','saving','failed'].includes(remote?.status));
       },
       prepareLeave:async()=>{
+        if(global.KGAuthRecovery?.isPaused())return false;
         if(state.readonly)return true;
         if(state.ink?.hasTextDraft?.()&&!await state.ink.commitText())return false;
         await flushPendingOptionChoices();
@@ -5831,6 +5836,12 @@
         return true;
       },
       clearTransient:()=>clearPaperTransientState()
+    };
+    global.KGLearningProgress?.registerAdapter?.('multi_question_canvas',workspaceParticipant);
+    global.KGAuthRecovery?.register('multi-question',{
+      ...workspaceParticipant,
+      onExpired:()=>{global.clearTimeout(state.answerFlushTimer);state.ink?.cancel();state.kernel?.cards?.cancelDrag?.();updateReadonly()},
+      onRecovered:async()=>{updateReadonly();return workspaceParticipant.prepareLeave()}
     });
     // P4.5.37：退出/隐藏页面时把待同步作答一次性提交（keepalive 请求可存活于卸载）。
     global.addEventListener('pagehide',()=>{void flushAnswerQueue()});
@@ -5875,6 +5886,8 @@
       trigger:byId('qwInkBtn'),viewport:state.viewport,world:state.world,history:state.kernel.history,showHistory:true,
       getViewport:()=>({x:state.panX,y:state.panY,scale:state.zoom}),
       getStrokes:()=>state.workspace?.strokes||[],isReadonly:()=>state.readonly||!state.workspace,
+      getTextContext:()=>JSON.stringify([store()?.currentUserId?.()||'guest',state.workspaceId]),
+      allowReadonlyToolSelection:()=>!!global.KGAuthRecovery?.isPaused(),
       getColorContext:()=>JSON.stringify([store()?.currentUserId?.()||'guest',state.workspaceId,state.workspaceSession,state.workspaceTransition]),
       openColorPicker:request=>global.KGColorPickerV2?.openInk({...request,kind:'multi-question-ink',documentColors:workspaceDocumentColors(),documentLabel:'当前画布'})||null,
       setStrokes:strokes=>{

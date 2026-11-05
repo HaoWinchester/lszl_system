@@ -90,11 +90,12 @@
     function update(patch){Object.assign(state,patch);emit()}
 
     async function send(url,init={}){
-      const response=await request(url,{
+      const initOptions={
         credentials:'include',
         headers:{Accept:'application/json',...(init.body?{'Content-Type':'application/json'}:{}),...(init.headers||{})},
         ...init
-      });
+      };
+      const response=await (global.KGAuthRecovery?global.KGAuthRecovery.fetch(url,initOptions,request):request(url,initOptions));
       const payload=await responseJson(response);
       if(!response.ok)throw requestError(response,payload);
       return payload;
@@ -175,6 +176,7 @@
 
     function saveGraph(graph){
       if(!state.session)return Promise.reject(new Error('请先加载深度回忆会话'));
+      try{global.KGAuthRecovery?.assertWritable?.()}catch(error){return Promise.reject(error)}
       const pending=normalizeGraph(graph),sequence=++saveSequence;latestRequestedSave=sequence;
       update({saveState:'saving',error:null,lastUnsavedGraph:pending,graph:pending});
       const operation=saveChain.catch(()=>undefined).then(()=>performSave(pending,sequence));

@@ -43,7 +43,7 @@
     }
     const payload = body === undefined ? undefined : { ...body, ...(revision === undefined ? {} : { revision }) }
     try {
-      const response = await global.fetch(path, {
+      const response = await (global.KGAuthRecovery?.fetch || global.fetch)(path, {
         method,
         credentials: 'include',
         headers: payload === undefined

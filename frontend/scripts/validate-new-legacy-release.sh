@@ -241,6 +241,13 @@ if new_legacy_validation_group_enabled "$VALIDATION_PROFILE" canvas-e2e; then
   deployment_timing_stage canvas-browser
   python3 frontend/e2e/canvas_release_regression.py --release-root "$VALIDATION_ROOT/releases"
   python3 new-legacy/tests/graph-empty-current-browser.py --base-url "http://127.0.0.1:$INTEGRATED_PORT" --output "$VALIDATION_ROOT/empty-current"
+  deployment_timing_stage classroom-auth-recovery
+  node --test new-legacy/tests/auth-recovery.test.js new-legacy/tests/home-auth-recovery.test.js new-legacy/tests/canvas-ink-navigation.test.js new-legacy/tests/canvas-ink-workspace-save.test.js new-legacy/tests/v90-p4529-deep-recall-database-adapter.test.js
+  python3 new-legacy/tests/canvas-ink-draft-recovery-browser.py
+  CANVAS_TEST_RELEASE_ROOT="$VALIDATION_ROOT/releases" python3 new-legacy/tests/run-practice-demand-browser.py \
+    --server canvas_ink_server.py --server-arg=--role-matrix \
+    --browser classroom-auth-recovery-browser.py --extra-browser home-auth-recovery-browser.py \
+    --artifacts classroom-auth-recovery
 fi
 if new_legacy_validation_group_enabled "$VALIDATION_PROFILE" cross-domain-e2e; then
   deployment_timing_stage cross-domain-browser

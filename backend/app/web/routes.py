@@ -61,8 +61,7 @@ async def _page_access_denied(request: Request, db: AsyncSession, page: str) -> 
         allowed_roles = {"admin", "teacher"}
     if allowed_roles is None:
         return False
-    username = request.session.get("username")
-    user = await user_service.get_by_username(db, str(username)) if username else None
+    user = await optional_user(request, db)
     if user is None or user.status != "active":
         return page != "content-prep.html"
     return user.role not in allowed_roles

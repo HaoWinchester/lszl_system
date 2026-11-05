@@ -551,10 +551,11 @@ function patchFeatureAnalytics(path, source) {
     if (source.includes(legacyBefore)) {
       return replaceExactlyOnce(source, legacyBefore, legacyAfter, 'new-legacy 回忆数据库保存埋点')
     }
-    const databaseBefore = '    try{await recallAdapter.saveGraph(progressPayload());return true}'
+    const dirtyBefore='    try{await recallAdapter.saveGraph(progressPayload());progressSavedVersion=version;return true}'
+    const databaseBefore = source.includes(dirtyBefore)?dirtyBefore:'    try{await recallAdapter.saveGraph(progressPayload());return true}'
     const databaseAfter = `    try{
       const saved=Boolean(await recallAdapter.saveGraph(progressPayload()));
-      if(saved){${ANALYTICS_TRACK}track('recall','key_action','recall_saved');track('recall','outcome','recall_saved');}
+      if(saved){${source.includes(dirtyBefore)?'progressSavedVersion=version;':''}${ANALYTICS_TRACK}track('recall','key_action','recall_saved');track('recall','outcome','recall_saved');}
       return saved
     }`
     return source.includes(databaseBefore)
