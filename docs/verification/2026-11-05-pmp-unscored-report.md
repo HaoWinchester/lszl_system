@@ -26,4 +26,15 @@
 
 ## 发布状态
 
-目标v9.0-p4.1.419；完整发布、公网版本和资源复核待执行后补充。用户尚未验收，main不合入，保留功能分支。
+已部署v9.0-p4.1.419，实现提交691c2d2f。用户尚未验收，main保持6941af5c，保留功能分支。
+
+## 实际发布与公网复核
+
+- update-uat.sh退出0，完整release验证1628秒、总部署1694秒；validation.json为passed=true、profile=full，active pointer指向419，site1276文件。
+- 正式验证包含backend的`cd backend && .venv/bin/python -m pytest tests/ -q`：1311通过（3条既有弃用警告），frontend的`cd frontend && pnpm test`：404通过，以及全部要求的浏览器/视觉检查。新PMP真实API浏览器与报告5个Node用例均在正式候选上通过。
+- 公网7种视口（1504×801、1366×768、1280×768、1024×768、768×844、390×844、320×568）仍通过首屏2脚本/12摘要、整页固定、桌面一屏、按钮对齐、窄屏操作可达及向上规则提示，无JS错误。
+- 公网practice-lobby.js、practice-report.js、practice-lobby.css的SHA256均与419候选逐字节一致。UAT后端容器内practice_scoring_service.py和practice_session_service.py的SHA256与已测源码一致，确认实际部署实现。
+- HTTPS健康status=ok、db=ok；脚本确认PUBLIC_RELEASE_OK=v9.0-p4.1.419。证据uat-verification.json、uat-backend-hashes.json、uat-health.json及uat-deploy-419.log。
+- 最后以只读数据库投影核对published PMP的实际题量：当前没有180题整卷；公网搜索“模拟”只有PMP模拟卷A（185题）。按用户确认的范围，该卷不启用本规则；没有擅自删去原卷5题、扩大适用范围或回算历史成绩。
+- 业务计分/名单/回看已在隔离真实API和候选浏览器上验证；公网复核是版本、资源、后端源文件与大厅检查，没有宣称使用UAT现有185题卷验证了180题业务。用户业务验收仍需准备一份180题PMP已发布卷并新开会话。
+- 未合入或推送main，等待用户验收。
