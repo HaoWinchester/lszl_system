@@ -130,5 +130,27 @@ with sync_playwright() as pw:
     # Empty new text creates no object or network save.
     count=page.evaluate('writes');page.evaluate('ink.openTextAt(250,200)');page.get_by_role('button',name='画笔',exact=True).click()
     expect(editor).to_have_count(0);assert page.evaluate('writes')==count
+    # An expired session can open a previously closed toolbar and select tools,
+    # while all drawing/text creation remains readonly. Viewers retain their lock.
+    page.evaluate('''()=>{ink.destroy();window.paused=false;window.locked=false;
+      const launch=document.createElement('button');launch.id='launch';launch.textContent='打开画笔';document.body.prepend(launch);
+      window.ink=KGCanvasInk.create({trigger:launch,viewport:document.querySelector('#view'),world:document.querySelector('#world'),getViewport:()=>({x:0,y:0,scale:1}),getStrokes:()=>strokes,setStrokes:s=>{changes++;strokes=s},isReadonly:()=>locked,allowReadonlyToolSelection:()=>paused});
+      window.closedSnapshot=JSON.stringify(strokes);window.closedChanges=changes;
+      paused=true;locked=true;ink.render()}''')
+    launch=page.locator('#launch');expect(page.locator('.canvas-ink-toolbar')).to_be_hidden()
+    expect(launch).to_be_enabled(timeout=1000);launch.click();expect(page.locator('.canvas-ink-toolbar')).to_be_visible()
+    page.get_by_role('button',name='画笔',exact=True).click();assert page.evaluate('ink.tool')=='pen'
+    page.mouse.move(700,400);page.mouse.down();page.mouse.move(760,440,steps=3);page.mouse.up()
+    page.get_by_role('button',name='文字',exact=True).click();assert page.evaluate('ink.tool')=='text'
+    page.mouse.click(600,300);expect(editor).to_have_count(0)
+    assert page.evaluate('ink.openTextAt(500,300)') is False
+    page.evaluate('ink.setOpen(false)');expect(page.locator('.canvas-ink-toolbar')).to_be_hidden()
+    assert page.evaluate('ink.activateText()') is True
+    assert page.evaluate('ink.tool')=='text';expect(page.locator('.canvas-ink-toolbar')).to_be_visible()
+    assert page.evaluate('JSON.stringify(strokes)===closedSnapshot && changes===closedChanges')
+    page.evaluate('ink.setOpen(false);paused=false;ink.render()');expect(launch).to_be_disabled()
+    assert page.evaluate('ink.activateText()') is False
+    page.evaluate('ink.setOpen(true)');expect(page.locator('.canvas-ink-toolbar')).to_be_hidden()
+    assert page.evaluate('JSON.stringify(strokes)===closedSnapshot && changes===closedChanges')
     browser.close()
 print('canvas-ink-draft-recovery-browser: passed')

@@ -38,6 +38,7 @@
     const reasonElement=byId('authReason');
     if(reasonElement)reasonElement.textContent=String(reason||'登录后可以继续操作。');
     message('');
+    global.KGAuthRecovery?.raiseAuthDialog?.(modal);
     modal.classList.add('show');
     modal.setAttribute('aria-hidden','false');
     byId('authUsername')?.focus?.();

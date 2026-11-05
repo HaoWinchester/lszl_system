@@ -4025,7 +4025,7 @@ function setNodeModalFullMode(full,{announce=false}={}){
   }
   if(announce)showStatus(nodeModalFullMode?'已切换为完整编辑模式。':'已切换为简易编辑模式。');
 }
-function openNodeModal(id,isNew=false){if(!graphModeAllows('nodeEdit'))return false;const n=nodeById(id);if(!n)return;if(!isNew&&isNodeFullyLocked(n)){showStatus('该节点已锁定，不能打开编辑弹窗；请先解锁。');return}resetGraphPointerInteractions({hideMenus:true});editingNodeId=id;editingNodeIsNew=!!isNew;$('nodeModalTitle').textContent=isNew?'创建知识点':'编辑知识点';$('nTitle').value=n.title||'';$('nSummary').value=n.summary||'';$('nCategory').value=n.category||'';$('nColor').value=safeColor(n.color,'#64748b');$('nSize').value=NODE_SIZES.has(n.size)?n.size:'';$('nLevel').value=LEVELS.has(n.level)?n.level:'基础';$('nKeywords').value=n.keywords||'';$('nNotes').value=n.notes||'';nodeModalInitialValues=readNodeModalValues();$('deleteNodeBtn').style.display=isNew?'none':'';setNodeModalFullMode(nodeModalDefaultFullMode());$('nodeModal').classList.add('show');setTimeout(()=>$('nTitle').focus(),80)}
+function openNodeModal(id,isNew=false){if(!graphModeAllows('nodeEdit'))return false;const n=nodeById(id);if(!n)return;if(!isNew&&isNodeFullyLocked(n)){showStatus('该节点已锁定，不能打开编辑弹窗；请先解锁。');return}resetGraphPointerInteractions({hideMenus:true});editingNodeId=id;editingNodeIsNew=!!isNew;$('nodeModalTitle').textContent=isNew?'创建知识点':'编辑知识点';$('nTitle').value=n.title||'';$('nSummary').value=n.summary||'';$('nCategory').value=n.category||'';$('nColor').value=safeColor(n.color,'#64748b');$('nSize').value=NODE_SIZES.has(n.size)?n.size:'';$('nLevel').value=LEVELS.has(n.level)?n.level:'基础';$('nKeywords').value=n.keywords||'';$('nNotes').value=n.notes||'';nodeModalInitialValues=readNodeModalValues();$('deleteNodeBtn').style.display=isNew?'none':'';setNodeModalFullMode(nodeModalDefaultFullMode());$('nodeModal').classList.add('show');globalThis.KGAuthRecovery?.watchForm?.($('nodeModal'),{isOpen:()=>$('nodeModal').classList.contains('show')});setTimeout(()=>$('nTitle').focus(),80)}
 function closeNodeModal(options={}){resetGraphPointerInteractions({hideMenus:true});const draftId=options.discardNew&&editingNodeIsNew?editingNodeId:null;$('nodeModal').classList.remove('show');editingNodeId=null;editingNodeIsNew=false;nodeModalInitialValues=null;if(draftId){state.nodes=state.nodes.filter(node=>node.id!==draftId);state.links=state.links.filter(link=>link.from!==draftId&&link.to!==draftId);selectedNodeIds.delete(draftId);if(state.selectedNodeId===draftId)state.selectedNodeId=null;if(state.linkSourceId===draftId)state.linkSourceId=null;render({persist:true});showStatus('已取消创建知识点。')}}
 $('nodeModalModeBtn').onclick=()=>setNodeModalFullMode(!nodeModalFullMode,{announce:true});
 $('cancelNodeBtn').onclick=()=>closeNodeModal({discardNew:true});
@@ -4090,7 +4090,7 @@ async function deleteGraphBatchSelection(){
 }
 function deleteSelectedNodesBatch(){return deleteGraphBatchSelection()}
 function deleteSelectedLinksBatch(){return deleteGraphBatchSelection()}
-function openLinkModal(id){if(!graphModeAllows('edgeAdvanced'))return false;const l=linkById(id);if(!l)return;state.selectedElementId=null;editingLinkId=id;state.selectedLinkId=id;state.selectedNodeId=null;state.linkSourceId=null;$('linkType').value=l.type||'';$('linkStyle').value=l.lineStyle||DEFAULTS.linkStyle;$('linkColor').value=safeColor(l.color,DEFAULTS.linkColor);$('linkNote').value=l.note||'';$('linkModal').classList.add('show');setTimeout(()=>$('linkNote').focus(),80);renderEdges()}
+function openLinkModal(id){if(!graphModeAllows('edgeAdvanced'))return false;const l=linkById(id);if(!l)return;state.selectedElementId=null;editingLinkId=id;state.selectedLinkId=id;state.selectedNodeId=null;state.linkSourceId=null;$('linkType').value=l.type||'';$('linkStyle').value=l.lineStyle||DEFAULTS.linkStyle;$('linkColor').value=safeColor(l.color,DEFAULTS.linkColor);$('linkNote').value=l.note||'';$('linkModal').classList.add('show');globalThis.KGAuthRecovery?.watchForm?.($('linkModal'),{isOpen:()=>$('linkModal').classList.contains('show')});setTimeout(()=>$('linkNote').focus(),80);renderEdges()}
 function closeLinkModal(){$('linkModal').classList.remove('show')}
 $('cancelLinkBtn').onclick=closeLinkModal;
 $('saveLinkBtn').onclick=()=>{const l=linkById(editingLinkId);if(l){const next={type:$('linkType').value||'',lineStyle:LINE_STYLES.has($('linkStyle').value)?$('linkStyle').value:DEFAULTS.linkStyle,color:safeColor($('linkColor').value,DEFAULTS.linkColor),note:$('linkNote').value.trim()},changed=l.type!==next.type||l.lineStyle!==next.lineStyle||safeColor(l.color,DEFAULTS.linkColor)!==next.color||l.note!==next.note;if(changed){const history=ensureGraphHistoryController(),mutate=()=>Object.assign(l,next);if(history)history.run('编辑知识关系',mutate);else mutate()}}closeLinkModal();render({persist:true});showStatus('关系线已保存。')};
@@ -4169,7 +4169,7 @@ async function saveGraphTitle(nextTitle,options={}){
 function openGraphModal(){
   $('gTitle').value=currentGraphTitle();
   updateGraphInfoModal();
-  $('graphModal').classList.add('show');
+  $('graphModal').classList.add('show');globalThis.KGAuthRecovery?.watchForm?.($('graphModal'),{isOpen:()=>$('graphModal').classList.contains('show')});
   setTimeout(()=>$('gTitle').focus(),80);
 }
 $('cancelGraphBtn').onclick=()=>$('graphModal').classList.remove('show');

@@ -88,6 +88,7 @@
     if(!state.mounted&&!mount())return false;
     const modal=byId('authModal');
     if(!modal)return false;
+    global.KGAuthRecovery?.raiseAuthDialog?.(modal);
     const reasonElement=byId('authReason');
     if(reasonElement)reasonElement.textContent=String(reason||state.options.defaultReason);
     message('');

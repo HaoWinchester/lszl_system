@@ -24,13 +24,17 @@
     return `个人归纳卡请求失败 (${status})`
   }
   async function request(path = '', options = {}) {
-    const response = await global.fetch(`${API_ROOT}${path}`, {
+    const owner=String(currentUser()?.username||'')
+    const response = await (global.KGAuthRecovery?.fetch || global.fetch)(`${API_ROOT}${path}`, {
       ...options,
       credentials: 'include',
       headers: { ...(options.body ? { 'content-type': 'application/json' } : {}), ...(options.headers || {}) },
     })
     let payload = {}
     try { payload = await response.json() } catch (error) {}
+    if(owner!==String(currentUser()?.username||'')){
+      const error=new Error('登录账号已变化，已丢弃上一账号的归纳卡响应。');error.status=409;throw error
+    }
     if (!response.ok) {
       const error = new Error(errorMessage(payload, response.status))
       error.status = response.status
@@ -84,26 +88,31 @@
   }
   async function create(input) {
     const payload = await request('', { method: 'POST', body: JSON.stringify(input || {}) })
-    await loadArchived(false)
-    return clone(payload.card || null)
+    return adoptAcknowledgedCard(payload.card)
   }
   async function update(cardId, input) {
     const payload = await request(`/${encodeURIComponent(text(cardId))}`, {
       method: 'PUT',
       body: JSON.stringify(input || {}),
     })
-    await loadArchived(Boolean(payload.card?.archivedAt))
-    return clone(payload.card || null)
+    return adoptAcknowledgedCard(payload.card)
   }
   async function archive(cardId) {
     const payload = await request(`/${encodeURIComponent(text(cardId))}/archive`, { method: 'POST' })
-    await Promise.all([loadArchived(false), loadArchived(true)])
-    return clone(payload.card || null)
+    return adoptAcknowledgedCard(payload.card)
   }
   async function restore(cardId) {
     const payload = await request(`/${encodeURIComponent(text(cardId))}/restore`, { method: 'POST' })
-    await Promise.all([loadArchived(false), loadArchived(true)])
-    return clone(payload.card || null)
+    return adoptAcknowledgedCard(payload.card)
+  }
+  function adoptAcknowledgedCard(value) {
+    if (!value?.id) return null
+    const card = clone(value)
+    activeCards = activeCards.filter(item => item.id !== card.id)
+    archivedCards = archivedCards.filter(item => item.id !== card.id)
+    ;(card.archivedAt ? archivedCards : activeCards).unshift(card)
+    emit()
+    return clone(card)
   }
 
   global.KGPersonalSynthesisCardApi = Object.freeze({ refresh, snapshot, list, get, create, update, archive, restore })

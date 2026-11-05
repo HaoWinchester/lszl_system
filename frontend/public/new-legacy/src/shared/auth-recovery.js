@@ -2,6 +2,8 @@
   'use strict';
   if(global.KGAuthRecovery)return;
   const participants=new Map();
+  const forms=new Map(),nativeFetch=global.fetch;
+  let guardedFetch=null;
   const TIMEOUT=15000,RENEW_INTERVAL=15*60*1000;
   let paused=false,retained=null,recovering=null,logoutCheck=null,banner=null;
   let renewFlight=null,nextRenewal=Date.now()+1000,lastActivity=Date.now();
@@ -21,8 +23,11 @@
     return true;
   }
   function hasUnsavedChanges(){
-    return [...participants.values()].some(value=>{try{return !!value.hasUnsavedChanges?.()}catch(_){return true}});
+    return formsDirty()||[...participants.values()].some(value=>{try{return !!value.hasUnsavedChanges?.()}catch(_){return true}});
   }
+  function formValue(element){return JSON.stringify([...element.querySelectorAll('input:not([type="file"]),textarea,select,[contenteditable="true"]')].map(field=>['checkbox','radio'].includes(field.type)?!!field.checked:String(field.value??field.textContent??'')))}
+  function watchForm(element,options={}){if(element)forms.set(element,{baseline:formValue(element),isOpen:options.isOpen||(()=>!element.hidden)});return element}
+  function formsDirty(){return [...forms].some(([element,value])=>value.isOpen()&&formValue(element)!==value.baseline)}
   async function bounded(action){
     let timer;
     try{return await Promise.race([Promise.resolve().then(action),new Promise((_,reject)=>{timer=global.setTimeout(()=>reject(new Error('保存仍未完成，当前内容已保留，请稍后重试。')),TIMEOUT)})])}
@@ -67,9 +72,10 @@
     paused=false;
     if(recovering)return recovering;
     const operation=(async()=>{
-      let saved=true;
+      let saved=!formsDirty();
       for(const value of participants.values())try{if(value.onRecovered&&await bounded(()=>value.onRecovered(identity))===false)saved=false}catch(_){saved=false}
       if(paused)return true;
+      if(hasUnsavedChanges())saved=false;
       retained=null;
       if(saved)hide();else show('登录已恢复，部分修改尚未保存；当前内容已保留，请重试保存。');
       global.dispatchEvent(new CustomEvent('kg:auth-recovered',{detail:{...identity,saved}}));
@@ -82,15 +88,18 @@
   async function prepareLogout(){
     if(logoutCheck)return logoutCheck;
     if(paused){show('登录已失效，当前课堂尚未保存，已取消退出。请先重新登录原账号。');return false}
+    if(formsDirty()){show('当前弹窗有未保存的文字，已取消退出。请先保存，或明确取消编辑后再退出。');return false}
     logoutCheck=(async()=>{
       try{
         for(const value of participants.values())if(value.prepareLeave&&await bounded(()=>value.prepareLeave())===false){show('当前修改尚未保存，已取消退出，请重试保存。');return false}
+        if(hasUnsavedChanges()){show('仍有未提交的文字或画布修改，已取消退出，请先保存。');return false}
         return true;
       }catch(error){show(String(error?.message||'当前修改尚未保存，已取消退出。'));return false}
     })();
     try{return await logoutCheck}finally{logoutCheck=null}
   }
   async function beforeLogin(username){
+    if(retained&&!paused&&!hasUnsavedChanges())retained=null;
     if(retained&&username!==retained.username){show('请使用原账号 '+retained.username+' 重新登录，当前课堂尚未保存。');return false}
     const current=capture();
     if(current&&current.username!==username)return prepareLogout();
@@ -98,8 +107,11 @@
     return true;
   }
   async function request(url,init={},fetchImpl=global.fetch){
-    const identity=capture(),authentication=/\/auth\/(?:login|logout|register)(?:$|\?)/.test(String(url));
-    const writing=!authentication&&!['GET','HEAD','OPTIONS'].includes(String(init.method||'GET').toUpperCase());
+    if(fetchImpl===guardedFetch)fetchImpl=nativeFetch;
+    const target=typeof url==='string'?url:url?.url||String(url);
+    const identity=capture(),authentication=/\/auth\/(?:login|logout|register)(?:$|\?)/.test(target);
+    const writing=!authentication&&!['GET','HEAD','OPTIONS'].includes(String(init.method||url?.method||'GET').toUpperCase());
+    if(!init.headers&&url?.headers)init={...init,headers:url.headers};
     if(writing)assertWritable(identity);
     if(writing&&identity?.loginSessionId){
       const headers=init.headers?.entries?Object.fromEntries(init.headers.entries()):Array.isArray(init.headers)?Object.fromEntries(init.headers):{...(init.headers||{})};
@@ -112,13 +124,18 @@
     try{
       const response=await fetchImpl(url,{...init,signal:controller.signal});
       if(!authentication)observe(response,identity,{path:String(url)});
-      if(writing&&identity&&!same(identity,capture()))throw failure('登录状态已变化，旧保存结果已忽略。',409);
+      if(writing&&identity&&identity.username!==capture()?.username)throw failure('登录账号已变化，旧保存结果已忽略。',409);
+      if(!authentication&&identity&&typeof response.json==='function'){
+        const decode=response.json.bind(response);
+        response.json=async()=>{const value=await decode();if(identity.username!==capture()?.username)throw failure('登录账号已变化，旧响应已忽略。',409);return value};
+      }
       return response;
     }catch(error){if(controller.signal.aborted&&!external?.aborted){const timeout=new Error('请求超时，当前内容已保留，请重试。');timeout.code='REQUEST_TIMEOUT';throw timeout}throw error}
     finally{global.clearTimeout(timer);external?.removeEventListener?.('abort',abort)}
   }
   async function retry(){
     if(paused){await global.KGAuthCore?.refreshSession?.();return !paused}
+    if(formsDirty()){show('弹窗文字仍未提交，请先点击弹窗的保存按钮；当前输入已保留。');return false}
     let saved=true;
     for(const value of participants.values())try{if(value.prepareLeave&&await bounded(()=>value.prepareLeave())===false)saved=false}catch(_){saved=false}
     if(saved&&!hasUnsavedChanges())hide();else show('当前修改尚未保存，内容已保留，请检查连接后重试。');
@@ -129,7 +146,7 @@
     if(paused||!capture()||global.document?.visibilityState==='hidden')return false;
     nextRenewal=Date.now()+60000;
     renewFlight=(async()=>{
-      try{const response=await request('/api/v1/auth/refresh',{method:'POST',credentials:'include',headers:{Accept:'application/json'}});if(!response.ok)return false;const payload=await response.json();if(payload.loginSessionId&&payload.loginSessionId!==capture()?.loginSessionId)await global.KGAuthCore?.refreshSession?.();nextRenewal=Date.now()+RENEW_INTERVAL;return true}catch(_){return false}
+      try{const response=await request('/api/v1/auth/refresh',{method:'POST',credentials:'include',headers:{Accept:'application/json'}});if(!response.ok)return false;const payload=await response.json();if(payload.ok!==true)return false;if(payload.loginSessionId&&payload.loginSessionId!==capture()?.loginSessionId)await global.KGAuthCore?.refreshSession?.();const lifetime=Number(payload.expiresIn)*1000;nextRenewal=Date.now()+Math.min(RENEW_INTERVAL,lifetime>0?Math.max(1000,lifetime/2):RENEW_INTERVAL);return true}catch(_){return false}
     })();
     try{return await renewFlight}finally{renewFlight=null}
   }
@@ -140,6 +157,8 @@
   global.addEventListener?.('focus',activity);
   global.document?.addEventListener?.('visibilitychange',()=>{if(global.document.visibilityState==='visible')activity()});
   function publishSession(identity){channel?.postMessage({username:String(identity?.username||''),loginSessionId:String(identity?.loginSessionId||'')})}
+  function completeLogout(){if(hasUnsavedChanges())return false;paused=false;retained=null;hide();return true}
+  function raiseAuthDialog(element){if(element?.style)element.style.zIndex='2147483100'}
   if(channel)channel.onmessage=event=>{
     const identity=capture(),next=event.data;
     if(!identity||!next||typeof next.username!=='string'||typeof next.loginSessionId!=='string'||same(identity,next))return;
@@ -147,5 +166,16 @@
     if(next.username===identity.username)void global.KGAuthCore?.refreshSession?.();
   };
   if(global.document&&global.setInterval)global.setInterval(()=>{if(Date.now()-lastActivity<RENEW_INTERVAL&&Date.now()>=nextRenewal)void renew()},60000);
-  global.KGAuthRecovery=Object.freeze({capture,isPaused:()=>paused,observe,assertWritable,register,acceptSession,beforeLogin,prepareLogout,hasUnsavedChanges,fetch:request,retry,renew,publishSession});
+  // Raw canvas features share this boundary too: fragment paste, template
+  // application and question bindings must never bypass the login identity.
+  if(global.document&&typeof nativeFetch==='function'){
+    guardedFetch=function(input,init){
+      let url;
+      try{url=new global.URL(typeof input==='string'?input:input?.url||String(input),global.location.href)}catch(_){return nativeFetch(input,init)}
+      if(url.origin!==global.location.origin||!url.pathname.startsWith('/api/v1/'))return nativeFetch(input,init);
+      return request(input,init||{},nativeFetch);
+    };
+    global.fetch=guardedFetch;
+  }
+  global.KGAuthRecovery=Object.freeze({capture,isPaused:()=>paused,observe,assertWritable,register,acceptSession,beforeLogin,prepareLogout,hasUnsavedChanges,fetch:request,retry,renew,publishSession,watchForm,formsDirty,completeLogout,raiseAuthDialog});
 })(window);

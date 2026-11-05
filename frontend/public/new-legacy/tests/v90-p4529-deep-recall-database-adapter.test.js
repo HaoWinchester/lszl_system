@@ -327,7 +327,7 @@ function loadRecallDraftLifecycle(overrides = {}) {
     saveProgress: () => calls.push('pending'),
     writeProgressNow: async () => { calls.push('save'); return true; },
     notifyRecallLimit: message => calls.push(message),
-    progressChangeVersion:0,progressSavedVersion:0,
+    progressChangeVersion:0,progressSavedVersion:0,recallSession:null,
     ...overrides,
   };
   vm.createContext(context);

@@ -349,6 +349,12 @@ def check_auth_pages(browser, base, checks):
         page = context.new_page()
         page.goto(base + path, wait_until='networkidle')
         dismiss_overlays(page)
+        # Protected guest data may legitimately open login during bootstrap.
+        # Close it through its real control, then independently verify the menu
+        # can reopen login on this particular page.
+        if page.locator('#authModal').is_visible():
+            page.locator('#authCloseBtn').click()
+            expect(page.locator('#authModal')).to_be_hidden()
         if '/file-manager.html' in path:
             page.locator('#fmAvatar').click()
             page.locator('#fmAccountSessionBtn').click()

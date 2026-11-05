@@ -180,3 +180,102 @@ test('multi-question answer writes pause with the classroom and resume with the 
   await c.KGPracticeLearningApi.answer({questionId:'q1',selectedAnswer:'B'},{skipRefresh:true});
   assert.equal(writes.length,1);assert.equal(writes[0].init.headers['X-KG-Login-Session-ID'],'new-login');
 });
+
+test('raw same-origin canvas writes use the common identity guard while external fetches remain untouched',async()=>{
+  const calls=[];
+  const network=async(url,init)=>{calls.push({url,init});return response(calls.length===1?401:200)};
+  const {api,context:c}=harness({document:{addEventListener(){},visibilityState:'visible'},location:{origin:'http://classroom.test',href:'http://classroom.test/index.html',pathname:'/index.html'},fetch:network});
+  await c.fetch('/api/v1/files/f1/fragments',{method:'POST'});
+  assert.equal(api.isPaused(),true);assert.equal(calls[0].init.headers['X-KG-Login-Session-ID'],'old-login');
+  await assert.rejects(c.fetch('/api/v1/templates/template/apply',{method:'POST'}),e=>e.status===401);
+  await c.fetch('https://external.test/resource',{method:'POST'});
+  assert.equal(calls.length,2);assert.equal(calls[1].init.headers?.['X-KG-Login-Session-ID'],undefined);
+});
+
+test('unsubmitted modal text is retained across re-login and blocks logout until saved or explicitly closed',async()=>{
+  const {api,setSession,events}=harness();const input={value:'旧标题',type:'text'};let open=true;
+  assert.equal(typeof api.watchForm,'function');
+  api.watchForm({querySelectorAll:()=>[input]},{isOpen:()=>open});
+  assert.equal(api.hasUnsavedChanges(),false);input.value='课堂未提交的标题';
+  assert.equal(api.hasUnsavedChanges(),true);assert.equal(await api.prepareLogout(),false);
+  api.observe(response(401),api.capture());setSession({user:{username:'teacher'},loginSessionId:'new-login'});
+  await api.acceptSession({username:'teacher',loginSessionId:'new-login'});
+  assert.equal(input.value,'课堂未提交的标题');assert.equal(api.hasUnsavedChanges(),true);
+  assert.equal(events.find(e=>e.type==='kg:auth-recovered').detail.saved,false);
+  open=false;assert.equal(api.hasUnsavedChanges(),false);assert.equal(await api.prepareLogout(),true);
+});
+
+test('logout cannot discard a remaining draft even if a participant incorrectly returns a successful save',async()=>{
+  const {api}=harness();api.register('unsubmitted-child',{hasUnsavedChanges:()=>true,prepareLeave:()=>true});
+  assert.equal(await api.prepareLogout(),false);
+});
+
+test('personal card acknowledgement is retained without a follow-up read that can turn success into duplicate retry',async()=>{
+  const {context:c}=harness();let mutated=false,posts=0;
+  c.fetch=async(url,init={})=>{
+    if(init.method==='POST'){mutated=true;posts++;return response(201,{card:{id:'card-ack',revision:1,title:'课堂标题',content:'已入库内容'}})}
+    if(mutated)throw new Error('the subsequent read is offline');
+    return response(200,{cards:[]});
+  };
+  vm.runInContext(fs.readFileSync(path.resolve(__dirname,'../../frontend/scripts/new-legacy-assets/personal-card-adapter.js'),'utf8'),c);
+  await c.KGPersonalSynthesisCardApi.refresh();
+  const card=await c.KGPersonalSynthesisCardApi.create({title:'课堂标题',content:'已入库内容'});
+  assert.equal(card.id,'card-ack');assert.equal(posts,1);assert.equal(c.KGPersonalSynthesisCardApi.snapshot().active[0].id,'card-ack');
+});
+
+test('an acknowledged in-flight write survives same-owner re-login but never reaches a replacement owner',async()=>{
+  const {api,setSession}=harness();let finish;
+  const network=()=>new Promise(resolve=>{finish=resolve});
+  const first=api.fetch('/api/v1/personal-synthesis-cards',{method:'POST'},network);
+  setSession({user:{username:'teacher'},loginSessionId:'new-login'});finish(response(201,{card:{id:'already-created'}}));
+  assert.equal((await first).status,201);
+  const other=api.fetch('/api/v1/personal-synthesis-cards',{method:'POST'},network);
+  setSession({user:{username:'student'},loginSessionId:'student-login'});finish(response(201));
+  await assert.rejects(other,e=>e.status===409);
+});
+
+test('new edits during a pending logout retain the original classroom for re-login',async()=>{
+  let finish,dirty=false;const pending=new Promise(resolve=>{finish=resolve});
+  const {context:c}=authHarness(()=>pending);
+  c.KGAuthRecovery.register('canvas',{hasUnsavedChanges:()=>dirty,prepareLeave:()=>!dirty});
+  const logout=c.KGAuthCore.logout();await new Promise(resolve=>setImmediate(resolve));
+  dirty=true;finish(response(200,{ok:true}));
+  assert.equal((await logout).ok,false);assert.equal(c.KGAuthCore.currentUsername(),'teacher');assert.equal(c.KGAuthRecovery.isPaused(),true);
+});
+
+test('new same-owner edits during login are recovered without account-change resets',async()=>{
+  let finish,dirty=false,saves=0;const pending=new Promise(resolve=>{finish=resolve});
+  const {context:c,events}=authHarness(()=>pending);
+  c.KGAuthRecovery.register('canvas',{hasUnsavedChanges:()=>dirty,onRecovered:()=>{saves++;dirty=false;return true}});
+  const login=c.KGAuthCore.login('teacher','password');await new Promise(resolve=>setImmediate(resolve));
+  dirty=true;finish(response(200,{user:{username:'teacher'},loginSessionId:'new-login'}));
+  assert.equal((await login).ok,true);assert.equal(saves,1);assert.equal(events.filter(e=>e.type==='kg-auth-session-change').length,0);
+});
+
+test('a failed same-owner login cannot permanently bind a clean logged-out page to that account',async()=>{
+  let dirty=true,mode='fail';
+  const {context:c}=authHarness(async()=>mode==='fail'?response(401):mode==='logout'?response(200,{ok:true}):response(200,{user:{username:'student'},loginSessionId:'student-login'}));
+  c.KGAuthRecovery.register('canvas',{hasUnsavedChanges:()=>dirty,prepareLeave:()=>!dirty});
+  assert.equal((await c.KGAuthCore.login('teacher','bad-password')).ok,false);
+  dirty=false;mode='logout';assert.equal((await c.KGAuthCore.logout()).ok,true);
+  mode='student';assert.equal((await c.KGAuthCore.login('student','password')).ok,true);assert.equal(c.KGAuthCore.currentUsername(),'student');
+});
+
+test('a delayed personal-card response body never enters a replacement owner cache',async()=>{
+  const {context:c,setSession}=harness();let finish;
+  c.fetch=async(url,init={})=>init.method==='POST'?{ok:true,status:201,json:()=>new Promise(resolve=>{finish=resolve})}:response(200,{cards:[]});
+  vm.runInContext(fs.readFileSync(path.resolve(__dirname,'../../frontend/scripts/new-legacy-assets/personal-card-adapter.js'),'utf8'),c);
+  await c.KGPersonalSynthesisCardApi.refresh();
+  const creation=c.KGPersonalSynthesisCardApi.create({title:'teacher private'});await new Promise(resolve=>setImmediate(resolve));
+  setSession({user:{username:'student'},loginSessionId:'student-login'});finish({card:{id:'teacher-card',title:'teacher private',revision:1}});
+  await assert.rejects(creation,e=>e.status===409);
+  assert.equal(c.KGPersonalSynthesisCardApi.snapshot().active.length,0);
+});
+
+test('session refresh cannot adopt another cookie owner while the old classroom has unsaved text',async()=>{
+  const {context:c,events}=authHarness(async()=>response(200,{user:{username:'student'},loginSessionId:'student-login'}));
+  c.KGAuthRecovery.register('classroom',{hasUnsavedChanges:()=>true,prepareLeave:()=>false});
+  const result=await c.KGAuthCore.refreshSession();
+  assert.equal(result.ok,false);assert.equal(c.KGAuthCore.currentUsername(),'teacher');assert.equal(c.KGAuthRecovery.isPaused(),true);
+  assert.equal(events.filter(e=>e.type==='kg-auth-session-change').length,0);
+});

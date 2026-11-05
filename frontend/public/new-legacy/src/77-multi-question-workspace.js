@@ -133,6 +133,7 @@
     minimapModel:null,
     minimapDrag:null,
     inlineEdit:null,
+    groupInlineEdit:null,
     questions:[],
     papers:[],
     paperCatalog:[],
@@ -2725,24 +2726,46 @@
     const record=state.cards.get(String(nodeId));
     if(!record?.node||record.node.nodeType!=='synthesis-card')return false;
     if(String(record.node.cardType||'user')==='system'){notify('系统预设归纳卡不可编辑，可复制为“我的归纳”。');return false}
-    if(state.inlineEdit?.finish&&state.inlineEdit.element!==element)state.inlineEdit.finish(true);
+    const owner=()=>String(store()?.currentUserId?.()||global.KGAuthCore?.currentUsername?.()||'guest');
+    const context={owner:owner(),workspaceId:state.workspaceId,session:state.workspaceSession};
+    const contextMatches=()=>owner()===context.owner&&state.workspaceId===context.workspaceId&&state.workspaceSession===context.session&&state.cards.get(String(nodeId))===record;
+    if(state.inlineEdit?.finish&&state.inlineEdit.element!==element){
+      const previous=state.inlineEdit;
+      Promise.resolve(previous.finish(true)).then(saved=>{
+        if(saved&&!state.inlineEdit&&contextMatches()&&element.isConnected)beginInlineNodeEdit(element,nodeId,field);
+      });
+      return false;
+    }
     if(element.isContentEditable)return true;
-    const original=String(record.node[field]||'');
-    const originalHeight=Number(record.node.height||180);
+    let original=String(record.node[field]||''),originalHeight=Number(record.node.height||180);
     element.textContent=original;
     element.contentEditable='true';
     element.classList.add('is-inline-editing');
     record.element?.classList.add('is-inline-editing');
     element.dataset.inlineOriginal=original;
+    element.dataset.saveState='draft';
     element.focus();
     placeCaretAtEnd(element);
-    let settled=false,keydownHandler=null,blurHandler=null,inputHandler=null,resizeRaf=0;
+    let settled=false,pending=null,acknowledged=null,composing=false,deferredCommit=false;
+    let keydownHandler=null,blurHandler=null,inputHandler=null,resizeRaf=0;
+    const session={element,nodeId:String(nodeId),field:String(field),finish:null};
+    const current=()=>!settled&&state.inlineEdit===session&&contextMatches();
+    const text=()=>String(element.innerText||element.textContent||'');
+    const hydrateDeferred=card=>{
+      const cards=[...(session.pendingPersonalCards||[])];session.pendingPersonalCards=null;
+      if(card){
+        const index=cards.findIndex(item=>String(item.id)===String(card.id));
+        if(index<0)cards.push(card);
+        else if(Number(cards[index].revision||0)<=Number(card.revision||0))cards[index]=card;
+      }
+      if(cards.length&&contextMatches()&&!state.inlineEdit)hydratePersonalCards(cards);
+    };
     const resize=()=>{
       if(settled)return;
       if(resizeRaf)cancelAnimationFrame(resizeRaf);
       resizeRaf=requestAnimationFrame(()=>{
         resizeRaf=0;
-        if(settled||!record.element?.isConnected)return;
+        if(!current()||!record.element?.isConnected)return;
         const nextHeight=measureFullCardHeight(record);
         if(Math.abs(Number(record.node.height||0)-nextHeight)>.5){
           record.node.height=nextHeight;applyCard(record);
@@ -2750,70 +2773,98 @@
         }
       });
     };
+    const compositionStart=()=>{composing=true};
+    const compositionEnd=()=>{composing=false;if(deferredCommit){deferredCommit=false;finish(true)}};
     const cleanup=()=>{
       if(keydownHandler)element.removeEventListener('keydown',keydownHandler);
       if(blurHandler)element.removeEventListener('blur',blurHandler);
       if(inputHandler)element.removeEventListener('input',inputHandler);
+      element.removeEventListener('compositionstart',compositionStart);
+      element.removeEventListener('compositionend',compositionEnd);
       if(resizeRaf){cancelAnimationFrame(resizeRaf);resizeRaf=0}
-      if(state.inlineEdit?.element===element)state.inlineEdit=null;
-    };
-    const finish=async(commit)=>{
-      if(settled)return;settled=true;
-      if(resizeRaf){cancelAnimationFrame(resizeRaf);resizeRaf=0}
-      const next=String(element.innerText||element.textContent||'').trim();
-      const measuredHeight=commit?measureFullCardHeight(record):originalHeight;
-      cleanup();
+      if(state.inlineEdit===session)state.inlineEdit=null;
       element.removeAttribute('contenteditable');
       element.classList.remove('is-inline-editing');
       record.element?.classList.remove('is-inline-editing');
+    };
+    const finish=async(commit)=>{
+      if(settled)return true;
       if(!commit){
+        settled=true;cleanup();
         element.textContent=original||(field==='content'?'双击补充你的理解':'原则：待提炼');
-        record.node.height=originalHeight;applyCard(record);updateEdgesForNodeIds([record.id]);
-        return;
+        if(contextMatches()){record.node.height=originalHeight;applyCard(record);updateEdgesForNodeIds([record.id])}
+        hydrateDeferred();return true;
       }
-      const value=field==='title'?(next||'原则：待提炼'):next;
-      if(value===original&&Math.abs(measuredHeight-originalHeight)<.5){refreshSingleCardMarkup(record);applyCard(record);return}
-      const before=workspaceSnapshot();
-      let result=null;
-      try{
-        const proposed={...record.node,[field]:value};
-        const card=record.node.personalCardId
-          ?await PersonalCards.update?.(record.node.personalCardId,{...personalCardInput(proposed),revision:Number(record.node.personalCardRevision||1)})
-          :await PersonalCards.create?.(personalCardInput(proposed));
-        if(!card?.id)throw new Error('个人归纳卡服务暂不可用');
-        state.suppressStoreEvent=true;
-        try{result=store()?.updateNode?.(nodeId,{...personalCardNodeFields(card),height:measuredHeight},workspaceOptions())}finally{state.suppressStoreEvent=false}
-      }catch(error){
-        record.node.height=originalHeight;refreshSingleCardMarkup(record);applyCard(record);notify('归纳卡更新失败：'+String(error?.message||'请重试'));return;
+      if(pending)return pending;
+      if(!current()){element.dataset.saveState='failed';notify('画布或账号已切换，归纳卡输入仍保留，请复制输入或按 Esc 取消。');return false}
+      if(composing){deferredCommit=true;return false}
+      if(!canEdit()){element.dataset.saveState='failed';notify('归纳卡尚未保存，输入已保留，请恢复编辑权限后重试。');return false}
+      if(resizeRaf){cancelAnimationFrame(resizeRaf);resizeRaf=0}
+      const submitted=text(),next=submitted.trim(),value=field==='title'?(next||'原则：待提炼'):next;
+      const measuredHeight=measureFullCardHeight(record);
+      if(value===original&&Math.abs(measuredHeight-originalHeight)<.5){
+        settled=true;cleanup();refreshSingleCardMarkup(record);applyCard(record);hydrateDeferred();return true;
       }
-      if(!result?.node){
-        record.node.height=originalHeight;refreshSingleCardMarkup(record);applyCard(record);notify('归纳卡更新失败，请重试。');return;
-      }
-      state.workspace=result.workspace||store()?.ensure?.(workspaceOptions())||state.workspace;
-      const after=workspaceSnapshot();
-      pushWorkspaceHistory(field==='title'?'编辑归纳标题':'编辑归纳内容',before,after);
-      syncRecordNode(record,result.node);
-      refreshSingleCardMarkup(record);
-      applyCard(record);
-      renderStructure();updateEdgesGeometry();renderMinimap();scheduleLayoutDiagnosis();
-      setCardSelection([nodeId],{reason:'inline-edit-retain'});
-      hydratePersonalCards([{
-        id:result.node.personalCardId,revision:result.node.personalCardRevision,title:result.node.title,content:result.node.content,
-        tags:result.node.tags,status:result.node.status,synthesisType:result.node.synthesisType,archivedAt:result.node.archived?new Date().toISOString():null
-      }]);
-      notify('归纳卡已更新，并同步到“我的归纳卡”。');
+      const before=workspaceSnapshot();element.dataset.saveState='committing';
+      pending=(async()=>{
+        try{
+          const proposed={...record.node,[field]:value};
+          let card=acknowledged?.value===value?acknowledged.card:null;
+          if(!card){
+            const id=acknowledged?.card.id||record.node.personalCardId;
+            card=id
+              ?await PersonalCards.update?.(id,{...personalCardInput(proposed),revision:Number(acknowledged?.card.revision||record.node.personalCardRevision||1)})
+              :await PersonalCards.create?.(personalCardInput(proposed));
+            if(!card?.id)throw new Error('个人归纳卡服务暂不可用');
+          }
+          if(!current())return false;
+          // Remember the server acknowledgement even if the local workspace
+          // write fails, so retries never duplicate a newly created card.
+          acknowledged={card,value};
+          let result=null;
+          state.suppressStoreEvent=true;
+          try{result=store()?.updateNode?.(nodeId,{...personalCardNodeFields(card),height:measuredHeight},workspaceOptions(context.workspaceId))}finally{state.suppressStoreEvent=false}
+          if(!result?.node)throw new Error('画布归纳卡更新失败，请重试');
+          if(!current())return false;
+          state.workspace=result.workspace||store()?.ensure?.(workspaceOptions(context.workspaceId))||state.workspace;
+          pushWorkspaceHistory(field==='title'?'编辑归纳标题':'编辑归纳内容',before,workspaceSnapshot());
+          syncRecordNode(record,result.node);
+          original=String(result.node[field]||'');originalHeight=Number(result.node.height||measuredHeight);
+          element.dataset.inlineOriginal=original;
+          if(text()!==submitted||composing){
+            element.dataset.saveState='draft';resize();
+            notify('已提交的归纳卡内容已保存，后续输入仍保留，请继续编辑或重试保存。');return false;
+          }
+          settled=true;cleanup();
+          refreshSingleCardMarkup(record);applyCard(record);
+          renderStructure();updateEdgesGeometry();renderMinimap();scheduleLayoutDiagnosis();
+          setCardSelection([nodeId],{reason:'inline-edit-retain'});
+          hydrateDeferred({
+            id:result.node.personalCardId,revision:result.node.personalCardRevision,title:result.node.title,content:result.node.content,
+            tags:result.node.tags,status:result.node.status,synthesisType:result.node.synthesisType,archivedAt:result.node.archived?new Date().toISOString():null
+          });
+          notify('归纳卡已更新，并同步到“我的归纳卡”。');return true;
+        }catch(error){
+          if(current()){element.dataset.saveState='failed';notify('归纳卡更新失败，输入已保留，请点击外部重试或按 Esc 取消：'+String(error?.message||'请重试'))}
+          return false;
+        }
+      })();
+      try{return await pending}finally{pending=null}
     };
     keydownHandler=event=>{
+      if(event.isComposing||event.keyCode===229||composing)return;
       if(event.key==='Escape'){event.preventDefault();finish(false)}
       else if(field==='title'&&event.key==='Enter'){event.preventDefault();finish(true)}
       else if(field==='content'&&(event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();finish(true)}
     };
     blurHandler=()=>finish(true);
-    inputHandler=()=>resize();
+    inputHandler=()=>{element.dataset.saveState='draft';resize()};
     element.addEventListener('keydown',keydownHandler);
-    element.addEventListener('blur',blurHandler,{once:true});
+    element.addEventListener('blur',blurHandler);
     element.addEventListener('input',inputHandler);
-    state.inlineEdit={element,nodeId:String(nodeId),field:String(field),finish};
+    element.addEventListener('compositionstart',compositionStart);
+    element.addEventListener('compositionend',compositionEnd);
+    session.finish=finish;state.inlineEdit=session;
     resize();
     return true;
   }
@@ -2824,6 +2875,7 @@
     if(!group||!element)return false;
     if(element.isContentEditable)return true;
     const original=String(group.title||'新分组');
+    const workspaceId=state.workspaceId,session=state.workspaceSession,owner=store()?.currentUserId?.();
     element.textContent=original;
     element.contentEditable='true';
     element.classList.add('is-inline-editing');
@@ -2832,18 +2884,21 @@
     const cleanup=()=>{
       if(keydownHandler)element.removeEventListener('keydown',keydownHandler);
       if(blurHandler)element.removeEventListener('blur',blurHandler);
+      if(state.groupInlineEdit?.element===element)state.groupInlineEdit=null;
     };
     const finish=(commit)=>{
-      if(settled)return;settled=true;cleanup();
+      if(settled)return true;
+      if(commit&&(!canEdit()||state.workspaceId!==workspaceId||state.workspaceSession!==session||store()?.currentUserId?.()!==owner))return false;
+      settled=true;cleanup();
       const value=String(element.innerText||element.textContent||'').trim()||'新分组';
       element.removeAttribute('contenteditable');element.classList.remove('is-inline-editing');
-      if(!commit){element.textContent=original;return}
-      if(value===original)return;
+      if(!commit){element.textContent=original;return true}
+      if(value===original)return true;
       const before=workspaceSnapshot();
       state.suppressStoreEvent=true;
       try{store()?.updateGroup?.(groupId,{title:value},workspaceOptions())}finally{state.suppressStoreEvent=false}
       const after=workspaceSnapshot();pushWorkspaceHistory('编辑分组名称',before,after);
-      state.workspace=after;renderCards();notify('分组名称已更新。');
+      state.workspace=after;renderCards();notify('分组名称已更新。');return true;
     };
     keydownHandler=event=>{
       if(event.key==='Escape'){event.preventDefault();finish(false)}
@@ -2851,7 +2906,8 @@
     };
     blurHandler=()=>finish(true);
     element.addEventListener('keydown',keydownHandler);
-    element.addEventListener('blur',blurHandler,{once:true});
+    element.addEventListener('blur',blurHandler);
+    state.groupInlineEdit={element,finish};
     return true;
   }
   const ARRANGE_LABELS=Object.freeze({
@@ -3064,7 +3120,7 @@
     const backdrop=byId('qwStructureBackdrop');
     if(backdrop)backdrop.hidden=false;
     const modal=byId(id);
-    if(modal){modal.hidden=false;setTimeout(()=>modal.querySelector('input,textarea,select')?.focus?.(),0)}
+    if(modal){modal.hidden=false;global.KGAuthRecovery?.watchForm?.(modal,{isOpen:()=>!modal.hidden});setTimeout(()=>modal.querySelector('input,textarea,select')?.focus?.(),0)}
   }
   function viewportCenterWorld(){
     const rect=state.viewport.getBoundingClientRect();
@@ -3646,7 +3702,10 @@
   function hideEdgeInlineEditor(){if(state.edgeInlineEditor)state.edgeInlineEditor.hidden=true}
   function commitEdgeInlineEditor(){
     const editor=state.edgeInlineEditor,edge=edgeById(state.activeEdgeId);if(!editor||!edge)return false;
-    const label=String(editor.querySelector('input')?.value||'').trim();hideEdgeInlineEditor();return updateEdgeStyle(edge.id,{label},label?'添加关系文字':'清除关系文字');
+    if(!canEdit())return false;
+    const label=String(editor.querySelector('input')?.value||'').trim();
+    const saved=label===String(edge.label||'')||updateEdgeStyle(edge.id,{label},label?'添加关系文字':'清除关系文字');
+    if(saved)hideEdgeInlineEditor();return saved;
   }
   function updateEdgeStyle(edgeId,patch,label){
     if(!canEdit())return false;
@@ -4029,9 +4088,12 @@
     workspaceId=String(workspaceId||'');
     // Initialization stays synchronous; changing an existing canvas waits for its server writes.
     if(!state.workspace||!state.workspaceId||state.workspaceId===workspaceId)return activateWorkspace(workspaceId,options);
+    if(global.KGAuthRecovery?.isPaused()||global.KGAuthRecovery?.formsDirty?.())return false;
     const previousId=state.workspaceId,session=state.workspaceSession,shouldSave=!state.readonly;
     if(state.ink?.hasTextDraft?.())return state.ink.commitText().then(saved=>saved?loadWorkspace(workspaceId,options):false);
-    if(state.inlineEdit?.finish)state.inlineEdit.finish(true);
+    if(state.inlineEdit?.finish)return Promise.resolve(state.inlineEdit.finish(true)).then(saved=>saved?loadWorkspace(workspaceId,options):false);
+    if(state.groupInlineEdit?.finish)return Promise.resolve(state.groupInlineEdit.finish(true)).then(saved=>saved?loadWorkspace(workspaceId,options):false);
+    if(state.edgeInlineEditor?.hidden===false&&!commitEdgeInlineEditor())return false;
     state.workspaceTransition=true;
     // 切换画布只取消进行中的笔迹，保留当前画笔工具状态。
     state.ink?.cancel();
@@ -5736,8 +5798,11 @@
       }
     });
     global.addEventListener('kg-personal-synthesis-cards-change',event=>{
-      const detail=event.detail||{};
-      hydratePersonalCards([...(detail.active||[]),...(detail.archived||[])]);
+      const detail=event.detail||{},cards=[...(detail.active||[]),...(detail.archived||[])];
+      // Library refreshes can arrive before an inline write resolves. Rebuilding
+      // the card here would replace the live editable DOM and its newer input.
+      if(state.inlineEdit){state.inlineEdit.pendingPersonalCards=cards;return}
+      hydratePersonalCards(cards);
     });
     global.addEventListener('focus',()=>{
       updateReadonly();
@@ -5824,11 +5889,14 @@
       hasUnsavedChanges:()=>{
         if(state.readonly&&!global.KGAuthRecovery?.isPaused())return false;
         const remote=global.KGCanvasWorkspaceAdapter?.getState?.(state.workspaceId||state.workspace?.id);
-        return Boolean(state.ink?.hasTextDraft?.()||state.optionClickTimers.size||state.answerQueue.length||state.answerFlushing||['pending','saving','failed'].includes(remote?.status));
+        return Boolean(state.inlineEdit||state.groupInlineEdit||state.edgeInlineEditor?.hidden===false||state.ink?.hasTextDraft?.()||state.optionClickTimers.size||state.answerQueue.length||state.answerFlushing||['pending','saving','failed'].includes(remote?.status));
       },
       prepareLeave:async()=>{
         if(global.KGAuthRecovery?.isPaused())return false;
         if(state.readonly)return true;
+        while(state.inlineEdit?.finish)if(await state.inlineEdit.finish(true)===false)return false;
+        if(state.groupInlineEdit?.finish&&await state.groupInlineEdit.finish(true)===false)return false;
+        if(state.edgeInlineEditor?.hidden===false&&!commitEdgeInlineEditor())return false;
         if(state.ink?.hasTextDraft?.()&&!await state.ink.commitText())return false;
         await flushPendingOptionChoices();
         if(state.workspace)store()?.write?.(state.workspace,{reason:'learning-navigation'});

@@ -146,6 +146,7 @@
       if(settings){panel.style.right='auto';panel.style.left=(Math.max(8,Math.min(left+box.width-settings.width,global.innerWidth-settings.width-8))-left)+'px'}
     }
     function setOpen(value){
+      if(value&&!allowToolSelection())return;
       if(!value)closeColorPicker();
       if(!value&&textSession){cancel();textSession.onSaved=()=>setOpen(false);closeTextEditor(true);return}
       opened=!!value;if(!opened){settingsOpen=false;space=false;viewport.classList.remove('canvas-ink-panning');setTool('select');options.onExitDraw?.()}else setTool('pen');
@@ -189,7 +190,7 @@
       toolbar.querySelectorAll('[data-ink-tool]').forEach(btn=>{btn.setAttribute('aria-pressed',String(btn.dataset.inkTool===tool));btn.disabled=locked&&!allowToolSelection()&&btn.dataset.inkTool!=='select'});
       for(const action of ['undo','redo']){const btn=toolbar.querySelector('[data-ink-action='+action+']');btn.hidden=!(ownHistory||options.showHistory);btn.disabled=locked||!state[action==='undo'?'canUndo':'canRedo']}
       toolbar.hidden=!opened;
-      const launch=trigger();if(launch){if(!launch.querySelector('svg'))launch.innerHTML=penIcon;launch.classList.add('canvas-ink-entry');launch.setAttribute('aria-expanded',String(opened));launch.disabled=locked;const tip=locked?'当前画布只读，无法使用画笔':opened?'收起画笔工具并退出绘画':'展开画笔工具，在画布上书写或标注';if(launch.hasAttribute('data-tooltip')){launch.dataset.tooltip=tip;launch.removeAttribute('title')}else launch.title=tip;launch.querySelector('svg')?.style.setProperty('color',prefs[TOOLS[tool]?tool:'pen'].color)}
+      const launch=trigger();if(launch){if(!launch.querySelector('svg'))launch.innerHTML=penIcon;launch.classList.add('canvas-ink-entry');launch.setAttribute('aria-expanded',String(opened));launch.disabled=!allowToolSelection();const tip=locked?(allowToolSelection()?'当前修改已保留，可切换工具，重新登录后继续绘制':'当前画布只读，无法使用画笔'):opened?'收起画笔工具并退出绘画':'展开画笔工具，在画布上书写或标注';if(launch.hasAttribute('data-tooltip')){launch.dataset.tooltip=tip;launch.removeAttribute('title')}else launch.title=tip;launch.querySelector('svg')?.style.setProperty('color',prefs[TOOLS[tool]?tool:'pen'].color)}
       for(const name of Object.keys(prefs)){const btn=toolbar.querySelector('button[data-ink-tool='+name+']');btn.querySelector('svg')?.style.setProperty('color',prefs[name].color);btn.title=(name==='pen'?'画笔：拖动绘制笔迹':name==='highlighter'?'荧光笔：拖动高亮标注':'文字：点击空白插入，单击选择并拖动文字，双击编辑')+(name==='text'?'；单击显示颜色、字号与加粗':'；点击设置调整粗细和透明度')}
       const currentTool=styleTool(),pref=currentStyle();
       panel.hidden=!settingsOpen||!pref;
@@ -621,7 +622,7 @@
       catch(error){report(error);return false}
     }
     function destroy(){closeColorPicker();if(textSession){report(new Error('文字草稿尚未保存'));return false}closeTextEditor(false);stopEraserHold();cursorStyle.remove();cancel();destroyed=true;listeners.forEach(remove=>remove());layer.remove();toolbar.remove();viewport.classList.remove('canvas-ink-drawing','canvas-ink-panning');delete viewport.dataset.inkTool}
-    function activateText(){if(destroyed||readonly())return false;opened=true;settingsOpen=true;setTool('text');options.onOpenChange?.(true);return true}
+    function activateText(){if(destroyed||!allowToolSelection())return false;opened=true;settingsOpen=true;setTool('text');options.onOpenChange?.(true);return true}
     async function openTextAt(clientX,clientY){
       if(destroyed||readonly()||!Number.isFinite(clientX)||!Number.isFinite(clientY))return false;
       if(textSession&&!await closeTextEditor(true))return false;

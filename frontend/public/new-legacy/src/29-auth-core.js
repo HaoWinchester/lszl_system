@@ -313,6 +313,11 @@
       try{
         const payload=await remoteRequest(providerConfig().endpoints.login,{body:{username,password,acceptedTermsVersion:context.acceptedTermsVersion||undefined,context}});
         const user=normalizeUser(payload.user?.username||payload.username||username,{...(payload.user||{}),username:payload.user?.username||payload.username||username,source:"remote"});
+        if(window.KGAuthRecovery&&await window.KGAuthRecovery.beforeLogin(user.username)===false){
+          window.KGAuthRecovery.observe({status:401},window.KGAuthRecovery.capture(),{source:'login-new-draft'});
+          window.KGAuthRecovery.publishSession({username:user.username,loginSessionId:serverLoginSessionId(payload)});
+          return {ok:false,message:'登录期间产生了未保存修改，当前课堂已保留，请重新登录原账号后保存。'};
+        }
         const previousLoginSessionId=serverLoginSessionId(readRemoteSession()||{}),loginSessionId=serverLoginSessionId(payload);
         writeRemoteSession({user,token:payload.token||"",loginSessionId,issuedAt:Date.now()});
         try{if(Store.remove)Store.remove(AUTH_SESSION_KEY);else localStorage.removeItem(AUTH_SESSION_KEY)}catch(e){}
@@ -367,6 +372,11 @@
       try{
         const payload=await remoteRequest(config.endpoints.register,{body:{username,password,acceptedTermsVersion:context.acceptedTermsVersion||undefined,referralCode:context.referralCode??readReferralCode(),context}});
         const user=normalizeUser(payload.user?.username||payload.username||username,{...(payload.user||{}),username:payload.user?.username||payload.username||username,source:"remote"});
+        if(window.KGAuthRecovery&&await window.KGAuthRecovery.beforeLogin(user.username)===false){
+          window.KGAuthRecovery.observe({status:401},window.KGAuthRecovery.capture(),{source:'register-new-draft'});
+          window.KGAuthRecovery.publishSession({username:user.username,loginSessionId:serverLoginSessionId(payload)});
+          return {ok:false,message:'注册期间产生了未保存修改，当前课堂已保留，请重新登录原账号后保存。'};
+        }
         const previousLoginSessionId=serverLoginSessionId(readRemoteSession()||{}),loginSessionId=serverLoginSessionId(payload);
         writeRemoteSession({user,token:payload.token||"",loginSessionId,issuedAt:Date.now()});
         try{if(Store.remove)Store.remove(AUTH_SESSION_KEY);else localStorage.removeItem(AUTH_SESSION_KEY)}catch(e){}
@@ -387,10 +397,17 @@
     const username=currentUsername();
     if(window.KGAuthRecovery&&await window.KGAuthRecovery.prepareLogout()===false)return {ok:false,username,message:'当前课堂尚未保存，已取消退出。'};
     if(config.mode==="remote"){
+      const logoutIdentity=window.KGAuthRecovery?.capture?.();
       const requestId=globalThis.crypto?.randomUUID?.()||uid('logout');
       const page=String(globalThis.location?.pathname||'').split('?')[0].split('#')[0];
       try{await remoteRequest(config.endpoints.logout,{body:{context},headers:{'X-KG-Page':page,'X-KG-Entry':'account-menu','X-Request-ID':requestId}})}
       catch(error){return {ok:false,username,message:String(error?.message||'退出失败，当前课堂已保留，请重试。')}}
+      if(window.KGAuthRecovery?.hasUnsavedChanges()){
+        window.KGAuthRecovery.observe({status:401},logoutIdentity,{source:'logout-new-draft'});
+        window.KGAuthRecovery.publishSession({username:'',loginSessionId:''});
+        return {ok:false,username,message:'退出期间产生了新修改，内容已保留，请重新登录原账号后保存。'};
+      }
+      window.KGAuthRecovery?.completeLogout?.();
       const previousLoginSessionId=serverLoginSessionId(readRemoteSession()||{});
       writeRemoteSession(null);
       try{if(Store.remove)Store.remove(AUTH_SESSION_KEY);else localStorage.removeItem(AUTH_SESSION_KEY)}catch(e){}
@@ -415,6 +432,10 @@
       if(!username)throw new Error('会话响应缺少用户信息');
       if(identityChanged())return {ok:false,stale:true,user:remoteUser(),provider:'remote'};
       const user=normalizeUser(username,{...(payload.user||{}),username,source:"remote"});
+      if(window.KGAuthRecovery&&await window.KGAuthRecovery.beforeLogin(user.username)===false){
+        window.KGAuthRecovery.observe({status:401},identity,{source:'session-owner-changed'});
+        return {ok:false,user:remoteUser(),provider:'remote',preservedSession:true,message:'登录账号已变化，当前课堂已保留，请重新登录原账号。'};
+      }
       const previousLoginSessionId=serverLoginSessionId(readRemoteSession()||{}),loginSessionId=serverLoginSessionId(payload);
       writeRemoteSession({user,token:payload.token||readRemoteSession()?.token||"",loginSessionId,issuedAt:Date.now()});
       await notifyRemoteSession(user.username,loginSessionId,previousLoginSessionId);

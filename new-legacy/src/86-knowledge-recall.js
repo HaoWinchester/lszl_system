@@ -356,7 +356,9 @@
     return {nodes:state.nodes,edges:state.edges,strokes:state.strokes,tables,customNodes:state.customNodes,activeKeywords:state.activeKeywords,choiceOffsets:state.choiceOffsets,metrics:{...state.metrics,optionState},graphSchemaVersion:3,transform:{x:Number(state.transform.x)||0,y:Number(state.transform.y)||0,scale:Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,Number(state.transform.scale)||1))},optionState};
   }
   function commitPersonalDraft(){
-    if(isRecallReadonly()||isTeacherDraftPreview())return true;
+    const retaining=!!globalThis.KGAuthRecovery?.isPaused()
+      &&!document.body.classList.contains('kr-readonly')&&recallSession?.permissions?.canWrite===true;
+    if((isRecallReadonly()&&!retaining)||isTeacherDraftPreview())return true;
     const titleInput=$('krPersonalTitle'),contentInput=$('krPersonalContent');
     const node=state.nodes.find(item=>item.instanceId===state.activeNodeId);
     if(!titleInput||!contentInput||!node?.custom)return true;
@@ -372,7 +374,10 @@
       if(label)label.textContent=title;if(initial)initial.textContent=firstChar(title);
       if(button){button.title=title+' · 拖动整理位置 · 双击删除';button.setAttribute('aria-label','打开 '+title+' 的回忆引导；拖动整理位置；双击删除')}
     });
-    saveProgress();return true;
+    // Authentication expiry freezes requests, not the existing author's input.
+    // Stage the draft before hiding its form; recovery saves this same revision.
+    if(retaining)progressChangeVersion+=1;else saveProgress();
+    return true;
   }
   async function commitRecallDrafts(){
     if(!commitPersonalDraft())return false;
@@ -387,6 +392,7 @@
   }
   function hasRecallDraft(){
     if((isRecallSessionReadonly()&&!globalThis.KGAuthRecovery?.isPaused())||isTeacherDraftPreview())return false;
+    if(recallSession?.permissions?.canWrite===true&&!document.body.classList.contains('kr-readonly')&&String($('krCustomInput')?.value||'').trim())return true;
     if(progressChangeVersion!==progressSavedVersion||progressSaveTimer||inkController?.hasTextDraft?.())return true;
     if(['saving','failed','conflict'].includes(recallAdapter?.getState?.().saveState))return true;
     const node=state.nodes.find(item=>item.instanceId===state.activeNodeId);
@@ -1123,14 +1129,20 @@
     const submitCustomChild=()=>{
       const title=(customInput?.value||'').trim();
       if(!title){if(customInput){customInput.setCustomValidity('请输入要添加的知识点');customInput.reportValidity?.();customInput.focus()}return}
-      customInput.setCustomValidity('');createCustomChild(node,title);
+      customInput.setCustomValidity('');createCustomChild(node,title,true);
     };
     if(customSave)customSave.onclick=submitCustomChild;
     if(customInput){customInput.oninput=()=>customInput.setCustomValidity('');customInput.onkeydown=e=>{if(e.key==='Enter'&&!e.isComposing&&e.keyCode!==229){e.preventDefault();submitCustomChild()}}}
     requestAnimationFrame(()=>placeGuide(liveAnchor));
   }
   function hideGuide(){guide.hidden=true;guide.innerHTML='';guide.dataset.dragged='';guideDragging=false;state.activeNodeId=null}
-  function closeGuide(){if(!commitPersonalDraft())return false;hideGuide();syncActiveNodeClass();return true}
+  function closeGuide(){
+    if(!isTeacherDraftPreview()&&recallSession?.permissions?.canWrite===true
+      &&!document.body.classList.contains('kr-readonly')&&String($('krCustomInput')?.value||'').trim()){
+      notifyRecallLimit('输入的知识点尚未生成，已保留输入；请先生成或清空。');return false;
+    }
+    if(!commitPersonalDraft())return false;hideGuide();syncActiveNodeClass();return true;
+  }
   function placeGuide(anchor){
     if(!guide||guide.hidden||guide.dataset.dragged==='1')return;
     const vp=viewport.getBoundingClientRect();
@@ -1199,7 +1211,7 @@
   }
 
 
-  function createChildFromChoice(parent,choice,choiceIndex=0){
+  function createChildFromChoice(parent,choice,choiceIndex=0,consumeInput=false){
     if(isRecallReadonly()){notifyRecallReadonly();return}
     if(!choice||!choice.next)return;
     const data=getNodeData(choice.next);
@@ -1218,17 +1230,18 @@
       state.edges.push(edge);state.lastNewEdgeId=edge.id;connected=true;
     }
     saveProgress();
+    if(consumeInput&&$('krCustomInput'))$('krCustomInput').value='';
     closeGuide();renderGraphDelta({node:child,edge:connected?state.edges[state.edges.length-1]:null,nodeCreated:created,edgeCreated:connected});
     setTimeout(()=>focusNode(child.instanceId,created||connected),60);
   }
-  function createCustomChild(parent,title){
+  function createCustomChild(parent,title,consumeInput=false){
     if(isRecallReadonly()){notifyRecallReadonly();return}
     const normalized=String(title||'').trim();
     if(!normalized)return;
     const resolved=resolveAssociationNode(normalized);
     if(resolved&&String(resolved.id)!==String(parent?.dataId)){
       const choiceIndex=state.nodes.filter(n=>n.parentId===parent.instanceId).length;
-      createChildFromChoice(parent,{text:resolved.title,next:resolved.id},choiceIndex);
+      createChildFromChoice(parent,{text:resolved.title,next:resolved.id},choiceIndex,consumeInput);
       return;
     }
     let child=GraphModel.findReusableNode?.(state.nodes,{title:normalized,custom:true})||null;
@@ -1245,7 +1258,7 @@
       const edge={id:uid('edge'),from:parent.instanceId,to:child.instanceId};
       state.edges.push(edge);state.lastNewEdgeId=edge.id;connected=true;
     }
-    saveProgress();closeGuide();renderGraphDelta({node:child,edge:connected?state.edges[state.edges.length-1]:null,nodeCreated:created,edgeCreated:connected});setTimeout(()=>focusNode(child.instanceId,created||connected),60);
+    saveProgress();if(consumeInput&&$('krCustomInput'))$('krCustomInput').value='';closeGuide();renderGraphDelta({node:child,edge:connected?state.edges[state.edges.length-1]:null,nodeCreated:created,edgeCreated:connected});setTimeout(()=>focusNode(child.instanceId,created||connected),60);
   }
   function childPosition(parent,choiceIndex){
     const siblingCount=state.nodes.filter(n=>n.parentId===parent.instanceId).length;

@@ -1,13 +1,12 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.421",
-  "toVersion": "v9.0-p4.1.422",
+  "fromVersion": "v9.0-p4.1.422",
+  "toVersion": "v9.0-p4.1.423",
   "changes": {
     "added": [],
     "changed": [
       "VERSION",
-      "content-prep-studio/dist/content-prep.html",
-      "tests/classroom-auth-recovery-browser.py"
+      "content-prep-studio/dist/content-prep.html"
     ],
     "removed": []
   },

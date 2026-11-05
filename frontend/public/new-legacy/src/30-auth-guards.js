@@ -259,7 +259,7 @@ function authInstallGuards(){
     if(e.target.matches&&e.target.matches(AUTH_EDIT_CHANGE_SELECTOR)){
       e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();
       if(authIsLoggedIn())showStatus('当前角色无图谱编辑权限。');else authOpen('登录后才能修改图谱内容或导入数据。');
-      try{e.target.value=e.target.defaultValue||''}catch(err){}
+      if(!window.KGAuthRecovery?.isPaused())try{e.target.value=e.target.defaultValue||''}catch(err){}
     }
   },true);
 
