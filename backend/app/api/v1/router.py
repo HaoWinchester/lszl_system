@@ -64,3 +64,6 @@ api_router.include_router(graph_questions.router)
 
 from app.api.v1 import graph_templates
 api_router.include_router(graph_templates.router)
+
+from app.api.v1 import knowledge_audio
+api_router.include_router(knowledge_audio.router)

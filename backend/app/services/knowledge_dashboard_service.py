@@ -207,6 +207,7 @@ def _proficiency(grades, practiced):
 
 async def get_universe(db: AsyncSession, owner: str):
     """Return every active node in each active subject's current published tree."""
+    from app.services.knowledge_audio_service import audio_counts
     now = now_utc()
     state = await _owner_state(db, owner, now)
     # Frozen path/subject labels may change without changing node identity.
@@ -226,6 +227,7 @@ async def get_universe(db: AsyncSession, owner: str):
         if selected is None:
             continue
         taxonomy, rows = selected
+        node_audio_counts = await audio_counts(db, taxonomy.id)
         active = {row.node_id: row for row in rows if row.status == 'active'}
         practiced_count = 0
         for row in active.values():
@@ -247,6 +249,7 @@ async def get_universe(db: AsyncSession, owner: str):
                 'attemptCount': attempt_count,
                 'lastPracticedAt': last.isoformat() if last else None,
                 **_proficiency(state['grades'].get((taxonomy.id, row.node_id)), practiced),
+                **({'audioCount': node_audio_counts[row.node_id]} if node_audio_counts.get(row.node_id) else {}),
             })
         subjects.append({'id': subject.id, 'code': subject.code, 'name': subject.name,
                          'topicCount': len(active), 'practicedTopicCount': practiced_count,

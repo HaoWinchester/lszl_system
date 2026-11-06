@@ -10000,6 +10000,17 @@ body:not([data-graph-interaction-mode="reading"]) .stage :is(.knowledge-card.mul
 /* Original node-tooltip styling; owned by the scene and scoped away from graph UI. */
 .kg-knowledge-tooltip{position:fixed;z-index:20;pointer-events:none;min-width:180px;max-width:min(260px,calc(100vw - 16px));max-height:calc(100dvh - 16px);overflow:hidden;overflow-wrap:anywhere;padding:10px 11px;background:rgba(5,9,15,.94);color:#eef6ff;border:1px solid rgba(146,196,240,.2);box-shadow:0 12px 34px rgba(0,0,0,.38);backdrop-filter:blur(12px)}
 .kg-knowledge-tooltip[hidden]{display:none!important}.kg-knowledge-tooltip small{display:block;color:#64778c;font-size:9px;letter-spacing:.13em;margin-bottom:4px}.kg-knowledge-tooltip strong{font-size:12px;line-height:1.45}
+
+/* Explanation controls are only created after opening a node with audio. */
+.kg-knowledge-audio{min-width:0;margin:8px 0 16px;padding-top:14px;border-top:1px solid var(--line);pointer-events:auto}
+.kg-knowledge-audio h4{margin:0 0 8px;font-size:15px;color:#dce8f4}
+.kg-knowledge-audio-status,.kg-knowledge-audio-current{margin:8px 0;color:#9cafc2;font-size:12px;line-height:1.6;overflow-wrap:anywhere}
+.kg-knowledge-audio-list{list-style:none;padding:0;margin:8px 0}
+.kg-knowledge-audio-list li{display:grid;gap:5px;margin:10px 0;min-width:0}
+.kg-knowledge-dialog .kg-knowledge-audio-list .btn{width:100%;text-align:left;white-space:normal;overflow-wrap:anywhere}
+.kg-knowledge-audio-list small{color:#8193a8;font-size:11px}
+.kg-knowledge-audio audio{display:block;width:100%;min-width:0;max-width:100%;margin:10px 0;color-scheme:dark}
+.kg-knowledge-detail.has-knowledge-audio .kg-knowledge-detail-content>.kg-knowledge-list{grid-row:1 / span 9}
 /* style: styles/learning-weekly-open-gate.css */
 /* 三学习板块周日 14:00 开放：入口倒计时 + 页面门禁 */
 .learning-entry-card.is-scheduled-closed{filter:saturate(.82);cursor:not-allowed}

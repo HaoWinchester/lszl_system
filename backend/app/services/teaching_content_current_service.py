@@ -67,29 +67,35 @@ async def valid_recall_pointer(
     return row
 
 
+async def current_taxonomy_id(db: AsyncSession, subject_id: str) -> str | None:
+    """Resolve the current tree without fetching node records or tree metadata."""
+    subject = (await db.execute(select(
+        ContentSubject.content_metadata[CURRENT_TAXONOMY_KEY].astext
+    ).where(ContentSubject.id == subject_id))).one_or_none()
+    if subject is None:
+        return None
+    pointer = str(subject[0] or '').strip()
+    if pointer:
+        selected = await db.scalar(select(ContentTaxonomy.id).where(
+            ContentTaxonomy.id == pointer, ContentTaxonomy.subject_id == subject_id,
+            ContentTaxonomy.status == 'published'))
+        if selected is not None:
+            return selected
+    return await db.scalar(
+        select(ContentTaxonomy.id)
+        .where(ContentTaxonomy.subject_id == subject_id, ContentTaxonomy.status == 'published')
+        .order_by(ContentTaxonomy.version.desc(), ContentTaxonomy.updated_at.desc(), ContentTaxonomy.id.desc())
+        .limit(1)
+    )
+
+
 async def current_taxonomy(
     db: AsyncSession, subject_id: str
 ) -> tuple[ContentTaxonomy, list[TaxonomyNode]] | None:
-    subject = await db.get(ContentSubject, subject_id)
-    if subject is None:
+    taxonomy_id = await current_taxonomy_id(db, subject_id)
+    if taxonomy_id is None:
         return None
-    row = await valid_taxonomy_pointer(db, subject)
-    if row is None:
-        row = (
-            await db.execute(
-                select(ContentTaxonomy)
-                .where(
-                    ContentTaxonomy.subject_id == subject_id,
-                    ContentTaxonomy.status == "published",
-                )
-                .order_by(
-                    ContentTaxonomy.version.desc(),
-                    ContentTaxonomy.updated_at.desc(),
-                    ContentTaxonomy.id.desc(),
-                )
-                .limit(1)
-            )
-        ).scalar_one_or_none()
+    row = await db.get(ContentTaxonomy, taxonomy_id)
     if row is None:
         return None
     nodes = list(
