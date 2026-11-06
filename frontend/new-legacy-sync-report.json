@@ -4,10 +4,7 @@
   "toVersion": "v9.0-p4.1.427",
   "changes": {
     "added": [],
-    "changed": [
-      "src/practice/knowledge-dashboard.js",
-      "tests/knowledge-audio-browser.py"
-    ],
+    "changed": [],
     "removed": []
   },
   "incompatible": []
