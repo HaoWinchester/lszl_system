@@ -1,6 +1,6 @@
 # 画布文字缩放与知识星空反馈
 
-状态：v9.0-p4.1.426 完整发布门禁通过，正在准备 UAT 部署；用户业务验收待执行。
+状态：v9.0-p4.1.426 完整发布门禁、UAT 部署和线上复验通过；等待用户本人业务验收，未合入 main。
 
 ## 用户需求与实现
 
@@ -40,3 +40,17 @@
 - 初始 main 为 `6256275850e25c30cd7f3c696167c9d779122a46`；本次仅允许合入和部署 uat，用户明确验收前不合入 main。
 - 原有 docs/design-previews、docs/local-preview、docs/promo 均保留；为避免无关本地素材影响发布上下文，临时本地排除项将在收尾时恢复。
 - 本地证据目录：`artifacts/canvas-knowledge-feedback/`。私有登录信息与密码不提交、不输出到日志。
+
+## UAT 部署与实际核验
+
+- 实现提交 `e8434ca3`，无冲突合入 uat 的提交为 `08db6304`；合并后文件树与已测实现完全一致。已用命令级代理推送功能分支与 uat，并核对远程引用；main 仍为初始提交，三个分支均保留。
+- `PYTHONDONTWRITEBYTECODE=1 bash deploy/update-uat.sh` 退出 0，总耗时 207 秒。内置 full 验证按相同内容指纹复用（2 秒），没有跳过或降级；HTTP/HTTPS、数据库、小程序和教师助手就绪检查均通过。实际容器、公网页面为 426，回滚版 425。
+- 专用账号 `uat-knowledge-demo` 首次 dry-run 确认新增 18 条完成态会话、156 次作答后执行 apply；重跑新增会话/作答均为 0，密码不重置。密码通过 stdin 提供，私有登录信息仅在本地 `demo-login.txt`。
+- 实际登录 API 与页面均显示 **156 次作答、45 / 316 个节点点亮**。18 个直接叶节点分属人/过程/环境，各类均有 1/5/20 次样例；其余 27 个点亮节点来自真实祖先累加，271 个节点仍未练习，19 个达到最亮。未知考点与未映射作答均为 0，冻结会话详情与报告可读。
+- agent-browser 从登录 UI 进入知识星空，在 1440×960、390×844 查看并保存真实截图 `uat-knowledge-lit-1440.png`、`uat-knowledge-lit-390.png`，人工检查连线与三类发光效果。示例数据没有修改原有用户、试卷或题目。
+- 同账号通过真实 UI 新建“UAT文字缩放测试”画布并输入文字。原生滚轮在 15 个不同缩放采样帧中最大锚点偏差为 **0.0154px**，焦点保留、scrollbarWidth=none；正常保存后重新 GET 工作区，确认文字已持久化。该画布仅属于专用测试账号。
+- 公网 5 个公共页版本与剥离唯一已知动态 bootstrap 后的 HTML 全文哈希一致；2 个教学页匿名访问正确返回 403。容器 7 页原 HTML、10 个前端静态资源/构建 bundle，以及新增后端 CLI/service 均与已测版本逐字节一致。实际 site 1288 文件，无符号链接，admin-console 存在。
+- 正式环境容器 ID、镜像与完整 current 指针同部署前完全一致。公网 HTTPS 使用系统 CA 验证，没有关闭证书检查。
+- 线上证据：`uat-deploy-426.log`、`uat-demo-{dry-run,apply,repeat,verification}.json`、`verify-uat-assets-result.json`、`uat-text-live-result.json`、`uat-text-persistence.json`。Python HTTPS 复核命令使用 `SSL_CERT_FILE=/etc/ssl/cert.pem`。
+
+用户验收入口：<https://uat.aihuanpu.com/index.html>，用专用测试账号登录后进入“学习入口 → 知识星空”。检查三类亮点与连线、切换分类与刷新；再进入“多题画布 → UAT文字缩放测试”查看文字编辑和缩放。以上只代表开发自检和部署核验，用户明确表示验收通过前不合入 main。

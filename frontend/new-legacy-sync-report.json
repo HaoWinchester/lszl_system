@@ -4,10 +4,7 @@
   "toVersion": "v9.0-p4.1.426",
   "changes": {
     "added": [],
-    "changed": [
-      "tests/canvas-text-persistence-browser.py",
-      "tests/canvas-text-zoom-browser.py"
-    ],
+    "changed": [],
     "removed": []
   },
   "incompatible": []
