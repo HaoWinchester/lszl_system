@@ -188,7 +188,7 @@
       const projected=positions();ctx.lineWidth=.75;ctx.textAlign='start';
       for(const edge of model.edges){const a=projected[edge.source],b=projected[edge.target];if(!a.visible||!b.visible)continue;
         const on=Number(model.points[a.index].node.relatedAttemptCount)>0&&Number(model.points[b.index].node.relatedAttemptCount)>0;
-        ctx.strokeStyle=on?hexrgba(categoryColor(a.group),.26):"rgba(123,153,186,.07)";
+        ctx.strokeStyle=on?hexrgba(categoryColor(a.group),.48):"rgba(123,153,186,.24)";
         ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
       }
       // Original depth sorting, radii, opacity, category glows and double selection rings.

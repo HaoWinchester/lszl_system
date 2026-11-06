@@ -436,6 +436,11 @@
       };
       const relocate=()=>resize();
       session.resize=resize;session.relocate=relocate;
+      // The editor lives outside the transformed world. Follow every animation
+      // frame (including button zoom and pan), rather than only the wheel event.
+      const viewObserver=new global.MutationObserver(relocate);
+      viewObserver.observe(options.world,{attributes:true,attributeFilter:['style']});
+      session.unmount.push(()=>viewObserver.disconnect());
       const updateDraft=()=>{resize();session.edit.update({text:editor.value,...style,points:[[...world]]});editor.dataset.saveState='draft';status.textContent=''};
       border.addEventListener('pointerdown',event=>{
         if(event.button!==0||readonly()||session.stale)return;stop(event);

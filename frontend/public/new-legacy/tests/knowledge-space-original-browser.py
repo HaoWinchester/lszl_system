@@ -8,6 +8,26 @@ NODES=json.loads((ROOT/'new-legacy/tests/fixtures/knowledge-space-published-cata
 parents={n.get('parentId') for n in NODES}
 for category,count in [('人',1),('过程',5),('环境',20)]:
  next(n for n in NODES if len(n['path'])>2 and n['path'][1]==category and n['id'] not in parents)['attemptCount']=count
+
+def assert_catalog_links(page, expected_count):
+ links=page.evaluate('''()=>{
+  const state=scene.snapshot(),points=state.positions;
+  return drawnLines.filter(line=>/rgba\\((123, 153, 186|139, 220, 255|255, 213, 139|128, 240, 184),/.test(line.color)).map(line=>{
+   const source=points.find(p=>Math.hypot(p.x-line.start[0],p.y-line.start[1])<.001);
+   const target=points.find(p=>Math.hypot(p.x-line.end[0],p.y-line.end[1])<.001);
+   const a=source&&sceneNodes[source.index],b=target&&sceneNodes[target.index];
+   return {real:!!a&&!!b&&b.parentId===a.id&&a.subject===b.subject&&a.taxonomyId===b.taxonomyId,
+    visible:!!source?.visible&&!!target?.visible,lit:Number(a?.relatedAttemptCount)>0&&Number(b?.relatedAttemptCount)>0,
+    alpha:Number(line.color.match(/, ([\\d.]+)\\)$/)?.[1]||1)*line.alpha,width:line.width};
+  });
+ }''')
+ assert len(links)==expected_count, f'paint every visible real parent link exactly once: {len(links)} / {expected_count}'
+ assert all(link['real'] and link['visible'] for link in links), 'never invent links or paint filtered-out categories'
+ assert all(link['alpha']>=.2 and link['width']>=.7 for link in links), 'unpracticed parent links must remain visible on the dark canvas'
+ lit=[link for link in links if link['lit']]
+ assert lit and all(link['alpha']>=.4 for link in lit), 'practiced parent paths must stand out from the base structure'
+ assert min(link['alpha'] for link in lit)>max(link['alpha'] for link in links if not link['lit'])
+
 with sync_playwright() as p:
  browser=p.chromium.launch(headless=True,channel='chrome')
  for width,height in [(1440,960),(390,844),(1280,720),(559,854),(390,568)]:
@@ -16,6 +36,16 @@ with sync_playwright() as p:
   page.add_style_tag(path=str(ROOT/'new-legacy/styles/knowledge-dashboard.css'))
   page.add_script_tag(path=str(ROOT/'new-legacy/src/practice/knowledge-space-scene.js'))
   page.evaluate('''nodes=>{const api=KGKnowledgeSpaceScene;KGKnowledgeSpaceScene={...api,mount:o=>{window.sceneNodes=o.nodes;return window.scene=api.mount(o)}};KGAuthCore={currentUser:()=>({username:'test'})};KGDomainApi={request:async()=>({nodes,attemptCount:26})};window.drawColors=[];window.pointRadii=[];window.businessPointFills=[];window.decorRects=0;const clear=CanvasRenderingContext2D.prototype.clearRect;CanvasRenderingContext2D.prototype.clearRect=function(){businessPointFills=[];decorRects=0;return clear.apply(this,arguments)};const rect=CanvasRenderingContext2D.prototype.fillRect;CanvasRenderingContext2D.prototype.fillRect=function(x,y,w,h){if(w<=2&&h<=2)decorRects++;return rect.apply(this,arguments)};const arc=CanvasRenderingContext2D.prototype.arc;CanvasRenderingContext2D.prototype.arc=function(x,y,r){this.lastRadius=r;return arc.apply(this,arguments)};const fill=CanvasRenderingContext2D.prototype.fill;CanvasRenderingContext2D.prototype.fill=function(){drawColors.push(this.fillStyle);if(typeof this.fillStyle==='string'&&['rgba(98, 108, 120','rgba(139, 220, 255','rgba(255, 213, 139','rgba(128, 240, 184'].some(prefix=>this.fillStyle.startsWith(prefix)))businessPointFills.push(this.lastRadius);if(typeof this.fillStyle==='string'&&this.fillStyle.startsWith('rgba(98, 108, 120'))pointRadii.push(this.lastRadius);return fill.apply(this,arguments)}}''',NODES)
+  page.evaluate('''()=>{
+   const prototype=CanvasRenderingContext2D.prototype;
+   const clear=prototype.clearRect,begin=prototype.beginPath,move=prototype.moveTo,line=prototype.lineTo,stroke=prototype.stroke;
+   window.drawnLines=[];
+   prototype.clearRect=function(...args){drawnLines=[];return clear.apply(this,args)};
+   prototype.beginPath=function(...args){this.drawnPath=[];return begin.apply(this,args)};
+   prototype.moveTo=function(x,y){this.drawnPath?.push([x,y]);return move.call(this,x,y)};
+   prototype.lineTo=function(x,y){this.drawnPath?.push([x,y]);return line.call(this,x,y)};
+   prototype.stroke=function(...args){if(this.drawnPath?.length===2)drawnLines.push({start:this.drawnPath[0],end:this.drawnPath[1],color:this.strokeStyle,alpha:this.globalAlpha,width:this.lineWidth});return stroke.apply(this,args)};
+  }''')
   page.add_script_tag(path=str(ROOT/'new-legacy/src/practice/knowledge-dashboard.js'))
   page.click('#open');page.wait_for_function('scene.snapshot().settled')
   assert page.locator('[data-knowledge-focus-title]').is_visible(), 'selected information must inhabit the canvas foreground'
@@ -31,6 +61,7 @@ with sync_playwright() as p:
   assert page.evaluate("['rgba(139, 220, 255','rgba(255, 213, 139','rgba(128, 240, 184'].every(prefix=>drawColors.some(c=>typeof c==='string'&&c.startsWith(prefix)))"), 'practice glow must respect all three original category colors'
   if width>960:assert page.evaluate('Math.max(...pointRadii)/Math.min(...pointRadii)>1.5'), 'desktop depth must visibly change the original dot radius'
   assert page.evaluate('Math.min(...pointRadii)>=2.6'), 'original minimum radius must keep distant/phone points visible'
+  assert_catalog_links(page,313)
   page.screenshot(path=str(OUT/f'task9-source-lit-{width}x{height}.png'))
   if height<600:
    ys=[p['y'] for p in state['positions']];assert max(ys)-min(ys)>230, 'short phone must retain a usable vertically scrollable plot'
@@ -59,6 +90,13 @@ with sync_playwright() as p:
   assert focus['y']+focus['height']<dock['y'], 'longest actual title must not collide with lower controls'
   assert page.locator('[data-knowledge-focus-title]').inner_text()==max((n['title'] for n in NODES),key=len)
   assert page.locator('[data-knowledge-focus-subject]').evaluate('e=>getComputedStyle(e).color')=='rgb(139, 220, 255)', 'selected Process kicker must reuse its category color'
+  if page.locator('.kg-knowledge-detail').is_visible():page.locator('[data-knowledge-details-close]').click()
+  page.locator('[data-knowledge-group]').filter(has_text='PMP · 人 / 62').click()
+  page.wait_for_function('!scene.snapshot().running')
+  assert_catalog_links(page,61)
+  page.locator('[data-knowledge-group]').filter(has_text='全部考点').click()
+  page.wait_for_function('!scene.snapshot().running')
+  assert_catalog_links(page,313)
   page.close()
  browser.close()
-print('PASS original visual foreground, neutral point rendering, 316 genuine nodes, depth, anchors and selection at five viewports')
+print('PASS original visual foreground, neutral points, 316 genuine nodes, 313 visible parent links, practice paths, category filtering, depth, anchors and selection at five viewports')
