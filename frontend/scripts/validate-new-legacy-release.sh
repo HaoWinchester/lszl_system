@@ -234,6 +234,7 @@ python3 new-legacy/tests/practice-sound-browser.py
 PYTHONDONTWRITEBYTECODE=1 python3 new-legacy/tests/knowledge-space-scene-browser.py
 PYTHONDONTWRITEBYTECODE=1 python3 new-legacy/tests/knowledge-dashboard-browser.py
 PYTHONDONTWRITEBYTECODE=1 python3 new-legacy/tests/knowledge-space-semantic-browser.py
+PYTHONDONTWRITEBYTECODE=1 python3 new-legacy/tests/knowledge-audio-browser.py
 python3 new-legacy/tests/template-center-account-browser.py
 python3 new-legacy/tests/run-danmaku-api-browser.py --output-dir "$VALIDATION_ROOT/danmaku-api"
 fi

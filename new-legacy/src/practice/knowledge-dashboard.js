@@ -73,24 +73,50 @@
     reading.innerHTML='<p class="module-line" data-knowledge-focus-subject></p><p class="kg-knowledge-focus-number big-index" data-knowledge-focus-number>—</p><h3 class="topic" data-knowledge-focus-title>选择一个考点</h3><p class="kg-knowledge-path desc" data-knowledge-focus-path></p><dl class="kg-knowledge-facts status"><div class="chip"><dt>直接作答</dt><dd data-knowledge-focus-attempts>—</dd></div><div class="chip"><dt>含下级作答</dt><dd data-knowledge-focus-related>—</dd></div></dl>';
     find('.kg-knowledge-body').prepend(reading);
     const actions=document.createElement('div');actions.className='actions interactive';actions.append(find('[data-knowledge-details-open]'));
+    const audioEntry=document.createElement('button');audioEntry.type='button';audioEntry.className='btn';audioEntry.dataset.knowledgeAudioOpen='';audioEntry.textContent='音频讲解';audioEntry.hidden=true;actions.append(audioEntry);
     const refresh=document.createElement('button');refresh.type='button';refresh.className='btn';refresh.setAttribute('data-knowledge-refresh','');refresh.textContent='刷新数据';actions.append(refresh,find('[data-knowledge-close]'));find('.kg-knowledge-dismiss').remove();reading.after(actions);
     for(const control of dialog.querySelectorAll('button'))control.classList.add('btn');
 
     const detail=find('.kg-knowledge-detail');let detailReturnFocus=null,labelsVisible=false;
-    function closeDetail(){if(detail.open)detail.close();scene?.setRotationPaused(false);detailReturnFocus?.focus?.();detailReturnFocus=null}
-    function openDetail(){if(!nodes.length)return;detailReturnFocus=document.activeElement;toggleList(true);if(!detail.open)detail.showModal();scene?.setRotationPaused(true)}
+    const audioPanel=document.createElement('section');audioPanel.className='kg-knowledge-audio';audioPanel.dataset.knowledgeAudioPanel='';audioPanel.hidden=true;detail.querySelector('.kg-knowledge-step').before(audioPanel);
+    let audioController=null,audioGeneration=0;
+    const hasAudio=node=>Number(node?.audioCount)>0&&node.taxonomyId!=null&&node.primaryNodeId!=null;
+    function closeAudio(){audioGeneration++;audioController?.close();audioPanel.hidden=true;detail.classList.remove('has-knowledge-audio');if(!audioController)audioPanel.replaceChildren()}
+    async function openAudio(){
+      const node=nodes[selected];if(!detail.open||!hasAudio(node)){closeAudio();return}
+      detail.classList.add('has-knowledge-audio');
+      if(audioController){void audioController.open(node);return}
+      const request=++audioGeneration,owner=(options.getUser||currentOwner)();audioPanel.hidden=false;audioPanel.textContent='正在加载音频讲解…';
+      try{
+        if(!global.KGKnowledgeAudio){
+          if(!global.KGFeatureAssets?.loadScript)throw Error('Audio loader unavailable');
+          const version=document.documentElement.dataset.release||document.querySelector('meta[name="kg-homepage-bundle-version"]')?.content||'';
+          await global.KGFeatureAssets.loadScript('/src/practice/knowledge-audio-controller.js'+(version?'?v='+encodeURIComponent(version):''));
+        }
+        if(request!==audioGeneration||!detail.open||node!==nodes[selected]||owner!==(options.getUser||currentOwner)())return;
+        audioController=global.KGKnowledgeAudio.create({host:audioPanel,getUser:options.getUser||currentOwner});void audioController.open(node);
+      }catch(error){
+        if(request!==audioGeneration||!detail.open||owner!==(options.getUser||currentOwner)())return;
+        audioPanel.textContent='音频组件暂时无法加载，请重试。';const retry=document.createElement('button');retry.type='button';retry.className='btn';retry.dataset.knowledgeAudioLoadRetry='';retry.textContent='重试加载';audioPanel.append(retry);
+      }
+    }
+    function closeDetail(){closeAudio();if(detail.open)detail.close();scene?.setRotationPaused(false);detailReturnFocus?.focus?.();detailReturnFocus=null}
+    function openDetail(){if(!nodes.length)return;detailReturnFocus=document.activeElement;toggleList(true);if(!detail.open)detail.showModal();scene?.setRotationPaused(true);void openAudio()}
     detail.addEventListener('cancel',event=>{event.preventDefault();event.stopPropagation();closeDetail()});
+    detail.addEventListener('close',()=>{if(!detail.open)closeAudio()});
     let returnFocus=null,scene=null,nodes=[],selected=null,activeGroup='',listOpen=false;
     const formatDate=value=>{const date=value?new Date(value):null;return !date||Number.isNaN(date.getTime())?'时间未知':date.toLocaleDateString('zh-CN')};
     const setText=(name,value)=>{find(`[data-knowledge-${name}]`).textContent=text(value);const inline=find(`[data-knowledge-${name.replace('detail-','focus-')}]`);if(inline)inline.textContent=text(value)};
     function toggleList(value){listOpen=value;list.hidden=!value||!nodes.length;find('[data-knowledge-list-toggle]').setAttribute('aria-expanded',String(!list.hidden))}
     function select(index,reveal=true){
       const node=nodes[index];if(!node)return;
+      const changed=node!==nodes[selected];if(changed)closeAudio();audioEntry.hidden=!hasAudio(node);
       selected=index;scene?.select(index,reveal);
       setText('detail-subject',node.subject||'科目未标注');find('[data-knowledge-focus-subject]').textContent=[node.subject,JSON.parse(groupKey(node))[2]].filter(Boolean).join(' · ');reading.style.setProperty('--category-color',categoryColor(groupKey(node)));setText('detail-number',String(index+1).padStart(2,'0'));
       setText('detail-title',node.title||'未命名考点');setText('detail-path',Array.isArray(node.path)?node.path.map(text).join(' / ')||'无路径标签':'无路径标签');
       setText('detail-attempts',`${Number(node.attemptCount)||0} 次`);setText('detail-related',`${node.relatedAttemptCount} 次`);setText('detail-date',formatDate(node.lastPracticedAt));
       for(const button of list.querySelectorAll('button'))button.setAttribute('aria-pressed',String(Number(button.dataset.knowledgeNode)===index));
+      if(changed&&detail.open)void openAudio();
     }
     function focusGroup(key,reveal=true){
       activeGroup=key;scene?.focusGroup(key);
@@ -104,7 +130,7 @@
     }
     function button(label,attribute,value){const element=document.createElement('button');element.type='button';element.className='btn';element.textContent=label;element.setAttribute(attribute,value);if(attribute==='data-knowledge-group'){element.className='module-btn';const title=document.createElement('div');title.className='mt';title.textContent=label;const number=document.createElement('div');number.className='mn';number.textContent=value?JSON.parse(value)[2]:'ALL';const track=document.createElement('div');track.className='mp';track.appendChild(document.createElement('i'));element.replaceChildren(number,title,track)}return element}
     function render(data){
-      closeDetail();autoButton.disabled=true;rotationState(false);scene?.destroy();scene=null;dialog.classList.remove('kg-knowledge-fallback');nodes=[];selected=null;activeGroup='';summary.textContent='';find('[data-knowledge-subject-title]').textContent='知识目录';find('[data-knowledge-attempt-total]').textContent='0';find('[data-knowledge-coverage]').textContent='0 / 0';find('[data-knowledge-coverage-fill]').style.width='0%';network.replaceChildren();list.replaceChildren();groups.replaceChildren();
+      closeDetail();audioEntry.hidden=true;autoButton.disabled=true;rotationState(false);scene?.destroy();scene=null;dialog.classList.remove('kg-knowledge-fallback');nodes=[];selected=null;activeGroup='';summary.textContent='';find('[data-knowledge-subject-title]').textContent='知识目录';find('[data-knowledge-attempt-total]').textContent='0';find('[data-knowledge-coverage]').textContent='0 / 0';find('[data-knowledge-coverage-fill]').style.width='0%';network.replaceChildren();list.replaceChildren();groups.replaceChildren();
       network.hidden=true;find('[data-knowledge-space-empty]').hidden=false;
       setText('detail-title','选择一个考点');setText('detail-number','—');setText('detail-subject','');setText('detail-path','');setText('detail-attempts','—');setText('detail-related','—');setText('detail-date','—');setText('page-count','全目录 0 个节点');
       for(const control of dialog.querySelectorAll('.kg-knowledge-step button,.kg-knowledge-camera button'))control.disabled=true;
@@ -115,7 +141,7 @@
       setText('page-count',`全目录 ${nodes.length} 个节点`);
       list.start=1;
       for(const [index,node] of nodes.entries()){
-        const li=document.createElement('li'),item=button(`${String(index+1).padStart(2,'0')} · ${node.title||'未命名考点'}`,'data-knowledge-node',index);
+        const li=document.createElement('li'),item=button(`${String(index+1).padStart(2,'0')} · ${node.title||'未命名考点'}${hasAudio(node)?' · 讲解':''}`,'data-knowledge-node',index);
         item.setAttribute('aria-pressed','false');li.appendChild(item);list.appendChild(li);
       }
       if(nodes.length){
@@ -151,7 +177,8 @@
       const button=event.target.closest('button');if(!button||button.disabled)return;
       if(button.hasAttribute('data-knowledge-auto-rotate'))scene?.setAutoRotate(!scene.snapshot().autoRotate);
       else if(button.hasAttribute('data-knowledge-details-close'))closeDetail();
-      else if(button.hasAttribute('data-knowledge-details-open'))openDetail();
+      else if(button.hasAttribute('data-knowledge-details-open')||button.hasAttribute('data-knowledge-audio-open'))openDetail();
+      else if(button.hasAttribute('data-knowledge-audio-load-retry'))void openAudio();
       else if(button.hasAttribute('data-knowledge-labels')){labelsVisible=!labelsVisible;button.setAttribute('aria-pressed',String(labelsVisible));scene?.setLabelsVisible(labelsVisible)}
       else if(button.hasAttribute('data-knowledge-close'))close();
       else if(button.hasAttribute('data-knowledge-retry')||button.hasAttribute('data-knowledge-refresh'))void loader.refresh();
