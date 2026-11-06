@@ -16,7 +16,8 @@ with sync_playwright() as p:
         if mode=='home':return c.request.get(BASE+'/api/v1/files/'+file_id).json()['graphData']['strokes']
         if mode=='recall':return c.request.get(BASE+'/api/v1/recall/session/ink-question-1?releaseId=ink-release').json()['progress']['strokes']
         data=c.request.get(BASE+'/api/v1/workspaces').json()
-        return next(w['payload']['strokes'] for w in data['workspaces'] if w['payload'].get('id')=='pmp-pattern-workspace')
+        active_id=page.evaluate('KGMultiQuestionWorkspace.activeWorkspaceId()')
+        return next(w['payload']['strokes'] for w in data['workspaces'] if w['payload'].get('id')==active_id)
     modes=[('home','/index.html','#homeInkBtn'),('recall','/knowledge-recall.html?questionId=ink-question-1&bankId=ink-bank&paperId=ink-paper&releaseId=ink-release','#krInkBtn'),('workspace','/question-workspace.html?paperId=ink-paper&releaseId=ink-release','#qwInkBtn')]
     for mode,path,trigger in modes:
         page=c.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)));page.goto(BASE+path,wait_until='networkidle')

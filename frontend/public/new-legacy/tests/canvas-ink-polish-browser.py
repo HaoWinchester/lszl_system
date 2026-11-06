@@ -155,6 +155,47 @@ def viewport_drafts(browser):
             editor.press('Control+Enter');saved=page.evaluate('strokes.at(-1)');assert saved['points'][0]==[x/scale,y/scale] and saved['width']==24 and 'boxWidth' not in saved,saved
     page.evaluate('ink.openTextAt(1095,795)');page.locator('.canvas-ink-text-editor').fill('缩小窗口时保留草稿');page.set_viewport_size({'width':800,'height':600});page.wait_for_function("(()=>{const r=document.querySelector('.canvas-ink-text-editor-viewport').getBoundingClientRect();return r.right<=innerWidth&&r.bottom<=innerHeight})()");r=page.locator('.canvas-ink-text-editor-viewport').bounding_box();assert r['x']>=0 and r['y']>=0 and r['x']+r['width']<=800 and r['y']+r['height']<=600,r
     page.locator('.canvas-ink-text-editor').press('Escape');page.close()
+def animated_text_anchor(browser):
+    page=setup(browser)
+    page.add_script_tag(content=(ROOT/'src/canvas/79-canvas-viewport-controller.js').read_text())
+    page.evaluate('''()=>{
+        ink.destroy();const viewport=document.querySelector('#view'),world=document.querySelector('#world');
+        window.canvasView=KGCanvasViewportController.create({viewport,world,initial:{x:100,y:80,zoom:1}});
+        window.ink=KGCanvasInk.create({viewport,world,getViewport:()=>canvasView.getState(),getStrokes:()=>strokes,setStrokes:s=>{strokes=s;writes++}});
+        const anchor=document.createElement('span');anchor.id='text-anchor';anchor.style.cssText='position:absolute;left:200px;top:200px';world.append(anchor);
+        ink.openTextAt(300,280);
+    }''')
+    editor=page.locator('.canvas-ink-text-editor');editor.fill('缩放文字不跳动')
+    for target in [{'x':150,'y':120,'zoom':.5},{'x':40,'y':20,'zoom':1.5},{'x':100,'y':80,'zoom':1}]:
+        samples=page.evaluate('''async target=>{
+            canvasView.animateTo(target,{duration:180,persist:false});const samples=[];
+            do{await new Promise(resolve=>requestAnimationFrame(()=>setTimeout(resolve,0)));
+                const v=canvasView.getState(),r=document.querySelector('#text-anchor').getBoundingClientRect(),e=document.querySelector('.canvas-ink-text-editor-viewport').getBoundingClientRect();
+                samples.push({x:e.x-(r.x-8*v.zoom),y:e.y-(r.y-4*v.zoom),zoom:v.zoom});
+            }while(canvasView.getAnimationTarget());return samples;
+        }''',target)
+        assert len(samples)>1,'Exercise the actual multi-frame viewport animation'
+        assert max(max(abs(s['x']),abs(s['y'])) for s in samples)<1,('Live draft detached during viewport animation',samples)
+        expect(editor).to_be_focused();expect(editor).to_have_value('缩放文字不跳动');assert page.evaluate('writes')==0
+    editor.press('Control+Enter');assert page.evaluate('strokes[0].points')==[[200,200]]
+    original=page.evaluate('JSON.stringify(strokes)')
+    saved=page.locator('.canvas-ink-layer text').evaluate('e=>{const b=e.getBBox();return {x:b.x,y:b.y,width:b.width,height:b.height}}')
+    for zoom in [.25,.5,2,1]:
+        page.evaluate('z=>canvasView.set({zoom:z},{persist:false})',zoom)
+        box=page.locator('.canvas-ink-layer text').evaluate('e=>{const b=e.getBBox();return {x:b.x,y:b.y,width:b.width,height:b.height}}')
+        assert box==saved and page.evaluate('JSON.stringify(strokes)')==original,'Saved text keeps its world position, font and dimensions'
+    page.evaluate('ink.reset();ink.setTool("text")');page.mouse.dblclick(310,285);expect(editor).to_be_visible();expect(editor).to_have_value('缩放文字不跳动');editor.press('Escape')
+    page.evaluate('canvasView.destroy()');page.close()
+def hidden_text_scrollbars(browser):
+    page=setup(browser);page.evaluate('ink.openTextAt(100,100)');editor=page.locator('.canvas-ink-text-editor')
+    frame=page.locator('.canvas-ink-text-editor-viewport')
+    assert frame.evaluate('e=>getComputedStyle(e).scrollbarWidth')=='none','Text editing must not show either native scrollbar'
+    editor.fill('W'*500);editor.press('End')
+    assert frame.evaluate('e=>e.scrollWidth>e.clientWidth&&e.scrollLeft>0'),'Hidden bars preserve long-draft caret scrolling'
+    editor.fill(('长文字 ABC\n'*55)[:500]);editor.press('ControlOrMeta+End')
+    assert frame.evaluate('e=>e.scrollHeight>e.clientHeight&&e.scrollTop>0'),'Hidden bars preserve multiline caret scrolling'
+    value=editor.input_value();editor.press('Control+Enter');assert page.evaluate('strokes[0].text')==value
+    page.close()
 def dock_avoidance(browser):
     page=setup(browser);page.set_viewport_size({'width':1024,'height':640});page.locator('#view').evaluate("el=>{el.style.width='100%';el.style.height='100vh'}")
     page.evaluate("""()=>{ink.destroy();const trigger=document.createElement('button');trigger.id='launch';document.body.append(trigger);const dock=document.createElement('div');dock.className='uc-minimap-dock';dock.style.cssText='position:absolute;right:12px;bottom:12px;width:260px;height:116px;z-index:360;background:white';document.querySelector('#view').append(dock);window.ink=KGCanvasInk.create({viewport:document.querySelector('#view'),world:document.querySelector('#world'),trigger,getViewport:()=>({x:0,y:0,scale:1}),getStrokes:()=>strokes,setStrokes:s=>strokes=s});ink.setOpen(true)}""")
@@ -437,6 +478,7 @@ else:
     with sync_playwright() as pw:
         browser=pw.chromium.launch(headless=True,executable_path='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
         cases={'modal_draft_host':modal_draft_host,'viewport_drafts':viewport_drafts,'dock_avoidance':dock_avoidance,'readonly_resize':readonly_resize,'asynchronous_tool_exit':asynchronous_tool_exit,'deferred_tool_exit':deferred_tool_exit,'right_grip':right_grip,'eraser_hold_exit':eraser_hold_exit,'selection_over_control':selection_over_control,'draft_formatting':draft_formatting,'external_history':external_history,'explicit_word_wrap':explicit_word_wrap,'long_automatic_text':long_automatic_text,'eraser':eraser,'curve_eraser':curve_eraser,'selection':selection,'text':text,'public_entry':public_entry,'export_opacity':export_opacity,'responsive_controls':responsive_controls}
+        cases.update(animated_text_anchor=animated_text_anchor,hidden_text_scrollbars=hidden_text_scrollbars)
         for name in sys.argv[1:] or cases:
             cases[name](browser);print(name+': passed')
         browser.close()
