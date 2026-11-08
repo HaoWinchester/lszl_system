@@ -29,6 +29,16 @@ UAT 不含真实微信支付商户凭据，保持 demo=false。新增三个有�
 
 候选 432 已在干净发布工作树 `.worktrees/subscription-renewal-release` 通过完整门禁，耗时 1882 秒：后端 1350、前端 446、账号恢复 82 项与所有浏览器检查通过，无跳过或降级。视觉：练习桌面/手机、自由图谱手机 0%，自由图谱桌面 0.001%。候选与 active 430 均 1291 文件，无路径丢失，admin-console.html 存在。本次原工作区的设计、视频和数据库备份保持未跟踪且原样保留。
 
-source SHA256 `ec9bcaf5ac12df8c1f630bbd21bb7971a1f7daf1e4006a3c63dd68e9aa7776c7`；site SHA256 `372b2ff4d89a418967290dbd372b9cd571829462adefef4b467c7502b1a80975`；adapter SHA256 `74f05d33a3fad64288e6398b394c854c870cdac47d6165109f31426ff4f904ac`。共享适配器修复由发布管理器重新构建和验证，未手工修改 release site 或验证结果。当前准备合入并部署 UAT。
+source SHA256 `ec9bcaf5ac12df8c1f630bbd21bb7971a1f7daf1e4006a3c63dd68e9aa7776c7`；site SHA256 `372b2ff4d89a418967290dbd372b9cd571829462adefef4b467c7502b1a80975`；adapter SHA256 `74f05d33a3fad64288e6398b394c854c870cdac47d6165109f31426ff4f904ac`。共享适配器修复由发布管理器重新构建和验证，未手工修改 release site 或验证结果。
+
+功能提交 `ac7d4a8fefc021219bd4fa291ce0275fad949687` 已合入 UAT，合并提交 `05655a079e8b33e7e7de0a5500a65462637352f5`；按命令级代理推送并核对远端引用。2026-11-08 通过干净发布工作树执行 `PYTHONDONTWRITEBYTECODE=1 bash deploy/update-uat.sh`，复用与源码/适配器/站点哈希一致的完整门禁证据，48 秒成功完成；未使用跳过验证选项。线上为 `v9.0-p4.1.432`，previous 为 430，HTTPS/API/数据库及辅助服务检查通过。
+
+部署后只读比对全部 1291 个路径及逐文件 SHA256，与本地已验证候选完全一致；站点文件映射 SHA256 为 `284fe4bdeebf25e24573c9a06415dea1328c7617f92906f415a7c84dc9c1bc4a`。首页、练习页版本和 bundle 元信息为 432，8 个公开静态资源哈希匹配，admin-console 保留。正式容器 ID/镜像和完整 current 指针与部署前快照一致；本地和远端 main 均仍为上述 `62562758`。
+
+UAT 真实浏览器复查有效会员 6/6、过期会员 6/6：各包含月度、季度、半年，在首页桌面端和练习页移动端从正常可见入口打开会员弹窗，校验同套餐可下单、失败可重试、方案切换及 503 恢复。12 个场景的订阅和权益均未改变；共 28 个真实订单全部为 cancelled/failed，逐单清理复核 28/28，无待支付/已支付订单或清理错误。没有付款、调用支付通知或修改商户配置。由于 UAT 未配置支付商户，线上验证止于真实下单失败与重试；成功支付后的延期和幂等由上述真实数据库/API 回归覆盖，外部支付边界使用替身。
+
+可复查证据均在原工作区 `artifacts/subscription-active-renewal/`：`validation-432.json`、`validation-run-432.log`、`uat-deploy-432.log`、`uat-runtime-432.json`、`uat-active-432/results.json` 和 `uat-expired-432/results.json`。线上脚本分别使用 `--membership-state active` / `expired` 与 `--expect-unavailable`，未削弱断言。验收地址为 https://uat.aihuanpu.com；有效会员专用账号见前述私有文件。
+
+本次新增行为的用户业务验收仍待确认。保留 main、uat、两个会员功能分支和发布工作树，不以自动化通过替代用户验收；用户已确认的“全部 UAT 内容”正式发布范围继续有效，待新增续费行为验收后继续正式发布。
 
 正式范围已确认全部 UAT；正式发布仍须先备份正式代码/数据库、保留实际运行镜像，再快进 main 并使用正式脚本。新增两张表的迁移只建表；UAT 的两条真实知识音频不随代码自动进入正式库，需在正式备份后核对正式节点并按原件 SHA256 dry-run/apply；不覆盖正式业务库或复制 UAT 测试账号。
