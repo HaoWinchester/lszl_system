@@ -1,6 +1,6 @@
-"""Exercise expired memberships through real browser checkout controls.
+"""Exercise finite memberships through real browser checkout controls.
 
-Use dedicated, already-expired student accounts: creating an order invalidates
+Use dedicated student accounts matching --membership-state: creating an order invalidates
 that account's older pending orders on the server. This script never pays,
 activates membership, changes accounts, or changes payment configuration.
 
@@ -25,6 +25,8 @@ Default mode requires a real QR image GET and a loaded, visible image. Both mode
 cover six isolated contexts (three plans, desktop home and mobile practice), one
 injected HTTP 503, and switching away from and back to the original plan. The
 mobile home is read-only and has no account entry, so it is outside this matrix.
+Add --membership-state active with three unexpired accounts to check renewal
+while their existing paid entitlements and future expiry remain unchanged.
 
 Only this run's pending orders are self-cancelled before each context closes.
 Screenshots mask QR images; no passwords, cookies, codeUrl, or payment tokens
@@ -67,6 +69,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--base-url", help="Local/UAT origin; overrides accounts JSON baseUrl")
     parser.add_argument("--accounts-file", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, default=Path("artifacts/subscription-renewal"))
+    parser.add_argument("--membership-state", choices=("expired", "active"), default="expired", help="Required starting state of all three dedicated student accounts")
     parser.add_argument("--expect-unavailable", action="store_true", help="Expect real orders without a QR because payment is unconfigured")
     parser.add_argument("--fail-fast", action="store_true", help="Stop after the first failing context (useful when reproducing an old release)")
     parser.add_argument("--timeout-ms", type=int, default=30000)
@@ -80,7 +83,7 @@ def load_inputs(args: argparse.Namespace) -> tuple[str, list[dict], Path]:
         raise RegressionFailure("Accounts file is unreadable or is not valid JSON") from None
     config = payload if isinstance(payload, dict) else {}
     accounts = config.get("accounts", payload if isinstance(payload, list) else None)
-    require(isinstance(accounts, list) and len(accounts) == 3, "Supply exactly three expired test accounts")
+    require(isinstance(accounts, list) and len(accounts) == 3, f"Supply exactly three {args.membership_state} test accounts")
     require(all(isinstance(account, dict) for account in accounts), "Each account must be an object")
     require({account.get("planId") for account in accounts} == set(PLAN_IDS), "Supply one account for each finite paid plan")
     for account in accounts:
@@ -110,7 +113,7 @@ def subscription_snapshot(context, base_url: str) -> dict:
     return payload
 
 
-def assert_expired(snapshot: dict, account: dict) -> None:
+def assert_membership_state(snapshot: dict, account: dict, membership_state: str) -> None:
     subscription = snapshot["subscription"]
     require(subscription.get("username") == account["username"], "Subscription belongs to a different account")
     require(subscription.get("planId") == account["planId"], "Test account has the wrong plan")
@@ -118,9 +121,14 @@ def assert_expired(snapshot: dict, account: dict) -> None:
         expires_at = datetime.fromisoformat(str(subscription.get("expiresAt", "")).replace("Z", "+00:00"))
     except ValueError:
         raise RegressionFailure("Test account needs a finite expiry date") from None
-    require(expires_at.tzinfo is not None and expires_at < datetime.now(timezone.utc), "Test membership is not expired")
-    require(subscription.get("status") in {"active", "trial", "manual", "expired"}, "Use an expired membership, rather than a suspended or cancelled account")
-    require(snapshot.get("entitlements", {}).get("allExamPapers") is False, "Expired membership unexpectedly has paid entitlements")
+    if membership_state == "active":
+        require(expires_at.tzinfo is not None and expires_at > datetime.now(timezone.utc), "Test membership needs a future expiry")
+        require(subscription.get("status") == "active", "Test membership is not active")
+        require(snapshot.get("entitlements", {}).get("allExamPapers") is True, "Active membership has no paid entitlements")
+    else:
+        require(expires_at.tzinfo is not None and expires_at < datetime.now(timezone.utc), "Test membership is not expired")
+        require(subscription.get("status") in {"active", "trial", "manual", "expired"}, "Use an expired membership, rather than a suspended or cancelled account")
+        require(snapshot.get("entitlements", {}).get("allExamPapers") is False, "Expired membership unexpectedly has paid entitlements")
 
 
 def assert_unchanged(context, base_url: str, baseline: dict) -> None:
@@ -138,7 +146,7 @@ def dismiss_onboarding(page) -> None:
         expect(tour).to_be_hidden()
 
 
-def open_membership(page, base_url: str, entry: str, account: dict) -> None:
+def open_membership(page, base_url: str, entry: str, account: dict, membership_state: str) -> None:
     path = "/index.html?mode=free" if entry == "index" else "/practice-mode.html"
     page.goto(base_url + path, wait_until="networkidle")
     dismiss_onboarding(page)
@@ -160,11 +168,11 @@ def open_membership(page, base_url: str, entry: str, account: dict) -> None:
     expect(page.locator(MODAL + " .plans-grid")).to_be_visible()
     page.wait_for_function("""expected => {
       const subscription = window.KGSubscription?.currentSubscription?.();
-      return subscription?.planId === expected.planId && subscription.status === 'expired';
-    }""", arg={"planId": account["planId"]})
+      return subscription?.planId === expected.planId && subscription.status === expected.status;
+    }""", arg={"planId": account["planId"], "status": membership_state})
     page.wait_for_load_state("networkidle")
     # The first lazy render may precede the server subscription hydration.
-    # Reopening through ordinary controls tests the persisted expired plan,
+    # Reopening through ordinary controls tests the persisted membership,
     # rather than accidentally testing the temporary default-free plan.
     page.locator("#userSubscriptionDetailCloseBtn").click()
     expect(page.locator(MODAL)).to_have_count(0)
@@ -289,6 +297,7 @@ def run_case(browser, base_url: str, account: dict, entry: str, mobile: bool,
              extended: bool, args: argparse.Namespace, output_dir: Path) -> dict:
     case_id = f"{account['planId']}-{entry}-{'mobile' if mobile else 'desktop'}"
     result = {"case": case_id, "planId": account["planId"], "entry": entry,
+              "membershipState": args.membership_state,
               "viewport": "mobile" if mobile else "desktop", "status": "running",
               "phase": "login", "injectedHttp503": False, "realQrImagesLoaded": 0,
               "checkedOrderIds": [], "orders": [], "cleanup": []}
@@ -323,14 +332,16 @@ def run_case(browser, base_url: str, account: dict, entry: str, mobile: bool,
         user = login.json().get("user") or {}
         require(user.get("username") == account["username"] and user.get("role") == "student", "Use the expected student test account")
         baseline = subscription_snapshot(context, base_url)
-        assert_expired(baseline, account)
+        assert_membership_state(baseline, account, args.membership_state)
         result["initialSubscription"] = {key: baseline["subscription"].get(key) for key in ("planId", "status", "startedAt", "expiresAt")}
         page = context.new_page()
         page.on("response", observe_response)
         result["phase"] = "visible-membership-entry"
-        open_membership(page, base_url, entry, account)
-        result["phase"] = "expired-same-plan-enabled"
-        plan_button(page, account["planId"])
+        open_membership(page, base_url, entry, account, args.membership_state)
+        result["phase"] = f"{args.membership_state}-same-plan-enabled"
+        same_plan_button = plan_button(page, account["planId"])
+        if args.membership_state == "active":
+            expect(same_plan_button).to_have_text("续费该方案")
         if extended:
             result["phase"] = "http-503-button-recovery"
             inject_one_503(page, base_url, account["planId"], result)
@@ -383,6 +394,7 @@ def main() -> int:
         print(f"subscription-renewal: {error}", file=sys.stderr)
         return 2
     report = {"baseUrl": base_url, "mode": "real-payment-unavailable" if args.expect_unavailable else "real-qr-checkout",
+              "membershipState": args.membership_state,
               "fixtureCheckout": False, "startedAt": datetime.now(timezone.utc).isoformat(),
               "paymentActivationAttempted": False, "cases": []}
     exit_code = 0

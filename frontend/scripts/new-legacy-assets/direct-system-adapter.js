@@ -16,6 +16,7 @@
   let initialization = Object.freeze({ status: 'loading', error: null })
   let subscriptionRequest = 0
   let subscriptionFlight = null
+  let authContextRevision = 0
 
   function request(method, path, body) {
     return api.request({ method, path, body })
@@ -101,7 +102,10 @@
 
   async function refreshUserProfile() {
     if (userProfile) return userProfile
+    const revision = authContextRevision
+    const owner = String(auth?.currentUser?.()?.username || '')
     const payload = await request('GET', '/api/v1/auth/me')
+    if (revision !== authContextRevision || (owner && payload?.user?.username !== owner)) return null
     userProfile = payload?.user || null
     return userProfile
   }
@@ -184,22 +188,32 @@
   }
 
   async function refreshAuthenticatedContext() {
-    await refreshPlans()
-    try { await refreshUserProfile() } catch (_) { userProfile = null }
-    if (!userProfile) {
-      global.KGServerEntitlements = Object.freeze({ allExamPapers: false })
-      return null
-    }
-    await Promise.all([refreshRoleThemes(), refreshSubscription()])
-    if (userProfile.role === 'admin') {
-      // 按需加载：管理日志/订单/兑换码仅管理页消费（约 50KB+），不在其他页面预取。
-      if (/\/(admin-console|admin-settings|admin-operations|user-management|feedback-management|message-management|system-settings)\.html/.test(global.location?.pathname || '')) {
-        await Promise.all([refreshAdminSettings(), refreshAdminLogs(), refreshOrders(), refreshRedeemCodes()])
-      } else {
-        await refreshAdminSettings()
+    const revision = authContextRevision
+    try {
+      await refreshPlans()
+      if (revision !== authContextRevision) return null
+      let profile = null
+      try { profile = await refreshUserProfile() } catch (_) { if (revision === authContextRevision) userProfile = null }
+      if (revision !== authContextRevision) return null
+      if (!profile) {
+        global.KGServerEntitlements = Object.freeze({ allExamPapers: false })
+        return null
       }
+      await Promise.all([refreshRoleThemes(), refreshSubscription()])
+      if (revision !== authContextRevision || userProfile !== profile) return null
+      if (profile.role === 'admin') {
+        // 按需加载：管理日志/订单/兑换码仅管理页消费（约 50KB+），不在其他页面预取。
+        if (/\/(admin-console|admin-settings|admin-operations|user-management|feedback-management|message-management|system-settings)\.html/.test(global.location?.pathname || '')) {
+          await Promise.all([refreshAdminSettings(), refreshAdminLogs(), refreshOrders(), refreshRedeemCodes()])
+        } else {
+          await refreshAdminSettings()
+        }
+      }
+      return revision === authContextRevision && userProfile === profile ? profile : null
+    } catch (error) {
+      if (revision !== authContextRevision) return null
+      throw error
     }
-    return userProfile
   }
 
   async function saveTheme(role, theme) {
@@ -376,6 +390,7 @@
 
   if (typeof global.addEventListener === 'function') {
     global.addEventListener('kg-auth-session-change', event => {
+      authContextRevision++
       subscriptionRequest++
       const username = String(event?.detail?.username || '').trim()
       userProfile = null
