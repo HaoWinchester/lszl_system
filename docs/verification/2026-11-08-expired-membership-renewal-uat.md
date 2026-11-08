@@ -56,3 +56,5 @@ source SHA256 `ba2da4426e23720190385c06eb8c1c2676d79fc6384c0a1bb8e9c4761902df24`
 执行过的定向命令：`node --test frontend/scripts/subscription-renewal.test.mjs frontend/scripts/wechat-pay-contract.test.mjs new-legacy/tests/subscription-source.test.js`（24 项）；`cd frontend && pnpm test:design`（5 项）；`cd backend && .venv/bin/python -m pytest tests/test_subscription_expired_renewal.py tests/test_subscription_order_cancellation.py tests/test_subscription_entitlements.py -q`（23 项）。完整部署门禁包含 `.venv/bin/python -m pytest tests/ -q`（1347 项）和 `pnpm test`（434 项及附属契约）。
 
 部署后命令：`python3 frontend/e2e/subscription_renewal.py --accounts-file artifacts/subscription-renewal/uat-accounts.json --output-dir artifacts/subscription-renewal/uat-fixed-430 --expect-unavailable`；`python3 artifacts/subscription-renewal/verify-uat-runtime.py`。两者均退出 0。
+
+后续：用户已验收本修复及新增的有效期内同套餐续费，明确要求发布当前 UAT 全部内容；正式 432 的备份、部署和核验见 [2026-11-08-production-432.md](2026-11-08-production-432.md)。上文 main/正式未更新为当时 UAT 阶段状态。
