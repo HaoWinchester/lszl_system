@@ -93,9 +93,10 @@
       && plan
       && plan.id
       && plan.id!=="free");
-    const actionText="升级会员";
+    const canRenew=typeof sub.canRenewSubscription==="function"&&sub.canRenewSubscription(record);
+    const actionText=canRenew?"续费会员":"升级会员";
     panel.innerHTML=`<div class="uc-card-icon uc-card-icon-membership">◇</div>
-      <div class="uc-membership-main"><div class="uc-membership-heading"><div><h3>${escapeHTML(plan.name||"免费学员")}</h3><p>${escapeHTML(plan.description||"当前学员订阅状态。")}</p></div>${hasActivePaidMembership?"":`<button type="button" class="uc-button uc-button-primary uc-button-compact" id="ucSubscriptionRenewBtn">${escapeHTML(actionText)}</button>`}</div>
+      <div class="uc-membership-main"><div class="uc-membership-heading"><div><h3>${escapeHTML(plan.name||"免费学员")}</h3><p>${escapeHTML(plan.description||"当前学员订阅状态。")}</p></div>${hasActivePaidMembership&&!canRenew?"":`<button type="button" class="uc-button uc-button-primary uc-button-compact" id="ucSubscriptionRenewBtn">${escapeHTML(actionText)}</button>`}</div>
       <div class="uc-meta-chips"><span>✓ 状态：${escapeHTML(statusText)}</span><span>▣ 有效期：${escapeHTML(expiresText)}</span><span>◷ 倒计时：${escapeHTML(countdownText)}</span><span>◇ 来源：${escapeHTML(summary&&summary.sourceText||"其他来源")}</span></div>
       <p class="uc-membership-note">此处展示当前订阅状态和权益有效期。</p></div>`;
     const btn=$("ucSubscriptionRenewBtn");
@@ -203,13 +204,14 @@
     }
     body.innerHTML=`<div class="divider"></div><div class="plans-grid">
       ${plans.map(plan=>{
-        // 历史套餐保留用于展示；到期后必须允许重新购买同套餐。
+        // 当前方案用于标记；有效的有限期会员也可以提前续费。
         const current=!currentPlanExpired && !!currentPlanId && plan.id===currentPlanId;
         const features=planFeatureList(plan);
         const limitText=planLimitText(plan);
         const featured=plan.id==="monthly"||!!plan.recommended;
-        const canPurchase=!current && plan.id!=="free";
-        const cta=current?(plan.id==="free"?"当前使用中":"当前方案"):(plan.id==="free"?"免费使用":"选择该方案");
+        const canRenew=current && typeof sub.canRenewSubscription==="function" && sub.canRenewSubscription(summary.subscription);
+        const canPurchase=plan.id!=="free" && (!current || canRenew);
+        const cta=canRenew?"续费该方案":current?(plan.id==="free"?"当前使用中":"当前方案"):(plan.id==="free"?"免费使用":"选择该方案");
         return `<article class="plan-card${featured?' featured':''}${current?' current':''}" data-plan-id="${escapeHTML(plan.id)}">
           <div class="plan-head">
             <h3 class="plan-title">${escapeHTML(plan.name||'套餐')}</h3>

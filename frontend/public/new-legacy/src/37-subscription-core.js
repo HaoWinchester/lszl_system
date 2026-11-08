@@ -189,6 +189,14 @@
     if(!user || !isStudentRole(role)) return null;
     return subscriptionFor(user.username);
   }
+  function canRenewSubscription(subscription=currentSubscription()){
+    if(!subscription)return false;
+    const effective=effectiveSubscription(subscription);
+    const plan=planById(effective.planId);
+    return ACTIVE_STATUSES.has(effective.status)
+      && plan.durationDays>0
+      && Number(effective.expiresAt)>Date.now();
+  }
   function currentPlan(){
     const role=currentRole();
     if(isBypassRole(role)){
@@ -429,9 +437,10 @@
       && ACTIVE_STATUSES.has(current.status)
       && current.planId
       && current.planId!=="free");
+    const canRenew=canRenewSubscription(current);
     scope.querySelectorAll("#upgradeMemberBtn,#accountMenuUpgradeBtn,[data-subscription-upgrade-label]").forEach(btn=>{
-      btn.hidden=hasActivePaidMembership;
-      if(!hasActivePaidMembership) btn.textContent="升级会员";
+      btn.hidden=hasActivePaidMembership&&!canRenew;
+      if(!btn.hidden)btn.textContent=canRenew?"续费会员":"升级会员";
     });
   }
 
@@ -542,6 +551,7 @@
     expiresAtForPlan,
     subscriptionFor,
     currentSubscription,
+    canRenewSubscription,
     currentPlan,
     currentRole,
     isStudentRole,

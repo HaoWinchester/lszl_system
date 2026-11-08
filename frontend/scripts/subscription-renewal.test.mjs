@@ -13,6 +13,24 @@ function membershipCenter({ planId, status = 'active', expired = true, failFirst
   const buttons = new Map()
   const elements = new Map()
   const classList = { add() {}, remove() {}, toggle() {}, contains() { return false } }
+  const upgradeEntries = [{ hidden: false, textContent: '升级会员' }, { hidden: false, textContent: '升级会员' }]
+  for (const id of ['ucUsername', 'ucDisplayName', 'ucEmail', 'ucPhone', 'ucSubject', 'ucTags', 'ucNote', 'ucNoteCount', 'ucRoleChip', 'ucStatusChip', 'ucCurrentPassword', 'ucNewPassword', 'ucConfirmPassword', 'ucPasswordHelp', 'userCenterAvatar', 'userCenterMsg']) {
+    elements.set(id, { value: '', textContent: '', classList, closest() { return { hidden: false } } })
+  }
+  elements.set('userCenterModal', { classList })
+  elements.set('ucSubscriptionBox', {
+    set innerHTML(html) {
+      elements.delete('ucSubscriptionRenewBtn')
+      const match = html.match(/<button[^>]*id="ucSubscriptionRenewBtn"[^>]*>[\s\S]*?<\/button>/)
+      if (!match) return
+      const handlers = new Map()
+      elements.set('ucSubscriptionRenewBtn', {
+        innerHTML: match[0],
+        addEventListener(type, handler) { handlers.set(type, handler) },
+        async click() { handlers.get('click')?.(); await new Promise(setImmediate) },
+      })
+    },
+  })
   const body = {
     html: '',
     set innerHTML(html) {
@@ -69,7 +87,7 @@ function membershipCenter({ planId, status = 'active', expired = true, failFirst
       async getNativeOrderStatus() { return { payStatus: 'pending', status: 'pending' } },
     },
   }
-  const context = vm.createContext({ window, document, console, setInterval: () => 1, clearInterval() {} })
+  const context = vm.createContext({ window, document, console, setInterval: () => 1, clearInterval() {}, setTimeout: () => 1 })
   for (const name of ['37-subscription-plans', '37-subscription-orders', '37-subscription-redeem-codes', '37-subscription-core', '33-user-center']) {
     vm.runInContext(readFileSync(resolve(sourceRoot, `${name}.js`), 'utf8'), context)
   }
@@ -78,7 +96,17 @@ function membershipCenter({ planId, status = 'active', expired = true, failFirst
     expiresAt: Date.now() + (expired ? -1 : 1) * 86_400_000,
   } })
   window.KGUserCenter.openSubscriptionDetail()
-  return { window, user, buttons, requests, messages, get checkout() { return elements.get('membershipCheckout') }, get paymentMessage() { return elements.get('membershipPaymentMsg') } }
+  return { window, user, buttons, requests, messages, upgradeEntries,
+    get profileRenewButton() { return elements.get('ucSubscriptionRenewBtn') },
+    get checkout() { return elements.get('membershipCheckout') },
+    get paymentMessage() { return elements.get('membershipPaymentMsg') },
+    decorateUpgradeEntries() {
+      window.KGSubscription.decorateSubscriptionElements({
+        querySelector: () => null,
+        querySelectorAll: selector => selector.includes('#upgradeMemberBtn') ? upgradeEntries : [],
+      })
+    },
+  }
 }
 
 for (const planId of ['monthly', 'quarterly', 'half_year']) {
@@ -95,16 +123,43 @@ for (const planId of ['monthly', 'quarterly', 'half_year']) {
     })
   }
 
-  test(`active ${planId} preserves the existing current-plan rule`, async () => {
+  test(`active ${planId} can renew the same plan without changing its unpaid expiry`, async () => {
     const ui = membershipCenter({ planId, expired: false })
-    assert.equal(ui.buttons.get(planId).disabled, true)
+    const before = ui.window.KGSubscription.subscriptionSummary(ui.user.username).subscription
+    assert.equal(ui.buttons.get(planId).disabled, false, 'valid finite memberships must allow advance renewal')
+    assert.match(ui.buttons.get(planId).innerHTML, /续费该方案/)
     await ui.buttons.get(planId).click()
-    assert.deepEqual(ui.requests, [])
+    assert.deepEqual(ui.requests, [planId])
+    assert.equal(ui.checkout.hidden, false)
+    const after = ui.window.KGSubscription.subscriptionSummary(ui.user.username).subscription
+    assert.equal(after.status, 'active')
+    assert.equal(after.expiresAt, before.expiresAt, 'an unpaid renewal must preserve remaining membership time')
+  })
+
+  test(`active ${planId} can reach renewal through its user center`, async () => {
+    const ui = membershipCenter({ planId, expired: false })
+    ui.window.KGUserCenter.open()
+    assert.ok(ui.profileRenewButton, 'valid finite membership must keep a visible user-center renewal entry')
+    assert.match(ui.profileRenewButton.innerHTML, /续费会员/)
+    await ui.profileRenewButton.click()
+    await ui.buttons.get(planId).click()
+    assert.deepEqual(ui.requests, [planId])
+    assert.equal(ui.checkout.hidden, false)
+  })
+
+  test(`active ${planId} keeps toolbar and account-menu renewal entries available`, () => {
+    const ui = membershipCenter({ planId, expired: false })
+    ui.decorateUpgradeEntries()
+    for (const entry of ui.upgradeEntries) {
+      assert.equal(entry.hidden, false, 'valid finite membership must not lose its renewal navigation')
+      assert.equal(entry.textContent, '续费会员')
+    }
   })
 }
 
-test('expired same-plan checkout unlocks after failure and can retry', async () => {
-  const ui = membershipCenter({ planId: 'monthly', failFirst: true })
+for (const expired of [true, false]) {
+test(`${expired ? 'expired' : 'active'} same-plan checkout unlocks after failure and can retry`, async () => {
+  const ui = membershipCenter({ planId: 'monthly', expired, failFirst: true })
   const button = ui.buttons.get('monthly')
   await button.click()
   assert.deepEqual(ui.requests, ['monthly'])
@@ -119,12 +174,26 @@ test('expired same-plan checkout unlocks after failure and can retry', async () 
   assert.equal(ui.checkout.hidden, false)
   assert.equal(ui.paymentMessage.hidden, true, 'retry must clear the stale payment error')
 })
+}
 
 for (const planId of ['free', 'lifetime']) {
   test(`${planId} membership retains its non-purchasable same-plan button`, async () => {
     const ui = membershipCenter({ planId })
     assert.equal(ui.buttons.get(planId).disabled, true)
     await ui.buttons.get(planId).click()
+    assert.deepEqual(ui.requests, [])
+    ui.window.KGUserCenter.open()
+    assert.equal(Boolean(ui.profileRenewButton), planId === 'free')
+    ui.decorateUpgradeEntries()
+    assert.ok(ui.upgradeEntries.every(entry => entry.hidden === (planId === 'lifetime')))
+  })
+}
+
+for (const status of ['paused', 'cancelled']) {
+  test(`${status} membership preserves its unavailable current-plan button`, async () => {
+    const ui = membershipCenter({ planId: 'monthly', status, expired: false })
+    assert.equal(ui.buttons.get('monthly').disabled, true)
+    await ui.buttons.get('monthly').click()
     assert.deepEqual(ui.requests, [])
   })
 }

@@ -1,4 +1,4 @@
-"""Expired plans renew through real orders and verified-payment activation once."""
+"""Finite plans renew through real orders and verified-payment activation once."""
 
 import asyncio
 from datetime import datetime, timedelta, timezone
@@ -128,4 +128,73 @@ def test_expired_same_plan_requires_payment_and_activates_once(
         assert datetime.fromisoformat(paid["subscription"]["expiresAt"]) == NOW + timedelta(days=days)
         active = client.get("/api/v1/subscriptions/me")
         assert active.status_code == 200, active.text
+        assert active.json()["entitlements"]["allExamPapers"] is True
+
+
+@pytest.mark.parametrize("plan_id,days", [("monthly", 30), ("quarterly", 90), ("half_year", 180)])
+def test_active_same_plan_preserves_remaining_days_and_activates_once(
+    student, native_payment, plan_id, days
+):
+    """Catch early extension, lost remaining days, and duplicate paid renewal."""
+    client, username = student
+    original_expiry = NOW + timedelta(days=11, hours=3, minutes=7)
+
+    async def seed_active_subscription():
+        async with AsyncSessionLocal() as db:
+            db.add(Subscription(
+                username=username,
+                plan_id=plan_id,
+                status="active",
+                started_at=NOW - timedelta(days=20),
+                expires_at=original_expiry,
+                source="wechat_pay",
+            ))
+            await db.commit()
+
+    async def persisted_subscription():
+        async with AsyncSessionLocal() as db:
+            subscription = await db.get(Subscription, username)
+            return subscription_service.sub_to_dict(subscription)
+
+    asyncio.run(seed_active_subscription())
+    before = client.get("/api/v1/subscriptions/me")
+    assert before.status_code == 200
+    original = before.json()
+    assert original["subscription"]["status"] == "active"
+    assert datetime.fromisoformat(original["subscription"]["expiresAt"]) == original_expiry
+    assert original["entitlements"]["allExamPapers"] is True
+
+    created = client.post("/api/v1/subscriptions/orders", json={"planId": plan_id})
+    assert created.status_code == 200
+    order = created.json()["order"]
+    assert order["planId"] == plan_id
+    assert order["status"] == "pending" and order["payStatus"] == "pending"
+    assert order["codeUrl"] and order["amount"] > 0
+
+    unpaid = client.get("/api/v1/subscriptions/me")
+    assert unpaid.status_code == 200
+    assert unpaid.json() == original, "An unpaid renewal must preserve the active subscription and entitlements"
+    assert asyncio.run(persisted_subscription()) == original["subscription"]
+
+    native_payment.update({
+        "trade_state": "SUCCESS",
+        "out_trade_no": order["id"],
+        "transaction_id": "provider-" + order["id"],
+        "amount": {"total": order["amount"], "currency": "CNY"},
+    })
+    for _ in range(2):
+        notified = client.post("/api/v1/subscriptions/wechat-pay/notify", json={"resource": {}})
+        assert notified.status_code == 200
+        status = client.get(f"/api/v1/subscriptions/orders/{order['id']}/status")
+        assert status.status_code == 200
+        paid = status.json()
+        assert paid["status"] == "approved" and paid["payStatus"] == "paid"
+        assert paid["subscription"]["planId"] == plan_id
+        assert paid["subscription"]["status"] == "active"
+        assert paid["subscription"]["source"] == "wechat_pay"
+        assert datetime.fromisoformat(paid["subscription"]["expiresAt"]) == original_expiry + timedelta(days=days)
+        assert asyncio.run(persisted_subscription()) == paid["subscription"]
+        active = client.get("/api/v1/subscriptions/me")
+        assert active.status_code == 200
+        assert active.json()["subscription"] == paid["subscription"]
         assert active.json()["entitlements"]["allExamPapers"] is True

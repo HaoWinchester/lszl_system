@@ -5,18 +5,19 @@ import vm from 'node:vm'
 
 // Only the transport/cache resource boundary is recorded. Run the actual shared
 // system adapter so old-owner entitlements cannot be restored by a late response.
-async function adapter() {
+async function adapter({ bootstrap = true, holdProfiles = false, waitForReady = true } = {}) {
   let current = { username: 'owner-A', role: 'student' }
-  const pending = [], hydrated = [], listeners = new Map()
+  const pending = [], profiles = [], hydrated = [], listeners = new Map(), requests = []
   const win = {
-    __KG_DIRECT_BOOTSTRAP__: { authenticated: true, authUser: current },
+    __KG_DIRECT_BOOTSTRAP__: { authenticated: bootstrap, authUser: bootstrap ? current : null },
     KGAuthCore: { currentUser: () => current }, KGRolePermissions: { hydrateThemes() {} },
     KGSubscription: { hydrateSubscriptions: value => hydrated.push(value), hydratePlanSettings() {} },
     KGDomainApi: { request: async ({path}) => {
+      requests.push(path)
       if (path.endsWith('/plans')) return { plans: [] }
-      if (path.endsWith('/auth/me')) return { user: current }
+      if (path.endsWith('/auth/me')) return holdProfiles ? new Promise(resolve => profiles.push(resolve)) : { user: current }
       if (path.endsWith('/themes')) return { themes: {} }
-      if (path.endsWith('/subscriptions/me')) return new Promise(resolve => pending.push(resolve))
+      if (path.endsWith('/subscriptions/me')) return new Promise((resolve, reject) => pending.push(Object.assign(resolve, { reject })))
       throw new Error('Unexpected API: ' + path)
     } },
     addEventListener: (key, fn) => listeners.set(key, fn), dispatchEvent() {}, location: { pathname: '/practice-mode.html' },
@@ -24,10 +25,12 @@ async function adapter() {
   vm.runInNewContext(readFileSync(new URL('./new-legacy-assets/direct-system-adapter.js', import.meta.url), 'utf8'), { window: win, console, CustomEvent: class {} })
   const tick = () => new Promise(resolve => setImmediate(resolve))
   await tick()
-  pending.shift()({ subscription: {username: 'owner-A', planId: 'free'}, entitlements: {allExamPapers: false} })
-  await win.KGSystemDomain.ready
-  pending.length = 0
-  return {win, pending, hydrated, listeners, tick, setCurrent: value => {current = value}}
+  if (waitForReady) {
+    pending.shift()({ subscription: {username: 'owner-A', planId: 'free'}, entitlements: {allExamPapers: false} })
+    await win.KGSystemDomain.ready
+    pending.length = 0
+  }
+  return {win, pending, profiles, requests, hydrated, listeners, tick, setCurrent: value => {current = value}}
 }
 
 test('shared subscription refresh discards a previous owner response after switching account', async () => {
@@ -54,4 +57,37 @@ test('same-owner overlapping refreshes share a successful response rather than r
   pending[0]({subscription:{username:'owner-A',planId:'monthly'},entitlements:{allExamPapers:true}})
   const [one,two]=await Promise.all([first,second])
   assert.equal(one.planId,'monthly');assert.equal(two.planId,'monthly')
+})
+
+for (const failure of [false, true]) {
+test(`logout while initialization awaits resources discards late ${failure ? 'failure' : 'success'}`, async () => {
+  const {win,pending,listeners,tick,setCurrent}=await adapter()
+  const initializing=win.KGSystemDomain.retryInitialization()
+  const finished=assert.doesNotReject(initializing)
+  await tick()
+  assert.equal(pending.length,1)
+  setCurrent(null)
+  listeners.get('kg-auth-session-change')({detail:{username:''}})
+  if (failure) pending[0].reject(new Error('Old owner request failed'))
+  else pending[0]({subscription:{username:'owner-A',planId:'monthly'},entitlements:{allExamPapers:true}})
+  await finished
+  assert.equal(await initializing,null)
+  assert.equal(win.KGServerEntitlements.allExamPapers,false)
+})
+}
+
+test('an auth profile arriving after logout cannot trigger private reads or restore entitlements', async () => {
+  const {win,pending,profiles,requests,hydrated,listeners,tick,setCurrent}=await adapter({bootstrap:false,holdProfiles:true,waitForReady:false})
+  const finished=assert.doesNotReject(win.KGSystemDomain.ready)
+  assert.equal(profiles.length,1)
+  setCurrent(null)
+  listeners.get('kg-auth-session-change')({detail:{username:''}})
+  profiles[0]({user:{username:'owner-A',role:'admin'}})
+  await tick()
+  for (const resolve of pending) resolve({subscription:{username:'owner-A',planId:'monthly'},entitlements:{allExamPapers:true}})
+  await finished
+  assert.equal(await win.KGSystemDomain.ready,null)
+  assert.equal(requests.some(path=>path.endsWith('/subscriptions/me')||path.endsWith('/themes')||path.endsWith('/wechat-pay-config')),false)
+  assert.equal(hydrated.some(value=>value['owner-A']),false)
+  assert.equal(win.KGServerEntitlements.allExamPapers,false)
 })
