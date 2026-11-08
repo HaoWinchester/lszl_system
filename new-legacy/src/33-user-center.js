@@ -56,6 +56,7 @@
     return window.KGSubscription || null;
   }
   let nativePayPollTimer=0;
+  let subscriptionDetailGeneration=0;
   function clearNativePayPolling(){
     if(nativePayPollTimer){clearInterval(nativePayPollTimer);nativePayPollTimer=0;}
   }
@@ -184,8 +185,11 @@
     const sub=subscriptionApi();
     const rec=currentRecord();
     if(!body||!sub){return}
+    clearNativePayPolling();
+    const detailGeneration=++subscriptionDetailGeneration;
     const summary=rec&&typeof sub.subscriptionSummary==="function"?sub.subscriptionSummary(rec.username):null;
     const currentPlanId=summary&&summary.plan&&summary.plan.id || "";
+    const currentPlanExpired=summary&&summary.subscription&&summary.subscription.status==="expired";
     const plans=typeof sub.enabledPlanList==="function"?sub.enabledPlanList():[];
     let activeNativeOrder=null;
     let planPickLocked=false;
@@ -199,7 +203,8 @@
     }
     body.innerHTML=`<div class="divider"></div><div class="plans-grid">
       ${plans.map(plan=>{
-        const current=!!currentPlanId && plan.id===currentPlanId;
+        // 历史套餐保留用于展示；到期后必须允许重新购买同套餐。
+        const current=!currentPlanExpired && !!currentPlanId && plan.id===currentPlanId;
         const features=planFeatureList(plan);
         const limitText=planLimitText(plan);
         const featured=plan.id==="monthly"||!!plan.recommended;
@@ -222,6 +227,7 @@
         </article>`;
       }).join('')}
     </div>
+    <p class="redeem-message" id="membershipPaymentMsg" role="alert" hidden></p>
     <section class="membership-checkout" id="membershipCheckout" hidden aria-live="polite"></section>
     <section class="redeem">
       <div class="redeem-intro">
@@ -254,6 +260,7 @@
       const refresh=async()=>{
         try{
           const latest=await pay.getNativeOrderStatus(order.id);
+          if(detailGeneration!==subscriptionDetailGeneration)return;
           if(latest.payStatus==="paid"){
             clearNativePayPolling();
             pay.syncSubscription(latest.subscription);
@@ -267,6 +274,7 @@
           }
           if(status)status.textContent="等待扫码付款";
         }catch(error){
+          if(detailGeneration!==subscriptionDetailGeneration)return;
           if(status)status.textContent="支付状态同步失败，正在自动重试";
         }
       };
@@ -316,6 +324,8 @@
         return;
       }
       const originalLabel=card.innerHTML;
+      const paymentMsg=$("membershipPaymentMsg");
+      if(paymentMsg){paymentMsg.textContent="";paymentMsg.hidden=true;}
       setPlanPickLocked(true);
       card.textContent="正在生成支付二维码…";
       try{
@@ -325,6 +335,7 @@
           return;
         }
         const result=await pay.createNativeOrder(plan.id);
+        if(detailGeneration!==subscriptionDetailGeneration)return;
         if(!result||!result.order||!result.order.codeUrl)throw new Error("支付二维码生成失败，请重试。");
         // 服务端不复用待支付订单：每次点击都按当前所选套餐重新下单，
         // 并自动作废旧待支付订单（点击哪个套餐就显示哪个套餐）。
@@ -335,7 +346,10 @@
         renderNativePayment(checkoutPlan||plan,order);
         showStatus("支付二维码已生成，请使用微信扫码。");
       }catch(error){
-        showStatus(String(error&&error.message||"支付二维码生成失败，请重试。"));
+        if(detailGeneration!==subscriptionDetailGeneration)return;
+        const message=String(error&&error.message||"支付二维码生成失败，请重试。");
+        if(paymentMsg){paymentMsg.textContent=message;paymentMsg.hidden=false;}
+        showStatus(message);
         setPlanPickLocked(false);
         card.innerHTML=originalLabel;
       }
@@ -382,6 +396,7 @@
     modal.classList.add("show");
   }
   function closeSubscriptionDetailModal(){
+    subscriptionDetailGeneration++;
     clearNativePayPolling();
     setMembershipPaymentView(false);
     const modal=$("userSubscriptionDetailModal");
