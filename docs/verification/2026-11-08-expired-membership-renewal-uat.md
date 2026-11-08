@@ -2,6 +2,8 @@
 
 日期：2026-11-08，Asia/Shanghai。用户要求月度、季度、半年会员到期后可购买相同套餐，先部署 UAT 等本人验收。
 
+状态：UAT `v9.0-p4.1.430` 已部署并完成开发自检，等待用户本人业务验收。正式环境和 main 未变。
+
 ## 原因与改动
 
 正式实际运行版本为 v9.0-p4.1.420，UAT 基线为 v9.0-p4.1.427。共享用户中心只比较历史套餐 ID 就标记“当前方案”并禁用购买按钮，没有消费订阅核心已经计算的 expired 状态。三个有限期套餐都有同一问题。
@@ -32,8 +34,25 @@ UAT 部署前备份：`/home/ubuntu/lszl-uat-backups/20261108T081926Z-membership
 
 ## 发布阶段
 
-v9.0-p4.1.429 已通过完整发布门禁并由管理器 promote 到本地 active，完整门禁耗时 1800 秒，无跳过或降级。后端 1347 项、前端 434 项、账号恢复 82 项、扩展契约和全部浏览器流程通过。视觉对照：做题桌面/手机与自由图谱手机均 0%，自由图谱桌面 0.001%。完整证据：`artifacts/subscription-renewal/validation-429.json` 与 `validation-run-429.log`。
+最终 430 已在干净发布工作树 `.worktrees/subscription-renewal-release` 通过完整门禁，耗时 1766 秒，无跳过或降级。后端 1347 项、前端 434 项、账号恢复 82 项、扩展契约和全部浏览器流程通过。视觉对照：做题桌面/手机与自由图谱手机均 0%，自由图谱桌面 0.001%。完整证据：`artifacts/subscription-renewal/validation-430.json` 与 `validation-run-430.log`。
 
-source SHA256 `254bd9c92bd6bacaad3628477d2f222ba2e38ddf7c651ed85a280d6a0a4d3a35`；site SHA256 `7df5ef134ae10f1bb133a95cda7999b43b041b95fa6ffd2c58b26643b0405b36`。源、同步产物与不可变包一致，回滚版本 427。此前 428 为补充测试而中止，未 promote 或部署，未覆盖不可变候选。
+source SHA256 `ba2da4426e23720190385c06eb8c1c2676d79fc6384c0a1bb8e9c4761902df24`；site SHA256 `9c9d98cd33ed2e0433d21c40e43902470d45ce1e8a7c7ffba2a064ef01ef1032`。同步产物与不可变包完全一致，当前 430、回滚版本 429。
 
-候选与基线均 1291 文件，无缺失路径，保留 admin-console.html。当前准备合入、推送和部署 UAT。用户本人验收前不合入 main、不部署正式、不清理功能分支。
+原工作区的既有未跟踪设计、视频和数据库备份未移动、未提交；部署脚本因它们正确中止原工作区的 preflight。改用工作区内的干净发布工作树后重新执行完整门禁。发布脚本因原源包含 30 个忽略的 Python/pytest 缓存而自动从已测 429 编号为 430；独立逐文件复核确认两版 site 均 1291 文件且路径相同，32 个 HTML 归一版本字符串后完全一致，会员模块哈希相同，没有业务回退。保留原本地 release 历史。
+
+实现提交 `88e67227`，合入 uat 的提交 `98419988`；430 的 37 个版本生成物在发布工作树提交为 `dceba30f`，原 uat 纳回为 `6a6abe94`，两者文件树相同。功能分支和 uat 均经命令级代理推送，并核对远端引用；main 始终保持上述基线。
+
+`PYTHONDONTWRITEBYTECODE=1 bash deploy/update-uat.sh` 在发布工作树退出 0，总耗时 2357 秒，含完整门禁 1770 秒和镜像/依赖重建 553 秒。健康、数据库、小程序、教师助手、HTTPS 和历史回填核验均通过，公网版本为 430。部署日志：`artifacts/subscription-renewal/uat-deploy-430.log`。
+
+## 部署后实际核验
+
+- UAT 容器当前 site 的 1291 个文件路径和全部 SHA256 逐项匹配本地已测 430，关键 admin-console.html 存在。HTTPS 首页/做题页的 release 与 bundle meta 均为 430，8 个静态资源哈希一致，健康 status/db 均 ok。报告：`artifacts/subscription-renewal/uat-runtime-430.json`。
+- 正式容器 Id/Image 和完整 current.json 在核验前后均与备份 manifest 的 productionBefore 严格相同；本地及远端 main 均为 `6256275850e25c30cd7f3c696167c9d779122a46`。
+- 三种到期套餐 × 首页桌面/做题页手机，共 6 个 UAT 真实浏览器场景全部通过。包含一次 HTTP503 恢复、同套餐重复下单重试、切换套餐再返回。14 个真实 UAT 订单均按预期 cancelled/failed，已逐项核对清理状态，会员和权益未改变；未付款、未调用支付激活接口。报告：`artifacts/subscription-renewal/uat-fixed-430/results.json`。
+- UAT 商户凭据未配置，因此此环境验证的是可操作按钮、真实下单响应、明确失败提示与恢复；成功二维码由本地演示环境验证，付款激活由隔离数据库回归验证，不能宣称 UAT 真实扫码付款通过。
+
+验收入口：<https://uat.aihuanpu.com/index.html> 或 <https://uat.aihuanpu.com/practice-mode.html>。使用私有 `artifacts/subscription-renewal/uat-accounts.json` 中的三个专用到期账号，打开会员权益，检查原套餐可选并能下单、失败后可重试。用户本人明确验收前不合入 main、不发布正式、不清理功能分支或发布工作树。
+
+执行过的定向命令：`node --test frontend/scripts/subscription-renewal.test.mjs frontend/scripts/wechat-pay-contract.test.mjs new-legacy/tests/subscription-source.test.js`（24 项）；`cd frontend && pnpm test:design`（5 项）；`cd backend && .venv/bin/python -m pytest tests/test_subscription_expired_renewal.py tests/test_subscription_order_cancellation.py tests/test_subscription_entitlements.py -q`（23 项）。完整部署门禁包含 `.venv/bin/python -m pytest tests/ -q`（1347 项）和 `pnpm test`（434 项及附属契约）。
+
+部署后命令：`python3 frontend/e2e/subscription_renewal.py --accounts-file artifacts/subscription-renewal/uat-accounts.json --output-dir artifacts/subscription-renewal/uat-fixed-430 --expect-unavailable`；`python3 artifacts/subscription-renewal/verify-uat-runtime.py`。两者均退出 0。
