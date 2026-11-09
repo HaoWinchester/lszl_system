@@ -1,6 +1,6 @@
 # 学习记录分页 UAT 交付
 
-日期：2026-11-09，Asia/Shanghai。当前状态：434 完整门禁通过，已合入、推送并部署 UAT，线上验证通过，等待用户亲自验收；main及正式环境未更新。
+日期：2026-11-09，Asia/Shanghai。用户现已明确确认本轮UAT验收通过，并授权合入main及正式部署；正式已更新434，备份与上线结果见[正式发布记录](2026-11-09-production-history-pagination.md)。下文保留UAT阶段的验证与交付范围。
 
 ## 问题与改动
 
@@ -43,4 +43,4 @@
 
 首次UAT发布在传输前因不可变版本保护中止：完整浏览器测试在源目录新增了4个ignored Python字节码文件，改变了source指纹。仅删除这4个测试临时文件，并撤回脚本临时递增的VERSION/生成页面；逐路径SHA256确认当前权威源与已通过完整门禁的434 source完全一致，再用上述禁止写字节码的环境执行原生发布。没有手改release site或验证报告，也没有发布中间候选433/435。
 
-本地证据位于工作树`artifacts/practice-history-pagination/`及不可变release的validation日志；凭据、数据库内容和真实账号标识不提交Git。
+收尾后，本地专项证据位于主工作区`artifacts/practice-history-pagination/`，完整门禁的其他截图归档于`artifacts/production-history-434/uat-validation-artifacts/`，434不可变release及validation日志也已完整保留到主工作区。凭据、数据库内容和真实账号标识不提交Git。
