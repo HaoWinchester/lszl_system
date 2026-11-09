@@ -143,6 +143,7 @@ with sync_playwright() as playwright:
     for script in ["src/111-practice-session-core.js", "src/115-practice-mode-policy.js", "src/112-practice-answer-sheet.js",
                    "src/113-practice-result-report.js", "src/116-practice-session-save.js", "src/117-question-answer-set.js", "src/114-practice-draft-state.js", "src/118-revenge-entry-policy.js"]:
         page.add_script_tag(content=(ROOT / script).read_text(encoding="utf-8"))
+    page.add_script_tag(content=(ROOT / "src/practice/history-controller.js").read_text(encoding="utf-8"))
     page.add_script_tag(content=(ROOT / "src/100-practice-mode.js").read_text(encoding="utf-8"))
     page.evaluate("document.dispatchEvent(new Event('DOMContentLoaded'))")
     page.wait_for_timeout(50)

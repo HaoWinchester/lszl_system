@@ -36,6 +36,7 @@ with sync_playwright() as p:
       page.add_style_tag(content=(ROOT/file).read_text(encoding='utf-8'))
     page.add_script_tag(content=(ROOT/'src/107-learning-ui-icons.js').read_text(encoding='utf-8'))
     page.add_script_tag(content=(ROOT.parent/'frontend/scripts/new-legacy-assets/question-catalog-adapter.js').read_text(encoding='utf-8'))
+    page.add_script_tag(content=(ROOT/'src/practice/history-controller.js').read_text(encoding='utf-8'))
     page.add_script_tag(content=(ROOT/'src/100-practice-mode.js').read_text(encoding='utf-8'))
     page.evaluate("document.dispatchEvent(new Event('DOMContentLoaded'))");page.wait_for_timeout(120)
 

@@ -42,9 +42,9 @@ with sync_playwright() as pw:
             }
           };
         }''')
-        for css in ['styles/main.css','styles/practice-mode.css']:
+        for css in ['styles/dialogs.css','styles/main.css','styles/practice-mode.css']:
             page.add_style_tag(content=(ROOT/css).read_text())
-        for script in ['111-practice-session-core.js','115-practice-mode-policy.js','112-practice-answer-sheet.js','113-practice-result-report.js','116-practice-session-save.js','117-question-answer-set.js','114-practice-draft-state.js','118-revenge-entry-policy.js','100-practice-mode.js']:
+        for script in ['00-dialogs.js','111-practice-session-core.js','115-practice-mode-policy.js','112-practice-answer-sheet.js','113-practice-result-report.js','116-practice-session-save.js','117-question-answer-set.js','114-practice-draft-state.js','118-revenge-entry-policy.js','practice/history-controller.js','100-practice-mode.js']:
             page.add_script_tag(content=(ROOT/'src'/script).read_text())
         page.evaluate("document.dispatchEvent(new Event('DOMContentLoaded'))")
         expect(page.locator('[data-practice-start="practice"]')).to_have_text('继续上次练习 0/10')
@@ -53,12 +53,13 @@ with sync_playwright() as pw:
         assert snap['sessionId']=='saved' and snap['index']==4
         click_tool(page, '#practiceExitBtn');page.locator('#practiceSaveExitBtn').click()
         # Cancellation must leave the original round resumable.
-        page.once('dialog',lambda d:d.dismiss())
         page.locator('[data-practice-new="practice"]').click()
+        expect(page.locator('[data-dialog-message]')).to_contain_text('练习模式未完成')
+        page.locator('[data-dialog-cancel]').click()
         expect(page.locator('[data-practice-new="practice"]')).to_be_enabled()
         assert not page.evaluate('window.__calls.some(c=>c[0]==="abandon")')
         page.locator('#practiceHistoryOpenBtn').click()
-        page.locator('details summary').click()
+        page.locator('.practice-history-group details summary').click()
         expect(page.locator('[data-history-resume="saved"]')).to_be_visible()
         expect(page.locator('[data-history-session="old"]')).to_be_visible()
         expect(page.locator('[data-history-session="older"]')).to_be_visible()
@@ -70,13 +71,13 @@ with sync_playwright() as pw:
         page.locator('[data-history-session="older"]').click()
         expect(page.locator('.practice-report-meta')).to_contain_text('older')
         page.locator('[data-report-lobby]').click()
-        page.locator('#practiceHistoryOpenBtn').click();page.locator('details summary').click()
+        page.locator('#practiceHistoryOpenBtn').click();page.locator('.practice-history-group details summary').click()
         page.locator('[data-history-resume="saved"]').click()
         assert page.evaluate('window.KGPracticeMode.snapshot().sessionId')=='saved'
         click_tool(page, '#practiceExitBtn');page.locator('#practiceSaveExitBtn').click()
         page.evaluate('window.__failStart=true')
-        page.once('dialog',lambda d:d.accept())
         page.locator('[data-practice-new="practice"]').click()
+        page.locator('[data-dialog-accept]').click()
         expect(page.locator('#practiceToast')).to_contain_text('旧轮已结束并保留记录')
         assert page.evaluate('window.__sessions.saved.status')=='abandoned'
         page.evaluate('window.__failStart=false')

@@ -4,13 +4,13 @@ from copy import deepcopy
 import re
 from datetime import timedelta
 
-from sqlalchemy import case, func, or_, select, text as sql_text
+from sqlalchemy import case, or_, select, text as sql_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas.canvas_ink import validate_strokes
 from app.core.security import now_utc, uid
 from app.models.question import Question, QuestionBank
-from app.models.paper_release import PaperRelease, PaperReleaseQuestion
+from app.models.paper_release import PaperReleaseQuestion
 from app.models.training import (
     CanvasWorkspace,
     LearningEvent,
@@ -19,7 +19,7 @@ from app.models.training import (
     PracticeVerification,
     TrainingProgress,
 )
-from app.services import question_catalog_service, question_service, practice_experience_service, practice_growth_service, question_answer_service
+from app.services import question_catalog_service, question_service, practice_experience_service, practice_growth_service, question_answer_service, practice_history_service
 
 SESSION_SCHEMA_VERSIONS = {1, 2}
 WORKSPACE_SCHEMA_VERSIONS = set(range(1, 11))
@@ -1650,7 +1650,7 @@ async def list_events(
     return [event_to_dict(event) for event in events]
 
 
-PRACTICE_SESSION_EVENT_TYPE = "PRACTICE_SESSION_COMPLETED"
+PRACTICE_SESSION_EVENT_TYPE = practice_history_service.PRACTICE_SESSION_EVENT_TYPE
 
 
 def _practice_session_payload(data: dict) -> dict:
@@ -1694,72 +1694,9 @@ async def record_practice_session(db: AsyncSession, owner: str, data: dict) -> d
 
 
 async def list_practice_sessions(db: AsyncSession, owner: str) -> list[dict]:
-    """Return history display fields without loading saved answers or reports."""
-    stat_fields = ("total", "answered", "correct", "experience", "durationMs")
-    modern_rows = (await db.execute(
-        select(
-            PracticeSession.id, PracticeSession.release_id, PracticeSession.paper_id,
-            PracticeSession.mode, PracticeSession.status, PracticeSession.completed_at,
-            PracticeSession.abandoned_at, PracticeSession.last_saved_at,
-            PaperRelease.name.label("paper_name"),
-            func.jsonb_typeof(PracticeSession.report_snapshot).label("report_type"),
-            *(PracticeSession.stats[key].label(key) for key in stat_fields),
-        )
-        .join(PaperRelease, PaperRelease.id == PracticeSession.release_id)
-        .where(
-            PracticeSession.owner_id == owner,
-            PracticeSession.status.in_(["active", "paused", "completed", "abandoned"]),
-            PracticeSession.stats["historyHidden"].as_boolean().isnot(True),
-        )
-        .order_by(PracticeSession.last_saved_at.desc())
-        .limit(100)
-    )).mappings().all()
-    modern = [
-        {
-            "sessionId": session["id"],
-            "releaseId": session["release_id"],
-            "mode": session["mode"],
-            "paperId": session["paper_id"],
-            "paperName": session["paper_name"],
-            **{key: max(0, int(session[key] or 0)) for key in stat_fields},
-            "status": session["status"],
-            "reportAvailable": session["status"] == "completed" and session["report_type"] == "object",
-            "createdAt": _iso(session["completed_at"] or session["abandoned_at"] or session["last_saved_at"]),
-        }
-        for session in modern_rows
-    ]
-    modern_ids = {row["sessionId"] for row in modern}
-    legacy_fields = (
-        "sessionId", "releaseId", "paperId", "paperName", "mode", "status",
-        "total", "answered", "correct", "experience", "durationMs",
-    )
-    event_rows = (await db.execute(
-        select(
-            LearningEvent.id, LearningEvent.created_at,
-            *(LearningEvent.payload[key].label(key) for key in legacy_fields),
-        )
-        .where(
-            LearningEvent.owner_id == owner,
-            LearningEvent.event_type == PRACTICE_SESSION_EVENT_TYPE,
-        )
-        .order_by(LearningEvent.created_at.desc())
-        .limit(100)
-    )).mappings().all()
-    legacy = [
-        {
-            **{key: row[key] for key in legacy_fields if row[key] is not None},
-            "eventId": row["id"],
-            "createdAt": _iso(row["created_at"]),
-            "reportAvailable": False,
-        }
-        for row in event_rows
-        if str(row["sessionId"] or "") not in modern_ids
-    ]
-    return sorted(
-        [*modern, *legacy],
-        key=lambda row: str(row.get("createdAt") or ""),
-        reverse=True,
-    )[:100]
+    """Compatibility entry point for callers expecting the first 100 summaries."""
+    page = await practice_history_service.list_practice_sessions(db, owner, limit=100)
+    return page["sessions"]
 
 
 async def clear_practice_sessions(db: AsyncSession, owner: str) -> int:

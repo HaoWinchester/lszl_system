@@ -1,11 +1,11 @@
 <!doctype html>
-<html data-release="v9.0-p4.1.432" lang="zh-CN">
+<html data-release="v9.0-p4.1.434" lang="zh-CN">
 <head>
-<link rel="icon" type="image/jpeg" href="/assets/logo.jpg?v=v9.0-p4.1.432">
-<meta name="kg-practice-bundle-version" content="v9.0-p4.1.432">
-<script type="application/json" id="kg-page-features">{"auth":{"depends":[],"scripts":["bundles/practice-auth.js?v=v9.0-p4.1.432"],"styles":[]},"account":{"depends":["auth"],"scripts":["bundles/practice-account.js?v=v9.0-p4.1.432"],"styles":[]},"question":{"depends":[],"scripts":["bundles/practice-question.js?v=v9.0-p4.1.432"],"styles":[]},"community":{"depends":["question"],"scripts":["bundles/practice-community.js?v=v9.0-p4.1.432"],"styles":[]},"answer":{"depends":["community"],"scripts":["bundles/practice-answer.js?v=v9.0-p4.1.432"],"styles":[]},"report":{"depends":[],"scripts":["bundles/practice-report.js?v=v9.0-p4.1.432"],"styles":[]},"knowledge":{"depends":[],"scripts":["bundles/practice-knowledge.js?v=v9.0-p4.1.432"],"styles":[]}}</script>
-<script src="bundles/practice-prelude.js?v=v9.0-p4.1.432"></script>
-<script defer src="bundles/practice-lobby.js?v=v9.0-p4.1.432"></script><!-- kg-teaching-content-sync:generated -->
+<link rel="icon" type="image/jpeg" href="/assets/logo.jpg?v=v9.0-p4.1.434">
+<meta name="kg-practice-bundle-version" content="v9.0-p4.1.434">
+<script type="application/json" id="kg-page-features">{"auth":{"depends":[],"scripts":["bundles/practice-auth.js?v=v9.0-p4.1.434"],"styles":[]},"account":{"depends":["auth"],"scripts":["bundles/practice-account.js?v=v9.0-p4.1.434"],"styles":[]},"question":{"depends":[],"scripts":["bundles/practice-question.js?v=v9.0-p4.1.434"],"styles":[]},"community":{"depends":["question"],"scripts":["bundles/practice-community.js?v=v9.0-p4.1.434"],"styles":[]},"answer":{"depends":["community"],"scripts":["bundles/practice-answer.js?v=v9.0-p4.1.434"],"styles":[]},"report":{"depends":[],"scripts":["bundles/practice-report.js?v=v9.0-p4.1.434"],"styles":[]},"knowledge":{"depends":[],"scripts":["bundles/practice-knowledge.js?v=v9.0-p4.1.434"],"styles":[]},"history":{"depends":[],"scripts":["bundles/practice-history.js?v=v9.0-p4.1.434"],"styles":[]}}</script>
+<script src="bundles/practice-prelude.js?v=v9.0-p4.1.434"></script>
+<script defer src="bundles/practice-lobby.js?v=v9.0-p4.1.434"></script><!-- kg-teaching-content-sync:generated -->
 <!-- kg-direct-bootstrap-anchor -->
 <!-- kg-runtime:generated -->
 <!-- kg-auth-session:generated -->
@@ -14,7 +14,7 @@
 <!-- kg-direct-entry:generated -->
 <!-- kg-feature-usage-clock:generated -->
 <!-- kg-feature-analytics:generated -->
-<link rel="stylesheet" href="bundles/practice-lobby.css?v=v9.0-p4.1.432">
+<link rel="stylesheet" href="bundles/practice-lobby.css?v=v9.0-p4.1.434">
 
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
@@ -361,7 +361,7 @@
         <button type="button" class="practice-drawer-close" id="practiceHistoryCloseBtn" aria-label="关闭学习记录">×</button>
       </header>
       <div class="practice-drawer-toolbar practice-history-toolbar"><span id="practiceHistorySummary">暂无练习记录</span><button type="button" id="practiceClearHistoryBtn">清空记录</button></div>
-      <div class="practice-drawer-body"><div id="practiceHistoryList" class="practice-history-list"></div><div class="practice-history-empty" id="practiceHistoryEmpty">保存或完成一次练习后，记录会显示在这里。</div></div>
+      <div class="practice-drawer-body"><div id="practiceHistoryList" class="practice-history-list"></div><div class="practice-history-empty" id="practiceHistoryEmpty">保存或完成一次练习后，记录会显示在这里。</div><div class="practice-history-pagination"><p id="practiceHistoryPageStatus" role="status" aria-live="polite" hidden></p><button type="button" class="practice-secondary-btn" id="practiceHistoryLoadMore" hidden>加载更多</button></div></div>
     </aside>
   </div>
 
@@ -447,6 +447,7 @@
 
 
   <!-- kg-paper-releases:generated -->
+
 
 
 

@@ -161,10 +161,19 @@
     })
     return clone(payload.session || null)
   }
-  async function listSessions() {
-    if (!authenticated()) return []
-    const payload = await request('/sessions')
-    return Array.isArray(payload?.sessions) ? clone(payload.sessions) : []
+  async function listSessionsPage({ limit = 20, cursor = null } = {}) {
+    if (!authenticated()) return { sessions: [], total: 0, nextCursor: null }
+    const params = new URLSearchParams({ limit: text(limit) })
+    if (cursor) params.set('cursor', text(cursor))
+    const payload = await request('/sessions?' + params)
+    return {
+      sessions: Array.isArray(payload?.sessions) ? clone(payload.sessions) : [],
+      total: Math.max(0, Number(payload?.total) || 0),
+      nextCursor: payload?.nextCursor || null,
+    }
+  }
+  async function listSessions(options = {}) {
+    return (await listSessionsPage({ limit: 100, ...options })).sessions
   }
   async function clearSessions() {
     await request('/sessions', { method: 'DELETE' })
@@ -232,7 +241,7 @@
   const api = Object.freeze({
     refresh, snapshot, list, active, stats, plan, answer, upsertWrong,
     answerRevenge, remediationReviewed, verificationCandidate, verify,
-    recordSession, listSessions, clearSessions, startSession, getActiveSessions,
+    recordSession, listSessionsPage, listSessions, clearSessions, startSession, getActiveSessions,
     getPaperProgress, getRevengeSummary, enterSession, invalidateEntrySummaries,
     getSession, updateState, answerSession, remediationSession, verifySession, pauseSession, completeSession,
     abandonSession, getReport,

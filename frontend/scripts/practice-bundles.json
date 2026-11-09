@@ -169,6 +169,17 @@
       ],
       "styles": [],
       "retainStyleArtifact": true
+    },
+    {
+      "name": "practice-history",
+      "feature": "history",
+      "initial": false,
+      "defer": true,
+      "depends": [],
+      "scripts": [
+        "src/practice/history-controller.js"
+      ],
+      "styles": []
     }
   ]
 }

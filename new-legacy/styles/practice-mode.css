@@ -779,3 +779,6 @@ body.practice-mode-page[data-practice-view="lobby"] #practiceLobby{min-height:0;
 .practice-feature-status{position:fixed;z-index:2147483200;left:50%;bottom:24px;transform:translateX(-50%);display:flex;align-items:center;gap:12px;padding:12px 16px;background:#fff;color:#172033;border:1px solid #dce2ea;border-radius:10px;box-shadow:0 4px 20px #17203322;max-width:calc(100vw - 32px)}
 .practice-feature-status[hidden]{display:none}
 .practice-feature-status button{flex-shrink:0;min-height:36px}
+
+/* The history footer is appended without changing existing drawer rows. */
+.practice-history-pagination{display:grid;justify-items:center;gap:12px;padding:16px 0}.practice-history-pagination p{margin:0;color:var(--practice-muted)}

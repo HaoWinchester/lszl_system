@@ -347,7 +347,7 @@
         <button type="button" class="practice-drawer-close" id="practiceHistoryCloseBtn" aria-label="关闭学习记录">×</button>
       </header>
       <div class="practice-drawer-toolbar practice-history-toolbar"><span id="practiceHistorySummary">暂无练习记录</span><button type="button" id="practiceClearHistoryBtn">清空记录</button></div>
-      <div class="practice-drawer-body"><div id="practiceHistoryList" class="practice-history-list"></div><div class="practice-history-empty" id="practiceHistoryEmpty">保存或完成一次练习后，记录会显示在这里。</div></div>
+      <div class="practice-drawer-body"><div id="practiceHistoryList" class="practice-history-list"></div><div class="practice-history-empty" id="practiceHistoryEmpty">保存或完成一次练习后，记录会显示在这里。</div><div class="practice-history-pagination"><p id="practiceHistoryPageStatus" role="status" aria-live="polite" hidden></p><button type="button" class="practice-secondary-btn" id="practiceHistoryLoadMore" hidden>加载更多</button></div></div>
     </aside>
   </div>
 
@@ -447,6 +447,7 @@
   <script defer src="src/118-revenge-entry-policy.js"></script>
   <script defer src="src/paper-presentation.js"></script>
   <script defer src="src/practice/lobby-dashboard.js"></script>
+  <script type="application/x-kg-feature" data-practice-feature="history" src="src/practice/history-controller.js"></script>
   <script type="application/x-kg-feature" data-practice-feature="answer" src="src/practice/practice-sound.js"></script>
   <script type="application/x-kg-feature" data-practice-feature="knowledge" src="src/practice/knowledge-space-scene.js"></script>
   <script type="application/x-kg-feature" data-practice-feature="knowledge" src="src/practice/knowledge-dashboard.js"></script>

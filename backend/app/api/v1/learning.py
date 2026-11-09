@@ -9,7 +9,7 @@ from app.core.auth import CanvasWriter, CurrentUser
 from app.core.rate_limit import QuestionRateLimited
 from app.db.session import get_db
 from app.schemas.personal_card import PersonalCardCreate, PersonalCardUpdate
-from app.services import knowledge_dashboard_service, learning_service, personal_card_service, practice_session_service
+from app.services import knowledge_dashboard_service, learning_service, personal_card_service, practice_session_service, practice_history_service
 from app.services.practice_client_view_service import project_practice_payload
 
 router = APIRouter(tags=["learning"])
@@ -279,8 +279,17 @@ async def record_practice_session(body: dict, db: DB, user: CurrentUser):
 
 
 @router.get("/learning/practice/sessions")
-async def list_practice_sessions(db: DB, user: CurrentUser):
-    return {"sessions": await learning_service.list_practice_sessions(db, user.username)}
+async def list_practice_sessions(
+    db: DB, user: CurrentUser,
+    limit: int = Query(100, ge=1, le=100),
+    cursor: str | None = Query(None, max_length=1024),
+):
+    try:
+        return await practice_history_service.list_practice_sessions(
+            db, user.username, limit=limit, cursor=cursor,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
 
 
 @router.get("/learning/practice/experience-summary")
