@@ -1,0 +1,3074 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-11-10T23:02:27.275740+08:00",
+  "release": "v9.0-p4.1.438",
+  "previousProductionRelease": "v9.0-p4.1.437",
+  "acceptedUatCommit": "d891413c3d14ac4c9b4171d0a7ae0bf3248bb3e3",
+  "productionUrl": "https://lszl.aihuanpu.com",
+  "deployment": {
+    "script": "deploy/update.sh",
+    "exitCode": 0,
+    "backupVerifiedBeforeSync": true,
+    "previousReleaseKeptForRollback": "v9.0-p4.1.437",
+    "uatContainerUnchanged": true
+  },
+  "backup": {
+    "backup_dir": "/home/ubuntu/lszl-backups/20261110_225431",
+    "directory_mode": "0700",
+    "manifest_matches_expected": true,
+    "files": {
+      "manifest": {
+        "path": "/home/ubuntu/lszl-backups/20261110_225431/manifest.txt",
+        "bytes": 309,
+        "mode": "0600",
+        "sha256": "6c512a26f7baed63ee7834731f56ad56525c32b10f3af99f080e7ba407363f5a",
+        "nonempty": true
+      },
+      "repo": {
+        "path": "/home/ubuntu/lszl-backups/20261110_225431/repo_20261110_225431.tar.gz",
+        "bytes": 138110662,
+        "mode": "0600",
+        "sha256": "c720a78689a2a462d4b37f87424a48c0cac4676a7ea218f0677d6efcfe7e41b6",
+        "nonempty": true
+      },
+      "database_dump": {
+        "path": "/home/ubuntu/lszl-backups/20261110_225431/db_20261110_225431.dump",
+        "bytes": 245380939,
+        "mode": "0600",
+        "sha256": "e5010715bae945c3c25fb522d98af5c464339638c42f447f0e7fb8214c3483eb",
+        "nonempty": true
+      }
+    },
+    "tar_readable": true,
+    "pg_restore_list_readable": true,
+    "rollback_image": {
+      "tag": "lszl-kg-backend:rollback-20261110_225431",
+      "image_id": "sha256:0ebbaacf175ea73e25ded5e7ad66a9b789c61dfbdf5950f5127effdcf7f639cb",
+      "matches_previous_production": true
+    },
+    "verified": true
+  },
+  "verification": {
+    "http": {
+      "version": "v9.0-p4.1.438",
+      "assets": {
+        "styles/dialogs.css": "b449459fd80d053331516808f47795bd6d05c544e1c5910481ca3df62f13c4e4",
+        "styles/main.css": "bbaac75f6c047c30f682e308958753bb07be41465259c753eb4db0e9744aa214",
+        "src/32-wechat-login.js": "a3a33a4a23cc7972c7dff3c56b18726fb52cd90c1319d7d3d6774a98b8404f40"
+      },
+      "pages": {
+        "index.html": "v9.0-p4.1.438",
+        "workbench.html": "v9.0-p4.1.438",
+        "practice-mode.html": "v9.0-p4.1.438",
+        "knowledge-recall.html": "v9.0-p4.1.438",
+        "question-workspace.html": "v9.0-p4.1.438"
+      },
+      "health": {
+        "status": "ok",
+        "db": "ok"
+      },
+      "publicWechatMode": "official"
+    },
+    "browser": {
+      "scope": "Actual public production form layout/scroll only; local API/QR-fixture suite is separate",
+      "expectedVersion": "v9.0-p4.1.438",
+      "cases": [
+        {
+          "route": "/graph",
+          "viewport": {
+            "width": 970,
+            "height": 530
+          },
+          "pointer": "desktop-fine",
+          "scrolls": [
+            {
+              "target": "initial-body-scroll",
+              "input": "wheel",
+              "changed": true,
+              "before": [
+                {
+                  "name": "auth-body",
+                  "top": 0,
+                  "height": 378,
+                  "scrollHeight": 691,
+                  "overflow": "auto"
+                }
+              ],
+              "after": [
+                {
+                  "name": "auth-body",
+                  "top": 240,
+                  "height": 378,
+                  "scrollHeight": 691,
+                  "overflow": "auto"
+                }
+              ]
+            },
+            {
+              "target": "#authLegalConsent",
+              "input": "wheel",
+              "changed": true,
+              "before": [
+                {
+                  "name": "auth-body",
+                  "top": 240,
+                  "height": 378,
+                  "scrollHeight": 691,
+                  "overflow": "auto"
+                }
+              ],
+              "after": [
+                {
+                  "name": "auth-body",
+                  "top": 313,
+                  "height": 378,
+                  "scrollHeight": 691,
+                  "overflow": "auto"
+                }
+              ]
+            }
+          ],
+          "passed": true,
+          "httpStatus": 200,
+          "preparations": [
+            "dragged-global-shortcuts-left"
+          ],
+          "version": "v9.0-p4.1.438",
+          "authCss": [
+            {
+              "href": "https://lszl.aihuanpu.com/bundles/home-shell.css?v=v9.0-p4.1.438",
+              "selector": "#authModal.auth-backdrop .auth-body",
+              "overflowY": "auto"
+            }
+          ],
+          "initialClose": {
+            "rect": {
+              "x": 651.390625,
+              "y": 42,
+              "width": 27.609375,
+              "height": 34
+            },
+            "clip": {
+              "left": 270,
+              "top": 21,
+              "right": 700,
+              "bottom": 509
+            },
+            "reachable": true,
+            "ancestors": [
+              {
+                "tag": "auth-head",
+                "top": 0,
+                "height": 107,
+                "scrollHeight": 107,
+                "overflow": "visible"
+              },
+              {
+                "tag": "modal auth-modal",
+                "top": 0,
+                "height": 486,
+                "scrollHeight": 486,
+                "overflow": "hidden"
+              },
+              {
+                "tag": "authModal",
+                "top": 0,
+                "height": 530,
+                "scrollHeight": 530,
+                "overflow": "visible"
+              },
+              {
+                "tag": "authDialogRoot",
+                "top": 0,
+                "height": 0,
+                "scrollHeight": 0,
+                "overflow": "visible"
+              },
+              {
+                "tag": "knowledge-graph-page auth-readonly graph-mode-efficient",
+                "top": 0,
+                "height": 530,
+                "scrollHeight": 530,
+                "overflow": "hidden"
+              },
+              {
+                "tag": "kg-perf-defer-drag-edges",
+                "top": 0,
+                "height": 530,
+                "scrollHeight": 530,
+                "overflow": "hidden"
+              }
+            ]
+          },
+          "controls": {
+            "#authDoLoginBtn": {
+              "rect": {
+                "x": 291,
+                "y": 258.65625,
+                "width": 189,
+                "height": 40
+              },
+              "clip": {
+                "left": 271,
+                "top": 130.28125,
+                "right": 699,
+                "bottom": 508
+              },
+              "reachable": true,
+              "ancestors": [
+                {
+                  "tag": "auth-actions",
+                  "top": 0,
+                  "height": 40,
+                  "scrollHeight": 40,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "auth-body",
+                  "top": 240,
+                  "height": 378,
+                  "scrollHeight": 691,
+                  "overflow": "auto"
+                },
+                {
+                  "tag": "modal auth-modal",
+                  "top": 0,
+                  "height": 486,
+                  "scrollHeight": 486,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "authModal",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "authDialogRoot",
+                  "top": 0,
+                  "height": 0,
+                  "scrollHeight": 0,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "knowledge-graph-page auth-readonly graph-mode-efficient",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "kg-perf-defer-drag-edges",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "hidden"
+                }
+              ]
+            },
+            "#authLegalConsent": {
+              "rect": {
+                "x": 291,
+                "y": 471.21875,
+                "width": 16,
+                "height": 16
+              },
+              "clip": {
+                "left": 271,
+                "top": 130.28125,
+                "right": 699,
+                "bottom": 508
+              },
+              "reachable": true,
+              "ancestors": [
+                {
+                  "tag": "auth-agreement",
+                  "top": 0,
+                  "height": 19,
+                  "scrollHeight": 19,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "auth-body",
+                  "top": 313,
+                  "height": 378,
+                  "scrollHeight": 691,
+                  "overflow": "auto"
+                },
+                {
+                  "tag": "modal auth-modal",
+                  "top": 0,
+                  "height": 486,
+                  "scrollHeight": 486,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "authModal",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "authDialogRoot",
+                  "top": 0,
+                  "height": 0,
+                  "scrollHeight": 0,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "knowledge-graph-page auth-readonly graph-mode-efficient",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "kg-perf-defer-drag-edges",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "hidden"
+                }
+              ]
+            },
+            ".wechat-login-entry": {
+              "rect": {
+                "x": 291,
+                "y": 341.03125,
+                "width": 388,
+                "height": 44
+              },
+              "clip": {
+                "left": 271,
+                "top": 130.28125,
+                "right": 699,
+                "bottom": 508
+              },
+              "reachable": true,
+              "ancestors": [
+                {
+                  "tag": "wechat-login-section",
+                  "top": 0,
+                  "height": 144,
+                  "scrollHeight": 144,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "auth-body",
+                  "top": 313,
+                  "height": 378,
+                  "scrollHeight": 691,
+                  "overflow": "auto"
+                },
+                {
+                  "tag": "modal auth-modal",
+                  "top": 0,
+                  "height": 486,
+                  "scrollHeight": 486,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "authModal",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "authDialogRoot",
+                  "top": 0,
+                  "height": 0,
+                  "scrollHeight": 0,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "knowledge-graph-page auth-readonly graph-mode-efficient",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "kg-perf-defer-drag-edges",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "hidden"
+                }
+              ]
+            }
+          },
+          "wechatEntryText": "微信扫码登录",
+          "wechatEntryVisible": true,
+          "wechatPublicMode": {
+            "enableOfficial": true,
+            "enableDemo": false
+          },
+          "layout": {
+            "card": {
+              "top": 21,
+              "bottom": 509,
+              "width": 430,
+              "height": 488,
+              "clientHeight": 486,
+              "scrollHeight": 486,
+              "scrollTop": 0,
+              "overflowY": "hidden",
+              "touchAction": "auto"
+            },
+            "header": {
+              "top": 22,
+              "bottom": 130.28125,
+              "width": 428,
+              "height": 108.28125,
+              "clientHeight": 107,
+              "scrollHeight": 107,
+              "scrollTop": 0,
+              "overflowY": "visible",
+              "touchAction": "auto"
+            },
+            "body": {
+              "top": 130.28125,
+              "bottom": 508,
+              "width": 428,
+              "height": 377.71875,
+              "clientHeight": 378,
+              "scrollHeight": 691,
+              "scrollTop": 313,
+              "overflowY": "auto",
+              "touchAction": "pan-y pinch-zoom"
+            },
+            "close": {
+              "top": 42,
+              "bottom": 76,
+              "width": 27.609375,
+              "height": 34,
+              "clientHeight": 34,
+              "scrollHeight": 34,
+              "scrollTop": 0,
+              "overflowY": "visible",
+              "touchAction": "manipulation"
+            }
+          },
+          "consentAccepted": false,
+          "authenticated": false,
+          "oauthTriggered": false,
+          "closedViaVisibleButton": true
+        },
+        {
+          "route": "/index.html",
+          "viewport": {
+            "width": 970,
+            "height": 530
+          },
+          "pointer": "desktop-fine",
+          "scrolls": [
+            {
+              "target": "initial-body-scroll",
+              "input": "wheel",
+              "changed": true,
+              "before": [
+                {
+                  "name": "auth-body",
+                  "top": 0,
+                  "height": 378,
+                  "scrollHeight": 691,
+                  "overflow": "auto"
+                }
+              ],
+              "after": [
+                {
+                  "name": "auth-body",
+                  "top": 240,
+                  "height": 378,
+                  "scrollHeight": 691,
+                  "overflow": "auto"
+                }
+              ]
+            },
+            {
+              "target": "#authLegalConsent",
+              "input": "wheel",
+              "changed": true,
+              "before": [
+                {
+                  "name": "auth-body",
+                  "top": 240,
+                  "height": 378,
+                  "scrollHeight": 691,
+                  "overflow": "auto"
+                }
+              ],
+              "after": [
+                {
+                  "name": "auth-body",
+                  "top": 313,
+                  "height": 378,
+                  "scrollHeight": 691,
+                  "overflow": "auto"
+                }
+              ]
+            }
+          ],
+          "passed": true,
+          "httpStatus": 200,
+          "preparations": [
+            "dragged-global-shortcuts-left"
+          ],
+          "version": "v9.0-p4.1.438",
+          "authCss": [
+            {
+              "href": "https://lszl.aihuanpu.com/bundles/home-shell.css?v=v9.0-p4.1.438",
+              "selector": "#authModal.auth-backdrop .auth-body",
+              "overflowY": "auto"
+            }
+          ],
+          "initialClose": {
+            "rect": {
+              "x": 651.390625,
+              "y": 42,
+              "width": 27.609375,
+              "height": 34
+            },
+            "clip": {
+              "left": 270,
+              "top": 21,
+              "right": 700,
+              "bottom": 509
+            },
+            "reachable": true,
+            "ancestors": [
+              {
+                "tag": "auth-head",
+                "top": 0,
+                "height": 107,
+                "scrollHeight": 107,
+                "overflow": "visible"
+              },
+              {
+                "tag": "modal auth-modal",
+                "top": 0,
+                "height": 486,
+                "scrollHeight": 486,
+                "overflow": "hidden"
+              },
+              {
+                "tag": "authModal",
+                "top": 0,
+                "height": 530,
+                "scrollHeight": 530,
+                "overflow": "visible"
+              },
+              {
+                "tag": "authDialogRoot",
+                "top": 0,
+                "height": 0,
+                "scrollHeight": 0,
+                "overflow": "visible"
+              },
+              {
+                "tag": "knowledge-graph-page auth-readonly graph-mode-efficient",
+                "top": 0,
+                "height": 530,
+                "scrollHeight": 530,
+                "overflow": "hidden"
+              },
+              {
+                "tag": "kg-perf-defer-drag-edges",
+                "top": 0,
+                "height": 530,
+                "scrollHeight": 530,
+                "overflow": "hidden"
+              }
+            ]
+          },
+          "controls": {
+            "#authDoLoginBtn": {
+              "rect": {
+                "x": 291,
+                "y": 258.65625,
+                "width": 189,
+                "height": 40
+              },
+              "clip": {
+                "left": 271,
+                "top": 130.28125,
+                "right": 699,
+                "bottom": 508
+              },
+              "reachable": true,
+              "ancestors": [
+                {
+                  "tag": "auth-actions",
+                  "top": 0,
+                  "height": 40,
+                  "scrollHeight": 40,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "auth-body",
+                  "top": 240,
+                  "height": 378,
+                  "scrollHeight": 691,
+                  "overflow": "auto"
+                },
+                {
+                  "tag": "modal auth-modal",
+                  "top": 0,
+                  "height": 486,
+                  "scrollHeight": 486,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "authModal",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "authDialogRoot",
+                  "top": 0,
+                  "height": 0,
+                  "scrollHeight": 0,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "knowledge-graph-page auth-readonly graph-mode-efficient",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "kg-perf-defer-drag-edges",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "hidden"
+                }
+              ]
+            },
+            "#authLegalConsent": {
+              "rect": {
+                "x": 291,
+                "y": 471.21875,
+                "width": 16,
+                "height": 16
+              },
+              "clip": {
+                "left": 271,
+                "top": 130.28125,
+                "right": 699,
+                "bottom": 508
+              },
+              "reachable": true,
+              "ancestors": [
+                {
+                  "tag": "auth-agreement",
+                  "top": 0,
+                  "height": 19,
+                  "scrollHeight": 19,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "auth-body",
+                  "top": 313,
+                  "height": 378,
+                  "scrollHeight": 691,
+                  "overflow": "auto"
+                },
+                {
+                  "tag": "modal auth-modal",
+                  "top": 0,
+                  "height": 486,
+                  "scrollHeight": 486,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "authModal",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "authDialogRoot",
+                  "top": 0,
+                  "height": 0,
+                  "scrollHeight": 0,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "knowledge-graph-page auth-readonly graph-mode-efficient",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "kg-perf-defer-drag-edges",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "hidden"
+                }
+              ]
+            },
+            ".wechat-login-entry": {
+              "rect": {
+                "x": 291,
+                "y": 341.03125,
+                "width": 388,
+                "height": 44
+              },
+              "clip": {
+                "left": 271,
+                "top": 130.28125,
+                "right": 699,
+                "bottom": 508
+              },
+              "reachable": true,
+              "ancestors": [
+                {
+                  "tag": "wechat-login-section",
+                  "top": 0,
+                  "height": 144,
+                  "scrollHeight": 144,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "auth-body",
+                  "top": 313,
+                  "height": 378,
+                  "scrollHeight": 691,
+                  "overflow": "auto"
+                },
+                {
+                  "tag": "modal auth-modal",
+                  "top": 0,
+                  "height": 486,
+                  "scrollHeight": 486,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "authModal",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "authDialogRoot",
+                  "top": 0,
+                  "height": 0,
+                  "scrollHeight": 0,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "knowledge-graph-page auth-readonly graph-mode-efficient",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "kg-perf-defer-drag-edges",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "hidden"
+                }
+              ]
+            }
+          },
+          "wechatEntryText": "微信扫码登录",
+          "wechatEntryVisible": true,
+          "wechatPublicMode": {
+            "enableOfficial": true,
+            "enableDemo": false
+          },
+          "layout": {
+            "card": {
+              "top": 21,
+              "bottom": 509,
+              "width": 430,
+              "height": 488,
+              "clientHeight": 486,
+              "scrollHeight": 486,
+              "scrollTop": 0,
+              "overflowY": "hidden",
+              "touchAction": "auto"
+            },
+            "header": {
+              "top": 22,
+              "bottom": 130.28125,
+              "width": 428,
+              "height": 108.28125,
+              "clientHeight": 107,
+              "scrollHeight": 107,
+              "scrollTop": 0,
+              "overflowY": "visible",
+              "touchAction": "auto"
+            },
+            "body": {
+              "top": 130.28125,
+              "bottom": 508,
+              "width": 428,
+              "height": 377.71875,
+              "clientHeight": 378,
+              "scrollHeight": 691,
+              "scrollTop": 313,
+              "overflowY": "auto",
+              "touchAction": "pan-y pinch-zoom"
+            },
+            "close": {
+              "top": 42,
+              "bottom": 76,
+              "width": 27.609375,
+              "height": 34,
+              "clientHeight": 34,
+              "scrollHeight": 34,
+              "scrollTop": 0,
+              "overflowY": "visible",
+              "touchAction": "manipulation"
+            }
+          },
+          "consentAccepted": false,
+          "authenticated": false,
+          "oauthTriggered": false,
+          "closedViaVisibleButton": true
+        },
+        {
+          "route": "/workbench.html",
+          "viewport": {
+            "width": 970,
+            "height": 530
+          },
+          "pointer": "desktop-fine",
+          "scrolls": [
+            {
+              "target": "initial-body-scroll",
+              "input": "wheel",
+              "changed": true,
+              "before": [
+                {
+                  "name": "auth-body",
+                  "top": 0,
+                  "height": 378,
+                  "scrollHeight": 691,
+                  "overflow": "auto"
+                }
+              ],
+              "after": [
+                {
+                  "name": "auth-body",
+                  "top": 240,
+                  "height": 378,
+                  "scrollHeight": 691,
+                  "overflow": "auto"
+                }
+              ]
+            },
+            {
+              "target": "#authLegalConsent",
+              "input": "wheel",
+              "changed": true,
+              "before": [
+                {
+                  "name": "auth-body",
+                  "top": 240,
+                  "height": 378,
+                  "scrollHeight": 691,
+                  "overflow": "auto"
+                }
+              ],
+              "after": [
+                {
+                  "name": "auth-body",
+                  "top": 313,
+                  "height": 378,
+                  "scrollHeight": 691,
+                  "overflow": "auto"
+                }
+              ]
+            }
+          ],
+          "passed": true,
+          "httpStatus": 200,
+          "preparations": [
+            "dragged-global-shortcuts-left"
+          ],
+          "version": "v9.0-p4.1.438",
+          "authCss": [
+            {
+              "href": "https://lszl.aihuanpu.com/bundles/home-shell.css?v=v9.0-p4.1.438",
+              "selector": "#authModal.auth-backdrop .auth-body",
+              "overflowY": "auto"
+            }
+          ],
+          "initialClose": {
+            "rect": {
+              "x": 651.390625,
+              "y": 42,
+              "width": 27.609375,
+              "height": 34
+            },
+            "clip": {
+              "left": 270,
+              "top": 21,
+              "right": 700,
+              "bottom": 509
+            },
+            "reachable": true,
+            "ancestors": [
+              {
+                "tag": "auth-head",
+                "top": 0,
+                "height": 107,
+                "scrollHeight": 107,
+                "overflow": "visible"
+              },
+              {
+                "tag": "modal auth-modal",
+                "top": 0,
+                "height": 486,
+                "scrollHeight": 486,
+                "overflow": "hidden"
+              },
+              {
+                "tag": "authModal",
+                "top": 0,
+                "height": 530,
+                "scrollHeight": 530,
+                "overflow": "visible"
+              },
+              {
+                "tag": "authDialogRoot",
+                "top": 0,
+                "height": 0,
+                "scrollHeight": 0,
+                "overflow": "visible"
+              },
+              {
+                "tag": "knowledge-graph-page auth-readonly graph-mode-efficient",
+                "top": 0,
+                "height": 530,
+                "scrollHeight": 530,
+                "overflow": "hidden"
+              },
+              {
+                "tag": "kg-perf-defer-drag-edges",
+                "top": 0,
+                "height": 530,
+                "scrollHeight": 530,
+                "overflow": "hidden"
+              }
+            ]
+          },
+          "controls": {
+            "#authDoLoginBtn": {
+              "rect": {
+                "x": 291,
+                "y": 258.65625,
+                "width": 189,
+                "height": 40
+              },
+              "clip": {
+                "left": 271,
+                "top": 130.28125,
+                "right": 699,
+                "bottom": 508
+              },
+              "reachable": true,
+              "ancestors": [
+                {
+                  "tag": "auth-actions",
+                  "top": 0,
+                  "height": 40,
+                  "scrollHeight": 40,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "auth-body",
+                  "top": 240,
+                  "height": 378,
+                  "scrollHeight": 691,
+                  "overflow": "auto"
+                },
+                {
+                  "tag": "modal auth-modal",
+                  "top": 0,
+                  "height": 486,
+                  "scrollHeight": 486,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "authModal",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "authDialogRoot",
+                  "top": 0,
+                  "height": 0,
+                  "scrollHeight": 0,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "knowledge-graph-page auth-readonly graph-mode-efficient",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "kg-perf-defer-drag-edges",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "hidden"
+                }
+              ]
+            },
+            "#authLegalConsent": {
+              "rect": {
+                "x": 291,
+                "y": 471.21875,
+                "width": 16,
+                "height": 16
+              },
+              "clip": {
+                "left": 271,
+                "top": 130.28125,
+                "right": 699,
+                "bottom": 508
+              },
+              "reachable": true,
+              "ancestors": [
+                {
+                  "tag": "auth-agreement",
+                  "top": 0,
+                  "height": 19,
+                  "scrollHeight": 19,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "auth-body",
+                  "top": 313,
+                  "height": 378,
+                  "scrollHeight": 691,
+                  "overflow": "auto"
+                },
+                {
+                  "tag": "modal auth-modal",
+                  "top": 0,
+                  "height": 486,
+                  "scrollHeight": 486,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "authModal",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "authDialogRoot",
+                  "top": 0,
+                  "height": 0,
+                  "scrollHeight": 0,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "knowledge-graph-page auth-readonly graph-mode-efficient",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "kg-perf-defer-drag-edges",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "hidden"
+                }
+              ]
+            },
+            ".wechat-login-entry": {
+              "rect": {
+                "x": 291,
+                "y": 341.03125,
+                "width": 388,
+                "height": 44
+              },
+              "clip": {
+                "left": 271,
+                "top": 130.28125,
+                "right": 699,
+                "bottom": 508
+              },
+              "reachable": true,
+              "ancestors": [
+                {
+                  "tag": "wechat-login-section",
+                  "top": 0,
+                  "height": 144,
+                  "scrollHeight": 144,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "auth-body",
+                  "top": 313,
+                  "height": 378,
+                  "scrollHeight": 691,
+                  "overflow": "auto"
+                },
+                {
+                  "tag": "modal auth-modal",
+                  "top": 0,
+                  "height": 486,
+                  "scrollHeight": 486,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "authModal",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "authDialogRoot",
+                  "top": 0,
+                  "height": 0,
+                  "scrollHeight": 0,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "knowledge-graph-page auth-readonly graph-mode-efficient",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "kg-perf-defer-drag-edges",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "hidden"
+                }
+              ]
+            }
+          },
+          "wechatEntryText": "微信扫码登录",
+          "wechatEntryVisible": true,
+          "wechatPublicMode": {
+            "enableOfficial": true,
+            "enableDemo": false
+          },
+          "layout": {
+            "card": {
+              "top": 21,
+              "bottom": 509,
+              "width": 430,
+              "height": 488,
+              "clientHeight": 486,
+              "scrollHeight": 486,
+              "scrollTop": 0,
+              "overflowY": "hidden",
+              "touchAction": "auto"
+            },
+            "header": {
+              "top": 22,
+              "bottom": 130.28125,
+              "width": 428,
+              "height": 108.28125,
+              "clientHeight": 107,
+              "scrollHeight": 107,
+              "scrollTop": 0,
+              "overflowY": "visible",
+              "touchAction": "auto"
+            },
+            "body": {
+              "top": 130.28125,
+              "bottom": 508,
+              "width": 428,
+              "height": 377.71875,
+              "clientHeight": 378,
+              "scrollHeight": 691,
+              "scrollTop": 313,
+              "overflowY": "auto",
+              "touchAction": "pan-y pinch-zoom"
+            },
+            "close": {
+              "top": 42,
+              "bottom": 76,
+              "width": 27.609375,
+              "height": 34,
+              "clientHeight": 34,
+              "scrollHeight": 34,
+              "scrollTop": 0,
+              "overflowY": "visible",
+              "touchAction": "manipulation"
+            }
+          },
+          "consentAccepted": false,
+          "authenticated": false,
+          "oauthTriggered": false,
+          "closedViaVisibleButton": true
+        },
+        {
+          "route": "/practice-mode.html",
+          "viewport": {
+            "width": 970,
+            "height": 530
+          },
+          "pointer": "desktop-fine",
+          "scrolls": [
+            {
+              "target": "initial-body-scroll",
+              "input": "wheel",
+              "changed": true,
+              "before": [
+                {
+                  "name": "auth-body",
+                  "top": 0,
+                  "height": 378,
+                  "scrollHeight": 691,
+                  "overflow": "auto"
+                }
+              ],
+              "after": [
+                {
+                  "name": "auth-body",
+                  "top": 240,
+                  "height": 378,
+                  "scrollHeight": 691,
+                  "overflow": "auto"
+                }
+              ]
+            },
+            {
+              "target": "#authLegalConsent",
+              "input": "wheel",
+              "changed": true,
+              "before": [
+                {
+                  "name": "auth-body",
+                  "top": 240,
+                  "height": 378,
+                  "scrollHeight": 691,
+                  "overflow": "auto"
+                }
+              ],
+              "after": [
+                {
+                  "name": "auth-body",
+                  "top": 313,
+                  "height": 378,
+                  "scrollHeight": 691,
+                  "overflow": "auto"
+                }
+              ]
+            }
+          ],
+          "passed": true,
+          "httpStatus": 200,
+          "version": "v9.0-p4.1.438",
+          "authCss": [
+            {
+              "href": "https://lszl.aihuanpu.com/bundles/practice-lobby.css?v=v9.0-p4.1.438",
+              "selector": "#authModal.auth-backdrop .auth-body",
+              "overflowY": "auto"
+            }
+          ],
+          "initialClose": {
+            "rect": {
+              "x": 651.390625,
+              "y": 42,
+              "width": 27.609375,
+              "height": 34
+            },
+            "clip": {
+              "left": 270,
+              "top": 21,
+              "right": 700,
+              "bottom": 509
+            },
+            "reachable": true,
+            "ancestors": [
+              {
+                "tag": "auth-head",
+                "top": 0,
+                "height": 107,
+                "scrollHeight": 107,
+                "overflow": "visible"
+              },
+              {
+                "tag": "modal auth-modal",
+                "top": 0,
+                "height": 486,
+                "scrollHeight": 486,
+                "overflow": "hidden"
+              },
+              {
+                "tag": "authModal",
+                "top": 0,
+                "height": 530,
+                "scrollHeight": 530,
+                "overflow": "visible"
+              },
+              {
+                "tag": "authDialogRoot",
+                "top": 0,
+                "height": 0,
+                "scrollHeight": 0,
+                "overflow": "visible"
+              },
+              {
+                "tag": "practice-mode-page auth-readonly",
+                "top": 0,
+                "height": 530,
+                "scrollHeight": 530,
+                "overflow": "hidden"
+              },
+              {
+                "tag": "HTML",
+                "top": 0,
+                "height": 530,
+                "scrollHeight": 530,
+                "overflow": "hidden"
+              }
+            ]
+          },
+          "controls": {
+            "#authDoLoginBtn": {
+              "rect": {
+                "x": 291,
+                "y": 258.65625,
+                "width": 189,
+                "height": 40
+              },
+              "clip": {
+                "left": 271,
+                "top": 130.28125,
+                "right": 699,
+                "bottom": 508
+              },
+              "reachable": true,
+              "ancestors": [
+                {
+                  "tag": "auth-actions",
+                  "top": 0,
+                  "height": 40,
+                  "scrollHeight": 40,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "auth-body",
+                  "top": 240,
+                  "height": 378,
+                  "scrollHeight": 691,
+                  "overflow": "auto"
+                },
+                {
+                  "tag": "modal auth-modal",
+                  "top": 0,
+                  "height": 486,
+                  "scrollHeight": 486,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "authModal",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "authDialogRoot",
+                  "top": 0,
+                  "height": 0,
+                  "scrollHeight": 0,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "practice-mode-page auth-readonly",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "HTML",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "hidden"
+                }
+              ]
+            },
+            "#authLegalConsent": {
+              "rect": {
+                "x": 291,
+                "y": 471.21875,
+                "width": 16,
+                "height": 16
+              },
+              "clip": {
+                "left": 271,
+                "top": 130.28125,
+                "right": 699,
+                "bottom": 508
+              },
+              "reachable": true,
+              "ancestors": [
+                {
+                  "tag": "auth-agreement",
+                  "top": 0,
+                  "height": 19,
+                  "scrollHeight": 19,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "auth-body",
+                  "top": 313,
+                  "height": 378,
+                  "scrollHeight": 691,
+                  "overflow": "auto"
+                },
+                {
+                  "tag": "modal auth-modal",
+                  "top": 0,
+                  "height": 486,
+                  "scrollHeight": 486,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "authModal",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "authDialogRoot",
+                  "top": 0,
+                  "height": 0,
+                  "scrollHeight": 0,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "practice-mode-page auth-readonly",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "HTML",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "hidden"
+                }
+              ]
+            },
+            ".wechat-login-entry": {
+              "rect": {
+                "x": 291,
+                "y": 341.03125,
+                "width": 388,
+                "height": 44
+              },
+              "clip": {
+                "left": 271,
+                "top": 130.28125,
+                "right": 699,
+                "bottom": 508
+              },
+              "reachable": true,
+              "ancestors": [
+                {
+                  "tag": "wechat-login-section",
+                  "top": 0,
+                  "height": 144,
+                  "scrollHeight": 144,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "auth-body",
+                  "top": 313,
+                  "height": 378,
+                  "scrollHeight": 691,
+                  "overflow": "auto"
+                },
+                {
+                  "tag": "modal auth-modal",
+                  "top": 0,
+                  "height": 486,
+                  "scrollHeight": 486,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "authModal",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "authDialogRoot",
+                  "top": 0,
+                  "height": 0,
+                  "scrollHeight": 0,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "practice-mode-page auth-readonly",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "HTML",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "hidden"
+                }
+              ]
+            }
+          },
+          "wechatEntryText": "微信扫码登录",
+          "wechatEntryVisible": true,
+          "wechatPublicMode": {
+            "enableOfficial": true,
+            "enableDemo": false
+          },
+          "layout": {
+            "card": {
+              "top": 21,
+              "bottom": 509,
+              "width": 430,
+              "height": 488,
+              "clientHeight": 486,
+              "scrollHeight": 486,
+              "scrollTop": 0,
+              "overflowY": "hidden",
+              "touchAction": "auto"
+            },
+            "header": {
+              "top": 22,
+              "bottom": 130.28125,
+              "width": 428,
+              "height": 108.28125,
+              "clientHeight": 107,
+              "scrollHeight": 107,
+              "scrollTop": 0,
+              "overflowY": "visible",
+              "touchAction": "auto"
+            },
+            "body": {
+              "top": 130.28125,
+              "bottom": 508,
+              "width": 428,
+              "height": 377.71875,
+              "clientHeight": 378,
+              "scrollHeight": 691,
+              "scrollTop": 313,
+              "overflowY": "auto",
+              "touchAction": "pan-y pinch-zoom"
+            },
+            "close": {
+              "top": 42,
+              "bottom": 76,
+              "width": 27.609375,
+              "height": 34,
+              "clientHeight": 34,
+              "scrollHeight": 34,
+              "scrollTop": 0,
+              "overflowY": "visible",
+              "touchAction": "manipulation"
+            }
+          },
+          "consentAccepted": false,
+          "authenticated": false,
+          "oauthTriggered": false,
+          "closedViaVisibleButton": true
+        },
+        {
+          "route": "/knowledge-recall.html",
+          "viewport": {
+            "width": 970,
+            "height": 530
+          },
+          "pointer": "desktop-fine",
+          "scrolls": [
+            {
+              "target": "initial-body-scroll",
+              "input": "wheel",
+              "changed": true,
+              "before": [
+                {
+                  "name": "auth-body",
+                  "top": 0,
+                  "height": 398,
+                  "scrollHeight": 592,
+                  "overflow": "auto"
+                }
+              ],
+              "after": [
+                {
+                  "name": "auth-body",
+                  "top": 194,
+                  "height": 398,
+                  "scrollHeight": 592,
+                  "overflow": "auto"
+                }
+              ]
+            }
+          ],
+          "passed": true,
+          "httpStatus": 200,
+          "preparations": [
+            "dragged-global-shortcuts-left",
+            "page-requested-authentication"
+          ],
+          "version": "v9.0-p4.1.438",
+          "authCss": [
+            {
+              "href": "https://lszl.aihuanpu.com/styles/dialogs.css?v=v9.0-p4.1.438",
+              "selector": "#authModal.auth-backdrop .auth-body",
+              "overflowY": "auto"
+            }
+          ],
+          "initialClose": {
+            "rect": {
+              "x": 645,
+              "y": 42,
+              "width": 34,
+              "height": 34
+            },
+            "clip": {
+              "left": 270,
+              "top": 21,
+              "right": 700,
+              "bottom": 509
+            },
+            "reachable": true,
+            "ancestors": [
+              {
+                "tag": "auth-head",
+                "top": 0,
+                "height": 87,
+                "scrollHeight": 87,
+                "overflow": "visible"
+              },
+              {
+                "tag": "modal auth-modal",
+                "top": 0,
+                "height": 486,
+                "scrollHeight": 486,
+                "overflow": "hidden"
+              },
+              {
+                "tag": "authModal",
+                "top": 0,
+                "height": 530,
+                "scrollHeight": 530,
+                "overflow": "visible"
+              },
+              {
+                "tag": "knowledge-recall-page auth-readonly kr-readonly kr-has-no-question",
+                "top": 0,
+                "height": 530,
+                "scrollHeight": 530,
+                "overflow": "hidden"
+              },
+              {
+                "tag": "HTML",
+                "top": 0,
+                "height": 530,
+                "scrollHeight": 530,
+                "overflow": "hidden"
+              }
+            ]
+          },
+          "controls": {
+            "#authDoLoginBtn": {
+              "rect": {
+                "x": 291,
+                "y": 265.328125,
+                "width": 189,
+                "height": 40
+              },
+              "clip": {
+                "left": 271,
+                "top": 110.140625,
+                "right": 699,
+                "bottom": 508
+              },
+              "reachable": true,
+              "ancestors": [
+                {
+                  "tag": "auth-actions",
+                  "top": 0,
+                  "height": 40,
+                  "scrollHeight": 40,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "auth-body",
+                  "top": 194,
+                  "height": 398,
+                  "scrollHeight": 592,
+                  "overflow": "auto"
+                },
+                {
+                  "tag": "modal auth-modal",
+                  "top": 0,
+                  "height": 486,
+                  "scrollHeight": 486,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "authModal",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "knowledge-recall-page auth-readonly kr-readonly kr-has-no-question",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "HTML",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "hidden"
+                }
+              ]
+            },
+            "#authLegalConsent": {
+              "rect": {
+                "x": 291,
+                "y": 454.125,
+                "width": 16,
+                "height": 16
+              },
+              "clip": {
+                "left": 271,
+                "top": 110.140625,
+                "right": 699,
+                "bottom": 508
+              },
+              "reachable": true,
+              "ancestors": [
+                {
+                  "tag": "auth-agreement",
+                  "top": 0,
+                  "height": 24,
+                  "scrollHeight": 24,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "auth-body",
+                  "top": 194,
+                  "height": 398,
+                  "scrollHeight": 592,
+                  "overflow": "auto"
+                },
+                {
+                  "tag": "modal auth-modal",
+                  "top": 0,
+                  "height": 486,
+                  "scrollHeight": 486,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "authModal",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "knowledge-recall-page auth-readonly kr-readonly kr-has-no-question",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "HTML",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "hidden"
+                }
+              ]
+            },
+            ".wechat-login-entry": {
+              "rect": {
+                "x": 291,
+                "y": 394.125,
+                "width": 388,
+                "height": 44
+              },
+              "clip": {
+                "left": 271,
+                "top": 110.140625,
+                "right": 699,
+                "bottom": 508
+              },
+              "reachable": true,
+              "ancestors": [
+                {
+                  "tag": "wechat-login-section",
+                  "top": 0,
+                  "height": 118,
+                  "scrollHeight": 118,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "auth-body",
+                  "top": 194,
+                  "height": 398,
+                  "scrollHeight": 592,
+                  "overflow": "auto"
+                },
+                {
+                  "tag": "modal auth-modal",
+                  "top": 0,
+                  "height": 486,
+                  "scrollHeight": 486,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "authModal",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "knowledge-recall-page auth-readonly kr-readonly kr-has-no-question",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "HTML",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "hidden"
+                }
+              ]
+            }
+          },
+          "wechatEntryText": "微信扫码登录",
+          "wechatEntryVisible": true,
+          "wechatPublicMode": {
+            "enableOfficial": true,
+            "enableDemo": false
+          },
+          "layout": {
+            "card": {
+              "top": 21,
+              "bottom": 509,
+              "width": 430,
+              "height": 488,
+              "clientHeight": 486,
+              "scrollHeight": 486,
+              "scrollTop": 0,
+              "overflowY": "hidden",
+              "touchAction": "auto"
+            },
+            "header": {
+              "top": 22,
+              "bottom": 110.140625,
+              "width": 428,
+              "height": 88.140625,
+              "clientHeight": 87,
+              "scrollHeight": 87,
+              "scrollTop": 0,
+              "overflowY": "visible",
+              "touchAction": "auto"
+            },
+            "body": {
+              "top": 110.140625,
+              "bottom": 508,
+              "width": 428,
+              "height": 397.859375,
+              "clientHeight": 398,
+              "scrollHeight": 592,
+              "scrollTop": 194,
+              "overflowY": "auto",
+              "touchAction": "pan-y pinch-zoom"
+            },
+            "close": {
+              "top": 42,
+              "bottom": 76,
+              "width": 34,
+              "height": 34,
+              "clientHeight": 34,
+              "scrollHeight": 34,
+              "scrollTop": 0,
+              "overflowY": "visible",
+              "touchAction": "manipulation"
+            }
+          },
+          "consentAccepted": false,
+          "authenticated": false,
+          "oauthTriggered": false,
+          "closedViaVisibleButton": true
+        },
+        {
+          "route": "/question-workspace.html",
+          "viewport": {
+            "width": 970,
+            "height": 530
+          },
+          "pointer": "desktop-fine",
+          "scrolls": [
+            {
+              "target": "initial-body-scroll",
+              "input": "wheel",
+              "changed": true,
+              "before": [
+                {
+                  "name": "auth-body",
+                  "top": 0,
+                  "height": 398,
+                  "scrollHeight": 621,
+                  "overflow": "auto"
+                }
+              ],
+              "after": [
+                {
+                  "name": "auth-body",
+                  "top": 223,
+                  "height": 398,
+                  "scrollHeight": 621,
+                  "overflow": "auto"
+                }
+              ]
+            }
+          ],
+          "passed": true,
+          "httpStatus": 200,
+          "preparations": [
+            "dragged-global-shortcuts-left"
+          ],
+          "version": "v9.0-p4.1.438",
+          "authCss": [
+            {
+              "href": "https://lszl.aihuanpu.com/styles/dialogs.css?v=v9.0-p4.1.438",
+              "selector": "#authModal.auth-backdrop .auth-body",
+              "overflowY": "auto"
+            }
+          ],
+          "initialClose": {
+            "rect": {
+              "x": 645,
+              "y": 42,
+              "width": 34,
+              "height": 34
+            },
+            "clip": {
+              "left": 270,
+              "top": 21,
+              "right": 700,
+              "bottom": 509
+            },
+            "reachable": true,
+            "ancestors": [
+              {
+                "tag": "auth-head",
+                "top": 0,
+                "height": 87,
+                "scrollHeight": 87,
+                "overflow": "visible"
+              },
+              {
+                "tag": "modal auth-modal",
+                "top": 0,
+                "height": 486,
+                "scrollHeight": 486,
+                "overflow": "hidden"
+              },
+              {
+                "tag": "authModal",
+                "top": 0,
+                "height": 530,
+                "scrollHeight": 530,
+                "overflow": "visible"
+              },
+              {
+                "tag": "question-workspace-page auth-readonly qw-light-canvas",
+                "top": 0,
+                "height": 530,
+                "scrollHeight": 530,
+                "overflow": "hidden"
+              },
+              {
+                "tag": "HTML",
+                "top": 0,
+                "height": 530,
+                "scrollHeight": 530,
+                "overflow": "hidden"
+              }
+            ]
+          },
+          "controls": {
+            "#authDoLoginBtn": {
+              "rect": {
+                "x": 291,
+                "y": 255.515625,
+                "width": 189,
+                "height": 40
+              },
+              "clip": {
+                "left": 271,
+                "top": 110.140625,
+                "right": 699,
+                "bottom": 508
+              },
+              "reachable": true,
+              "ancestors": [
+                {
+                  "tag": "auth-actions",
+                  "top": 0,
+                  "height": 40,
+                  "scrollHeight": 40,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "auth-body",
+                  "top": 223,
+                  "height": 398,
+                  "scrollHeight": 621,
+                  "overflow": "auto"
+                },
+                {
+                  "tag": "modal auth-modal",
+                  "top": 0,
+                  "height": 486,
+                  "scrollHeight": 486,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "authModal",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "question-workspace-page auth-readonly qw-light-canvas",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "HTML",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "hidden"
+                }
+              ]
+            },
+            "#authLegalConsent": {
+              "rect": {
+                "x": 291,
+                "y": 470.890625,
+                "width": 16,
+                "height": 16
+              },
+              "clip": {
+                "left": 271,
+                "top": 110.140625,
+                "right": 699,
+                "bottom": 508
+              },
+              "reachable": true,
+              "ancestors": [
+                {
+                  "tag": "auth-agreement",
+                  "top": 0,
+                  "height": 19,
+                  "scrollHeight": 19,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "auth-body",
+                  "top": 223,
+                  "height": 398,
+                  "scrollHeight": 621,
+                  "overflow": "auto"
+                },
+                {
+                  "tag": "modal auth-modal",
+                  "top": 0,
+                  "height": 486,
+                  "scrollHeight": 486,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "authModal",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "question-workspace-page auth-readonly qw-light-canvas",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "HTML",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "hidden"
+                }
+              ]
+            },
+            ".wechat-login-entry": {
+              "rect": {
+                "x": 291,
+                "y": 410.890625,
+                "width": 388,
+                "height": 44
+              },
+              "clip": {
+                "left": 271,
+                "top": 110.140625,
+                "right": 699,
+                "bottom": 508
+              },
+              "reachable": true,
+              "ancestors": [
+                {
+                  "tag": "wechat-login-section",
+                  "top": 0,
+                  "height": 144,
+                  "scrollHeight": 144,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "auth-body",
+                  "top": 223,
+                  "height": 398,
+                  "scrollHeight": 621,
+                  "overflow": "auto"
+                },
+                {
+                  "tag": "modal auth-modal",
+                  "top": 0,
+                  "height": 486,
+                  "scrollHeight": 486,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "authModal",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "question-workspace-page auth-readonly qw-light-canvas",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "HTML",
+                  "top": 0,
+                  "height": 530,
+                  "scrollHeight": 530,
+                  "overflow": "hidden"
+                }
+              ]
+            }
+          },
+          "wechatEntryText": "微信扫码登录",
+          "wechatEntryVisible": true,
+          "wechatPublicMode": {
+            "enableOfficial": true,
+            "enableDemo": false
+          },
+          "layout": {
+            "card": {
+              "top": 21,
+              "bottom": 509,
+              "width": 430,
+              "height": 488,
+              "clientHeight": 486,
+              "scrollHeight": 486,
+              "scrollTop": 0,
+              "overflowY": "hidden",
+              "touchAction": "auto"
+            },
+            "header": {
+              "top": 22,
+              "bottom": 110.140625,
+              "width": 428,
+              "height": 88.140625,
+              "clientHeight": 87,
+              "scrollHeight": 87,
+              "scrollTop": 0,
+              "overflowY": "visible",
+              "touchAction": "auto"
+            },
+            "body": {
+              "top": 110.140625,
+              "bottom": 508,
+              "width": 428,
+              "height": 397.859375,
+              "clientHeight": 398,
+              "scrollHeight": 621,
+              "scrollTop": 223,
+              "overflowY": "auto",
+              "touchAction": "pan-y pinch-zoom"
+            },
+            "close": {
+              "top": 42,
+              "bottom": 76,
+              "width": 34,
+              "height": 34,
+              "clientHeight": 34,
+              "scrollHeight": 34,
+              "scrollTop": 0,
+              "overflowY": "visible",
+              "touchAction": "manipulation"
+            }
+          },
+          "consentAccepted": false,
+          "authenticated": false,
+          "oauthTriggered": false,
+          "closedViaVisibleButton": true
+        },
+        {
+          "route": "/graph",
+          "viewport": {
+            "width": 320,
+            "height": 320
+          },
+          "pointer": "desktop-fine",
+          "scrolls": [
+            {
+              "target": "initial-body-scroll",
+              "input": "wheel",
+              "changed": true,
+              "before": [
+                {
+                  "name": "auth-body",
+                  "top": 0,
+                  "height": 243,
+                  "scrollHeight": 763,
+                  "overflow": "auto"
+                }
+              ],
+              "after": [
+                {
+                  "name": "auth-body",
+                  "top": 240,
+                  "height": 243,
+                  "scrollHeight": 763,
+                  "overflow": "auto"
+                }
+              ]
+            },
+            {
+              "target": "#authLegalConsent",
+              "input": "wheel",
+              "changed": true,
+              "before": [
+                {
+                  "name": "auth-body",
+                  "top": 240,
+                  "height": 243,
+                  "scrollHeight": 763,
+                  "overflow": "auto"
+                }
+              ],
+              "after": [
+                {
+                  "name": "auth-body",
+                  "top": 480,
+                  "height": 243,
+                  "scrollHeight": 763,
+                  "overflow": "auto"
+                }
+              ]
+            },
+            {
+              "target": "#authLegalConsent",
+              "input": "wheel",
+              "changed": true,
+              "before": [
+                {
+                  "name": "auth-body",
+                  "top": 480,
+                  "height": 243,
+                  "scrollHeight": 763,
+                  "overflow": "auto"
+                }
+              ],
+              "after": [
+                {
+                  "name": "auth-body",
+                  "top": 520,
+                  "height": 243,
+                  "scrollHeight": 763,
+                  "overflow": "auto"
+                }
+              ]
+            }
+          ],
+          "passed": true,
+          "httpStatus": 200,
+          "preparations": [
+            "closed-mobile-reading-notice",
+            "phone-graph-used-existing-auth-login-url"
+          ],
+          "version": "v9.0-p4.1.438",
+          "authCss": [
+            {
+              "href": "https://lszl.aihuanpu.com/bundles/home-shell.css?v=v9.0-p4.1.438",
+              "selector": "#authModal.auth-backdrop .auth-body",
+              "overflowY": "auto"
+            }
+          ],
+          "initialClose": {
+            "rect": {
+              "x": 251,
+              "y": 20.452621459960938,
+              "width": 34,
+              "height": 34
+            },
+            "clip": {
+              "left": 14,
+              "top": 12,
+              "right": 306,
+              "bottom": 308
+            },
+            "reachable": true,
+            "ancestors": [
+              {
+                "tag": "auth-head",
+                "top": 0,
+                "height": 50,
+                "scrollHeight": 50,
+                "overflow": "visible"
+              },
+              {
+                "tag": "modal auth-modal",
+                "top": 0,
+                "height": 294,
+                "scrollHeight": 294,
+                "overflow": "hidden"
+              },
+              {
+                "tag": "authModal",
+                "top": 0,
+                "height": 320,
+                "scrollHeight": 320,
+                "overflow": "visible"
+              },
+              {
+                "tag": "authDialogRoot",
+                "top": 0,
+                "height": 0,
+                "scrollHeight": 0,
+                "overflow": "visible"
+              },
+              {
+                "tag": "knowledge-graph-page auth-readonly graph-mode-reading graph-phone-reading home-mobile-readonly-notice-open",
+                "top": 0,
+                "height": 320,
+                "scrollHeight": 320,
+                "overflow": "hidden"
+              },
+              {
+                "tag": "kg-perf-defer-drag-edges",
+                "top": 0,
+                "height": 320,
+                "scrollHeight": 320,
+                "overflow": "hidden"
+              }
+            ]
+          },
+          "controls": {
+            "#authDoLoginBtn": {
+              "rect": {
+                "x": 35,
+                "y": 214.0625,
+                "width": 250,
+                "height": 40
+              },
+              "clip": {
+                "left": 15,
+                "top": 64,
+                "right": 305,
+                "bottom": 307
+              },
+              "reachable": true,
+              "ancestors": [
+                {
+                  "tag": "auth-actions",
+                  "top": 0,
+                  "height": 90,
+                  "scrollHeight": 90,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "auth-body",
+                  "top": 240,
+                  "height": 243,
+                  "scrollHeight": 763,
+                  "overflow": "auto"
+                },
+                {
+                  "tag": "modal auth-modal",
+                  "top": 0,
+                  "height": 294,
+                  "scrollHeight": 294,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "authModal",
+                  "top": 0,
+                  "height": 320,
+                  "scrollHeight": 320,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "authDialogRoot",
+                  "top": 0,
+                  "height": 0,
+                  "scrollHeight": 0,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "knowledge-graph-page auth-readonly graph-mode-reading graph-phone-reading home-mobile-readonly-notice-open",
+                  "top": 0,
+                  "height": 320,
+                  "scrollHeight": 320,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "kg-perf-defer-drag-edges",
+                  "top": 0,
+                  "height": 320,
+                  "scrollHeight": 320,
+                  "overflow": "hidden"
+                }
+              ]
+            },
+            "#authLegalConsent": {
+              "rect": {
+                "x": 35,
+                "y": 269.625,
+                "width": 16,
+                "height": 16
+              },
+              "clip": {
+                "left": 15,
+                "top": 64,
+                "right": 305,
+                "bottom": 307
+              },
+              "reachable": true,
+              "ancestors": [
+                {
+                  "tag": "auth-agreement",
+                  "top": 0,
+                  "height": 19,
+                  "scrollHeight": 19,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "auth-body",
+                  "top": 520,
+                  "height": 243,
+                  "scrollHeight": 763,
+                  "overflow": "auto"
+                },
+                {
+                  "tag": "modal auth-modal",
+                  "top": 0,
+                  "height": 294,
+                  "scrollHeight": 294,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "authModal",
+                  "top": 0,
+                  "height": 320,
+                  "scrollHeight": 320,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "authDialogRoot",
+                  "top": 0,
+                  "height": 0,
+                  "scrollHeight": 0,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "knowledge-graph-page auth-readonly graph-mode-reading graph-phone-reading home-mobile-readonly-notice-open",
+                  "top": 0,
+                  "height": 320,
+                  "scrollHeight": 320,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "kg-perf-defer-drag-edges",
+                  "top": 0,
+                  "height": 320,
+                  "scrollHeight": 320,
+                  "overflow": "hidden"
+                }
+              ]
+            },
+            ".wechat-login-entry": {
+              "rect": {
+                "x": 35,
+                "y": 139.4369354248047,
+                "width": 250,
+                "height": 44
+              },
+              "clip": {
+                "left": 15,
+                "top": 64,
+                "right": 305,
+                "bottom": 307
+              },
+              "reachable": true,
+              "ancestors": [
+                {
+                  "tag": "wechat-login-section",
+                  "top": 0,
+                  "height": 144,
+                  "scrollHeight": 144,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "auth-body",
+                  "top": 520,
+                  "height": 243,
+                  "scrollHeight": 763,
+                  "overflow": "auto"
+                },
+                {
+                  "tag": "modal auth-modal",
+                  "top": 0,
+                  "height": 294,
+                  "scrollHeight": 294,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "authModal",
+                  "top": 0,
+                  "height": 320,
+                  "scrollHeight": 320,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "authDialogRoot",
+                  "top": 0,
+                  "height": 0,
+                  "scrollHeight": 0,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "knowledge-graph-page auth-readonly graph-mode-reading graph-phone-reading home-mobile-readonly-notice-open",
+                  "top": 0,
+                  "height": 320,
+                  "scrollHeight": 320,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "kg-perf-defer-drag-edges",
+                  "top": 0,
+                  "height": 320,
+                  "scrollHeight": 320,
+                  "overflow": "hidden"
+                }
+              ]
+            }
+          },
+          "wechatEntryText": "微信扫码登录",
+          "wechatEntryVisible": true,
+          "wechatPublicMode": {
+            "enableOfficial": true,
+            "enableDemo": false
+          },
+          "layout": {
+            "card": {
+              "top": 12,
+              "bottom": 308,
+              "width": 292,
+              "height": 296,
+              "clientHeight": 294,
+              "scrollHeight": 294,
+              "scrollTop": 0,
+              "overflowY": "hidden",
+              "touchAction": "auto"
+            },
+            "header": {
+              "top": 13,
+              "bottom": 64,
+              "width": 290,
+              "height": 51,
+              "clientHeight": 50,
+              "scrollHeight": 50,
+              "scrollTop": 0,
+              "overflowY": "visible",
+              "touchAction": "auto"
+            },
+            "body": {
+              "top": 64,
+              "bottom": 307,
+              "width": 290,
+              "height": 243,
+              "clientHeight": 243,
+              "scrollHeight": 763,
+              "scrollTop": 520,
+              "overflowY": "auto",
+              "touchAction": "pan-y pinch-zoom"
+            },
+            "close": {
+              "top": 21,
+              "bottom": 55,
+              "width": 34,
+              "height": 34,
+              "clientHeight": 34,
+              "scrollHeight": 34,
+              "scrollTop": 0,
+              "overflowY": "visible",
+              "touchAction": "manipulation"
+            }
+          },
+          "consentAccepted": false,
+          "authenticated": false,
+          "oauthTriggered": false,
+          "closedViaVisibleButton": true
+        },
+        {
+          "route": "/knowledge-recall.html",
+          "viewport": {
+            "width": 320,
+            "height": 320
+          },
+          "pointer": "desktop-fine",
+          "scrolls": [
+            {
+              "target": "initial-body-scroll",
+              "input": "wheel",
+              "changed": true,
+              "before": [
+                {
+                  "name": "auth-body",
+                  "top": 0,
+                  "height": 243,
+                  "scrollHeight": 681,
+                  "overflow": "auto"
+                }
+              ],
+              "after": [
+                {
+                  "name": "auth-body",
+                  "top": 240,
+                  "height": 243,
+                  "scrollHeight": 681,
+                  "overflow": "auto"
+                }
+              ]
+            },
+            {
+              "target": "#authLegalConsent",
+              "input": "wheel",
+              "changed": true,
+              "before": [
+                {
+                  "name": "auth-body",
+                  "top": 240,
+                  "height": 243,
+                  "scrollHeight": 681,
+                  "overflow": "auto"
+                }
+              ],
+              "after": [
+                {
+                  "name": "auth-body",
+                  "top": 438,
+                  "height": 243,
+                  "scrollHeight": 681,
+                  "overflow": "auto"
+                }
+              ]
+            }
+          ],
+          "passed": true,
+          "httpStatus": 200,
+          "preparations": [
+            "dragged-global-shortcuts-left",
+            "page-requested-authentication"
+          ],
+          "version": "v9.0-p4.1.438",
+          "authCss": [
+            {
+              "href": "https://lszl.aihuanpu.com/styles/dialogs.css?v=v9.0-p4.1.438",
+              "selector": "#authModal.auth-backdrop .auth-body",
+              "overflowY": "auto"
+            }
+          ],
+          "initialClose": {
+            "rect": {
+              "x": 245,
+              "y": 21,
+              "width": 34,
+              "height": 34
+            },
+            "clip": {
+              "left": 20,
+              "top": 12,
+              "right": 300,
+              "bottom": 308
+            },
+            "reachable": true,
+            "ancestors": [
+              {
+                "tag": "auth-head",
+                "top": 0,
+                "height": 50,
+                "scrollHeight": 50,
+                "overflow": "visible"
+              },
+              {
+                "tag": "modal auth-modal",
+                "top": 0,
+                "height": 294,
+                "scrollHeight": 294,
+                "overflow": "hidden"
+              },
+              {
+                "tag": "authModal",
+                "top": 0,
+                "height": 320,
+                "scrollHeight": 320,
+                "overflow": "visible"
+              },
+              {
+                "tag": "knowledge-recall-page auth-readonly kr-readonly kr-has-no-question",
+                "top": 0,
+                "height": 320,
+                "scrollHeight": 320,
+                "overflow": "hidden"
+              },
+              {
+                "tag": "HTML",
+                "top": 0,
+                "height": 320,
+                "scrollHeight": 320,
+                "overflow": "hidden"
+              }
+            ]
+          },
+          "controls": {
+            "#authDoLoginBtn": {
+              "rect": {
+                "x": 41,
+                "y": 191.78125,
+                "width": 238,
+                "height": 40
+              },
+              "clip": {
+                "left": 21,
+                "top": 64,
+                "right": 299,
+                "bottom": 307
+              },
+              "reachable": true,
+              "ancestors": [
+                {
+                  "tag": "auth-actions",
+                  "top": 0,
+                  "height": 90,
+                  "scrollHeight": 90,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "auth-body",
+                  "top": 240,
+                  "height": 243,
+                  "scrollHeight": 681,
+                  "overflow": "auto"
+                },
+                {
+                  "tag": "modal auth-modal",
+                  "top": 0,
+                  "height": 294,
+                  "scrollHeight": 294,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "authModal",
+                  "top": 0,
+                  "height": 320,
+                  "scrollHeight": 320,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "knowledge-recall-page auth-readonly kr-readonly kr-has-no-question",
+                  "top": 0,
+                  "height": 320,
+                  "scrollHeight": 320,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "HTML",
+                  "top": 0,
+                  "height": 320,
+                  "scrollHeight": 320,
+                  "overflow": "hidden"
+                }
+              ]
+            },
+            "#authLegalConsent": {
+              "rect": {
+                "x": 41,
+                "y": 253.375,
+                "width": 16,
+                "height": 16
+              },
+              "clip": {
+                "left": 21,
+                "top": 64,
+                "right": 299,
+                "bottom": 307
+              },
+              "reachable": true,
+              "ancestors": [
+                {
+                  "tag": "auth-agreement",
+                  "top": 0,
+                  "height": 24,
+                  "scrollHeight": 24,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "auth-body",
+                  "top": 438,
+                  "height": 243,
+                  "scrollHeight": 681,
+                  "overflow": "auto"
+                },
+                {
+                  "tag": "modal auth-modal",
+                  "top": 0,
+                  "height": 294,
+                  "scrollHeight": 294,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "authModal",
+                  "top": 0,
+                  "height": 320,
+                  "scrollHeight": 320,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "knowledge-recall-page auth-readonly kr-readonly kr-has-no-question",
+                  "top": 0,
+                  "height": 320,
+                  "scrollHeight": 320,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "HTML",
+                  "top": 0,
+                  "height": 320,
+                  "scrollHeight": 320,
+                  "overflow": "hidden"
+                }
+              ]
+            },
+            ".wechat-login-entry": {
+              "rect": {
+                "x": 41,
+                "y": 193.375,
+                "width": 238,
+                "height": 44
+              },
+              "clip": {
+                "left": 21,
+                "top": 64,
+                "right": 299,
+                "bottom": 307
+              },
+              "reachable": true,
+              "ancestors": [
+                {
+                  "tag": "wechat-login-section",
+                  "top": 0,
+                  "height": 139,
+                  "scrollHeight": 139,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "auth-body",
+                  "top": 438,
+                  "height": 243,
+                  "scrollHeight": 681,
+                  "overflow": "auto"
+                },
+                {
+                  "tag": "modal auth-modal",
+                  "top": 0,
+                  "height": 294,
+                  "scrollHeight": 294,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "authModal",
+                  "top": 0,
+                  "height": 320,
+                  "scrollHeight": 320,
+                  "overflow": "visible"
+                },
+                {
+                  "tag": "knowledge-recall-page auth-readonly kr-readonly kr-has-no-question",
+                  "top": 0,
+                  "height": 320,
+                  "scrollHeight": 320,
+                  "overflow": "hidden"
+                },
+                {
+                  "tag": "HTML",
+                  "top": 0,
+                  "height": 320,
+                  "scrollHeight": 320,
+                  "overflow": "hidden"
+                }
+              ]
+            }
+          },
+          "wechatEntryText": "微信扫码登录",
+          "wechatEntryVisible": true,
+          "wechatPublicMode": {
+            "enableOfficial": true,
+            "enableDemo": false
+          },
+          "layout": {
+            "card": {
+              "top": 12,
+              "bottom": 308,
+              "width": 280,
+              "height": 296,
+              "clientHeight": 294,
+              "scrollHeight": 294,
+              "scrollTop": 0,
+              "overflowY": "hidden",
+              "touchAction": "auto"
+            },
+            "header": {
+              "top": 13,
+              "bottom": 64,
+              "width": 278,
+              "height": 51,
+              "clientHeight": 50,
+              "scrollHeight": 50,
+              "scrollTop": 0,
+              "overflowY": "visible",
+              "touchAction": "auto"
+            },
+            "body": {
+              "top": 64,
+              "bottom": 307,
+              "width": 278,
+              "height": 243,
+              "clientHeight": 243,
+              "scrollHeight": 681,
+              "scrollTop": 438,
+              "overflowY": "auto",
+              "touchAction": "pan-y pinch-zoom"
+            },
+            "close": {
+              "top": 21,
+              "bottom": 55,
+              "width": 34,
+              "height": 34,
+              "clientHeight": 34,
+              "scrollHeight": 34,
+              "scrollTop": 0,
+              "overflowY": "visible",
+              "touchAction": "manipulation"
+            }
+          },
+          "consentAccepted": false,
+          "authenticated": false,
+          "oauthTriggered": false,
+          "closedViaVisibleButton": true
+        }
+      ],
+      "blockedRequests": [],
+      "browserClosed": true
+    },
+    "acceptedReleaseFullValidation": {
+      "profile": "full",
+      "passed": true,
+      "completedAt": "2026-11-10T14:19:27.197Z",
+      "sourceHash": "7614843044ce0e7350aac11216fcb0f5847931bceaaacf8a1d4df8c52c00fac8",
+      "siteHash": "56ef5aa12e4881e85d865dd1314e8b29fb5b711e59910db1083c8ae8d5a3d48b",
+      "adapterHash": "d928eeb906f283e5609423919642b59497cb8b86001d1b6f867c3c4aeadd4073"
+    },
+    "authViewportCasesPassed": 30,
+    "generatedSeed": {
+      "version": "v9.0-p4.1.438",
+      "businessContentMatchesAcceptedUat": true,
+      "changedFields": [
+        "version",
+        "contentHash"
+      ],
+      "exportContractTestsPassed": 3,
+      "sha256": "3183ce9a77ee8682819388ed9fa32b6499feafd3c51636be4b72b44f8d284a26"
+    }
+  },
+  "cleanup": {
+    "featureBranch": "codex/auth-dialog-small-window",
+    "localFeatureBranchDeleted": true,
+    "remoteFeatureBranchExisted": false,
+    "permanentBranchesPreserved": [
+      "main",
+      "uat"
+    ]
+  }
+}
