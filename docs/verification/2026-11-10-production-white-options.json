@@ -1,0 +1,132 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-11-10T14:23:34.748067+08:00",
+  "release": "v9.0-p4.1.437",
+  "previousProductionRelease": "v9.0-p4.1.434",
+  "acceptedUatCommit": "d46b438ca2439c9813e6b6aef0ce864fe327f1ea",
+  "productionUrl": "https://lszl.aihuanpu.com",
+  "deployment": {
+    "script": "deploy/update.sh",
+    "exitCode": 0,
+    "backupVerifiedBeforeSync": true,
+    "previousReleaseKeptForRollback": "v9.0-p4.1.434",
+    "uatContainerUnchanged": true
+  },
+  "backup": {
+    "backup_dir": "/home/ubuntu/lszl-backups/20261110_141727",
+    "directory_mode": "0700",
+    "manifest_matches_expected": true,
+    "files": {
+      "manifest": {
+        "path": "/home/ubuntu/lszl-backups/20261110_141727/manifest.txt",
+        "bytes": 309,
+        "mode": "0600",
+        "sha256": "d7f48f2ff7540a342bdc34b365c1ff91a04fab77dd22771d6c09321592c6c06d",
+        "nonempty": true
+      },
+      "repo": {
+        "path": "/home/ubuntu/lszl-backups/20261110_141727/repo_20261110_141727.tar.gz",
+        "bytes": 43321788,
+        "mode": "0600",
+        "sha256": "9677c446f5175218f1ddb9643eeebbafb020fc42fb2b82af34bd1256b3fea4b0",
+        "nonempty": true
+      },
+      "database_dump": {
+        "path": "/home/ubuntu/lszl-backups/20261110_141727/db_20261110_141727.dump",
+        "bytes": 245037238,
+        "mode": "0600",
+        "sha256": "20540eb626d8f1b8557800e01ec00d70cf2e68362750b6e80123c2e222a6315e",
+        "nonempty": true
+      }
+    },
+    "tar_readable": true,
+    "pg_restore_list_readable": true,
+    "rollback_image": {
+      "tag": "lszl-kg-backend:rollback-20261110_141727",
+      "image_id": "sha256:28c4ce8e945102e5ce363717236f247ed29aac9d50ce4806315e01ccdbf1ecec",
+      "matches_previous_production": true
+    },
+    "verified": true
+  },
+  "verification": {
+    "http": {
+      "version": "v9.0-p4.1.437",
+      "pages": {
+        "question-workspace.html": {
+          "version": "v9.0-p4.1.437",
+          "optionStylesheet": "styles/question-workspace.css?v=v9.0-p4.1.437"
+        },
+        "knowledge-recall.html": {
+          "version": "v9.0-p4.1.437",
+          "optionStylesheet": "styles/question-workspace.css?v=v9.0-p4.1.437"
+        }
+      },
+      "cssSha256": "fc0d659303456b62832e15a1a770e44e00adf737e3abcdc46176c5c3ab1a0068",
+      "health": {
+        "status": "ok",
+        "db": "ok"
+      }
+    },
+    "browser": {
+      "expectedVersion": "v9.0-p4.1.437",
+      "checks": [
+        {
+          "page": "question-workspace.html",
+          "url": "https://lszl.aihuanpu.com/question-workspace.html",
+          "stylesheetHref": "https://lszl.aihuanpu.com/styles/question-workspace.css?v=v9.0-p4.1.437",
+          "computedStyle": {
+            "row": "rgb(255, 255, 255)",
+            "key": "rgb(255, 255, 255)",
+            "color": "rgb(51, 65, 85)"
+          },
+          "probeKind": "temporary matching card/option DOM under actual page stylesheet cascade",
+          "httpStatus": 200,
+          "probeRemoved": true
+        },
+        {
+          "page": "knowledge-recall.html",
+          "url": "https://lszl.aihuanpu.com/knowledge-recall.html",
+          "stylesheetHref": "https://lszl.aihuanpu.com/styles/question-workspace.css?v=v9.0-p4.1.437",
+          "computedStyle": {
+            "row": "rgb(255, 255, 255)",
+            "key": "rgb(255, 255, 255)",
+            "color": "rgb(51, 65, 85)"
+          },
+          "probeKind": "temporary matching card/option DOM under actual page stylesheet cascade",
+          "httpStatus": 200,
+          "probeRemoved": true
+        }
+      ],
+      "blockedWrites": [],
+      "authenticated": false,
+      "browserClosed": true
+    },
+    "acceptedReleaseFullValidation": {
+      "profile": "full",
+      "passed": true,
+      "completedAt": "2026-11-10T05:13:29.930Z",
+      "sourceHash": "312f2d84676639cea87e17addac7c70b18e7b008e7074630bfab22adb664d1ec",
+      "siteHash": "31ee51a81672db1516dabe45f3ae3c1c68a4796f4ff0af9cc4c10fde66861e1b",
+      "adapterHash": "d928eeb906f283e5609423919642b59497cb8b86001d1b6f867c3c4aeadd4073"
+    },
+    "generatedSeed": {
+      "version": "v9.0-p4.1.437",
+      "businessContentMatchesAcceptedUat": true,
+      "changedFields": [
+        "version",
+        "contentHash"
+      ],
+      "exportContractTestsPassed": 3,
+      "sha256": "e653c6cbcabc1ecb70499b6c944009e86bef013deaa6bd29d8e515f946d3dfea"
+    }
+  },
+  "cleanup": {
+    "featureBranch": "codex/white-question-options",
+    "localFeatureBranchDeleted": true,
+    "remoteFeatureBranchExisted": false,
+    "permanentBranchesPreserved": [
+      "main",
+      "uat"
+    ]
+  }
+}
