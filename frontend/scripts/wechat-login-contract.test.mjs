@@ -53,7 +53,7 @@ test('wechat scan mode hides password controls and offers a return action', () =
 })
 
 test('embedded official WeChat login stays comfortably within a short viewport', () => {
-  const styles = readSource('new-legacy/styles/main.css')
+  const styles = readSource('new-legacy/styles/dialogs.css') + readSource('new-legacy/styles/main.css')
 
   assert.match(styles, /\.wechat-login-qr\{height:320px;/)
   assert.match(styles, /\.wechat-login-qr iframe\{transform:scale\(\.8\)/)

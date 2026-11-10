@@ -30,12 +30,12 @@ def main():
             for script in ('canvas-ink-controller-browser.py', 'canvas-capture-browser.py', 'graph-focus-visual-browser.py', 'graph-file-import-permissions-browser.py'):
                 subprocess.run([sys.executable, str(ROOT/'new-legacy/tests'/script)], cwd=ROOT, check=True)
 
-            def start_canvas_server():
+            def start_canvas_server(extra_env=None):
                 server = subprocess.Popen([
                     str(ROOT / 'backend/.venv/bin/python'),
                     str(ROOT / 'new-legacy/tests/helpers/canvas_ink_server.py'),
                     '--port', str(port), '--multiple-papers', '--role-matrix',
-                ], cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT)
+                ], cwd=ROOT, env=dict(env, **(extra_env or {})), stdout=log, stderr=subprocess.STDOUT)
                 for _ in range(240):
                     if server.poll() is not None:
                         raise RuntimeError('Canvas fixture server exited')
@@ -54,6 +54,20 @@ def main():
                 except subprocess.TimeoutExpired:
                     server.kill()
                     server.wait()
+
+            server = start_canvas_server({
+                'WECHAT_ENABLE_OFFICIAL': 'true',
+                'WECHAT_ENABLE_DEMO': 'false',
+                'WECHAT_APP_ID': 'auth-viewport-fixture',
+                'WECHAT_APP_SECRET': 'auth-viewport-fixture-secret',
+            })
+            try:
+                subprocess.run([
+                    sys.executable, str(ROOT/'frontend/e2e/auth_dialog_viewport.py'),
+                    '--base-url', base,
+                ], cwd=ROOT, check=True)
+            finally:
+                stop_canvas_server(server)
 
             def run_with_fresh_db(script, attempts=2):
                 # 该用例的数据流假设干净数据库；失败重试时重启 fixture 服务器

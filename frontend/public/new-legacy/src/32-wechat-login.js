@@ -135,7 +135,8 @@
   }
   function isMobileLogin(){
     return /Android|iPhone|iPad|iPod|Mobile/i.test(window.navigator?.userAgent||'') ||
-      !!window.matchMedia?.('(max-width: 640px)').matches;
+      (!!window.matchMedia?.('(max-width: 640px)').matches &&
+        !!window.matchMedia?.('(pointer: coarse)').matches);
   }
   async function renderPanel(container){
     if(!container)return;

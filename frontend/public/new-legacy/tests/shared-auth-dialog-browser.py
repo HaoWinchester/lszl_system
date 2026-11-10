@@ -22,6 +22,7 @@ def body_html(file_name):
 def install_harness(page, file_name, initial_username=''):
     attrs, body = body_html(file_name)
     page.set_content(f'<!doctype html><html><head><base href="http://localhost/"></head><body{attrs}>{body}</body></html>')
+    page.add_style_tag(content=(ROOT / 'styles/dialogs.css').read_text(encoding='utf-8'))
     page.add_style_tag(content=(ROOT / 'styles/main.css').read_text(encoding='utf-8'))
     if file_name == 'practice-mode.html':
         page.add_style_tag(content=(ROOT / 'styles/learning-skin.css').read_text(encoding='utf-8'))
@@ -52,9 +53,9 @@ def install_harness(page, file_name, initial_username=''):
         },
         async logout(){calls.logout+=1;user=null;return {ok:true}},
       };
-      window.fetch=async()=>({
+      window.fetch=async(url)=>({
         ok:true,
-        async json(){return {authUrl:'https://open.weixin.qq.com/connect/qrconnect?appid=test-app&redirect_uri=https%3A%2F%2Fexample.com%2Fcallback&scope=snsapi_login&state=test-state'}}
+        async json(){return String(url).endsWith('/config')?{mode:'official',scope:'snsapi_login'}:{authUrl:'https://open.weixin.qq.com/connect/qrconnect?appid=test-app&redirect_uri=https%3A%2F%2Fexample.com%2Fcallback&scope=snsapi_login&state=test-state'}}
       });
       window.WxLogin=function(options){
         const target=document.getElementById(options.id);
@@ -76,6 +77,7 @@ def modal_signature(page):
 
 
 def visual_signature(page):
+    page.locator('.auth-modal').evaluate('element=>Promise.all(element.getAnimations().map(animation=>animation.finished))')
     return page.locator('.auth-modal').evaluate("""modal=>{
       const style=getComputedStyle(modal),rect=modal.getBoundingClientRect();
       const input=getComputedStyle(modal.querySelector('#authUsername'));
@@ -240,7 +242,13 @@ with sync_playwright() as playwright:
             visuals[file_name] = visual_signature(page)
             assert visuals[file_name]['inViewport'], (file_name, width, visuals[file_name])
             page.close()
-        assert visuals['index.html'] == visuals['practice-mode.html'], (width, visuals)
+        # The learning skin deliberately reverses the two Chinese font choices.
+        # Preserve each page's typography while comparing the shared appearance.
+        assert visuals['index.html']['fontFamily'].startswith('"PingFang SC", "Microsoft YaHei",')
+        assert visuals['practice-mode.html']['fontFamily'].startswith('"Microsoft YaHei", "PingFang SC",')
+        assert {key:value for key,value in visuals['index.html'].items() if key!='fontFamily'} == {
+            key:value for key,value in visuals['practice-mode.html'].items() if key!='fontFamily'
+        }, (width, visuals)
 
     assert not errors, errors
     browser.close()

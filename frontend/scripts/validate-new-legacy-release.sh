@@ -123,6 +123,7 @@ node new-legacy/tests/landing-page-contract.test.js
 node new-legacy/tests/shared-auth-dialog.test.js
 python3 new-legacy/tests/landing-page-browser.py
 python3 new-legacy/tests/dialogs-browser.py
+python3 new-legacy/tests/shared-auth-dialog-browser.py
 fi
 if new_legacy_validation_group_enabled "$VALIDATION_PROFILE" extended-contracts; then
   deployment_timing_stage extended-contracts

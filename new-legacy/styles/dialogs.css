@@ -13,3 +13,38 @@
 .kg-dialog-danger .kg-dialog-actions [data-dialog-accept]{border-color:#b83235;background:#b83235}
 .kg-dialog button:focus-visible,.kg-dialog input:focus-visible{outline:3px solid #5b8def;outline-offset:2px}
 @media(max-width:480px){.kg-dialog-panel{padding:24px 20px 20px}.kg-dialog-actions button{min-height:44px}}
+
+/* Both authentication templates use this layout; page styles keep their appearance. */
+#authModal.auth-backdrop{touch-action:pan-y pinch-zoom}
+#authModal.auth-backdrop>.modal.auth-modal{
+  display:flex;
+  flex-direction:column;
+  min-height:0;
+  max-height:calc(100vh - 42px);
+  max-height:calc(100dvh - 42px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));
+  overflow:hidden;
+}
+#authModal.auth-backdrop .auth-head{flex:0 0 auto}
+#authModal.auth-backdrop .auth-body{
+  flex:1 1 auto;
+  min-height:0;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  touch-action:pan-y pinch-zoom;
+  -webkit-overflow-scrolling:touch;
+}
+.wechat-login-qr{height:320px;position:relative;overflow:hidden}
+.wechat-login-qr iframe{transform:scale(.8);transform-origin:top center;position:absolute;left:50%;margin-left:-150px;width:300px;height:400px;border:0;max-width:none}
+@media(max-width:360px){
+  #authModal.auth-backdrop.wechat-login-mode .auth-body{padding-inline:8px}
+  #authModal.auth-backdrop .wechat-login-card{padding-inline:8px}
+}
+@media(max-height:480px){
+  #authModal.auth-backdrop{padding-block:12px}
+  #authModal.auth-backdrop>.modal.auth-modal{
+    max-height:calc(100vh - 24px);
+    max-height:calc(100dvh - 24px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));
+  }
+  #authModal.auth-backdrop .auth-head{padding-block:8px;align-items:center}
+  #authModal.auth-backdrop #authReason{display:none}
+}
