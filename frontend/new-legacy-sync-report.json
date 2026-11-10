@@ -1,16 +1,10 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.436",
+  "fromVersion": "v9.0-p4.1.437",
   "toVersion": "v9.0-p4.1.437",
   "changes": {
     "added": [],
-    "changed": [
-      "VERSION",
-      "content-prep-studio/dist/content-prep.html",
-      "tests/boardmix-graph-controls-browser.py",
-      "tests/canvas-ink-controller-browser.py",
-      "tests/graph-mindmap-browser.py"
-    ],
+    "changed": [],
     "removed": []
   },
   "incompatible": []
