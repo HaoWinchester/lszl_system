@@ -5,7 +5,7 @@ from playwright.sync_api import sync_playwright,expect
 p=argparse.ArgumentParser();p.add_argument('--base-url',required=True);base=p.parse_args().base_url.rstrip('/');assert base.startswith('http://127.0.0.1:')
 out=Path(__file__).resolve().parents[2]/'artifacts/boardmix-interaction-polish/task-2';out.mkdir(parents=True,exist_ok=True)
 with sync_playwright() as pw:
- browser=pw.chromium.launch(channel='chrome');ctx=browser.new_context(viewport={'width':1440,'height':1000})
+ browser=pw.chromium.launch();ctx=browser.new_context(viewport={'width':1440,'height':1000})
  assert ctx.request.post(base+'/api/v1/auth/login',data={'username':'ink-browser','password':'ink-browser-test'}).ok
  graph={'nodes':[{'id':'a','title':'学习计划','x':400,'y':220},{'id':'b','title':'理解知识','x':780,'y':520}], 'links':[{'id':'ab','from':'a','to':'b','pathStyle':'curve'}], 'elements':[{'id':'old','elementType':'text','text':'历史文字','x':820,'y':120,'width':180,'height':80,'fontSize':20,'manualSize':True}], 'viewport':{'x':0,'y':0,'scale':1}}
  r=ctx.request.post(base+'/api/v1/files',data={'name':'控件回归'+uuid.uuid4().hex[:8],'graphData':graph});assert r.ok;fid=r.json()['file']['id'];assert ctx.request.put(base+'/api/v1/files/current',data={'fileId':fid}).ok

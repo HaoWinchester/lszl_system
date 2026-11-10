@@ -1079,6 +1079,9 @@ body[data-qw-readonly="1"] .qw-question-copy{
   list-style:none;
 }
 .qw-card-option{
+  --kr-choice-bg:#fff;
+  --kr-card-ink:#334155;
+  --kr-muted:#64748b;
   display:grid;
   grid-template-columns:22px minmax(0,1fr);
   gap:7px;
@@ -1086,7 +1089,8 @@ body[data-qw-readonly="1"] .qw-question-copy{
   padding:7px 8px;
   border:1px solid rgba(148,163,184,.18);
   border-radius:10px;
-  background:rgba(255,255,255,.72);
+  background:#fff;
+  color:var(--kr-card-ink);
 }
 .qw-card-option-key{
   display:grid;
@@ -1094,7 +1098,7 @@ body[data-qw-readonly="1"] .qw-question-copy{
   width:21px;
   height:21px;
   border-radius:7px;
-  background:#f1f5f9;
+  background:#fff;
   color:#526176;
   font-size:7px;
   font-weight:950;
@@ -1809,12 +1813,12 @@ body[data-qw-readonly="1"] .qw-selection-toolbar{display:none!important}
 .qw-card-option-key:hover{transform:none;border-color:#8b7cf6;background:#f5f3ff;color:#5b21b6}
 .qw-card-option-key.is-correct-active{box-shadow:none}
 @keyframes qw-option-wrong-flash{
-  0%,100%{border-color:rgba(100,116,139,.18);background:#f1f5f9;color:#526176}
+  0%,100%{border-color:rgba(100,116,139,.18);background:#fff;color:#526176}
   20%,72%{border-color:#dc2626;background:#ef4444;color:#fff}
 }
 .qw-card-option-key.is-correct-flash{animation:qw-option-correct-flash .56s ease}
 @keyframes qw-option-correct-flash{
-  0%,100%{border-color:rgba(100,116,139,.18);background:#f1f5f9;color:#526176}
+  0%,100%{border-color:rgba(100,116,139,.18);background:#fff;color:#526176}
   24%,74%{border-color:#16a34a;background:#22c55e;color:#fff}
 }
 @media(prefers-reduced-motion:reduce){.qw-card-option-key.is-correct-flash{animation:none;background:#dcfce7;color:#166534;border-color:#16a34a}}
@@ -2205,7 +2209,7 @@ body.qw-light-canvas .qw-question-card.qw-synthesis-card{
 }
 body.qw-light-canvas .qw-card-option{
   border-color:rgba(71,85,105,.14);
-  background:rgba(255,255,255,.64);
+  background:#fff;
 }
 body.qw-light-canvas .qw-card-meta span,
 body.qw-light-canvas .qw-synthesis-tags span,

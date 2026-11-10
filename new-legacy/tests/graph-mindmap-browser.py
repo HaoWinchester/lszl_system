@@ -15,7 +15,7 @@ def main():
     p=argparse.ArgumentParser();p.add_argument('--base-url',required=True);base=p.parse_args().base_url.rstrip('/');assert base.startswith('http://127.0.0.1:')
     out=ROOT/'artifacts/canvas-m2-m5/t10';out.mkdir(parents=True,exist_ok=True)
     with sync_playwright() as pw:
-        browser=pw.chromium.launch(channel='chrome');ctx=browser.new_context(viewport={'width':1440,'height':1000})
+        browser=pw.chromium.launch();ctx=browser.new_context(viewport={'width':1440,'height':1000})
         assert ctx.request.post(base+'/api/v1/auth/login',data={'username':'ink-browser','password':'ink-browser-test'}).ok
         graph={'nodes':[{'id':i,'title':i,'notes':'备注','imageData':'keep-image','questionIds':['q1'],'x':x,'y':y} for i,x,y in [('a',400,300),('b',650,300),('c',650,550),('d',900,550),('e',1000,750)]],'links':[{'id':'ab','from':'a','to':'b','hierarchy':True,'fromPort':'left','toPort':'top','pathStyle':'curve','curveControls':[{'x':300,'y':100},{'x':850,'y':120}]},{'id':'ac','from':'a','to':'c'},{'id':'bd','from':'b','to':'d','hierarchy':True},{'id':'cd','from':'c','to':'d'},{'id':'da','from':'d','to':'a'}]}
         r=ctx.request.post(base+'/api/v1/files',data={'name':'布局'+uuid.uuid4().hex[:6],'graphData':graph});assert r.ok;file=r.json()['file'];assert ctx.request.put(base+'/api/v1/files/current',data={'fileId':file['id']}).ok

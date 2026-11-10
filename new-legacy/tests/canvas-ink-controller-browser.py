@@ -5,7 +5,7 @@ from playwright.sync_api import sync_playwright, expect
 ROOT = Path(__file__).resolve().parents[1]
 
 with sync_playwright() as pw:
-    browser = pw.chromium.launch(headless=True, executable_path='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
+    browser = pw.chromium.launch(headless=True)
     page = browser.new_page(viewport={'width': 1100, 'height': 780})
     errors=[]
     page.on('pageerror', lambda error: errors.append(str(error)))
