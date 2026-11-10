@@ -1,17 +1,10 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.437",
+  "fromVersion": "v9.0-p4.1.438",
   "toVersion": "v9.0-p4.1.438",
   "changes": {
     "added": [],
-    "changed": [
-      "VERSION",
-      "content-prep-studio/dist/content-prep.html",
-      "src/32-wechat-login.js",
-      "styles/dialogs.css",
-      "styles/main.css",
-      "tests/shared-auth-dialog-browser.py"
-    ],
+    "changed": [],
     "removed": []
   },
   "incompatible": []
