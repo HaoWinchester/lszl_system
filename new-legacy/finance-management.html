@@ -48,36 +48,43 @@
         <div class="admin-head-actions"><button id="financeRefreshBtn" type="button" class="admin-button"><span data-admin-icon="refresh-cw" data-admin-icon-size="16" aria-hidden="true"></span><span>刷新</span></button></div>
       </section>
 
-      <section class="admin-kpi-grid" aria-label="消费汇总">
+      <section class="admin-kpi-grid finance-kpi" aria-label="消费汇总">
         <article><span>当月合计</span><strong id="financeMonthTotal">—</strong><small id="financeMonthDetail">等待读取</small></article>
-        <article><span>当月笔数</span><strong id="financeMonthCount">—</strong><small>所选月份的登记记录</small></article>
-        <article><span>全部合计</span><strong id="financeAllTotal">—</strong><small id="financeAllDetail">等待读取</small></article>
+        <article class="finance-kpi-count"><span>当月笔数</span><strong id="financeMonthCount">—</strong><small>所选月份的登记记录</small></article>
+        <article class="finance-kpi-count"><span>全部合计</span><strong id="financeAllTotal">—</strong><small id="financeAllDetail">等待读取</small></article>
       </section>
 
-      <section class="admin-panel">
+      <section class="admin-panel" id="financeFormPanel">
         <header><div><p id="financeFormMode">NEW RECORD</p><h2 id="financeFormTitle">登记消费</h2><span>填写金额与用途，可附发票（png/jpg/jpeg/webp/pdf，限 20 MiB）。</span></div><button id="financeCancelEditBtn" type="button" class="admin-button" hidden>取消编辑</button></header>
         <form id="financeRecordForm">
           <div class="finance-form-grid">
             <label>金额（元）<input id="financeAmount" name="amount" type="number" step="0.01" min="0.01" required placeholder="例如 128.50"/></label>
             <label>消费日期<input id="financeSpentOn" name="spentOn" type="date" required/></label>
-            <label class="finance-form-wide">用途<input id="financePurpose" name="purpose" type="text" maxlength="200" required placeholder="例如：办公耗材采购"/></label>
+            <label>用途<input id="financePurpose" name="purpose" type="text" maxlength="200" required placeholder="例如：办公耗材采购"/></label>
             <label class="finance-form-wide">备注<textarea id="financeNote" name="note" rows="2" maxlength="2000" placeholder="选填"></textarea></label>
             <label class="finance-form-wide">发票附件<input id="financeInvoice" name="invoice" type="file" accept=".png,.jpg,.jpeg,.webp,.pdf"/><small id="financeInvoiceHint" class="finance-invoice-hint"></small></label>
           </div>
-          <div class="finance-form-actions"><button type="submit" class="admin-button primary" id="financeSubmitBtn">保存记录</button></div>
+          <div class="finance-form-actions"><span class="finance-form-hint">登记后列表与当月合计实时更新。</span><button type="submit" class="admin-button primary" id="financeSubmitBtn">保存记录</button></div>
         </form>
       </section>
 
       <section class="admin-panel">
-        <header><div><p>RECORDS</p><h2>消费记录</h2><span>按消费日期倒序；选择月份过滤列表与汇总。</span></div><input id="financeMonthFilter" type="month" aria-label="按月过滤"/></header>
+        <header><div><p>RECORDS</p><h2>消费记录</h2><span>按消费日期倒序；选择月份过滤列表与汇总。</span></div></header>
+        <div class="finance-tools"><label for="financeMonthFilter">月份</label><input id="financeMonthFilter" type="month" aria-label="按月过滤"/></div>
         <div class="admin-table-wrap">
-          <table>
-            <thead><tr><th>日期</th><th>用途</th><th>金额</th><th>备注</th><th>发票</th><th>录入人</th><th>操作</th></tr></thead>
-            <tbody id="financeRows"><tr><td colspan="7">正在读取…</td></tr></tbody>
+          <table class="finance-table">
+            <thead><tr><th>日期</th><th>用途</th><th class="finance-col-amount">金额</th><th>备注</th><th>发票</th><th>录入人</th><th>操作</th></tr></thead>
+            <tbody id="financeRows"><tr><td colspan="7" class="finance-empty">正在读取…</td></tr></tbody>
           </table>
         </div>
       </section>
     </main>
+  </div>
+  <div class="finance-viewer" id="financeViewer" role="dialog" aria-modal="true" aria-label="发票预览" hidden>
+    <div class="finance-viewer-card">
+      <div class="finance-viewer-head"><strong id="financeViewerName">发票</strong><small id="financeViewerMeta"></small><button type="button" class="finance-link" id="financeViewerDownload">下载</button><button type="button" class="finance-link" id="financeViewerClose">关闭</button></div>
+      <div class="finance-viewer-body" id="financeViewerBody"></div>
+    </div>
   </div>
   <div id="adminToast" class="admin-toast" role="status" aria-live="polite"></div>
   <script src="src/01-runtime-config.js"></script><script src="src/28-app-storage.js"></script><script src="src/29-auth-core.js"></script>

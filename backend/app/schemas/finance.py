@@ -21,9 +21,12 @@ class FinanceRecordUpdate(BaseModel):
 
 
 class FinanceInvoiceInfo(BaseModel):
+    model_config = ConfigDict(alias_generator=alias_generators.to_camel, populate_by_name=True)
+
     name: str
     mime: str
     size: int
+    by: str | None = None
     url: str
 
 

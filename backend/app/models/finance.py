@@ -41,6 +41,8 @@ class FinanceRecord(Base):
     invoice_mime: Mapped[str | None] = mapped_column(String(80), nullable=True)
     invoice_size: Mapped[int | None] = mapped_column(Integer, nullable=True)
     invoice_digest: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # 发票上传人（最后替换发票的人；与录入人可以不同）
+    invoice_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_by: Mapped[str] = mapped_column(
         String(64), ForeignKey("users.username"), nullable=False
     )

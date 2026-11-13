@@ -104,6 +104,7 @@ def test_admin_full_lifecycle_with_invoice() -> None:
             record_id = body["id"]
             assert body["invoice"]["name"] == "发票.png"
             assert body["invoice"]["mime"] == "image/png"
+            assert body["invoice"]["by"] == "admin"
             assert body["invoice"]["url"].endswith(f"/records/{record_id}/invoice")
 
             downloaded = client.get(body["invoice"]["url"])

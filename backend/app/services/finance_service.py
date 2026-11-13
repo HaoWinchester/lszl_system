@@ -70,6 +70,7 @@ def invoice_info(record: FinanceRecord) -> FinanceInvoiceInfo | None:
         name=record.invoice_name or "invoice",
         mime=record.invoice_mime or "application/octet-stream",
         size=record.invoice_size or 0,
+        by=record.invoice_by,
         url=f"/api/v1/finance/records/{record.id}/invoice",
     )
 
@@ -167,7 +168,9 @@ async def create_record(
     return record_to_out(record)
 
 
-async def attach_invoice(db: AsyncSession, record_id: str, upload: UploadFile) -> FinanceRecordOut:
+async def attach_invoice(
+    db: AsyncSession, record_id: str, upload: UploadFile, username: str
+) -> FinanceRecordOut:
     """为已有记录上传/替换发票（先落盘成功再改库，失败不留脏数据）。"""
     record = await get_record(db, record_id)
     info = await save_invoice(record_id, upload)
@@ -176,6 +179,7 @@ async def attach_invoice(db: AsyncSession, record_id: str, upload: UploadFile) -
     record.invoice_mime = info["mime"]
     record.invoice_size = info["size"]
     record.invoice_digest = info["digest"]
+    record.invoice_by = username
     await db.commit()
     await db.refresh(record)
     return record_to_out(record)

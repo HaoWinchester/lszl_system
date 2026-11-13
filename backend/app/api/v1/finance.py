@@ -64,13 +64,13 @@ async def create_record(
         actor.username,
     )
     if invoice is not None and (invoice.filename or "").strip():
-        record = await finance_service.attach_invoice(db, record.id, invoice)
+        record = await finance_service.attach_invoice(db, record.id, invoice, actor.username)
     return record
 
 
 @router.post("/records/{record_id}/invoice")
-async def upload_invoice(db: DB, _: Actor, record_id: str, invoice: UploadFile = File(...)):
-    return await finance_service.attach_invoice(db, record_id, invoice)
+async def upload_invoice(db: DB, actor: Actor, record_id: str, invoice: UploadFile = File(...)):
+    return await finance_service.attach_invoice(db, record_id, invoice, actor.username)
 
 
 @router.get("/records/{record_id}")

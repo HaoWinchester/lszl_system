@@ -10,6 +10,7 @@
   function canAccess(){const role=user()?.role;return role==='admin'||role==='teacher'}
   function deny(){document.querySelector('.admin-main').innerHTML='<section class="admin-page-head"><div><h1>无权访问</h1><span>财务管理仅限管理员与教师使用。</span></div></section>';return false}
   function money(value){const number=Number(value||0);return '¥'+number.toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2})}
+  function kib(size){return size>=1024*1024?`${(size/1024/1024).toFixed(1)} MiB`:`${Math.max(1,Math.round((size||0)/1024))} KiB`}
   function today(){const now=new Date();const pad=n=>String(n).padStart(2,'0');return `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`}
   function currentMonthKey(){return today().slice(0,7)}
   async function api(path,options={}){
@@ -33,19 +34,57 @@
     $('financeAllDetail').textContent=`共 ${monthly.reduce((sum,row)=>sum+Number(row.count||0),0)} 笔`;
   }
 
+  function invoiceCell(record){
+    const invoice=record.invoice;
+    if(!invoice)return '<span class="finance-cell-muted">无</span>';
+    const by=invoice.by?escapeHtml(invoice.by):'未知';
+    return `<button type="button" class="finance-link" data-finance-view="${escapeHtml(record.id)}">预览</button>`
+      +` <a class="finance-link" href="${escapeHtml(invoice.url)}" download="${escapeHtml(invoice.name)}">下载</a>`
+      +`<span class="finance-invoice-meta">${by} · ${escapeHtml(kib(invoice.size||0))}</span>`;
+  }
+
   function renderRows(){
     const tbody=$('financeRows');
-    if(!rows.length){tbody.innerHTML='<tr><td colspan="7">当前范围没有消费记录。</td></tr>';return}
+    if(!rows.length){tbody.innerHTML='<tr><td colspan="7" class="finance-empty">当前范围没有消费记录。</td></tr>';return}
     tbody.innerHTML=rows.map(record=>{
-      const invoice=record.invoice
-        ?`<a class="admin-action-link" href="${escapeHtml(record.invoice.url)}" target="_blank" rel="noopener">${escapeHtml(record.invoice.name)}</a>`
-        :'<span class="admin-status">无</span>';
-      const actions=[`<button type="button" class="admin-action-link" data-finance-edit="${escapeHtml(record.id)}">编辑</button>`];
-      if(isAdmin())actions.push(`<button type="button" class="admin-action-link" data-finance-delete="${escapeHtml(record.id)}">删除</button>`);
-      return `<tr><td>${escapeHtml(record.spentOn)}</td><td>${escapeHtml(record.purpose)}</td><td>${escapeHtml(money(record.amount))}</td><td>${escapeHtml(record.note||'—')}</td><td>${invoice}</td><td>${escapeHtml(record.createdBy)}</td><td>${actions.join('')}</td></tr>`;
+      const actions=[`<button type="button" class="finance-link" data-finance-edit="${escapeHtml(record.id)}">编辑</button>`];
+      if(isAdmin())actions.push(`<button type="button" class="finance-link" data-finance-delete="${escapeHtml(record.id)}">删除</button>`);
+      return `<tr>`
+        +`<td class="finance-cell-muted">${escapeHtml(record.spentOn)}</td>`
+        +`<td class="finance-purpose">${escapeHtml(record.purpose)}</td>`
+        +`<td class="finance-col-amount">${escapeHtml(money(record.amount))}</td>`
+        +`<td class="finance-cell-muted">${escapeHtml(record.note||'—')}</td>`
+        +`<td class="finance-invoice-cell">${invoiceCell(record)}</td>`
+        +`<td>${escapeHtml(record.createdBy)}</td>`
+        +`<td><span class="finance-row-actions">${actions.join('')}</span></td>`
+        +`</tr>`;
     }).join('');
     tbody.querySelectorAll('[data-finance-edit]').forEach(button=>button.addEventListener('click',()=>startEdit(button.dataset.financeEdit)));
     tbody.querySelectorAll('[data-finance-delete]').forEach(button=>button.addEventListener('click',()=>removeRecord(button.dataset.financeDelete)));
+    tbody.querySelectorAll('[data-finance-view]').forEach(button=>button.addEventListener('click',()=>openViewer(button.dataset.financeView)));
+  }
+
+  function openViewer(recordId){
+    const record=rows.find(row=>row.id===recordId);
+    const invoice=record?.invoice;
+    if(!invoice)return;
+    const body=$('financeViewerBody');
+    if((invoice.mime||'').startsWith('image/')){
+      body.innerHTML=`<img src="${escapeHtml(invoice.url)}" alt="${escapeHtml(invoice.name)}"/>`;
+    }else if(invoice.mime==='application/pdf'){
+      body.innerHTML=`<iframe src="${escapeHtml(invoice.url)}" title="${escapeHtml(invoice.name)}"></iframe>`;
+    }else{
+      body.innerHTML='<span class="finance-empty">该类型不支持内嵌预览，请下载查看。</span>';
+    }
+    $('financeViewerName').textContent=invoice.name;
+    $('financeViewerMeta').textContent=`${record.purpose} · ${kib(invoice.size||0)}${invoice.by?` · 上传人 ${invoice.by}`:''}`;
+    $('financeViewerDownload').onclick=()=>{window.location.href=invoice.url};
+    $('financeViewer').hidden=false;
+  }
+
+  function closeViewer(){
+    $('financeViewer').hidden=true;
+    $('financeViewerBody').innerHTML='';
   }
 
   function resetForm(){
@@ -56,6 +95,7 @@
     $('financeSubmitBtn').textContent='保存记录';
     $('financeCancelEditBtn').hidden=true;
     $('financeInvoice').disabled=false;
+    $('financeFormPanel').classList.remove('finance-editing');
   }
 
   function startEdit(recordId){
@@ -66,12 +106,13 @@
     $('financePurpose').value=record.purpose||'';
     $('financeNote').value=record.note||'';
     $('financeInvoice').value='';
-    if(record.invoice){$('financeInvoiceHint').textContent=`已有发票：${record.invoice.name}（${Math.round((record.invoice.size||0)/1024)} KiB），重新选择文件将替换`;$('financeInvoiceHint').classList.add('has-invoice')}
+    if(record.invoice){$('financeInvoiceHint').textContent=`已有发票：${record.invoice.name}（${kib(record.invoice.size||0)}${record.invoice.by?`，上传人 ${record.invoice.by}`:''}）。重新选择文件将替换`;$('financeInvoiceHint').classList.add('has-invoice')}
     else{$('financeInvoiceHint').textContent='当前记录没有发票，可选择文件上传';$('financeInvoiceHint').classList.add('has-invoice')}
     $('financeFormMode').textContent='EDIT RECORD';$('financeFormTitle').textContent='编辑消费记录';
     $('financeSubmitBtn').textContent='保存修改';
     $('financeCancelEditBtn').hidden=false;
-    $('financeFormMode').scrollIntoView?.({behavior:'smooth',block:'center'});
+    $('financeFormPanel').classList.add('finance-editing');
+    $('financeAmount').focus();
   }
 
   function validateInvoice(file){
@@ -147,6 +188,9 @@
       const error=validateInvoice($('financeInvoice').files[0]);
       if(error){$('financeInvoice').value='';$('financeInvoiceHint').textContent='';$('financeInvoiceHint').classList.remove('has-invoice');toast(error,true)}
     });
+    $('financeViewerClose').addEventListener('click',closeViewer);
+    $('financeViewer').addEventListener('click',event=>{if(event.target===$('financeViewer'))closeViewer()});
+    document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!$('financeViewer').hidden)closeViewer()});
   }
 
   async function init(){

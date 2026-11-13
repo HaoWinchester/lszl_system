@@ -48,7 +48,7 @@
             <button id="authRegisterBtn" type="button">注册并登录</button>
           </div>
           <div class="auth-note">账号身份与业务数据由服务器按用户隔离保存；请勿与他人共享密码。</div>
-          <label class="auth-agreement"><input id="authLegalConsent" type="checkbox"/><span>阅读并同意 <a href="privacy-policy.html" rel="noopener" target="_blank">隐私政策</a> 和 <a href="terms-of-service.html" rel="noopener" target="_blank">使用条款</a></span></label>
+          <label class="auth-agreement"><input id="authLegalConsent" type="checkbox" checked/><span>阅读并同意 <a href="privacy-policy.html" rel="noopener" target="_blank">隐私政策</a> 和 <a href="terms-of-service.html" rel="noopener" target="_blank">使用条款</a></span></label>
         </div>
       </div>
     </div>`;

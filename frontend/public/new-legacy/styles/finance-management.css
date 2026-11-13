@@ -1,9 +1,12 @@
-/* 财务管理页专用：登记表单网格与发票提示。其余布局复用 focus-vega admin 体系。 */
+/* 财务管理页专用样式：登记表单、消费记录表格、KPI 汇总与发票预览弹层。
+   其余布局复用 focus-vega admin 体系。 */
+
+/* ---------- 登记表单 ---------- */
 
 .finance-form-grid {
   display: grid;
-  grid-template-columns: minmax(160px, 220px) minmax(160px, 220px) 1fr;
-  gap: 14px 18px;
+  grid-template-columns: minmax(150px, 200px) minmax(150px, 200px) 1fr;
+  gap: 16px 20px;
   align-items: start;
 }
 
@@ -11,8 +14,16 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  font-size: 13px;
-  color: var(--admin-muted, #5b6b7f);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .02em;
+  color: #18181b;
+}
+
+.finance-form-grid label small {
+  font-size: 12px;
+  font-weight: 400;
+  color: #64748b;
 }
 
 .finance-form-grid label.finance-form-wide {
@@ -23,17 +34,34 @@
 .finance-form-grid textarea {
   width: 100%;
   box-sizing: border-box;
+  font-size: 14px;
+  font-weight: 400;
+  color: #18181b;
+}
+
+.finance-form-grid input::placeholder,
+.finance-form-grid textarea::placeholder {
+  color: #94a3b8;
+  font-weight: 400;
 }
 
 .finance-form-actions {
-  margin-top: 16px;
+  margin-top: 18px;
   display: flex;
   gap: 12px;
   justify-content: flex-end;
+  align-items: center;
+}
+
+.finance-form-hint {
+  margin-right: auto;
+  font-size: 12px;
+  color: #64748b;
 }
 
 .finance-invoice-hint {
-  color: var(--admin-muted, #5b6b7f);
+  color: #64748b;
+  font-weight: 400;
   font-size: 12px;
 }
 
@@ -41,8 +69,217 @@
   color: var(--admin-primary, #0f766e);
 }
 
+/* focus-vega 的 button display 规则会覆盖 hidden 属性，这里显式恢复 */
+#financeCancelEditBtn[hidden] {
+  display: none;
+}
+
+/* 编辑态：面板描边提示 */
+.admin-panel.finance-editing {
+  border-color: var(--admin-primary, #0f766e);
+  box-shadow: 0 0 0 1px var(--admin-primary, #0f766e) inset;
+}
+
+/* ---------- KPI 汇总卡 ---------- */
+
+.admin-kpi-grid.finance-kpi article {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.admin-kpi-grid.finance-kpi article span {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  color: #64748b;
+}
+
+.admin-kpi-grid.finance-kpi article strong {
+  font-size: 26px;
+  font-variant-numeric: tabular-nums;
+  color: var(--admin-primary, #0f766e);
+}
+
+.admin-kpi-grid.finance-kpi article.finance-kpi-count strong {
+  color: #18181b;
+}
+
+.admin-kpi-grid.finance-kpi article small {
+  color: #64748b;
+}
+
+/* ---------- 消费记录表格 ---------- */
+
+.finance-table { width: 100%; }
+
+.finance-table th {
+  text-align: left;
+  font-size: 12px;
+  letter-spacing: .04em;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.finance-table td {
+  vertical-align: top;
+}
+
+.finance-table tbody tr:hover td {
+  background: color-mix(in srgb, var(--admin-primary, #0f766e) 5%, transparent);
+}
+
+.finance-table .finance-col-amount {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.finance-table th.finance-col-amount {
+  text-align: right;
+}
+
+.finance-table .finance-purpose {
+  font-weight: 600;
+  color: #18181b;
+}
+
+.finance-table .finance-cell-muted {
+  color: #64748b;
+}
+
+.finance-table .finance-invoice-cell {
+  max-width: 220px;
+}
+
+.finance-table .finance-invoice-meta {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.finance-table .finance-row-actions {
+  display: flex;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.finance-table .finance-link {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--admin-primary, #0f766e);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.finance-table .finance-link:hover {
+  color: var(--admin-primary-strong, #0b5d57);
+}
+
+/* 表格工具行：月份选择器 */
+.finance-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.finance-tools label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.finance-empty {
+  padding: 28px 0;
+  text-align: center;
+  color: #64748b;
+}
+
+/* ---------- 发票预览弹层 ---------- */
+
+.finance-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  background: rgba(15, 23, 42, .62);
+}
+
+.finance-viewer[hidden] {
+  display: none;
+}
+
+.finance-viewer-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(880px, 100%);
+  max-height: calc(100vh - 64px);
+  padding: 20px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 24px 64px rgba(15, 23, 42, .35);
+}
+
+.finance-viewer-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.finance-viewer-head strong {
+  font-size: 15px;
+  color: #18181b;
+  word-break: break-all;
+}
+
+.finance-viewer-head small {
+  color: #64748b;
+}
+
+.finance-viewer-head .finance-link {
+  margin-left: auto;
+}
+
+.finance-viewer-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+  background: #f5f7fa;
+  border-radius: 10px;
+}
+
+.finance-viewer-body img {
+  max-width: 100%;
+  max-height: calc(100vh - 200px);
+  object-fit: contain;
+}
+
+.finance-viewer-body iframe {
+  width: 100%;
+  height: calc(100vh - 220px);
+  border: 0;
+  background: #fff;
+}
+
 @media (max-width: 720px) {
   .finance-form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .finance-viewer {
+    padding: 12px;
   }
 }
