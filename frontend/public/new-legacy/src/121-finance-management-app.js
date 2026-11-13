@@ -48,13 +48,19 @@
     $('financeMonthCurrent').textContent=viewMonth||'全部时间';
     $('financeMonthAll').classList.toggle('finance-month-all-active',!viewMonth);
   }
+  function switchRange(nextMonth){
+    viewMonth=nextMonth;
+    if(editingId)resetForm();
+    renderMonthPicker();
+    load().catch(error=>toast(error.message,true));
+  }
   function shiftMonth(delta){
     const base=viewMonthDate()||new Date();
     const target=new Date(base.getFullYear(),base.getMonth()+delta,1);
-    viewMonth=monthKey(target);
-    renderMonthPicker();load().catch(error=>toast(error.message,true));
+    switchRange(monthKey(target));
   }
-  function showAll(){viewMonth='';renderMonthPicker();load().catch(error=>toast(error.message,true))}
+  function showAll(){switchRange('')}
+  function backToCurrentMonth(){switchRange(monthKey(new Date()))}
 
   function renderKpi(){
     const monthRow=viewMonth?monthly.find(row=>row.month===viewMonth):null;
@@ -82,11 +88,13 @@
       const actions=[`<button type="button" class="finance-link" data-finance-edit="${escapeHtml(record.id)}">编辑</button>`];
       if(isAdmin())actions.push(`<button type="button" class="finance-link" data-finance-delete="${escapeHtml(record.id)}">删除</button>`);
       const date=record.spentOn||'';
+      const dateLabel=viewMonth&&date.startsWith(viewMonth+'-')?date.slice(5):date;
+      const note=record.note||'';
       return `<tr>`
-        +`<td class="finance-cell-muted">${escapeHtml(date)}</td>`
+        +`<td class="finance-date-cell">${escapeHtml(dateLabel)}</td>`
         +`<td class="finance-purpose">${escapeHtml(record.purpose)}</td>`
         +`<td class="finance-col-amount">${escapeHtml(money(record.amount))}</td>`
-        +`<td class="finance-cell-muted">${escapeHtml(record.note||'—')}</td>`
+        +`<td class="finance-note-cell"${note?` title="${escapeHtml(note)}"`:''}>${escapeHtml(note||'—')}</td>`
         +`<td class="finance-invoice-cell">${invoiceCell(record)}</td>`
         +`<td>${escapeHtml(record.createdBy)}</td>`
         +`<td><span class="finance-row-actions">${actions.join('')}</span></td>`
@@ -192,11 +200,14 @@
 
   async function submitForm(event){
     event.preventDefault();
+    if($('financeSubmitBtn').disabled)return;
     const amount=Number($('financeAmount').value);
     const purpose=$('financePurpose').value.trim();
     if(!(amount>0)){toast('请填写大于 0 的金额',true);return}
     if(!purpose){toast('请填写用途',true);return}
     const spentOn=selectedDate();
+    const submit=$('financeSubmitBtn');
+    submit.disabled=true;submit.textContent=editingId?'保存中…':'保存中…';
     try{
       if(editingId){
         await api(`/records/${editingId}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({
@@ -221,6 +232,7 @@
       }
       resetForm();await load();
     }catch(error){toast(error.message||'保存失败',true)}
+    finally{submit.disabled=false;submit.textContent=editingId?'保存修改':'保存记录'}
   }
 
   async function removeRecord(recordId){
@@ -235,10 +247,16 @@
   }
 
   async function load(){
-    const query=viewMonth?`?month=${encodeURIComponent(viewMonth)}`:'';
-    const data=await api(`/records${query}`);
-    rows=data.items||[];monthly=data.monthly||[];
-    renderKpi();renderRows();
+    const card=document.querySelector('.finance-table-card');
+    card?.classList.add('finance-loading');
+    try{
+      const query=viewMonth?`?month=${encodeURIComponent(viewMonth)}`:'';
+      const data=await api(`/records${query}`);
+      rows=data.items||[];monthly=data.monthly||[];
+      renderKpi();renderRows();
+    }finally{
+      card?.classList.remove('finance-loading');
+    }
   }
 
   function bind(){
@@ -250,6 +268,7 @@
     $('financeMonthPart').addEventListener('change',()=>fillDayOptions(Number($('financeYear').value),Number($('financeMonthPart').value)));
     $('financeMonthPrev').addEventListener('click',()=>shiftMonth(-1));
     $('financeMonthNext').addEventListener('click',()=>shiftMonth(1));
+    $('financeMonthCurrent').addEventListener('click',backToCurrentMonth);
     $('financeMonthAll').addEventListener('click',showAll);
     $('financeRefreshBtn').addEventListener('click',()=>load().catch(error=>toast(error.message,true)));
     $('financeRecordForm').addEventListener('submit',submitForm);
