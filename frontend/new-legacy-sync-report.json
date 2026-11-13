@@ -4,7 +4,9 @@
   "toVersion": "v9.0-p4.1.438",
   "changes": {
     "added": [],
-    "changed": [],
+    "changed": [
+      "src/121-finance-management-app.js"
+    ],
     "removed": []
   },
   "incompatible": []

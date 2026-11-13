@@ -1,0 +1,48 @@
+/* 财务管理页专用：登记表单网格与发票提示。其余布局复用 focus-vega admin 体系。 */
+
+.finance-form-grid {
+  display: grid;
+  grid-template-columns: minmax(160px, 220px) minmax(160px, 220px) 1fr;
+  gap: 14px 18px;
+  align-items: start;
+}
+
+.finance-form-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--admin-muted, #5b6b7f);
+}
+
+.finance-form-grid label.finance-form-wide {
+  grid-column: 1 / -1;
+}
+
+.finance-form-grid input,
+.finance-form-grid textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.finance-form-actions {
+  margin-top: 16px;
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.finance-invoice-hint {
+  color: var(--admin-muted, #5b6b7f);
+  font-size: 12px;
+}
+
+.finance-invoice-hint.has-invoice {
+  color: var(--admin-primary, #0f766e);
+}
+
+@media (max-width: 720px) {
+  .finance-form-grid {
+    grid-template-columns: 1fr;
+  }
+}

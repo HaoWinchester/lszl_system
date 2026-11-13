@@ -46,6 +46,9 @@ TEACHING_PAGES = frozenset({
     "teacher-workbench.html",
     "teacher-assistant.html",
 })
+FINANCE_PAGES = frozenset({
+    "finance-management.html",
+})
 CONTENT_PREP_PERMISSIONS = (
     "accessQuestionBank",
     "importData",
@@ -57,7 +60,7 @@ async def _page_access_denied(request: Request, db: AsyncSession, page: str) -> 
     allowed_roles: set[str] | None = None
     if page in ADMIN_ONLY_PAGES:
         allowed_roles = {"admin"}
-    elif page in TEACHING_PAGES:
+    elif page in TEACHING_PAGES or page in FINANCE_PAGES:
         allowed_roles = {"admin", "teacher"}
     if allowed_roles is None:
         return False

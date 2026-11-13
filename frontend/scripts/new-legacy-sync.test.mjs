@@ -23,6 +23,9 @@ const requiredPages = [
 const requiredFiles = [
   'src/00-dialogs.js',
   'styles/dialogs.css',
+  'finance-management.html',
+  'styles/finance-management.css',
+  'src/121-finance-management-app.js',
   'styles/landing.css',
   'src/landing.js',
   'assets/landing/graph.png',
@@ -118,6 +121,8 @@ function fixture({ omit, omitP45MigrationManifest = false } = {}) {
     if (path === omit) continue
     const content = ['src/00-dialogs.js', 'styles/dialogs.css'].includes(path)
       ? readFileSync(resolve(scriptsDir, '..', '..', 'new-legacy', path), 'utf8')
+      : path.endsWith('.html')
+      ? '<!doctype html><html><head></head><body></body></html>'
       : path.endsWith('.json')
       ? '{"type":"object"}\n'
       : path === 'src/64-flow-orchestrator.js'
