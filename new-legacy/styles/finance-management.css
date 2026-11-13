@@ -76,7 +76,7 @@
 
 .finance-field {
   display: block;
-  margin-bottom: 15px;
+  margin-bottom: 13px;
 }
 
 .finance-field-label {
@@ -131,9 +131,9 @@
   min-width: 0;
   border: 0;
   outline: none;
-  padding: 11px 14px 11px 12px;
+  padding: 9px 13px 9px 12px;
   font: inherit;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 650;
   font-variant-numeric: tabular-nums;
   color: var(--fin-ink);
@@ -156,14 +156,13 @@
   appearance: textfield;
 }
 
-/* 日期一体分段控件 */
+/* 日期一体分段控件：三段纯自绘下拉（无原生 select） */
 .finance-date-seg {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   border: 1px solid var(--fin-border-strong);
   border-radius: 11px;
   background: #fff;
-  overflow: hidden;
   transition: border-color .14s ease, box-shadow .14s ease;
 }
 
@@ -172,43 +171,116 @@
   box-shadow: 0 0 0 3.5px var(--fin-primary-ring);
 }
 
-.finance-date-seg select {
-  appearance: none;
-  -webkit-appearance: none;
+.finance-combo {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+}
+
+.finance-combo + .finance-combo {
+  border-left: 1px solid var(--fin-border);
+}
+
+.finance-combo-trigger {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
   border: 0;
-  background: transparent;
-  padding: 10px 6px 10px 14px;
+  background: none;
+  padding: 11px 6px;
+  font: inherit;
+  cursor: pointer;
+  color: var(--fin-ink);
+  transition: background .12s ease;
+}
+
+.finance-combo-trigger:hover {
+  background: var(--fin-primary-soft);
+}
+
+.finance-combo-trigger b {
+  font-size: 15px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.finance-combo-trigger small {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--fin-muted);
+}
+
+.finance-combo-trigger svg {
+  align-self: center;
+  width: 11px;
+  height: 11px;
+  flex: none;
+  color: var(--fin-muted);
+  transition: transform .15s ease;
+}
+
+.finance-combo.finance-combo-open .finance-combo-trigger {
+  background: var(--fin-primary-soft);
+  color: var(--fin-primary);
+}
+
+.finance-combo.finance-combo-open .finance-combo-trigger svg {
+  transform: rotate(180deg);
+  color: var(--fin-primary);
+}
+
+/* 自绘下拉面板（向下弹开） */
+.finance-combo-list {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  top: calc(100% + 7px);
+  max-height: 232px;
+  overflow: auto;
+  padding: 5px;
+  background: #fff;
+  border: 1px solid var(--fin-border);
+  border-radius: 11px;
+  box-shadow: 0 10px 30px rgba(24, 24, 27, .14), 0 2px 8px rgba(24, 24, 27, .07);
+  z-index: 30;
+  animation: finance-combo-in .14s ease;
+}
+
+@keyframes finance-combo-in {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: none; }
+}
+
+.finance-combo-list button {
+  display: block;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
   font: inherit;
   font-size: 14px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  color: var(--fin-ink);
+  color: var(--fin-ink-2);
+  text-align: center;
   cursor: pointer;
-  min-width: 0;
+  transition: background .1s ease, color .1s ease;
 }
 
-.finance-date-seg select:focus {
-  outline: none;
-}
-
-.finance-date-seg select:hover {
+.finance-combo-list button:hover {
+  background: var(--fin-primary-soft);
   color: var(--fin-primary);
 }
 
-#financeYear { flex: 1.4; }
-#financeMonthPart, #financeDayPart { flex: 1; text-align: center; }
-
-.finance-seg-label {
-  font-size: 12px;
-  color: var(--fin-muted);
-  padding: 0 8px 0 0;
-}
-
-.finance-seg-divider {
-  width: 1px;
-  align-self: stretch;
-  margin: 9px 0;
-  background: var(--fin-border);
+.finance-combo-list button.finance-combo-selected {
+  background: var(--fin-primary);
+  color: #fff;
 }
 
 /* 文本输入 */
@@ -217,7 +289,7 @@
   box-sizing: border-box;
   border: 1px solid var(--fin-border-strong);
   border-radius: 11px;
-  padding: 10px 13px;
+  padding: 9px 13px;
   font: inherit;
   font-size: 14px;
   color: var(--fin-ink);

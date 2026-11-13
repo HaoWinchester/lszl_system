@@ -1,14 +1,11 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.444",
-  "toVersion": "v9.0-p4.1.445",
+  "fromVersion": "v9.0-p4.1.446",
+  "toVersion": "v9.0-p4.1.447",
   "changes": {
     "added": [],
     "changed": [
       "VERSION",
-      "content-prep-studio/dist/content-prep.html",
-      "finance-management.html",
-      "src/121-finance-management-app.js",
       "styles/finance-management.css"
     ],
     "removed": []

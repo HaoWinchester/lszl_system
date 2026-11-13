@@ -24,22 +24,82 @@
     return response.status===204?null:response.json();
   }
 
-  /* ---------- 日期三段选择 ---------- */
-  function fillDateSelects(y,m,d){
+  /* ---------- 日期三段：纯自绘下拉（无原生 select） ---------- */
+  let dateCombos=null;
+  const CHEVRON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
+
+  function createCombo(container,unit,onChange){
+    const combo=document.createElement('div');
+    combo.className='finance-combo';
+    combo.innerHTML=`<button type="button" class="finance-combo-trigger" aria-haspopup="listbox" aria-expanded="false"><b>—</b><small>${unit}</small>${CHEVRON}</button>`;
+    container.appendChild(combo);
+    const trigger=combo.querySelector('.finance-combo-trigger');
+    const label=combo.querySelector('b');
+    let value=null,options=[];
+    function close(){combo.classList.remove('finance-combo-open');combo.querySelector('.finance-combo-list')?.remove();trigger.setAttribute('aria-expanded','false')}
+    function open(){
+      closeAllCombos();
+      const list=document.createElement('div');
+      list.className='finance-combo-list';
+      list.setAttribute('role','listbox');
+      list.innerHTML=options.map(option=>`<button type="button" role="option" data-value="${option.value}" class="${option.value===value?'finance-combo-selected':''}" aria-selected="${option.value===value}">${option.label}</button>`).join('');
+      list.addEventListener('click',event=>{
+        const button=event.target.closest('button[data-value]');
+        if(!button)return;
+        setValue(Number(button.dataset.value));
+        close();onChange?.();
+      });
+      combo.appendChild(list);
+      trigger.setAttribute('aria-expanded','true');
+      combo.classList.add('finance-combo-open');
+      const selected=list.querySelector('.finance-combo-selected');
+      if(selected)selected.scrollIntoView({block:'nearest'});
+    }
+    trigger.addEventListener('click',()=>{
+      if(combo.classList.contains('finance-combo-open'))close();
+      else if(options.length)open();
+    });
+    function setValue(next){value=next;label.textContent=String(next)}
+    return {
+      el:combo,
+      get:()=>value,
+      setValue,
+      setOptions(list){options=list;if(value==null&&list.length)setValue(list[0].value);if(value!=null&&!list.some(option=>option.value===value))setValue(list[0].value)},
+      close,
+    };
+  }
+  function closeAllCombos(){dateCombos?.forEach(combo=>combo.close())}
+  document.addEventListener('click',event=>{if(!event.target.closest?.('.finance-combo'))closeAllCombos()});
+  document.addEventListener('keydown',event=>{if(event.key==='Escape')closeAllCombos()});
+
+  function buildDateCombos(){
+    const seg=$('financeDateSeg');
+    seg.innerHTML='';
     const now=todayParts();
-    const years=[];for(let year=now.y+1;year>=now.y-5;year--)years.push(year);
-    $('financeYear').innerHTML=years.map(year=>`<option value="${year}">${year}</option>`).join('');
-    $('financeMonthPart').innerHTML=Array.from({length:12},(_,i)=>`<option value="${i+1}">${i+1}</option>`).join('');
-    fillDayOptions(y,m);
-    $('financeYear').value=y;$('financeMonthPart').value=m;$('financeDayPart').value=Math.min(d,new Date(y,m,0).getDate());
+    const yearCombo=createCombo(seg,'年');
+    const monthCombo=createCombo(seg,'月');
+    const dayCombo=createCombo(seg,'日',()=>clampDay());
+    dateCombos=[yearCombo,monthCombo,dayCombo];
+    const years=[];for(let year=now.y+1;year>=now.y-6;year--)years.push(year);
+    yearCombo.setOptions(years.map(year=>({value:year,label:String(year)})));
+    monthCombo.setOptions(Array.from({length:12},(_,i)=>({value:i+1,label:String(i+1)})));
+    refreshDayOptions();
+    yearCombo.setValue(now.y);monthCombo.setValue(now.m);dayCombo.setValue(now.d);
   }
-  function fillDayOptions(y,m){
-    const days=new Date(y,m,0).getDate();
-    $('financeDayPart').innerHTML=Array.from({length:days},(_,i)=>`<option value="${i+1}">${i+1}</option>`).join('');
+  function refreshDayOptions(){
+    const y=dateCombos[0].get(),m=dateCombos[1].get();
+    const days=y&&m?new Date(y,m,0).getDate():31;
+    dateCombos[2].setOptions(Array.from({length:days},(_,i)=>({value:i+1,label:String(i+1)})));
   }
+  function clampDay(){refreshDayOptions()}
   function selectedDate(){
-    const y=Number($('financeYear').value),m=Number($('financeMonthPart').value),d=Number($('financeDayPart').value);
+    const y=dateCombos[0].get(),m=dateCombos[1].get(),d=dateCombos[2].get();
     return `${y}-${pad(m)}-${pad(d)}`;
+  }
+  function setDate(y,m,d){
+    dateCombos[0].setValue(y);dateCombos[1].setValue(m);
+    refreshDayOptions();
+    dateCombos[2].setValue(Math.min(d,new Date(y,m,0).getDate()));
   }
 
   /* ---------- 月份胶囊 ---------- */
@@ -159,7 +219,7 @@
     editingId='';existingInvoice=null;clearFile();
     $('financeRecordForm').reset();
     const now=todayParts();
-    fillDateSelects(now.y,now.m,now.d);
+    buildDateCombos();
     $('financeFormMode').textContent='NEW RECORD';$('financeFormTitle').textContent='登记消费';
     $('financeSubmitBtn').textContent='保存记录';
     $('financeCancelEditBtn').hidden=true;
@@ -172,7 +232,7 @@
     existingInvoice=record.invoice||null;
     selectedFile=null;
     const [y,m,d]=String(record.spentOn||'').split('-').map(Number);
-    if(y&&m&&d)fillDateSelects(y,m,d);
+    if(y&&m&&d)setDate(y,m,d);
     $('financeAmount').value=Number(record.amount||0).toFixed(2);
     $('financePurpose').value=record.purpose||'';
     $('financeNote').value=record.note||'';
@@ -263,9 +323,7 @@
     const now=todayParts();
     viewMonth=monthKey(new Date());
     renderMonthPicker();
-    fillDateSelects(now.y,now.m,now.d);
-    $('financeYear').addEventListener('change',()=>fillDayOptions(Number($('financeYear').value),Number($('financeMonthPart').value)));
-    $('financeMonthPart').addEventListener('change',()=>fillDayOptions(Number($('financeYear').value),Number($('financeMonthPart').value)));
+    buildDateCombos();
     $('financeMonthPrev').addEventListener('click',()=>shiftMonth(-1));
     $('financeMonthNext').addEventListener('click',()=>shiftMonth(1));
     $('financeMonthCurrent').addEventListener('click',backToCurrentMonth);
