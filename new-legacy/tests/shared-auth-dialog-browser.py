@@ -130,6 +130,8 @@ def exercise_dialog(page):
 
     page.locator('#authUsername').fill('admin')
     page.locator('#authPassword').fill('wrong')
+    # 政策勾选默认勾选（2026-11）：先取消勾选验证拦截，再勾选放行。
+    page.locator('#authLegalConsent').uncheck()
     page.locator('#authDoLoginBtn').click()
     assert '请先阅读并勾选同意' in page.locator('#authMsg').inner_text()
     assert page.evaluate('__authHarness.calls.login') == 0
