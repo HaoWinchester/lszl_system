@@ -124,7 +124,8 @@ async def release_management_catalog(
 
 
 @router.get("/{release_id}")
-async def release_detail(release_id: str, db: DB, user: CurrentUser):
+async def release_detail(release_id: str, request: Request, db: DB):
+    user = await optional_current_user(request, db)
     release = await paper_release_service.detail(db, user, release_id)
     if release is None:
         raise _nf()
@@ -134,13 +135,15 @@ async def release_detail(release_id: str, db: DB, user: CurrentUser):
 @router.get("/{release_id}/questions")
 async def release_questions(
     release_id: str,
+    request: Request,
     db: DB,
-    user: CurrentUser,
     _: QuestionRateLimited = None,
     limit: int = Query(default=20, ge=1, le=50),
     offset: int = Query(default=0, ge=0),
     seed: str | None = Query(default=None, max_length=128),
 ):
+    # 免费体验卷对游客放行（can_access_with_entitlement 处理匿名分支）；会员卷仍要求登录。
+    user = await optional_current_user(request, db)
     result = await paper_release_service.questions(
         db, user, release_id, limit=limit, offset=offset, seed=seed
     )

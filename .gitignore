@@ -29,3 +29,6 @@ miniprogram/project.private.config.json
 /backend/.env.teacher-assistant.local
 /var/
 output/
+
+# 宣传视频制作素材（成品保留在本地，不进 git）
+docs/promo/

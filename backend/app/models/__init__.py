@@ -16,6 +16,7 @@ from app.models.content_prep import (
 from app.models.course_management import CourseDraft, CourseRelease, LearningTask
 from app.models.file import CurrentFile, FileContent, FileTag, Folder, GraphFile, Tag
 from app.models.engagement import Announcement, AnnouncementAudience, Feedback, FeedbackReceipt, FeedbackReply, MessageReceipt
+from app.models.finance import FinanceRecord
 from app.models.guided_learning import GuidedActivity, GuidedCourse, GuidedCourseActivity, GuidedLearningProgress
 from app.models.paper import PaperCategory, PaperGenerationBatch, PaperImportOperation
 from app.models.paper_release import PaperRelease, PaperReleaseQuestion
@@ -74,6 +75,7 @@ __all__ = [
     "WechatMiniSession",
     "RoleTheme",
     "SystemSetting",
+    "FinanceRecord",
     "SecurityIPBlock",
     "Folder",
     "GraphFile",

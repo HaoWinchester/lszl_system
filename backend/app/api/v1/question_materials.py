@@ -1,10 +1,10 @@
 """Authenticated material editing and immutable image delivery."""
 import base64
 from typing import Annotated
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.auth import get_current_user, require_role
+from app.core.auth import get_current_user, optional_current_user, require_role
 from app.db.session import get_db
 from app.models.user import User
 from app.models.question_material import QuestionMaterial
@@ -21,7 +21,10 @@ async def upload(data: AssetInput, db: DB, user: Editor):
     return {'asset': await service.upload_asset(db, user, data)}
 
 @router.get('/question-assets/{asset_id}/content')
-async def asset_content(asset_id: str, db: DB, user: Reader, fileId: str | None = None, nodeId: str | None = None, bindingId: str | None = None, sourceVersion: str | None = None, attemptId: str | None = None):
+async def asset_content(asset_id: str, request: Request, db: DB, fileId: str | None = None, nodeId: str | None = None, bindingId: str | None = None, sourceVersion: str | None = None, attemptId: str | None = None):
+    # 免费体验卷的图片对游客放行（authorized_asset 按发布卷引用判定）
+    from fastapi import Request as _Request  # noqa: F401
+    user = await optional_current_user(request, db)
     context = (fileId, nodeId, bindingId, sourceVersion)
     if (attemptId is not None or any(value is not None for value in context)) and not all(context):
         service.fail('GRAPH_CONTEXT_REQUIRED', '卡片资源需要完整上下文', 422)
@@ -29,7 +32,8 @@ async def asset_content(asset_id: str, db: DB, user: Reader, fileId: str | None 
     return {'asset': service.asset_payload(asset), 'mimeType': asset.mime_type, 'dataBase64': base64.b64encode(asset.data).decode('ascii')}
 
 @router.get('/question-assets/{asset_id}')
-async def asset_bytes(asset_id: str, db: DB, user: Reader, fileId: str | None = None, nodeId: str | None = None, bindingId: str | None = None, sourceVersion: str | None = None, attemptId: str | None = None):
+async def asset_bytes(asset_id: str, request: Request, db: DB, fileId: str | None = None, nodeId: str | None = None, bindingId: str | None = None, sourceVersion: str | None = None, attemptId: str | None = None):
+    user = await optional_current_user(request, db)
     context = (fileId, nodeId, bindingId, sourceVersion)
     if (attemptId is not None or any(value is not None for value in context)) and not all(context):
         service.fail('GRAPH_CONTEXT_REQUIRED', '卡片资源需要完整上下文', 422)

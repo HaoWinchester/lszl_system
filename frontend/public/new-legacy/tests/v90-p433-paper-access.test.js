@@ -63,7 +63,7 @@ const plans = global.KGSubscriptionPlansModule({
 });
 
 assert.equal(plans.planById('free').features.allExamPapers, false);
-for (const planId of ['monthly', 'quarterly', 'half_year', 'lifetime']) {
+for (const planId of ['monthly', 'quarterly', 'half_year', 'tutoring_elite', 'lifetime']) {
   assert.equal(plans.planById(planId).features.allExamPapers, true, `${planId} 应包含全部已发布试卷权益`);
 }
 assert.equal(plans.featureLabel('allExamPapers'), '全部已发布试卷');

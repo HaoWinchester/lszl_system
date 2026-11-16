@@ -12,7 +12,7 @@ from app.core.security import now_utc, uid
 from app.models.subscription import RedeemCode, Subscription, SubscriptionOrder
 from app.services import system_service, user_service, wechat_pay_service
 
-FINITE_PAID_PLAN_IDS = frozenset({"monthly", "quarterly", "half_year"})
+FINITE_PAID_PLAN_IDS = frozenset({"monthly", "quarterly", "half_year", "tutoring_elite"})
 PAID_PLAN_IDS = FINITE_PAID_PLAN_IDS | {"lifetime"}
 VALID_PLAN_IDS = PAID_PLAN_IDS | {"free"}
 WECHAT_NATIVE_OUT_TRADE_NO_MAX_LENGTH = 32

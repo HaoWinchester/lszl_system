@@ -81,6 +81,8 @@ class Settings(BaseSettings):
     WECHAT_PAY_MONTHLY_AMOUNT_FEN: int = 2900
 
     TEACHER_ASSISTANT_STORAGE: str = str(PROJECT_ROOT / "var" / "teacher-assistant")
+    # 公司财务发票附件存储（私有，仅经带权限校验的 API 访问）
+    FINANCE_INVOICE_STORAGE: str = str(PROJECT_ROOT / "var" / "finance-invoices")
     TEACHER_ASSISTANT_CLAUDE: str = "claude"
     TEACHER_ASSISTANT_MODEL: str = "glm-5.3-flash[1m]"
     TEACHER_ASSISTANT_MODEL_TIMEOUT: int = 150

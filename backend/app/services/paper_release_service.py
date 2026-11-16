@@ -333,7 +333,14 @@ async def entitlement_for_request(db: AsyncSession, user: User) -> bool:
     return bool(subscription_service.entitlements_for(user.role, subscription).get("allExamPapers"))
 
 
-def can_access_with_entitlement(user: User, release: PaperRelease, entitled: bool) -> bool:
+def can_access_with_entitlement(user: User | None, release: PaperRelease, entitled: bool) -> bool:
+    if user is None:
+        # 游客（未登录）：仅放行免费体验卷供试做。角色限制按准学员语义放宽——
+        # 角色列表为空、含 student 或 viewer 均放行；教师专属卷与会员卷仍不可见。
+        roles = {str(role).strip() for role in (release.allowed_roles or []) if str(role).strip()}
+        if roles and not ({"student", "viewer"} & roles):
+            return False
+        return str(release.access_level).casefold() not in MEMBER_ACCESS_LEVELS
     if user.role == "admin":
         return True
     roles = {str(role).strip() for role in (release.allowed_roles or []) if str(role).strip()}
@@ -342,8 +349,9 @@ def can_access_with_entitlement(user: User, release: PaperRelease, entitled: boo
     return str(release.access_level).casefold() not in MEMBER_ACCESS_LEVELS or entitled
 
 
-async def can_access(db: AsyncSession, user: User, release: PaperRelease) -> bool:
-    return can_access_with_entitlement(user, release, await entitlement_for_request(db, user))
+async def can_access(db: AsyncSession, user: User | None, release: PaperRelease) -> bool:
+    entitled = await entitlement_for_request(db, user) if user is not None else False
+    return can_access_with_entitlement(user, release, entitled)
 
 
 async def publish(
@@ -710,19 +718,20 @@ async def management_catalog(
     return {"papers": papers, "page": page, "pageSize": page_size, "total": total}
 
 
-async def detail(db: AsyncSession, user: User, release_id: str) -> dict | None:
+async def detail(db: AsyncSession, user: User | None, release_id: str) -> dict | None:
     release = await db.get(PaperRelease, release_id)
     if release is None or release.status not in {ACTIVE_STATUS, "superseded"}:
         return None
-    entitled = await entitlement_for_request(db, user)
-    if not can_access_with_entitlement(user, release, entitled) and user.role not in (release.allowed_roles or []):
+    entitled = await entitlement_for_request(db, user) if user is not None else False
+    access_allowed = can_access_with_entitlement(user, release, entitled)
+    if not access_allowed and (user is None or user.role not in (release.allowed_roles or [])):
         return None
-    return release_to_dict(release, content_restricted=not can_access_with_entitlement(user, release, entitled))
+    return release_to_dict(release, content_restricted=not access_allowed)
 
 
 async def questions(
     db: AsyncSession,
-    user: User,
+    user: User | None,
     release_id: str,
     *,
     limit: int,
@@ -734,7 +743,7 @@ async def questions(
         return None
     if release.status not in {ACTIVE_STATUS, "superseded"}:
         return None
-    entitled = await entitlement_for_request(db, user)
+    entitled = await entitlement_for_request(db, user) if user is not None else False
     if not can_access_with_entitlement(user, release, entitled):
         return None
 
