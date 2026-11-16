@@ -125,7 +125,9 @@ async def authorized_asset(db, user, asset_id, *, graph_context=None):
         from app.services import graph_question_service
         await graph_question_service.authorized_asset(db, user, asset_id, *graph_context)
         return row
-    if user.role == 'admin' or (user.role == 'teacher' and row.owner_id == user.username):
+    if user is None:
+        pass  # 游客：仅当免费发布卷引用该资产时放行（下方循环判定）
+    elif user.role == 'admin' or (user.role == 'teacher' and row.owner_id == user.username):
         return row
     # Only releases actually referencing this asset grant learner access.
     query = select(PaperRelease).join(PaperReleaseQuestion, PaperRelease.id == PaperReleaseQuestion.release_id).where(
@@ -133,7 +135,7 @@ async def authorized_asset(db, user, asset_id, *, graph_context=None):
         or_(PaperReleaseQuestion.snapshot['images'].contains([{'id': asset_id}]),
             PaperReleaseQuestion.snapshot['material']['images'].contains([{'id': asset_id}]))).distinct()
     from app.services import paper_release_service
-    entitled = await paper_release_service.entitlement_for_request(db, user)
+    entitled = await paper_release_service.entitlement_for_request(db, user) if user is not None else False
     for release in (await db.scalars(query)).all():
         if paper_release_service.can_access_with_entitlement(user, release, entitled):
             return row
