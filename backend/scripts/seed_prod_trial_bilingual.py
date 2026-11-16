@@ -205,10 +205,8 @@ def render_burndown_chart(image_path: str | None) -> bytes:
 
 async def main(database_url: str | None, image_path: str | None, dry_run: bool) -> None:
     if database_url:
-        from app.db import session as session_module
-
-        session_module.settings.DATABASE_URL = database_url
-        session_module.engine = session_module.create_async_engine(database_url)
+        # DATABASE_URL 通过进程环境变量传入（settings 启动时读取），在此仅做提示。
+        print(f"[0] 数据库：{database_url.split('@')[-1]}")
     async with AsyncSessionLocal() as db:
         admin = await db.get(User, "admin")
         if admin is None:
