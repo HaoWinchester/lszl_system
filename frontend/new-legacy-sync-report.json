@@ -1,12 +1,14 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.453",
-  "toVersion": "v9.0-p4.1.454",
+  "fromVersion": "v9.0-p4.1.454",
+  "toVersion": "v9.0-p4.1.455",
   "changes": {
     "added": [],
     "changed": [
       "VERSION",
-      "content-prep-studio/dist/content-prep.html"
+      "content-prep-studio/dist/content-prep.html",
+      "src/100-practice-mode.js",
+      "src/58-paper-access-service.js"
     ],
     "removed": []
   },

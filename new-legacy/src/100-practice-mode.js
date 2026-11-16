@@ -124,14 +124,19 @@
       rows=(Array.isArray(raw)?raw:[]).filter(row=>publishedStatus(row)&&practiceModeEnabled(row)).map(releaseCatalogFallback).filter(row=>row.questionCount);
     }
     const unique=new Map();
-    // 体验卷（免费）置顶第一位，会员卷在后；组内按发布时间倒序。
+    // 体验卷（免费）置顶第一位仅面向非会员视角（游客/未开通会员的学员）；
+    // 会员与管理/教学角色保持原发布时间倒序。
+    const user=global.KGAuthCore?.currentUser?.();
+    const role=String(global.KGRolePermissions?.currentRole?.()||user?.role||'guest').toLowerCase();
+    const memberView=role==='admin'||role==='teacher'||global.KGPaperAccessService?.hasExamEntitlement?.()===true;
     const accessLevelOfRow=row=>String(row?.accessPolicy?.accessLevel||row?.accessLevel||'free').toLowerCase();
+    const byPublishedAt=(a,b)=>Number(b.publishedAt||0)-Number(a.publishedAt||0);
     const freeFirst=(a,b)=>{
       const aFree=accessLevelOfRow(a)!=='member',bFree=accessLevelOfRow(b)!=='member';
       if(aFree!==bFree)return aFree?-1:1;
-      return Number(b.publishedAt||0)-Number(a.publishedAt||0);
+      return byPublishedAt(a,b);
     };
-    rows.slice().sort(freeFirst).forEach(row=>{
+    rows.slice().sort(memberView?byPublishedAt:freeFirst).forEach(row=>{
       const id=text(row.paperId||row.id);
       if(id&&!unique.has(id))unique.set(id,{...row,id,paperId:id,questionCount:Number(row.questionCount||row.totalCount||0),access:paperAccess(row)});
     });

@@ -32,7 +32,7 @@
     return {allowed:false,accessLevel,state:'membership_required',code:'MEMBERSHIP_REQUIRED',message:'此试卷为 VIP 会员专属，开通会员即可解锁全部试卷。'};
   }
   function canUse(paper){return inspect(paper).allowed}
-  const api=Object.freeze({FREE,MEMBER,normalizeAccessLevel,accessLevelOf,inspect,canUse});
+  const api=Object.freeze({FREE,MEMBER,normalizeAccessLevel,accessLevelOf,inspect,canUse,hasExamEntitlement});
   global.KGPaperAccessService=api;
   if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);
