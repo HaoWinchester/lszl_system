@@ -137,6 +137,7 @@ with sync_playwright() as playwright:
         page.locator("#authModal.show").wait_for(state="visible")
         page.locator("#authUsername").fill("佩奇007")
         page.locator("#authPassword").fill("111111")
+        page.locator("#authLegalConsent").uncheck()
         page.locator("#authDoLoginBtn").click()
         assert "请先阅读并勾选同意" in page.locator("#authMsg").inner_text()
         page.locator("#authLegalConsent").check()

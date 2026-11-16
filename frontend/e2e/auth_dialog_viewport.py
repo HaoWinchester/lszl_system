@@ -251,6 +251,7 @@ def exercise(browser, args, route, width, height):
 
         fill(page, "#authUsername", args.username, report, touch)
         fill(page, "#authPassword", "incorrect-auth-viewport-password", report, touch)
+        click(page, "#authLegalConsent", report, touch) if page.locator("#authLegalConsent").is_checked() else None
         click(page, "#authDoLoginBtn", report, touch)
         assert "请先阅读并勾选同意" in page.locator("#authMsg").inner_text()
         assert not login_requests, "Consent failure sent an authentication request"
