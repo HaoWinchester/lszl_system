@@ -1,11 +1,11 @@
 <!doctype html>
-<html data-release="v9.0-p4.1.447" lang="zh-CN">
+<html data-release="v9.0-p4.1.450" lang="zh-CN">
 <head>
-<link rel="icon" type="image/jpeg" href="/assets/logo.jpg?v=v9.0-p4.1.447">
-<meta name="kg-practice-bundle-version" content="v9.0-p4.1.447">
-<script type="application/json" id="kg-page-features">{"auth":{"depends":[],"scripts":["bundles/practice-auth.js?v=v9.0-p4.1.447"],"styles":[]},"account":{"depends":["auth"],"scripts":["bundles/practice-account.js?v=v9.0-p4.1.447"],"styles":[]},"question":{"depends":[],"scripts":["bundles/practice-question.js?v=v9.0-p4.1.447"],"styles":[]},"community":{"depends":["question"],"scripts":["bundles/practice-community.js?v=v9.0-p4.1.447"],"styles":[]},"answer":{"depends":["community"],"scripts":["bundles/practice-answer.js?v=v9.0-p4.1.447"],"styles":[]},"report":{"depends":[],"scripts":["bundles/practice-report.js?v=v9.0-p4.1.447"],"styles":[]},"knowledge":{"depends":[],"scripts":["bundles/practice-knowledge.js?v=v9.0-p4.1.447"],"styles":[]},"history":{"depends":[],"scripts":["bundles/practice-history.js?v=v9.0-p4.1.447"],"styles":[]}}</script>
-<script src="bundles/practice-prelude.js?v=v9.0-p4.1.447"></script>
-<script defer src="bundles/practice-lobby.js?v=v9.0-p4.1.447"></script><!-- kg-teaching-content-sync:generated -->
+<link rel="icon" type="image/jpeg" href="/assets/logo.jpg?v=v9.0-p4.1.450">
+<meta name="kg-practice-bundle-version" content="v9.0-p4.1.450">
+<script type="application/json" id="kg-page-features">{"auth":{"depends":[],"scripts":["bundles/practice-auth.js?v=v9.0-p4.1.450"],"styles":[]},"account":{"depends":["auth"],"scripts":["bundles/practice-account.js?v=v9.0-p4.1.450"],"styles":[]},"question":{"depends":[],"scripts":["bundles/practice-question.js?v=v9.0-p4.1.450"],"styles":[]},"community":{"depends":["question"],"scripts":["bundles/practice-community.js?v=v9.0-p4.1.450"],"styles":[]},"answer":{"depends":["community"],"scripts":["bundles/practice-answer.js?v=v9.0-p4.1.450"],"styles":[]},"report":{"depends":[],"scripts":["bundles/practice-report.js?v=v9.0-p4.1.450"],"styles":[]},"knowledge":{"depends":[],"scripts":["bundles/practice-knowledge.js?v=v9.0-p4.1.450"],"styles":[]},"history":{"depends":[],"scripts":["bundles/practice-history.js?v=v9.0-p4.1.450"],"styles":[]}}</script>
+<script src="bundles/practice-prelude.js?v=v9.0-p4.1.450"></script>
+<script defer src="bundles/practice-lobby.js?v=v9.0-p4.1.450"></script><!-- kg-teaching-content-sync:generated -->
 <!-- kg-direct-bootstrap-anchor -->
 <!-- kg-runtime:generated -->
 <!-- kg-auth-session:generated -->
@@ -14,7 +14,7 @@
 <!-- kg-direct-entry:generated -->
 <!-- kg-feature-usage-clock:generated -->
 <!-- kg-feature-analytics:generated -->
-<link rel="stylesheet" href="bundles/practice-lobby.css?v=v9.0-p4.1.447">
+<link rel="stylesheet" href="bundles/practice-lobby.css?v=v9.0-p4.1.450">
 
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
@@ -100,8 +100,6 @@
               <span data-kg-icon="star" data-kg-icon-size="18" aria-hidden="true"></span>
               <span>我的收藏</span>
             </button>
-            <div class="practice-sidebar-divider"></div>
-            <button type="button" class="practice-utility-btn" data-lobby-open="account"><span data-kg-icon="settings" data-kg-icon-size="18" aria-hidden="true"></span>账号设置</button>
           </nav>
       </aside>
       <button type="button" class="practice-exp-fab" id="practiceExpFab" hidden aria-expanded="false" aria-controls="practiceExpPanel" aria-label="展开做题经验面板">XP</button>
@@ -322,6 +320,10 @@
         <div class="practice-result-actions">
           <button type="button" class="practice-primary-btn" id="practiceAgainBtn">开始新一轮练习</button>
           <button type="button" class="practice-secondary-btn" id="practiceLobbyBtn">返回大厅</button>
+        </div>
+        <div class="practice-guest-guide" id="practiceGuestGuide" hidden>
+          <span>本次为游客试做，成绩不会被保存。</span>
+          <button type="button" class="practice-primary-btn" id="practiceGuestLoginBtn">登录后可保存记录与错题本</button>
         </div>
       </section>
     </main>

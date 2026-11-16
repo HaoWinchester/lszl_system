@@ -240,7 +240,7 @@
       <button type="button" class="btn btn-primary" id="subscriptionRedeemCodeBtn">兑换卡密</button>
       <div class="redeem-message" id="subscriptionRedeemCodeMsg"></div>
     </section>
-    <div class="footnote"><span class="icon i-shield-check"></span>卡密兑换成功后，权益将自动开通并即时生效</div>`;
+    <div class="footnote"><span class="icon i-shield-check"></span>卡密兑换成功后，权益将自动开通并即时生效</div><div class="footnote"><span class="icon i-info"></span>会员权益仅包含平台线上学习功能，不包含答疑、人工批改与一对一指导服务；精英老师解答套餐的解答服务同样不含日常答疑</div>`;
     function renderNativePayment(plan,order){
       const pay=window.KGWechatPay;
       if(!body||!pay||!order||!order.id)return;

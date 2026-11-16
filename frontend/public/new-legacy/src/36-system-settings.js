@@ -412,7 +412,7 @@
     ${renderRedeemCodeAdminMarkup(sub)}
     <div class="subscription-policy-note">
       <strong>订阅边界：</strong>
-      管理员和教师/教研不受订阅限制；订阅仅用于学员角色。游客不进入订阅体系，只用于公开示例和体验入口。当前套餐模型为 <code>free</code>、<code>monthly</code>、<code>quarterly</code>、<code>half_year</code>、<code>lifetime</code>。
+      管理员和教师/教研不受订阅限制；订阅仅用于学员角色。游客不进入订阅体系，只用于公开示例和体验入口。当前套餐模型为 <code>free</code>、<code>monthly</code>、<code>quarterly</code>、<code>half_year</code>、<code>tutoring_elite</code>、<code>lifetime</code>。
     </div>`;
   }
   function collectPlanSettings(card){

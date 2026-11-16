@@ -39,7 +39,7 @@ def test_non_teaching_roles_fail_closed_without_a_paid_subscription(role: str) -
     assert entitlements_for(role, None) == {"allExamPapers": False}
 
 
-@pytest.mark.parametrize("plan_id", ["monthly", "quarterly", "half_year"])
+@pytest.mark.parametrize("plan_id", ["monthly", "quarterly", "half_year", "tutoring_elite"])
 def test_finite_paid_plans_require_a_future_expiry(plan_id: str) -> None:
     assert entitlements_for("student", _subscription(plan_id)) == {"allExamPapers": False}
     assert entitlements_for(
@@ -67,7 +67,7 @@ def test_visitor_can_read_database_backed_subscription_plans() -> None:
 
     assert response.status_code == 200, response.text
     plans = response.json()["plans"]
-    assert {plan["planId"] for plan in plans} >= {"free", "monthly", "quarterly", "half_year", "lifetime"}
+    assert {plan["planId"] for plan in plans} >= {"free", "monthly", "quarterly", "half_year", "tutoring_elite", "lifetime"}
     assert all(plan["originalPriceText"] for plan in plans)
 
 

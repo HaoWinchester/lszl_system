@@ -86,8 +86,6 @@
               <span data-kg-icon="star" data-kg-icon-size="18" aria-hidden="true"></span>
               <span>我的收藏</span>
             </button>
-            <div class="practice-sidebar-divider"></div>
-            <button type="button" class="practice-utility-btn" data-lobby-open="account"><span data-kg-icon="settings" data-kg-icon-size="18" aria-hidden="true"></span>账号设置</button>
           </nav>
       </aside>
       <button type="button" class="practice-exp-fab" id="practiceExpFab" hidden aria-expanded="false" aria-controls="practiceExpPanel" aria-label="展开做题经验面板">XP</button>
@@ -308,6 +306,10 @@
         <div class="practice-result-actions">
           <button type="button" class="practice-primary-btn" id="practiceAgainBtn">开始新一轮练习</button>
           <button type="button" class="practice-secondary-btn" id="practiceLobbyBtn">返回大厅</button>
+        </div>
+        <div class="practice-guest-guide" id="practiceGuestGuide" hidden>
+          <span>本次为游客试做，成绩不会被保存。</span>
+          <button type="button" class="practice-primary-btn" id="practiceGuestLoginBtn">登录后可保存记录与错题本</button>
         </div>
       </section>
     </main>

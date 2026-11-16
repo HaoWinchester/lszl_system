@@ -149,7 +149,7 @@
     container.innerHTML=`<div class="wechat-login-card"><div class="wechat-login-copy"><strong>请使用微信扫码</strong><p>在手机上确认后，将自动登录当前页面。</p><div class="wechat-login-qr" id="${qrId}"><span>正在生成微信授权二维码…</span></div><button type="button" class="wechat-login-back">使用账号密码登录</button></div></div>`;
     bindPasswordLoginReturn(container);
     try{
-      const [payload]=await Promise.all([createOfficialAuthRequest('login',currentReturnPath(),window.KGAuthRuntime?.legalConsentVersion||''),loadWechatLoginSdk()]);
+      const [payload]=await Promise.all([createOfficialAuthRequest('login',currentReturnPath(),window.KGAuthRuntime?.hasLegalConsent?.()?(window.KGAuthRuntime?.legalConsentVersion||''):''),loadWechatLoginSdk()]);
       if(!container.isConnected)return;
       const auth=getEmbeddedAuthParams(payload.authUrl);
       if(typeof window.WxLogin!=='function')throw new Error('微信二维码组件加载失败。');

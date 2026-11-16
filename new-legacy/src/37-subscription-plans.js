@@ -34,10 +34,14 @@
       pro_student:"half_year",
       lifetime:"lifetime",
       life:"lifetime",
-      forever:"lifetime"
+      forever:"lifetime",
+      tutoring_elite:"tutoring_elite",
+      tutoring:"tutoring_elite",
+      elite:"tutoring_elite",
+      elite_tutor:"tutoring_elite"
     };
 
-    const PLAN_ORDER = ["free","monthly","quarterly","half_year","lifetime"];
+    const PLAN_ORDER = ["free","monthly","quarterly","half_year","tutoring_elite","lifetime"];
 
     const PLANS = {
       free:{
@@ -176,12 +180,48 @@
           exportPackages:-1
         }
       },
+      tutoring_elite:{
+        id:"tutoring_elite",
+        enabled:true,
+        name:"精英老师解答套餐",
+        shortName:"解答",
+        level:4,
+        billingCycle:"monthly",
+      durationDays:30,
+        paymentAmountFen:68800,
+        priceText:"待配置",
+        originalPriceText:"",
+        discountPercent:"",
+        durationText:"30 天",
+        badgeText:"含解答",
+        recommended:false,
+        description:"会员全部权益，另含精英老师一对一试卷解答服务；解答服务不含日常答疑、人工批改与陪跑。",
+        features:{
+          basicTraining:true,
+          basicRecall:true,
+          personalGraph:true,
+          standardQuestionBank:true,
+          allExamPapers:true,
+          learningPackageImport:true,
+          learningPackageExport:true,
+          advancedRecall:true,
+          tutorAnswer:true
+        },
+        limits:{
+          dailyTraining:-1,
+          recallMaps:-1,
+          graphNodes:-1,
+          recallNodes:-1,
+          importPackages:-1,
+          exportPackages:-1
+        }
+      },
       lifetime:{
         id:"lifetime",
         enabled:true,
         name:"终身会员",
         shortName:"终身",
-        level:4,
+        level:5,
         billingCycle:"lifetime",
       durationDays:-1,
         paymentAmountFen:39900,
@@ -225,7 +265,8 @@
       learningPackageExport:"学习包导出",
       advancedRecall:"高级深度回忆",
       analytics:"学习分析",
-      futureAdvanced:"后续高级功能"
+      futureAdvanced:"后续高级功能",
+      tutorAnswer:"精英老师试卷解答服务（不含日常答疑）"
     };
 
     const LIMIT_LABELS = {

@@ -1006,6 +1006,35 @@ def test_release_api_rejects_student_publish_and_exposes_lightweight_catalog() -
         asyncio.run(_cleanup(ids))
 
 
+def test_guest_can_read_free_release_without_login():
+    """游客可读取免费体验卷的详情与题目（不产生任何做题记录）。"""
+    ids = _ids()
+    asyncio.run(_seed(ids))
+
+    async def publish():
+        async with AsyncSessionLocal() as db:
+            teacher = await db.get(User, ids["teacher"])
+            release = await paper_release_service.publish(
+                db, teacher, ids["paper"], expected_revision=1,
+                access_level="free", enabled_modes=["practice_mode"],
+                allowed_roles=["student", "teacher", "admin", "viewer"], metadata={}
+            )
+            return release.id
+
+    try:
+        release_id = asyncio.run(publish())
+        with TestClient(app) as client:
+            detail = client.get(f"/api/v1/paper-releases/{release_id}")
+            assert detail.status_code == 200, detail.text
+            questions = client.get(f"/api/v1/paper-releases/{release_id}/questions")
+            assert questions.status_code == 200, questions.text
+            payload = questions.json()
+            assert payload["total"] >= 1 and payload["questions"]
+            assert client.get(f"/api/v1/paper-releases/{release_id}", headers={"X-Forwarded-For": "203.0.113.9"}).status_code == 200
+    finally:
+        asyncio.run(_cleanup(ids))
+
+
 def test_guest_catalog_shows_student_papers_without_content_or_private_metadata():
     ids = _ids()
     asyncio.run(_seed(ids))
@@ -1031,8 +1060,9 @@ def test_guest_catalog_shows_student_papers_without_content_or_private_metadata(
             assert row["contentRestricted"] is True
             assert row["publishedAt"] > 0
             assert not {"questions", "questionSnapshots", "metadata", "publishedBy", "allowedRoles"} & row.keys()
-            assert client.get(f"/api/v1/paper-releases/{release_id}").status_code == 401
-            assert client.get(f"/api/v1/paper-releases/{release_id}/questions").status_code == 401
+            # 游客访问会员卷：路由改为可选登录后，匿名不可见（404），不再暴露内容端点语义。
+            assert client.get(f"/api/v1/paper-releases/{release_id}").status_code == 404
+            assert client.get(f"/api/v1/paper-releases/{release_id}/questions").status_code == 404
 
             async def change_visibility(status, roles):
                 async with AsyncSessionLocal() as db:

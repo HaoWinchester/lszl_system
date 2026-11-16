@@ -6200,6 +6200,38 @@ body.practice-mode-page[data-practice-view="lobby"] #practiceLobby{min-height:0;
 
 /* The history footer is appended without changing existing drawer rows. */
 .practice-history-pagination{display:grid;justify-items:center;gap:12px;padding:16px 0}.practice-history-pagination p{margin:0;color:var(--practice-muted)}
+/* 游客试做引导条：结果页提示成绩不保存并引导登录 */
+.practice-guest-guide{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px 14px;margin-top:16px;padding:14px 16px;border:1px solid #e4d9ff;border-radius:14px;background:#f5f2ff}
+.practice-guest-guide[hidden]{display:none}
+.practice-guest-guide span{font-size:13px;color:#6d5ce6;font-weight:650}
+.practice-guest-guide .practice-primary-btn{min-height:38px;height:auto;padding:8px 16px;font-size:13px}
+/* ---------- 移动端体验增补：游客体验卷 / 大厅侧栏 / 顶栏 / 安全区 ---------- */
+@media (max-width:900px){
+  .practice-sidebar-nav{-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .practice-sidebar-nav::-webkit-scrollbar{display:none}
+}
+@media (max-width:480px){
+  .practice-sidebar-nav{flex-wrap:wrap;overflow-x:visible}
+  #practiceLobby .practice-library-actions{flex-wrap:wrap;gap:8px;margin-left:0}
+  #practiceLobby .practice-mode-card{min-height:auto}
+  .practice-guest-guide{flex-direction:column;text-align:center}
+  .practice-guest-guide .practice-primary-btn{width:100%}
+}
+@media (max-width:560px){
+  .practice-game-topbar{min-width:0}
+  .practice-game-topbar .practice-timer,.practice-game-topbar [data-practice-progress]{font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+}
+@supports (padding: env(safe-area-inset-bottom)) {
+  @media (max-width:760px){
+    .practice-answer-sheet-drawer .practice-drawer{padding-bottom:calc(14px + env(safe-area-inset-bottom))}
+    .practice-exit-dialog{padding-bottom:calc(16px + env(safe-area-inset-bottom))}
+    .practice-submit-confirm .practice-exit-dialog{padding-bottom:calc(16px + env(safe-area-inset-bottom))}
+  }
+}
+@media (max-width:380px){
+  .practice-report-meta{grid-template-columns:1fr}
+  .practice-report-overall .practice-report-score strong{font-size:34px}
+}
 /* style: styles/question-comments.css */
 /* 单题留言 + 弹幕（119-question-comments.js）。
  * 配色对齐做题页 focus-vega 皮肤：白卡片、zinc 中性色、紫色主色（--learn-*，带回退值）。
