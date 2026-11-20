@@ -1,10 +1,11 @@
 {
   "schemaVersion": 1,
   "fromVersion": "v9.0-p4.1.457",
-  "toVersion": "v9.0-p4.1.457",
+  "toVersion": "v9.0-p4.1.458-dev1",
   "changes": {
     "added": [],
     "changed": [
+      "VERSION",
       "styles/home-learning-entry-p4515.css"
     ],
     "removed": []
