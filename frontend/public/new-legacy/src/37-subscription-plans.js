@@ -195,7 +195,7 @@
         durationText:"30 天",
         badgeText:"含解答",
         recommended:false,
-        description:"会员全部权益，另含精英老师一对一试卷解答服务；解答服务不含日常答疑、人工批改与陪跑。",
+        description:"会员全部权益，另含精英老师一对一试卷解答服务。",
         features:{
           basicTraining:true,
           basicRecall:true,
@@ -266,7 +266,7 @@
       advancedRecall:"高级深度回忆",
       analytics:"学习分析",
       futureAdvanced:"后续高级功能",
-      tutorAnswer:"精英老师试卷解答服务（不含日常答疑）"
+      tutorAnswer:"精英老师试卷解答服务"
     };
 
     const LIMIT_LABELS = {

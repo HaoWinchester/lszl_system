@@ -271,7 +271,7 @@
       <button type="button" class="btn btn-primary" id="subscriptionRedeemCodeBtn">兑换卡密</button>
       <div class="redeem-message" id="subscriptionRedeemCodeMsg"></div>
     </section>
-    <div class="footnote"><span class="icon i-shield-check"></span>卡密兑换成功后，权益将自动开通并即时生效</div><div class="footnote"><span class="icon i-info"></span>会员权益仅包含平台线上学习功能，不包含答疑、人工批改与一对一指导服务；精英老师解答套餐的解答服务同样不含日常答疑</div>`;
+    <div class="footnote"><span class="icon i-shield-check"></span>卡密兑换成功后，权益将自动开通并即时生效</div><div class="footnote"><span class="icon i-info"></span>会员权益仅包含平台线上学习功能，不包含答疑、人工批改与一对一指导服务</div>`;
     // 活动倒计时每秒刷新；弹窗关闭或重新渲染（generation 变化）后自动失效并清理。
     // 测试环境的 body mock 可能没有 querySelector，此时跳过倒计时绑定即可。
     if(promotionBannerHtml()&&typeof body.querySelector==="function"){

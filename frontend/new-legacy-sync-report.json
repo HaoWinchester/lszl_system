@@ -5,7 +5,8 @@
   "changes": {
     "added": [],
     "changed": [
-      "content-prep-studio/dist/content-prep.html"
+      "src/33-user-center.js",
+      "src/37-subscription-plans.js"
     ],
     "removed": []
   },
