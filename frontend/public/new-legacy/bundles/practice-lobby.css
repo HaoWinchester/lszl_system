@@ -3766,17 +3766,23 @@ g.is-batch-selected .edge-visible{
 .membership-ui .checkout-meta{gap:6px 12px;padding-top:7px;font-size:10px}
 @media(max-width:760px){.membership-ui .membership-checkout{grid-template-columns:1fr}.membership-ui .checkout-qr .qr-frame{width:min(220px,72vw)}}
 
-/* 限时活动 banner：套餐网格上方的活动倒计时条。 */
-.membership-ui .membership-promo-banner{display:flex;align-items:center;gap:14px;margin:-2px 0 0;padding:13px 16px;border:1px solid #f4c98a;border-radius:16px;background:linear-gradient(105deg,#fff7ea,#fffdf8 58%,#f2fbf4);box-shadow:0 10px 24px rgba(194,120,20,.10)}
-.membership-ui .membership-promo-banner .promo-icon{display:grid;width:38px;height:38px;flex:0 0 auto;place-items:center;border-radius:12px;background:linear-gradient(145deg,#fbbf24,#ea8a0c);box-shadow:0 8px 16px rgba(234,138,12,.22);color:#fff}
-.membership-ui .membership-promo-banner .promo-icon .icon{width:20px;height:20px;filter:brightness(0) invert(1)}
-.membership-ui .membership-promo-banner .promo-copy{min-width:0;flex:1}
-.membership-ui .membership-promo-banner .promo-title{margin:0;color:#8a4b08;font-size:16px;font-weight:900;line-height:1.25}
-.membership-ui .membership-promo-banner .promo-message{margin:3px 0 0;color:#b06a1e;font-size:12px;line-height:1.45}
-.membership-ui .membership-promo-banner .promo-countdown{display:flex;flex:0 0 auto;flex-direction:column;align-items:center;gap:2px;padding:7px 14px;border:1px solid #f4c98a;border-radius:12px;background:#fff}
-.membership-ui .membership-promo-banner .promo-countdown-label{color:#b98a44;font-size:10px;font-weight:800;letter-spacing:.08em}
-.membership-ui .membership-promo-banner .membership-promo-countdown{color:#d97706;font-size:17px;font-weight:900;font-variant-numeric:tabular-nums;letter-spacing:.02em}
-@media(max-width:600px){.membership-ui .membership-promo-banner{flex-wrap:wrap;gap:10px;padding:12px 13px}.membership-ui .membership-promo-banner .promo-copy{flex:1 1 calc(100% - 48px)}.membership-ui .membership-promo-banner .promo-countdown{flex-direction:row;align-items:baseline;gap:8px;padding:5px 12px}.membership-ui .membership-promo-banner .promo-countdown-label{font-size:10px}.membership-ui .membership-promo-banner .membership-promo-countdown{font-size:15px}}
+/* 限时活动 banner：套餐网格上方的暖金活动横幅（参考电商活动条：图标块 + 标题 + 文案 + 数字方块倒计时）。 */
+.membership-ui .membership-promo-banner{position:relative;display:flex;align-items:center;gap:14px;margin:-2px 0 0;padding:13px 18px;border:1px solid #ffe3ae;border-radius:18px;background:linear-gradient(100deg,#fffaf0 0%,#fff3d6 38%,#ffe9b8 72%,#ffe0a0 100%);box-shadow:0 12px 28px rgba(214,140,30,.16);overflow:hidden}
+.membership-ui .membership-promo-banner::before{content:"";position:absolute;right:-46px;top:-58px;width:150px;height:150px;border-radius:50%;background:rgba(255,255,255,.34)}
+.membership-ui .membership-promo-banner::after{content:"";position:absolute;right:64px;bottom:-72px;width:110px;height:110px;border-radius:50%;background:rgba(255,255,255,.26)}
+.membership-ui .membership-promo-banner .promo-icon{display:grid;width:44px;height:44px;flex:0 0 auto;place-items:center;border-radius:14px;background:#fffdf6;box-shadow:0 6px 16px rgba(214,120,20,.22);color:#f2590a}
+.membership-ui .membership-promo-banner .promo-icon svg{width:24px;height:24px}
+.membership-ui .membership-promo-banner .promo-title{flex:0 0 auto;color:#f2590a;font-size:22px;font-weight:900;letter-spacing:.02em;line-height:1.2}
+.membership-ui .membership-promo-banner .promo-message{min-width:0;flex:1;overflow:hidden;color:#9a6420;font-size:13px;font-weight:700;line-height:1.5}
+.membership-ui .membership-promo-banner .promo-countdown{position:relative;z-index:1;display:flex;flex:0 0 auto;align-items:center;gap:6px;padding:8px 14px;border-radius:999px;background:#fff;box-shadow:0 6px 18px rgba(214,120,20,.18)}
+.membership-ui .membership-promo-banner .promo-countdown-label{display:inline-flex;align-items:center;gap:5px;margin-right:2px;color:#a06a1c;font-size:12.5px;font-weight:800;white-space:nowrap}
+.membership-ui .membership-promo-banner .promo-clock{display:inline-flex;width:15px;height:15px;color:#e08a2c}
+.membership-ui .membership-promo-banner .promo-clock svg{width:100%;height:100%}
+.membership-ui .membership-promo-banner .promo-num{display:inline-grid;min-width:34px;place-items:center;padding:4px 6px;border-radius:9px;background:linear-gradient(160deg,#ff9440,#f2590a);box-shadow:0 3px 8px rgba(242,89,10,.30);color:#fff;font-size:19px;font-weight:900;font-variant-numeric:tabular-nums;line-height:1.15}
+.membership-ui .membership-promo-banner .promo-num-day{min-width:34px}
+.membership-ui .membership-promo-banner .promo-unit{color:#b5762a;font-size:13px;font-weight:800}
+.membership-ui .membership-promo-banner .promo-colon{margin:0 -1px;color:#f2590a;font-size:18px;font-weight:900;font-style:normal}
+@media(max-width:600px){.membership-ui .membership-promo-banner{flex-wrap:wrap;gap:10px;padding:12px 14px}.membership-ui .membership-promo-banner .promo-title{font-size:18px}.membership-ui .membership-promo-banner .promo-message{flex:1 1 100%;order:3;white-space:normal}.membership-ui .membership-promo-banner .promo-countdown{order:2;margin-left:auto}.membership-ui .membership-promo-banner .promo-num{min-width:28px;font-size:16px;padding:3px 5px}}
 /* style: styles/subscription.css */
 /* 学员订阅权益：订阅状态与锁定提示的通用样式 */
 .subscription-badge,

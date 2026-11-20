@@ -63,18 +63,32 @@
     if(promotionCountdownTimer){clearInterval(promotionCountdownTimer);promotionCountdownTimer=0;}
   }
   // 限时活动 banner：数据来自 adapter 预载的 KGPromotionActivity（公开 plans 接口），
-  // enabled 且未到结束时间才渲染；倒计时格式复用周开放门控的 formatCountdown。
+  // enabled 且未到结束时间才渲染；倒计时按 天/时/分/秒 数字方块分块展示，每秒刷新。
+  const PROMO_BOLT_SVG='<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M13 2 4.6 12.6c-.4.5 0 1.4.7 1.4h4.3l-1.5 7.2c-.1.7.8 1.1 1.2.5l8.5-10.6c.4-.5 0-1.4-.7-1.4h-4.3l1.5-7.2c.1-.7-.8-1.1-1.3-.5Z"/></svg>';
+  const PROMO_CLOCK_SVG='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3.2 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+  function promotionCountdownParts(ms){
+    const total=Math.max(0,Math.floor((Number(ms)||0)/1000));
+    const days=Math.floor(total/86400),hours=Math.floor((total%86400)/3600),minutes=Math.floor((total%3600)/60),seconds=total%60;
+    const pad=v=>String(v).padStart(2,"0");
+    return {days:String(days),hours:pad(hours),minutes:pad(minutes),seconds:pad(seconds)};
+  }
   function promotionBannerHtml(){
     const promo=window.KGPromotionActivity;
     if(!promo||!promo.enabled)return"";
     const end=Date.parse(promo.endTime||"");
     if(!Number.isFinite(end)||end<=Date.now())return"";
-    const formatCountdown=window.KGLearningWeeklyOpen&&window.KGLearningWeeklyOpen.formatCountdown;
-    const remaining=typeof formatCountdown==="function"?formatCountdown(end-Date.now()):"--";
+    const parts=promotionCountdownParts(end-Date.now());
     return `<section class="membership-promo-banner" data-promo-end="${end}">
-      <div class="promo-icon"><span class="icon i-star"></span></div>
-      <div class="promo-copy"><h3 class="promo-title">${escapeHTML(promo.title||"限时活动")}</h3>${promo.message?`<p class="promo-message">${escapeHTML(promo.message)}</p>`:""}</div>
-      <div class="promo-countdown"><span class="promo-countdown-label">距结束</span><strong class="membership-promo-countdown">${escapeHTML(remaining)}</strong></div>
+      <span class="promo-icon" aria-hidden="true">${PROMO_BOLT_SVG}</span>
+      <strong class="promo-title">${escapeHTML(promo.title||"限时活动")}</strong>
+      ${promo.message?`<span class="promo-message">${escapeHTML(promo.message)}</span>`:""}
+      <div class="promo-countdown" aria-label="距活动结束剩余时间">
+        <span class="promo-countdown-label"><i class="promo-clock">${PROMO_CLOCK_SVG}</i>距结束仅剩</span>
+        <strong class="promo-num promo-num-day">${parts.days}</strong><span class="promo-unit">天</span>
+        <strong class="promo-num" data-promo-part="hours">${parts.hours}</strong><em class="promo-colon">:</em>
+        <strong class="promo-num" data-promo-part="minutes">${parts.minutes}</strong><em class="promo-colon">:</em>
+        <strong class="promo-num" data-promo-part="seconds">${parts.seconds}</strong>
+      </div>
     </section>`;
   }
   function setMembershipPaymentView(active){
@@ -262,17 +276,21 @@
     // 测试环境的 body mock 可能没有 querySelector，此时跳过倒计时绑定即可。
     if(promotionBannerHtml()&&typeof body.querySelector==="function"){
       const promoBanner=body.querySelector(".membership-promo-banner");
-      const formatCountdown=window.KGLearningWeeklyOpen&&window.KGLearningWeeklyOpen.formatCountdown;
       const tickPromo=()=>{
         if(detailGeneration!==subscriptionDetailGeneration){
           if(promotionCountdownTimer){clearInterval(promotionCountdownTimer);promotionCountdownTimer=0;}
           return;
         }
         const end=Number(promoBanner.dataset.promoEnd||0);
-        const el=body.querySelector(".membership-promo-countdown");
-        if(!end||!el){if(promotionCountdownTimer){clearInterval(promotionCountdownTimer);promotionCountdownTimer=0;}return}
-        if(Date.now()>=end){promoBanner.remove();if(promotionCountdownTimer){clearInterval(promotionCountdownTimer);promotionCountdownTimer=0;}return}
-        if(typeof formatCountdown==="function")el.textContent=formatCountdown(end-Date.now());
+        const remaining=end-Date.now();
+        if(!end||remaining<=0){promoBanner.remove();if(promotionCountdownTimer){clearInterval(promotionCountdownTimer);promotionCountdownTimer=0;}return}
+        const parts=promotionCountdownParts(remaining);
+        for(const key of["hours","minutes","seconds"]){
+          const el=promoBanner.querySelector(`[data-promo-part="${key}"]`);
+          if(el)el.textContent=parts[key];
+        }
+        const dayEl=promoBanner.querySelector(".promo-num-day");
+        if(dayEl)dayEl.textContent=parts.days;
       };
       if(promotionCountdownTimer)clearInterval(promotionCountdownTimer);
       promotionCountdownTimer=setInterval(tickPromo,1000);
