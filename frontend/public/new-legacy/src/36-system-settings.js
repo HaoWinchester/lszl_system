@@ -343,6 +343,59 @@
     }catch(error){toast(error?.message||'订阅申请处理失败，请重试')}
   }
 
+  // ---------- 限时活动配置 ----------
+  function isoToLocalInputValue(iso){
+    if(!iso)return '';
+    const date=new Date(iso);
+    if(Number.isNaN(date.getTime()))return '';
+    const pad=n=>String(n).padStart(2,'0');
+    return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  }
+  function localInputValueToIso(value){
+    if(!value)return '';
+    const date=new Date(value);
+    if(Number.isNaN(date.getTime()))return '';
+    return date.toISOString();
+  }
+  function renderPromotionAdminMarkup(){
+    const promo=window.KGPromotionActivity||{};
+    const defaultEnd=new Date(Date.now()+7*24*60*60*1000);
+    const pad=n=>String(n).padStart(2,'0');
+    const defaultEndValue=`${defaultEnd.getFullYear()}-${pad(defaultEnd.getMonth()+1)}-${pad(defaultEnd.getDate())}T${pad(defaultEnd.getHours())}:${pad(defaultEnd.getMinutes())}`;
+    return `<div class="subscription-promo-card subscription-admin-card">
+      <div class="subscription-plan-head">
+        <h3>限时活动</h3>
+        <span>充值界面倒计时</span>
+      </div>
+      <div class="subscription-admin-switches">
+        <label><input type="checkbox" id="ssPromoEnabled" ${promo.enabled?'checked':''}> 启用限时活动</label>
+      </div>
+      <div class="subscription-admin-fields">
+        <label class="full">活动标题<input id="ssPromoTitle" value="${escapeHTML(promo.title||'')}" placeholder="例如：限时钜惠，会员立减"></label>
+        <label class="full">活动说明<input id="ssPromoMessage" value="${escapeHTML(promo.message||'')}" placeholder="例如：活动期内开通会员享专属优惠"></label>
+        <label class="full">活动结束时间<input id="ssPromoEndTime" type="datetime-local" value="${escapeHTML(isoToLocalInputValue(promo.endTime)||defaultEndValue)}"></label>
+      </div>
+      <div class="subscription-admin-actions">
+        <button type="button" class="primary" id="ssPromoSaveBtn">保存活动配置</button>
+      </div>
+    </div>`;
+  }
+  async function savePromotionSettings(){
+    const enabled=!!$('ssPromoEnabled')?.checked;
+    const endTimeValue=$('ssPromoEndTime')?.value||'';
+    const endTime=enabled?localInputValueToIso(endTimeValue):'';
+    if(enabled&&!endTime){toast('请选择有效的活动结束时间');return}
+    try{
+      await window.KGSystemDomain?.savePromotionActivity?.({
+        enabled,
+        title:String($('ssPromoTitle')?.value||'').trim(),
+        message:String($('ssPromoMessage')?.value||'').trim(),
+        endTime,
+      });
+      logAction('保存限时活动配置','SYSTEM',enabled?`限时活动已启用，结束时间 ${endTime}`:'限时活动已停用');
+      toast('限时活动配置已保存');
+    }catch(error){toast(error?.message||'限时活动保存失败')}
+  }
   function renderSubscriptionPlans(){
     const panel=$('ssSubscriptionPanel');
     if(!panel)return;
@@ -408,6 +461,7 @@
         </article>`;
       }).join('')}
     </div>
+    ${renderPromotionAdminMarkup()}
     ${renderSubscriptionOrdersMarkup(sub)}
     ${renderRedeemCodeAdminMarkup(sub)}
     <div class="subscription-policy-note">
@@ -546,6 +600,7 @@
     if(subscriptionPanel)subscriptionPanel.addEventListener('click',event=>{
       const resetAll=event.target.closest('#ssResetAllPlanSettingsBtn');
       if(resetAll){resetAllPlanSettings();return}
+      if(event.target.closest('#ssPromoSaveBtn')){savePromotionSettings();return}
       const generateCodes=event.target.closest('#ssGenerateRedeemCodesBtn');
       if(generateCodes){handleRedeemCodeGenerate();return}
       const codePage=event.target.closest('[data-code-page]');

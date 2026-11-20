@@ -814,3 +814,9 @@ body.practice-mode-page[data-practice-view="lobby"] #practiceLobby{min-height:0;
   .practice-report-meta{grid-template-columns:1fr}
   .practice-report-overall .practice-report-score strong{font-size:34px}
 }
+
+/* P4.5.18 移动端收尾：#practiceLobby 工具栏规则（L662 一带）特异性高于上方 600px media 块，
+   必须在文件尾部以同特异性覆盖，才能在 ≤600px 恢复 column 布局的左对齐与紧凑搜索框。 */
+@media(max-width:600px){#practiceLobby .practice-library-toolbar{align-items:stretch;gap:10px}#practiceLobby .practice-library-title{flex:0 0 auto}#practiceLobby .practice-catalog-search{justify-content:flex-start}#practiceLobby .practice-catalog-search label:first-child{flex:1 1 100%}
+/* 窄屏下右下角做题经验 fab（XP）悬浮于复仇模式卡上方，"可复习"计数左移让位 */
+#practiceLobby .practice-revenge-total{right:66px}}

@@ -56,9 +56,26 @@
     return window.KGSubscription || null;
   }
   let nativePayPollTimer=0;
+  let promotionCountdownTimer=0;
   let subscriptionDetailGeneration=0;
   function clearNativePayPolling(){
     if(nativePayPollTimer){clearInterval(nativePayPollTimer);nativePayPollTimer=0;}
+    if(promotionCountdownTimer){clearInterval(promotionCountdownTimer);promotionCountdownTimer=0;}
+  }
+  // 限时活动 banner：数据来自 adapter 预载的 KGPromotionActivity（公开 plans 接口），
+  // enabled 且未到结束时间才渲染；倒计时格式复用周开放门控的 formatCountdown。
+  function promotionBannerHtml(){
+    const promo=window.KGPromotionActivity;
+    if(!promo||!promo.enabled)return"";
+    const end=Date.parse(promo.endTime||"");
+    if(!Number.isFinite(end)||end<=Date.now())return"";
+    const formatCountdown=window.KGLearningWeeklyOpen&&window.KGLearningWeeklyOpen.formatCountdown;
+    const remaining=typeof formatCountdown==="function"?formatCountdown(end-Date.now()):"--";
+    return `<section class="membership-promo-banner" data-promo-end="${end}">
+      <div class="promo-icon"><span class="icon i-star"></span></div>
+      <div class="promo-copy"><h3 class="promo-title">${escapeHTML(promo.title||"限时活动")}</h3>${promo.message?`<p class="promo-message">${escapeHTML(promo.message)}</p>`:""}</div>
+      <div class="promo-countdown"><span class="promo-countdown-label">距结束</span><strong class="membership-promo-countdown">${escapeHTML(remaining)}</strong></div>
+    </section>`;
   }
   function setMembershipPaymentView(active){
     const modal=document.querySelector("#userSubscriptionDetailModal .membership-ui");
@@ -202,7 +219,7 @@
         button.setAttribute("aria-disabled",String(planPickLocked&&!isActive));
       });
     }
-    body.innerHTML=`<div class="divider"></div><div class="plans-grid">
+    body.innerHTML=`<div class="divider"></div>${promotionBannerHtml()}<div class="plans-grid">
       ${plans.map(plan=>{
         // 当前方案用于标记；有效的有限期会员也可以提前续费。
         const current=!currentPlanExpired && !!currentPlanId && plan.id===currentPlanId;
@@ -241,6 +258,25 @@
       <div class="redeem-message" id="subscriptionRedeemCodeMsg"></div>
     </section>
     <div class="footnote"><span class="icon i-shield-check"></span>卡密兑换成功后，权益将自动开通并即时生效</div><div class="footnote"><span class="icon i-info"></span>会员权益仅包含平台线上学习功能，不包含答疑、人工批改与一对一指导服务；精英老师解答套餐的解答服务同样不含日常答疑</div>`;
+    // 活动倒计时每秒刷新；弹窗关闭或重新渲染（generation 变化）后自动失效并清理。
+    // 测试环境的 body mock 可能没有 querySelector，此时跳过倒计时绑定即可。
+    if(promotionBannerHtml()&&typeof body.querySelector==="function"){
+      const promoBanner=body.querySelector(".membership-promo-banner");
+      const formatCountdown=window.KGLearningWeeklyOpen&&window.KGLearningWeeklyOpen.formatCountdown;
+      const tickPromo=()=>{
+        if(detailGeneration!==subscriptionDetailGeneration){
+          if(promotionCountdownTimer){clearInterval(promotionCountdownTimer);promotionCountdownTimer=0;}
+          return;
+        }
+        const end=Number(promoBanner.dataset.promoEnd||0);
+        const el=body.querySelector(".membership-promo-countdown");
+        if(!end||!el){if(promotionCountdownTimer){clearInterval(promotionCountdownTimer);promotionCountdownTimer=0;}return}
+        if(Date.now()>=end){promoBanner.remove();if(promotionCountdownTimer){clearInterval(promotionCountdownTimer);promotionCountdownTimer=0;}return}
+        if(typeof formatCountdown==="function")el.textContent=formatCountdown(end-Date.now());
+      };
+      if(promotionCountdownTimer)clearInterval(promotionCountdownTimer);
+      promotionCountdownTimer=setInterval(tickPromo,1000);
+    }
     function renderNativePayment(plan,order){
       const pay=window.KGWechatPay;
       if(!body||!pay||!order||!order.id)return;

@@ -271,10 +271,10 @@ test('winning claim renders the update-style dismissible four-choice dialog in t
   assert.equal(tab.document.getElementById('learningEntryTitle').textContent, '从这里开始学习');
   const choices = tab.document.querySelectorAll('[data-learning-entry-choice]');
   assert.deepEqual(Array.from(choices, button => [button.getAttribute('data-learning-entry-choice'), button.getAttribute('data-destination')]), [
-    ['知识图谱', 'index.html'], ['深度回忆', 'knowledge-recall.html'], ['多题归纳', 'question-workspace.html'], ['知识星空', 'knowledge-space'],
+    ['知识图谱', 'index.html'], ['深度回忆', 'knowledge-recall.html'], ['多题归纳', 'question-workspace.html'], ['知识星空', 'knowledge-space'], ['做题模式', 'practice-mode.html'],
   ]);
   assert.deepEqual(Array.from(choices, button => button.getAttribute('data-description')), [
-    '梳理知识结构与关系 · 当前首页', '主动回忆关键词与知识线索 · 深度回忆', '多题比较、归纳与连接 · 多题画布', '按科目与分类探索练习足迹',
+    '梳理知识结构与关系 · 当前首页', '主动回忆关键词与知识线索 · 深度回忆', '多题比较、归纳与连接 · 多题画布', '按科目与分类探索练习足迹', '试卷实战演练 · 做题大厅',
   ]);
   assert.equal(tab.document.querySelector('[aria-label="关闭学习入口"]'), null, 'the dialog must not contain a close control');
   assert.equal(tab.document.querySelector('.learning-entry-close'), null, 'the dialog must not contain a learning-entry-close element');
