@@ -40,7 +40,10 @@ async def plans(db: DB):
     """公开展示数据库中的套餐配置；下单仍要求已登录的学员。"""
     # 套餐价格后台可改，禁止浏览器启发式缓存，防止改价后前端拿到旧价。
     return JSONResponse(
-        {"plans": await system_service.get_subscription_plans(db)},
+        {
+            "plans": await system_service.get_subscription_plans(db),
+            "promotion": await system_service.get_promotion_activity(db),
+        },
         headers={"Cache-Control": "no-store"},
     )
 

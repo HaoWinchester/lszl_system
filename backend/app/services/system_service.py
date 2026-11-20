@@ -1,6 +1,7 @@
 """系统设置：主题覆盖、微信配置、订阅套餐展示配置（DB KV 覆盖默认常量）。"""
 
 from collections.abc import Mapping
+from datetime import datetime
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 import re
 from pathlib import Path
@@ -340,3 +341,51 @@ async def set_plan_setting(db: AsyncSession, plan_id: str, patch: dict) -> dict 
         if p["planId"] == plan_id:
             return p
     return None
+
+
+# ---------- 限时活动（充值界面 banner + 倒计时）----------
+DEFAULT_PROMOTION_ACTIVITY = {
+    "enabled": False,
+    "title": "",
+    "message": "",
+    "endTime": None,
+}
+
+
+async def get_promotion_activity(db: AsyncSession) -> dict:
+    s = await _get_setting(db, "promotion_activity")
+    stored = dict(s.value or {}) if s else {}
+    return {**DEFAULT_PROMOTION_ACTIVITY, **stored}
+
+
+async def set_promotion_activity(db: AsyncSession, patch: dict) -> dict:
+    if not isinstance(patch, dict):
+        raise ValueError("活动配置必须是对象")
+    current = await get_promotion_activity(db)
+    enabled = patch.get("enabled", current["enabled"])
+    if not isinstance(enabled, bool):
+        raise ValueError("enabled 必须是布尔值")
+    title = str(patch.get("title", current["title"]) or "").strip()
+    message = str(patch.get("message", current["message"]) or "").strip()
+    end_time = patch.get("endTime", current["endTime"])
+    if end_time not in (None, ""):
+        try:
+            datetime.fromisoformat(str(end_time).replace("Z", "+00:00"))
+        except ValueError as error:
+            raise ValueError("endTime 必须是 ISO 8601 时间字符串") from error
+        end_time = str(end_time)
+    else:
+        end_time = None
+    value = {
+        "enabled": enabled,
+        "title": title,
+        "message": message,
+        "endTime": end_time,
+    }
+    s = await _get_setting(db, "promotion_activity")
+    if s:
+        s.value = value
+    else:
+        db.add(SystemSetting(key="promotion_activity", value=value))
+    await db.commit()
+    return value

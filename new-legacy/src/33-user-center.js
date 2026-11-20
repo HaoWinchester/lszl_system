@@ -56,9 +56,40 @@
     return window.KGSubscription || null;
   }
   let nativePayPollTimer=0;
+  let promotionCountdownTimer=0;
   let subscriptionDetailGeneration=0;
   function clearNativePayPolling(){
     if(nativePayPollTimer){clearInterval(nativePayPollTimer);nativePayPollTimer=0;}
+    if(promotionCountdownTimer){clearInterval(promotionCountdownTimer);promotionCountdownTimer=0;}
+  }
+  // 限时活动 banner：数据来自 adapter 预载的 KGPromotionActivity（公开 plans 接口），
+  // enabled 且未到结束时间才渲染；倒计时按 天/时/分/秒 数字方块分块展示，每秒刷新。
+  const PROMO_BOLT_SVG='<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M13 2 4.6 12.6c-.4.5 0 1.4.7 1.4h4.3l-1.5 7.2c-.1.7.8 1.1 1.2.5l8.5-10.6c.4-.5 0-1.4-.7-1.4h-4.3l1.5-7.2c.1-.7-.8-1.1-1.3-.5Z"/></svg>';
+  const PROMO_CLOCK_SVG='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3.2 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+  function promotionCountdownParts(ms){
+    const total=Math.max(0,Math.floor((Number(ms)||0)/1000));
+    const days=Math.floor(total/86400),hours=Math.floor((total%86400)/3600),minutes=Math.floor((total%3600)/60),seconds=total%60;
+    const pad=v=>String(v).padStart(2,"0");
+    return {days:String(days),hours:pad(hours),minutes:pad(minutes),seconds:pad(seconds)};
+  }
+  function promotionBannerHtml(){
+    const promo=window.KGPromotionActivity;
+    if(!promo||!promo.enabled)return"";
+    const end=Date.parse(promo.endTime||"");
+    if(!Number.isFinite(end)||end<=Date.now())return"";
+    const parts=promotionCountdownParts(end-Date.now());
+    return `<section class="membership-promo-banner" data-promo-end="${end}">
+      <span class="promo-icon" aria-hidden="true">${PROMO_BOLT_SVG}</span>
+      <strong class="promo-title">${escapeHTML(promo.title||"限时活动")}</strong>
+      ${promo.message?`<span class="promo-message">${escapeHTML(promo.message)}</span>`:""}
+      <div class="promo-countdown" aria-label="距活动结束剩余时间">
+        <span class="promo-countdown-label"><i class="promo-clock">${PROMO_CLOCK_SVG}</i>距结束仅剩</span>
+        <strong class="promo-num promo-num-day">${parts.days}</strong><span class="promo-unit">天</span>
+        <strong class="promo-num" data-promo-part="hours">${parts.hours}</strong><em class="promo-colon">:</em>
+        <strong class="promo-num" data-promo-part="minutes">${parts.minutes}</strong><em class="promo-colon">:</em>
+        <strong class="promo-num" data-promo-part="seconds">${parts.seconds}</strong>
+      </div>
+    </section>`;
   }
   function setMembershipPaymentView(active){
     const modal=document.querySelector("#userSubscriptionDetailModal .membership-ui");
@@ -202,7 +233,7 @@
         button.setAttribute("aria-disabled",String(planPickLocked&&!isActive));
       });
     }
-    body.innerHTML=`<div class="divider"></div><div class="plans-grid">
+    body.innerHTML=`<div class="divider"></div>${promotionBannerHtml()}<div class="plans-grid">
       ${plans.map(plan=>{
         // 当前方案用于标记；有效的有限期会员也可以提前续费。
         const current=!currentPlanExpired && !!currentPlanId && plan.id===currentPlanId;
@@ -241,6 +272,29 @@
       <div class="redeem-message" id="subscriptionRedeemCodeMsg"></div>
     </section>
     <div class="footnote"><span class="icon i-shield-check"></span>卡密兑换成功后，权益将自动开通并即时生效</div><div class="footnote"><span class="icon i-info"></span>会员权益仅包含平台线上学习功能，不包含答疑、人工批改与一对一指导服务；精英老师解答套餐的解答服务同样不含日常答疑</div>`;
+    // 活动倒计时每秒刷新；弹窗关闭或重新渲染（generation 变化）后自动失效并清理。
+    // 测试环境的 body mock 可能没有 querySelector，此时跳过倒计时绑定即可。
+    if(promotionBannerHtml()&&typeof body.querySelector==="function"){
+      const promoBanner=body.querySelector(".membership-promo-banner");
+      const tickPromo=()=>{
+        if(detailGeneration!==subscriptionDetailGeneration){
+          if(promotionCountdownTimer){clearInterval(promotionCountdownTimer);promotionCountdownTimer=0;}
+          return;
+        }
+        const end=Number(promoBanner.dataset.promoEnd||0);
+        const remaining=end-Date.now();
+        if(!end||remaining<=0){promoBanner.remove();if(promotionCountdownTimer){clearInterval(promotionCountdownTimer);promotionCountdownTimer=0;}return}
+        const parts=promotionCountdownParts(remaining);
+        for(const key of["hours","minutes","seconds"]){
+          const el=promoBanner.querySelector(`[data-promo-part="${key}"]`);
+          if(el)el.textContent=parts[key];
+        }
+        const dayEl=promoBanner.querySelector(".promo-num-day");
+        if(dayEl)dayEl.textContent=parts.days;
+      };
+      if(promotionCountdownTimer)clearInterval(promotionCountdownTimer);
+      promotionCountdownTimer=setInterval(tickPromo,1000);
+    }
     function renderNativePayment(plan,order){
       const pay=window.KGWechatPay;
       if(!body||!pay||!order||!order.id)return;
@@ -396,6 +450,18 @@
     setMembershipPaymentView(false);
     renderSubscriptionDetailPlans();
     modal.classList.add("show");
+    // 活动配置/套餐价格可能在其他页面（如管理后台）刚保存过，本页内存还是旧值：
+    // 打开后异步拉取最新，若弹窗仍开着且停在套餐视图（不能打断扫码支付视图）则重渲染。
+    const refreshPromise=window.KGSystemDomain&&typeof window.KGSystemDomain.refreshPlans==="function"
+      ?window.KGSystemDomain.refreshPlans().catch(()=>null):null;
+    if(!refreshPromise)return;
+    refreshPromise.then(()=>{
+      const wrap=$("userSubscriptionDetailModal");
+      const shell=document.querySelector("#userSubscriptionDetailModal .membership-ui");
+      if(!wrap||!wrap.classList.contains("show"))return;
+      if(!shell||shell.classList.contains("is-payment-view"))return;
+      renderSubscriptionDetailPlans();
+    });
   }
   function closeSubscriptionDetailModal(){
     subscriptionDetailGeneration++;

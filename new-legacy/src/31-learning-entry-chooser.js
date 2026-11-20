@@ -16,6 +16,7 @@
     { label: "深度回忆", description: "主动回忆关键词与知识线索 · 深度回忆", destination: "knowledge-recall.html" },
     { label: "多题归纳", description: "多题比较、归纳与连接 · 多题画布", destination: "question-workspace.html" },
     { label: "知识星空", description: "按科目与分类探索练习足迹", destination: "knowledge-space" },
+    { label: "做题模式", description: "试卷实战演练 · 做题大厅", destination: "practice-mode.html" },
   ];
   let active = null;
 
@@ -194,8 +195,8 @@
       const choices = element(doc, "div", { class: "learning-entry-grid" });
       const error = element(doc, "p", { class: "learning-entry-error", id: "learningEntryChooserError", "aria-live": "polite" });
       CHOICES.forEach(choice => {
-        const style = { "知识图谱": "entry-graph is-current", "深度回忆": "entry-recall", "多题归纳": "entry-synthesis", "知识星空": "entry-practice" }[choice.label];
-        const avatar = { "知识图谱": "图", "深度回忆": "忆", "多题归纳": "归", "知识星空": "星" }[choice.label];
+        const style = { "知识图谱": "entry-graph is-current", "深度回忆": "entry-recall", "多题归纳": "entry-synthesis", "知识星空": "entry-practice", "做题模式": "entry-quizmode" }[choice.label];
+        const avatar = { "知识图谱": "图", "深度回忆": "忆", "多题归纳": "归", "知识星空": "星", "做题模式": "练" }[choice.label];
         const button = element(doc, "button", { type: "button", class: `learning-entry-card ${style}`, "data-learning-entry": choice.label, "data-learning-entry-choice": choice.label, "data-destination": choice.destination, "data-description": choice.description });
         button.append(element(doc, "span", { class: "learning-entry-avatar" }, avatar), element(doc, "span", { class: "learning-entry-name" }, choice.label), element(doc, "span", { class: "learning-entry-id" }, choice.description)); choices.append(button);
       });

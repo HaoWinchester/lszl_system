@@ -98,6 +98,21 @@ async def update_plan(plan_id: str, body: dict, db: DB, _: AdminUser):
     return {"plan": plan}
 
 
+# ---------- 限时活动（充值界面 banner）----------
+@router.get("/promotion-activity")
+async def promotion_activity(db: DB, _: CurrentUser):
+    return {"config": await system_service.get_promotion_activity(db)}
+
+
+@router.put("/promotion-activity")
+async def update_promotion_activity(body: dict, db: DB, _: AdminUser):
+    try:
+        config = await system_service.set_promotion_activity(db, body)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    return {"config": config}
+
+
 # ---------- 操作日志 ----------
 @router.get("/logs")
 async def logs(db: DB, _: AdminUser, limit: int = 100):

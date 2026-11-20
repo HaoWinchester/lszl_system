@@ -125,6 +125,9 @@
     subscriptionApi.hydratePlanSettings?.(next)
     global.KGSubscriptionRemotePlanSettings = next
     global.dispatchEvent?.(new CustomEvent('kg-subscription-plan-change', { detail: { settings: next } }))
+    const promotion = payload.promotion || null
+    global.KGPromotionActivity = promotion ? Object.freeze({ ...promotion }) : null
+    global.dispatchEvent?.(new CustomEvent('kg-promotion-activity-change', { detail: { promotion } }))
     return next
   }
 
@@ -239,6 +242,14 @@
     return subscriptionApi.planById?.(planId) || payload.plan || patch
   }
 
+  async function savePromotionActivity(patch) {
+    const payload = await request('PUT', '/api/v1/system/promotion-activity', patch)
+    const promotion = payload.config || null
+    global.KGPromotionActivity = promotion ? Object.freeze({ ...promotion }) : null
+    global.dispatchEvent?.(new CustomEvent('kg-promotion-activity-change', { detail: { promotion } }))
+    return promotion
+  }
+
   async function saveAllPlans(settings = {}) {
     for (const planId of subscriptionApi.PLAN_ORDER || []) {
       await savePlan(planId, settings[planId] || subscriptionApi.PLANS?.[planId] || {})
@@ -341,6 +352,7 @@
     resetTheme,
     saveWechatConfig,
     savePlan,
+    savePromotionActivity,
     saveAllPlans,
     setStudentSubscription,
     retryInitialization,
@@ -365,6 +377,7 @@
   roleApi.resetTheme = resetTheme
   if (wechatApi) wechatApi.saveConfig = saveWechatConfig
   subscriptionApi.setPlanSettings = savePlan
+  subscriptionApi.setPromotionActivity = savePromotionActivity
   subscriptionApi.resetPlanSettings = planId => savePlan(planId, subscriptionApi.PLANS?.[planId] || {})
   subscriptionApi.savePlanSettings = saveAllPlans
   subscriptionApi.setStudentSubscription = setStudentSubscription
