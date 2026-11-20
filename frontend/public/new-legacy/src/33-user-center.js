@@ -432,6 +432,18 @@
     setMembershipPaymentView(false);
     renderSubscriptionDetailPlans();
     modal.classList.add("show");
+    // 活动配置/套餐价格可能在其他页面（如管理后台）刚保存过，本页内存还是旧值：
+    // 打开后异步拉取最新，若弹窗仍开着且停在套餐视图（不能打断扫码支付视图）则重渲染。
+    const refreshPromise=window.KGSystemDomain&&typeof window.KGSystemDomain.refreshPlans==="function"
+      ?window.KGSystemDomain.refreshPlans().catch(()=>null):null;
+    if(!refreshPromise)return;
+    refreshPromise.then(()=>{
+      const wrap=$("userSubscriptionDetailModal");
+      const shell=document.querySelector("#userSubscriptionDetailModal .membership-ui");
+      if(!wrap||!wrap.classList.contains("show"))return;
+      if(!shell||shell.classList.contains("is-payment-view"))return;
+      renderSubscriptionDetailPlans();
+    });
   }
   function closeSubscriptionDetailModal(){
     subscriptionDetailGeneration++;
