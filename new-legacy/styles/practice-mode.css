@@ -1057,10 +1057,14 @@ body.practice-mode-page[data-practice-view="lobby"] #practiceLobby>.practice-emp
 /* —— 复仇模式语义：不限试卷 —— */
 .practice-revenge-pool{display:none;align-items:baseline;gap:6px;color:#9f1239;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
 .practice-revenge-pool strong{font-size:16px;color:#9f1239}
-.practice-library-revenge-note{display:none;margin:0 0 10px;padding:9px 12px;border:1px solid #f1d7dc;border-radius:9px;background:#fff8f8;color:#881337;font-size:12px;font-weight:650;line-height:1.55}
 #practiceLobby.is-revenge-active .practice-revenge-pool{display:inline-flex}
-#practiceLobby.is-revenge-active .practice-library-revenge-note{display:block}
 #practiceLobby.is-revenge-active .practice-selected-paper,
 #practiceLobby.is-revenge-active .practice-action-divider,
 #practiceLobby.is-revenge-active .practice-action-config,
 #practiceLobby.is-revenge-active .practice-coverage-retry{display:none}
+/* 复仇激活：试卷库加蒙版，明确该区域与复仇无关且不可交互 */
+#practiceLobby.is-revenge-active .practice-library-shelf{position:relative}
+#practiceLobby.is-revenge-active .practice-library-shelf::before{content:"";position:absolute;inset:0;z-index:6;border-radius:12px;background:rgba(246,247,251,.55);backdrop-filter:blur(2.5px)}
+#practiceLobby.is-revenge-active .practice-library-shelf>*{position:relative;z-index:1;pointer-events:none;user-select:none;filter:grayscale(.4);opacity:.72}
+.practice-revenge-pool-hint{display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;background:#fff3f5;color:#9f1239;font-size:11.5px;font-weight:750;white-space:nowrap}
+#practiceLobby.is-revenge-active .practice-library-shelf::after{z-index:7}

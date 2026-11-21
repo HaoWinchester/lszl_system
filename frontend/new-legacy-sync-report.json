@@ -6,7 +6,6 @@
     "added": [],
     "changed": [
       "practice-mode.html",
-      "src/practice/lobby-actions-controller.js",
       "styles/practice-mode.css"
     ],
     "removed": []
