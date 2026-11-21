@@ -1,12 +1,13 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.459",
-  "toVersion": "v9.0-p4.1.460",
+  "fromVersion": "v9.0-p4.1.461",
+  "toVersion": "v9.0-p4.1.461",
   "changes": {
     "added": [],
     "changed": [
-      "VERSION",
-      "content-prep-studio/dist/content-prep.html"
+      "practice-mode.html",
+      "src/practice/lobby-actions-controller.js",
+      "styles/practice-mode.css"
     ],
     "removed": []
   },

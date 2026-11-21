@@ -6489,6 +6489,17 @@ body.practice-mode-page[data-practice-view="lobby"] #practiceLobby>.practice-emp
 
 /* 设计定稿：试卷库工具行移除「清除筛选」「更多 →」按钮（功能保留，搜索框清空/筛选 tab 即等效操作） */
 #practiceLobby #practiceLibraryClear,#practiceLobby #practiceLibraryMoreBtn{display:none!important}
+
+/* —— 复仇模式语义：不限试卷 —— */
+.practice-revenge-pool{display:none;align-items:baseline;gap:6px;color:#9f1239;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
+.practice-revenge-pool strong{font-size:16px;color:#9f1239}
+.practice-library-revenge-note{display:none;margin:0 0 10px;padding:9px 12px;border:1px solid #f1d7dc;border-radius:9px;background:#fff8f8;color:#881337;font-size:12px;font-weight:650;line-height:1.55}
+#practiceLobby.is-revenge-active .practice-revenge-pool{display:inline-flex}
+#practiceLobby.is-revenge-active .practice-library-revenge-note{display:block}
+#practiceLobby.is-revenge-active .practice-selected-paper,
+#practiceLobby.is-revenge-active .practice-action-divider,
+#practiceLobby.is-revenge-active .practice-action-config,
+#practiceLobby.is-revenge-active .practice-coverage-retry{display:none}
 /* style: styles/question-comments.css */
 /* 单题留言 + 弹幕（119-question-comments.js）。
  * 配色对齐做题页 focus-vega 皮肤：白卡片、zinc 中性色、紫色主色（--learn-*，带回退值）。

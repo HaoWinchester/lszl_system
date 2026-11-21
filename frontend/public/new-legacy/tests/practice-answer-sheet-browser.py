@@ -525,7 +525,6 @@ with sync_playwright() as playwright:
     page.locator('[data-practice-tab="revenge"]').click()
     page.locator('.practice-revenge-options summary').click()
     # 普通练习选择 60 题，复仇只有 1 题时仍自动发送 count=1。
-    page.locator('[data-practice-tab="revenge"]').click()
     page.locator('[data-config-dropdown="count"]').click()
     page.locator('[data-config-menu="count"] [data-value="60"]').click()
     assert page.locator('#practiceRevengeActiveCount').inner_text() == '1'

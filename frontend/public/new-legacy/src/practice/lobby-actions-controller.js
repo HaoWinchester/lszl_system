@@ -11,6 +11,8 @@
   const shells={count:document.getElementById('practiceCountOptions'),order:document.getElementById('practiceOrderOptions')};
   const summary=document.getElementById('practiceActionBarSummary');
   const revengeStrip=document.getElementById('practiceRevengeStrip');
+  const lobby=document.getElementById('practiceLobby');
+  const poolCount=document.getElementById('practiceRevengePoolCount');
   let activeMode='practice';
   const dropdowns={};
 
@@ -57,6 +59,8 @@
   }
 
   function refreshSummary(){
+    // 复仇激活：题池数字与复仇条保持一致
+    if(poolCount)poolCount.textContent=document.getElementById('practiceRevengeActiveCount')?.textContent||'0';
     if(!summary)return;
     const parts=[MODE_LABELS[activeMode]];
     const count=activeMode==='revenge'?'':checkedLabel('practiceCount',shells.count);
@@ -77,6 +81,7 @@
     });
     document.querySelectorAll('[data-mode-actions]').forEach(wrapper=>{wrapper.hidden=wrapper.dataset.modeActions!==mode});
     if(revengeStrip)revengeStrip.hidden=mode!=='revenge';
+    if(lobby)lobby.classList.toggle('is-revenge-active',mode==='revenge');
     refreshSummary();
   }
 
@@ -113,5 +118,5 @@
   setMode('practice');
 
   // 题量下拉的“全部（N 题）”文案等由主逻辑异步更新，兜底轮询保持同步（仅大厅视图时开销极小）。
-  global.setInterval?.(()=>{if(document.body.dataset.practiceView==='lobby'){dropdowns.count?.refresh();dropdowns.order?.refresh();refreshSummary()}},1500);
+  global.setInterval?.(()=>{if(document.body.dataset.practiceView==='lobby'){dropdowns.count?.refresh();dropdowns.order?.refresh();refreshSummary()}},800);
 })(window,document);

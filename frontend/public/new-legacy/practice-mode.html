@@ -1,11 +1,11 @@
 <!doctype html>
-<html data-release="v9.0-p4.1.460" lang="zh-CN">
+<html data-release="v9.0-p4.1.461" lang="zh-CN">
 <head>
-<link rel="icon" type="image/jpeg" href="/assets/logo.jpg?v=v9.0-p4.1.460">
-<meta name="kg-practice-bundle-version" content="v9.0-p4.1.460">
-<script type="application/json" id="kg-page-features">{"auth":{"depends":[],"scripts":["bundles/practice-auth.js?v=v9.0-p4.1.460"],"styles":[]},"account":{"depends":["auth"],"scripts":["bundles/practice-account.js?v=v9.0-p4.1.460"],"styles":[]},"question":{"depends":[],"scripts":["bundles/practice-question.js?v=v9.0-p4.1.460"],"styles":[]},"community":{"depends":["question"],"scripts":["bundles/practice-community.js?v=v9.0-p4.1.460"],"styles":[]},"answer":{"depends":["community"],"scripts":["bundles/practice-answer.js?v=v9.0-p4.1.460"],"styles":[]},"report":{"depends":[],"scripts":["bundles/practice-report.js?v=v9.0-p4.1.460"],"styles":[]},"knowledge":{"depends":[],"scripts":["bundles/practice-knowledge.js?v=v9.0-p4.1.460"],"styles":[]},"history":{"depends":[],"scripts":["bundles/practice-history.js?v=v9.0-p4.1.460"],"styles":[]}}</script>
-<script src="bundles/practice-prelude.js?v=v9.0-p4.1.460"></script>
-<script defer src="bundles/practice-lobby.js?v=v9.0-p4.1.460"></script><!-- kg-teaching-content-sync:generated -->
+<link rel="icon" type="image/jpeg" href="/assets/logo.jpg?v=v9.0-p4.1.461">
+<meta name="kg-practice-bundle-version" content="v9.0-p4.1.461">
+<script type="application/json" id="kg-page-features">{"auth":{"depends":[],"scripts":["bundles/practice-auth.js?v=v9.0-p4.1.461"],"styles":[]},"account":{"depends":["auth"],"scripts":["bundles/practice-account.js?v=v9.0-p4.1.461"],"styles":[]},"question":{"depends":[],"scripts":["bundles/practice-question.js?v=v9.0-p4.1.461"],"styles":[]},"community":{"depends":["question"],"scripts":["bundles/practice-community.js?v=v9.0-p4.1.461"],"styles":[]},"answer":{"depends":["community"],"scripts":["bundles/practice-answer.js?v=v9.0-p4.1.461"],"styles":[]},"report":{"depends":[],"scripts":["bundles/practice-report.js?v=v9.0-p4.1.461"],"styles":[]},"knowledge":{"depends":[],"scripts":["bundles/practice-knowledge.js?v=v9.0-p4.1.461"],"styles":[]},"history":{"depends":[],"scripts":["bundles/practice-history.js?v=v9.0-p4.1.461"],"styles":[]}}</script>
+<script src="bundles/practice-prelude.js?v=v9.0-p4.1.461"></script>
+<script defer src="bundles/practice-lobby.js?v=v9.0-p4.1.461"></script><!-- kg-teaching-content-sync:generated -->
 <!-- kg-direct-bootstrap-anchor -->
 <!-- kg-runtime:generated -->
 <!-- kg-auth-session:generated -->
@@ -14,7 +14,7 @@
 <!-- kg-direct-entry:generated -->
 <!-- kg-feature-usage-clock:generated -->
 <!-- kg-feature-analytics:generated -->
-<link rel="stylesheet" href="bundles/practice-lobby.css?v=v9.0-p4.1.460">
+<link rel="stylesheet" href="bundles/practice-lobby.css?v=v9.0-p4.1.461">
 
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
@@ -145,6 +145,7 @@
         </section>
 
         <section class="practice-library practice-library-shelf" aria-label="快速选择试卷">
+          <p class="practice-library-revenge-note">复仇模式不限试卷：将重练全部已积累错题，下方选择仅对普通/挑战/学霸生效。</p>
           <div class="practice-library-toolbar">
             <div class="practice-library-title"><strong>试卷库</strong><span id="practiceLibrarySummary" aria-live="polite">选择最近发布的试卷</span></div>
             <div class="practice-catalog-search">
@@ -174,6 +175,7 @@
             </div>
             <span class="practice-action-divider" aria-hidden="true"></span>
             <span class="practice-action-config" id="practiceActionBarSummary">普通练习 · 全部 · 试卷顺序</span>
+            <div class="practice-revenge-pool" id="practiceRevengePoolSummary" aria-live="polite">复仇题池 · 全部错题 <strong id="practiceRevengePoolCount">0</strong> 题 · 不限试卷</div>
             <button type="button" class="practice-secondary-btn practice-coverage-retry" id="practiceCoverageRetry" hidden>重试加载进度</button>
           </div>
           <div class="practice-action-actions">
