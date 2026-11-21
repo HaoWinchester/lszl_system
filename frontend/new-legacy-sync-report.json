@@ -5,7 +5,7 @@
   "changes": {
     "added": [],
     "changed": [
-      "styles/practice-mode.css"
+      "src/practice/lobby-actions-controller.js"
     ],
     "removed": []
   },

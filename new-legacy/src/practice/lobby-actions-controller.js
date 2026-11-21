@@ -81,6 +81,30 @@
   }
 
   tabs.forEach(tab=>tab.addEventListener('click',()=>setMode(tab.dataset.practiceTab)));
+
+  // 双击试卷直接进入普通练习：有未完成一轮时先询问（继续/新开一轮），否则直接开始。
+  const library=document.getElementById('practicePaperLibrary');
+  library?.addEventListener('dblclick',event=>{
+    if(document.body.dataset.practiceView!=='lobby')return;
+    const card=event.target.closest('[data-paper-id]');
+    if(!card)return;
+    event.preventDefault();
+    if(!card.classList.contains('is-selected'))card.click();
+    const startButton=document.querySelector('[data-practice-start="practice"]');
+    const freshButton=document.querySelector('[data-practice-new="practice"]');
+    if(!startButton||startButton.disabled)return;
+    const confirmDialog=global.KGDialogs?.confirm;
+    if(freshButton&&!freshButton.hidden&&typeof confirmDialog==='function'){
+      const match=/(\d+)\s*\/\s*(\d+)/.exec(startButton.textContent||'');
+      const detail=match?`已保存 ${match[1]}/${match[2]} 题。`:'';
+      confirmDialog(`这份试卷有一轮未完成的普通练习，${detail}是否继续？`,{danger:false}).then(ok=>{
+        if(ok)startButton.click();
+        else freshButton.click();
+      });
+      return;
+    }
+    startButton.click();
+  });
   dropdowns.count=makeDropdown('count','practiceCount',shells.count);
   dropdowns.order=makeDropdown('order','practiceOrder',shells.order);
   setMode('practice');
