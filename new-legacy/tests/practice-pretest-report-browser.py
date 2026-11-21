@@ -15,7 +15,8 @@ with sync_playwright() as pw:
     assert ctx.request.post(base+'/api/v1/auth/login',data={'username':'pretest-student','password':'practice-session-pass'}).ok
     p.reload(wait_until='networkidle')
     p.locator('#practicePaperLibrary [data-paper-id="pretest-paper"]').click()
-    p.locator('label').filter(has=p.locator('input[name="practiceCount"][value="180"]')).click()
+    p.locator('[data-config-dropdown="count"]').click()
+    p.locator('[data-config-menu="count"] [data-value="180"]').click()
     p.locator('[data-practice-start="practice"]').click();expect(p.locator('#practiceGame')).to_be_visible()
     sid=p.evaluate('KGPracticeMode.snapshot().sessionId');api=base+'/api/v1/learning/practice/sessions/'+sid
     active=ctx.request.get(api).json()['session'];assert len(active['questionOrder'])==180
