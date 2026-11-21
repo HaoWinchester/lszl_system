@@ -80,11 +80,13 @@ with sync_playwright() as playwright:
         "src/114-practice-draft-state.js",
         "src/118-revenge-entry-policy.js",
         "src/100-practice-mode.js",
+        "src/practice/lobby-actions-controller.js",
     ]:
         page.add_script_tag(content=(ROOT / script).read_text(encoding="utf-8"))
     page.evaluate("document.dispatchEvent(new Event('DOMContentLoaded'))")
     page.wait_for_timeout(120)
 
+    page.locator('[data-practice-tab="challenge"]').click()
     page.locator('[data-practice-start="challenge"]').click()
     page.wait_for_function("document.body.dataset.practiceView === 'game'")
     page.wait_for_function("document.querySelector('[data-practice-start=\"challenge\"]').getAttribute('aria-busy') === 'false'")

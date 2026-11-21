@@ -75,8 +75,8 @@ scenario = '''
     def styles(selector):
         return page.locator(selector).evaluate("""e=>{const s=getComputedStyle(e);return Object.fromEntries(['borderRadius','boxShadow','backgroundColor','color','opacity','pointerEvents','transform'].map(k=>[k,s[k]]))}""")
     observed={selector:styles(selector) for selector in ['#practiceHistoryOpenBtn','#practiceFavoritesOpenBtn']}
-    cards=page.locator('.practice-mode-card').evaluate_all('(es)=>es.map(e=>({class:e.className,height:e.getBoundingClientRect().height,y:e.getBoundingClientRect().y}))')
-    (OUT / ('ui-'+args.capture+'-computed.json')).write_text(json.dumps({'controls':observed,'cards':cards},ensure_ascii=False,indent=2))
+    cards=page.locator('.practice-mode-tab').evaluate_all('(es)=>es.map(e=>({class:e.className,height:e.getBoundingClientRect().height,y:e.getBoundingClientRect().y}))')
+    (OUT / ('ui-'+args.capture+'-computed.json')).write_text(json.dumps({'controls':observed,'tabs':cards},ensure_ascii=False,indent=2))
     for selector,s in observed.items():
         assert s['opacity']=='1' and s['pointerEvents']!='none',(selector,'available navigation must not appear disabled',s)
         before=page.locator(selector).bounding_box()
@@ -84,7 +84,7 @@ scenario = '''
         after=page.locator(selector).bounding_box()
         assert abs(before['width']-after['width'])<.1 and abs(before['height']-after['height'])<.1,(selector,'hover must preserve control size')
         page.locator(selector).focus();expect(page.locator(selector)).to_be_focused()
-    # Speed work must preserve the approved content-driven title/meta geometry.
+    # 改版后标题/摘要行仍是内容驱动的自然单行几何。
     for selector in ['#practiceSelectedPaperName', '#practicePaperMeta']:
         element=page.locator(selector)
         original=element.inner_html()
@@ -92,36 +92,37 @@ scenario = '''
         geometry=element.evaluate("e=>({height:e.getBoundingClientRect().height,lineHeight:parseFloat(getComputedStyle(e).lineHeight)})")
         assert abs(geometry['height']-geometry['lineHeight'])<1, (selector,'short text must retain one natural line',geometry)
         element.evaluate('(e,html)=>e.innerHTML=html',original)
-    assert len(cards)==4 and len(set(round(c['height'],2) for c in cards))==1,('mode card heights',cards)
+    assert len(cards)==4 and len(set(round(c['height'],2) for c in cards))==1,('mode tab heights',cards)
+    assert page.locator('.practice-action-bar [data-practice-start]').count()==4,'four real start buttons live in the action bar'
     expect(page.locator('#practiceLibrarySubject')).to_have_count(0)
+    page.locator('[data-practice-tab="revenge"]').click()
     for width in [1440, 768, 390, 320]:
         page.set_viewport_size({'width':width,'height':900 if width==1440 else 844})
         page.evaluate('()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))')
-        geometry=page.evaluate("""()=>{const rect=s=>document.querySelector(s).getBoundingClientRect();const search=rect('#practiceLibrarySearch'),toolbar=rect('.practice-library-toolbar'),actions=rect('.practice-library-actions'),controls=['.practice-count-options','.practice-order-options','[data-practice-start="practice"]'].map(rect);return {searchRight:search.right,toolbarRight:toolbar.right,actionsLeft:actions.left,heights:controls.map(r=>r.height),tops:controls.map(r=>r.top),bottoms:controls.map(r=>r.bottom)}}""")
-        assert max(geometry['heights'])-min(geometry['heights'])<1,('matching practice control heights',width,geometry)
-        if width==1440:
-            assert max(geometry['tops'])-min(geometry['tops'])<1 and max(geometry['bottoms'])-min(geometry['bottoms'])<1,('practice controls share the same baseline',width,geometry)
-        elif width==768:
-            assert abs(geometry['tops'][1]-geometry['tops'][2])<1,('order and action align in two-column setup',width,geometry)
-        target=geometry['actionsLeft']-16 if width==1440 else geometry['toolbarRight']
-        assert abs(geometry['searchRight']-target)<1,('right aligned search',width,geometry)
-        offsets=page.evaluate("""()=>[['.challenge','.practice-lobby-help>summary'],['.revenge','#practiceRevengeRuleTrigger']].map(([card,button])=>{const root=document.querySelector('.practice-mode-card'+card),c=root.getBoundingClientRect(),b=root.querySelector(button).getBoundingClientRect();return {top:b.top-c.top,right:c.right-b.right}})""")
-        assert abs(offsets[0]['top']-offsets[1]['top'])<1 and abs(offsets[0]['right']-offsets[1]['right'])<1,('aligned rule icons',width,offsets)
+        geometry=page.evaluate("""()=>{const rect=s=>document.querySelector(s).getBoundingClientRect();const search=rect('#practiceLibrarySearch'),toolbar=rect('.practice-library-toolbar'),config=rect('.practice-lobby-config'),shelf=rect('.practice-library-shelf'),bar=rect('.practice-action-bar');return {searchRight:search.right,toolbarRight:toolbar.right,configRight:config.right,shelfRight:shelf.right,barWidth:bar.width,barHeight:bar.height,overflow:document.documentElement.scrollWidth>innerWidth}}""")
+        assert not geometry['overflow'],('lobby must not overflow horizontally',width,geometry)
+        assert abs(geometry['searchRight']-geometry['toolbarRight'])<1,('right aligned search',width,geometry)
+        if width>=1181:
+            assert abs(geometry['configRight']-geometry['shelfRight'])<2,('config dropdowns share the content right edge',width,geometry)
         trigger=page.locator('#practiceRevengeRuleTrigger');trigger.scroll_into_view_if_needed()
         before=page.evaluate('({height:document.documentElement.scrollHeight,y:scrollY})')
         trigger.click();tooltip=page.locator('#practiceRevengeRuleTooltip');expect(tooltip).to_be_visible()
-        popup=tooltip.bounding_box();anchor=trigger.bounding_box()
-        assert popup['y']>=8 and popup['y']+popup['height']<=anchor['y']-7,('rule opens upward in viewport',width,popup,anchor)
-        assert popup['x']>=8 and popup['x']+popup['width']<=width-8,('rule stays horizontally in viewport',width,popup)
+        popup=tooltip.bounding_box()
+        assert popup['y']>=8 and popup['x']>=8 and popup['x']+popup['width']<=width-8,('rule stays in viewport',width,popup)
         assert page.evaluate('({height:document.documentElement.scrollHeight,y:scrollY})')==before,('rule must not move page',width,before)
         page.keyboard.press('Escape');expect(tooltip).to_be_hidden()
     page.set_viewport_size({'width':390,'height':480})
     page.locator('#practiceLibrarySearch').focus();trigger.scroll_into_view_if_needed();trigger.focus()
     expect(tooltip).to_be_visible();page.keyboard.press('Tab');expect(tooltip).to_be_focused()
-    assert tooltip.evaluate('e=>e.scrollHeight>e.clientHeight'), 'short viewport must retain scrollable rules'
-    before_scroll=page.evaluate('scrollY');tooltip.press('End')
-    page.wait_for_function('document.querySelector("#practiceRevengeRuleTooltip").scrollTop>0')
-    assert page.evaluate('scrollY')==before_scroll, 'keyboard rule reading must not scroll the page'
+    # 改版后规则 tooltip 由 answer-page 的定位脚本按视口剩余空间分配高度：
+    # 空间足够时完整展示（不可滚动），空间不足时可滚动阅读，两种情况都不得滚动页面。
+    before_scroll=page.evaluate('scrollY')
+    if tooltip.evaluate('e=>e.scrollHeight>e.clientHeight'):
+        tooltip.press('End')
+        page.wait_for_function('document.querySelector("#practiceRevengeRuleTooltip").scrollTop>0')
+        assert page.evaluate('scrollY')==before_scroll, 'keyboard rule reading must not scroll the page'
+    else:
+        assert tooltip.evaluate('e=>Math.abs(e.scrollHeight-e.clientHeight)<=2'), 'rules must be fully visible when the popup is not scrollable'
     page.keyboard.press('Escape');expect(tooltip).to_be_hidden();expect(trigger).to_be_focused()
     page.set_viewport_size({'width':390,'height':844})
     page.evaluate('scrollTo(0,0)')

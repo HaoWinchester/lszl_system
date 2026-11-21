@@ -122,11 +122,13 @@ with sync_playwright() as playwright:
             "src/114-practice-draft-state.js",
             "src/118-revenge-entry-policy.js",
             "src/100-practice-mode.js",
+            "src/practice/lobby-actions-controller.js",
         ):
             practice_page.add_script_tag(
                 content=(ROOT / script_name).read_text(encoding="utf-8")
             )
         practice_page.evaluate("document.dispatchEvent(new Event('DOMContentLoaded'))")
+        practice_page.locator('[data-practice-tab="challenge"]').click()
         practice_page.locator("[data-practice-start='challenge']").click()
         wrong = practice_page.locator(".practice-option[data-option-id='A']")
         right = practice_page.locator(".practice-option[data-option-id='B']")

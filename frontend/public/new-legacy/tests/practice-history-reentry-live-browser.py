@@ -112,12 +112,14 @@ with sync_playwright() as p:
         check('real student UI login')
         short, large = fixtures
         select_paper(large)
+        page.locator('[data-practice-tab="challenge"]').click()
         enter(lambda: page.locator('[data-practice-start="challenge"]').click(), large, 'challenge')
         click_tool(page, '#practiceExitBtn')
         page.locator('#practiceAbandonBtn').click()
         page.locator('#practiceLobby').wait_for(state='visible')
         check('entered preceding 10-question paper and exited through UI')
         select_paper(short)
+        page.locator('[data-practice-tab="challenge"]').click()
         started = enter(lambda: page.locator('[data-practice-start="challenge"]').click(), short, 'challenge')
         sid = started['session']['id']
         for index in range(3):

@@ -25,12 +25,14 @@ with sync_playwright() as pw:
         }''')
         for css in ['styles/main.css','styles/practice-mode.css']:
             page.add_style_tag(content=(ROOT/css).read_text())
-        for script in ['115-practice-mode-policy.js','118-revenge-entry-policy.js','100-practice-mode.js']:
+        for script in ['115-practice-mode-policy.js','118-revenge-entry-policy.js','100-practice-mode.js','practice/lobby-actions-controller.js']:
             page.add_script_tag(content=(ROOT/'src'/script).read_text())
         page.evaluate("document.dispatchEvent(new Event('DOMContentLoaded'))")
         expect(page.locator('#practicePaperLibrary [data-paper-id]')).to_have_count(25)
-        page.locator('label:has(input[name="practiceCount"][value="20"])').click()
-        page.locator('label:has(input[name="practiceOrder"][value="random"])').click()
+        page.locator('[data-config-dropdown="count"]').click()
+        page.locator('[data-config-menu="count"] [data-value="20"]').click()
+        page.locator('[data-config-dropdown="order"]').click()
+        page.locator('[data-config-menu="order"] [data-value="random"]').click()
         selected = page.locator('#practiceSelectedPaperName').inner_text()
         page.locator('#practiceLibrarySearch').fill('agile')
         expect(page.locator('#practicePaperLibrary [data-paper-id]')).to_have_count(1)

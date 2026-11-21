@@ -38,6 +38,7 @@ with sync_playwright() as p:
     page.add_script_tag(content=(ROOT.parent/'frontend/scripts/new-legacy-assets/question-catalog-adapter.js').read_text(encoding='utf-8'))
     page.add_script_tag(content=(ROOT/'src/practice/history-controller.js').read_text(encoding='utf-8'))
     page.add_script_tag(content=(ROOT/'src/100-practice-mode.js').read_text(encoding='utf-8'))
+    page.add_script_tag(content=(ROOT/'src/practice/lobby-actions-controller.js').read_text(encoding='utf-8'))
     page.evaluate("document.dispatchEvent(new Event('DOMContentLoaded'))");page.wait_for_timeout(120)
 
     assert page.locator('[data-kg-icon] svg.kg-icon').count() >= 8
@@ -56,6 +57,7 @@ with sync_playwright() as p:
     assert page.locator('.practice-mode-switch a[href="index.html"]').inner_text()=='自由'
     assert '只读取教师已经发布的固定版本' not in page.locator('#practiceLobby').inner_text()
 
+    page.locator('[data-practice-tab="challenge"]').click()
     page.locator('[data-practice-start="challenge"]').click();page.wait_for_timeout(80)
     assert page.locator('#practiceGame').is_visible()
     assert page.locator('.practice-header').is_hidden()
@@ -86,6 +88,7 @@ with sync_playwright() as p:
     assert page.locator('.practice-history-row').count()==1
     page.locator('#practiceHistoryCloseBtn').click();page.wait_for_timeout(80)
     assert page.locator('#practiceHistoryDrawer').is_hidden()
+    page.locator('[data-practice-tab="scholar"]').click()
     page.locator('[data-practice-start="scholar"]').click();page.wait_for_timeout(160)
     assert page.locator('#practiceTimer').is_visible()
     assert page.locator('#practiceTimeRow').is_visible()

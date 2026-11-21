@@ -29,6 +29,7 @@ SCRIPTS = [
     "src/119-question-comments.js",
     "src/120-question-favorites.js",
     "src/100-practice-mode.js",
+    "src/practice/lobby-actions-controller.js",
     "src/practice/practice-answer-page.js",
 ]
 

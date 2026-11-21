@@ -70,7 +70,7 @@ with sync_playwright() as pw:
           const config=document.createElement('script');config.id='kg-page-features';config.type='application/json';
           config.textContent=JSON.stringify({history:{scripts:['http://history.test/history-feature.js'],styles:[]}});document.head.append(config);
         }''')
-        scripts.extend(['feature-assets.js', 'practice/feature-loader.js', '100-practice-mode.js'])
+        scripts.extend(['feature-assets.js', 'practice/feature-loader.js', '100-practice-mode.js', 'practice/lobby-actions-controller.js'])
         for script in scripts:
             page.add_script_tag(content=(ROOT / 'src' / script).read_text())
         page.evaluate("document.dispatchEvent(new Event('DOMContentLoaded'))")

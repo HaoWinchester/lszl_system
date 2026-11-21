@@ -19,25 +19,27 @@ with sync_playwright() as p:
         page.add_style_tag(content=(ROOT / file).read_text())
     for width in [1440, 944, 390]:
         page.set_viewport_size({'width': width, 'height': 944})
-        normal_before = page.locator('.practice-standard-modes').bounding_box()
         for resume in [False, True]:
             page.evaluate('''resume => {
+                document.getElementById('practiceRevengeStrip').hidden = false;
+                document.querySelector('[data-mode-actions="revenge"]').hidden = false;
                 document.querySelector('[data-practice-new="revenge"]').hidden = !resume;
                 document.querySelector('[data-practice-start="revenge"]').textContent = resume ? '继续上次复仇 1/6' : '暂无错题';
                 document.querySelector('[data-practice-start="revenge"]').disabled = !resume;
             }''', resume)
             geometry = page.evaluate('''() => {
                 const card = document.querySelector('.practice-mode-card.revenge');
-                const rect = selector => card.querySelector(selector).getBoundingClientRect();
-                const icon = rect('.practice-mode-icon'), header = card.children[1].getBoundingClientRect();
-                const start = rect('.practice-start-btn'), fresh = rect('.practice-secondary-btn');
-                return {headerGap:header.left-icon.right, expectedGap:parseFloat(getComputedStyle(card).columnGap), startWidth:start.width, freshWidth:fresh.width, startLeft:start.left, freshLeft:fresh.left, overflow:document.documentElement.scrollWidth > innerWidth};
+                const start = document.querySelector('[data-practice-start="revenge"]').getBoundingClientRect();
+                const fresh = document.querySelector('[data-practice-new="revenge"]').getBoundingClientRect();
+                return {overflow:document.documentElement.scrollWidth > innerWidth,
+                    stripInsideLobby:document.getElementById('practiceLobby').contains(card),
+                    barInsideLobby:document.getElementById('practiceLobby').contains(document.getElementById('practiceActionBar')),
+                    startVisible:start.width>0&&start.height>0,freshVisible:fresh.width>0&&fresh.height>0};
             }''')
-            assert abs(geometry['headerGap'] - geometry['expectedGap']) < 1, (width, resume, geometry)
             assert not geometry['overflow'], (width, resume, geometry)
+            assert geometry['stripInsideLobby'] and geometry['barInsideLobby'], (width, resume, geometry)
+            assert geometry['startVisible'], (width, resume, geometry)
             if resume:
-                assert abs(geometry['startWidth'] - geometry['freshWidth']) < 1, (width, geometry)
-                assert abs(geometry['startLeft'] - geometry['freshLeft']) < 1, (width, geometry)
-            assert page.locator('.practice-standard-modes').bounding_box() == normal_before
+                assert geometry['freshVisible'], (width, resume, geometry)
     browser.close()
 print('practice revenge responsive resume/empty layout: PASS')

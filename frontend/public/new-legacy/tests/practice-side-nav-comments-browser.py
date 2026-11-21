@@ -29,6 +29,7 @@ SCRIPTS = [
     "src/119-question-comments.js",
     "src/120-question-favorites.js",
     "src/100-practice-mode.js",
+    "src/practice/lobby-actions-controller.js",
     "src/practice/practice-answer-page.js",
 ]
 
@@ -210,39 +211,11 @@ with sync_playwright() as playwright:
         assert page.locator('body > .q-danmaku').count() == 0, 'saved exit must remove viewport danmaku'
         assert page.locator('.q-comments-standalone-host').count() == 0, 'owned comment hosts must be disposed'
 
+        # 改版后挑战/学霸的规则说明移到模式 tab 的 title 提示（复仇规则保留专用 tooltip）。
         for mode in ['challenge', 'scholar']:
-            help = page.locator(f'.practice-mode-card.{mode} .practice-lobby-help')
-            summary = help.locator('summary')
-            summary.hover()
-            assert help.evaluate('el=>el.open'), f'{mode} help must open on hover'
-            content_box = help.locator('.practice-help-content').bounding_box()
-            assert content_box['y'] >= 8 and content_box['y'] + content_box['height'] <= viewport['height'] - 8, (mode, content_box, viewport)
-            if viewport['width'] <= 480:
-                trigger_box = summary.bounding_box()
-                gap = max(content_box['y'] - trigger_box['y'] - trigger_box['height'],
-                          trigger_box['y'] - content_box['y'] - content_box['height'])
-                assert 0 <= gap <= 12, f'{mode} mobile help must stay next to its trigger: {gap=}'
-                assert content_box['y'] >= 8 and content_box['y'] + content_box['height'] <= viewport['height'] - 8
-            page.mouse.move(content_box['x']+content_box['width']/2, content_box['y']+20, steps=20)
-            page.wait_for_timeout(450)  # Must survive the existing pointerleave grace period.
-            assert help.evaluate('el=>el.open'), 'moving into help must keep it readable'
-            evidence = ROOT.parent / 'artifacts/remaining-learning-requirements/help-hover'
-            evidence.mkdir(parents=True, exist_ok=True)
-            page.screenshot(path=str(evidence / f'{mode}-{viewport["width"]}.png'))
-            page.mouse.move(1, 1)
-            expect(help).not_to_have_attribute('open', '')
-            summary.focus()
-            assert help.evaluate('el=>el.open'), 'keyboard focus reveals help'
-            page.keyboard.press('Escape')
-            assert not help.evaluate('el=>el.open'), 'Escape dismisses focused help'
-            summary.click()
-            assert help.evaluate('el=>el.open'), 'first click pins help even after focus or hover'
-            page.mouse.click(1, 1)
-            assert not help.evaluate('el=>el.open'), 'outside click dismisses pinned help'
-            summary.click()
-            assert help.evaluate('el=>el.open')
-            summary.click()
-            assert not help.evaluate('el=>el.open'), 'second click closes help'
+            tab = page.locator(f'[data-practice-tab="{mode}"]')
+            rule = tab.get_attribute('title') or ''
+            assert '模式规则' in rule and '答错' in rule, (mode, rule)
         page.evaluate("KGPracticeMode.startPractice('practice')")
         page.wait_for_function("document.body.dataset.practiceView==='game'")
         page.locator('#practiceOptions .practice-option[data-option-id="B"]').click()

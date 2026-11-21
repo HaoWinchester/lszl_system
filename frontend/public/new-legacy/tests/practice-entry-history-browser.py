@@ -44,7 +44,7 @@ with sync_playwright() as pw:
         }''')
         for css in ['styles/dialogs.css','styles/main.css','styles/practice-mode.css']:
             page.add_style_tag(content=(ROOT/css).read_text())
-        for script in ['00-dialogs.js','111-practice-session-core.js','115-practice-mode-policy.js','112-practice-answer-sheet.js','113-practice-result-report.js','116-practice-session-save.js','117-question-answer-set.js','114-practice-draft-state.js','118-revenge-entry-policy.js','practice/history-controller.js','100-practice-mode.js']:
+        for script in ['00-dialogs.js','111-practice-session-core.js','115-practice-mode-policy.js','112-practice-answer-sheet.js','113-practice-result-report.js','116-practice-session-save.js','117-question-answer-set.js','114-practice-draft-state.js','118-revenge-entry-policy.js','practice/history-controller.js','100-practice-mode.js','practice/lobby-actions-controller.js']:
             page.add_script_tag(content=(ROOT/'src'/script).read_text())
         page.evaluate("document.dispatchEvent(new Event('DOMContentLoaded'))")
         expect(page.locator('[data-practice-start="practice"]')).to_have_text('继续上次练习 0/10')

@@ -13,10 +13,9 @@ PAGES = {
         [
             '.practice-header',
             '.practice-main',
-            '.practice-setup-card',
-            '.practice-mode-grid',
-            '.practice-mode-card.challenge',
-            '.practice-mode-card.scholar',
+            '.practice-mode-tabs-card',
+            '.practice-library-shelf',
+            '.practice-action-bar',
         ],
     )
 }

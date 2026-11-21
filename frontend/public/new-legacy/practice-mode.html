@@ -107,101 +107,141 @@
         <header class="practice-lobby-head">
           <div class="practice-lobby-head-title">
             <h1 id="practiceLobbyTitle">开始练习</h1>
-            <p>选择试卷，配置练习方式，开始学习。</p>
+            <p>选择练习模式和试卷，开始答题。</p>
           </div>
-
+          <div class="practice-lobby-config" aria-label="练习配置">
+            <div class="practice-config-dropdown" id="practiceCountDropdown">
+              <span class="practice-config-label" id="practiceCountDropdownLabel">练习题量</span>
+              <button type="button" class="practice-config-trigger" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="practiceCountDropdownLabel practiceCountDropdownValue" data-config-dropdown="count"><span class="practice-config-value" id="practiceCountDropdownValue">全部</span><span class="practice-config-chevron" data-kg-icon="chevron-down" data-kg-icon-size="14" aria-hidden="true"></span></button>
+              <div class="practice-config-menu" role="listbox" aria-label="练习题量" hidden data-config-menu="count"></div>
+            </div>
+            <div class="practice-config-dropdown" id="practiceOrderDropdown">
+              <span class="practice-config-label" id="practiceOrderDropdownLabel">答题顺序</span>
+              <button type="button" class="practice-config-trigger" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="practiceOrderDropdownLabel practiceOrderDropdownValue" data-config-dropdown="order"><span class="practice-config-value" id="practiceOrderDropdownValue">试卷顺序</span><span class="practice-config-chevron" data-kg-icon="chevron-down" data-kg-icon-size="14" aria-hidden="true"></span></button>
+              <div class="practice-config-menu" role="listbox" aria-label="答题顺序" hidden data-config-menu="order"></div>
+            </div>
+          </div>
         </header>
         <p class="practice-feedback" id="practiceRetiredModeNotice" role="status" hidden></p>
 
-        <section class="practice-library practice-library-shelf" aria-label="快速选择试卷">
-          <div class="practice-library-toolbar">
-            <div class="practice-library-title"><strong>试卷库</strong><span id="practiceLibrarySummary" aria-live="polite">选择最近发布的试卷</span></div>
-          <div class="practice-catalog-search">
-            <label for="practiceLibrarySearch"><span class="practice-visually-hidden">搜索试卷</span><input id="practiceLibrarySearch" type="search" placeholder="搜索试卷名称或关键词" autocomplete="off"/></label>
-            <button type="button" class="practice-secondary-btn" id="practiceLibraryClear" hidden>清除筛选</button>
+        <section class="practice-mode-tabs-card" aria-label="练习模式">
+          <h2 class="practice-tabs-heading">练习模式</h2>
+          <div class="practice-mode-tabs" role="tablist" aria-label="选择练习模式" id="practiceModeTabs">
+            <button type="button" class="practice-mode-tab is-active" role="tab" aria-selected="true" data-practice-tab="practice" id="practiceTabPractice"><span class="practice-mode-tab-icon" data-kg-icon="file-text" data-kg-icon-size="20" aria-hidden="true"></span><span class="practice-mode-tab-text"><strong>普通练习</strong><small>按所选题量练习</small></span></button>
+            <button type="button" class="practice-mode-tab" role="tab" aria-selected="false" data-practice-tab="challenge" id="practiceTabChallenge" title="挑战模式规则：初始生命随题量动态计算（约30%容错）。答错扣血，血尽判负但仍可完成全卷。"><span class="practice-mode-tab-icon" data-kg-icon="diamond" data-kg-icon-size="20" aria-hidden="true"></span><span class="practice-mode-tab-text"><strong>挑战模式</strong><small>整卷闯关</small></span></button>
+            <button type="button" class="practice-mode-tab" role="tab" aria-selected="false" data-practice-tab="scholar" id="practiceTabScholar" title="学霸模式规则：共享60秒时间池。答对增加20秒，并在连续答对5题后回血。答错扣时间扣血，血尽即败。"><span class="practice-mode-tab-icon" data-kg-icon="zap" data-kg-icon-size="20" aria-hidden="true"></span><span class="practice-mode-tab-text"><strong>学霸模式</strong><small>限时答题</small></span></button>
+            <button type="button" class="practice-mode-tab" role="tab" aria-selected="false" data-practice-tab="revenge" id="practiceTabRevenge"><span class="practice-mode-tab-icon" data-kg-icon="rotate-ccw" data-kg-icon-size="20" aria-hidden="true"></span><span class="practice-mode-tab-text"><strong>复仇模式</strong><small>重练错题</small></span></button>
           </div>
-            <div class="practice-library-actions">
-              <div class="practice-library-filters" id="practiceLibraryFilters" aria-label="筛选试卷">
-                <button type="button" class="is-active" data-paper-filter="all">全部</button>
-                <button type="button" data-paper-filter="free">免费</button>
-                <button type="button" data-paper-filter="member">会员</button>
-              </div>
-              <button type="button" class="practice-more-btn" id="practiceLibraryMoreBtn" aria-haspopup="dialog" aria-controls="practicePaperDrawer">更多 <span aria-hidden="true">→</span></button>
-            </div>
-          </div>
-
-          <div class="practice-paper-scroll-shell"><div class="practice-paper-scroll" id="practicePaperLibrary" aria-busy="true"><div class="practice-paper-card practice-paper-empty" role="status">正在读取已发布试卷…</div></div></div>
-          <select id="practicePaperSelect" hidden aria-hidden="true"></select>
-        </section>
-
-        <section class="practice-mode-layout" aria-label="可选练习模式">
-          <h2 class="practice-modes-title">选择练习模式</h2>
-          <article class="practice-mode-card ordinary"><span class="practice-mode-icon" data-kg-icon="file-text" data-kg-icon-size="24" aria-hidden="true"></span><div><h2>普通练习</h2><p class="practice-mode-purpose">按所选题量进行常规练习</p></div><a class="practice-mode-setting-link" href="#practiceSetupCard">设置题量并开始 →</a></article>
-          <div class="practice-standard-column">
-            <section class="practice-setup-card" id="practiceSetupCard" aria-label="普通练习设置">
-              <div class="practice-selected-paper">
-                <span>已选试卷</span>
-                <strong id="practiceSelectedPaperName">请选择试卷</strong>
-                <small id="practicePaperMeta">正在读取已发布试卷…</small>
-              </div>
-              <fieldset class="practice-choice-group">
-                <legend>练习题量</legend>
-                <div class="practice-count-options" id="practiceCountOptions">
-                  <label><input type="radio" name="practiceCount" value="10" checked/><span>10</span></label>
-                  <label><input type="radio" name="practiceCount" value="20"/><span>20</span></label>
-                  <label><input type="radio" name="practiceCount" value="60"/><span>60</span></label>
-                  <label><input type="radio" name="practiceCount" value="180"/><span>180</span></label>
-                  <label class="practice-count-all"><input type="radio" name="practiceCount" value="all"/><span>全部</span></label>
-                </div>
-              </fieldset>
-              <details class="practice-lobby-help practice-coverage-help"><summary aria-label="查看普通练习和进度规则">?</summary><div class="practice-help-content"><strong>普通练习规则</strong><p class="practice-selection-notice" id="practiceCoverageSummary" role="status"></p><p>优先练未做题，不足所选题量时用已做题补足；案例题保留完整。全部做过后进入复习。已练不代表掌握，只统计已保存的有效作答。</p></div></details>
-              <fieldset class="practice-choice-group">
-                <legend>试卷顺序</legend>
-                <div class="practice-order-options">
-                  <label><input type="radio" name="practiceOrder" value="paper" checked/><span>试卷顺序</span></label>
-                  <label><input type="radio" name="practiceOrder" value="random"/><span>随机顺序</span></label>
-                </div>
-              </fieldset>
-              <fieldset class="practice-entry-actions practice-choice-group" aria-label="普通练习操作">
-                <legend class="practice-entry-legend" aria-hidden="true">开始练习</legend>
-                <button type="button" class="practice-start-btn" data-practice-start="practice">开始 10 题短练</button>
-                <button type="button" class="practice-secondary-btn" data-practice-new="practice" hidden>新开一轮</button>
-              </fieldset>
-              <button type="button" class="practice-secondary-btn practice-coverage-retry" id="practiceCoverageRetry" hidden>重试加载进度</button>
-            </section>
-            <section class="practice-mode-grid practice-standard-modes" aria-label="挑战和学霸模式">
-              <article class="practice-mode-card challenge">
-                <span class="practice-mode-icon" data-kg-icon="diamond" data-kg-icon-size="20" aria-hidden="true"></span>
-                <div><h2>挑战模式</h2><p class="practice-mode-purpose">整卷闯关，检验答题准确率</p></div><details class="practice-lobby-help"><summary aria-label="查看挑战模式规则">?</summary><div class="practice-help-content"><strong>挑战模式规则</strong><p>初始生命随题量动态计算（约30%容错）。答错扣血，血尽判负但仍可完成全卷。</p></div></details>
-                <button type="button" class="practice-start-btn" data-practice-start="challenge">开始挑战</button>
-                <button type="button" class="practice-secondary-btn" data-practice-new="challenge" hidden>新开一轮</button>
-              </article>
-              <article class="practice-mode-card scholar">
-                <span class="practice-mode-icon" data-kg-icon="zap" data-kg-icon-size="20" aria-hidden="true"></span>
-                <div><h2>学霸模式</h2><p class="practice-mode-purpose">限时挑战，训练判断速度</p></div><details class="practice-lobby-help"><summary aria-label="查看学霸模式规则">?</summary><div class="practice-help-content"><strong>学霸模式规则</strong><p>共享60秒时间池。答对增加20秒，并在连续答对5题后回血。答错扣时间扣血，血尽即败。</p></div></details>
-                <button type="button" class="practice-start-btn" data-practice-start="scholar">进入学霸模式</button>
-                <button type="button" class="practice-secondary-btn" data-practice-new="scholar" hidden>新开一轮</button>
-              </article>
-            </section>
-          </div>
-          <aside class="practice-revenge-column" role="region" aria-label="错题复习">
+          <div class="practice-revenge-strip" id="practiceRevengeStrip" role="region" aria-label="错题复习" hidden>
             <article class="practice-mode-card revenge">
-              <span class="practice-mode-icon" data-kg-icon="rotate-ccw" data-kg-icon-size="20" aria-hidden="true"></span>
               <div><div class="practice-revenge-title" id="practiceRevengeRuleShell"><h2>复仇模式</h2><button type="button" class="practice-revenge-rule-trigger" id="practiceRevengeRuleTrigger" aria-label="查看复仇模式规则" aria-controls="practiceRevengeRuleTooltip" aria-expanded="false">?</button><div class="practice-revenge-rule-tooltip" id="practiceRevengeRuleTooltip" role="tooltip" tabindex="0" aria-label="复仇模式规则" hidden><strong>复仇模式规则</strong><ul><li><b>第一次在复仇模式答对，并且完成交卷</b><br>题目会进入“待验证”，暂时移出复仇题池。</li><li><b>等待约 24 小时</b><br>题目会重新进入复仇模式，作为延迟验证题。</li><li><b>再次答对并完成交卷</b><br>题目会变成“已掌握”，不再进入复仇题池。</li><li>只“保存退出”不算，必须交卷结算。</li><li>如果再次答错，需要先看解析、完成补救和验证，然后重新等待验证。</li><li>“已掌握”仍会保留在统计里，并非删除历史记录；以后若又答错，会重新进入错题池。</li></ul></div></div><p class="practice-mode-purpose">重做错题，巩固薄弱知识点</p></div>
               <div class="practice-revenge-total">可复仇 <strong id="practiceRevengeActiveCount">0</strong> 题</div>
               <details class="practice-revenge-options"><summary>复习进度与题量</summary>
               <div class="practice-revenge-stats" aria-label="复仇错题统计"><span>新错题 <strong id="practiceRevengePendingCount">0</strong></span><span>需补救 <strong id="practiceRevengeRemediationCount">0</strong></span><span>待验证 <strong id="practiceRevengeVerificationCount">0</strong></span><span>已掌握 <strong id="practiceRevengeMasteredCount">0</strong></span></div>
               <div class="practice-revenge-count-shell"><span id="practiceRevengeCountSummary">当前暂无可复仇错题</span><fieldset id="practiceRevengeCountOptions" hidden><legend>本次题量</legend><div id="practiceRevengeCountOptionList"></div></fieldset></div>
               </details>
-              <button type="button" class="practice-start-btn" data-practice-start="revenge">开始复仇</button>
-                <button type="button" class="practice-secondary-btn" data-practice-new="revenge" hidden>新开一轮</button>
             </article>
-          </aside>
+          </div>
         </section>
+
+        <section class="practice-library practice-library-shelf" aria-label="快速选择试卷">
+          <div class="practice-library-toolbar">
+            <div class="practice-library-title"><strong>试卷库</strong><span id="practiceLibrarySummary" aria-live="polite">选择最近发布的试卷</span></div>
+            <div class="practice-catalog-search">
+              <label for="practiceLibrarySearch"><span class="practice-visually-hidden">搜索试卷</span><input id="practiceLibrarySearch" type="search" placeholder="搜索试卷名称或关键词" autocomplete="off"/></label>
+              <button type="button" class="practice-secondary-btn" id="practiceLibraryClear" hidden>清除筛选</button>
+            </div>
+          </div>
+          <div class="practice-library-actions">
+            <div class="practice-library-filters" id="practiceLibraryFilters" aria-label="筛选试卷">
+              <button type="button" class="is-active" data-paper-filter="all">全部试卷</button>
+              <button type="button" data-paper-filter="free">免费</button>
+              <button type="button" data-paper-filter="member">会员</button>
+            </div>
+            <button type="button" class="practice-more-btn" id="practiceLibraryMoreBtn" aria-haspopup="dialog" aria-controls="practicePaperDrawer">更多 <span aria-hidden="true">→</span></button>
+          </div>
+
+          <div class="practice-paper-grid-shell"><div class="practice-paper-grid" id="practicePaperLibrary" aria-busy="true"><div class="practice-paper-card practice-paper-empty" role="status">正在读取已发布试卷…</div></div></div>
+          <select id="practicePaperSelect" hidden aria-hidden="true"></select>
+        </section>
+
+        <div class="practice-action-bar" id="practiceActionBar">
+          <div class="practice-action-summary">
+            <div class="practice-selected-paper">
+              <span>已选试卷</span>
+              <strong id="practiceSelectedPaperName">请选择试卷</strong>
+              <small id="practicePaperMeta">正在读取已发布试卷…</small>
+            </div>
+            <span class="practice-action-divider" aria-hidden="true"></span>
+            <span class="practice-action-config" id="practiceActionBarSummary">普通练习 · 全部 · 试卷顺序</span>
+            <button type="button" class="practice-secondary-btn practice-coverage-retry" id="practiceCoverageRetry" hidden>重试加载进度</button>
+          </div>
+          <div class="practice-action-actions">
+            <div class="practice-action-mode" data-mode-actions="practice">
+              <button type="button" class="practice-start-btn" data-practice-start="practice">开始 10 题短练</button>
+              <button type="button" class="practice-secondary-btn" data-practice-new="practice" hidden>新开一轮</button>
+            </div>
+            <div class="practice-action-mode" data-mode-actions="challenge" hidden>
+              <button type="button" class="practice-start-btn" data-practice-start="challenge">开始挑战</button>
+              <button type="button" class="practice-secondary-btn" data-practice-new="challenge" hidden>新开一轮</button>
+            </div>
+            <div class="practice-action-mode" data-mode-actions="scholar" hidden>
+              <button type="button" class="practice-start-btn" data-practice-start="scholar">进入学霸模式</button>
+              <button type="button" class="practice-secondary-btn" data-practice-new="scholar" hidden>新开一轮</button>
+            </div>
+            <div class="practice-action-mode" data-mode-actions="revenge" hidden>
+              <button type="button" class="practice-start-btn" data-practice-start="revenge">开始复仇</button>
+              <button type="button" class="practice-secondary-btn" data-practice-new="revenge" hidden>新开一轮</button>
+            </div>
+          </div>
+        </div>
 
         <div class="practice-empty" id="practiceEmpty" hidden>
           <strong>暂时没有可练习的已发布试卷</strong>
           <p>请先让教师在“教师工作台 → 试卷管理”中完成选题并发布。</p>
+        </div>
+
+        <div class="practice-legacy-shell" aria-hidden="true">
+          <section class="practice-mode-layout" aria-hidden="true" tabindex="-1">
+            <h2 class="practice-modes-title">选择练习模式</h2>
+            <article class="practice-mode-card ordinary"><span class="practice-mode-icon" data-kg-icon="file-text" data-kg-icon-size="24" aria-hidden="true"></span><div><h2>普通练习</h2><p class="practice-mode-purpose">按所选题量进行常规练习</p></div></article>
+            <div class="practice-standard-column">
+              <section class="practice-setup-card" id="practiceSetupCard" aria-label="普通练习设置">
+                <fieldset class="practice-choice-group">
+                  <legend>练习题量</legend>
+                  <div class="practice-count-options" id="practiceCountOptions">
+                    <label><input type="radio" name="practiceCount" value="10" checked/><span>10</span></label>
+                    <label><input type="radio" name="practiceCount" value="20"/><span>20</span></label>
+                    <label><input type="radio" name="practiceCount" value="60"/><span>60</span></label>
+                    <label><input type="radio" name="practiceCount" value="180"/><span>180</span></label>
+                    <label class="practice-count-all"><input type="radio" name="practiceCount" value="all"/><span>全部</span></label>
+                  </div>
+                </fieldset>
+                <details class="practice-lobby-help practice-coverage-help"><summary aria-label="查看普通练习和进度规则">?</summary><div class="practice-help-content"><strong>普通练习规则</strong><p class="practice-selection-notice" id="practiceCoverageSummary" role="status"></p><p>优先练未做题，不足所选题量时用已做题补足；案例题保留完整。全部做过后进入复习。已练不代表掌握，只统计已保存的有效作答。</p></div></details>
+                <fieldset class="practice-choice-group">
+                  <legend>试卷顺序</legend>
+                  <div class="practice-order-options" id="practiceOrderOptions">
+                    <label><input type="radio" name="practiceOrder" value="paper" checked/><span>试卷顺序</span></label>
+                    <label><input type="radio" name="practiceOrder" value="random"/><span>随机顺序</span></label>
+                  </div>
+                </fieldset>
+                <fieldset class="practice-entry-actions practice-choice-group" aria-label="普通练习操作">
+                  <legend class="practice-entry-legend" aria-hidden="true">开始练习</legend>
+                </fieldset>
+              </section>
+              <section class="practice-mode-grid practice-standard-modes" aria-label="挑战和学霸模式">
+                <article class="practice-mode-card challenge">
+                  <span class="practice-mode-icon" data-kg-icon="diamond" data-kg-icon-size="20" aria-hidden="true"></span>
+                  <div><h2>挑战模式</h2><p class="practice-mode-purpose">整卷闯关，检验答题准确率</p></div><details class="practice-lobby-help"><summary aria-label="查看挑战模式规则">?</summary><div class="practice-help-content"><strong>挑战模式规则</strong><p>初始生命随题量动态计算（约30%容错）。答错扣血，血尽判负但仍可完成全卷。</p></div></details>
+                </article>
+                <article class="practice-mode-card scholar">
+                  <span class="practice-mode-icon" data-kg-icon="zap" data-kg-icon-size="20" aria-hidden="true"></span>
+                  <div><h2>学霸模式</h2><p class="practice-mode-purpose">限时挑战，训练判断速度</p></div><details class="practice-lobby-help"><summary aria-label="查看学霸模式规则">?</summary><div class="practice-help-content"><strong>学霸模式规则</strong><p>共享60秒时间池。答对增加20秒，并在连续答对5题后回血。答错扣时间扣血，血尽即败。</p></div></details>
+                </article>
+              </section>
+            </div>
+            <aside class="practice-revenge-column" role="region" aria-label="错题复习"></aside>
+          </section>
         </div>
       </section>
 
@@ -449,6 +489,7 @@
 
 
   <!-- kg-paper-releases:generated -->
+
 
 
 

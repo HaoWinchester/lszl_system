@@ -705,7 +705,7 @@ body.practice-mode-page:not([data-practice-view="lobby"]) .practice-lobby-sideba
 #practiceLobby .practice-revenge-options{grid-column:1/-1;font-size:11px;color:#8c4160}#practiceLobby .practice-revenge-options>summary{cursor:pointer;line-height:22px}
 #practiceLobby .practice-revenge-stats{margin-top:8px;grid-template-columns:repeat(2,1fr);gap:5px}#practiceLobby .practice-revenge-count-shell{margin-top:10px}
 #practiceLobby #practiceRevengeRuleTrigger{position:absolute;right:10px;top:17px;width:19px;height:19px;min-height:0;padding:0;border:1px solid #d5dbe8;border-radius:50%;background:transparent;color:#969eb4;font:inherit;font-size:12px;line-height:1;box-shadow:none;transform:none}#practiceLobby .practice-revenge-title{position:static;gap:3px;align-items:flex-start;width:auto}
-#practiceLobby .practice-revenge-rule-tooltip{transition-property:none;position:fixed;top:8px;right:0;left:auto;width:280px;max-height:calc(100dvh - 16px);overflow:auto;color:#44516a;background:#fff;z-index:45;border-color:#deddea}
+#practiceLobby .practice-revenge-strip .practice-revenge-rule-tooltip{transition-property:none;position:fixed;top:auto;right:auto;left:auto;width:min(390px,calc(100vw - 44px));max-height:min(48vh,300px);overflow:auto;color:#44516a;background:#fff;z-index:60;border-color:#deddea}
 #practiceLobby .practice-lobby-help{position:absolute;right:10px;top:17px;z-index:3;font-size:12px;line-height:1.5}
 #practiceLobby .practice-lobby-help>summary{list-style:none;display:grid;place-items:center;width:19px;height:19px;color:#969eb4;border:1px solid #d5dbe8;border-radius:50%;cursor:pointer}#practiceLobby .practice-lobby-help>summary::-webkit-details-marker{display:none}
 #practiceLobby .practice-lobby-help[open]{z-index:46}#practiceLobby .practice-help-content{transition-property:none;position:absolute;right:0;top:27px;width:260px;padding:16px;border:1px solid #deddea;border-radius:9px;background:#fff;box-shadow:0 8px 30px #17203315;color:#526078}
@@ -820,3 +820,197 @@ body.practice-mode-page[data-practice-view="lobby"] #practiceLobby{min-height:0;
 @media(max-width:600px){#practiceLobby .practice-library-toolbar{align-items:stretch;gap:10px}#practiceLobby .practice-library-title{flex:0 0 auto}#practiceLobby .practice-catalog-search{justify-content:flex-start}#practiceLobby .practice-catalog-search label:first-child{flex:1 1 100%}
 /* 窄屏下右下角做题经验 fab（XP）悬浮于复仇模式卡上方，"可复习"计数左移让位 */
 #practiceLobby .practice-revenge-total{right:66px}}
+
+/* =====================================================================
+   V9.1 做题大厅信息架构改版（参考稿：模式 tab + 头部配置下拉 + 试卷网格 + 底部操作栏）
+   仅作用于大厅视图（data-practice-view="lobby"）；答题/成绩单皮肤保持不变。
+   旧大厅 DOM 保留在 .practice-legacy-shell 内以兼容既有脚本与测试，不参与排版。
+   ===================================================================== */
+.practice-legacy-shell{display:none!important}
+/* 大厅改用蓝调 accent（仅 lobby 视图生效，进入答题视图后恢复紫色皮肤） */
+body.practice-mode-page[data-practice-view="lobby"]{
+  --practice-accent:#2563eb;
+  --practice-accent-soft:#eef4ff;
+}
+/* 契约：副标题在窄屏保持可见 */
+#practiceLobby .practice-lobby-head p{display:block}
+
+/* —— 侧栏：导航在上、本周学习在下 —— */
+body.practice-mode-page[data-practice-view="lobby"] .practice-lobby-sidebar{display:flex;flex-direction:column;gap:0}
+.practice-lobby-sidebar .practice-sidebar-nav{order:-1;margin:0 0 6px}
+.practice-lobby-sidebar .practice-sidebar-nav::after{content:"";display:block;height:1px;background:#e6eaf2;margin:14px 4px 0}
+.practice-sidebar-nav .practice-sidebar-link.is-current{background:#eef4ff;color:#1d4ed8}
+.practice-sidebar-nav .practice-utility-btn:hover{background:#f1f5fd;color:#1d4ed8}
+.practice-lobby-sidebar .practice-exp-card h2{font-size:14px;color:#33415c}
+.practice-lobby-sidebar .practice-exp-totals{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+.practice-lobby-sidebar .practice-exp-totals div:first-child{order:2;align-items:flex-end}
+.practice-lobby-sidebar .practice-exp-totals div:first-child strong{font-size:20px;color:#33415c}
+.practice-lobby-sidebar .practice-exp-totals div:last-child{order:1;text-align:left}
+.practice-lobby-sidebar .practice-exp-totals div:last-child strong{font-size:36px;color:#111a2c}
+.practice-lobby-sidebar .practice-exp-chart polyline{stroke:#2563eb}
+.practice-lobby-sidebar .practice-exp-chart circle{fill:#2563eb}
+
+/* —— 头部：大标题 + 右侧配置下拉 —— */
+#practiceLobby .practice-lobby-head{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;margin:0 0 22px}
+#practiceLobby .practice-lobby-head h1{font-size:36px;font-weight:700;letter-spacing:-.045em;margin:0 0 8px;color:#111a2c}
+#practiceLobby .practice-lobby-head p{font-size:14px;color:#64748b;margin:0}
+.practice-lobby-config{display:flex;gap:12px;flex-shrink:0}
+.practice-config-dropdown{position:relative;display:grid;gap:6px;min-width:132px}
+.practice-config-label{font-size:12px;font-weight:700;color:#475467}
+.practice-config-trigger{display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:132px;height:40px;padding:0 12px;border:1px solid #d6deea;border-radius:9px;background:#fff;color:#172033;font-size:13px;font-weight:700;transition:border-color .15s ease,box-shadow .15s ease}
+.practice-config-trigger:hover{border-color:#9fb2cf}
+.practice-config-trigger:focus-visible{outline:2px solid rgba(37,99,235,.4);outline-offset:2px}
+.practice-config-trigger:disabled{opacity:.45;cursor:not-allowed}
+.practice-config-dropdown.is-disabled .practice-config-trigger{background:#f6f8fc;color:#8a94a6}
+.practice-config-value{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
+.practice-config-chevron{display:inline-flex;color:#8a94a6;flex-shrink:0}
+.practice-config-trigger[aria-expanded="true"] .practice-config-chevron{transform:rotate(180deg)}
+.practice-config-menu{position:absolute;z-index:48;top:calc(100% + 6px);left:0;right:0;min-width:100%;padding:6px;display:grid;gap:2px;border:1px solid #dfe6f0;border-radius:10px;background:#fff;box-shadow:0 16px 40px rgba(15,23,42,.14)}
+.practice-config-menu[hidden]{display:none!important}
+.practice-config-option{border:0;border-radius:7px;background:transparent;color:#33415c;font-size:13px;font-weight:600;padding:8px 10px;text-align:left;white-space:nowrap}
+.practice-config-option:hover:not(:disabled){background:#f1f5fd}
+.practice-config-option.is-selected{background:#eef4ff;color:#1d4ed8;font-weight:700}
+.practice-config-option:disabled{opacity:.38;cursor:not-allowed}
+
+/* —— 练习模式 tab 条 —— */
+.practice-mode-tabs-card{margin:0 0 20px}
+.practice-tabs-heading{margin:0 0 10px;font-size:15px;font-weight:700;color:#172033}
+.practice-mode-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid #e6eaf2;border-radius:12px;background:#fff;overflow:hidden;box-shadow:0 6px 18px rgba(15,23,42,.04)}
+.practice-mode-tab{position:relative;display:flex;align-items:center;gap:10px;min-height:64px;padding:12px 16px;border:0;background:transparent;text-align:left;transition:background .15s ease}
+.practice-mode-tab+.practice-mode-tab::before{content:"";position:absolute;left:0;top:12px;bottom:12px;width:1px;background:#eef1f6}
+.practice-mode-tab:hover{background:#f8fafd}
+.practice-mode-tab.is-active{background:#eef4ff}
+.practice-mode-tab.is-active::after{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;background:#2563eb}
+.practice-mode-tab:focus-visible{outline:2px solid rgba(37,99,235,.4);outline-offset:-2px}
+.practice-mode-tab-icon{display:grid;place-items:center;width:30px;height:30px;flex-shrink:0;border-radius:9px;background:#f1f5fb;color:#64748b}
+.practice-mode-tab.is-active .practice-mode-tab-icon{background:#dbeafe;color:#1d4ed8}
+.practice-mode-tab-text{display:grid;gap:2px;min-width:0}
+.practice-mode-tab-text strong{font-size:14px;font-weight:700;color:#172033;white-space:nowrap}
+.practice-mode-tab-text small{font-size:12px;color:#8a94a6;white-space:nowrap}
+.practice-mode-tab.is-active .practice-mode-tab-text strong{color:#1d4ed8}
+
+/* —— 复仇模式条：仅复仇 tab 激活时展示 —— */
+#practiceLobby .practice-revenge-strip{margin-top:12px}
+#practiceLobby .practice-revenge-strip .practice-mode-card.revenge{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;min-height:0;height:auto;padding:13px 16px;border:1px solid #f3c6ce;border-radius:12px;background:#fff;grid-template-columns:none;grid-template-rows:none}
+#practiceLobby .practice-revenge-strip .practice-revenge-title{display:flex;align-items:center;gap:6px}
+#practiceLobby .practice-revenge-strip .practice-revenge-title h2{margin:0;font-size:14px;color:#9f1239}
+#practiceLobby .practice-revenge-strip .practice-mode-purpose{margin:0;font-size:12px;color:#8a94a6}
+#practiceLobby .practice-revenge-strip .practice-revenge-total{position:static;padding:0;background:transparent;color:#9f1239;font-size:12px;margin:0}
+#practiceLobby .practice-revenge-strip .practice-revenge-total strong{font-size:15px}
+#practiceLobby .practice-revenge-strip .practice-revenge-options{margin-left:auto;font-size:12px;color:#8b5560}
+#practiceLobby .practice-revenge-strip .practice-revenge-options>summary{cursor:pointer;list-style:none;white-space:nowrap}
+#practiceLobby .practice-revenge-strip .practice-revenge-options>summary::-webkit-details-marker{display:none}
+#practiceLobby .practice-revenge-strip .practice-revenge-options>summary::after{content:" ▾";color:#b3798a}
+#practiceLobby .practice-revenge-strip .practice-revenge-options[open]>summary::after{content:" ▴"}
+#practiceLobby .practice-revenge-strip .practice-revenge-stats{grid-column:auto;flex-basis:100%;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+#practiceLobby .practice-revenge-strip .practice-revenge-count-shell{flex-basis:100%;margin:0}
+#practiceLobby .practice-revenge-strip .practice-revenge-rule-trigger{width:22px;height:22px;font-size:11px}
+#practiceLobby .practice-revenge-strip .practice-revenge-rule-tooltip{position:fixed;z-index:60;top:auto;right:auto;left:auto;width:min(390px,calc(100vw - 44px));max-height:min(48vh,300px);overflow:auto}
+
+/* —— 试卷库：标题 + 搜索一行，下划线筛选 tab，网格卡片 —— */
+#practiceLobby .practice-library-shelf{padding:18px 20px 20px;border-radius:12px;background:#fff;box-shadow:none;margin-bottom:18px}
+#practiceLobby .practice-library-toolbar{flex-wrap:nowrap;margin-bottom:12px}
+#practiceLobby .practice-library-title strong{font-size:17px}
+#practiceLobby .practice-catalog-search{flex:0 1 300px;margin-left:auto;padding:0;justify-content:flex-end}
+#practiceLobby .practice-catalog-search label{position:relative;flex:1;min-width:0}
+#practiceLobby .practice-catalog-search label::before{content:"";position:absolute;left:10px;top:50%;width:14px;height:14px;transform:translateY(-50%);background:no-repeat center/contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E");pointer-events:none}
+#practiceLobby .practice-catalog-search input{height:38px;min-height:38px;padding-left:32px;border:1px solid #e2e8f2;border-radius:9px;font-size:14px;background:#fff}
+.practice-library-actions{display:flex;align-items:center;gap:12px;margin:0 0 6px;border-bottom:1px solid #eef1f6}
+#practiceLobby .practice-library-filters{display:flex;gap:20px;padding:0;border:0;border-radius:0;background:transparent}
+#practiceLobby .practice-library-filters button{position:relative;height:38px;min-width:0;padding:0 2px;border:0;border-radius:0;background:transparent;color:#667085;font-size:14px;font-weight:600;box-shadow:none}
+#practiceLobby .practice-library-filters button::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:transparent;transition:background .15s ease}
+#practiceLobby .practice-library-filters button.is-active{background:transparent;color:#1d4ed8;font-weight:700;box-shadow:none}
+#practiceLobby .practice-library-filters button.is-active::after{background:#2563eb}
+#practiceLobby .practice-library-actions .practice-more-btn{margin-left:auto;border:0;background:transparent;color:#64748b;font-size:14px;white-space:nowrap}
+#practiceLobby .practice-library-actions .practice-more-btn:hover{color:#1d4ed8}
+
+/* 试卷卡：缩略图 + 名称 + 描述 + 进度（大厅网格 4 列；抽屉内仍兼容） */
+.practice-paper-thumb{display:block;margin:0}
+.practice-paper-thumb-card{display:flex;flex-direction:column;gap:8px;height:100%;padding:12px;border-radius:10px;background:linear-gradient(160deg,#eef2f9,#e6ecf6);border:1px solid #e3e9f3}
+.practice-paper-thumb-brand{align-self:flex-start;padding:2px 7px;border-radius:5px;background:rgba(255,255,255,.85);color:#5b6b84;font-size:10px;font-weight:800;letter-spacing:.02em}
+.practice-paper-thumb-body{display:flex;align-items:stretch;gap:10px;flex:1;min-height:0}
+.practice-paper-thumb-letter{display:grid;place-items:center;min-width:52px;padding:0 6px;border-radius:8px;background:#fff;box-shadow:0 4px 12px rgba(30,58,138,.08);color:#1e3a8a;font-family:Georgia,"Times New Roman",serif;font-size:40px;font-weight:700;line-height:1}
+.practice-paper-thumb-dots{flex:1;border-radius:8px;background-color:#fff;background-image:radial-gradient(circle,#c3cfdf 1.3px,transparent 1.5px);background-size:13px 13px;background-position:6px 8px;box-shadow:0 4px 12px rgba(30,58,138,.06)}
+.practice-paper-card.is-locked .practice-paper-thumb-card{filter:grayscale(.35);opacity:.85}
+
+#practiceLobby .practice-selected-paper>span{font-size:12px;font-weight:600;color:#8a94a6}
+#practiceLobby .practice-selected-paper small{font-size:12px;color:#8a94a6}
+#practiceLobby .practice-selected-paper strong{font-size:15px;font-weight:700;white-space:nowrap}
+#practiceLobby .practice-action-mode .practice-start-btn{font-size:15px}
+#practiceLobby .practice-paper-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-top:14px}
+#practiceLobby .practice-paper-grid .practice-paper-card{position:relative;display:flex;flex-direction:column;gap:0;min-height:0;min-width:0;padding:10px 12px 14px;border:1px solid #e6eaf2;border-radius:12px;background:#fff;text-align:left;box-shadow:0 4px 14px rgba(15,23,42,.035);flex:none}
+#practiceLobby .practice-paper-card:hover{border-color:#c3cfdf;transform:translateY(-2px);box-shadow:0 12px 26px rgba(15,23,42,.08)}
+#practiceLobby .practice-paper-card.is-selected{border-color:#2563eb;background:#fff;box-shadow:0 0 0 1px #2563eb,0 10px 24px rgba(37,99,235,.1)}
+#practiceLobby .practice-paper-card.is-selected::after{content:"✓";position:absolute;top:8px;right:8px;z-index:2;display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:#2563eb;color:#fff;font-size:12px;font-weight:900;box-shadow:0 3px 8px rgba(37,99,235,.35)}
+#practiceLobby .practice-paper-thumb{margin:0}
+#practiceLobby .practice-paper-thumb-card{aspect-ratio:16/9}
+#practiceLobby .practice-paper-thumb-letter{font-size:34px}
+#practiceLobby .practice-paper-card-head{order:1;display:flex;align-items:center;gap:8px;margin:12px 0 0;padding:0}
+#practiceLobby .practice-paper-card h2{order:2;display:-webkit-box;min-height:0;margin:8px 0 4px;font-size:14px;line-height:1.4;letter-spacing:-.01em;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+#practiceLobby .practice-paper-card p:not(.practice-paper-coverage){order:3;display:-webkit-box;min-height:34px;margin:0;color:#8a94a6;font-size:12px;line-height:1.5;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+#practiceLobby .practice-paper-progress{order:4;height:5px;margin:10px 0 6px;background:#edf0f5;border-radius:99px;overflow:hidden}
+#practiceLobby .practice-paper-progress>span{display:block;height:100%;width:var(--paper-progress,0%);border-radius:inherit;background:#2563eb}
+#practiceLobby .practice-paper-coverage{order:5;min-height:0;margin:0;color:#737d96;font-size:11px;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#practiceLobby .practice-paper-footer{display:none}
+#practiceLobby .practice-paper-empty{grid-column:1/-1}
+.practice-paper-drawer-grid .practice-paper-card{display:flex;flex-direction:column}
+.practice-paper-drawer-grid .practice-paper-thumb-card{aspect-ratio:16/7}
+
+/* —— 底部操作栏 —— */
+.practice-action-bar{position:sticky;bottom:0;z-index:24;display:flex;align-items:center;justify-content:space-between;gap:18px;margin-top:auto;padding:13px 18px;border:1px solid #e6eaf2;border-radius:12px;background:rgba(255,255,255,.97);box-shadow:0 -8px 26px rgba(15,23,42,.06),0 8px 26px rgba(15,23,42,.05);backdrop-filter:blur(8px)}
+.practice-action-summary{display:flex;align-items:center;gap:14px;min-width:0}
+.practice-selected-paper{display:grid;gap:3px;min-width:0;padding-left:12px;border-left:3px solid #2563eb}
+.practice-selected-paper>span{font-size:12px;font-weight:600;color:#8a94a6}
+.practice-selected-paper strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:15px;font-weight:700;color:#172033}
+.practice-selected-paper small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#8a94a6;font-size:12px}
+.practice-action-divider{width:1px;height:30px;background:#e6eaf2;flex-shrink:0}
+.practice-action-config{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#475467;font-size:13px;font-weight:600;font-variant-numeric:tabular-nums}
+.practice-coverage-retry{min-width:0;height:30px;padding:0 10px;border-radius:8px;font-size:11px;flex-shrink:0}
+.practice-action-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-shrink:0}
+.practice-action-mode{display:flex;align-items:center;gap:10px}
+.practice-action-mode[hidden]{display:none!important}
+#practiceLobby .practice-action-mode .practice-start-btn{grid-column:auto;height:46px;min-width:170px;padding:0 26px;border:0;border-radius:11px;background:#2563eb;color:#fff;font-size:15px;font-weight:700;box-shadow:0 8px 20px rgba(37,99,235,.24);white-space:nowrap}
+#practiceLobby .practice-action-mode .practice-start-btn:hover:not(:disabled){background:#1d4ed8;filter:none}
+#practiceLobby .practice-action-mode .practice-start-btn:disabled{opacity:.42;cursor:not-allowed;box-shadow:none}
+#practiceLobby .practice-action-mode .practice-start-btn.is-upgrade{background:#b45309;box-shadow:0 8px 20px rgba(180,83,9,.2)}
+#practiceLobby .practice-action-mode .practice-start-btn[aria-busy="true"]{position:relative;color:transparent}
+#practiceLobby .practice-action-mode .practice-start-btn[aria-busy="true"]::after{content:"";position:absolute;inset:0;margin:auto;width:18px;height:18px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:practiceSpin .8s linear infinite}
+@keyframes practiceSpin{to{transform:rotate(360deg)}}
+.practice-action-mode .practice-secondary-btn{min-width:0;height:36px;padding:0 13px;border-radius:9px;font-size:12px;white-space:nowrap}
+
+/* —— 目录加载期先隐藏改版区块，避免闪空 —— */
+#practiceLobby[data-catalog-pending] .practice-mode-tabs-card,
+#practiceLobby[data-catalog-pending] .practice-action-bar{visibility:hidden}
+
+/* —— 响应式 —— */
+@media(max-width:1180px){
+  #practiceLobby .practice-paper-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(max-width:900px){
+  .practice-sidebar-nav .practice-utility-btn,.practice-sidebar-nav .practice-sidebar-link{font-size:14px}
+  #practiceLobby .practice-lobby-head{flex-direction:column;align-items:stretch;gap:12px}
+  .practice-lobby-config{flex-wrap:wrap}
+  .practice-config-dropdown{flex:1;min-width:150px}
+  .practice-mode-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .practice-mode-tab+.practice-mode-tab::before{display:none}
+  .practice-mode-tab:nth-child(n+3){border-top:1px solid #eef1f6}
+  #practiceLobby .practice-paper-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .practice-action-bar{flex-direction:column;align-items:stretch;gap:12px}
+  .practice-action-summary{flex-wrap:wrap;gap:10px}
+  .practice-action-config{flex-basis:100%;white-space:normal}
+  .practice-action-actions{justify-content:stretch}
+  .practice-action-mode{flex:1}
+  .practice-action-mode .practice-start-btn{flex:1;min-width:0}
+  .practice-revenge-strip .practice-revenge-options{margin-left:0;flex-basis:100%}
+}
+@media(max-width:560px){
+  #practiceLobby .practice-paper-grid{grid-template-columns:1fr}
+  .practice-mode-tabs{grid-template-columns:1fr}
+  .practice-mode-tab:nth-child(n+2){border-top:1px solid #eef1f6}
+  .practice-mode-tab{min-height:52px;padding:10px 14px}
+}
+@media (prefers-reduced-motion:reduce){.practice-action-mode .practice-start-btn[aria-busy="true"]::after{animation-duration:.001ms!important}}
+
+/* 大厅滚动容器改为纵向 flex：内容不足一屏时底部操作栏仍贴底 */
+body.practice-mode-page[data-practice-view="lobby"] #practiceLobby{display:flex;flex-direction:column;align-items:stretch}
+body.practice-mode-page[data-practice-view="lobby"] #practiceLobby>.practice-empty{margin-top:auto}
