@@ -231,7 +231,7 @@ with sync_playwright() as playwright:
     )
     for stylesheet in ["styles/main.css", "styles/practice-mode.css", "styles/focus-vega-typography.css", "styles/learning-skin.css", "styles/answer-page.css"]:
         page.add_style_tag(content=(ROOT / stylesheet).read_text(encoding="utf-8"))
-    for script in ["src/111-practice-session-core.js", "src/115-practice-mode-policy.js", "src/112-practice-answer-sheet.js", "src/113-practice-result-report.js", "src/116-practice-session-save.js", "src/117-question-answer-set.js", "src/114-practice-draft-state.js", "src/118-revenge-entry-policy.js", "src/practice/practice-answer-page.js", "src/practice/history-controller.js", "src/100-practice-mode.js"]:
+    for script in ["src/111-practice-session-core.js", "src/115-practice-mode-policy.js", "src/112-practice-answer-sheet.js", "src/113-practice-result-report.js", "src/116-practice-session-save.js", "src/117-question-answer-set.js", "src/114-practice-draft-state.js", "src/118-revenge-entry-policy.js", "src/practice/practice-answer-page.js", "src/practice/history-controller.js", "src/100-practice-mode.js", "src/practice/lobby-actions-controller.js"]:
         page.add_script_tag(content=(ROOT / script).read_text(encoding="utf-8"))
     page.evaluate("document.dispatchEvent(new Event('DOMContentLoaded'))")
     page.wait_for_timeout(120)
@@ -276,6 +276,7 @@ with sync_playwright() as playwright:
     page.evaluate('KGPracticeLearningApi.listSessions=async()=>[]')
 
     # ---------- challenge：作答与导航零写请求 ----------
+    page.locator('[data-practice-tab="challenge"]').click()
     page.locator('[data-practice-start="challenge"]').click()
     page.wait_for_timeout(200)
     assert page.locator("#practiceGame").is_visible(), page.evaluate("document.body.dataset.practiceView")
@@ -446,6 +447,7 @@ with sync_playwright() as playwright:
 
     # ---------- 恢复会话：服务端草稿在题目与答题卡回放本地判题结果 ----------
     page.evaluate("window.__writes=[]")
+    page.locator('[data-practice-tab="challenge"]').click()
     page.locator('[data-practice-start="challenge"]').click()
     page.wait_for_timeout(300)
     resumed = page.evaluate("window.KGPracticeMode.snapshot()")
@@ -498,27 +500,34 @@ with sync_playwright() as playwright:
       window.KGPracticeMode.showLobby();
     }""")
     page.wait_for_timeout(500)
-    # 批准的新大厅：设置区在上，普通/挑战/学霸/复仇四种模式在下方同排。
+    # 改版新大厅：头部标题+配置下拉、模式 tab 同排、试卷库网格、底部操作栏收纳四个真实开始按钮。
     lobby_geometry = page.evaluate("""()=>{
-      const rect=selector=>{const value=document.querySelector(selector).getBoundingClientRect();return {x:value.x,y:value.y,width:value.width,height:value.height,right:value.right}};
+      const rect=selector=>{const el=document.querySelector(selector);if(!el)return null;const value=el.getBoundingClientRect();return {x:value.x,y:value.y,width:value.width,height:value.height,right:value.right,bottom:value.bottom}};
+      const lobby=rect('#practiceLobby'),bar=rect('.practice-action-bar');
       return {
-        setup:rect('.practice-setup-card'),order:rect('.practice-order-options'),
-        ordinary:rect('.practice-mode-card.ordinary'),
-        challenge:rect('.practice-mode-card.challenge'),scholar:rect('.practice-mode-card.scholar'),
-        revenge:rect('.practice-mode-card.revenge'),
-        orderInsideSetup:document.querySelector('.practice-setup-card').contains(document.querySelector('[name="practiceOrder"]'))
+        head:rect('.practice-lobby-head-title'),config:rect('.practice-lobby-config'),
+        tabs:rect('.practice-mode-tabs'),library:rect('.practice-library-shelf'),bar,lobby,
+        startButtons:document.querySelectorAll('.practice-action-bar [data-practice-start]').length,
+        revengeHidden:document.getElementById('practiceRevengeStrip').hidden,
+        barInsideLobby:document.getElementById('practiceLobby').contains(document.querySelector('.practice-action-bar')),
+        tabsRow:[...document.querySelectorAll('.practice-mode-tab')].map(tab=>Math.round(tab.getBoundingClientRect().y))
       };
     }""")
-    assert lobby_geometry["orderInsideSetup"], lobby_geometry
-    assert lobby_geometry["setup"]["x"] <= lobby_geometry["order"]["x"], lobby_geometry
-    assert lobby_geometry["order"]["right"] <= lobby_geometry["setup"]["right"], lobby_geometry
-    modes=[lobby_geometry[key] for key in ['ordinary','challenge','scholar','revenge']]
-    assert max(card['y'] for card in modes)-min(card['y'] for card in modes)<2,lobby_geometry
-    assert modes[0]['y']>lobby_geometry['setup']['y']+lobby_geometry['setup']['height'],lobby_geometry
-    assert all(first['right']<second['x'] for first,second in zip(modes,modes[1:])),lobby_geometry
+    assert lobby_geometry["barInsideLobby"], lobby_geometry
+    assert lobby_geometry["config"]["x"] >= lobby_geometry["head"]["right"] - 8, lobby_geometry
+    assert lobby_geometry["tabs"]["y"] > lobby_geometry["head"]["y"], lobby_geometry
+    assert lobby_geometry["library"]["y"] > lobby_geometry["tabs"]["y"] + lobby_geometry["tabs"]["height"], lobby_geometry
+    assert lobby_geometry["bar"]["y"] > lobby_geometry["library"]["y"], lobby_geometry
+    assert lobby_geometry["startButtons"] == 4, lobby_geometry
+    assert lobby_geometry["revengeHidden"], lobby_geometry
+    assert max(lobby_geometry["tabsRow"]) - min(lobby_geometry["tabsRow"]) < 2, lobby_geometry
+    assert lobby_geometry["lobby"]["bottom"] - lobby_geometry["bar"]["bottom"] > -2, lobby_geometry
+    page.locator('[data-practice-tab="revenge"]').click()
     page.locator('.practice-revenge-options summary').click()
     # 普通练习选择 60 题，复仇只有 1 题时仍自动发送 count=1。
-    page.locator('label:has([name="practiceCount"][value="60"])').click()
+    page.locator('[data-practice-tab="revenge"]').click()
+    page.locator('[data-config-dropdown="count"]').click()
+    page.locator('[data-config-menu="count"] [data-value="60"]').click()
     assert page.locator('#practiceRevengeActiveCount').inner_text() == '1'
     assert '全部 1 题' in page.locator('#practiceRevengeCountSummary').inner_text()
     assert page.locator('#practiceRevengeCountOptions').is_hidden()
@@ -547,6 +556,7 @@ with sync_playwright() as playwright:
     assert rule_tooltip.is_hidden()
 
     page.evaluate('window.__writes=[]')
+    page.locator('[data-practice-tab="revenge"]').click()
     page.locator('[data-practice-start="revenge"]').click()
     page.wait_for_timeout(180)
     assert writes(page)[0] == {"name": "start", "body": {"mode": "revenge", "count": 1, "order": "paper"}}, writes(page)
@@ -567,6 +577,7 @@ with sync_playwright() as playwright:
     assert page.locator('[name="practiceRevengeCount"][value="10"]').is_checked()
     assert page.locator('[name="practiceRevengeCount"][value="20"]').is_disabled()
     page.locator('label:has([name="practiceRevengeCount"][value="14"])').click()
+    page.locator('[data-practice-tab="revenge"]').click()
     page.locator('[data-practice-start="revenge"]').click()
     page.wait_for_timeout(180)
     assert writes(page)[0]["body"]["count"] == 14, writes(page)
@@ -579,6 +590,7 @@ with sync_playwright() as playwright:
     page.evaluate("""()=>{window.__revengeStats={active:29,pending:10,needsRemediation:4,verificationDue:15,mastered:0};window.KGPracticeMode.showLobby();window.__writes=[]}""")
     page.wait_for_timeout(100)
     page.locator('label:has([name="practiceRevengeCount"][value="20"])').click()
+    page.locator('[data-practice-tab="revenge"]').click()
     page.locator('[data-practice-start="revenge"]').click()
     page.wait_for_timeout(180)
     assert writes(page)[0]["body"]["count"] == 20, writes(page)
@@ -599,6 +611,7 @@ with sync_playwright() as playwright:
       };
       window.__writes=[];
     }""")
+    page.locator('[data-practice-tab="revenge"]').click()
     page.locator('[data-practice-start="revenge"]').click()
     page.wait_for_timeout(250)
     assert "历史错题内容暂不可用" in page.locator("#practiceToast").inner_text()
@@ -610,6 +623,7 @@ with sync_playwright() as playwright:
       window.__writes=[];
     }""")
     page.evaluate("window.__writes=[]")
+    page.locator('[data-practice-tab="revenge"]').click()
     page.locator('[data-practice-start="revenge"]').click()
     page.wait_for_timeout(300)
     revenge = page.evaluate("window.KGPracticeMode.snapshot()")
@@ -660,6 +674,7 @@ with sync_playwright() as playwright:
     page.locator("#practiceAbandonBtn").click()
     page.wait_for_timeout(120)
     page.evaluate("window.__writes=[]")
+    page.locator('[data-practice-tab="revenge"]').click()
     page.locator('[data-practice-start="revenge"]').click()
     page.wait_for_timeout(180)
     revenge = page.evaluate("window.KGPracticeMode.snapshot()")
@@ -819,7 +834,8 @@ with sync_playwright() as playwright:
     # 服务端已冻结随机题序：首次从第 1 题开始，跳题与恢复沿用同一序列。
     for mode in ("challenge", "scholar", "practice"):
         page.evaluate("KGPracticeMode.showLobby()")
-        page.locator('label:has(input[name="practiceOrder"][value="random"])').click()
+        page.locator('[data-config-dropdown="order"]').click()
+        page.locator('[data-config-menu="order"] [data-value="random"]').click()
         page.evaluate(
             """mode=>{
               const order=[7,2,9,1,8,3,10,4,6,5];
@@ -857,7 +873,8 @@ with sync_playwright() as playwright:
         assert saved['runtimeState']['order'] == 'random', saved
         assert saved['answers']['random-q7']['selectedAnswer'] == 'A', saved
         # 大厅选择不能改写已保存会话的随机顺序。
-        page.locator('label:has(input[name="practiceOrder"][value="paper"])').click()
+        page.locator('[data-config-dropdown="order"]').click()
+        page.locator('[data-config-menu="order"] [data-value="paper"]').click()
         page.evaluate("mode=>KGPracticeMode.startPractice(mode)", mode)
         assert_question_progress(page, 8, 10)
         assert page.locator('#practiceQuestionStem').inner_text() == '随机来源题 4'

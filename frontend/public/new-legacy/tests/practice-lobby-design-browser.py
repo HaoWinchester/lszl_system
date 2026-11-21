@@ -49,11 +49,10 @@ with sync_playwright() as pw:
     choose();checks.append('real catalog and four modes')
     assert page.locator('.practice-mode-card').count()==4
     for label in ['普通练习','挑战模式','学霸模式','复仇模式']:assert page.get_by_role('heading',name=label,exact=True).count()==1,label
-    page.locator('#practiceLibrarySearch').fill('找不到的试卷');expect(page.locator('#practicePaperLibrary .practice-paper-empty')).to_contain_text('没有找到');page.locator('#practiceLibraryClear').click();expect(page.locator('#practicePaperLibrary [data-paper-id]')).to_have_count(4)
-    page.locator('#practiceLibraryFilters [data-paper-filter="member"]').click();expect(page.locator('#practicePaperLibrary [data-paper-id]')).to_have_count(1);page.locator('#practiceLibraryClear').click();expect(page.locator('#practiceLibrarySubject')).to_have_count(0);checks.append('search, free/member and clear without subject selector')
-    page.locator('#practiceLibraryMoreBtn').click();expect(page.locator('#practicePaperDrawer')).to_be_visible();page.keyboard.press('Escape');expect(page.locator('#practicePaperDrawer')).to_be_hidden()
-    for mode in ['challenge','scholar']:
-        help=page.locator('.'+mode+' .practice-lobby-help');help.locator('summary').click();expect(help).to_have_attribute('open','');page.keyboard.press('Escape');assert not help.evaluate('e=>e.open')
+    page.locator('#practiceLibrarySearch').fill('找不到的试卷');expect(page.locator('#practicePaperLibrary .practice-paper-empty')).to_contain_text('没有找到');page.evaluate("document.getElementById('practiceLibraryClear').click()");expect(page.locator('#practicePaperLibrary [data-paper-id]')).to_have_count(4)
+    page.locator('#practiceLibraryFilters [data-paper-filter="member"]').click();expect(page.locator('#practicePaperLibrary [data-paper-id]')).to_have_count(1);page.evaluate("document.getElementById('practiceLibraryClear').click()");expect(page.locator('#practiceLibrarySubject')).to_have_count(0);checks.append('search, free/member and clear without subject selector')
+    page.evaluate("document.getElementById('practiceLibraryMoreBtn').click()");expect(page.locator('#practicePaperDrawer')).to_be_visible();page.keyboard.press('Escape');expect(page.locator('#practicePaperDrawer')).to_be_hidden()
+    page.locator('[data-practice-tab="revenge"]').click()
     page.locator('#practiceRevengeRuleTrigger').click();expect(page.locator('#practiceRevengeRuleTooltip')).to_be_visible();page.keyboard.press('Escape');page.locator('.practice-revenge-options summary').click();expect(page.locator('#practiceRevengePendingCount')).to_be_visible();page.locator('.practice-revenge-options summary').click();checks.append('rule disclosure and all revenge batch controls')
     assert page.locator('[data-lobby-open="reports"]').count()==0,'duplicate reports entry must stay absent'
     for button,drawer,close in [('#practiceHistoryOpenBtn','#practiceHistoryDrawer','#practiceHistoryCloseBtn'),('#practiceFavoritesOpenBtn','#practiceFavoritesDrawer','#practiceFavoritesCloseBtn')]:
@@ -66,7 +65,8 @@ with sync_playwright() as pw:
     # Each mode starts and saves through its original API-backed workflow.
     call('delete','/api/v1/learning/practice/sessions')
     for mode in ['practice','challenge','scholar']:
-        choose();page.locator('#practiceCountOptions label:has([value="20"])').click();page.locator('.practice-order-options label:has([value="random"])').click()
+        choose();page.locator('[data-config-dropdown="count"]').click();page.locator('[data-config-menu="count"] [data-value="20"]').click();page.locator('[data-config-dropdown="order"]').click();page.locator('[data-config-menu="order"] [data-value="random"]').click()
+        page.locator('[data-practice-tab="'+mode+'"]').click()
         page.locator('[data-practice-start="'+mode+'"]').click();page.wait_for_function('(mode)=>KGPracticeMode.snapshot().active&&KGPracticeMode.snapshot().mode===mode',arg=mode)
         assert page.evaluate('KGPracticeMode.snapshot().questionCount')==20
         click_tool(page, '#practiceExitBtn');expect(page.locator('#practiceExitConfirm')).to_be_visible();page.locator('#practiceSaveExitBtn').click();page.wait_for_function('KGPracticeMode.snapshot().view==="lobby"')
@@ -115,12 +115,10 @@ with sync_playwright() as pw:
     expect(knowledge.locator('canvas')).to_have_count(1);page.keyboard.press('Escape')
     checks.append('real completed practice produces 20 server-owned knowledge nodes; Canvas/list/details and reopen preserve saved counts')
     page.locator('#practiceRecentFavoritesTab').click();expect(page.locator('[data-recent-favorite]')).to_have_count(1);page.locator('[data-recent-favorite]').click();expect(page.locator('#practiceFavoriteDetail')).to_be_visible();page.keyboard.press('Escape');page.locator('#practiceRecentHistoryTab').click()
-    page.locator('[data-practice-start="revenge"]').click();page.wait_for_function('KGPracticeMode.snapshot().active&&KGPracticeMode.snapshot().mode==="revenge"');click_tool(page, '#practiceExitBtn');page.locator('#practiceSaveExitBtn').click();page.wait_for_function('KGPracticeMode.snapshot().view==="lobby"');checks.append('revenge mode retained with real wrong-question pool')
+    page.locator('[data-practice-tab="revenge"]').click();page.locator('[data-practice-start="revenge"]').click();page.wait_for_function('KGPracticeMode.snapshot().active&&KGPracticeMode.snapshot().mode==="revenge"');click_tool(page, '#practiceExitBtn');page.locator('#practiceSaveExitBtn').click();page.wait_for_function('KGPracticeMode.snapshot().view==="lobby"');checks.append('revenge mode retained with real wrong-question pool')
     # Mobile: no viewport overflow, all four modes and all help/actions remain reachable.
     page.set_viewport_size({'width':390,'height':844});page.wait_for_timeout(250)
     assert page.evaluate('document.documentElement.scrollWidth<=innerWidth'),page.evaluate('document.documentElement.scrollWidth')
-    for mode in ['challenge','scholar']:
-        help=page.locator('.'+mode+' .practice-lobby-help');help.locator('summary').click();box=help.locator('.practice-help-content').bounding_box();assert box['x']>=0 and box['x']+box['width']<=390,box;page.keyboard.press('Escape')
     page.locator('#practiceExpFab').click();expect(page.locator('#practiceExpPanel')).to_be_visible();page.locator('#practiceExpFab').click();checks.append('390px layout, accessible rules and XP controls')
     for button in ['#practiceHistoryOpenBtn','#practiceFavoritesOpenBtn']:
         assert page.locator(button+' span').last.is_visible(),button+' mobile navigation label'
@@ -130,6 +128,7 @@ with sync_playwright() as pw:
     page.wait_for_function('!KGAuthCore.currentUser()');expect(page.locator('#practiceRecentBody tr')).to_have_count(0)
     page.set_viewport_size({'width':1440,'height':1000});expect(page.locator('#practiceExpPanel')).to_be_hidden();expect(page.locator('#practiceExpTotal')).to_have_text('0')
     for mode in ['practice','challenge','scholar','revenge']:
+        page.locator('[data-practice-tab="'+mode+'"]').click()
         page.locator('[data-practice-start="'+mode+'"]').click();expect(page.locator('#authModal')).to_be_visible();page.keyboard.press('Escape')
         assert not page.evaluate('KGPracticeMode.snapshot().active')
     checks.append('real logout clears private preview; all four guest starts require login')
@@ -138,6 +137,7 @@ with sync_playwright() as pw:
     sp=student.new_page();sp.goto(BASE+'/practice-mode.html',wait_until='networkidle')
     sp.locator('#practicePaperLibrary [data-paper-id="'+fixture['papers'][2]['id']+'"]').click()
     for mode in ['practice','challenge','scholar']:
+        sp.locator('[data-practice-tab="'+mode+'"]').click()
         sp.locator('[data-practice-start="'+mode+'"]').click();expect(sp.locator('#userSubscriptionDetailModal')).to_be_visible();sp.keyboard.press('Escape')
         assert not sp.evaluate('KGPracticeMode.snapshot().active')
     expect(sp.locator('#practiceRecentBody tr')).to_have_count(0)

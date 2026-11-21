@@ -16,7 +16,7 @@ SCRIPTS = [
     'src/113-practice-result-report.js', 'src/116-practice-session-save.js',
     'src/117-question-answer-set.js', 'src/114-practice-draft-state.js',
     'src/118-revenge-entry-policy.js', 'src/118-question-materials.js',
-    'src/practice/practice-sound.js', 'src/100-practice-mode.js',
+    'src/practice/practice-sound.js', 'src/100-practice-mode.js', 'src/practice/lobby-actions-controller.js',
 ]
 
 
@@ -60,6 +60,7 @@ def harness(page, unsupported=False, mode="practice"):
         if (ROOT / script).exists():
             page.add_script_tag(content=(ROOT / script).read_text())
     page.evaluate("document.dispatchEvent(new Event('DOMContentLoaded'))")
+    page.locator(f'[data-practice-tab="{mode}"]').click()
     page.locator(f'[data-practice-start="{mode}"]').click()
     page.wait_for_function("KGPracticeMode.snapshot().view==='game'")
 

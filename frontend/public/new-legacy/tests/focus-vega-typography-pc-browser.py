@@ -147,23 +147,22 @@ PAGES = {
         'primary': '.ss-sidebar button.active',
     },
     'practice-mode.html': {
-        'anchors': ('.practice-header', '.practice-lobby-head', '.practice-setup-card', '.practice-mode-grid'),
+        'anchors': ('.practice-header', '.practice-lobby-head', '.practice-mode-tabs-card', '.practice-library-shelf', '.practice-action-bar'),
         'roles': (
-            ('page title', '.practice-lobby-head h1', 28),
-            (
-                'metadata',
-                '.practice-lobby-head>span,.practice-brand small,.practice-field>span,'
-                '.practice-field small,.practice-choice-group legend,.practice-mode-card small',
-                12,
-            ),
-            ('library filter', '.practice-library-filters button', 14),
-            ('choice control', '.practice-choice-group label>span', 14),
+            ('page title', '.practice-lobby-head h1', 36),
+            ('page description', '.practice-lobby-head p', 14),
+            ('config label', '.practice-config-label', 12),
+            ('tabs heading', '.practice-tabs-heading', 15),
+            ('library filter', '#practiceLibraryFilters button', 14),
+            ('config value', '.practice-config-value', 14),
             ('mode switch', '.practice-mode-switch a', 14),
-            ('card title', '.practice-mode-card h2', 18),
-            ('card body', '.practice-mode-card p', 16),
-            ('primary action', '.practice-start-btn', 14),
+            ('tab title', '.practice-mode-tab-text strong', 14),
+            ('tab subtitle', '.practice-mode-tab-text small', 12),
+            ('selected paper', '.practice-selected-paper strong', 15),
+            ('action summary', '.practice-action-config', 13),
+            ('primary action', '.practice-action-mode:not([hidden]) .practice-start-btn', 15),
         ),
-        'primary': '.practice-start-btn[data-practice-start="challenge"]',
+        'primary': '.practice-action-mode:not([hidden]) .practice-start-btn',
     },
 }
 
@@ -378,6 +377,7 @@ def inject_fixture(page, filename):
         page.evaluate(
             """() => {
               document.body.dataset.practiceView='lobby';
+              document.querySelector('#practiceLobby').removeAttribute('data-catalog-pending');
               const select=document.querySelector('#practicePaperSelect');
               select.innerHTML='<option value="pmp">PMP 综合模拟卷</option>';
               document.querySelector('#practicePaperMeta').textContent='共 180 题 · 已发布';

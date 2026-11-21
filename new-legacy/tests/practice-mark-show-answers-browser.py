@@ -27,6 +27,7 @@ SCRIPTS = [
     "src/118-question-materials.js",
     "src/practice/history-controller.js",
     "src/100-practice-mode.js",
+    "src/practice/lobby-actions-controller.js",
     "src/practice/practice-answer-page.js",
 ]
 

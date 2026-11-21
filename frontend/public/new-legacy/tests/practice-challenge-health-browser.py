@@ -129,7 +129,7 @@ with sync_playwright() as playwright:
     page.evaluate(MOCK_BACKEND)
     for stylesheet in ["styles/main.css", "styles/practice-mode.css"]:
         page.add_style_tag(content=(ROOT / stylesheet).read_text(encoding="utf-8"))
-    for script in ["src/111-practice-session-core.js", "src/115-practice-mode-policy.js", "src/112-practice-answer-sheet.js", "src/113-practice-result-report.js", "src/116-practice-session-save.js", "src/117-question-answer-set.js", "src/114-practice-draft-state.js", "src/118-revenge-entry-policy.js", "src/100-practice-mode.js"]:
+    for script in ["src/111-practice-session-core.js", "src/115-practice-mode-policy.js", "src/112-practice-answer-sheet.js", "src/113-practice-result-report.js", "src/116-practice-session-save.js", "src/117-question-answer-set.js", "src/114-practice-draft-state.js", "src/118-revenge-entry-policy.js", "src/100-practice-mode.js", "src/practice/lobby-actions-controller.js"]:
         page.add_script_tag(content=(ROOT / script).read_text(encoding="utf-8"))
     page.evaluate("document.dispatchEvent(new Event('DOMContentLoaded'))")
     page.wait_for_timeout(150)
@@ -137,7 +137,9 @@ with sync_playwright() as playwright:
     page.clock.install()
 
     def start(count=180):
-        page.locator(f'[name="practiceCount"][value="{count}"]').check(force=True)
+        page.locator('[data-config-dropdown="count"]').click()
+        page.locator(f'[data-config-menu="count"] [data-value="{count}"]').click()
+        page.locator('[data-practice-tab="challenge"]').click()
         page.locator('[data-practice-start="challenge"]').click()
         page.wait_for_function("document.body.dataset.practiceView === 'game'")
 
@@ -233,7 +235,9 @@ with sync_playwright() as playwright:
     page.evaluate("window.__seedProgress({count:10});window.KGPracticeMode.showLobby();window.__calls=[]")
     dialogs = []
     page.on("dialog", lambda dialog: (dialogs.append(dialog.message), dialog.dismiss()))
-    page.locator('[name="practiceCount"][value="180"]').check(force=True)
+    page.locator('[data-config-dropdown="count"]').click()
+    page.locator('[data-config-menu="count"] [data-value="180"]').click()
+    page.locator('[data-practice-tab="challenge"]').click()
     page.locator('[data-practice-start="challenge"]').click()
     page.wait_for_function("document.body.dataset.practiceView === 'game'")
     assert not dialogs, dialogs
@@ -244,6 +248,7 @@ with sync_playwright() as playwright:
 
     # 学霸仍使用已保存的血量（有回血/超时规则，不能套用挑战计算）。
     page.evaluate("window.__seedProgress({mode:'scholar',wrong:3,health:7});window.KGPracticeMode.showLobby()")
+    page.locator('[data-practice-tab="scholar"]').click()
     page.locator('[data-practice-start="scholar"]').click()
     page.wait_for_function("document.body.dataset.practiceView === 'game'")
     assert health_label(page) == "剩余血量 7 / 18"
