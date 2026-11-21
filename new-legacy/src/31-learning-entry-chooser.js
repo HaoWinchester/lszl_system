@@ -12,11 +12,11 @@
   const SCHEMA_VERSION = 1;
   const ERROR_TEXT = "该学习页面暂时不可用，请稍后重试";
   const CHOICES = [
-    { label: "知识图谱", description: "梳理知识结构与关系 · 当前首页", destination: "index.html" },
-    { label: "深度回忆", description: "主动回忆关键词与知识线索 · 深度回忆", destination: "knowledge-recall.html" },
-    { label: "多题归纳", description: "多题比较、归纳与连接 · 多题画布", destination: "question-workspace.html" },
-    { label: "知识星空", description: "按科目与分类探索练习足迹", destination: "knowledge-space" },
-    { label: "做题模式", description: "试卷实战演练 · 做题大厅", destination: "practice-mode.html" },
+    { label: "知识图谱", description: "P 计划 · 梳理知识结构，定位薄弱点", destination: "index.html" },
+    { label: "深度回忆", description: "C 检查 · 主动回忆，自测是否真记住", destination: "knowledge-recall.html" },
+    { label: "多题归纳", description: "A 改进 · 归纳错题规律，连回知识图谱", destination: "question-workspace.html" },
+    { label: "知识星空", description: "C 检查 · 复盘练习足迹与掌握分布", destination: "knowledge-space" },
+    { label: "做题模式", description: "D 执行 · 试卷实战演练，暴露问题", destination: "practice-mode.html" },
   ];
   let active = null;
 
@@ -190,19 +190,25 @@
       const dialog = element(doc, "section", { class: "modal learning-entry-modal", role: "dialog", "aria-modal": "true", "aria-labelledby": "learningEntryTitle" });
       const head = element(doc, "div", { class: "learning-entry-head" });
       const heading = element(doc, "div");
-      heading.append(element(doc, "h2", { id: "learningEntryTitle" }, "从这里开始学习"), element(doc, "p", {}, "选择你现在最想做的事，直接进入对应学习板块。"));
+      heading.append(element(doc, "h2", { id: "learningEntryTitle" }, "PDCA 学习循环"), element(doc, "p", {}, "规划 → 执行 → 检查 → 改进：沿圆环顺时针推进，归纳的结果连回知识图谱，开始下一轮。"));
       head.append(heading);
       const choices = element(doc, "div", { class: "learning-entry-grid" });
+      const arrows = element(doc, "span", { class: "learning-entry-arrows", "aria-hidden": "true" });
+      [45, 135, 225, 315].forEach(angle => arrows.append(element(doc, "i", { style: `--arrow-angle:${angle}deg` })));
+      choices.append(arrows);
       const error = element(doc, "p", { class: "learning-entry-error", id: "learningEntryChooserError", "aria-live": "polite" });
       CHOICES.forEach(choice => {
         const style = { "知识图谱": "entry-graph is-current", "深度回忆": "entry-recall", "多题归纳": "entry-synthesis", "知识星空": "entry-practice", "做题模式": "entry-quizmode" }[choice.label];
         const avatar = { "知识图谱": "图", "深度回忆": "忆", "多题归纳": "归", "知识星空": "星", "做题模式": "练" }[choice.label];
+        const stage = { "知识图谱": ["P", "计划"], "深度回忆": ["C", "检查"], "多题归纳": ["A", "改进"], "知识星空": ["C", "检查"], "做题模式": ["D", "执行"] }[choice.label] || ["", ""];
         const button = element(doc, "button", { type: "button", class: `learning-entry-card ${style}`, "data-learning-entry": choice.label, "data-learning-entry-choice": choice.label, "data-destination": choice.destination, "data-description": choice.description });
-        button.append(element(doc, "span", { class: "learning-entry-avatar" }, avatar), element(doc, "span", { class: "learning-entry-name" }, choice.label), element(doc, "span", { class: "learning-entry-id" }, choice.description)); choices.append(button);
+        const badge = element(doc, "span", { class: "learning-entry-stage", "aria-hidden": "true" });
+        badge.append(element(doc, "b", {}, stage[0]), element(doc, "span", {}, stage[1]));
+        button.append(badge, element(doc, "span", { class: "learning-entry-avatar" }, avatar), element(doc, "span", { class: "learning-entry-name" }, choice.label), element(doc, "span", { class: "learning-entry-id" }, choice.description)); choices.append(button);
       });
       const foot = element(doc, "div", { class: "learning-entry-foot" });
       const dismiss = element(doc, "button", { type: "button", id: "learningEntryDismissBtn", "data-learning-entry-focusable": "" }, "进入知识图谱");
-      foot.append(element(doc, "span", {}, "以后可从首页右上角“学习入口”再次打开。"), dismiss);
+      foot.append(element(doc, "span", {}, "按 PDCA 循环推进：规划 → 执行 → 检查 → 改进 → 再规划。以后可从首页右上角“学习入口”再次打开。"), dismiss);
       dialog.append(head, choices, error, foot); root.append(dialog); doc.body.append(root);
     }
     root.classList.add("kg-learning-entry-dialog"); root.hidden = false; root.classList.add("show"); root.setAttribute("aria-hidden", "false");

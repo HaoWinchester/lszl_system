@@ -268,13 +268,13 @@ test('winning claim renders the update-style dismissible four-choice dialog in t
   assert.ok(dialog, 'the winning claim must create a dialog');
   assert.equal(dialog.getAttribute('aria-modal'), 'true');
   assert.equal(dialog.getAttribute('aria-labelledby'), 'learningEntryTitle');
-  assert.equal(tab.document.getElementById('learningEntryTitle').textContent, '从这里开始学习');
+  assert.equal(tab.document.getElementById('learningEntryTitle').textContent, 'PDCA 学习循环');
   const choices = tab.document.querySelectorAll('[data-learning-entry-choice]');
   assert.deepEqual(Array.from(choices, button => [button.getAttribute('data-learning-entry-choice'), button.getAttribute('data-destination')]), [
     ['知识图谱', 'index.html'], ['深度回忆', 'knowledge-recall.html'], ['多题归纳', 'question-workspace.html'], ['知识星空', 'knowledge-space'], ['做题模式', 'practice-mode.html'],
   ]);
   assert.deepEqual(Array.from(choices, button => button.getAttribute('data-description')), [
-    '梳理知识结构与关系 · 当前首页', '主动回忆关键词与知识线索 · 深度回忆', '多题比较、归纳与连接 · 多题画布', '按科目与分类探索练习足迹', '试卷实战演练 · 做题大厅',
+    'P 计划 · 梳理知识结构，定位薄弱点', 'C 检查 · 主动回忆，自测是否真记住', 'A 改进 · 归纳错题规律，连回知识图谱', 'C 检查 · 复盘练习足迹与掌握分布', 'D 执行 · 试卷实战演练，暴露问题',
   ]);
   assert.equal(tab.document.querySelector('[aria-label="关闭学习入口"]'), null, 'the dialog must not contain a close control');
   assert.equal(tab.document.querySelector('.learning-entry-close'), null, 'the dialog must not contain a learning-entry-close element');

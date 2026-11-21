@@ -9960,6 +9960,28 @@ body:not([data-graph-interaction-mode="reading"]) .stage :is(.knowledge-card.mul
 /* Phone reading mode hides the canvas toolbar; keep learning navigation reachable. */
 .learning-entry-mobile{display:none}
 @media(max-width:720px){body.graph-phone-reading .learning-entry-mobile{display:block;position:fixed;right:12px;top:var(--home-mobile-readonly-offset,12px);z-index:110;min-height:44px;padding:8px 14px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;color:#5140a7;font:700 13px system-ui;box-shadow:0 3px 12px #18223a18}}
+
+/* V9.1 · PDCA 学习循环：环序 P图谱→D做题→C回忆→C星空→A归纳，阶段徽标 + 顺时针方向箭头。 */
+/* 节点环上位置重排（自顶部顺时针每 72°） */
+.learning-entry-card.entry-graph{--ring-x:50%;--ring-y:5.5%}
+.learning-entry-card.entry-quizmode{--ring-x:94.5%;--ring-y:33%}
+.learning-entry-card.entry-recall{--ring-x:79%;--ring-y:89%}
+.learning-entry-card.entry-practice{--ring-x:21%;--ring-y:89%}
+.learning-entry-card.entry-synthesis{--ring-x:5.5%;--ring-y:33%}
+/* 底部两枚节点（深度回忆/知识星空）的描述提示朝上弹出 */
+.learning-entry-card.entry-recall .learning-entry-id,.learning-entry-card.entry-practice .learning-entry-id{top:auto;bottom:calc(100% + 8px)}
+/* 阶段徽标 */
+.learning-entry-stage{position:absolute;left:5%;top:5%;z-index:2;display:flex;align-items:center;gap:3px;padding:2px 7px 2px 4px;border-radius:999px;background:rgba(255,255,255,.92);box-shadow:0 2px 8px rgba(30,43,63,.18);font-size:10px;font-weight:800;color:#3f3659;line-height:1.25;white-space:nowrap}
+.learning-entry-stage b{display:grid;place-items:center;width:14px;height:14px;border-radius:50%;background:linear-gradient(145deg,#8b5cf6,#6d28d9);color:#fff;font-size:9.5px;font-weight:900}
+/* 顺时针方向箭头（虚线圆环上 4 枚，45°/135°/225°/315°） */
+.learning-entry-arrows{position:absolute;inset:11%;pointer-events:none}
+.learning-entry-arrows i{position:absolute;left:var(--arrow-x);top:var(--arrow-y);width:20px;height:20px;display:grid;place-items:center;color:rgba(109,74,214,.8);font-size:13px;font-style:normal;transform:translate(-50%,-50%) rotate(var(--arrow-angle))}
+.learning-entry-arrows i::before{content:"➤"}
+.learning-entry-arrows i:nth-child(1){--arrow-x:77.5%;--arrow-y:22.5%}
+.learning-entry-arrows i:nth-child(2){--arrow-x:77.5%;--arrow-y:77.5%}
+.learning-entry-arrows i:nth-child(3){--arrow-x:22.5%;--arrow-y:77.5%}
+.learning-entry-arrows i:nth-child(4){--arrow-x:22.5%;--arrow-y:22.5%}
+@media(max-width:560px),(max-height:660px){.learning-entry-stage{font-size:9px;padding:1px 5px 1px 3px}.learning-entry-stage b{width:12px;height:12px;font-size:8.5px}.learning-entry-arrows i{width:15px;height:15px;font-size:10px}}
 /* style: styles/knowledge-dashboard.css */
 /* Original-reference.html lines 8–135: declarations transplanted verbatim and scoped.
    Only host positioning, native child modal and compact phone flow are adapted below. */
