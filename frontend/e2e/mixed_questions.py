@@ -85,6 +85,7 @@ def main():
         errors=[];page.on('pageerror',lambda error:errors.append(str(error)))
         page.goto(base+'/practice-mode.html',wait_until='networkidle')
         page.locator(f'[data-paper-id="{ids["paper"]}"]').first.click()
+        page.locator('[data-practice-tab="challenge"]').click()
         page.locator('[data-practice-start="challenge"]').click()
         page.locator('#practiceGame').wait_for(state='visible')
         sid=page.evaluate('KGPracticeMode.snapshot().sessionId')
@@ -104,6 +105,7 @@ def main():
         assert qs[2]['id'] not in saved['answers']
         page.reload(wait_until='networkidle')
         page.locator(f'[data-paper-id="{ids["paper"]}"]').first.click()
+        page.locator('[data-practice-tab="challenge"]').click()
         page.locator('[data-practice-start="challenge"]').click()
         page.locator('#practiceGame').wait_for(state='visible')
         assert '乙' in page.locator('[data-qm-left="l1"]').inner_text()
@@ -146,6 +148,7 @@ def main():
         response=context.request.post(path+'/'+attempt['id']+'/complete',data={'revision':attempt['revision'],'answers':answers})
         assert response.ok,response.text()
         page.reload(wait_until='networkidle')
+        page.locator('[data-practice-tab="revenge"]').click()
         page.locator('[data-practice-start="revenge"]').click()
         page.locator('#practiceGame').wait_for(state='visible')
         page.locator('#practiceShowPreviousWrong').check()

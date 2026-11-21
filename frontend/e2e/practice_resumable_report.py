@@ -416,6 +416,7 @@ def run_matrix() -> None:
 
             # ---- matrix 1: challenge 3 answers + sheet jump, zero write requests ----
             log = install_recorder(page)
+            page.locator('[data-practice-tab="challenge"]').click()
             page.locator('[data-practice-start="challenge"]').click()
             page.locator("#practiceGame").wait_for(state="visible")
             sheet_count = page.locator("#practiceAnswerSheet [data-question-id]").count()
@@ -506,6 +507,7 @@ def run_matrix() -> None:
             resume_label = page.locator('[data-practice-start="challenge"]').inner_text()
             check_matrix(3, "resume entry shows continue label", "继续上次练习" in resume_label, f"label={resume_label!r}")
             log["rows"].clear()
+            page.locator('[data-practice-tab="challenge"]').click()
             page.locator('[data-practice-start="challenge"]').click()
             page.locator("#practiceGame").wait_for(state="visible")
             snap = page.evaluate("KGPracticeMode.snapshot()")
@@ -592,6 +594,7 @@ def run_matrix() -> None:
             page.reload(wait_until="networkidle")
             page.locator(f'[data-paper-id="{ids["paper"]}"]').first.click()
             page.wait_for_timeout(200)
+            page.locator('[data-practice-tab="scholar"]').click()
             page.locator('[data-practice-start="scholar"]').click()
             page.locator("#practiceGame").wait_for(state="visible")
             page.clock.install()
@@ -629,6 +632,7 @@ def run_matrix() -> None:
             page.wait_for_timeout(200)
             scholar_resume = page.locator('[data-practice-start="scholar"]').inner_text()
             check_matrix(6, "scholar resume label present", "继续上次练习" in scholar_resume, f"label={scholar_resume!r}")
+            page.locator('[data-practice-tab="scholar"]').click()
             page.locator('[data-practice-start="scholar"]').click()
             page.locator("#practiceGame").wait_for(state="visible")
             scholar_resumed = page.evaluate("KGPracticeMode.snapshot()")
@@ -662,6 +666,7 @@ def run_matrix() -> None:
             page.reload(wait_until="networkidle")
             page.locator(f'[data-paper-id="{ids["paper"]}"]').first.click()
             page.wait_for_timeout(200)
+            page.locator('[data-practice-tab="revenge"]').click()
             page.locator('[data-practice-start="revenge"]').click()
             page.locator("#practiceGame").wait_for(state="visible")
             page.locator('[data-option-id="B"]').first.click()
@@ -749,6 +754,7 @@ def run_matrix() -> None:
             page.reload(wait_until="networkidle")
             page.locator(f'[data-paper-id="{ids["paper"]}"]').first.click()
             page.wait_for_timeout(200)
+            page.locator('[data-practice-tab="challenge"]').click()
             page.locator('[data-practice-start="challenge"]').click()
             page.locator("#practiceGame").wait_for(state="visible")
             page.locator('[data-option-id="B"]').first.click()
@@ -761,6 +767,7 @@ def run_matrix() -> None:
             page.reload(wait_until="networkidle")
             page.locator(f'[data-paper-id="{ids["paper"]}"]').first.click()
             page.wait_for_timeout(200)
+            page.locator('[data-practice-tab="challenge"]').click()
             page.locator('[data-practice-start="challenge"]').click()
             page.locator("#practiceGame").wait_for(state="visible")
             page.evaluate("""() => {
@@ -816,6 +823,7 @@ def run_matrix() -> None:
             page.reload(wait_until="networkidle")
             page.locator(f'[data-paper-id="{ids["paper"]}"]').first.click()
             page.wait_for_timeout(200)
+            page.locator('[data-practice-tab="challenge"]').click()
             page.locator('[data-practice-start="challenge"]').click()
             page.locator("#practiceGame").wait_for(state="visible")
             geometry_results = {}

@@ -61,6 +61,7 @@ def main():
                 return {title:size('.practice-mode-card h2'), body:size('.practice-mode-card p'),
                         control:size('.practice-start-btn'), brand:size('.practice-brand strong')};
             }''')
+            page.locator('[data-practice-tab="challenge"]').click()
             page.locator('[data-practice-start="challenge"]').click()
             page.locator('#practiceGame').wait_for(state='visible')
             def jump(index):
@@ -146,6 +147,7 @@ def main():
             page.locator('#practiceLobby').wait_for(state='visible')
             page.reload(wait_until='networkidle')
             page.locator(f'[data-paper-id="{ids["paper"]}"]').first.click()
+            page.locator('[data-practice-tab="challenge"]').click()
             page.locator('[data-practice-start="challenge"]').click()
             page.locator('#practiceGame').wait_for(state='visible')
             page.locator('#practiceAnswerSheetMobileBtn').click()

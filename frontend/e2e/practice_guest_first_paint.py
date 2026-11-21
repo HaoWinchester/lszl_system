@@ -72,7 +72,9 @@ with sync_playwright() as playwright:
             'document.documentElement.classList.contains("kg-practice-guest-first-paint")'
         )
         assert not authenticated_page.locator("#practiceEmpty").is_visible()
-        assert authenticated_page.locator(".practice-setup-card").is_visible()
+        # 大厅改版后配置 UI 为头部题量/顺序下拉 + 底部操作栏
+        assert authenticated_page.locator(".practice-config-dropdown").first.is_visible()
+        assert authenticated_page.locator(".practice-action-bar").is_visible()
     finally:
         authenticated.close()
         browser.close()
