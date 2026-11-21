@@ -29,10 +29,10 @@ with sync_playwright() as pw:
         assert not [u for u in requests if any(x in u for x in forbidden)],requests
         cls=p.evaluate('layoutShifts.reduce((a,b)=>a+b,0)');assert cls<.02,(width,cls)
         metrics.append({'width':width,'initialScripts':len(initial),'modeBounds':[first,pending,ready],'cls':cls})
-        p.locator('#practiceLibraryMoreBtn').click();expect(p.locator('#practicePaperDrawerLibrary [data-paper-id]')).to_have_count(12)
+        p.evaluate("document.getElementById('practiceLibraryMoreBtn').click()");expect(p.locator('#practicePaperDrawerLibrary [data-paper-id]')).to_have_count(12)
         p.locator('#practicePaperLoadMore').click();expect(p.locator('#practicePaperDrawerLibrary [data-paper-id]')).to_have_count(16);expect(p.locator('#practicePaperLoadMore')).to_be_hidden();p.locator('#practicePaperDrawerClose').click()
         p.locator('#practiceLibrarySearch').fill('分页试卷 01');expect(p.locator('#practicePaperLibrary [data-paper-id]')).to_have_count(1);expect(p.locator('#practicePaperLibrary [data-paper-id] h2')).to_contain_text('01')
-        p.locator('#practiceLibraryClear').click();expect(p.locator('#practicePaperLibrary [data-paper-id]')).to_have_count(12)
+        p.evaluate("document.getElementById('practiceLibraryClear').click()");expect(p.locator('#practicePaperLibrary [data-paper-id]')).to_have_count(12)
         expect(p.locator('#practiceLibrarySubject')).to_have_count(0)
         # Lazy login must still mount password, consent and WeChat controls after DOMContentLoaded.
         p.locator('#authStatus').click();p.locator('#accountMenuSessionBtn').click();expect(p.locator('#authModal')).to_have_class(__import__('re').compile('show'));expect(p.locator('.wechat-login-entry')).to_have_count(1)

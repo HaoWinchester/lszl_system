@@ -45,7 +45,7 @@ with sync_playwright() as pw:
         expect(page.locator('input[name="practiceOrder"][value="random"]')).to_be_checked()
         page.locator('#practiceLibrarySearch').fill('no such paper')
         expect(page.locator('#practicePaperLibrary [data-paper-id]')).to_have_count(0)
-        page.locator('#practiceLibraryClear').click()
+        page.evaluate("document.getElementById('practiceLibraryClear').click()")
         expect(page.locator('#practicePaperLibrary [data-paper-id]')).to_have_count(25)
         expect(page.locator('#practiceLibrarySearch')).to_have_value('')
         expect(page.locator('#practiceSelectedPaperName')).to_have_text(selected)

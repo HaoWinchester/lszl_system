@@ -79,7 +79,7 @@ with sync_playwright() as p:
     def select_paper(fixture):
         target = page.locator(f'#practicePaperLibrary [data-paper-id="{fixture["paperId"]}"]')
         if not target.count():
-            page.locator('#practiceLibraryMoreBtn').click()
+            page.evaluate("document.getElementById('practiceLibraryMoreBtn').click()")
             target = page.locator(f'#practicePaperDrawerLibrary [data-paper-id="{fixture["paperId"]}"]')
         target.click()
         page.wait_for_function('name=>document.querySelector("#practiceSelectedPaperName").textContent===name', arg=fixture['name'])

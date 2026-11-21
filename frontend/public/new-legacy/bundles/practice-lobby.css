@@ -6486,6 +6486,9 @@ body.practice-mode-page[data-practice-view="lobby"] #practiceLobby>.practice-emp
   .practice-tabs-heading{margin:0 0 6px;font-size:14px}
   #practiceLobby .practice-library-shelf{margin-bottom:12px}
 }
+
+/* 设计定稿：试卷库工具行移除「清除筛选」「更多 →」按钮（功能保留，搜索框清空/筛选 tab 即等效操作） */
+#practiceLobby #practiceLibraryClear,#practiceLobby #practiceLibraryMoreBtn{display:none!important}
 /* style: styles/question-comments.css */
 /* 单题留言 + 弹幕（119-question-comments.js）。
  * 配色对齐做题页 focus-vega 皮肤：白卡片、zinc 中性色、紫色主色（--learn-*，带回退值）。

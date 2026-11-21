@@ -1050,3 +1050,6 @@ body.practice-mode-page[data-practice-view="lobby"] #practiceLobby>.practice-emp
   .practice-tabs-heading{margin:0 0 6px;font-size:14px}
   #practiceLobby .practice-library-shelf{margin-bottom:12px}
 }
+
+/* 设计定稿：试卷库工具行移除「清除筛选」「更多 →」按钮（功能保留，搜索框清空/筛选 tab 即等效操作） */
+#practiceLobby #practiceLibraryClear,#practiceLobby #practiceLibraryMoreBtn{display:none!important}

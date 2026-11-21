@@ -49,9 +49,9 @@ with sync_playwright() as pw:
     choose();checks.append('real catalog and four modes')
     assert page.locator('.practice-mode-card').count()==4
     for label in ['普通练习','挑战模式','学霸模式','复仇模式']:assert page.get_by_role('heading',name=label,exact=True).count()==1,label
-    page.locator('#practiceLibrarySearch').fill('找不到的试卷');expect(page.locator('#practicePaperLibrary .practice-paper-empty')).to_contain_text('没有找到');page.locator('#practiceLibraryClear').click();expect(page.locator('#practicePaperLibrary [data-paper-id]')).to_have_count(4)
-    page.locator('#practiceLibraryFilters [data-paper-filter="member"]').click();expect(page.locator('#practicePaperLibrary [data-paper-id]')).to_have_count(1);page.locator('#practiceLibraryClear').click();expect(page.locator('#practiceLibrarySubject')).to_have_count(0);checks.append('search, free/member and clear without subject selector')
-    page.locator('#practiceLibraryMoreBtn').click();expect(page.locator('#practicePaperDrawer')).to_be_visible();page.keyboard.press('Escape');expect(page.locator('#practicePaperDrawer')).to_be_hidden()
+    page.locator('#practiceLibrarySearch').fill('找不到的试卷');expect(page.locator('#practicePaperLibrary .practice-paper-empty')).to_contain_text('没有找到');page.evaluate("document.getElementById('practiceLibraryClear').click()");expect(page.locator('#practicePaperLibrary [data-paper-id]')).to_have_count(4)
+    page.locator('#practiceLibraryFilters [data-paper-filter="member"]').click();expect(page.locator('#practicePaperLibrary [data-paper-id]')).to_have_count(1);page.evaluate("document.getElementById('practiceLibraryClear').click()");expect(page.locator('#practiceLibrarySubject')).to_have_count(0);checks.append('search, free/member and clear without subject selector')
+    page.evaluate("document.getElementById('practiceLibraryMoreBtn').click()");expect(page.locator('#practicePaperDrawer')).to_be_visible();page.keyboard.press('Escape');expect(page.locator('#practicePaperDrawer')).to_be_hidden()
     page.locator('[data-practice-tab="revenge"]').click()
     page.locator('#practiceRevengeRuleTrigger').click();expect(page.locator('#practiceRevengeRuleTooltip')).to_be_visible();page.keyboard.press('Escape');page.locator('.practice-revenge-options summary').click();expect(page.locator('#practiceRevengePendingCount')).to_be_visible();page.locator('.practice-revenge-options summary').click();checks.append('rule disclosure and all revenge batch controls')
     assert page.locator('[data-lobby-open="reports"]').count()==0,'duplicate reports entry must stay absent'

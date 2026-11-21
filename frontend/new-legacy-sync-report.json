@@ -5,7 +5,11 @@
   "changes": {
     "added": [],
     "changed": [
-      "src/practice/lobby-actions-controller.js"
+      "src/practice/lobby-actions-controller.js",
+      "tests/practice-catalog-search-browser.py",
+      "tests/practice-demand-loading-browser.py",
+      "tests/practice-history-reentry-live-browser.py",
+      "tests/practice-lobby-design-browser.py"
     ],
     "removed": []
   },

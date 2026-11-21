@@ -93,6 +93,9 @@
     const startButton=document.querySelector('[data-practice-start="practice"]');
     const freshButton=document.querySelector('[data-practice-new="practice"]');
     if(!startButton||startButton.disabled)return;
+    // 当前题量对该试卷不可用（如默认 10 题但试卷只有 2 题）时，自动切到“全部”再开始。
+    const checkedCount=document.querySelector('[name="practiceCount"]:checked');
+    if(checkedCount&&checkedCount.disabled)document.querySelector('[name="practiceCount"][value="all"]')?.click();
     const confirmDialog=global.KGDialogs?.confirm;
     if(freshButton&&!freshButton.hidden&&typeof confirmDialog==='function'){
       const match=/(\d+)\s*\/\s*(\d+)/.exec(startButton.textContent||'');
