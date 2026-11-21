@@ -828,7 +828,7 @@ body.practice-mode-page[data-practice-view="lobby"] #practiceLobby{min-height:0;
    ===================================================================== */
 .practice-legacy-shell{display:none!important}
 /* 大厅改用蓝调 accent（仅 lobby 视图生效，进入答题视图后恢复紫色皮肤） */
-body.practice-mode-page[data-practice-view="lobby"]{
+body.practice-mode-page[data-learning-skin][data-practice-view="lobby"]{
   --practice-accent:#2563eb;
   --practice-accent-soft:#eef4ff;
 }
@@ -875,14 +875,23 @@ body.practice-mode-page[data-practice-view="lobby"] .practice-lobby-sidebar{disp
 /* —— 练习模式 tab 条 —— */
 .practice-mode-tabs-card{margin:0 0 20px}
 .practice-tabs-heading{margin:0 0 10px;font-size:15px;font-weight:700;color:#172033}
-.practice-mode-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid #e6eaf2;border-radius:12px;background:#fff;overflow:hidden;box-shadow:0 6px 18px rgba(15,23,42,.04)}
+.practice-mode-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid #e6eaf2;border-radius:12px;background:#fff;box-shadow:0 6px 18px rgba(15,23,42,.04)}
+.practice-mode-tab:first-child{border-radius:11px 0 0 11px}
+.practice-mode-tab:last-child{border-radius:0 11px 11px 0}
 .practice-mode-tab{position:relative;display:flex;align-items:center;gap:10px;min-height:64px;padding:12px 16px;border:0;background:transparent;text-align:left;transition:background .15s ease}
 .practice-mode-tab+.practice-mode-tab::before{content:"";position:absolute;left:0;top:12px;bottom:12px;width:1px;background:#eef1f6}
 .practice-mode-tab:hover{background:#f8fafd}
 .practice-mode-tab.is-active{background:#eef4ff}
 .practice-mode-tab.is-active::after{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;background:#2563eb}
 .practice-mode-tab:focus-visible{outline:2px solid rgba(37,99,235,.4);outline-offset:-2px}
+.practice-mode-tab-iconwrap{position:relative;display:grid;place-items:center;width:30px;height:30px;flex-shrink:0}
+.practice-mode-tab-iconwrap .practice-mode-tab-icon{width:30px;height:30px}
 .practice-mode-tab-icon{display:grid;place-items:center;width:30px;height:30px;flex-shrink:0;border-radius:9px;background:#f1f5fb;color:#64748b}
+.practice-mode-help-tip{position:absolute;z-index:72;top:calc(100% + 12px);left:-6px;width:250px;padding:12px 13px;border:1px solid #dfe6f0;border-radius:10px;background:#fff;box-shadow:0 14px 36px rgba(15,23,42,.16);color:#526078;font-size:12px;font-weight:400;line-height:1.65;text-align:left;white-space:normal;opacity:0;visibility:hidden;transform:translateY(4px);transition:opacity .15s ease,transform .15s ease,visibility .15s ease;pointer-events:none;cursor:default}
+.practice-mode-help-tip strong{display:block;margin-bottom:4px;color:#28314a;font-size:12px;font-weight:700}
+.practice-mode-tab-iconwrap:hover .practice-mode-help-tip,.practice-mode-tab-iconwrap:focus-within .practice-mode-help-tip{opacity:1;visibility:visible;transform:none}
+.practice-mode-tab:nth-last-child(-n+2) .practice-mode-help-tip{left:auto;right:-6px}
+@media(max-width:900px){.practice-mode-tab:nth-last-child(-n+2) .practice-mode-help-tip{left:-6px;right:auto}}
 .practice-mode-tab.is-active .practice-mode-tab-icon{background:#dbeafe;color:#1d4ed8}
 .practice-mode-tab-text{display:grid;gap:2px;min-width:0}
 .practice-mode-tab-text strong{font-size:14px;font-weight:700;color:#172033;white-space:nowrap}
@@ -910,7 +919,7 @@ body.practice-mode-page[data-practice-view="lobby"] .practice-lobby-sidebar{disp
 /* —— 试卷库：标题 + 搜索一行，下划线筛选 tab，网格卡片 —— */
 #practiceLobby .practice-library-shelf{padding:18px 20px 20px;border-radius:12px;background:#fff;box-shadow:none;margin-bottom:18px}
 #practiceLobby .practice-library-toolbar{flex-wrap:nowrap;margin-bottom:12px}
-#practiceLobby .practice-library-title strong{font-size:17px}
+#practiceLobby .practice-library-title strong{font-size:20px}
 #practiceLobby .practice-catalog-search{flex:0 1 300px;margin-left:auto;padding:0;justify-content:flex-end}
 #practiceLobby .practice-catalog-search label{position:relative;flex:1;min-width:0}
 #practiceLobby .practice-catalog-search label::before{content:"";position:absolute;left:10px;top:50%;width:14px;height:14px;transform:translateY(-50%);background:no-repeat center/contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E");pointer-events:none}
@@ -945,8 +954,11 @@ body.practice-mode-page[data-practice-view="lobby"] .practice-lobby-sidebar{disp
 #practiceLobby .practice-paper-thumb{margin:0}
 #practiceLobby .practice-paper-thumb-card{aspect-ratio:16/9}
 #practiceLobby .practice-paper-thumb-letter{font-size:34px}
-#practiceLobby .practice-paper-card-head{order:1;display:flex;align-items:center;gap:8px;margin:12px 0 0;padding:0}
-#practiceLobby .practice-paper-card h2{order:2;display:-webkit-box;min-height:0;margin:8px 0 4px;font-size:14px;line-height:1.4;letter-spacing:-.01em;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+#practiceLobby .practice-paper-card-head{order:1;display:none;margin:0;padding:0}
+#practiceLobby .practice-paper-card-head .practice-paper-subject{display:none}
+#practiceLobby .practice-paper-card h2{order:1;display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:0;margin:12px 0 4px;font-size:14px;line-height:1.4;letter-spacing:-.01em}
+#practiceLobby .practice-paper-card h2 .practice-paper-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#practiceLobby .practice-paper-card h2 .practice-paper-free,#practiceLobby .practice-paper-card h2 .practice-vip-badge{flex-shrink:0}
 #practiceLobby .practice-paper-card p:not(.practice-paper-coverage){order:3;display:-webkit-box;min-height:34px;margin:0;color:#8a94a6;font-size:12px;line-height:1.5;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 #practiceLobby .practice-paper-progress{order:4;height:5px;margin:10px 0 6px;background:#edf0f5;border-radius:99px;overflow:hidden}
 #practiceLobby .practice-paper-progress>span{display:block;height:100%;width:var(--paper-progress,0%);border-radius:inherit;background:#2563eb}
@@ -969,6 +981,7 @@ body.practice-mode-page[data-practice-view="lobby"] .practice-lobby-sidebar{disp
 .practice-action-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-shrink:0}
 .practice-action-mode{display:flex;align-items:center;gap:10px}
 .practice-action-mode[hidden]{display:none!important}
+#practiceLobby .practice-action-mode .practice-start-btn::after{content:" →";font-weight:700}
 #practiceLobby .practice-action-mode .practice-start-btn{grid-column:auto;height:46px;min-width:170px;padding:0 26px;border:0;border-radius:11px;background:#2563eb;color:#fff;font-size:15px;font-weight:700;box-shadow:0 8px 20px rgba(37,99,235,.24);white-space:nowrap}
 #practiceLobby .practice-action-mode .practice-start-btn:hover:not(:disabled){background:#1d4ed8;filter:none}
 #practiceLobby .practice-action-mode .practice-start-btn:disabled{opacity:.42;cursor:not-allowed;box-shadow:none}
@@ -1013,4 +1026,24 @@ body.practice-mode-page[data-practice-view="lobby"] .practice-lobby-sidebar{disp
 
 /* 大厅滚动容器改为纵向 flex：内容不足一屏时底部操作栏仍贴底 */
 body.practice-mode-page[data-practice-view="lobby"] #practiceLobby{display:flex;flex-direction:column;align-items:stretch}
+body.practice-mode-page[data-practice-view="lobby"] #practiceLobby>*{flex-shrink:0}
+body.practice-mode-page[data-practice-view="lobby"] #practiceLobby .practice-library-shelf{overflow:visible}
 body.practice-mode-page[data-practice-view="lobby"] #practiceLobby>.practice-empty{margin-top:auto}
+
+/* 矮视口（<850px 高）紧凑化：尽量保持大厅一屏不滚 */
+@media(min-width:1181px) and (max-height:850px){
+  #practiceLobby .practice-lobby-head{margin:0 0 12px}
+  #practiceLobby .practice-lobby-head h1{font-size:30px}
+  .practice-mode-tabs-card{margin:0 0 12px}
+  .practice-mode-tab{min-height:56px;padding:10px 14px}
+  #practiceLobby .practice-library-shelf{padding:13px 18px 15px}
+  #practiceLobby .practice-library-toolbar{margin-bottom:10px}
+  #practiceLobby .practice-paper-grid{margin-top:10px;gap:12px}
+  .practice-action-bar{padding:10px 16px}
+  #practiceLobby .practice-action-mode .practice-start-btn{height:42px}
+}
+@media(min-width:1181px) and (max-height:800px){
+  #practiceLobby .practice-lobby-head h1{font-size:28px}
+  .practice-tabs-heading{margin:0 0 6px;font-size:14px}
+  #practiceLobby .practice-library-shelf{margin-bottom:12px}
+}
