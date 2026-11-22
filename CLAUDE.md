@@ -58,21 +58,24 @@ users / role_themes / system_settings(KV) / user_admin_logs / folders / graph_fi
 - 角色：`admin`/`teacher`/`student`/`viewer`（权限矩阵在 `core/permissions.py`）。
 - 订阅只对 `student` 生效；admin/teacher 绕过；viewer/guest 不进订阅。套餐：`free/monthly/quarterly/half_year/lifetime`。
 
-## 验证
+## 验证（按改动范围，不搞全套）
 
 - 后端：`cd backend && .venv/bin/python -m pytest tests/ -q`。
 - 前端同步/发布契约：`cd frontend && pnpm test`。
 - 定向设计契约：`cd frontend && pnpm test:design`；涉及特定域时再运行相应专项契约和浏览器测试。
-- 发布候选：必须经过 `manage-new-legacy.js update` 内置的文件数量、关键页面、API 和视觉校验后才能 promote。
+- **验证范围跟改动走**：纯前端内容改动（样式、单页布局、文案）只需在浏览器里验证改动涉及的页面；**全套测试（pnpm test / pytest）和浏览器逐页遍历只在这些情况跑**——后端功能变更、跨页面行为变更（认证/权限/导航等）、或用户明确要求。不要每次发布前都跑全套，那曾把一次发布拖到半小时。
+- 发布候选：`manage-new-legacy.js update --skip-browser` 内置候选 site 与 manifest 一致性校验；promote 后按发布纪律做秒级防回退核对即可。
 
 ## 发布与验证纪律（事故教训，强制执行）
 
 后端实际 serve 的是 **active release**（`frontend/new-legacy-releases/<version>/site`，由 `current.json` 指定），**不是** sync 产物（`frontend/public/new-legacy/`），**也不是**源（`new-legacy/`）。三者内容可能脱节。以下纪律是用两次生产事故换来的，必须遵守：
 
-### 1. 发布前硬校验，防内容回退
-- 发布前**必须**核对：`find <待发布 site> -type f | wc -l` 与当前 active release site 文件数对齐；抽查关键页面（如 v9 的 `admin-console.html`）存在。
+### 1. 发布就是快路径：直接更新，不做多余检查（2026-11-22 用户定规）
+- **前端内容发布的标准动作**：bump `new-legacy/VERSION` → `node frontend/scripts/manage-new-legacy.js update new-legacy --skip-browser`（实测约 1~2 秒：sync + 重建 site + promote）→ `cd frontend && pnpm sync:new-legacy` 生成 sync 产物 → 秒级防回退核对（见下）→ 提交发布产物 → 推送。
+- **发布前后不要跑全套测试或浏览器遍历**：完整检查（pytest 全量、pnpm test 全量、validate 完整验收、agent-browser 逐页）只用于后端功能变更和跨页面行为变更，且属于开发期验证，不是发布门槛。纯前端内容改动在开发期验证过改动页面即可直接发布。
+- 发布后防回退核对（秒级，必须做）：`find <新 site> -type f | wc -l` 与上一版 active release 对齐；抽查关键页面（如 `admin-console.html`、`practice-mode.html`）存在；必要时 grep 确认本次改动进入了 site。
 - **版本号"最新" ≠ 内容最新**：版本号只是标识，内容取决于 source。源（`new-legacy/`）可能比 active release 旧。
-- 文件数对不上**绝对不发**。改源后正式发布走 `node frontend/scripts/manage-new-legacy.js update new-legacy --skip-browser`（内部 sync + 重建 site + promote），不要手 cp 覆盖 release site。
+- 文件数对不上**绝对不发**。不要手 cp 覆盖 release site。
 
 ### 2. 跨页面 bug 必须遍历验证，防漏页
 - 改认证/登录/权限/导航等跨页面逻辑，**必须遍历所有相关页**验证：用 agent-browser 循环每页（`hasAuthModal` / `authOpen` / 点登录 / 点退出），不能只在顺手测过的页面通过就宣布完成。
