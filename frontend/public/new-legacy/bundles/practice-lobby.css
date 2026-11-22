@@ -6455,7 +6455,7 @@ body.practice-mode-page[data-practice-view="lobby"] .practice-lobby-sidebar{disp
   .practice-mode-tab+.practice-mode-tab::before{display:none}
   .practice-mode-tab:nth-child(n+3){border-top:1px solid #eef1f6}
   #practiceLobby .practice-paper-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .practice-action-bar{flex-direction:column;align-items:stretch;gap:12px}
+  .practice-action-bar{position:static;flex-direction:column;align-items:stretch;gap:12px}
   .practice-action-summary{flex-wrap:wrap;gap:10px}
   .practice-action-config{flex-basis:100%;white-space:normal}
   .practice-action-actions{justify-content:stretch}

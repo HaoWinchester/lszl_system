@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "version": "v9.0-p4.1.462",
+  "version": "v9.0-p4.1.463",
   "bridgeVersion": 2,
   "sourceFiles": {
     "ACTIVITY_SCHEMA_V1.md": "5b42cb917237d6a6eb4e7438ac491543a653918fb172d49e3a2a05b1d98c20b9",
@@ -160,7 +160,7 @@
     "V9.0_P4.1_DATA_INTEGRITY.json": "65a6d63dfac46ce58dfc27d34bbcecad45a019302c419e7967f2e1ed46ead3f4",
     "V9.0_P4.1_HELP_FEEDBACK_MESSAGES_REPORT.md": "edfc028219fece4c0e4893f868470f1f00f8836bce74ec6de3acbc54f3fcc5cd",
     "V9.0_P4.1_QUICK_START.md": "1316de5b831a2109176f627b3e7bbaf1bb030c14f3ae93ba8945b4a83deb864c",
-    "VERSION": "6734de4a8391762c3f79747d99feb882faa7060584db0770765cc9a820608032",
+    "VERSION": "2a0bc199a8e2eb9b067b639bbbaf7bcb03851201a33fcc528ce24e3293c7e553",
     "admin-console.html": "d959ba1e42f3688eac52b30bb967f52a799a0caa587e8200c463cfe3851e471a",
     "admin-operations.html": "eea16b42dced31be60c5732b2ad16dce5677e7fe24d0579a7d50d76a650ddb43",
     "admin-settings.html": "bfa50b466b40c2cc540a575d330b0e742e39b042a5ce564ef29a76fcacc1ec65",
@@ -688,7 +688,7 @@
     "styles/main.css": "2d4d230920de631747ef408aed54dafaf0ffd521ed0aab3c5c7c848f90ffaabe",
     "styles/membership-ui.css": "d9426dc3ccd5b622392f0b3e7d7be09de28a38a396972240bdedd6e811643843",
     "styles/paper-management.css": "27b28d2710b71f1622edf09fd6aaf043e94f88eacedb0efbf739f60b3a141b9d",
-    "styles/practice-mode.css": "95375353b05ab5e7e8beb5df6225f5eaea74ca356aae10c1e357b07a834319f1",
+    "styles/practice-mode.css": "48777db2aedf3685d1263333d14170aa13e547759d07f7b1ca422eba75d304a3",
     "styles/progress-workspace-dock.css": "63cbcb3db9d758f3f8e8429f1361ef16b765923e3e2aad0fe97b65b80bf084f9",
     "styles/question-bank-admin.css": "a99fdd0a5b181509a1fa78bfefcc0226feee8242413aa6284a275cbd952a26e8",
     "styles/question-classification.css": "6ac95554381e3b2ed0721f9113d4c15203b9380080f5c2a1671f27cf0758bef1",
