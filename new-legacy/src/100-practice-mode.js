@@ -200,7 +200,10 @@
   function coverageText(release){
     if(!hasAuthenticatedUser())return '登录后查看已练进度';
     const coverage=paperCoverage(release);
-    return coverage?`当前版本：已练 ${coverage.completedCount} / ${coverage.totalCount} 题 · 未练 ${coverage.remainingUnseen} 题`:'覆盖进度暂不可用';
+    if(coverage)return `当前版本：已练 ${coverage.completedCount} / ${coverage.totalCount} 题 · 未练 ${coverage.remainingUnseen} 题`;
+    // 无覆盖数据时回退为旧 footer 信息（题数 · 版本 · 访问状态）
+    const count=Number(release.questionCount||release.totalCount||0),vip=release.accessPolicy?.accessLevel==='member',access=paperAccess(release);
+    return `${count} 题 · v${Number(release.version||0)} · ${vip?(access.allowed?'VIP 已解锁':'会员专属'):'直接练习'}`;
   }
   function renderCoverage(){
     const release=selectedRelease(),summary=$('practiceCoverageSummary');
