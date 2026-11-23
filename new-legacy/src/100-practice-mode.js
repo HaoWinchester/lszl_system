@@ -1535,7 +1535,10 @@
   function paperThumbMarkup(row){
     const subject=escapeHTML(row.subject||'综合');
     const name=text(row.name||'');
-    const letter=(name.match(/[A-Za-z]/)?.[0]||name.charAt(0)||'卷').toUpperCase();
+    // 封面取"有意义的首字"：去掉 PMP 品牌前缀与日期数字后取首个可见字符（如「PMP 12月新题·图表判读专题卷」→「新」），
+    // 名字中的拉丁字母（如「模拟卷A」的 A）仍优先作为封面字。
+    const stripped=name.replace(/^PMP[\s®]*/i,'').replace(/^[\d\s年月]+(?=[一-龥A-Za-z])/,'');
+    const letter=(stripped.match(/[A-Za-z]/)?.[0]||stripped.charAt(0)||name.charAt(0)||'卷').toUpperCase();
     return '<span class="practice-paper-thumb" aria-hidden="true"><span class="practice-paper-thumb-card"><span class="practice-paper-thumb-brand">'+subject+'</span><span class="practice-paper-thumb-body"><span class="practice-paper-thumb-letter">'+escapeHTML(letter)+'</span><span class="practice-paper-thumb-dots"></span></span></span></span>';
   }
   function paperCardMarkup(row){

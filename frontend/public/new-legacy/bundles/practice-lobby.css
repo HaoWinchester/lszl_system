@@ -6496,8 +6496,8 @@ body.practice-mode-page[data-practice-view="lobby"] #practiceLobby>.practice-emp
   #practiceLobby .practice-library-shelf{margin-bottom:12px}
 }
 
-/* 设计定稿：试卷库工具行移除「清除筛选」「更多 →」按钮（功能保留，搜索框清空/筛选 tab 即等效操作） */
-#practiceLobby #practiceLibraryClear,#practiceLobby #practiceLibraryMoreBtn{display:none!important}
+/* 清除筛选按钮保留隐藏（清空搜索框等效）；「更多 →」必须保留——它是大厅查看第一页之外试卷的唯一翻页入口 */
+#practiceLobby #practiceLibraryClear{display:none!important}
 
 /* —— 复仇模式语义：不限试卷 —— */
 .practice-revenge-pool{display:none;align-items:baseline;gap:6px;color:#9f1239;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
