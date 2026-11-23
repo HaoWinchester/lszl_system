@@ -1,12 +1,11 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.465",
-  "toVersion": "v9.0-p4.1.466",
+  "fromVersion": "v9.0-p4.1.468",
+  "toVersion": "v9.0-p4.1.469",
   "changes": {
     "added": [],
     "changed": [
       "VERSION",
-      "src/100-practice-mode.js",
       "styles/practice-mode.css"
     ],
     "removed": []
