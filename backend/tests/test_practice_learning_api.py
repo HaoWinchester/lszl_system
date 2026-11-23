@@ -537,11 +537,47 @@ def test_practice_mistake_remediation_and_verification_are_database_backed() -> 
     assert row["questionSnapshot"]["id"] == source["question"]["id"]
 
 
+def test_practice_mistake_detail_returns_full_options_without_answers() -> None:
+    username = _name("mistake_detail_owner")
+    _create_student(username)
+    source = _create_public_question(title="错题详情接口", taxonomy_id="taxonomy-pmp", node_id="scope-baseline")
+    client = TestClient(app)
+    _login(client, username)
+    created = client.post(
+        "/api/v1/learning/practice/mistakes",
+        json={
+            "questionId": source["question"]["id"],
+            "bankId": source["bankId"],
+            "releaseId": "",
+            "selectedAnswer": "B",
+        },
+    )
+    assert created.status_code == 200, created.text
+    mistake_id = created.json()["mistake"]["id"]
+
+    detail = client.get(f"/api/v1/learning/practice/mistakes/{mistake_id}")
+    assert detail.status_code == 200, detail.text
+    snapshot = detail.json()["mistake"]["questionSnapshot"]
+    assert snapshot["id"] == source["question"]["id"]
+    assert [option["id"] for option in snapshot["options"]] == ["A", "B"]
+    assert all("correct" not in option for option in snapshot["options"])
+    assert "correctAnswer" not in snapshot
+    assert "analysis" not in snapshot
+
+    listed = client.get("/api/v1/learning/practice/overview").json()["revengeCandidates"][0]["questionSnapshot"]
+    assert listed["options"] == []
+
+    other = TestClient(app)
+    _login(other, "admin", "jbgsnmm~123")
+    assert other.get(f"/api/v1/learning/practice/mistakes/{mistake_id}").status_code == 404
+
+
 def test_practice_mistake_routes_require_authentication() -> None:
     client = TestClient(app)
     assert client.get("/api/v1/learning/practice/overview").status_code == 401
     assert client.post("/api/v1/learning/practice/mistakes", json={}).status_code == 401
     assert client.post("/api/v1/learning/practice/answers", json={}).status_code == 401
+    assert client.get("/api/v1/learning/practice/mistakes/anything").status_code == 401
 
 
 def test_published_learning_mode_uses_supported_surface_and_falls_back_safely() -> None:

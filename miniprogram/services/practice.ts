@@ -193,6 +193,11 @@ export async function getReport(sessionId: string): Promise<PracticeReport> {
   return payload.report || {};
 }
 
+export async function getMistakeDetail(mistakeId: string): Promise<any> {
+  const payload = await request<{ mistake: any }>({ path: `${ROOT}/mistakes/${encodeURIComponent(mistakeId)}` });
+  return payload.mistake;
+}
+
 export async function submitRevengeAnswer(mistakeId: string, answer: Record<string, unknown>): Promise<any> {
   const key = String(answer.requestId || `revenge:${mistakeId}`);
   const payload = await request<{ mistake: any }>({

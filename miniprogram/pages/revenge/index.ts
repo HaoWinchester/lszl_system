@@ -9,8 +9,8 @@ import { classifyFailure, createSyncCoordinator } from '../../domain/sync-coordi
 import type { SyncJob } from '../../domain/sync-coordinator';
 import { messageOf } from '../../services/http';
 import {
+  getMistakeDetail,
   getOverview,
-  getRevengeSummary,
   getRemediation,
   getVerificationCandidate,
   markRemediationReviewed,
@@ -75,7 +75,8 @@ Page(withAppearance(withAppShare({
   async loadQueue() {
     this.setData({ loading: true, busy: false, loadError: '', writeError: '', selectedIds: [], selectedPairs:{},matchingComplete:false, feedback: '' });
     try {
-      const [overview, summary] = await Promise.all([getOverview(), getRevengeSummary()]);
+      const overview = await getOverview();
+      const stats = overview.revengeStats || {};
       const candidates = Array.isArray(overview.revengeCandidates) ? overview.revengeCandidates : [];
       let skipped = 0;
       for (const candidate of candidates) {
@@ -89,7 +90,7 @@ Page(withAppearance(withAppShare({
           this.setData({
             loading: false,
             empty: false,
-            stats: summary.stats || {},
+            stats,
             queueCount: candidates.length - skipped,
             stage: 'verification',
             candidate,
@@ -102,26 +103,29 @@ Page(withAppearance(withAppShare({
         }
         if (candidate.status === 'needs_remediation') {
           const mistake = await getRemediation(String(candidate.mistakeId || candidate.id || ''));
-          this.setData({ loading: false, empty: false, stats: summary.stats || {}, queueCount: candidates.length - skipped,
+          this.setData({ loading: false, empty: false, stats, queueCount: candidates.length - skipped,
             stage: 'remediation', candidate, mistake, question: normalizeQuestion(mistake.questionSnapshot || {}),
             selectedPairs:mistake.selectedPairs||{}, previousAnswer: previousAnswer(mistake) || previousAnswer(candidate), feedback: '继续上次未完成的纠错。' });
           return;
         }
+        // overview 只带摘要快照（options 为空），重答阶段按 mistakeId 另取完整题目。
+        const mistakeId = String(candidate.mistakeId || candidate.id || '');
+        const detail = await getMistakeDetail(mistakeId);
         this.setData({
           loading: false,
           empty: false,
-          stats: summary.stats || {},
+          stats,
           queueCount: candidates.length - skipped,
           stage: 'answer',
           candidate,
           mistake: candidate,
-          question: normalizeQuestion(candidate.questionSnapshot || {}),
+          question: normalizeQuestion(detail?.questionSnapshot || candidate.questionSnapshot || {}),
           previousAnswer: previousAnswer(candidate),
         });
         return;
       }
-      const waitingCount = skipped + Number(summary.stats?.verificationWaiting || 0);
-      this.setData({ loading: false, empty: true, stats: summary.stats || {}, queueCount: 0, waitingCount,
+      const waitingCount = skipped + Number(stats.verificationWaiting || 0);
+      this.setData({ loading: false, empty: true, stats, queueCount: 0, waitingCount,
         emptyTitle: waitingCount ? '本轮复习已完成' : '暂无待处理错题',
         emptyCopy: waitingCount ? `还有 ${waitingCount} 道题等待复习时间或验证题，学习记录已保留。` : '继续练习后，需要重做的错题会出现在这里。' });
     } catch (error) {

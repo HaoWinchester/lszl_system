@@ -15,7 +15,7 @@ test('resumed matching remediation retains pair labels and the material snapshot
  const {pairLabel}=await import('../domain/pc-practice.ts');
  const question={...q,material:{id:'m',title:'案例',text:'共同材料',revision:1,images:[]}};
  const mistake={id:'m1',status:'needs_remediation',questionSnapshot:question,selectedPairs:{l1:'r1',l2:'r2'},selectedAnswers:[{selectedPairs:{l1:'r1',l2:'r2'}}]};
- const {page}=await loadPage('revenge',{getOverview:async()=>({revengeCandidates:[mistake]}),getRevengeSummary:async()=>({candidates:[mistake],stats:{}}),getRemediation:async()=>mistake,normalizeQuestion,pairLabel,messageOf:error=>error.message});
+ const {page}=await loadPage('revenge',{getOverview:async()=>({revengeStats:{},revengeCandidates:[mistake]}),getRemediation:async()=>mistake,normalizeQuestion,pairLabel,messageOf:error=>error.message});
  await page.loadQueue();
  assert.equal(page.data.stage,'remediation');assert.deepEqual(page.data.selectedPairs,mistake.selectedPairs);assert.ok(page.data.previousAnswer.includes('甲'));assert.ok(!page.data.previousAnswer.includes('[object Object]'));assert.equal(page.data.question.material.text,'共同材料');
 });

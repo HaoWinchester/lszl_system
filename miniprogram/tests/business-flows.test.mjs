@@ -376,14 +376,23 @@ test('scholar result uses remaining life rather than exam pass percentage', asyn
 
 test('revenge restores unfinished remediation without asking the original question again', async () => {
   const candidate = { id: 'm1', status: 'needs_remediation' };
-  const { page } = await loadPage('revenge', { normalizeQuestion: value => value, getOverview: async () => ({ revengeCandidates: [candidate] }),
-    getRevengeSummary: async () => ({ stats: {} }), getRemediation: async () => ({ ...candidate, selectedAnswers: ['B'], questionSnapshot: { correctAnswer: 'A' } }), messageOf: e => e.message });
+  const { page } = await loadPage('revenge', { normalizeQuestion: value => value, getOverview: async () => ({ revengeStats: {}, revengeCandidates: [candidate] }),
+    getRemediation: async () => ({ ...candidate, selectedAnswers: ['B'], questionSnapshot: { correctAnswer: 'A' } }), messageOf: e => e.message });
   await page.loadQueue(); assert.equal(page.data.stage, 'remediation'); assert.equal(page.data.question.correctAnswer, 'A');
 });
 
+test('revenge answer stage fetches the full question instead of the overview summary', async () => {
+  const candidate = { id: 'm1', mistakeId: 'm1', status: 'pending', questionSnapshot: { id: 'q1', type: 'single_choice', stem: '摘要', options: [] } };
+  const { page } = await loadPage('revenge', { normalizeQuestion: value => value, getOverview: async () => ({ revengeStats: { pending: 1 }, revengeCandidates: [candidate] }),
+    getMistakeDetail: async mistakeId => { assert.equal(mistakeId, 'm1'); return { id: 'm1', questionSnapshot: { id: 'q1', type: 'single_choice', stem: '完整题干', options: [{ id: 'A', text: '甲' }, { id: 'B', text: '乙' }] } }; }, messageOf: e => e.message });
+  await page.loadQueue();
+  assert.equal(page.data.stage, 'answer'); assert.equal(page.data.queueCount, 1);
+  assert.equal(page.data.question.options.length, 2); assert.equal(page.data.question.stem, '完整题干');
+});
+
 test('revenge waiting for verification is not presented as no mistakes', async () => {
-  const { page } = await loadPage('revenge', { getOverview: async () => ({ revengeCandidates: [{ id: 'm1', status: 'needs_remediation', remediationReviewedAt: 'today' }] }),
-    getRevengeSummary: async () => ({ stats: { verificationWaiting: 2 } }), getVerificationCandidate: async () => ({ available: false }), messageOf: e => e.message });
+  const { page } = await loadPage('revenge', { getOverview: async () => ({ revengeStats: { verificationWaiting: 2 }, revengeCandidates: [{ id: 'm1', status: 'needs_remediation', remediationReviewedAt: 'today' }] }),
+    getVerificationCandidate: async () => ({ available: false }), messageOf: e => e.message });
   await page.loadQueue(); assert.equal(page.data.empty, true); assert.equal(page.data.waitingCount, 3);
   assert.equal(page.data.emptyTitle, '本轮复习已完成');
 });

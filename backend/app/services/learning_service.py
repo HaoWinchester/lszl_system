@@ -1413,6 +1413,15 @@ async def record_revenge_answer(
     return mistake
 
 
+async def get_practice_mistake_detail(db: AsyncSession, owner: str, mistake_id: str) -> dict | None:
+    """按 mistakeId 提供完整题目：overview 列表只带摘要，作答页需另行取全量快照。"""
+
+    mistake = await _practice_mistake(db, owner, mistake_id)
+    if mistake is None:
+        return None
+    return _practice_mistake_to_dict(mistake, reveal_answer=False)
+
+
 async def get_remediation(db: AsyncSession, owner: str, mistake_id: str) -> dict | None:
     mistake = await _practice_mistake(db, owner, mistake_id)
     if mistake is None:
