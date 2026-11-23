@@ -1531,6 +1531,8 @@
     dom.paperMeta.textContent=release.subject+' · v'+release.version+' · 可练习 '+count+' 题 · '+(release.accessPolicy?.accessLevel==='member'?(access.allowed?'VIP 已解锁':'VIP 会员专属'):'免费');
   }
   function vipBadge(){return '<span class="practice-vip-badge"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 6 4.3 4.1L12 4l4.7 6.1L21 6l-2 12H5L3 6Zm4.1 9h9.8l.8-4.8-1.4 1.3L12 6l-4.3 5.5-1.4-1.3.8 4.8Z"/></svg>会员</span>'}
+  function mustDoBadge(){return '<span class="practice-paper-must" aria-label="必做试卷">必做</span>'}
+  function isMustDoPaper(name){return /新题型|12月|模拟卷/.test(text(name))}
   // 试卷卡缩略图：学科小标 + 名称首字母 + 装饰点阵，模拟试卷封面样式。
   function paperThumbMarkup(row){
     const subject=escapeHTML(row.subject||'综合');
@@ -1542,9 +1544,9 @@
     return '<span class="practice-paper-thumb" aria-hidden="true"><span class="practice-paper-thumb-card"><span class="practice-paper-thumb-brand">'+subject+'</span><span class="practice-paper-thumb-body"><span class="practice-paper-thumb-letter">'+escapeHTML(letter)+'</span><span class="practice-paper-thumb-dots"></span></span></span></span>';
   }
   function paperCardMarkup(row){
-    const access=paperAccess(row),vip=row.accessPolicy?.accessLevel==='member',selected=row.id===state.selectedPaperId,count=Number(row.questionCount||row.totalCount||0);
+    const access=paperAccess(row),vip=row.accessPolicy?.accessLevel==='member',selected=row.id===state.selectedPaperId,count=Number(row.questionCount||row.totalCount||0),mustDo=isMustDoPaper(row.name);
     const coverage=paperCoverage(row),ratio=coverage?.totalCount>0?Math.max(0,Math.min(100,Number(coverage.completedCount)/Number(coverage.totalCount)*100))||0:0;
-    return `<button type="button" class="practice-paper-card ${selected?'is-selected':''} ${!access.allowed?'is-locked':''}" data-paper-id="${escapeHTML(row.id)}" aria-pressed="${selected}">${paperThumbMarkup(row)}<div class="practice-paper-card-head"><span class="practice-paper-subject">${escapeHTML(row.subject||'综合')}</span></div><h2><span class="practice-paper-name">${escapeHTML(row.name)}${global.KGPaperPresentation?.isRecentPublication(row)?'<span class="practice-paper-latest" aria-label="三天内发布的最新试卷">最新</span>':''}</span>${vip?vipBadge():'<span class="practice-paper-free">免费</span>'}</h2><p>${escapeHTML(row.description||'已发布练习试卷')}</p><div class="practice-paper-progress" style="--paper-progress:${ratio}%" aria-hidden="true"><span></span></div><p class="practice-paper-coverage">${escapeHTML(coverageText(row))}</p><div class="practice-paper-footer"><span>${count} 题 · v${Number(row.version||0)}</span><span class="practice-paper-access">${vip?(access.allowed?'VIP 已解锁':'会员专属'):'直接练习'}</span></div></button>`;
+    return `<button type="button" class="practice-paper-card ${selected?'is-selected':''} ${!access.allowed?'is-locked':''} ${mustDo?'has-must':''}" data-paper-id="${escapeHTML(row.id)}" aria-pressed="${selected}">${paperThumbMarkup(row)}<div class="practice-paper-card-head"><span class="practice-paper-subject">${escapeHTML(row.subject||'综合')}</span></div><h2><span class="practice-paper-name">${escapeHTML(row.name)}${global.KGPaperPresentation?.isRecentPublication(row)?'<span class="practice-paper-latest" aria-label="三天内发布的最新试卷">最新</span>':''}</span>${mustDo?mustDoBadge():''}${vip?vipBadge():'<span class="practice-paper-free">免费</span>'}</h2><p>${escapeHTML(row.description||'已发布练习试卷')}</p><div class="practice-paper-progress" style="--paper-progress:${ratio}%" aria-hidden="true"><span></span></div><p class="practice-paper-coverage">${escapeHTML(coverageText(row))}</p><div class="practice-paper-footer"><span>${count} 题 · v${Number(row.version||0)}</span><span class="practice-paper-access">${vip?(access.allowed?'VIP 已解锁':'会员专属'):'直接练习'}</span></div></button>`;
   }
   function syncSelectedPaperCards(){
     document.querySelectorAll('[data-paper-id]').forEach(button=>{const selected=button.dataset.paperId===state.selectedPaperId;button.classList.toggle('is-selected',selected);button.setAttribute('aria-pressed',String(selected))});
