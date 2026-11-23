@@ -1398,8 +1398,8 @@
         setView('game');renderQuestion();if(state.mode==='scholar')startTimer();return true;
       }catch(error){
         restoreFocus=true;
-        const errorCode=error?.detail?.code;
-        showToast(error.practiceMessage||(errorCode==='NO_REVENGE_QUESTIONS'?'当前没有可用的全局复仇错题。':errorCode==='REVENGE_SNAPSHOT_UNAVAILABLE'?'历史错题内容暂不可用，可先使用其他练习模式。':'试题读取失败，请稍后重试。'));
+        const errorCode=error?.detail?.code,backendMessage=error?.detail&&typeof error.detail==='object'?String(error.detail.message||''):'';
+        showToast(error.practiceMessage||(errorCode==='NO_REVENGE_QUESTIONS'?'当前没有可用的全局复仇错题。':errorCode==='REVENGE_SNAPSHOT_UNAVAILABLE'?'历史错题内容暂不可用，可先使用其他练习模式。':backendMessage||'试题读取失败，请稍后重试。'));
         return false;
       }
     },beginEntry,endEntry);

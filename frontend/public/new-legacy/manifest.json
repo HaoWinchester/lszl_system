@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "version": "v9.0-p4.1.470",
+  "version": "v9.0-p4.1.471",
   "bridgeVersion": 2,
   "sourceFiles": {
     "ACTIVITY_SCHEMA_V1.md": "5b42cb917237d6a6eb4e7438ac491543a653918fb172d49e3a2a05b1d98c20b9",
@@ -160,7 +160,7 @@
     "V9.0_P4.1_DATA_INTEGRITY.json": "65a6d63dfac46ce58dfc27d34bbcecad45a019302c419e7967f2e1ed46ead3f4",
     "V9.0_P4.1_HELP_FEEDBACK_MESSAGES_REPORT.md": "edfc028219fece4c0e4893f868470f1f00f8836bce74ec6de3acbc54f3fcc5cd",
     "V9.0_P4.1_QUICK_START.md": "1316de5b831a2109176f627b3e7bbaf1bb030c14f3ae93ba8945b4a83deb864c",
-    "VERSION": "c4b53580a39437625baf37415672e9bdd55b9d58229bb14792dde0e6bb9a2320",
+    "VERSION": "95a4d09e155f0b42b02c86e751f0bf9ae981863075ab6a85c06e6cf80318fb4e",
     "admin-console.html": "d959ba1e42f3688eac52b30bb967f52a799a0caa587e8200c463cfe3851e471a",
     "admin-operations.html": "eea16b42dced31be60c5732b2ad16dce5677e7fe24d0579a7d50d76a650ddb43",
     "admin-settings.html": "bfa50b466b40c2cc540a575d330b0e742e39b042a5ce564ef29a76fcacc1ec65",
@@ -357,7 +357,7 @@
     "src/01-runtime-config.js": "e06eda6fd661a8234a501d9547439770687b064320a64d5b8d4a6f44e7950b75",
     "src/09-graph-connector-drag-controller.js": "eaeec70d8e7dec7e2b26f06fea4bec51d8d0793978183ec598f3cfac47f6009a",
     "src/10-graph-editor.js": "97bd288be0719e82356198509629b7506a20da32007d590d4d3837c947053492",
-    "src/100-practice-mode.js": "40301e3af4889e0b0d4e2d678dce54dbb62f5d89208c5548bb8ee6eb04718f26",
+    "src/100-practice-mode.js": "9c3a985bfd7c326a691bdd1497b7fff97f53aba5785d2758aa9af09f85145b8f",
     "src/101-engagement-repository.js": "6a56dbc185b477c3d2739267f202b3a12d03928d3c15132c31c5e94c937989a3",
     "src/102-help-content.js": "b2d741c600fde33a4bb0bb8ca2cfd396f73a19b8ea7292315e60375d8fc12524",
     "src/103-support-center.js": "b851c7edbc33908d350b99ad80942ef8d1e5987f967c81a759a0a18a88b73884",
