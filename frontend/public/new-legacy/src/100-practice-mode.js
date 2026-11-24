@@ -1571,13 +1571,29 @@
     return rows.filter(row=>(!needle||[row.name,row.description,row.subject].map(text).join(' ').toLowerCase().includes(needle))
       &&(!subject||row.subject===subject)&&(access==='all'||row.accessPolicy?.accessLevel===access));
   }
-  let catalogSearchTimer=0;
+  let catalogSearchTimer=0,catalogAppendBusy=false;
   async function queryPaperCatalog({append=false}={}){
     global.clearTimeout(catalogSearchTimer);
     const api=global.KGPaperReleaseApi;if(!api?.queryCatalog){renderPaperLibrary();return}
     const page=api.catalogPage();
     try{await api.queryCatalog({page:append?page.page+1:1,pageSize:12,search:state.librarySearch,access:state.libraryFilter,append})}
     catch(error){showToast('试卷读取失败，请重试。');}
+  }
+  async function loadNextCatalogPage(){
+    const page=global.KGPaperReleaseApi?.catalogPage?.();
+    if(catalogAppendBusy||!page?.hasMore)return;
+    catalogAppendBusy=true;
+    const auto=$('practicePaperAutoLoad');
+    if(auto&&!auto.hidden)auto.textContent='正在加载更多试卷…';
+    try{await queryPaperCatalog({append:true})}
+    finally{catalogAppendBusy=false;renderPaperLibrary();if(auto){catalogAutoLoadObserver?.unobserve(auto);catalogAutoLoadObserver?.observe(auto)}}
+  }
+  let catalogAutoLoadObserver=null;
+  function setupPaperAutoLoad(){
+    const auto=$('practicePaperAutoLoad');
+    if(!auto||catalogAutoLoadObserver)return;
+    catalogAutoLoadObserver=new global.IntersectionObserver(entries=>{for(const entry of entries)if(entry.isIntersecting)void loadNextCatalogPage()},{rootMargin:'260px 0px'});
+    catalogAutoLoadObserver.observe(auto);
   }
   function renderPaperLibrary(){
     const page=global.KGPaperReleaseApi?.catalogPage?.();
@@ -1591,8 +1607,14 @@
     if(dom.paperLibrary){dom.paperLibrary.innerHTML=rows.length?rows.map(paperCardMarkup).join(''):empty;bindPaperCards(dom.paperLibrary)}
     if(dom.paperDrawerLibrary&&!dom.paperDrawer?.hidden){dom.paperDrawerLibrary.innerHTML=rows.length?rows.map(paperCardMarkup).join(''):empty;bindPaperCards(dom.paperDrawerLibrary,{closeDrawer:true})}
     const more=$('practicePaperLoadMore');if(more){more.hidden=!page?.hasMore;more.disabled=status==='loading';more.textContent=status==='loading'?'正在读取…':'加载更多试卷'}
+    const auto=$('practicePaperAutoLoad');
+    if(auto){
+      if(status==='error'||!rows.length){auto.hidden=true}
+      else if(page?.hasMore){auto.hidden=false;auto.textContent=catalogAppendBusy?'正在加载更多试卷…':'向上滑动加载更多'}
+      else{auto.hidden=false;auto.textContent=`已加载全部 ${page?.total??rows.length} 份试卷`}
+    }
     for(const root of [dom.paperLibrary,dom.paperDrawerLibrary])root?.querySelector('[data-retry-paper-catalog]')?.addEventListener('click',()=>{void global.KGPaperReleaseApi.reload().catch(()=>{});});
-    if(dom.librarySummary)dom.librarySummary.textContent=status==='loading'?'正在读取试卷…':status==='error'?'试卷读取失败':rows.length?`${page?.total??rows.length} 份可选试卷 · 横向滚动查看更多`:'当前筛选下暂无试卷';
+    if(dom.librarySummary)dom.librarySummary.textContent=status==='loading'?'正在读取试卷…':status==='error'?'试卷读取失败':rows.length?`${page?.total??rows.length} 份可选试卷 · 滑动到底自动加载`:'当前筛选下暂无试卷';
     if(dom.paperDrawerSummary)dom.paperDrawerSummary.textContent=status==='loading'?'正在读取试卷…':status==='error'?'试卷读取失败':rows.length?`已载入 ${rows.length} / ${page?.total??rows.length} 份已发布试卷`:'当前筛选下暂无试卷';
   }
   function syncLobby(){
@@ -1699,6 +1721,7 @@
     dom.librarySearch?.addEventListener('input',()=>{state.librarySearch=dom.librarySearch.value;global.clearTimeout(catalogSearchTimer);catalogSearchTimer=global.setTimeout(()=>queryPaperCatalog(),180)});
     dom.libraryClear?.addEventListener('click',()=>{state.librarySearch='';state.libraryFilter='all';if(dom.librarySearch)dom.librarySearch.value='';void queryPaperCatalog()});
     $('practicePaperLoadMore')?.addEventListener('click',()=>queryPaperCatalog({append:true}));
+    setupPaperAutoLoad();
     dom.libraryMoreBtn?.addEventListener('click',openPaperDrawer);dom.paperDrawerClose?.addEventListener('click',closePaperDrawer);
     dom.historyOpenBtn?.addEventListener('click',openHistoryDrawer);dom.historyCloseBtn?.addEventListener('click',closeHistoryDrawer);dom.clearHistoryBtn?.addEventListener('click',clearHistory);dom.historyMore?.addEventListener('click',()=>{if(!state.historyController)void renderHistory()});
     document.querySelectorAll('[data-favorites-kind]').forEach(button=>button.addEventListener('click',()=>{favoritesKind=button.dataset.favoritesKind;document.querySelectorAll('[data-favorites-kind]').forEach(tab=>tab.setAttribute('aria-pressed',String(tab===button)));renderFavorites()}));
