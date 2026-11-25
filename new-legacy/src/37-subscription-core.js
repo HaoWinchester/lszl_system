@@ -83,6 +83,7 @@
   function enabledPlanList(){ return Plans.enabledPlanList(); }
   function expiresAtForPlan(planId,startedAt=Date.now()){ return Plans.expiresAtForPlan(planId,startedAt); }
   function readPlanSettings(){ return Plans.readPlanSettings(); }
+  function remotePlanSettingsReady(){ return Plans.remotePlanSettingsReady(); }
   function savePlanSettings(settings){ return Plans.savePlanSettings(settings); }
   function setPlanSettings(planId,patch={}){ return Plans.setPlanSettings(planId,patch); }
   function resetPlanSettings(planId){ return Plans.resetPlanSettings(planId); }
@@ -540,6 +541,7 @@
     removeOrder,
     orderStatusLabel,
     readPlanSettings,
+    remotePlanSettingsReady,
     savePlanSettings,
     setPlanSettings,
     resetPlanSettings,

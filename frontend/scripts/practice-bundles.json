@@ -39,6 +39,7 @@
         "src/110-learning-loading.js",
         "src/118-revenge-entry-policy.js",
         "src/paper-presentation.js",
+        "src/practice/hall-catalog.js",
         "src/practice/lobby-dashboard.js",
         "src/practice/lobby-actions-controller.js",
         "practice-learning-adapter.js",

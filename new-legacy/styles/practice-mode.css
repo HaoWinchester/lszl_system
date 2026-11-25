@@ -1074,3 +1074,103 @@ body.practice-mode-page[data-practice-view="lobby"] #practiceLobby>.practice-emp
 #practiceLobby.is-revenge-active .practice-library-shelf>*{position:relative;z-index:1;pointer-events:none;user-select:none;filter:grayscale(.4);opacity:.72}
 .practice-revenge-pool-hint{display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;background:#fff3f5;color:#9f1239;font-size:11.5px;font-weight:750;white-space:nowrap}
 #practiceLobby.is-revenge-active .practice-library-shelf::after{z-index:7}
+
+/* —— 做题大厅两栏改版：左栏分类导航（圆环完成度）+ 右栏试卷行列表 —— */
+.practice-hall-layout{display:grid;grid-template-columns:264px minmax(0,1fr);gap:20px;align-items:start}
+.practice-hall-aside{position:sticky;top:24px;display:grid;gap:14px;background:#fff;border:1px solid var(--practice-border);border-radius:20px;padding:18px 16px;box-shadow:0 8px 24px rgba(31,41,55,.05)}
+.practice-hall-product{display:flex;align-items:center;gap:11px}
+.practice-hall-product-mark{width:44px;height:44px;flex-shrink:0;border-radius:14px;overflow:hidden;box-shadow:0 4px 12px rgba(109,40,217,.22)}
+.practice-hall-product-mark svg{width:100%;height:100%;display:block}
+.practice-hall-product strong{display:block;font-size:15px;line-height:1.3}
+.practice-hall-product small{display:block;font-size:11px;color:var(--practice-muted);margin-top:2px}
+.practice-hall-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:12px 8px;border-radius:14px;background:#f7f5fc}
+.practice-hall-stats div{text-align:center}
+.practice-hall-stats strong{display:block;font-size:19px;font-variant-numeric:tabular-nums;color:var(--practice-accent)}
+.practice-hall-stats span{display:block;font-size:10.5px;color:var(--practice-muted);margin-top:3px}
+.practice-hall-cats{display:grid;gap:6px}
+.practice-hall-cat{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:9px;width:100%;padding:9px 10px;border:1px solid transparent;border-radius:13px;background:transparent;text-align:left;cursor:pointer;transition:background .15s ease,border-color .15s ease}
+.practice-hall-cat:hover{background:#f6f4fb}
+.practice-hall-cat.is-active{background:var(--practice-accent-soft);border-color:#e2d6fb}
+.practice-hall-cat-text{min-width:0}
+.practice-hall-cat-text strong{display:block;font-size:13px;color:var(--practice-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.practice-hall-cat-text small{display:block;font-size:11px;color:var(--practice-muted);margin-top:2px}
+.practice-hall-cat.is-active .practice-hall-cat-text small{color:#7c5cd6}
+.practice-hall-cat-arrow{color:#b9b3cc;font-size:16px;line-height:1}
+.practice-hall-cat.is-active .practice-hall-cat-arrow{color:var(--practice-accent)}
+.practice-hall-ring{width:32px;height:32px;transform:rotate(0deg)}
+.practice-hall-ring-bg{fill:none;stroke:#e7e2f3;stroke-width:3.4}
+.practice-hall-ring-fg{fill:none;stroke:var(--practice-accent);stroke-width:3.4;stroke-linecap:round;stroke-dashoffset:0;transition:stroke-dasharray .3s ease}
+.practice-hall-main{min-width:0}
+.practice-hall-head{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+.practice-hall-title-wrap{display:flex;align-items:baseline;gap:10px;min-width:0}
+.practice-hall-title-wrap h2{margin:0;font-size:19px}
+.practice-hall-title-wrap span{font-size:12px;color:var(--practice-muted);white-space:nowrap}
+.practice-hall-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.practice-hall-list{display:grid;gap:10px}
+.practice-hall-row{display:grid;grid-template-columns:minmax(180px,1.6fr) repeat(4,minmax(86px,1fr)) auto;align-items:center;gap:12px;padding:14px 16px;background:#fff;border:1px solid #e6eaf1;border-radius:15px;cursor:pointer;transition:border-color .15s ease,box-shadow .15s ease,transform .15s ease}
+.practice-hall-row:hover{border-color:#c9d4e4;box-shadow:0 6px 16px rgba(15,23,42,.05);transform:translateY(-1px)}
+.practice-hall-row.is-selected{border-color:var(--practice-accent);box-shadow:0 0 0 2px rgba(109,40,217,.1)}
+.practice-hall-row.is-locked{filter:saturate(.85)}
+.practice-hall-row-name{min-width:0}
+.practice-hall-row-name strong{display:inline;font-size:14.5px;line-height:1.4}
+.practice-hall-seq{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;margin-right:8px;border-radius:7px;background:#eef2ff;color:#4f46e5;font-size:11px;font-weight:850;vertical-align:2px}
+.practice-hall-latest{display:inline-flex;align-items:center;height:20px;margin-left:8px;padding:0 8px;border-radius:999px;background:#f2ebff;color:#6d28d9;font-size:10.5px;font-weight:850;vertical-align:2px}
+.practice-hall-badge{display:inline-flex;align-items:center;height:20px;margin-left:6px;padding:0 8px;border-radius:999px;font-size:10.5px;font-weight:850;vertical-align:2px}
+.practice-hall-badge.is-free{background:#e6f6ec;color:#15803d}
+.practice-hall-badge.is-vip{background:#ffe9a8;color:#a06d0b}
+.practice-hall-cell{min-width:0}
+.practice-hall-cell span{display:block;font-size:12.5px;color:#5a6472;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.practice-hall-enter{height:36px;padding:0 16px;border:0;border-radius:11px;background:var(--practice-accent);color:#fff;font-size:13px;font-weight:780;white-space:nowrap;cursor:pointer;transition:filter .15s ease}
+.practice-hall-enter:hover{filter:brightness(1.06)}
+.practice-hall-row.is-locked .practice-hall-enter{background:#ede9fe;color:#7c5cd6}
+.practice-hall-empty{padding:34px 18px;border:1px dashed #d8dfe9;border-radius:15px;background:#fbfcfe;text-align:center;color:var(--practice-muted);font-size:13px}
+@media (max-width:900px){
+  .practice-hall-layout{grid-template-columns:minmax(0,1fr)}
+  .practice-hall-aside{position:static;grid-template-columns:auto minmax(0,1fr);align-items:center}
+  .practice-hall-product{grid-column:1}
+  .practice-hall-stats{grid-column:2;grid-template-columns:repeat(3,1fr);padding:10px 8px}
+  .practice-hall-cats{grid-column:1/-1;grid-template-columns:repeat(2,minmax(0,1fr))}
+  .practice-hall-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px}
+  .practice-hall-row-name{flex:1 1 100%;min-width:0}
+  .practice-hall-cell{flex:0 0 auto}
+  .practice-hall-enter{margin-left:auto}
+}
+/* 旧卡片网格退场：仅保留 DOM 供既有测试与抽屉逻辑使用，视觉上不再展示 */
+.practice-paper-grid-shell[hidden]{display:none!important}
+#practiceLobby .practice-hall-main .practice-paper-grid-shell{display:none}
+
+/* —— 大厅右栏头部：标题 + 搜索 + 筛选 + 更多 收进一行（参考图紧凑布局） —— */
+.practice-hall-head{flex-wrap:nowrap;gap:12px}
+.practice-hall-toolbar{flex-wrap:nowrap;gap:8px;margin-left:auto;flex-shrink:0}
+.practice-hall-head .practice-catalog-search{padding:0;gap:8px}
+.practice-hall-head .practice-catalog-search label{display:block}
+.practice-hall-head .practice-catalog-search label:first-child{flex:0 0 auto;min-width:0}
+.practice-hall-head .practice-catalog-search input{height:34px;min-height:34px;width:218px;padding:0 12px;border-color:#e0e5ee;border-radius:10px;background:#f6f7fa;font-size:12.5px;line-height:34px}
+.practice-hall-head .practice-catalog-search input:focus-visible{outline:2px solid rgba(37,99,235,.3);outline-offset:1px;background:#fff;border-color:#93b4f5}
+.practice-hall-head .practice-library-filters{padding:3px;border-radius:10px}
+.practice-hall-head .practice-library-filters button{height:28px;min-width:0;padding:0 13px;font-size:12px;border-radius:8px}
+.practice-hall-head .practice-library-filters button.is-active{color:var(--practice-accent)}
+.practice-hall-head .practice-more-btn{height:34px}
+.practice-hall-head .practice-secondary-btn{height:34px}
+@media (max-width:1240px){
+  .practice-hall-head{flex-wrap:wrap}
+  .practice-hall-toolbar{flex-wrap:wrap;margin-left:0}
+  .practice-hall-head .practice-catalog-search input{width:180px}
+}
+
+/* —— 学习侧边栏（导航+XP 面板）默认隐藏，按钮点开为左侧抽屉 —— */
+.practice-rail-toggle{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 12px;border:1px solid var(--practice-border);border-radius:10px;background:#fff;color:#566078;font-size:12.5px;font-weight:750;cursor:pointer;flex:0 0 auto;transition:border-color .15s ease,color .15s ease,background .15s ease}
+.practice-rail-toggle:hover{border-color:#c9d4e4;color:#374151}
+.practice-rail-toggle:focus-visible{outline:2px solid rgba(37,99,235,.3);outline-offset:1px}
+.practice-rail-toggle.is-open{color:var(--practice-accent);border-color:#93b4f5;background:#f4f8ff}
+.practice-lobby-head .practice-rail-toggle{align-self:center}
+.practice-lobby-head .practice-lobby-head-title{margin-right:auto}
+.practice-lobby-sidebar{display:none!important}
+body.practice-mode-page[data-practice-view="lobby"] .practice-main{grid-template-columns:minmax(0,1fr)}
+body.practice-mode-page[data-practice-view="lobby"] .practice-lobby-sidebar.is-open{display:flex!important;flex-direction:column;gap:12px;position:fixed;left:12px;top:74px;bottom:12px;z-index:48;width:300px;padding:16px 14px;overflow:auto;overscroll-behavior:contain;background:#fff;border:1px solid var(--practice-border);border-radius:18px;box-shadow:0 22px 48px rgba(15,23,42,.2);animation:practiceRailIn .16s ease}
+body.practice-mode-page[data-practice-view="lobby"] .practice-lobby-sidebar.is-open .practice-sidebar-nav{order:-1;flex-wrap:wrap}
+body.practice-mode-page[data-practice-view="lobby"] .practice-lobby-sidebar.is-open .practice-sidebar-nav::after{display:none}
+@keyframes practiceRailIn{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:none}}
+
+/* —— 右栏只让试卷列表内部滚动，头部固定；行保持紧凑，留白落在列表底部而不是拉伸行高 —— */
+.practice-hall-list{overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding-right:2px;align-content:start}

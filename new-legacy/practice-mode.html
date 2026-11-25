@@ -62,7 +62,7 @@
     </header>
 
     <main class="practice-main">
-      <aside class="practice-lobby-sidebar" aria-label="学习概览">
+      <aside class="practice-lobby-sidebar" id="practiceLobbySidebar" aria-label="学习概览">
       <aside class="practice-exp-panel" id="practiceExpPanel" hidden aria-label="做题学习经验">
         <div class="practice-exp-card">
           <header><h2>本周学习</h2></header>
@@ -76,7 +76,7 @@
           </div>
         </div>
       </aside>
-          <nav class="practice-lobby-head-actions practice-sidebar-nav" aria-label="学习导航">
+          <nav class="practice-lobby-head-actions practice-sidebar-nav" id="practiceSidebarNav" aria-label="学习导航">
             <a class="practice-sidebar-link is-current" href="#practiceLobby"><span data-kg-icon="library" data-kg-icon-size="18" aria-hidden="true"></span>开始练习</a>
             <button type="button" class="practice-utility-btn" id="practiceHistoryOpenBtn" aria-haspopup="dialog" aria-controls="practiceHistoryDrawer">
               <span data-kg-icon="history" data-kg-icon-size="18" aria-hidden="true"></span>
@@ -91,6 +91,7 @@
       <button type="button" class="practice-exp-fab" id="practiceExpFab" hidden aria-expanded="false" aria-controls="practiceExpPanel" aria-label="展开做题经验面板">XP</button>
       <section class="practice-lobby" id="practiceLobby" data-catalog-pending aria-labelledby="practiceLobbyTitle">
         <header class="practice-lobby-head">
+          <button type="button" class="practice-rail-toggle" id="practiceRailToggle" aria-haspopup="true" aria-expanded="false" aria-controls="practiceLobbySidebar"><span data-kg-icon="menu" data-kg-icon-size="15" aria-hidden="true"></span><span>学习面板</span></button>
           <div class="practice-lobby-head-title">
             <h1 id="practiceLobbyTitle">开始练习</h1>
             <p>选择练习模式和试卷，开始答题。</p>
@@ -109,6 +110,21 @@
           </div>
         </header>
         <p class="practice-feedback" id="practiceRetiredModeNotice" role="status" hidden></p>
+
+        <div class="practice-hall-layout">
+          <aside class="practice-hall-aside" id="practiceHallAside" aria-label="试卷分类导航">
+            <div class="practice-hall-product">
+              <span class="practice-hall-product-mark" aria-hidden="true"><svg viewBox="0 0 56 56" fill="none"><defs><linearGradient id="hallProductCap" x1="8" y1="5" x2="46" y2="52" gradientUnits="userSpaceOnUse"><stop stop-color="#65b9ff"/><stop offset="1" stop-color="#4941ff"/></linearGradient></defs><path d="M12 25v15c0 7 32 7 32 0V25" fill="url(#hallProductCap)"/><path d="m5 18 20-10a7 7 0 0 1 6 0l20 10a3 3 0 0 1 0 5L31 33a7 7 0 0 1-6 0L5 23a3 3 0 0 1 0-5Z" fill="url(#hallProductCap)"/><path d="m15 25 10 5a7 7 0 0 0 6 0l10-5M27 17l10 5" stroke="white" stroke-width="2.5" stroke-linecap="round"/></svg></span>
+              <div><strong>知识学习平台</strong><small>做题大厅 · 分类练习</small></div>
+            </div>
+            <div class="practice-hall-stats" aria-label="试卷总览">
+              <div><strong id="practiceHallStatPapers">0</strong><span>套试卷</span></div>
+              <div><strong id="practiceHallStatDone">0</strong><span>已完成</span></div>
+              <div><strong id="practiceHallStatProgress">0%</strong><span>总进度</span></div>
+            </div>
+            <nav class="practice-hall-cats" id="practiceHallCategories" aria-label="试卷分类"></nav>
+          </aside>
+          <div class="practice-hall-content">
 
         <section class="practice-mode-tabs-card" aria-label="练习模式">
           <h2 class="practice-tabs-heading">练习模式</h2>
@@ -130,24 +146,27 @@
           </div>
         </section>
 
-        <section class="practice-library practice-library-shelf" aria-label="快速选择试卷">
-          <div class="practice-library-toolbar">
-            <div class="practice-library-title"><strong>试卷库</strong><span id="practiceLibrarySummary" aria-live="polite">选择最近发布的试卷</span></div>
-            <div class="practice-catalog-search">
-              <label for="practiceLibrarySearch"><span class="practice-visually-hidden">搜索试卷</span><input id="practiceLibrarySearch" type="search" placeholder="搜索试卷名称或关键词" autocomplete="off"/></label>
-              <button type="button" class="practice-secondary-btn" id="practiceLibraryClear" hidden>清除筛选</button>
+        <section class="practice-library practice-library-shelf practice-hall-main" aria-label="按分类选择试卷">
+          <div class="practice-hall-head">
+            <div class="practice-hall-title-wrap">
+              <h2 id="practiceHallCategoryTitle">试卷分类</h2>
+              <span id="practiceHallCategoryCount" aria-live="polite"></span>
+            </div>
+            <div class="practice-hall-toolbar">
+              <div class="practice-catalog-search practice-hall-search">
+                <label for="practiceLibrarySearch"><span class="practice-visually-hidden">搜索试卷</span><input id="practiceLibrarySearch" type="search" placeholder="搜索试卷名称或关键词" autocomplete="off"/></label>
+                <button type="button" class="practice-secondary-btn" id="practiceLibraryClear" hidden>清除筛选</button>
+              </div>
+              <div class="practice-library-filters" id="practiceLibraryFilters" aria-label="筛选试卷">
+                <button type="button" class="is-active" data-paper-filter="all">全部试卷</button>
+                <button type="button" data-paper-filter="free">免费</button>
+                <button type="button" data-paper-filter="member">会员</button>
+              </div>
+              <button type="button" class="practice-more-btn" id="practiceLibraryMoreBtn" aria-haspopup="dialog" aria-controls="practicePaperDrawer">更多 <span aria-hidden="true">→</span></button>
             </div>
           </div>
-          <div class="practice-library-actions">
-            <div class="practice-library-filters" id="practiceLibraryFilters" aria-label="筛选试卷">
-              <button type="button" class="is-active" data-paper-filter="all">全部试卷</button>
-              <button type="button" data-paper-filter="free">免费</button>
-              <button type="button" data-paper-filter="member">会员</button>
-            </div>
-            <button type="button" class="practice-more-btn" id="practiceLibraryMoreBtn" aria-haspopup="dialog" aria-controls="practicePaperDrawer">更多 <span aria-hidden="true">→</span></button>
-          </div>
-
-          <div class="practice-paper-grid-shell"><div class="practice-paper-grid" id="practicePaperLibrary" aria-busy="true"><div class="practice-paper-card practice-paper-empty" role="status">正在读取已发布试卷…</div></div></div>
+          <div class="practice-hall-list" id="practiceHallPaperList" aria-busy="true"><div class="practice-hall-empty" role="status">正在读取已发布试卷…</div></div>
+          <div class="practice-paper-grid-shell" hidden><div class="practice-paper-grid" id="practicePaperLibrary" aria-busy="true"><div class="practice-paper-card practice-paper-empty" role="status">正在读取已发布试卷…</div></div></div>
           <div class="practice-paper-auto-load" id="practicePaperAutoLoad" role="status" hidden></div>
           <select id="practicePaperSelect" hidden aria-hidden="true"></select>
         </section>
@@ -184,6 +203,9 @@
           </div>
         </div>
 
+          </div>
+        </div>
+
         <div class="practice-empty" id="practiceEmpty" hidden>
           <strong>暂时没有可练习的已发布试卷</strong>
           <p>请先让教师在“教师工作台 → 试卷管理”中完成选题并发布。</p>
@@ -198,11 +220,11 @@
                 <fieldset class="practice-choice-group">
                   <legend>练习题量</legend>
                   <div class="practice-count-options" id="practiceCountOptions">
-                    <label><input type="radio" name="practiceCount" value="10" checked/><span>10</span></label>
+                    <label><input type="radio" name="practiceCount" value="10"/><span>10</span></label>
                     <label><input type="radio" name="practiceCount" value="20"/><span>20</span></label>
                     <label><input type="radio" name="practiceCount" value="60"/><span>60</span></label>
                     <label><input type="radio" name="practiceCount" value="180"/><span>180</span></label>
-                    <label class="practice-count-all"><input type="radio" name="practiceCount" value="all"/><span>全部</span></label>
+                    <label class="practice-count-all"><input type="radio" name="practiceCount" value="all" checked/><span>全部</span></label>
                   </div>
                 </fieldset>
                 <details class="practice-lobby-help practice-coverage-help"><summary aria-label="查看普通练习和进度规则">?</summary><div class="practice-help-content"><strong>普通练习规则</strong><p class="practice-selection-notice" id="practiceCoverageSummary" role="status"></p><p>优先练未做题，不足所选题量时用已做题补足；案例题保留完整。全部做过后进入复习。已练不代表掌握，只统计已保存的有效作答。</p></div></details>
@@ -490,6 +512,7 @@
   <script type="application/x-kg-feature" data-practice-feature="answer" src="src/116-practice-session-save.js"></script>
   <script defer src="src/118-revenge-entry-policy.js"></script>
   <script defer src="src/paper-presentation.js"></script>
+  <script defer src="src/practice/hall-catalog.js"></script>
   <script defer src="src/practice/lobby-dashboard.js"></script>
   <script defer src="src/practice/lobby-actions-controller.js"></script>
   <script type="application/x-kg-feature" data-practice-feature="history" src="src/practice/history-controller.js"></script>

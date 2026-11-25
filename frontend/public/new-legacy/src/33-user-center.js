@@ -225,6 +225,9 @@
     const plans=typeof sub.enabledPlanList==="function"?sub.enabledPlanList():[];
     let activeNativeOrder=null;
     let planPickLocked=false;
+    // 后台套餐价异步到达前不渲染内置兜底价：先出占位骨架，kg-subscription-plan-change
+    // 重绘监听到达后再显示真实价，避免"先闪兜底价再跳正确价"。
+    const priceReady=typeof sub.remotePlanSettingsReady==="function"?sub.remotePlanSettingsReady():true;
     function setPlanPickLocked(locked){
       planPickLocked=!!locked;
       body.querySelectorAll('[data-buy-plan]').forEach(button=>{
@@ -248,9 +251,9 @@
             <h3 class="plan-title">${escapeHTML(plan.name||'套餐')}</h3>
             <span class="pill${plan.recommended&&!current?' pill-warning':''}">${plan.recommended&&!current?'<span class="icon i-star"></span>':''}${escapeHTML(current?'当前方案':(plan.badgeText||plan.shortName||'套餐'))}</span>
           </div>
-          <div class="plan-price">
-            <strong>${escapeHTML(plan.priceText||'待配置')}</strong>
-            ${plan.originalPriceText?`<del>${escapeHTML(plan.originalPriceText)}</del>`:''}
+          <div class="plan-price">${plan.id!=="free"&&!priceReady
+            ?'<span class="plan-price-loading" role="status" aria-label="价格加载中"></span>'
+            :`<strong>${escapeHTML(plan.priceText||'待配置')}</strong>${plan.originalPriceText?`<del>${escapeHTML(plan.originalPriceText)}</del>`:''}`}
           </div>
           <p class="plan-desc">${escapeHTML(plan.description||'')}</p>
           <div class="plan-rule"></div>

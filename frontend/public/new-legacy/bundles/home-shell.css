@@ -5223,6 +5223,9 @@ g.is-batch-selected .edge-visible{
 .membership-ui .membership-promo-banner .promo-unit{color:#b5762a;font-size:13px;font-weight:800}
 .membership-ui .membership-promo-banner .promo-colon{margin:0 -1px;color:#f2590a;font-size:18px;font-weight:900;font-style:normal}
 @media(max-width:600px){.membership-ui .membership-promo-banner{flex-wrap:wrap;gap:10px;padding:12px 14px}.membership-ui .membership-promo-banner .promo-title{font-size:18px}.membership-ui .membership-promo-banner .promo-message{flex:1 1 100%;order:3;white-space:normal}.membership-ui .membership-promo-banner .promo-countdown{order:2;margin-left:auto}.membership-ui .membership-promo-banner .promo-num{min-width:28px;font-size:16px;padding:3px 5px}}
+.membership-ui .plan-price-loading{display:inline-block;width:92px;height:24px;border-radius:8px;background:linear-gradient(100deg,#e6eef5 40%,#f6fafd 50%,#e6eef5 60%) 0 0/200% 100%;animation:planPriceShimmer 1.1s linear infinite}
+@keyframes planPriceShimmer{to{background-position:-200% 0}}
+@media(max-width:600px){.membership-ui .plan-price-loading{width:74px;height:20px}}
 /* style: styles/account-menu.css */
 /*
  * C-1.2：右上角账号胶囊与下拉菜单。

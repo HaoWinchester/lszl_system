@@ -358,6 +358,10 @@
       }
       return out;
     }
+    function remotePlanSettingsReady(){
+      const remote=window.KGSubscriptionRemotePlanSettings;
+      return !!(remote && typeof remote==="object" && PLAN_ORDER.some(id=>remote[id] && typeof remote[id]==="object"));
+    }
     function savePlanSettings(settings){
       const out={};
       if(settings && typeof settings === "object"){
@@ -447,6 +451,7 @@
       FEATURE_LABELS,
       LIMIT_LABELS,
       readPlanSettings,
+      remotePlanSettingsReady,
       savePlanSettings,
       setPlanSettings,
       resetPlanSettings,

@@ -15,7 +15,7 @@
   const $=id=>document.getElementById(id);
   const dom={};
   const state={
-    releases:[],selectedPaperId:'',libraryFilter:'all',librarySearch:'',selectedCount:10,revengeSelectedCount:0,order:'paper',mode:'',questions:[],index:0,
+    releases:[],selectedPaperId:'',libraryFilter:'all',librarySearch:'',selectedCount:'all',revengeSelectedCount:0,order:'paper',mode:'',questions:[],index:0,
     health:MAX_HEALTH,streak:0,experience:0,correct:0,answered:0,startedAt:0,endedAt:0,
     locked:false,active:false,completed:false,lastSettings:null,timerId:0,deadline:0,
     feedbackTimer:0,popTimer:0,toastTimer:0,abandonedRecorded:false,catalogAvailable:false,retiredNavigation:null,retiredNoticeShown:false,
@@ -144,7 +144,7 @@
     if(!global.KGPaperReleaseApi?.catalogPage?.()&&!state.releases.some(row=>row.id===state.selectedCatalogEntry?.id))state.selectedCatalogEntry=null;
     return state.releases;
   }
-  function selectedRelease(){if(state.retiredSelectionUnavailable||state.retiredSelectionPending)return null;return state.releases.find(row=>row.id===state.selectedPaperId)||(state.selectedCatalogEntry?.id===state.selectedPaperId?state.selectedCatalogEntry:null)||(state.selectedPaperId?null:state.releases[0]||null)}
+  function selectedRelease(){if(state.retiredSelectionUnavailable||state.retiredSelectionPending)return null;return state.releases.find(row=>row.id===state.selectedPaperId)||(state.selectedCatalogEntry?.id===state.selectedPaperId?state.selectedCatalogEntry:null)||null}
   async function ensureSelectedPaper(paperId,{releaseId='',requireRelease=false}={}){
     const id=text(paperId),owner=global.KGAuthCore?.currentUser?.()?.username||'';
     if(!id)return null;
@@ -438,7 +438,7 @@
     return list;
   }
   function streakBonus(streak){if(streak>=8)return 10;if(streak>=5)return 5;if(streak>=3)return 2;return 0}
-  function accuracy(){return state.answered?Math.round(state.correct/state.answered*100):0}
+  function accuracy(){const total=state.questions.length;return total?Math.round(state.correct/total*100):0}
   function elapsed(){return Math.max(0,(state.endedAt||Date.now())-state.startedAt)}
   function remainingSeconds(){return Math.max(0,Math.ceil((state.deadline-Date.now())/1000))}
   function clearFeedbackTimer(){global.clearTimeout(state.feedbackTimer);state.feedbackTimer=0}
@@ -1206,7 +1206,7 @@
     const stats=state.draft?.stats?.()||{};
     const answers=state.draft?.viewAnswers?.()||{};
     const total=state.questions.length,answered=Number(stats.answered||0),correct=Number(stats.correct||0);
-    const accuracy=answered?Number((correct/answered*100).toFixed(2)):0;
+    const accuracy=total?Number((correct/total*100).toFixed(2)):0;
     const domains={people:{total:0,correct:0},process:{total:0,correct:0},'business-environment':{total:0,correct:0}};
     state.questions.forEach(question=>{
       const facets=question.raw?.metadata?.subjectFacets||question.raw?.metadata?.facets;
@@ -1483,13 +1483,15 @@
       const revenge=button.dataset.practiceStart==='revenge',revengeStats=getMistakeStats(),revengeAvailable=revengeStats.active>0,revengeUnavailable=Number(revengeStats.unavailable||0)>0;
       if(!hasAuthenticatedUser()){
         // 游客+免费体验卷可直接试做：按钮显示普通开始文案；复仇/会员卷仍引导登录。
+        // 未选择试卷时按钮禁用，不引导登录也不显示默认开始文案。
         const guestCanTry=!revenge&&!!release&&access.allowed;
+        if(!release&&!revenge){button.disabled=true;button.classList.remove('is-upgrade');button.textContent='请先选择试卷';return}
         button.disabled=false;button.classList.remove('is-upgrade');
         button.textContent=guestCanTry?(button.dataset.defaultLabel||button.textContent):'登录后'+(revenge?'开始复仇':button.dataset.practiceStart==='practice'?'开始短练':button.dataset.practiceStart==='challenge'?'开始挑战':'进入学霸模式');return
       }
       button.disabled=revenge?!revengeAvailable&&!revengeUnavailable:(catalogStatus()!=='ready'||!release||!firstEnabled);
       button.classList.toggle('is-upgrade',!revenge&&!!release&&!access.allowed);
-      button.textContent=revenge?(revengeAvailable?`开始复仇（${revengeEntry.automatic?'全部 ':''}${revengeEntry.requestCount} 题）`:revengeUnavailable?'检查错题内容':'暂无错题'):( !release?(button.dataset.defaultLabel||button.textContent):(!access.allowed?'开通会员':button.dataset.defaultLabel||button.textContent));
+      button.textContent=revenge?(revengeAvailable?`开始复仇（${revengeEntry.automatic?'全部 ':''}${revengeEntry.requestCount} 题）`:revengeUnavailable?'检查错题内容':'暂无错题'):( !release?'请先选择试卷':(!access.allowed?'开通会员':button.dataset.defaultLabel||button.textContent));
     });
     const ordinary=dom.startButtons.find(button=>button.dataset.practiceStart==='practice');
     if(ordinary&&hasAuthenticatedUser()&&access.allowed){const count=selectedQuestionCount(release);ordinary.textContent=`开始 ${count} 题${count<=20?'短练':'练习'}`}
@@ -1528,7 +1530,7 @@
   function catalogStatus(){return global.KGPaperReleaseApi?.catalogStatus?.()||'ready'}
   function syncPaperMeta(){
     const release=selectedRelease();
-    if(!release){dom.selectedPaperName.textContent='请选择试卷';dom.paperMeta.textContent=catalogStatus()==='loading'?'正在读取已发布试卷…':catalogStatus()==='error'?'试卷读取失败，请重试。':'暂无可用发布试卷。';return}
+    if(!release){dom.selectedPaperName.textContent='未选择试卷';dom.paperMeta.textContent=catalogStatus()==='loading'?'正在读取已发布试卷…':catalogStatus()==='error'?'试卷读取失败，请重试。':'在大厅选择一份试卷后即可开始练习。';return}
     const access=paperAccess(release),count=Number(release.questionCount||release.totalCount||0);
     dom.selectedPaperName.textContent=release.name;
     dom.paperMeta.textContent=release.subject+' · v'+release.version+' · 可练习 '+count+' 题 · '+(release.accessPolicy?.accessLevel==='member'?(access.allowed?'VIP 已解锁':'VIP 会员专属'):'免费');
@@ -1560,7 +1562,7 @@
     const row=state.releases.find(row=>row.id===paperId)|| (state.selectedCatalogEntry?.id===paperId?state.selectedCatalogEntry:null);if(!row)return;
     state.retiredSelectionUnavailable=false;state.selectedCatalogEntry=row;state.selectedPaperId=paperId;
     if(dom.paperSelect)dom.paperSelect.value=paperId;
-    syncSelectedPaperCards();syncCountOptions();syncPaperMeta();renderCoverage();syncResumableButtons();
+    syncSelectedPaperCards();syncCountOptions();syncPaperMeta();renderCoverage();syncResumableButtons();renderHallCatalog(loadReleases());
     if(closeDrawer)closePaperDrawer();
   }
   function bindPaperCards(container,{closeDrawer=false}={}){
@@ -1595,6 +1597,49 @@
     catalogAutoLoadObserver=new global.IntersectionObserver(entries=>{for(const entry of entries)if(entry.isIntersecting)void loadNextCatalogPage()},{rootMargin:'260px 0px'});
     catalogAutoLoadObserver.observe(auto);
   }
+  let hallCatalogEnsuring=false;
+  // 大厅分类需要全量试卷做前端归类；catalog 常态只载入第一页（旧网格靠滚动加载，
+  // 大厅模式下旧网格隐藏导致自动加载不触发），这里在大厅渲染前主动把余页拉满。
+  async function ensureHallCatalogRows(){
+    if(hallCatalogEnsuring)return;
+    const api=global.KGPaperReleaseApi;if(!api?.queryCatalog)return;
+    hallCatalogEnsuring=true;
+    try{
+      for(let guard=0;guard<60;guard+=1){
+        const page=api.catalogPage();
+        if(!page?.hasMore)break;
+        if(text(state.librarySearch).trim()||state.libraryFilter!=='all')break;
+        const ok=await api.queryCatalog({page:page.page+1,pageSize:12,search:state.librarySearch,access:state.libraryFilter,append:true}).catch(()=>false);
+        if(ok===false)break;
+      }
+    }
+    finally{hallCatalogEnsuring=false;renderPaperLibrary()}
+  }
+  // 右栏只有试卷列表内部滚动：列表恒定填满视口剩余空间（扣除底部已选卷条），
+  // 内容少时留白在列表内、页面不出现滚动，内容多时列表内滚。
+  function fitHallList(){
+    const list=$('practiceHallPaperList');
+    if(!list||list.hidden)return;
+    const scroller=list.closest('.practice-lobby');
+    const scrolled=(scroller?scroller.scrollTop:0)+(global.scrollY||0);
+    const top=list.getBoundingClientRect().top+scrolled;
+    const bar=$('practiceActionBar');
+    const barH=bar&&!bar.hidden?bar.offsetHeight:0;
+    const height=Math.max(260,Math.round(global.innerHeight-top-barH-26));
+    list.style.maxHeight=height+'px';
+    list.style.minHeight=height+'px';
+  }
+  function renderHallCatalog(rows){
+    fitHallList();
+    const page=global.KGPaperReleaseApi?.catalogPage?.();
+    const filtering=Boolean(text(state.librarySearch).trim())||state.libraryFilter!=='all';
+    if(!filtering&&page?.hasMore&&!hallCatalogEnsuring)void ensureHallCatalogRows();
+    try{
+      const resolved=rows.map(row=>({...row,coverage:paperCoverage(row)||row.coverage||null}));
+      global.KGPracticeHallCatalog?.render({rows:resolved,allRows:state.releases.map(row=>({...row,coverage:paperCoverage(row)||row.coverage||null})),selectedPaperId:state.selectedPaperId,authenticated:hasAuthenticatedUser(),filtering});
+    }
+    catch(error){/* 大厅改版渲染失败不阻塞旧逻辑 */}
+  }
   function renderPaperLibrary(){
     const page=global.KGPaperReleaseApi?.catalogPage?.();
     const rows=page?state.releases:filterCatalog(state.releases,{search:state.librarySearch,access:state.libraryFilter});
@@ -1609,13 +1654,15 @@
     const more=$('practicePaperLoadMore');if(more){more.hidden=!page?.hasMore;more.disabled=status==='loading';more.textContent=status==='loading'?'正在读取…':'加载更多试卷'}
     const auto=$('practicePaperAutoLoad');
     if(auto){
-      if(status==='error'||!rows.length){auto.hidden=true}
+      // 大厅视图的分类计数由 hall-head 自己显示，旧网格的全量加载提示在这里只会与分类数量冲突。
+      if(document.body.dataset.practiceView==='lobby'||status==='error'||!rows.length){auto.hidden=true}
       else if(page?.hasMore){auto.hidden=false;auto.textContent=catalogAppendBusy?'正在加载更多试卷…':'向上滑动加载更多'}
       else{auto.hidden=false;auto.textContent=`已加载全部 ${page?.total??rows.length} 份试卷`}
     }
     for(const root of [dom.paperLibrary,dom.paperDrawerLibrary])root?.querySelector('[data-retry-paper-catalog]')?.addEventListener('click',()=>{void global.KGPaperReleaseApi.reload().catch(()=>{});});
     if(dom.librarySummary)dom.librarySummary.textContent=status==='loading'?'正在读取试卷…':status==='error'?'试卷读取失败':rows.length?`${page?.total??rows.length} 份可选试卷 · 滑动到底自动加载`:'当前筛选下暂无试卷';
     if(dom.paperDrawerSummary)dom.paperDrawerSummary.textContent=status==='loading'?'正在读取试卷…':status==='error'?'试卷读取失败':rows.length?`已载入 ${rows.length} / ${page?.total??rows.length} 份已发布试卷`:'当前筛选下暂无试卷';
+    if(status!=='loading')renderHallCatalog(rows);
   }
   function syncLobby(){
     // 练习模式不依赖题库目录，试卷数据已包含题目快照
@@ -1632,7 +1679,7 @@
       (!state.retiredNavigation.paperId&&state.retiredNavigation.releaseId&&row.releaseId===state.retiredNavigation.releaseId)
     );
     if(retiredSelection)state.selectedPaperId=retiredSelection.id;
-    else if(!state.retiredSelectionPending&&!state.retiredSelectionUnavailable&&!releases.some(row=>row.id===state.selectedPaperId)&&state.selectedCatalogEntry?.id!==state.selectedPaperId)state.selectedPaperId=releases.find(row=>paperAccess(row).allowed)?.id||releases[0]?.id||'';
+    else if(!state.retiredSelectionPending&&!state.retiredSelectionUnavailable&&!releases.some(row=>row.id===state.selectedPaperId)&&state.selectedCatalogEntry?.id!==state.selectedPaperId)state.selectedPaperId='';
     if(dom.paperSelect){dom.paperSelect.innerHTML=releases.map(row=>'<option value="'+escapeHTML(row.id)+'">'+escapeHTML(row.name)+'</option>').join('');dom.paperSelect.value=state.selectedPaperId}
     const revengeStats=getMistakeStats(),revengeAvailable=revengeStats.active>0||Number(revengeStats.unavailable||0)>0;
     dom.empty.hidden=catalogStatus()!=='ready'||!!releases.length||revengeAvailable;dom.setupCard.hidden=false;dom.modeGrid.hidden=false;
@@ -1720,6 +1767,22 @@
     dom.filterButtons.forEach(button=>button.addEventListener('click',()=>{state.libraryFilter=button.dataset.paperFilter||'all';void queryPaperCatalog()}));
     dom.librarySearch?.addEventListener('input',()=>{state.librarySearch=dom.librarySearch.value;global.clearTimeout(catalogSearchTimer);catalogSearchTimer=global.setTimeout(()=>queryPaperCatalog(),180)});
     dom.libraryClear?.addEventListener('click',()=>{state.librarySearch='';state.libraryFilter='all';if(dom.librarySearch)dom.librarySearch.value='';void queryPaperCatalog()});
+    $('practiceHallCategories')?.addEventListener('click',event=>{const button=event.target.closest('[data-hall-cat]');if(button)global.KGPracticeHallCatalog?.setCategory(button.dataset.hallCat)});
+    const sidebarRail=$('practiceLobbySidebar');
+    const railToggle=$('practiceRailToggle');
+    if(sidebarRail&&railToggle){
+      const setRailOpen=open=>{sidebarRail.classList.toggle('is-open',open);railToggle.classList.toggle('is-open',open);railToggle.setAttribute('aria-expanded',String(open))};
+      railToggle.addEventListener('click',event=>{event.stopPropagation();setRailOpen(!sidebarRail.classList.contains('is-open'))});
+      sidebarRail.querySelectorAll('a,button').forEach(item=>item.addEventListener('click',()=>setRailOpen(false)));
+      document.addEventListener('click',event=>{if(sidebarRail.classList.contains('is-open')&&!sidebarRail.contains(event.target)&&!railToggle.contains(event.target))setRailOpen(false)});
+      document.addEventListener('keydown',event=>{if(event.key==='Escape'&&sidebarRail.classList.contains('is-open'))setRailOpen(false)});
+    }
+    $('practiceHallPaperList')?.addEventListener('click',event=>{
+      const start=event.target.closest('[data-hall-start]');
+      if(start){const paperId=start.dataset.hallStart||'';if(state.selectedPaperId!==paperId)selectPaper(paperId);startPractice('practice');return}
+      const row=event.target.closest('[data-hall-select]');
+      if(row)selectPaper(row.dataset.hallSelect||'');
+    });
     $('practicePaperLoadMore')?.addEventListener('click',()=>queryPaperCatalog({append:true}));
     setupPaperAutoLoad();
     dom.libraryMoreBtn?.addEventListener('click',openPaperDrawer);dom.paperDrawerClose?.addEventListener('click',closePaperDrawer);
@@ -1745,7 +1808,7 @@
       const panel=$('practiceExpPanel');
       if(panel)panel.hidden=!open;
     });
-    global.addEventListener('resize',()=>{if(document.body.dataset.practiceView==='lobby'){positionExperiencePanel();const panel=$('practiceExpPanel');if(panel)panel.hidden=!experienceReady|| (global.matchMedia?.('(max-width:900px)').matches?!document.body.classList.contains('is-exp-panel-open'):false)}});
+    global.addEventListener('resize',()=>{if(document.body.dataset.practiceView==='lobby'){positionExperiencePanel();const panel=$('practiceExpPanel');if(panel)panel.hidden=!experienceReady|| (global.matchMedia?.('(max-width:900px)').matches?!document.body.classList.contains('is-exp-panel-open'):false)};fitHallList()});
     dom.paperDrawer?.addEventListener('click',event=>{if(event.target===dom.paperDrawer)closePaperDrawer()});
     dom.historyDrawer?.addEventListener('click',event=>{if(event.target===dom.historyDrawer)closeHistoryDrawer()});
     dom.countInputs.forEach(input=>input.addEventListener('change',()=>{if(input.checked){state.selectedCount=input.value==='all'?'all':Number(input.value);syncCountOptions();syncResumableButtons()}}));
