@@ -1,14 +1,16 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.472",
-  "toVersion": "v9.0-p4.1.473",
+  "fromVersion": "v9.0-p4.1.474",
+  "toVersion": "v9.0-p4.1.475",
   "changes": {
-    "added": [],
+    "added": [
+      "tests/free-mode-language-explanation.test.js"
+    ],
     "changed": [
       "VERSION",
-      "practice-mode.html",
-      "src/100-practice-mode.js",
-      "styles/practice-mode.css"
+      "src/77-multi-question-workspace.js",
+      "src/86-free-mode-language.js",
+      "src/86-knowledge-recall.js"
     ],
     "removed": []
   },

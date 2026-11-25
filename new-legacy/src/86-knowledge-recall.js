@@ -819,7 +819,7 @@
     const answerId=krCorrectAnswerId();
     const correct=options.find(item=>String(item?.id||'')===answerId)||options.find(item=>item?.correct)||null;
     const displayCorrect=viewOptions.find(item=>String(item.id)===String(answerId))||null;
-    const explicit=String(view.explanation?.zh||question.analysis||question.explanation||question.rationale||question.solution||'').trim();
+    const explicit=String(view.explanation?.zh||global.KGFreeModeLanguage?.stripSourceNotes?.(question.analysis||question.explanation||question.rationale||question.solution)||'').trim();
     const pathText=String(view.path?.zh||question.keyPath?.ruleText||question.keyPath?.label||'').trim();
     const {concepts,clues,traps,clueTitle}=window.KGQuestionAnalysis.sections(question,associationLibrary());
     const sections=[];

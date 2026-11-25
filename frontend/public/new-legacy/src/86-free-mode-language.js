@@ -5,6 +5,17 @@
   const schema=()=>global.KGActivitySchemaV1;
   const clean=value=>String(value??'').trim();
   const clone=value=>{try{return JSON.parse(JSON.stringify(value))}catch(error){return value}};
+  // 题库导入时把溯源链接并入了 analysis；学员端做题只展示解析正文，不展示来源标注。
+  const SOURCE_NOTE_INLINE=/(?:来源|[Ss]ource)[ \t]*[:：][^\n]{0,300}?https?:\/\/[^\s，,。;；)）\]}>"'】]+/g;
+  const SOURCE_NOTE_LINE=/^[ \t]*(?:来源|Source)[ \t]*[:：][^\n]*$/gm;
+  function stripSourceNotes(value){
+    return String(value??'')
+      .replace(SOURCE_NOTE_INLINE,'')
+      .replace(SOURCE_NOTE_LINE,'')
+      .replace(/[ \t]+$/gm,'')
+      .replace(/\n{3,}/g,'\n\n')
+      .trim();
+  }
   function mode(){return schema()?.normalizeStudentLanguageMode?.(schema()?.getLanguageMode?.()||'zh')||'zh'}
   function pair(zh,en){
     const left=clean(zh),right=clean(en);
@@ -48,8 +59,8 @@
     const enTitle=en.title||question.titleEn||question.englishTitle||'';
     const zhStem=stemFrom(zh)||stemFrom(question);
     const enStem=stemFrom(en)||clean(question.stemEn||question.englishStem);
-    const zhExplanation=clean(question.analysis||question.explanation||question.rationale||question.solution||zh.analysis||zh.explanation);
-    const enExplanation=clean(en.analysis||en.explanation||en.rationale||en.solution||question.analysisEn||question.explanationEn);
+    const zhExplanation=stripSourceNotes(question.analysis||question.explanation||question.rationale||question.solution||zh.analysis||zh.explanation);
+    const enExplanation=stripSourceNotes(en.analysis||en.explanation||en.rationale||en.solution||question.analysisEn||question.explanationEn);
     const zhPath=clean(question.keyPath?.ruleText||question.keyPath?.label||zh.keyPath?.ruleText||zh.keyPath?.label);
     const enPath=clean(en.keyPath?.ruleText||en.keyPath?.label||question.keyPath?.ruleTextEn||question.keyPath?.labelEn);
     return {
@@ -107,5 +118,5 @@
     const en=clean(display?.en);
     return display?.hasEnglish&&en?en:'';
   }
-  global.KGFreeModeLanguage=Object.freeze({mode,pair,questionView,recallNodeView,recallQuestionView,englishNodeTitle,displayText,englishLineText});
+  global.KGFreeModeLanguage=Object.freeze({mode,pair,questionView,recallNodeView,recallQuestionView,englishNodeTitle,displayText,englishLineText,stripSourceNotes});
 })(window);

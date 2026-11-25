@@ -247,7 +247,7 @@
       mode:'zh',title:{zh:String(question.title||''),en:'',hasEnglish:false},
       stem:{zh:questionStem(question,''),en:'',hasEnglish:false},
       options:(Array.isArray(question.options)?question.options:[]).map((item,index)=>({id:String(item?.id||String.fromCharCode(65+index)),display:{zh:String(item?.text||''),en:'',hasEnglish:false},original:item})),
-      explanation:{zh:String(question.analysis||question.explanation||''),en:'',hasEnglish:false},
+      explanation:{zh:String(global.KGFreeModeLanguage?.stripSourceNotes?.(question.analysis||question.explanation||'')||question.analysis||question.explanation||''),en:'',hasEnglish:false},
       path:{zh:String(question.keyPath?.ruleText||question.keyPath?.label||''),en:'',hasEnglish:false},hasEnglish:false
     };
   }
@@ -1154,7 +1154,7 @@
     const answerId=correctAnswerId(question)||String(node.correctAnswer||'');
     const correct=options.find(item=>String(item?.id||'')===answerId)||options.find(item=>item?.correct)||null;
     const displayCorrect=view.options.find(item=>String(item.id)===String(answerId))||null;
-    const explicit=String(view.explanation?.zh||question.analysis||question.explanation||question.rationale||question.solution||'').trim();
+    const explicit=String(view.explanation?.zh||global.KGFreeModeLanguage?.stripSourceNotes?.(question.analysis||question.explanation||question.rationale||question.solution)||'').trim();
     const pathText=String(view.path?.zh||question.keyPath?.ruleText||question.keyPath?.label||'').trim();
     const subject=String(question.subject||'PMP');
     const {concepts,clues,traps,clueTitle}=global.KGQuestionAnalysis.sections(question,analysisLibraries.peek(subject));
