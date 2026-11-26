@@ -28,7 +28,9 @@ Page(withAppearance(withAppShare({
 
   onLoad(query: Record<string, string>) {
     const total = Math.max(1, Number(query.count || 1));
-    const values = total <= 5 ? [total] : total < 10 ? [5, total] : [...[5, 10, 20, 60, 180].filter(value => value < total), total];
+    // Backend caps one practice session at 180 questions (INVALID_PRACTICE_COUNT above that).
+    const cap = Math.min(total, 180);
+    const values = total <= 5 ? [total] : total < 10 ? [5, total] : [...[5, 10, 20, 60, 180].filter(value => value < cap), cap];
     const requestedCount = Number(query.practiceCount);
     const quick = query.quick === '1';
     const autoStart = quick || query.short === '1';
@@ -41,7 +43,7 @@ Page(withAppearance(withAppShare({
       countChoices: values.map(value => ({ label: value === total ? `全卷 ${value}` : `${value} 题`, value })),
       quick,
       autoStart,
-      count: quick ? Math.min(5, total) : values.includes(requestedCount) ? requestedCount : total,
+      count: quick ? Math.min(5, total) : values.includes(requestedCount) ? requestedCount : cap,
       mode: (autoStart ? 'normal' : query.mode || 'normal') as PracticeMode,
     });
   },
