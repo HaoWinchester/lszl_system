@@ -1,6 +1,8 @@
 import { reportQuestionContent } from '../../services/question-feedback';
 import { assignPair, pairLabel } from '../../domain/pc-practice';
 import { loadQuestionAsset, removeQuestionAsset } from '../../services/question-assets';
+import { cycleLanguageMode, getLanguageMode, languageLabel, setLanguageMode } from '../../domain/question-language';
+import { sanitizeRichText } from '../../domain/rich-text';
 Component({
   properties: {
     feedbackContext: { type: Object, value: {} },
@@ -13,9 +15,25 @@ Component({
     allowAnalysis: { type: Boolean, value: false },
     compact: { type: Boolean, value: false },
   },
-  data: { feedbackBusy: false, feedbackSent: false, analysisExpanded:false, questionKey:'', caseOpen:true, activeLeft:'', pairRows:[], matchingStatus:'', assetImages:[], assetErrors:[], materialImages:[], displayQuestion: { images: [], options: [] }, displayOptions: [], answerLabel: '', selectedLabel: '', outcome: '' },
+  data: { feedbackBusy: false, feedbackSent: false, analysisExpanded:false, questionKey:'', caseOpen:true, activeLeft:'', pairRows:[], matchingStatus:'', assetImages:[], assetErrors:[], materialImages:[], displayQuestion: { images: [], options: [] }, displayOptions: [], answerLabel: '', selectedLabel: '', outcome: '', languageMode: 'zh', languageLabel: '中', languageHasEnglish: false, stemEnNodes: [], analysisMain: '', analysisEnNote: '' },
   observers: {
     'question, selectedIds, showAnalysis, showResult, selectedPairs'(question: any, selectedIds: string[], showAnalysis: boolean, showResult: boolean, selectedPairs:Record<string,string>) {
+      (this as any).computeView(question, selectedIds, showAnalysis, showResult, selectedPairs);
+    },
+  },
+  lifetimes:{
+    attached() {
+      const mode = getLanguageMode();
+      if (mode !== (this as any).data.languageMode) {
+        (this as any).setData({ languageMode: mode, languageLabel: languageLabel(mode) });
+        const props = (this as any).properties;
+        (this as any).computeView(props.question, props.selectedIds, props.showAnalysis, props.showResult, props.selectedPairs);
+      }
+    },
+    detached(){(this as any)._assetToken=((this as any)._assetToken||0)+1;for(const file of (this as any)._assetFiles||[])removeQuestionAsset(file);},
+  },
+  methods: {
+    computeView(question: any, selectedIds: string[], showAnalysis: boolean, showResult: boolean, selectedPairs:Record<string,string>) {
       const selected = new Set((selectedIds || []).map(String));
       const safeQuestion = question && typeof question === 'object' ? question : { images: [], options: [] };
       const reveal = showAnalysis || showResult;
@@ -23,14 +41,24 @@ Component({
       const correct = new Set(correctIds);
       const pairs=selectedPairs||{}, matching=safeQuestion.type==='matching';
       const changed = this.data.questionKey !== String(safeQuestion.id || '');
+      const useEnglish = this.data.languageMode === 'en';
+      const bilingual = this.data.languageMode === 'bilingual';
+      const analysisEn = String(safeQuestion.analysisEn || '');
       this.setData({
         ...(changed ? { questionKey: String(safeQuestion.id || ''), activeLeft: '', matchingStatus: '', analysisExpanded: false, feedbackSent: false } : {}),
         pairRows:(safeQuestion.matching?.left||[]).map((left:any,index:number)=>({id:left.id,text:left.text,number:index+1,selectedId:pairs[left.id]||'',selectedText:safeQuestion.matching.right.find((r:any)=>r.id===pairs[left.id])?.text||'选择候选答案',correctText:reveal?safeQuestion.matching.right.find((r:any)=>r.id===safeQuestion.matching.correctPairs?.[left.id])?.text:'',verdict:reveal?(pairs[left.id]===safeQuestion.matching.correctPairs?.[left.id]?'correct':'wrong'):''})),
         displayQuestion: { ...safeQuestion, images: safeQuestion.images || [], options: safeQuestion.options || [] },
         displayOptions: (safeQuestion.options || []).map((option: any) => ({
-          ...option, selected: selected.has(String(option.id)),
+          ...option,
+          text: useEnglish ? (option.textEn || option.text) : option.text,
+          textEn: bilingual ? option.textEn : '',
+          selected: selected.has(String(option.id)),
           verdict: !reveal || !correct.size ? '' : correct.has(String(option.id)) ? 'correct' : selected.has(String(option.id)) ? 'wrong' : '',
         })),
+        stemEnNodes: useEnglish ? sanitizeRichText(safeQuestion.stemEn || safeQuestion.stem) : [],
+        analysisMain: useEnglish ? (analysisEn || safeQuestion.analysis || safeQuestion.explanation || '这道题尚未提供解析。') : (safeQuestion.analysis || safeQuestion.explanation || '这道题尚未提供解析。'),
+        analysisEnNote: bilingual ? analysisEn : '',
+        languageHasEnglish: Boolean(safeQuestion.stemEn || analysisEn || (safeQuestion.options || []).some((option: any) => option.textEn)),
         answerLabel: matching?pairLabel(safeQuestion,safeQuestion.matching?.correctPairs):correctIds.join('、') || '请参考解析',
         selectedLabel: matching?pairLabel(safeQuestion,pairs):[...selected].join('、') || '未作答',
         outcome: matching ? !Object.keys(pairs).length ? '本题未作答' : (safeQuestion.matching?.left||[]).every((item:any)=>pairs[item.id]===safeQuestion.matching.correctPairs?.[item.id]) ? '回答正确' : '回答有误' : !correct.size ? '作答已记录' : correct.size === selected.size && [...correct].every(id => selected.has(id)) ? '回答正确' : selected.size ? '回答有误' : '本题未作答',
@@ -38,9 +66,13 @@ Component({
       if (changed) this.triggerEvent('analysischange', {expanded:false, questionId:String(safeQuestion.id || '')});
       this.loadAssets?.(safeQuestion);
     },
-  },
-  lifetimes:{detached(){(this as any)._assetToken=((this as any)._assetToken||0)+1;for(const file of (this as any)._assetFiles||[])removeQuestionAsset(file);}},
-  methods: {
+    onLanguageToggle() {
+      if (!this.data.languageHasEnglish) return;
+      const next = setLanguageMode(cycleLanguageMode(this.data.languageMode));
+      this.setData({ languageMode: next, languageLabel: languageLabel(next) });
+      const props = (this as any).properties;
+      (this as any).computeView(props.question, props.selectedIds, props.showAnalysis, props.showResult, props.selectedPairs);
+    },
     async reportAnalysis() {
       if (this.data.feedbackBusy || this.data.feedbackSent || !this.properties.feedbackContext.questionId) return;
       const questionId = this.properties.feedbackContext.questionId;

@@ -299,10 +299,13 @@ test('ordinary practice display-answer toggle blocks answers but does not mark u
   assert.deepEqual(page.data.selectedIds, ['B']);
 });
 
-test('setup offers PC counts and a short-paper fallback', async () => {
+test('setup offers PC counts, a short-paper fallback, and clamps to the 180-question backend cap', async () => {
   const { page } = await loadPage('practice-setup', { MODE_CHOICES: [] });
-  page.onLoad({ count: '200' }); assert.deepEqual(page.data.countChoices.map(item => item.value), [5, 10, 20, 60, 180]);
-  page.onLoad({ count: '5' }); assert.deepEqual(page.data.countChoices.map(item => item.value), [5]);
+  page.onLoad({ count: '200' }); assert.deepEqual(page.data.countChoices.map(item => item.value), [5, 10, 20, 60, 180]); assert.equal(page.data.count, 180);
+  page.onLoad({ count: '185' }); assert.deepEqual(page.data.countChoices.map(item => item.value), [5, 10, 20, 60, 180]); assert.equal(page.data.count, 180);
+  page.onLoad({ count: '150' }); assert.deepEqual(page.data.countChoices.map(item => item.value), [5, 10, 20, 60, 150]); assert.equal(page.data.count, 150);
+  assert.equal(page.data.countChoices.at(-1).label, '全卷 150');
+  page.onLoad({ count: '5' }); assert.deepEqual(page.data.countChoices.map(item => item.value), [5]); assert.equal(page.data.count, 5);
 });
 
 test('history unfinished filter includes both active and paused sessions', async () => {

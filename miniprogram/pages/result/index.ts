@@ -157,6 +157,7 @@ Page(withAppearance(withAppShare({
       `releaseId=${encodeURIComponent(session.releaseId)}`,
       `title=${encodeURIComponent(String(report.paperName || session.paperName || '新一轮练习'))}`,
       `count=${coverage.totalCount}`,
+      `practiceCount=${this.data.nextCount}`,
       'short=1',
     ].join('&');
     navigation.redirectTo({

@@ -77,10 +77,11 @@ test('lightweight active progress does not erase persisted history duration or e
 test('published translations supply English stems and match options by ID without replacing Chinese', async () => {
   const { normalizeQuestion } = await loadModule('domain/question.ts', { sanitizeRichText }, ['normalizeQuestion']);
   const raw = { stemParts: [{ text: '项目经理下一步应该做什么？' }], options: [{ id: 'A', text: '先沟通' }, { id: 'B', text: '更新计划' }],
-    translations: { en: { stemParts: [{ text: 'What should the project manager do next?' }], options: [{ id: 'B', text: 'B. Update the plan' }, { id: 'A', text: 'A. Communicate first' }] } } };
+    translations: { en: { stemParts: [{ text: 'What should the project manager do next?' }], analysis: 'English analysis', options: [{ id: 'B', text: 'B. Update the plan' }, { id: 'A', text: 'A. Communicate first' }] } } };
   const result = normalizeQuestion(raw);
   assert.equal(result.stem, '项目经理下一步应该做什么？');
   assert.equal(result.stemEn, 'What should the project manager do next?');
+  assert.equal(result.analysisEn, 'English analysis');
   assert.deepEqual(result.options.map(o => o.textEn), ['Communicate first', 'Update the plan']);
   assert.deepEqual(normalizeQuestion(result), result);
   const flat = normalizeQuestion({ ...raw, stemEn: 'Explicit English', options: [{ id: 'A', text: '先沟通', textEn: 'Explicit option' }] });
