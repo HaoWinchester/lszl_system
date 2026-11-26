@@ -9,6 +9,7 @@
         "runtime-config.override.js",
         "auth-session-bootstrap.js",
         "domain-api-client.js",
+        "src/122-stem-table.js",
         "src/28-device-preferences.js",
         "src/feature-assets.js"
       ],

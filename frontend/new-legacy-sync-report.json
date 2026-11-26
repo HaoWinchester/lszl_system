@@ -1,15 +1,22 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.501",
-  "toVersion": "v9.0-p4.1.502",
+  "fromVersion": "v9.0-p4.1.502",
+  "toVersion": "v9.0-p4.1.504",
   "changes": {
-    "added": [],
+    "added": [
+      "src/122-stem-table.js"
+    ],
     "changed": [
       "VERSION",
-      "src/33-user-center.js",
-      "src/37-subscription-core.js",
-      "src/37-subscription-plans.js",
-      "styles/membership-ui.css"
+      "content-prep-studio/dist/content-prep.html",
+      "knowledge-recall.html",
+      "practice-mode.html",
+      "question-workspace.html",
+      "src/100-practice-mode.js",
+      "src/113-practice-result-report.js",
+      "src/119-question-comments.js",
+      "src/77-multi-question-workspace.js",
+      "src/86-knowledge-recall.js"
     ],
     "removed": []
   },

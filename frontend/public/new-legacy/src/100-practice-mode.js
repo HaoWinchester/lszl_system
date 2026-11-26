@@ -42,6 +42,7 @@
     return [rows[index],...rows.slice(0,index),...rows.slice(index+1)];
   }
   function escapeHTML(value){return text(value).replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]))}
+  function stemMarkup(value){return global.KGStemTable?global.KGStemTable.render(value):value}
   function hasAuthenticatedUser(){
     try{return !!global.KGAuthCore?.currentUser?.()}catch(error){return false}
   }
@@ -897,13 +898,13 @@
     if(!modePolicy().showCorrectness){const head=$('practiceExplanationHead'),body=$('practiceExplanationBody');if(head){head.textContent='';head.className='practice-explanation-head';}if(body)body.innerHTML='';dom.feedback.textContent='';}
     const view=questionLanguageView(question);
     if(view){
-      dom.questionStem.innerHTML=escapeHTML(languageText(view.stem))+englishLine(view.stem);
+      dom.questionStem.innerHTML=stemMarkup(escapeHTML(languageText(view.stem)))+englishLine(view.stem);
       dom.options.innerHTML=question.options.map(option=>{
         const display=view.options.find(item=>item.id===option.id)?.display||{zh:option.text,en:''};
         return '<button type="button" class="practice-option" data-option-id="'+escapeHTML(option.id)+'"><span class="practice-option-key">'+escapeHTML(option.id)+'</span><span>'+escapeHTML(languageText(display))+englishLine(display)+'</span></button>';
       }).join('');
     }else{
-      dom.questionStem.textContent=question.stem;
+      dom.questionStem.innerHTML=stemMarkup(escapeHTML(question.stem));
       dom.options.innerHTML=question.options.map(option=>'<button type="button" class="practice-option" data-option-id="'+escapeHTML(option.id)+'"><span class="practice-option-key">'+escapeHTML(option.id)+'</span><span>'+escapeHTML(option.text)+'</span></button>').join('');
     }
     const materialPanel=dom.questionCard.querySelector('.qm-question-materials');

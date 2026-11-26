@@ -131,6 +131,7 @@
   const MANAGER_ROLES = new Set(['admin', 'teacher'])
 
   function text(value) { return String(value == null ? '' : value) }
+  function stemMarkup(value){return global.KGStemTable?global.KGStemTable.render(value):value}
   function escapeHTML(value) {
     return text(value).replace(/[&<>'"]/g, char => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
@@ -1034,7 +1035,8 @@
     if(!focused){
       const question=comment.question || {},article=document.createElement('article')
       article.className='q-favorite-question'
-      article.innerHTML=`<button type="button" data-qc-close-question>关闭题目</button><h2>${escapeHTML(comment.questionTitle)}</h2><p>${escapeHTML(question.stem || (question.stemParts||[]).map(part=>part.text||'').join('') || question.title || '')}</p>${global.KGQuestionMaterials?.render?.(question,{readOnly:true,reveal:true}) || ''}<ol>${(question.options || []).map(option=>`<li>${escapeHTML(option.text || option.content || option)}</li>`).join('')}</ol><p>答案：${escapeHTML((question.correctOptionIds||[]).join('、') || question.correctAnswer || question.answer || '')}</p><p>${escapeHTML(question.analysis || question.explanation || '')}</p>`
+      const stemText=stemMarkup(escapeHTML(question.stem || (question.stemParts||[]).map(part=>part.text||'').join('') || question.title || ''))
+      article.innerHTML=`<button type="button" data-qc-close-question>关闭题目</button><h2>${escapeHTML(comment.questionTitle)}</h2><p>${stemText}</p>${global.KGQuestionMaterials?.render?.(question,{readOnly:true,reveal:true}) || ''}<ol>${(question.options || []).map(option=>`<li>${escapeHTML(option.text || option.content || option)}</li>`).join('')}</ol><p>答案：${escapeHTML((question.correctOptionIds||[]).join('、') || question.correctAnswer || question.answer || '')}</p><p>${escapeHTML(question.analysis || question.explanation || '')}</p>`
       document.body.appendChild(article)
       focused=mountCard({card:article,questionId:comment.questionId})
       article.querySelector('[data-qc-close-question]').onclick=()=>{teardown(focused);article.remove()}

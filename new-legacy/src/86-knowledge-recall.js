@@ -124,6 +124,7 @@
     return false;
   }
   function escapeHTML(s){return String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
+  function stemMarkup(s){return window.KGStemTable?window.KGStemTable.render(s):s}
   function languageMode(){return window.KGFreeModeLanguage?.mode?.()||'zh'}
   function englishLine(display,className='kr-bilingual-en'){
     return languageMode()==='bilingual'&&display?.hasEnglish?`<span class="${escapeHTML(className)}">${escapeHTML(display.en)}</span>`:'';
@@ -611,8 +612,8 @@
       ?`<span class="kr-question-order-badge" title="本试卷第 ${index+1} 题，共 ${total} 题"><b>${index+1}</b><small>/${total}</small></span>`
       :'';
     const stem=(question.stemParts||[]).map((p,i)=>{
-      const text=escapeHTML(p.text||'');
-      if(p.clue&&rootConfig(p.clue))return `<button type="button" class="kr-keyword-token${keywordsRevealed?'':' undiscovered'}${isKeywordActive(p.clue)?' active':''}" data-keyword-id="${escapeHTML(p.clue)}" data-keyword-index="${i}">${text}</button>`;
+      const text=stemMarkup(escapeHTML(p.text||''));
+      if(p.clue&&rootConfig(p.clue))return `<button type="button" class="kr-keyword-token${keywordsRevealed?'':' undiscovered'}${isKeywordActive(p.clue)?' active':''}" data-keyword-id="${escapeHTML(p.clue)}" data-keyword-index="${i}">${escapeHTML(p.text||'')}</button>`;
       return wrapKnownKeywords(text);
     }).join('');
     // P4.5.30：选项结构与多题画布一致（qw-card-options + qw-card-option-key 字母按钮），

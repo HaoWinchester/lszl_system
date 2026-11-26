@@ -231,6 +231,7 @@
       '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
     }[char]));
   }
+  function stemMarkup(value){return global.KGStemTable?global.KGStemTable.render(value):value}
   function notify(message){
     if(typeof showStatus==='function'){showStatus(message);return;}
     const statusEl=document.getElementById('status');
@@ -1249,7 +1250,11 @@
     const orderBadge=orderItem&&Number.isFinite(Number(orderItem.paperIndex))&&orderTotal
       ?'<span class="qw-card-question-order-badge" title="本试卷第 '+(Number(orderItem.paperIndex)+1)+' 题，共 '+orderTotal+' 题"><b>'+(Number(orderItem.paperIndex)+1)+'</b><small>/'+orderTotal+'</small></span>'
       :'';
-    const questionContent='<p class="qw-card-question-stem"><span class="qw-highlight-region" data-highlight-region="stem" data-highlight-language="zh">'+highlightedMarkup(stem,node,'stem')+'</span>'+englishLine(view.stem)+'</p>'
+    // 竖线表格题且该题干暂无划词高亮时用表格渲染（高亮偏移基于纯文本，有高亮则回退纯文本显示）
+    const stemHasTable=global.KGStemTable&&global.KGStemTable.hasTable(stem);
+    const stemHasHighlights=sessionHighlightsForNode(node).some(item=>String(item.region||'')==='stem'&&Number(item.end)>Number(item.start));
+    const stemBody=stemHasTable&&!stemHasHighlights?stemMarkup(escapeHTML(stem)):highlightedMarkup(stem,node,'stem');
+    const questionContent='<p class="qw-card-question-stem"><span class="qw-highlight-region" data-highlight-region="stem" data-highlight-language="zh">'+stemBody+'</span>'+englishLine(view.stem)+'</p>'
       +(question.type==='matching'?'<div data-qw-matching></div><button type="button" data-qw-confirm-matching>确认配对</button>':optionsMarkup)+syncMarkup;
     return '<header class="qw-card-header" data-card-drag-handle>'
       +'<div class="qw-card-heading"><span class="qw-card-icon">题</span>'+orderBadge
