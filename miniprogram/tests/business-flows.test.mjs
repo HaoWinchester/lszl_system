@@ -301,8 +301,8 @@ test('ordinary practice display-answer toggle blocks answers but does not mark u
 
 test('setup offers PC counts and a short-paper fallback', async () => {
   const { page } = await loadPage('practice-setup', { MODE_CHOICES: [] });
-  page.onLoad({ count: '200' }); assert.deepEqual(page.data.countChoices.map(item => item.value), [5, 10, 20, 60, 180]);
-  page.onLoad({ count: '5' }); assert.deepEqual(page.data.countChoices.map(item => item.value), [5]);
+  page.onLoad({ count: '200' }); assert.deepEqual(page.data.countChoices.map(item => item.value), [5, 10, 20, 60, 180, 200]); assert.equal(page.data.count, 200);
+  page.onLoad({ count: '5' }); assert.deepEqual(page.data.countChoices.map(item => item.value), [5]); assert.equal(page.data.count, 5);
 });
 
 test('history unfinished filter includes both active and paused sessions', async () => {

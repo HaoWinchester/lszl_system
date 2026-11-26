@@ -29,7 +29,7 @@ test('quick setup starts at most five available questions and cannot start twice
 });
 test('ordinary setup waits for the user and includes a five-question choice on long papers',async()=>{
  let calls=0;const {page}=await loadPage('practice-setup',{MODE_CHOICES:[],startSession:async()=>{calls++;return{id:'s'};}});
- page.onLoad({count:'185'});await page.onReady();assert.equal(calls,0);assert.equal(page.data.count,10);assert.ok(page.data.countChoices.some(c=>c.value===5));
+ page.onLoad({count:'185'});await page.onReady();assert.equal(calls,0);assert.equal(page.data.count,185);assert.ok(page.data.countChoices.some(c=>c.value===5));
 });
 test('inline matching collapses on cancel and assignment, and locks after submission',async()=>{
  let definition;await loadModule('components/question-view/index.ts',{Component:x=>definition=x,assignPair,pairLabel},[]);
