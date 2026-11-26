@@ -181,8 +181,18 @@ async def knowledge_dashboard(
 
 
 @router.get("/learning/practice/overview")
-async def practice_overview(db: DB, user: CurrentUser):
-    return await learning_service.practice_overview(db, user.username)
+async def practice_overview(
+    db: DB,
+    user: CurrentUser,
+    mistakes_limit: int = Query(0, alias="mistakesLimit", ge=0, le=2000),
+    candidates_limit: int = Query(0, alias="candidatesLimit", ge=0, le=500),
+):
+    return await learning_service.practice_overview(
+        db,
+        user.username,
+        mistakes_limit=mistakes_limit,
+        candidates_limit=candidates_limit,
+    )
 
 
 @router.get("/learning/practice/knowledge-universe")

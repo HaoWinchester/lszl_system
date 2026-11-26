@@ -4,7 +4,7 @@ from copy import deepcopy
 import re
 from datetime import timedelta
 
-from sqlalchemy import case, or_, select, text as sql_text
+from sqlalchemy import case, func, or_, select, text as sql_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas.canvas_ink import validate_strokes
@@ -295,6 +295,7 @@ def _practice_mistake_to_dict(
     mistake: PracticeMistake,
     *,
     reveal_answer: bool = True,
+    summary_snapshot: bool = False,
 ) -> dict:
     return {
         "id": mistake.id,
@@ -307,7 +308,9 @@ def _practice_mistake_to_dict(
         "sourceMode": mistake.source_mode,
         "languageMode": mistake.language_mode,
         "questionSnapshot": (
-            deepcopy(mistake.question_snapshot or {})
+            _question_snapshot_summary(mistake.question_snapshot or {})
+            if summary_snapshot
+            else deepcopy(mistake.question_snapshot or {})
             if reveal_answer
             else redact_practice_question(mistake.question_snapshot or {})
         ),
@@ -975,6 +978,40 @@ def _practice_stats(rows: list[PracticeMistake], now) -> dict:
     }
 
 
+async def _practice_stats_counts(db: AsyncSession, owner: str, now) -> dict:
+    """overview 行级统计的 SQL 聚合版 _practice_stats：免全行读取。"""
+
+    row = (
+        await db.execute(
+            select(
+                func.count(),
+                func.count().filter(PracticeMistake.status == "pending"),
+                func.count().filter(PracticeMistake.status == "needs_remediation"),
+                func.count().filter(
+                    (PracticeMistake.status == "verification_due")
+                    & (PracticeMistake.next_review_at.is_(None) | (PracticeMistake.next_review_at <= now))
+                ),
+                func.count().filter(
+                    (PracticeMistake.status == "verification_due")
+                    & PracticeMistake.next_review_at.is_not(None)
+                    & (PracticeMistake.next_review_at > now)
+                ),
+                func.count().filter(PracticeMistake.status == "mastered"),
+            ).where(PracticeMistake.owner_id == owner)
+        )
+    ).one()
+    total, pending, remediation, due, waiting, mastered = (int(value or 0) for value in row)
+    return {
+        "total": total,
+        "active": pending + remediation + due,
+        "pending": pending,
+        "needsRemediation": remediation,
+        "verificationDue": due,
+        "verificationWaiting": waiting,
+        "mastered": mastered,
+    }
+
+
 def canonical_practice_snapshot_answer(snapshot: dict) -> str:
     if not isinstance(snapshot, dict):
         return ""
@@ -1113,7 +1150,7 @@ def _revenge_row_key(row: PracticeMistake, now) -> tuple:
 
 
 def build_global_revenge_pool(
-    rows: list[PracticeMistake], *, now=None
+    rows: list[PracticeMistake], *, now=None, lite: bool = False
 ) -> dict:
     current_time = now or now_utc()
     grouped: dict[str, list[PracticeMistake]] = {}
@@ -1177,10 +1214,17 @@ def build_global_revenge_pool(
         if rank > 2:
             continue
         stats["active"] += 1
-        candidate = _practice_mistake_to_dict(representative, reveal_answer=True)
-        snapshot = deepcopy(candidate.get("questionSnapshot") or {})
-        snapshot["correctAnswer"] = canonical_practice_snapshot_answer(snapshot)
-        candidate["questionSnapshot"] = snapshot
+        candidate = _practice_mistake_to_dict(
+            representative, reveal_answer=True, summary_snapshot=lite
+        )
+        if lite:
+            # overview 只展示摘要；previousWrongAnswer 计算仍需完整 options，用原始快照只读，
+            # 免去完整快照的两轮深拷贝。
+            snapshot = representative.question_snapshot or {}
+        else:
+            snapshot = deepcopy(candidate.get("questionSnapshot") or {})
+            snapshot["correctAnswer"] = canonical_practice_snapshot_answer(snapshot)
+            candidate["questionSnapshot"] = snapshot
         candidate["mistakeId"] = representative.id
         candidate["mistakeIds"] = [row.id for row in group_rows]
         previous_wrong_answers, last_wrong = _latest_previous_wrong_answers(
@@ -1205,15 +1249,75 @@ async def global_revenge_candidates(db: AsyncSession, owner: str) -> list[dict]:
     return (await global_revenge_pool(db, owner))["candidates"]
 
 
-async def global_revenge_pool(db: AsyncSession, owner: str) -> dict:
+async def global_revenge_pool(db: AsyncSession, owner: str, *, lite: bool = False) -> dict:
+    now = now_utc()
     rows = (
         await db.execute(
             select(PracticeMistake)
-            .where(PracticeMistake.owner_id == owner)
+            .where(
+                PracticeMistake.owner_id == owner,
+                PracticeMistake.status != "mastered",
+            )
             .order_by(PracticeMistake.updated_at.desc(), PracticeMistake.id)
         )
     ).scalars().all()
-    return build_global_revenge_pool(list(rows))
+    pool = build_global_revenge_pool(list(rows), now=now, lite=lite)
+    # 主输入已排除 mastered：全组已掌握的 question 不再进 representatives，
+    # 组级 mastered 计数用 SQL 补齐。与旧全量实现唯一的差值是
+    # "全组 mastered 且快照全部损坏"的组（旧实现因 usable 筛选不计，新实现计入）。
+    mastered_only_groups = int(
+        await db.scalar(sql_text(
+            "SELECT count(*) FROM ("
+            "  SELECT question_id FROM practice_mistakes"
+            "  WHERE owner_id = :owner AND question_id IS NOT NULL AND btrim(question_id) <> ''"
+            "  GROUP BY question_id"
+            "  HAVING (count(*) FILTER (WHERE status <> 'mastered')) = 0"
+            "     AND (count(*) FILTER (WHERE status = 'mastered')) > 0"
+            ") t"
+        ), {"owner": owner}) or 0
+    )
+    pool["stats"]["mastered"] += mastered_only_groups
+    # 候选组的 mistakeIds / previousWrongAnswer 语义包含 mastered 历史行（组题续做与
+    # "我上次选了什么"依赖它），按候选 question_id 拉全组行补齐，保持与全量实现逐字节一致。
+    candidate_question_ids = {
+        str(candidate.get("questionId") or "").strip()
+        for candidate in pool["candidates"]
+        if str(candidate.get("questionId") or "").strip()
+    }
+    if candidate_question_ids:
+        history_rows = (
+            await db.execute(
+                select(PracticeMistake).where(
+                    PracticeMistake.owner_id == owner,
+                    PracticeMistake.question_id.in_(candidate_question_ids),
+                )
+            )
+        ).scalars().all()
+        grouped_history: dict[str, list[PracticeMistake]] = {}
+        for row in history_rows:
+            grouped_history.setdefault(str(row.question_id or "").strip(), []).append(row)
+        for candidate in pool["candidates"]:
+            group_rows = grouped_history.get(str(candidate.get("questionId") or "").strip())
+            representative = next(
+                (row for row in (group_rows or []) if row.id == candidate.get("mistakeId")),
+                None,
+            )
+            if representative is None:
+                continue
+            grouped_order = [
+                representative,
+                *sorted(
+                    (row for row in group_rows if row.id != representative.id),
+                    key=lambda row: _revenge_row_key(row, now),
+                ),
+            ]
+            candidate["mistakeIds"] = [row.id for row in grouped_order]
+            previous_wrong_answers, last_wrong = _latest_previous_wrong_answers(
+                grouped_order, representative.question_snapshot or {}
+            )
+            candidate["previousWrongAnswer"] = last_wrong
+            candidate["previousWrongAnswerIds"] = list(previous_wrong_answers)
+    return pool
 
 
 def _practice_plan(stats: dict) -> dict:
@@ -1256,34 +1360,35 @@ def _practice_plan(stats: dict) -> dict:
     return {"version": 1, "idealAction": action, "executableAction": dict(action)}
 
 
-async def practice_overview(db: AsyncSession, owner: str) -> dict:
-    rows = (
+async def practice_overview(
+    db: AsyncSession,
+    owner: str,
+    *,
+    mistakes_limit: int = 0,
+    candidates_limit: int = 0,
+) -> dict:
+    # 按需加载：overview 列表只携带轻量摘要（展示+搜索），
+    # 完整题目由复仇作答等既有接口按 mistakeId 提供。
+    # limit 为 0 表示不限（保持既有全量行为）；正数在响应层截断，
+    # 不影响 global_revenge_pool 的完整候选池（组题/续做语义不受截断影响）。
+    now = now_utc()
+    stats = await _practice_stats_counts(db, owner, now)
+    revenge_pool = await global_revenge_pool(db, owner, lite=True)
+    candidates = revenge_pool["candidates"]
+    candidates_has_more = bool(candidates_limit) and len(candidates) > candidates_limit
+    public_candidates = candidates[:candidates_limit] if candidates_limit else candidates
+    mistakes_rows = (
         await db.execute(
             select(PracticeMistake)
             .where(PracticeMistake.owner_id == owner)
             .order_by(PracticeMistake.updated_at.desc(), PracticeMistake.id)
+            .limit(mistakes_limit or None)
         )
     ).scalars().all()
-    stats = _practice_stats(rows, now_utc())
-    revenge_pool = build_global_revenge_pool(list(rows))
-    # 按需加载：overview 列表只携带轻量摘要（展示+搜索），
-    # 完整题目由复仇作答等既有接口按 mistakeId 提供。
-    public_candidates = [
-        {
-            **candidate,
-            "questionSnapshot": _question_snapshot_summary(
-                candidate.get("questionSnapshot") or {}
-            ),
-        }
-        for candidate in revenge_pool["candidates"]
+    mistakes_public = [
+        _practice_mistake_to_dict(row, reveal_answer=False, summary_snapshot=True)
+        for row in mistakes_rows
     ]
-    mistakes_public = []
-    for row in rows:
-        item = _practice_mistake_to_dict(row, reveal_answer=False)
-        item["questionSnapshot"] = _question_snapshot_summary(
-            item.get("questionSnapshot") or {}
-        )
-        mistakes_public.append(item)
     return {
         "mistakes": mistakes_public,
         "stats": stats,
@@ -1292,6 +1397,7 @@ async def practice_overview(db: AsyncSession, owner: str) -> dict:
             "unavailable": revenge_pool["unavailableCount"],
         },
         "revengeCandidates": public_candidates,
+        "candidatesHasMore": candidates_has_more,
         "plan": _practice_plan(revenge_pool["stats"]),
     }
 

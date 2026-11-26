@@ -955,3 +955,158 @@ def test_practice_session_history_is_database_backed_and_owner_scoped() -> None:
     assert deleted.status_code == 200, deleted.text
     assert deleted.json()["deleted"] == 1
     assert persisted.get("/api/v1/learning/practice/sessions").json()["sessions"] == []
+
+
+async def _seed_mistake_rows(rows: list[PracticeMistake]) -> None:
+    async with AsyncSessionLocal() as db:
+        for row in rows:
+            db.add(row)
+        await db.commit()
+
+
+async def _seed_release_row(release_id: str, publisher: str) -> None:
+    from app.models.paper_release import PaperRelease
+
+    async with AsyncSessionLocal() as db:
+        db.add(PaperRelease(
+            id=release_id,
+            paper_id=f"paper-{release_id}",
+            version=1,
+            name="overview 组历史 release",
+            subject="PMP",
+            publisher_id=publisher,
+        ))
+        await db.commit()
+
+
+async def _load_mistake_rows(owner: str) -> list[PracticeMistake]:
+    async with AsyncSessionLocal() as db:
+        rows = (
+            await db.execute(select(PracticeMistake).where(PracticeMistake.owner_id == owner))
+        ).scalars().all()
+        return list(rows)
+
+
+async def _stats_equivalence(owner: str) -> tuple[dict, dict]:
+    rows = await _load_mistake_rows(owner)
+    now = now_utc()
+    async with AsyncSessionLocal() as db:
+        aggregated = await learning_service._practice_stats_counts(db, owner, now)
+    return aggregated, learning_service._practice_stats(rows, now)
+
+
+def test_practice_overview_sql_stats_match_python_bucketing() -> None:
+    username = _name("overview_stats")
+    _create_student(username)
+    now = now_utc()
+    rows = [
+        _mistake_row(mistake_id=f"s1_{username}", owner=username, question_id="qS1", status="pending"),
+        _mistake_row(mistake_id=f"s2_{username}", owner=username, question_id="qS2", status="needs_remediation"),
+        _mistake_row(mistake_id=f"s3_{username}", owner=username, question_id="qS3", status="verification_due", next_review_at=now - timedelta(hours=1)),
+        _mistake_row(mistake_id=f"s4_{username}", owner=username, question_id="qS4", status="verification_due", next_review_at=now + timedelta(days=2)),
+        _mistake_row(mistake_id=f"s5_{username}", owner=username, question_id="qS5", status="verification_due", next_review_at=None),
+        _mistake_row(mistake_id=f"s6_{username}", owner=username, question_id="qS6", status="mastered"),
+    ]
+    asyncio.run(_seed_mistake_rows(rows))
+    aggregated, expected = asyncio.run(_stats_equivalence(username))
+    assert aggregated == expected
+    assert aggregated["pending"] == 1
+    assert aggregated["needsRemediation"] == 1
+    assert aggregated["verificationDue"] == 2
+    assert aggregated["verificationWaiting"] == 1
+    assert aggregated["mastered"] == 1
+    assert aggregated["active"] == 4
+    assert aggregated["total"] == 6
+
+
+def test_practice_overview_counts_mastered_only_groups_without_hiding_active_history() -> None:
+    username = _name("overview_groups")
+    _create_student(username)
+    now = now_utc()
+    release_id = f"rel-{username}"
+    asyncio.run(_seed_release_row(release_id, username))
+    rows = [
+        _mistake_row(mistake_id=f"g1_{username}", owner=username, question_id="qM", status="mastered", release_id=None, updated_at=now - timedelta(hours=3)),
+        _mistake_row(mistake_id=f"g2_{username}", owner=username, question_id="qM", status="mastered", release_id=release_id, updated_at=now - timedelta(hours=2)),
+        _mistake_row(mistake_id=f"g3_{username}", owner=username, question_id="qX", status="pending", release_id=None),
+        _mistake_row(mistake_id=f"g4_{username}", owner=username, question_id="qX", status="mastered", release_id=release_id),
+        _mistake_row(mistake_id=f"g5_{username}", owner=username, question_id="qW", status="verification_due", next_review_at=now + timedelta(days=2), release_id=None),
+        _mistake_row(mistake_id=f"g6_{username}", owner=username, question_id="qW", status="mastered", release_id=release_id),
+    ]
+    asyncio.run(_seed_mistake_rows(rows))
+    client = TestClient(app)
+    _login(client, username)
+    overview = client.get("/api/v1/learning/practice/overview")
+    assert overview.status_code == 200, overview.text
+    revenge_stats = overview.json()["revengeStats"]
+    assert revenge_stats["mastered"] == 1
+    assert revenge_stats["pending"] == 1
+    assert revenge_stats["verificationWaiting"] == 1
+    # active 只统计可直接开练的组（rank ≤ 2）；qW 组代表是未到期验证，不进 active
+    assert revenge_stats["active"] == 1
+    assert overview.json()["stats"]["mastered"] == 4
+    assert overview.json()["stats"]["total"] == 6
+
+
+def test_practice_overview_candidates_keep_mastered_history_in_mistake_ids() -> None:
+    username = _name("overview_history")
+    _create_student(username)
+    now = now_utc()
+    release_id = f"rel-{username}"
+    asyncio.run(_seed_release_row(release_id, username))
+    rows = [
+        _mistake_row(mistake_id=f"h1_{username}", owner=username, question_id="qH", status="pending", release_id=None, updated_at=now - timedelta(hours=5)),
+        _mistake_row(mistake_id=f"h2_{username}", owner=username, question_id="qH", status="mastered", release_id=release_id, updated_at=now - timedelta(hours=1)),
+    ]
+    rows[1].selected_answers = ["B"]
+    asyncio.run(_seed_mistake_rows(rows))
+    client = TestClient(app)
+    _login(client, username)
+    overview = client.get("/api/v1/learning/practice/overview")
+    assert overview.status_code == 200, overview.text
+    candidates = overview.json()["revengeCandidates"]
+    assert len(candidates) == 1
+    candidate = candidates[0]
+    assert set(candidate["mistakeIds"]) == {f"h1_{username}", f"h2_{username}"}
+    assert candidate["mistakeIds"][0] == f"h1_{username}"
+    assert candidate["previousWrongAnswerIds"] == ["B"]
+    all_rows = asyncio.run(_load_mistake_rows(username))
+    full_candidate = learning_service.build_global_revenge_pool(all_rows, now=now_utc())["candidates"][0]
+    assert candidate["mistakeIds"] == full_candidate["mistakeIds"]
+    assert candidate["previousWrongAnswer"] == full_candidate["previousWrongAnswer"]
+    assert candidate["previousWrongAnswerIds"] == full_candidate["previousWrongAnswerIds"]
+
+
+def test_practice_overview_limit_parameters_truncate_without_breaking_stats() -> None:
+    username = _name("overview_limits")
+    _create_student(username)
+    now = now_utc()
+    rows = [
+        _mistake_row(
+            mistake_id=f"l{index}_{username}", owner=username, question_id=f"qL{index}",
+            status="pending", updated_at=now - timedelta(hours=index),
+        )
+        for index in range(3)
+    ]
+    asyncio.run(_seed_mistake_rows(rows))
+    client = TestClient(app)
+    _login(client, username)
+    default_overview = client.get("/api/v1/learning/practice/overview").json()
+    assert len(default_overview["mistakes"]) == 3
+    assert len(default_overview["revengeCandidates"]) == 3
+    assert default_overview["candidatesHasMore"] is False
+
+    mistakes_capped = client.get("/api/v1/learning/practice/overview", params={"mistakesLimit": 2}).json()
+    assert len(mistakes_capped["mistakes"]) == 2
+    assert mistakes_capped["stats"]["total"] == 3
+    assert len(mistakes_capped["revengeCandidates"]) == 3
+    assert [row["id"] for row in mistakes_capped["mistakes"]] == [f"l0_{username}", f"l1_{username}"]
+
+    candidates_capped = client.get("/api/v1/learning/practice/overview", params={"candidatesLimit": 2}).json()
+    assert len(candidates_capped["revengeCandidates"]) == 2
+    assert candidates_capped["candidatesHasMore"] is True
+    assert len(candidates_capped["mistakes"]) == 3
+
+    candidates_all = client.get("/api/v1/learning/practice/overview", params={"candidatesLimit": 5}).json()
+    assert len(candidates_all["revengeCandidates"]) == 3
+    assert candidates_all["candidatesHasMore"] is False

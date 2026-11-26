@@ -383,7 +383,7 @@ test('revenge restores unfinished remediation without asking the original questi
 
 test('revenge answer stage fetches the full question instead of the overview summary', async () => {
   const candidate = { id: 'm1', mistakeId: 'm1', status: 'pending', questionSnapshot: { id: 'q1', type: 'single_choice', stem: '摘要', options: [] } };
-  const { page } = await loadPage('revenge', { normalizeQuestion: value => value, getOverview: async () => ({ revengeStats: { pending: 1 }, revengeCandidates: [candidate] }),
+  const { page } = await loadPage('revenge', { normalizeQuestion: value => value, getOverview: async () => ({ revengeStats: { pending: 1, active: 1 }, revengeCandidates: [candidate] }),
     getMistakeDetail: async mistakeId => { assert.equal(mistakeId, 'm1'); return { id: 'm1', questionSnapshot: { id: 'q1', type: 'single_choice', stem: '完整题干', options: [{ id: 'A', text: '甲' }, { id: 'B', text: '乙' }] } }; }, messageOf: e => e.message });
   await page.loadQueue();
   assert.equal(page.data.stage, 'answer'); assert.equal(page.data.queueCount, 1);
@@ -391,7 +391,7 @@ test('revenge answer stage fetches the full question instead of the overview sum
 });
 
 test('revenge waiting for verification is not presented as no mistakes', async () => {
-  const { page } = await loadPage('revenge', { getOverview: async () => ({ revengeStats: { verificationWaiting: 2 }, revengeCandidates: [{ id: 'm1', status: 'needs_remediation', remediationReviewedAt: 'today' }] }),
+  const { page } = await loadPage('revenge', { getOverview: async () => ({ revengeStats: { verificationWaiting: 2, active: 1 }, revengeCandidates: [{ id: 'm1', status: 'needs_remediation', remediationReviewedAt: 'today' }] }),
     getVerificationCandidate: async () => ({ available: false }), messageOf: e => e.message });
   await page.loadQueue(); assert.equal(page.data.empty, true); assert.equal(page.data.waitingCount, 3);
   assert.equal(page.data.emptyTitle, '本轮复习已完成');

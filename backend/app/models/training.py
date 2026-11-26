@@ -227,6 +227,8 @@ class PracticeMistake(Base):
             "status IN ('pending', 'needs_remediation', 'verification_due', 'mastered')",
             name="ck_practice_mistakes_status",
         ),
+        Index("ix_practice_mistakes_owner_status", "owner_id", "status"),
+        Index("ix_practice_mistakes_owner_updated_at", "owner_id", "updated_at"),
     )
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)

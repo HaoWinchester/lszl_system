@@ -91,7 +91,7 @@ Page(withAppearance(withAppShare({
             loading: false,
             empty: false,
             stats,
-            queueCount: candidates.length - skipped,
+            queueCount: Math.max(Number(stats.active || 0) - skipped, 0),
             stage: 'verification',
             candidate,
             mistake: candidate,
@@ -103,7 +103,7 @@ Page(withAppearance(withAppShare({
         }
         if (candidate.status === 'needs_remediation') {
           const mistake = await getRemediation(String(candidate.mistakeId || candidate.id || ''));
-          this.setData({ loading: false, empty: false, stats, queueCount: candidates.length - skipped,
+          this.setData({ loading: false, empty: false, stats, queueCount: Math.max(Number(stats.active || 0) - skipped, 0),
             stage: 'remediation', candidate, mistake, question: normalizeQuestion(mistake.questionSnapshot || {}),
             selectedPairs:mistake.selectedPairs||{}, previousAnswer: previousAnswer(mistake) || previousAnswer(candidate), feedback: '继续上次未完成的纠错。' });
           return;
@@ -115,7 +115,7 @@ Page(withAppearance(withAppShare({
           loading: false,
           empty: false,
           stats,
-          queueCount: candidates.length - skipped,
+          queueCount: Math.max(Number(stats.active || 0) - skipped, 0),
           stage: 'answer',
           candidate,
           mistake: candidate,
@@ -125,6 +125,16 @@ Page(withAppearance(withAppShare({
         return;
       }
       const waitingCount = skipped + Number(stats.verificationWaiting || 0);
+      const activeCount = Number(stats.active || 0);
+      // active 统计不受列表截断影响；候选列表扫完但统计上仍有可开练的组时，
+      // 不能误判为"暂无待处理错题"。
+      const queueTruncated = Boolean(overview.candidatesHasMore) || activeCount > candidates.length;
+      if (queueTruncated) {
+        this.setData({ loading: false, empty: true, stats, queueCount: Math.max(activeCount - skipped, 0), waitingCount,
+          emptyTitle: '队列同步中',
+          emptyCopy: '还有待处理错题未能展示，重新进入页面即可重试。' });
+        return;
+      }
       this.setData({ loading: false, empty: true, stats, queueCount: 0, waitingCount,
         emptyTitle: waitingCount ? '本轮复习已完成' : '暂无待处理错题',
         emptyCopy: waitingCount ? `还有 ${waitingCount} 道题等待复习时间或验证题，学习记录已保留。` : '继续练习后，需要重做的错题会出现在这里。' });

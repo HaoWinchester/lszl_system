@@ -23,6 +23,14 @@ test('reviewed remediation resumes verification and skips unavailable repeats', 
   assert.doesNotMatch(source, /const candidate = candidates\[0\]/);
 });
 
+test('queue count derives from server stats and survives candidate truncation', () => {
+  const source = read('pages/revenge/index.ts');
+  assert.match(source, /Math\.max\(Number\(stats\.active \|\| 0\) - skipped, 0\)/);
+  assert.doesNotMatch(source, /queueCount: candidates\.length - skipped/);
+  assert.match(source, /candidatesHasMore/);
+  assert.match(source, /queueTruncated/);
+});
+
 test('revenge uses a quiet three-step learning sequence with real states', () => {
   const page = read('pages/revenge/index.wxml');
   for (const label of ['重答原题', '阅读纠错', '变式验证', '暂无待处理错题']) {
