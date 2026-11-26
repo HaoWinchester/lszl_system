@@ -47,6 +47,7 @@ export interface PracticeQuestion {
   options: QuestionOption[];
   images: string[];
   analysis?: string;
+  analysisEn?: string;
   explanation?: string;
   correctAnswer?: string;
   correctOptionIds?: string[];

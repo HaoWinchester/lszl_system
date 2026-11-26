@@ -1,8 +1,9 @@
 <view class="question {{compact ? 'is-compact' : ''}}">
-  <view class="question-kind"><text class="question-kind-label">{{displayQuestion.type === 'matching' ? '匹配题' : displayQuestion.type === 'unknown' ? '未支持题型' : displayQuestion.type === 'multiple_choice' ? '多选题' : '单选题'}}</text><text wx:if="{{displayQuestion.type === 'multiple_choice'}}">请选择所有正确选项</text></view>
+  <view class="question-kind"><text class="question-kind-label">{{displayQuestion.type === 'matching' ? '匹配题' : displayQuestion.type === 'unknown' ? '未支持题型' : displayQuestion.type === 'multiple_choice' ? '多选题' : '单选题'}}</text><view class="question-kind-side"><text wx:if="{{displayQuestion.type === 'multiple_choice'}}">请选择所有正确选项</text><button wx:if="{{languageHasEnglish}}" class="language-toggle" bindtap="onLanguageToggle" aria-label="题目显示语言，当前{{languageLabel}}">{{languageLabel}}</button></view></view>
   <view wx:if="{{displayQuestion.material}}" class="case-material"><button class="case-toggle" bindtap="toggleCase" aria-expanded="{{caseOpen}}">{{displayQuestion.material.title}} · {{caseOpen ? '收起材料' : '展开材料'}}</button><view wx:if="{{caseOpen}}"><text class="case-text">{{displayQuestion.material.text}}</text><image wx:for="{{materialImages}}" wx:key="id" src="{{item.src}}" mode="widthFix" class="question-image" data-src="{{item.src}}" bindtap="previewImage"/><text wx:if="{{displayQuestion.caseGroup}}">第 {{displayQuestion.caseGroup.order}} / {{displayQuestion.caseGroup.total}} 小题</text></view></view>
-  <rich-text class="stem" nodes="{{displayQuestion.stemNodes}}"></rich-text>
-  <text wx:if="{{displayQuestion.stemEn}}" class="stem-en">{{displayQuestion.stemEn}}</text>
+  <rich-text wx:if="{{languageMode === 'en' && stemEnNodes.length}}" class="stem" nodes="{{stemEnNodes}}"></rich-text>
+  <rich-text wx:else class="stem" nodes="{{displayQuestion.stemNodes}}"></rich-text>
+  <text wx:if="{{languageMode === 'bilingual' && displayQuestion.stemEn}}" class="stem-en">{{displayQuestion.stemEn}}</text>
   <view wx:if="{{displayQuestion.images.length}}" class="question-images">
     <image wx:for="{{displayQuestion.images}}" wx:key="*this" class="question-image" src="{{item}}" mode="widthFix" data-src="{{item}}" bindtap="previewImage" />
   </view>
@@ -32,7 +33,8 @@
     <text class="answer-outcome">{{outcome}}</text>
     <view class="answer-summary"><text>你的答案：{{selectedLabel}}</text><text>正确答案：{{answerLabel}}</text></view>
     <text class="analysis-label">解析</text>
-    <text class="analysis-copy">{{displayQuestion.analysis || displayQuestion.explanation || '这道题尚未提供解析。'}}</text>
+    <text class="analysis-copy">{{analysisMain}}</text>
+    <text wx:if="{{analysisEnNote}}" class="analysis-en">{{analysisEnNote}}</text>
     <button wx:if="{{feedbackContext.questionId}}" class="analysis-toggle" disabled="{{feedbackBusy || feedbackSent}}" loading="{{feedbackBusy}}" bindtap="reportAnalysis">{{feedbackSent ? '反馈已提交' : '解析有误或缺失？反馈此题'}}</button>
   </view>
 </view>

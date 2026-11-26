@@ -90,7 +90,7 @@ test('manual question analysis expansion changes category and respects forced an
 test('the real question component emits expanded analysis state and resets it for another question',async()=>{
  let definition;
  await loadModule('components/question-view/index.ts',{Component:value=>{definition=value}},[]);
- const events=[],component={properties:{allowAnalysis:true,showResult:true,question:{id:'q1'}},data:{questionKey:'q1',analysisExpanded:false},setData(values){Object.assign(this.data,values)},triggerEvent:(name,detail)=>events.push({name,detail})};
+ const events=[],component={properties:{allowAnalysis:true,showResult:true,question:{id:'q1'}},data:{questionKey:'q1',analysisExpanded:false,languageMode:'zh'},setData(values){Object.assign(this.data,values)},triggerEvent:(name,detail)=>events.push({name,detail}),computeView:definition.methods.computeView};
  definition.methods.toggleAnalysis.call(component);
  assert.equal(events.at(-1)?.name,'analysischange');assert.equal(events.at(-1).detail.expanded,true);assert.equal(events.at(-1).detail.questionId,'q1');
  definition.observers['question, selectedIds, showAnalysis, showResult, selectedPairs'].call(component,{id:'q2',options:[]},[],false,false,{});

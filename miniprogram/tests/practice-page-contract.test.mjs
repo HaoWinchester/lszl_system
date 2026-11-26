@@ -125,3 +125,68 @@ test('answer switch has compact visual bounds while its label retains the shared
   assert.match(styles, /\.setting-switch\s*\{[^}]*scale\(0\.7\)/);
   assert.match(styles, /\.setting-toggle\s*\{[^}]*min-height:\s*var\(--touch-min\)/);
 });
+
+test('question language toggle cycles three modes with a persisted shared preference', async () => {
+  const storage = new Map();
+  const wx = { getStorageSync: key => storage.get(key), setStorageSync: (key, value) => storage.set(key, value) };
+  const { loadModule } = await import('./helpers/page-harness.mjs');
+  const language = await loadModule('domain/question-language.ts', { wx },
+    ['normalizeLanguageMode', 'getLanguageMode', 'setLanguageMode', 'cycleLanguageMode', 'languageLabel']);
+  assert.equal(language.getLanguageMode(), 'zh');
+  assert.equal(language.normalizeLanguageMode('weird'), 'zh');
+  assert.deepEqual([language.cycleLanguageMode('zh'), language.cycleLanguageMode('en'), language.cycleLanguageMode('bilingual')], ['en', 'bilingual', 'zh']);
+  assert.equal(language.setLanguageMode('bilingual'), 'bilingual');
+  assert.equal(language.getLanguageMode(), 'bilingual');
+  assert.deepEqual([language.languageLabel('zh'), language.languageLabel('en'), language.languageLabel('bilingual')], ['中', 'EN', '双']);
+});
+
+test('question component renders stem, options, and analysis following the language mode', async () => {
+  const { loadModule } = await import('./helpers/page-harness.mjs');
+  const { sanitizeRichText } = await import('../domain/rich-text.ts');
+  const wx = { getStorageSync: () => '', setStorageSync: () => {} };
+  let definition;
+  await loadModule('components/question-view/index.ts', { wx, sanitizeRichText, Component: value => { definition = value; } }, []);
+  const component = { properties: {}, data: { languageMode: 'zh', questionKey: '' },
+    setData(values) { Object.assign(this.data, values); }, triggerEvent() {}, loadAssets() {} };
+  const question = { id: 'q1', type: 'single_choice', stem: '中文题干', stemNodes: [{ type: 'text', text: '中文题干' }],
+    stemEn: 'English stem', analysis: '中文解析', analysisEn: 'English analysis',
+    options: [{ id: 'A', text: '中文A', textEn: 'English A' }, { id: 'B', text: '中文B' }] };
+  const call = () => definition.methods.computeView.call(component, question, [], false, false, {});
+
+  call();
+  assert.equal(component.data.languageHasEnglish, true);
+  assert.equal(component.data.displayOptions[0].text, '中文A');
+  assert.equal(component.data.displayOptions[0].textEn, '');
+  assert.equal(component.data.analysisMain, '中文解析');
+  assert.equal(component.data.analysisEnNote, '');
+  assert.deepEqual(component.data.stemEnNodes, []);
+
+  component.data.languageMode = 'en';
+  call();
+  assert.equal(component.data.displayOptions[0].text, 'English A');
+  assert.equal(component.data.displayOptions[0].textEn, '');
+  assert.ok(component.data.stemEnNodes.length > 0);
+  assert.equal(component.data.analysisMain, 'English analysis');
+
+  component.data.languageMode = 'bilingual';
+  call();
+  assert.equal(component.data.displayOptions[0].text, '中文A');
+  assert.equal(component.data.displayOptions[0].textEn, 'English A');
+  assert.equal(component.data.analysisMain, '中文解析');
+  assert.equal(component.data.analysisEnNote, 'English analysis');
+
+  definition.methods.computeView.call(component, { id: 'q2', type: 'single_choice', stem: '只有中文', stemNodes: [], options: [{ id: 'A', text: '甲' }] }, [], false, false, {});
+  assert.equal(component.data.languageHasEnglish, false);
+});
+
+test('question markup wires the language toggle to the shared mode module', () => {
+  const wxml = read('components/question-view/index.wxml');
+  const source = read('components/question-view/index.ts');
+  assert.match(wxml, /class="language-toggle"[\s\S]*?bindtap="onLanguageToggle"/);
+  assert.match(wxml, /wx:if="\{\{languageMode === 'bilingual' && displayQuestion\.stemEn\}\}"/);
+  assert.match(wxml, /nodes="\{\{stemEnNodes\}\}"/);
+  assert.match(wxml, /\{\{analysisMain\}\}/);
+  assert.match(wxml, /\{\{analysisEnNote\}\}/);
+  assert.match(source, /onLanguageToggle\(\)/);
+  assert.match(read('domain/question-language.ts'), /kg_mini_language_mode/);
+});

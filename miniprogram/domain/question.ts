@@ -49,6 +49,7 @@ export function normalizeQuestion(rawValue: unknown): PracticeQuestion {
     images: httpsImages(raw.images || raw.imageUrls || raw.image_urls),
     ...(raw.analysis != null ? { analysis: text(raw.analysis) } : {}),
     ...(raw.explanation != null ? { explanation: text(raw.explanation) } : {}),
+    ...(() => { const analysisEn = text(raw.analysisEn || english.analysis || english.explanation); return analysisEn ? { analysisEn } : {}; })(),
     ...(raw.correctAnswer != null ? { correctAnswer: text(raw.correctAnswer) } : {}),
     ...(Array.isArray(raw.correctOptionIds) ? { correctOptionIds: raw.correctOptionIds.map(text) } : {}),
   };
