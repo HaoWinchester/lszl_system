@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "version": "v9.0-p4.1.504",
+  "version": "v9.0-p4.1.505",
   "bridgeVersion": 2,
   "sourceFiles": {
     "ACTIVITY_SCHEMA_V1.md": "5b42cb917237d6a6eb4e7438ac491543a653918fb172d49e3a2a05b1d98c20b9",
@@ -160,7 +160,7 @@
     "V9.0_P4.1_DATA_INTEGRITY.json": "65a6d63dfac46ce58dfc27d34bbcecad45a019302c419e7967f2e1ed46ead3f4",
     "V9.0_P4.1_HELP_FEEDBACK_MESSAGES_REPORT.md": "edfc028219fece4c0e4893f868470f1f00f8836bce74ec6de3acbc54f3fcc5cd",
     "V9.0_P4.1_QUICK_START.md": "1316de5b831a2109176f627b3e7bbaf1bb030c14f3ae93ba8945b4a83deb864c",
-    "VERSION": "2f1ad262e1b9a88785e82031309ff1e568099b17d9b31aa909b447126bbc447b",
+    "VERSION": "59387131942a4058a7b0c9bd36f49b75ec2f8d785581e0b7dcb882e8a47f1a8a",
     "admin-console.html": "d959ba1e42f3688eac52b30bb967f52a799a0caa587e8200c463cfe3851e471a",
     "admin-operations.html": "eea16b42dced31be60c5732b2ad16dce5677e7fe24d0579a7d50d76a650ddb43",
     "admin-settings.html": "bfa50b466b40c2cc540a575d330b0e742e39b042a5ce564ef29a76fcacc1ec65",
@@ -583,7 +583,7 @@
     "src/landing.js": "5c35a5899959ae7d2f277db11b456b4b0ecc00721e33fc7c30a55d3261de020a",
     "src/paper-presentation.js": "1160a21213b75e2571f3f3c60db5d6103760dd967c044a45d23af6e975e9db1d",
     "src/practice/feature-loader.js": "78079b1c0639cf8c6286d9af8cc44251c460fed610980c103e95ca331575abc0",
-    "src/practice/hall-catalog.js": "916266cc9e82c352e2e330aea0ca51db6114f4b63ec2dc29fd195791ad48b79e",
+    "src/practice/hall-catalog.js": "ad7886cd731d8a0898bd2b704bcfb9e4f032c9661cced996cdca7b9b60e63d6d",
     "src/practice/history-controller.js": "9d22f7978bd74be757459e452240227ef3745b5a7e37e063d516d07b5ad4b39a",
     "src/practice/knowledge-audio-controller.js": "da31f40bd12899e798b7c3a9c676ca368bb3afa6e9572e2a5c4e60d8ec5c8aa0",
     "src/practice/knowledge-dashboard.js": "b5d8963190f383a3d5d0fc2c6d634b73a7c3f780411ce056f77df2be140dd57a",

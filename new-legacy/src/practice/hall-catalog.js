@@ -12,7 +12,7 @@
   // （行前显示序号徽标），不参与主归属匹配；catchAll 收留其余试卷，
   // order 定义其固定名称顺序，不在 order 的按发布时间排后。
   const CATEGORIES=[
-    {id:'dec-mocks',name:'12月最新模拟卷',match:name=>name.startsWith('真题模考卷'),fixed:['真题模考卷A','真题模考卷B','真题模考卷C','真题模考卷D','真题模考卷E','真题模考卷F','真题模考卷G','真题模考卷H','真题模考卷I','真题模考卷J']},
+    {id:'dec-mocks',name:'12月最新模拟卷',match:name=>name.startsWith('12月新题模考卷')||name.startsWith('真题模考卷'),fixed:['12月新题模考卷(一)','12月新题模考卷(二)','12月新题模考卷(三)','真题模考卷A','真题模考卷B','真题模考卷C','真题模考卷D','真题模考卷E','真题模考卷F','真题模考卷G','真题模考卷H','真题模考卷I','真题模考卷J']},
     {id:'case-chart',name:'专题卷-案例和图表',match:name=>name.includes('案例')||name.includes('图表'),emptyHint:'新题库整理中，敬请期待'},
     {id:'multi-choice',name:'专题卷-多选题',match:name=>name.includes('多选')},
     {id:'mock-general',name:'模拟卷综合练习',catchAll:true,order:['考试卷 01','考试卷 02','考试卷 03','考试卷 04','考试卷 05','考试卷 06','考试卷 07','考试卷 08','考试卷 09','考试卷 10','考试卷 11','考试卷 12','考试卷 13','考试卷 14']},
