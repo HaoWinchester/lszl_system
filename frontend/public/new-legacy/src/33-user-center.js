@@ -63,9 +63,17 @@
     if(promotionCountdownTimer){clearInterval(promotionCountdownTimer);promotionCountdownTimer=0;}
   }
   // 限时活动 banner：数据来自 adapter 预载的 KGPromotionActivity（公开 plans 接口），
-  // enabled 且未到结束时间才渲染；倒计时按 天/时/分/秒 数字方块分块展示，每秒刷新。
+  // enabled 即渲染；倒计时按 天/时/分/秒 数字方块分块展示，每秒刷新。
+  // 到期后以配置的 endTime 为锚点按 7 天一轮自动滚动循环，无需重新配置。
   const PROMO_BOLT_SVG='<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M13 2 4.6 12.6c-.4.5 0 1.4.7 1.4h4.3l-1.5 7.2c-.1.7.8 1.1 1.2.5l8.5-10.6c.4-.5 0-1.4-.7-1.4h-4.3l1.5-7.2c.1-.7-.8-1.1-1.3-.5Z"/></svg>';
   const PROMO_CLOCK_SVG='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3.2 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+  const PROMO_ROUND_MS=7*24*60*60*1000;
+  function promotionCycleEnd(configuredEnd){
+    const now=Date.now();
+    if(now<=configuredEnd)return configuredEnd;
+    const rounds=Math.floor((now-configuredEnd)/PROMO_ROUND_MS)+1;
+    return configuredEnd+rounds*PROMO_ROUND_MS;
+  }
   function promotionCountdownParts(ms){
     const total=Math.max(0,Math.floor((Number(ms)||0)/1000));
     const days=Math.floor(total/86400),hours=Math.floor((total%86400)/3600),minutes=Math.floor((total%3600)/60),seconds=total%60;
@@ -75,8 +83,9 @@
   function promotionBannerHtml(){
     const promo=window.KGPromotionActivity;
     if(!promo||!promo.enabled)return"";
-    const end=Date.parse(promo.endTime||"");
-    if(!Number.isFinite(end)||end<=Date.now())return"";
+    const configuredEnd=Date.parse(promo.endTime||"");
+    if(!Number.isFinite(configuredEnd))return"";
+    const end=promotionCycleEnd(configuredEnd);
     const parts=promotionCountdownParts(end-Date.now());
     return `<section class="membership-promo-banner" data-promo-end="${end}">
       <span class="promo-icon" aria-hidden="true">${PROMO_BOLT_SVG}</span>
@@ -236,7 +245,7 @@
         button.setAttribute("aria-disabled",String(planPickLocked&&!isActive));
       });
     }
-    body.innerHTML=`<div class="divider"></div>${promotionBannerHtml()}<div class="plans-grid">
+    body.innerHTML=`<div class="divider"></div>${promotionBannerHtml()}<div class="membership-scope-note" role="note"><span class="icon i-info"></span><span>普通会员套餐不包含答题解疑服务；如需精英老师一对一试卷解答，请选择「精英老师解答套餐」。</span></div><div class="plans-grid">
       ${plans.map(plan=>{
         // 当前方案用于标记；有效的有限期会员也可以提前续费。
         const current=!currentPlanExpired && !!currentPlanId && plan.id===currentPlanId;
@@ -284,9 +293,14 @@
           if(promotionCountdownTimer){clearInterval(promotionCountdownTimer);promotionCountdownTimer=0;}
           return;
         }
-        const end=Number(promoBanner.dataset.promoEnd||0);
-        const remaining=end-Date.now();
-        if(!end||remaining<=0){promoBanner.remove();if(promotionCountdownTimer){clearInterval(promotionCountdownTimer);promotionCountdownTimer=0;}return}
+        let end=Number(promoBanner.dataset.promoEnd||0);
+        if(!end){if(promotionCountdownTimer){clearInterval(promotionCountdownTimer);promotionCountdownTimer=0;}return}
+        let remaining=end-Date.now();
+        if(remaining<=0){
+          end=promotionCycleEnd(end);
+          promoBanner.dataset.promoEnd=String(end);
+          remaining=end-Date.now();
+        }
         const parts=promotionCountdownParts(remaining);
         for(const key of["hours","minutes","seconds"]){
           const el=promoBanner.querySelector(`[data-promo-part="${key}"]`);

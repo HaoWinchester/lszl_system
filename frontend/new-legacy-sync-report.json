@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "fromVersion": "v9.0-p4.1.504",
-  "toVersion": "v9.0-p4.1.505",
+  "fromVersion": "v9.0-p4.1.506",
+  "toVersion": "v9.0-p4.1.507",
   "changes": {
     "added": [],
     "changed": [
       "VERSION",
-      "src/practice/hall-catalog.js"
+      "src/33-user-center.js"
     ],
     "removed": []
   },
