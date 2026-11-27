@@ -14,7 +14,7 @@
   const CATEGORIES=[
     {id:'dec-mocks',name:'12月最新模拟卷',match:name=>name.startsWith('12月新题模考卷')||name.startsWith('真题模考卷'),fixed:['12月新题模考卷(一)','12月新题模考卷(二)','12月新题模考卷(三)','真题模考卷A','真题模考卷B','真题模考卷C','真题模考卷D','真题模考卷E','真题模考卷F','真题模考卷G','真题模考卷H','真题模考卷I','真题模考卷J']},
     {id:'case-chart',name:'专题卷-案例和图表',match:name=>name.includes('案例')||name.includes('图表'),emptyHint:'新题库整理中，敬请期待'},
-    {id:'multi-choice',name:'专题卷-多选题',match:name=>name.includes('多选')},
+    {id:'multi-choice',name:'专题卷-多选题',match:name=>name.includes('多选'),order:['综合多选训练试卷01','综合多选训练试卷02']},
     {id:'mock-general',name:'模拟卷综合练习',catchAll:true,order:['考试卷 01','考试卷 02','考试卷 03','考试卷 04','考试卷 05','考试卷 06','考试卷 07','考试卷 08','考试卷 09','考试卷 10','考试卷 11','考试卷 12','考试卷 13','考试卷 14']},
     {id:'mainstream',name:'主流思路专项训练',match:name=>name.includes('专项试卷'),numbered:true},
   ];
